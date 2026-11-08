@@ -126,6 +126,7 @@ describe("analysis-linked uploads", () => {
 				dataExport: true,
 				liveSessions: true,
 				repositoryEvidenceImages: true,
+				sessionInventory: true,
 				transcriptSlimming: true,
 			},
 		});

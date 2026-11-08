@@ -54,7 +54,7 @@ const context = { userId: "u", workspace: { id: "w", slug: "w" }, authSession: {
 // The history procedures as the API runs them, over an in-memory log.
 const log = { store: createMemoryAnalysisStore(), embedder: createLocalEmbedder(), now: () => new Date() };
 const viewer = { workspaceId: "w", userId: "u", isAdmin: false, restrictResults: false, onlyMember: null };
-const client = { analysis: { history: {
+const client = { analysis: { coverage: async () => ({ line: "coverage: stub" }), history: {
 	save: (input) => service.saveAnalysis(log, viewer, input),
 	share: (input) => service.shareAnalysis(log, viewer, input.analysis, input.shared),
 	get: (input) => service.getAnalysisTree(log, viewer, input.analysis),
@@ -712,7 +712,7 @@ test("analysis tools hide drafts, publish once, refuse a second save with a plai
 	});
 	const report = `Open in Opaline: https://opaline.so/w/reports/${id}`;
 	expect(flow.save).toEqual({
-		result: `saved analysis=${id} status=finished\n${report}`,
+		result: `saved analysis=${id} status=finished\n${report}\ncoverage: stub`,
 	});
 	expect(flow.share).toEqual({
 		result: `analysis=${id} shared=true\n${report}`,
@@ -726,7 +726,7 @@ test("analysis tools hide drafts, publish once, refuse a second save with a plai
 	);
 	const saved = resultOf(flow.revise);
 	expect(saved).toMatch(
-		/^saved analysis=(a_\S+) status=finished\nOpen in Opaline: https:\/\/opaline\.so\/w\/reports\/\1$/,
+		/^saved analysis=(a_\S+) status=finished\nOpen in Opaline: https:\/\/opaline\.so\/w\/reports\/\1\ncoverage: stub$/,
 	);
 	const revisionId = saved.split(/[= ]/)[2];
 	const prior = resultOf(flow.getPrior);

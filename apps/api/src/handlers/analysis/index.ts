@@ -13,6 +13,10 @@ import {
 	createPostgresCheckStore,
 } from "../../services/analysis/checks.js";
 import { analysisLimiter } from "../../services/analysis/concurrency.js";
+import {
+	cachedCoverage,
+	resolveCoverageScope,
+} from "../../services/analysis/coverage.js";
 import { findAnalysisWithOwners } from "../../services/analysis/find.service.js";
 import { NEW_DRAFT_RESERVE } from "../../services/analysis/find-text.js";
 import { visibleGitHubRepositories } from "../../services/analysis/github-access.js";
@@ -328,6 +332,24 @@ export function createAnalysisRouter(
 			return trace ? { ...outcome.result, trace } : outcome.result;
 		});
 
+	const coverage = os.analysis.coverage
+		.use(orgMiddleware)
+		.handler(({ input, context }) => {
+			const now = new Date();
+			const scope = resolveCoverageScope(input, now);
+			if ("error" in scope)
+				throw new ORPCError("BAD_REQUEST", { message: scope.error });
+			return cachedCoverage(
+				env.executor,
+				{
+					organizationId: context.organizationId,
+					userId: readableSessionOwner(context.sessionReader),
+				},
+				scope,
+				now,
+			);
+		});
+
 	const findingMirror = {
 		impact:
 			env.findingImpact ??
@@ -470,6 +492,7 @@ export function createAnalysisRouter(
 		schema,
 		sql,
 		search,
+		coverage,
 		...createPeekProcedures(sqlEnv),
 		...createMeasureProcedures({
 			executor: env.executor,

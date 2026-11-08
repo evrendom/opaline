@@ -1333,6 +1333,47 @@ export const RudelSessionImagesRowSchema = z.object({
 export type RudelSessionImagesRowInput = z.input<typeof RudelSessionImagesRowSchema>
 export type RudelSessionImagesRowOutput = z.output<typeof RudelSessionImagesRowSchema>
 
+export type RudelSessionInventoryRow = {
+  organization_id: string
+  user_id: string
+  row_kind: string
+  source: string
+  session_id: string
+  reported_at: string
+  main_lines: number
+  subagent_lines: number
+  subagent_files: number
+  main_bytes: string
+  subagent_bytes: string
+  modified_at: string
+  started_at: string | null
+  cli_version: string
+  session_count: number
+  omitted_count: number
+}
+
+export const RudelSessionInventoryRowSchema = z.object({
+  organization_id: z.string(),
+  user_id: z.string(),
+  row_kind: z.string(),
+  source: z.string(),
+  session_id: z.string(),
+  reported_at: z.string(),
+  main_lines: z.number(),
+  subagent_lines: z.number(),
+  subagent_files: z.number(),
+  main_bytes: z.string(),
+  subagent_bytes: z.string(),
+  modified_at: z.string(),
+  started_at: z.string().nullable(),
+  cli_version: z.string(),
+  session_count: z.number(),
+  omitted_count: z.number(),
+})
+
+export type RudelSessionInventoryRowInput = z.input<typeof RudelSessionInventoryRowSchema>
+export type RudelSessionInventoryRowOutput = z.output<typeof RudelSessionInventoryRowSchema>
+
 export type RudelSessionLanguageSignalsRow = {
   organization_id: string
   session_date: string

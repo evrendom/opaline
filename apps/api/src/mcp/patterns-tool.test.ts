@@ -20,7 +20,7 @@ const output = (table, drill) => ({
 	rows: table.split("\\n").length - 1, truncated: false, table, notices: ["not evidence"], sessions: [], runs: [],
 	measure: { name: "patterns", status: "approved", hash: "h", from: "2026-10-06", to: "2026-11-03", ...(drill ? { drill } : {}) },
 });
-const client = { analysis: { patterns: {
+const client = { analysis: { coverage: async (input) => { calls.push({ tool: "coverage", input }); return { line: "coverage: stub" }; }, patterns: {
 	list: async (input) => { calls.push({ tool: "list", input }); return output("id | kind | signature\\nfc_0123456789 | failing_call | bun test: error"); },
 	drill: async (input) => { calls.push({ tool: "drill", input }); return output("pattern | session_id\\nfc_0123456789 failing_call: bun test | s1", { id: input.id }); },
 	verify: async (input) => { calls.push({ tool: "verify", input }); return output("id | status\\nfc_0123456789 | improved", { verify: input.id ?? "top" }); },
@@ -90,7 +90,7 @@ test("patterns passes each action only its own inputs and points from the list t
 	expect(text(flow.list).split("\n")[0]).toStartWith(
 		"patterns window=2026-10-06..2026-11-03: sections in order, each ranked by the sessions it hit",
 	);
-	expect(text(flow.list).split("\n").at(-1)).toBe(
+	expect(text(flow.list).split("\n").at(-2)).toBe(
 		"next: patterns action=drill id=fc_0123456789 for its runs and evidence, or opaline pull --pattern fc_0123456789 --repo athena --from 2026-10-06 --to 2026-11-03; then read the examples and write the fix as a diff.",
 	);
 	expect(text(flow.drill)).toStartWith(
@@ -128,5 +128,20 @@ test("digest takes the analysis id every other action takes and says it stores n
 	expect(text(flow.digest).split("\n")).toEqual([
 		"digest window=2026-10-06..2026-11-03",
 		"note: the digest is not stored in an answer draft and starts none, with or without analysis; cite a number by its section and definition, or store the rows behind it with patterns list, drill or sql.",
+		"coverage: stub",
 	]);
+	expect(
+		new Set(
+			calls
+				.filter((call) => call.tool === "coverage")
+				.map((call) => JSON.stringify(call.input)),
+		),
+	).toEqual(
+		new Set([
+			JSON.stringify({
+				scope: { from: "2026-10-06", to: "2026-11-03", repository: "athena" },
+			}),
+			JSON.stringify({ scope: {} }),
+		]),
+	);
 });

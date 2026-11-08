@@ -67,6 +67,7 @@ const TRANSCRIPT_DERIVED = [
 	"weekly_totals",
 	// Findings' cited runs with their measures, by the run's owner.
 	"analysis_finding_runs",
+	"session_inventory",
 ];
 /** Workspace-scoped GitHub facts: deleted with the workspace, not with an account. */
 const WORKSPACE_ONLY = [

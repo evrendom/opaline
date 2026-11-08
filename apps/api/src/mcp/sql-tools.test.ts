@@ -39,6 +39,7 @@ const result = {
 	sessions: [], trace: { analysis: "a_1", step: "s_1", query: "q_1" },
 };
 const client = { analysis: {
+	coverage: async () => ({ line: "coverage: 3 sessions in scope" }),
 	sql: async (input) => {
 		calls.push({ tool: "sql", input });
 		if (input.query.includes("claude_sessions"))
@@ -169,6 +170,7 @@ test("an sql result renders its stored id, the table, what was cut and the not-e
 			"note: not evidence: these rows say where to look, not why. Open the runs with read (session_id, agent_id, and turn_idx as its turn) before naming a cause.",
 			"trace analysis=a_1 step=s_1 query=q_1",
 			'too large to page through here. If the opaline CLI is available, to compute on all of it, run: opaline sql "SELECT 1" --out rows.jsonl',
+			"coverage: 3 sessions in scope",
 		].join("\n"),
 	});
 });

@@ -100,6 +100,7 @@ export type {
 export { RepositorySummarySchema };
 
 import { analysisContract } from "./analysis.js";
+import { analysisCoverageContract } from "./analysis-coverage.js";
 import { analysisHistoryContract } from "./analysis-history.js";
 import { analysisMeasuresContract } from "./analysis-measures.js";
 import { analysisPeekContract } from "./analysis-peek.js";
@@ -427,6 +428,7 @@ import {
 } from "./schemas/analytics.js";
 import { sessionDetailProcedureContracts } from "./session-detail-contract.js";
 
+export * from "./analysis-coverage.js";
 export * from "./analysis-measures.js";
 export * from "./analysis-peek.js";
 export * from "./avatar.js";
@@ -730,6 +732,7 @@ export const CliUploadCapabilitiesSchema = z.object({
 	 */
 	liveSessions: z.literal(true).optional(),
 	dataExport: z.literal(true).optional(),
+	sessionInventory: z.literal(true).optional(),
 });
 
 export const CliUserSchema = z.object({
@@ -761,6 +764,49 @@ export const CliSessionUploadStatusOutputSchema = z.object({
 	organizationId: z.string(),
 	uploadedSessionIds: z.array(z.string()),
 });
+
+export const CLI_SESSION_INVENTORY_MAX_SESSIONS = 20_000;
+const UINT32_MAX = 4_294_967_295;
+
+export const CliSessionInventoryEntrySchema = z.object({
+	sessionId: z.string().min(1).max(200),
+	source: SourceSchema,
+	mainLines: z.number().int().nonnegative().max(UINT32_MAX),
+	subagentLines: z.number().int().nonnegative().max(UINT32_MAX),
+	subagentFiles: z.number().int().nonnegative().max(UINT32_MAX),
+	mainBytes: z.number().int().nonnegative(),
+	subagentBytes: z.number().int().nonnegative(),
+	modifiedAt: z.string().datetime(),
+	startedAt: z.string().datetime().optional(),
+});
+
+export const CliSessionInventoryInputSchema = z.object({
+	organizationId: z.string().min(1).max(200).optional(),
+	cliVersion: z.string().max(200).optional(),
+	omitted: z.number().int().nonnegative().max(UINT32_MAX).optional(),
+	sessions: z
+		.array(CliSessionInventoryEntrySchema)
+		.max(CLI_SESSION_INVENTORY_MAX_SESSIONS)
+		.refine(
+			(sessions) =>
+				new Set(
+					sessions.map((session) => `${session.source}:${session.sessionId}`),
+				).size === sessions.length,
+			{ message: "Sessions must be unique" },
+		),
+});
+
+export const CliSessionInventoryOutputSchema = z.object({
+	organizationId: z.string(),
+	sessions: z.number().int().nonnegative(),
+});
+
+export type CliSessionInventoryEntry = z.infer<
+	typeof CliSessionInventoryEntrySchema
+>;
+export type CliSessionInventoryInput = z.infer<
+	typeof CliSessionInventoryInputSchema
+>;
 
 export const OrganizationSchema = z.object({
 	id: z.string(),
@@ -1149,6 +1195,7 @@ export const contract = {
 		...runQuestionsAnalysisContract,
 		...analysisMeasuresContract,
 		...analysisPeekContract,
+		...analysisCoverageContract,
 		history: analysisHistoryContract,
 	},
 	billing: {
@@ -1239,6 +1286,9 @@ export const contract = {
 		sessionUploadStatus: oc
 			.input(CliSessionUploadStatusInputSchema)
 			.output(CliSessionUploadStatusOutputSchema),
+		sessionInventory: oc
+			.input(CliSessionInventoryInputSchema)
+			.output(CliSessionInventoryOutputSchema),
 		data: cliDataContract,
 	},
 	listMyOrganizations: oc.output(z.array(OrganizationSchema)),

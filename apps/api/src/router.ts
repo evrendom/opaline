@@ -243,6 +243,7 @@ import {
 	RepositoryEvidenceRepositoryBindingError,
 	resolveTrustedRepositoryIdentity,
 } from "./services/repository-evidence-repository-binding.service.js";
+import { recordSessionInventory } from "./services/session-inventory.service.js";
 import {
 	persistSessionLanguageSignals,
 	persistSessionLanguageSignalsBestEffort,
@@ -419,6 +420,7 @@ const cliAuthStatus = os.cli.authStatus
 				transcriptSlimming: true as const,
 				repositoryEvidenceImages: true as const,
 				dataExport: true as const,
+				sessionInventory: true as const,
 				...(isLiveSessionsEnabled() ? { liveSessions: true as const } : {}),
 			},
 		};
@@ -1566,6 +1568,27 @@ const cliSessionUploadStatus = os.cli.sessionUploadStatus
 		return { organizationId, uploadedSessionIds };
 	});
 
+const cliSessionInventory = os.cli.sessionInventory
+	.use(ingestAuthMiddleware)
+	.handler(async ({ input, context }) => {
+		const organizationId = await resolveIngestOrganizationId(
+			input.organizationId ?? getActiveOrganizationId(context.session),
+			context.user.id,
+		);
+		const owner = { organizationId, userId: context.user.id };
+		const sessions = await recordSessionInventory(
+			getClickhouse(),
+			owner,
+			input,
+			{
+				reportedAt: new Date(),
+				assertWritable: () =>
+					assertNoClickHousePurgeTombstone(owner, { database: sqlClient }),
+			},
+		);
+		return { organizationId, sessions };
+	});
+
 const ingestSessionHandler = os.ingestSession
 	.use(ingestAuthMiddleware)
 	.handler(async ({ input: requested, context, errors, signal }) => {
@@ -2596,6 +2619,7 @@ export const router: Router<typeof contract, AppContext> = os.router({
 		setupStatus: cliSetupStatus,
 		updateStatus: cliUpdateStatus,
 		sessionUploadStatus: cliSessionUploadStatus,
+		sessionInventory: cliSessionInventory,
 		reportUploadFailures: cliReportUploadFailures,
 		data: createCliDataRouter(),
 	},

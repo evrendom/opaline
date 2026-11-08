@@ -52,7 +52,7 @@ const header = { from: "2026-10-06", to: "2026-11-03", sessionsInScope: 3, index
 const find = (cursor) => async () => ({ source: "git", header: cursor ? { ...header, cursor } : header, events: [] });
 const sql = (truncated) => async (input) => ({ id: "sr_1", title: "t", query: input.query, columns: ["n"], rows: 1, truncated, table: "n\\n1", notices: [], sessions: [], runs: [] });
 const measure = async () => ({ id: "sr_m", title: "t", query: "q", columns: ["n"], rows: 1, truncated: true, table: "n\\n1", notices: [], sessions: [], runs: [], measure: { name: "time_lost_by_cause", status: "approved", hash: "h", from: "2026-10-06", to: "2026-11-03" } });
-const client = (cursor, truncated) => ({ analysis: { find: find(cursor), sql: sql(truncated), measures: { run: measure }, read: async () => ({ reads: [] }), run: async () => ({ id: "r", phaseRule: 1, truncated: false, text: "run" }) } });
+const client = (cursor, truncated) => ({ analysis: { coverage: async () => ({ line: "coverage: stub" }), find: find(cursor), sql: sql(truncated), measures: { run: measure }, read: async () => ({ reads: [] }), run: async () => ({ id: "r", phaseRule: 1, truncated: false, text: "run" }) } });
 const outcome = (promise) => promise.then((result) => ({ result: String(result) }), (error) => ({ error: error.message }));
 const git = { source: "git", from: "2026-10-06", to: "2026-11-03" };
 const query = "SELECT count() AS n FROM runs";
@@ -113,11 +113,11 @@ test("a find with more pages names the pull of its window and repository just be
 
 test("a cut sql result names the same query written to a file, and a cut measure the pull of its window", async () => {
 	const flow = await loaded;
-	expect(text(flow.sqlCut).split("\n").at(-1)).toBe(
+	expect(text(flow.sqlCut).split("\n").at(-2)).toBe(
 		`${LEAD}opaline sql "SELECT count() AS n FROM runs" --out rows.jsonl`,
 	);
 	expect(text(flow.sqlWhole)).not.toContain("opaline sql");
-	expect(text(flow.measuresCut).split("\n").at(-1)).toBe(
+	expect(text(flow.measuresCut).split("\n").at(-2)).toBe(
 		`${LEAD}opaline pull --repo athena --from 2026-10-06 --to 2026-11-03`,
 	);
 });

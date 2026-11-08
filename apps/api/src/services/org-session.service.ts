@@ -9,6 +9,7 @@ import { REPOSITORY_EVIDENCE_INDEX_TABLE } from "@rudel/ch-schema/repository-evi
 import { RUN_QUESTION_ANSWERS_TABLE } from "@rudel/ch-schema/run-question-answers";
 import { SESSION_CONTEXT_SNAPSHOTS_TABLE } from "@rudel/ch-schema/session-context-snapshots";
 import { SESSION_IMAGES_TABLE } from "@rudel/ch-schema/session-images";
+import { SESSION_INVENTORY_TABLE } from "@rudel/ch-schema/session-inventory";
 import { SESSION_SAVED_OUTPUTS_TABLE } from "@rudel/ch-schema/session-saved-outputs";
 import { WEEKLY_TOTALS_TABLE } from "@rudel/ch-schema/weekly-totals";
 import {
@@ -278,6 +279,7 @@ export function getClickHouseSessionPurgePlans(
 		// account wrote or whose deletion it causes go in purgeFindingImpact.
 		{ column, table: FINDING_RUNS_TABLE },
 		{ column, table: MCP_TOOL_CALLS_TABLE },
+		{ column, table: SESSION_INVENTORY_TABLE },
 	];
 }
 

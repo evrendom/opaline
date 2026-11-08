@@ -61,6 +61,7 @@ import {
 	pullPatternCommand,
 	sqlOutCommand,
 } from "./cli-hint.js";
+import { startCoverage, withCoverage } from "./coverage-line.js";
 import { DASHBOARD_WIDGET_URI, OPALINE_ICON } from "./dashboard-widget.js";
 import {
 	FIND_DESCRIPTION,
@@ -934,16 +935,19 @@ export const MCP_TOOLS: readonly McpTool[] = [
 				workspace: WORKSPACE_DESCRIPTION,
 			}),
 			run: async (client, { workspace: _workspace, ...args }, context) => {
-				const output = await client.analysis.sql(
-					parseMcpInput(AnalysisSqlInputSchema, args),
-				);
+				const input = parseMcpInput(AnalysisSqlInputSchema, args);
+				const coverage = startCoverage(client);
+				const output = await client.analysis.sql(input);
 				const text = withUrlLine(
 					renderSql(output),
 					sessionsUrl(context.workspace.slug),
 				);
-				return output.truncated
-					? `${text}\n${cliHint(sqlOutCommand(output.query))}`
-					: text;
+				return withCoverage(
+					output.truncated
+						? `${text}\n${cliHint(sqlOutCommand(output.query))}`
+						: text,
+					coverage,
+				);
 			},
 		},
 		sqlPeek,
@@ -1004,13 +1008,19 @@ export const MCP_TOOLS: readonly McpTool[] = [
 						await client.analysis.measures.describe({ name }),
 					);
 				const { action: _action, ...rest } = input;
-				const output = await client.analysis.measures.run(
-					parseMcpInput(MeasuresRunInputSchema, { ...rest, name }),
-				);
+				const runInput = parseMcpInput(MeasuresRunInputSchema, {
+					...rest,
+					name,
+				});
+				const coverage = startCoverage(client, runInput);
+				const output = await client.analysis.measures.run(runInput);
 				const text = renderMeasureRun(output);
-				return output.truncated && output.measure
-					? `${text}\n${cliHint(pullCommand({ repository: input.repository, ...output.measure }))}`
-					: text;
+				return withCoverage(
+					output.truncated && output.measure
+						? `${text}\n${cliHint(pullCommand({ repository: input.repository, ...output.measure }))}`
+						: text,
+					coverage,
+				);
 			},
 		},
 		measuresPeek,
@@ -1079,11 +1089,12 @@ export const MCP_TOOLS: readonly McpTool[] = [
 				const { action, ...rest } = input;
 				if (action === "digest") {
 					const { analysis: _analysis, ...scope } = rest;
-					const digest = await client.analysis.patterns.digest(
-						parseMcpInput(PatternsDigestInputSchema, scope),
-					);
-					return `${digest.text}\n${DIGEST_NOT_STORED}`;
+					const digestInput = parseMcpInput(PatternsDigestInputSchema, scope);
+					const coverage = startCoverage(client, digestInput);
+					const digest = await client.analysis.patterns.digest(digestInput);
+					return withCoverage(`${digest.text}\n${DIGEST_NOT_STORED}`, coverage);
 				}
+				const coverage = startCoverage(client, input);
 				const output =
 					action === "drill"
 						? await client.analysis.patterns.drill(
@@ -1107,9 +1118,10 @@ export const MCP_TOOLS: readonly McpTool[] = [
 				const text = renderPatterns(action, output, (id) =>
 					pullPatternCommand(id, scope),
 				);
-				return output.truncated
-					? `${text}\n${cliHint(pullCommand(scope))}`
-					: text;
+				return withCoverage(
+					output.truncated ? `${text}\n${cliHint(pullCommand(scope))}` : text,
+					coverage,
+				);
 			},
 		},
 		patternsPeek,
@@ -1408,21 +1420,27 @@ export const MCP_TOOLS: readonly McpTool[] = [
 				"Short reason, with counts or dates, up to 500 characters.",
 			workspace: WORKSPACE_DESCRIPTION,
 		}),
-		run: async (client, { workspace: _workspace, ...args }, { workspace }) =>
-			withLogOffMessage(
+		run: async (client, { workspace: _workspace, ...args }, { workspace }) => {
+			const input = parseMcpInput(AnalysisHistorySaveInputSchema, args);
+			const coverage = startCoverage(client);
+			return withLogOffMessage(
 				client.analysis.history
-					.save(parseMcpInput(AnalysisHistorySaveInputSchema, args))
+					.save(input)
 					.then((saved) =>
-						withReportLink(
-							[
-								`saved analysis=${saved.analysis} status=${saved.status}`,
-								...(saved.warnings ?? []),
-							].join("\n"),
-							workspace.slug,
-							saved.analysis,
+						withCoverage(
+							withReportLink(
+								[
+									`saved analysis=${saved.analysis} status=${saved.status}`,
+									...(saved.warnings ?? []),
+								].join("\n"),
+								workspace.slug,
+								saved.analysis,
+							),
+							coverage,
 						),
 					),
-			),
+			);
+		},
 	},
 	{
 		name: "share_answer",

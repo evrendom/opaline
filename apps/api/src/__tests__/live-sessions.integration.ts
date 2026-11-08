@@ -746,6 +746,7 @@ describe("live session switches", () => {
 				analysisLinkedUploads: true,
 				dataExport: true,
 				repositoryEvidenceImages: true,
+				sessionInventory: true,
 				transcriptSlimming: true,
 			});
 			await expect(owner.liveSession.append(request)).rejects.toMatchObject(

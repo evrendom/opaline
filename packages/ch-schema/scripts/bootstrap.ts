@@ -95,6 +95,7 @@ const FORWARD_SCRIPTS = new Map([
 		"20261107120000_session_context_snapshots.sql",
 		"migrate-session-context-snapshots.ts",
 	],
+	["20261107120000_session_inventory.sql", "migrate-session-inventory.ts"],
 ]);
 
 interface BootstrapMigration {
