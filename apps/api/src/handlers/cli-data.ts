@@ -14,7 +14,7 @@ import {
 } from "../services/analysis/github-access.js";
 import { withCallQuota } from "../services/analysis/sql-gateway.js";
 import {
-	createPostgresSqlQuota,
+	createSqlQuota,
 	type SqlQuota,
 } from "../services/analysis/sql-results.js";
 import { pullPlan } from "../services/cli-data/pull-plan.js";
@@ -49,7 +49,7 @@ export interface CliDataRouterEnv extends Omit<CliDataEnv, "quota"> {
 
 export function defaultCliDataEnv(): CliDataRouterEnv {
 	const executor = getClickhouse();
-	const quota = createPostgresSqlQuota(sqlClient);
+	const quota = createSqlQuota(sqlClient);
 	const limiter: AgentQueryLimiter = createAgentQueryLimiter(
 		createPostgresAgentQuerySlots(sqlClient),
 	);

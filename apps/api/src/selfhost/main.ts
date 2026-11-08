@@ -82,6 +82,9 @@ async function main(): Promise<void> {
 	status(
 		`listening on ${config.host}:${server.port}; jobs: ${jobs.jobs.join(", ")}${config.webDir ? `; web: ${config.webDir}` : "; no OPALINE_WEB_DIR, API only"}`,
 	);
+	status(
+		`sign-up: ${config.openSignup ? "open to anyone who reaches the server" : "invite only"}; sql quota: ${config.sqlQuotaPerHour === null ? "off" : `${config.sqlQuotaPerHour} calls per workspace per hour`}`,
+	);
 	process.stdout.write(`ready ${config.appUrl}\n`);
 
 	let stopping = false;

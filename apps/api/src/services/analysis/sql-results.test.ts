@@ -1,7 +1,11 @@
 import { expect, test } from "bun:test";
+import type postgres from "postgres";
 import {
 	createMemorySqlResultStore,
+	createSqlQuota,
 	openSqlResult,
+	readSqlQuotaLimits,
+	SQL_QUOTA,
 	type SqlResultRecord,
 } from "./sql-results.js";
 
@@ -89,4 +93,41 @@ test("nobody but its author opens a result, in no other workspace", async () => 
 	await expect(
 		openSqlResult(results, author, "sr_missing", days(1)),
 	).rejects.toThrow("No sql result sr_missing of yours");
+});
+
+test("the SQL quota is 120 calls an hour, off on a self-hosted server unless OPALINE_SQL_QUOTA_PER_HOUR sets one", async () => {
+	expect(readSqlQuotaLimits({})).toBe(SQL_QUOTA);
+	expect(readSqlQuotaLimits({ OPALINE_SQL_QUOTA_PER_HOUR: "5" })).toBe(
+		SQL_QUOTA,
+	);
+	expect(readSqlQuotaLimits({ OPALINE_SELF_HOSTED: "1" })).toBeNull();
+	expect(
+		readSqlQuotaLimits({
+			OPALINE_SELF_HOSTED: "1",
+			OPALINE_SQL_QUOTA_PER_HOUR: "600",
+		}),
+	).toEqual({ queries: 600, windowMs: 3_600_000 });
+	expect(
+		readSqlQuotaLimits({
+			OPALINE_SELF_HOSTED: "1",
+			OPALINE_SQL_QUOTA_PER_HOUR: "lots",
+		}),
+	).toBe(SQL_QUOTA);
+
+	const reached: string[] = [];
+	const sql = ((strings: TemplateStringsArray) => {
+		reached.push(strings.join("?"));
+		return Promise.resolve([{ query_count: 2, window_started_at: new Date() }]);
+	}) as unknown as postgres.Sql;
+	const off = createSqlQuota(sql, { OPALINE_SELF_HOSTED: "1" });
+	for (let call = 0; call < 500; call++)
+		expect(await off.take("w")).toEqual({ allowed: true });
+	expect(reached).toEqual([]);
+	const one = createSqlQuota(sql, {
+		OPALINE_SELF_HOSTED: "1",
+		OPALINE_SQL_QUOTA_PER_HOUR: "1",
+	});
+	expect(one.queries).toBe(1);
+	expect((await one.take("w")).allowed).toBe(false);
+	expect(createSqlQuota(sql, {}).queries).toBe(120);
 });

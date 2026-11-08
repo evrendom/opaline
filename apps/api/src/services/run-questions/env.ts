@@ -6,7 +6,7 @@ import {
 	createPostgresAgentQuerySlots,
 } from "../analysis/agent-query-slots.js";
 import { visibleGitHubRepositories } from "../analysis/github-access.js";
-import { createPostgresSqlQuota } from "../analysis/sql-results.js";
+import { createSqlQuota } from "../analysis/sql-results.js";
 import { workspaceFeatureEnabled } from "../workspace-features.js";
 import type { AgentRunsEnv } from "./agent-runs.js";
 import { findRunQuestions, listRunQuestions } from "./catalogue.js";
@@ -26,7 +26,7 @@ export function runQuestionsEnv(): RunQuestionsEnv {
 		provider: providers.default,
 		providers: providers.byName,
 		mayAnswer: readRunQuestionWorkspaces(),
-		sqlQuota: createPostgresSqlQuota(sqlClient),
+		sqlQuota: createSqlQuota(sqlClient),
 		limiter: createAgentQueryLimiter(createPostgresAgentQuerySlots(sqlClient)),
 		githubRepositories: visibleGitHubRepositories,
 		estimateKey: estimateKey(process.env.BETTER_AUTH_SECRET),
