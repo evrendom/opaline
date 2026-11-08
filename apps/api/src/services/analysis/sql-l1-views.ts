@@ -1,4 +1,5 @@
 import { TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX } from "@rudel/api-routes/transcript-records";
+import { CALL_FACTS_TABLE } from "@rudel/ch-schema/call-facts";
 import {
 	RUN_SETUP_COLUMNS,
 	RUN_SETUP_TABLE,
@@ -513,6 +514,7 @@ const SETUP_FILE_TRAPS: Readonly<Record<string, readonly string[]>> = {
 	],
 	version: [
 		"Two runs had the same version only when the text was identical; a different version can differ by one character. Read both before naming a change.",
+		"NULL for read_by_agent rows: which version the agent read is not recorded.",
 	],
 	uncommitted: [
 		"NULL is unknown, not committed: Codex records no git status, and a status Claude Code cut may miss files.",
@@ -526,6 +528,11 @@ const SETUP_FILE_TRAPS: Readonly<Record<string, readonly string[]>> = {
 	kind: [
 		"skill_body for Codex is a whole SKILL.md the agent printed with cat; partial reads (sed, head) and reads of several files at once are not received setup.",
 	],
+	chars: ["NULL for read_by_agent rows."],
+};
+const READ_TYPES: Readonly<Record<string, string>> = {
+	version: "Nullable(String)",
+	chars: "Nullable(UInt32)",
 };
 const SETUP_FILE_COLUMNS = [
 	"run_id",
@@ -566,11 +573,22 @@ function setupFilesView(owner: Owner): SqlView {
 		const time = name === "run_started_at" || name === "received_at";
 		return column(
 			name === "run_started_at" ? "started_at" : name,
-			found.type,
+			READ_TYPES[name] ?? found.type,
 			found.comment,
 			[...(SETUP_FILE_TRAPS[name] ?? []), ...(time ? [UTC] : [])],
 		);
-	});
+	}).concat([
+		column(
+			"read_by_agent",
+			"UInt8",
+			"1 when the agent read the file itself (a Read call, cat, head, sed and the like) in any stream: CLAUDE.md, CLAUDE.local.md, AGENTS.md, AGENTS.override.md, SKILL.md and .claude/rules files, from the call's files_read; 0 for setup the harness loaded.",
+			[
+				"Did an agent see a file: rows of it with either value. A read row is the call that read it: received_at and received_record are the call's, recorded_path is the path read, carried and compacted_since are false.",
+				"A read before the stream's first prompt has turn_idx 0, an empty run_id and started_at the call's time.",
+				"A read through a variable, a glob or a script is not seen (calls.files_read). A partial read (head, an offset) counts as a read.",
+			],
+		),
+	]);
 	return {
 		name: "setup_files",
 		grain:
@@ -581,18 +599,44 @@ function setupFilesView(owner: Owner): SqlView {
 			"Received setup is what the transcript recorded, never what was on disk: a file the agent had but its transcript does not record is not here, and a run whose session was built before received setup was read has no rows (runs.coverage_gaps has received_setup). Say unknown for those, never none.",
 			"The text is not a column: open it with run(run_id, expand=['s<n>']) after run(run_id, sections=['setup']) lists the run's setup with its s-ids.",
 			"Keep the time range as started_at >= … in the WHERE: a run with many setup files has a row for each.",
+			"Instruction and skill files an agent read itself are rows too (read_by_agent = 1), from every stream: filter read_by_agent = 0 for what the harness loaded.",
 		],
 		columns,
 		recent: { column: "started_at", rows: "run setup files" },
 		sql(memberOnly, window = {}) {
 			const scope = cohortOwner(owner(memberOnly), window);
 			const table = getSafeClickHouseTable(RUN_SETUP_TABLE);
-			return `SELECT ${SETUP_FILE_COLUMNS.map((name) =>
+			const runIndex = getSafeClickHouseTable(RUN_INDEX_TABLE);
+			const received = SETUP_FILE_COLUMNS.map((name) =>
 				name === "run_started_at" ? "run_started_at AS started_at" : name,
-			).join(", ")}
+			).join(", ");
+			const parts = "extractGroups(setup_file, '^([^:]*):([^:]*):(.*)$')";
+			const read: Readonly<Record<string, string>> = {
+				run_started_at: "ifNull(run_started_at, started_at) AS started_at",
+				kind: `toLowCardinality(multiIf(match(path, '(^|/)SKILL[.]md$'), 'skill_body', match(path, '(^|/)AGENTS[^/]*[.]md$'), 'agents_md', 'instructions')) AS kind`,
+				scope: `toLowCardinality(${parts}[1]) AS scope`,
+				owner: `${parts}[2] AS owner`,
+				path: `${parts}[3] AS path`,
+				version: "CAST(NULL, 'Nullable(String)') AS version",
+				version_name: "'' AS version_name",
+				uncommitted: "CAST(NULL, 'Nullable(Bool)') AS uncommitted",
+				carried: "false AS carried",
+				compacted_since: "false AS compacted_since",
+				chars: "CAST(NULL, 'Nullable(UInt32)') AS chars",
+				recorded_path: "recorded_path",
+				received_at: "started_at AS received_at",
+				received_record: "record_idx AS received_record",
+			};
+			return `SELECT ${received}, 0 AS read_by_agent
 				FROM ${table} FINAL
 				WHERE ${scope}
-					AND ${committedBuildSql(getSafeClickHouseTable(RUN_INDEX_TABLE), scope, ["user_id", "session_id"])}`;
+					AND ${committedBuildSql(runIndex, scope, ["user_id", "session_id"])}
+				UNION ALL
+				SELECT ${SETUP_FILE_COLUMNS.map((name) => read[name] ?? name).join(", ")}, 1 AS read_by_agent
+				FROM ${getSafeClickHouseTable(CALL_FACTS_TABLE)} FINAL
+				ARRAY JOIN setup_files_read AS setup_file, setup_paths_read AS recorded_path
+				WHERE ${scope} AND notEmpty(setup_files_read)
+					AND ${committedBuildSql(runIndex, scope, ["user_id", "session_id"])}`;
 		},
 	};
 }

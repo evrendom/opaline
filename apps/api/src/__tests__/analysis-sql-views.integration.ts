@@ -267,6 +267,7 @@ afterAll(async () => {
 	for (const table of [
 		"rudel.transcript_records",
 		"rudel.run_index",
+		"rudel.call_facts",
 		"rudel.session_git_observations",
 		"rudel.session_analytics",
 		"rudel.l1_edges",
@@ -357,6 +358,65 @@ describe("the calls view", () => {
 			"turn | run_calls | calls | failed | carried",
 			'1 | 2 | 2 | 0 | ["","command"]',
 			'2 | 1 | 1 | 1 | ["command"]',
+		]);
+	});
+});
+
+describe("calls outside runs and files the agent read", () => {
+	test("a call before the first prompt is a row outside every run, and an instruction file the agent read is received setup", async () => {
+		const session = `${RUN}_calls_turn0`;
+		const cwd = "/test/sql-views";
+		const tool = (
+			id: string,
+			name: string,
+			input: object,
+			seconds: number,
+		) => ({
+			type: "assistant",
+			timestamp: at(seconds),
+			cwd,
+			message: {
+				role: "assistant",
+				content: [{ type: "tool_use", id, name, input }],
+			},
+		});
+		const done = (id: string, content: string, seconds: number) => ({
+			...result(id, content, false, seconds),
+			cwd,
+		});
+		await ingest(
+			alice,
+			session,
+			jsonl([
+				tool("r0", "Read", { file_path: `${cwd}/AGENTS.md` }, 1),
+				done("r0", "rules", 2),
+				{ ...prompt("go", 5), cwd },
+				tool("b1", "Bash", { command: `cat ${cwd}/CLAUDE.md` }, 6),
+				done("b1", "more rules", 7),
+			]),
+		);
+
+		expect(
+			await sql(
+				teammate,
+				`SELECT turn_idx, run_id = '' AS outside, tool_name, stream_kind, repository, files_read
+				FROM calls WHERE session_id = '${session}' ORDER BY started_at`,
+			),
+		).toEqual([
+			"turn_idx | outside | tool_name | stream_kind | repository | files_read",
+			'0 | 1 | Read | main | github.com/opalinehq/athena | ["/test/sql-views/AGENTS.md"]',
+			'1 | 0 | Bash | main | github.com/opalinehq/athena | ["/test/sql-views/CLAUDE.md"]',
+		]);
+		expect(
+			await sql(
+				teammate,
+				`SELECT turn_idx, kind, setup_file, path, recorded_path, version, read_by_agent, repository
+				FROM setup_files WHERE session_id = '${session}' ORDER BY received_at`,
+			),
+		).toEqual([
+			"turn_idx | kind | setup_file | path | recorded_path | version | read_by_agent | repository",
+			"0 | agents_md | repository:github.com/opalinehq/athena:AGENTS.md | AGENTS.md | /test/sql-views/AGENTS.md | null | 1 | github.com/opalinehq/athena",
+			"1 | instructions | repository:github.com/opalinehq/athena:CLAUDE.md | CLAUDE.md | /test/sql-views/CLAUDE.md | null | 1 | github.com/opalinehq/athena",
 		]);
 	});
 });

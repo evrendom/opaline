@@ -163,9 +163,9 @@ describe("semantic run-index component projections", () => {
 		expect(sql).not.toContain("session_git_observations");
 	});
 
-	test("index 9 (each session's context snapshot after its build; 8 a Codex run's directory from its turn and workdir; 7 runs end at their last activity record, 6 is received setup, OPL-391, 5 requests, 4 the measure facts) with a SQL-and-gates fingerprint", () => {
+	test("index 10 (each build writes its call facts, ADR 0008; 9 each session's context snapshot after its build; 8 a Codex run's directory from its turn and workdir; 7 runs end at their last activity record, 6 is received setup, OPL-391, 5 requests, 4 the measure facts) with a SQL-and-gates fingerprint", () => {
 		const pricingOnly = `${MODEL_RATE_CARD_VERSION}+${createHash("sha256").update(buildPricedUsageEventsCte("")).digest("hex").slice(0, 12)}`;
-		expect(RUN_INDEX_VERSION).toBe(9);
+		expect(RUN_INDEX_VERSION).toBe(10);
 		expect(RUN_INDEX_PRICING_VERSION).toMatch(/\+[a-f0-9]{12}$/u);
 		expect(RUN_INDEX_PRICING_VERSION).not.toBe(pricingOnly);
 	});

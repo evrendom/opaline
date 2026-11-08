@@ -474,7 +474,7 @@ export function buildCommandRecordsStatement(
 	records: readonly CommandRecord[],
 ): ClickHouseStatement {
 	return {
-		query: `SELECT command_from, command_argv0, command_prefix, command_programs, command_prefixes, command_normalized,
+		query: `SELECT command_from, command_text, command_argv0, command_prefix, command_programs, command_prefixes, command_normalized,
 				toString(command_fingerprint) AS command_fingerprint, toString(command_simhash) AS command_simhash
 			FROM (
 				SELECT r.1 AS position, r.2 AS kind, r.3 AS subtype, r.4 AS tool_name, if(r.2 = 'file_change', 'write', '') AS file_op,
@@ -498,6 +498,7 @@ export function buildCommandRecordsStatement(
 
 export interface CommandColumns {
 	command_from: string;
+	command_text: string | null;
 	command_argv0: string | null;
 	command_prefix: string | null;
 	command_programs: string[];

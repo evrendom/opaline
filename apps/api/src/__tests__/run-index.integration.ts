@@ -900,7 +900,7 @@ test("the worker indexes runs literally, keeps them through rebuilds and expiry,
 	// in at most one keyed statement per table.
 	expect(sweep.generationsRetired).toBe(4);
 	expect(sweep.deleteStatements).toBeGreaterThanOrEqual(1);
-	expect(sweep.deleteStatements).toBeLessThanOrEqual(3);
+	expect(sweep.deleteStatements).toBeLessThanOrEqual(4);
 	expect(await generations()).toEqual(["2"]);
 	expect(await snapshotsOf(orphanSession)).toEqual(["2/2"]);
 

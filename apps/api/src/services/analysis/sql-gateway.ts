@@ -31,6 +31,7 @@ import { cell } from "./read-output.js";
 import { limitRefusal, runSplit, splitBudget } from "./refused-split.js";
 import type { MeasureParams } from "./retro-measure-sql.js";
 import { ANALYSIS_QUERY_SETTINGS, query } from "./sql.js";
+import { workspaceHasLegacyCalls } from "./sql-call-facts-view.js";
 import {
 	carriesText,
 	checkParsedSql,
@@ -781,6 +782,8 @@ export interface PreparedAgentStatement {
 	readonly traps?: SqlTraps;
 }
 
+const CALLS_WORD = /\bcalls\b/iu;
+
 export async function prepareAgentStatement(
 	caller: SqlCaller,
 	sql: string,
@@ -793,6 +796,9 @@ export async function prepareAgentStatement(
 > {
 	const memberOnly = readableSessionOwner(caller.reader) !== null;
 	const functions = env.functions ?? [];
+	const legacyCalls = CALLS_WORD.test(`${sql}\n${cohort ?? ""}`)
+		? await workspaceHasLegacyCalls(env.executor, caller.workspaceId)
+		: true;
 	const views = (narrowed: boolean) =>
 		new Map(
 			SQL_VIEWS.map((view) => [
@@ -800,10 +806,11 @@ export async function prepareAgentStatement(
 				{
 					windowColumn: view.windowColumn,
 					statement: (window: SqlWindow) =>
-						view.sql(
-							memberOnly,
-							narrowed ? { ...window, cohort: COHORT } : window,
-						),
+						view.sql(memberOnly, {
+							...window,
+							legacyCalls,
+							...(narrowed ? { cohort: COHORT } : {}),
+						}),
 				},
 			]),
 		);

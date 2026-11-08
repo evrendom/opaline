@@ -346,16 +346,16 @@ test("a run counts who accepted its calls and the prompts a person answered; a v
 		await sql(
 			`SELECT session_id = '${oldSession}' AS old, turn_idx, approvals_by_user, approvals_by_hook, approvals_by_config,
 				permission_prompts, has(unrecorded_facts, 'permission_prompts') AS unknown, rate_limited,
-				rate_limit_max_used_percent, efforts
+				rate_limit_max_used_percent, efforts, model, models
 			FROM runs WHERE session_id IN ('${session}', '${oldSession}') ORDER BY old, turn_idx`,
 		),
 	).toEqual([
-		"old | turn_idx | approvals_by_user | approvals_by_hook | approvals_by_config | permission_prompts | unknown | rate_limited | rate_limit_max_used_percent | efforts",
-		'0 | 1 | 3 | 1 | 2 | 3 | 0 | false | null | ["high","medium"]',
-		'0 | 2 | 0 | 0 | 0 | 0 | 0 | true | null | ["high"]',
+		"old | turn_idx | approvals_by_user | approvals_by_hook | approvals_by_config | permission_prompts | unknown | rate_limited | rate_limit_max_used_percent | efforts | model | models",
+		'0 | 1 | 3 | 1 | 2 | 3 | 0 | false | null | ["high","medium"] | claude-opus-5-5 | ["claude-opus-5-5"]',
+		'0 | 2 | 0 | 0 | 0 | 0 | 0 | true | null | ["high"] | claude-opus-5-5 | ["claude-opus-5-5"]',
 		// Its reply records effort high; the run's one result records no decision.
-		'1 | 1 | null | null | null | null | 1 | false | null | ["high"]',
-		"1 | 2 | 0 | 0 | 0 | 1 | 0 | false | null | []",
+		'1 | 1 | null | null | null | null | 1 | false | null | ["high"] | claude-opus-5-5 | ["claude-opus-5-5"]',
+		'1 | 2 | 0 | 0 | 0 | 1 | 0 | false | null | [] | claude-opus-5-5 | ["claude-opus-5-5"]',
 	]);
 });
 

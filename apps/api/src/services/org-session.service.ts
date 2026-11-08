@@ -1,4 +1,5 @@
 import { getAllAdapters } from "@rudel/agent-adapters";
+import { CALL_FACTS_TABLE } from "@rudel/ch-schema/call-facts";
 import { FINDING_RUNS_TABLE } from "@rudel/ch-schema/finding-runs";
 import { MCP_TOOL_CALLS_TABLE } from "@rudel/ch-schema/mcp-tool-calls";
 import {
@@ -253,6 +254,7 @@ export function getClickHouseSessionPurgePlans(
 		...L1_EDGE_TABLES.map((table) => ({ column, table })),
 		{ column, table: RUN_INDEX_TABLE },
 		{ column, table: RUN_REQUESTS_TABLE },
+		{ column, table: CALL_FACTS_TABLE },
 		// Received setup: each run's setup file versions, and each member's copy
 		// of the texts (written by the transcript-records writer). The follow-up
 		// pass removes texts a write already in flight stored after the first.

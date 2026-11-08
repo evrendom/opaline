@@ -70,8 +70,8 @@ const RECORDED_CWD = `if(startsWith(${componentValue("cwd_components")}, 'file:/
 const CALL_CWD = `if(facts['cwd_components'] != '', ${RECORDED_CWD}, facts['workdir'])`;
 const HAS_CALL_CWD =
 	"(facts['cwd_components'] != '' OR facts['workdir'] != '')";
-const FIRST_CWD = `multiIf(facts['cwd_components'] != '', ${RECORDED_CWD}, facts['workdir'] != '', facts['workdir'], facts['turn_cwd'])`;
-const HAS_FIRST_CWD =
+export const FIRST_CWD = `multiIf(facts['cwd_components'] != '', ${RECORDED_CWD}, facts['workdir'] != '', facts['workdir'], facts['turn_cwd'])`;
+export const HAS_FIRST_CWD =
 	"(facts['cwd_components'] != '' OR facts['workdir'] != '' OR facts['turn_cwd'] != '')";
 const SHELL_CALL = `kind = 'tool_call' AND lower(tool_name) IN (${SHELL_TOOLS.map(lit).join(", ")})`;
 /** A command's text: as stored, or its head when the text was cut. */

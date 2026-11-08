@@ -1,5 +1,6 @@
 import { TupleParam } from "@clickhouse/client-web";
 import { TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX } from "@rudel/api-routes/transcript-records";
+import { CALL_FACTS_TABLE } from "@rudel/ch-schema/call-facts";
 import type {
 	RudelRunIndexRow,
 	RudelRunRequestsRow,
@@ -88,6 +89,12 @@ import {
 	MAX_RETIRED_GENERATIONS_PER_PASS,
 	selectRetiredGenerations,
 } from "../transcript-records-ingest.service.js";
+import {
+	CallTuplesSchema,
+	callFactRows,
+	callFactsCtes,
+	callTuplesSql,
+} from "./call-facts.js";
 import {
 	runNodeId,
 	type SessionIdentity,
@@ -268,8 +275,11 @@ export async function buildRunIndex(input: {
 	);
 	const [facts] = await query(
 		executor,
-		RunIndexSessionFactsSchema,
-		buildRunIndexSessionStatement(scope, committed),
+		RunIndexSessionFactsSchema.extend({ calls: CallTuplesSchema }),
+		buildRunIndexSessionStatement(scope, committed, {
+			ctes: callFactsCtes(),
+			sql: callTuplesSql(),
+		}),
 	);
 	if (!unattributed || !facts)
 		throw new Error("Run index session statements returned no row");
@@ -417,6 +427,19 @@ export async function buildRunIndex(input: {
 			memberId: session.userId,
 		},
 	}).map((row) => setupRow(row, context));
+	const callRows = callFactRows(facts.calls, runRows, requestRows, {
+		organizationId,
+		session,
+		revision: generation.revision,
+		parserVersion: generation.parserVersion,
+		indexVersion: generation.indexVersion,
+		buildRevision: input.buildRevision,
+		builtAt: context.builtAt,
+		sessionDate: context.sessionDate,
+		repository: context.repository,
+		setupRepository: repositoryKey(recorded?.git_remote ?? ""),
+		threadSource: facts.thread_source,
+	});
 	// Each build has its own insert tokens: a generation deleted by a fence
 	// and rebuilt by a later claim is never dropped as a duplicate.
 	const token = `run-index:${organizationId}:${sessionScopeId(session)}:${generation.revision}:${generation.parserVersion}:${generation.indexVersion}:${input.buildRevision}`;
@@ -447,6 +470,15 @@ export async function buildRunIndex(input: {
 			values: setupRows,
 			asyncInsert: false,
 			deduplicationToken: `${token}:setup`,
+		});
+	}
+	if (callRows.length > 0) {
+		await input.beforeWrite();
+		await executor.insert({
+			table: CALL_FACTS_TABLE,
+			values: callRows,
+			asyncInsert: false,
+			deduplicationToken: `${token}:calls`,
 		});
 	}
 	await input.beforeWrite();
@@ -1301,18 +1333,27 @@ export async function retireRunIndexSnapshots(
 			]);
 	}
 	result.snapshots = keys.length;
-	const byTable = [RUN_SETUP_TABLE, RUN_REQUESTS_TABLE, RUN_INDEX_TABLE].map(
-		(table) =>
-			buildKeyedDeleteOperations({
-				table,
-				organizationId,
-				columns: RUN_INDEX_SNAPSHOT_KEY_COLUMNS,
-				keys,
-			}),
+	const byTable = [
+		CALL_FACTS_TABLE,
+		RUN_SETUP_TABLE,
+		RUN_REQUESTS_TABLE,
+		RUN_INDEX_TABLE,
+	].map((table) =>
+		buildKeyedDeleteOperations({
+			table,
+			organizationId,
+			columns: RUN_INDEX_SNAPSHOT_KEY_COLUMNS,
+			keys,
+		}),
 	);
-	const [setup = [], requests = [], index = []] = byTable;
+	const [calls = [], setup = [], requests = [], index = []] = byTable;
 	for (let chunk = 0; chunk < index.length; chunk++) {
-		const operations = [setup[chunk], requests[chunk], index[chunk]].filter(
+		const operations = [
+			calls[chunk],
+			setup[chunk],
+			requests[chunk],
+			index[chunk],
+		].filter(
 			(operation): operation is DeleteOperation => operation !== undefined,
 		);
 		const outcomes = await runRetirementDeletes(

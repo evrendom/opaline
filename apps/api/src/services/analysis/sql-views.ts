@@ -19,13 +19,13 @@ import {
 	type RunIndexColumnGate,
 } from "./run-index-columns.js";
 import { committedBuildSql } from "./run-index-reader.js";
+import { callsViewSql } from "./sql-call-facts-view.js";
 import { eventsView } from "./sql-event-views.js";
 import type { SqlWindow } from "./sql-guard.js";
 import { l1SqlViews } from "./sql-l1-views.js";
 import {
 	CALL_COLUMNS,
 	type CommittedRuns,
-	callsSql,
 	cohortOwner,
 	measuredRunsSql,
 	RUN_MEASURE_COLUMNS,
@@ -124,6 +124,12 @@ const COLUMN_TRAPS: Readonly<Record<string, string>> = {
 		"NULL means unknown, not the session's repository: count runs per repository WHERE cwd_repository IS NOT NULL, and say how many runs are unknown. A directory below one with evidence is taken to be the same repository (a nested repository or a link out of it is not told apart).",
 	mcp_unavailable:
 		"Empty is not proof every server worked: Codex records no server state (unrecorded_facts names mcp_unavailable), and a stream may record none. A server listed here can still connect later in the run; the run's mcp_servers says which servers its calls used.",
+	model:
+		"The run's first model; a run can switch models (a fallback, /model). For what one call or response used, read calls.model or requests.model.",
+	models:
+		"Every model that answered in the run. Filter has(models, '…'): models = ['…'] also drops runs where another model answered once. Builds before run index 10 can list the harness placeholder <synthetic>.",
+	efforts:
+		"Every effort the run used. Filter has(efforts, '…'), not efforts = ['…'].",
 	cwd_repository_basis:
 		"session_branch needs the upload's branch on a record at the session's own directory: a session whose folder has another branch (a coordinator folder) has none there.",
 };
@@ -153,6 +159,8 @@ const CALL_RUN_COLUMNS = [
 	"turn_idx",
 	"source",
 	"unrecorded_facts",
+	"model",
+	"started_at",
 ];
 
 /** The committed run rows a view may read: the caller's workspace, and only their own sessions when `memberOnly`. */
@@ -198,25 +206,33 @@ const RUNS: SqlView = {
 const CALLS: SqlView = {
 	name: "calls",
 	grain:
-		"One row per tool call of a run (every tool, with its command identity, its own time and its results reduced to one), from each session's committed build; joins runs by run_id. A Codex code-mode script is a call (call_level script) and so is each call it ran (call_level inner, parent_call_id the script).",
+		"One row per tool call of every stream (main, subagent, Codex thread), with its command identity, its own time and its results reduced to one, written once when its session was indexed; joins runs by run_id. A Codex code-mode script is a call (call_level script) and so is each call it ran (call_level inner, parent_call_id the script). Calls before a stream's first prompt are rows too (turn_idx 0, run_id empty).",
 	traps: [
 		"Older transcript generations, repeated copies and the calls a forked Codex session copied from its parent are already left out, but a Codex script and the commands it ran are rows of their own, and the script's command text names those commands again. Count commands (and search command text) over call_level != 'script'. Count the calls the agent made, and search output text, over call_level != 'inner': every such call holds its whole output, while an inner call has its own output only where the transcript recorded it (Codex 0.153 and later), so an output search over inner calls misses older sessions. Failures are on one row each (see failed), so countIf(failed = 1) needs no level filter.",
+		"Every stream is here: most reads of instructions and skills happen in subagents. Filter stream_kind = 'main' (or agent_id = '') only when the question is about the main transcript, and say so.",
 		"A group of calls has two times: its own calls (sum(call_minutes)) and the runs that contain it, each run once (sum(active_minutes) FROM runs WHERE run_id IN (SELECT run_id FROM calls WHERE ...)). Neither is time lost to it until those runs are read.",
 		"Only sessions you may read in this workspace (every member's, unless the workspace keeps members to their own). The server adds the workspace; never filter by it.",
-		"Only the sessions runs holds: a session is here once the worker indexed it (minutes after upload).",
+		"Only the sessions runs holds: a session is here once the worker indexed it (minutes after upload). A session indexed before call facts were written (run index 8 or older) is computed from its transcript records until the worker rebuilds it, with the same columns, more slowly.",
 		"Times are UTC.",
-		"Keep the time range as started_at >= … (and started_at < …) in the WHERE of the query that reads calls, joined to the rest with AND: the server then reads only the sessions with calls in it. Without it, or behind OR, every session of the workspace is read and a long history can pass the memory or time limit. The command columns read the stored text: about a week of a busy workspace fits, a month may not; narrow by member or session first.",
+		"Keep the time range as started_at >= … (and started_at < …) in the WHERE of the query that reads calls, joined to the rest with AND: the server then reads only the calls in it. output is the call's result text, read from the transcript only when a query names it: select it for the calls you read, not across a long window.",
 	],
-	columns: CALL_COLUMNS,
 	recent: { column: "started_at", rows: "calls made" },
 	windowColumn: "started_at",
-	sql(memberOnly, window) {
-		const runs = committedRuns(memberOnly, window);
-		return callsSql(
-			runs,
-			(scoped) => measuredRunsSql(scoped, CALL_RUN_COLUMNS),
+	columns: CALL_COLUMNS,
+	sql(memberOnly, window = {}) {
+		const table = getSafeClickHouseTable(RUN_INDEX_TABLE);
+		return callsViewSql(
+			{
+				owner: cohortOwner(memberOwner(memberOnly), window),
+				runs: (owner) => ({
+					table,
+					owner,
+					committed: committedBuildSql(table, owner, ["user_id", "session_id"]),
+				}),
+				measuredRuns: (scoped) => measuredRunsSql(scoped, CALL_RUN_COLUMNS),
+				parentOwner: memberOwner(memberOnly),
+			},
 			window,
-			memberOwner(memberOnly),
 		);
 	},
 };
@@ -350,6 +366,49 @@ const RUN_ANSWERS: SqlView = {
 	},
 };
 
+const REPOSITORY_COLUMN: SqlViewColumn = {
+	name: "repository",
+	type: "String",
+	meaning:
+		"The repository of the row's session as uploaded (runs.repository), the same on every row of the session; empty where the row has no session (GitHub edges) or its session has no committed run index build.",
+	traps: [
+		"Filter repository here instead of joining runs only to filter by it. One value per session: runs.cwd_repository says which repository a run worked in.",
+	],
+};
+
+function withRepository(view: SqlView): SqlView {
+	if (view.columns.some((column) => column.name === REPOSITORY_COLUMN.name))
+		return view;
+	return {
+		...view,
+		columns: [...view.columns, REPOSITORY_COLUMN],
+		sql(memberOnly, window) {
+			const table = getSafeClickHouseTable(RUN_INDEX_TABLE);
+			const owner = memberOwner(memberOnly);
+			return `SELECT v.*, s.repository AS repository
+				FROM (${view.sql(memberOnly, window)}) AS v
+				LEFT ANY JOIN (
+					SELECT user_id, session_id, repository FROM ${table} FINAL
+					WHERE ${owner} AND row_kind = 'receipt'
+						AND ${committedBuildSql(table, owner, ["user_id", "session_id"])}
+				) AS s ON s.user_id = v.user_id AND s.session_id = v.session_id`;
+		},
+	};
+}
+
+const SESSION_VIEWS = new Set([
+	"events",
+	"prompts",
+	"git_events",
+	"edges",
+	"setup_files",
+	"finding_runs",
+	"run_answers",
+	"requests",
+	"session_activity",
+	"model_text",
+]);
+
 export const SQL_VIEWS: readonly SqlView[] = [
 	RUNS,
 	CALLS,
@@ -360,7 +419,7 @@ export const SQL_VIEWS: readonly SqlView[] = [
 	setupSnapshotsView(SQL_SCOPE_PARAMS),
 	FINDING_RUNS,
 	RUN_ANSWERS,
-];
+].map((view) => (SESSION_VIEWS.has(view.name) ? withRepository(view) : view));
 
 export function findSqlView(name: string): SqlView | undefined {
 	return SQL_VIEWS.find((view) => view.name === name.toLowerCase());

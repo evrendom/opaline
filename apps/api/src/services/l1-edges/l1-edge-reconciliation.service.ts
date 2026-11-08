@@ -1,4 +1,5 @@
 import { getLogger } from "@logtape/logtape";
+import { CALL_FACTS_TABLE } from "@rudel/ch-schema/call-facts";
 import { RUN_SETUP_TABLE } from "@rudel/ch-schema/received-setup";
 import type postgres from "postgres";
 import type { ClickHouseExecutor } from "../../clickhouse.js";
@@ -312,6 +313,7 @@ async function deleteSessionEdges(
 		RUN_INDEX_TABLE,
 		RUN_REQUESTS_TABLE,
 		RUN_SETUP_TABLE,
+		CALL_FACTS_TABLE,
 	])
 		await executor.execute({
 			clickhouse_settings: { lightweight_deletes_sync: "3" },

@@ -55,6 +55,7 @@ Each purge runs inline, is retried by the purge worker, and runs a second pass a
 | ClickHouse `transcript_records` | every record, with text | yes | yes |
 | ClickHouse `run_index` | runs and receipts, with free text | yes | yes |
 | ClickHouse `run_requests` | each run's requests (calls, time, usage) and the head of their last assistant text; kept until a deletion request like the run index | yes | yes |
+| ClickHouse `call_facts` | each call of a run index build, every stream: tool, command text and identity, files read and changed, error line and outcome (not the output text); kept until a deletion request like the run index | yes | yes |
 | ClickHouse `run_setup` | each run's received setup: the setup file versions it had (setup file, content hash, recorded path, whether uncommitted), kept until a deletion request like the run index | yes | yes |
 | ClickHouse `setup_texts` | received setup texts (instruction files, skill bodies, MCP instructions, system prompts), each distinct text once per member; texts an upload stored while the first pass ran are removed by the second | yes, by `user_id` | yes, by `organization_id` |
 | ClickHouse `weekly_totals` | sums of the run index per member, agent and week (nightly snapshots); a refresh that was already running when the purge deleted the run index is removed by the second pass | yes | yes |

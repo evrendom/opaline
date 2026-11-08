@@ -59,6 +59,7 @@ export interface SqlWindow {
 	readonly to?: string;
 	readonly cohort?: string;
 	readonly words?: ReadonlySet<string>;
+	readonly legacyCalls?: boolean;
 }
 
 /** A view as the guard puts it in place of its name. */

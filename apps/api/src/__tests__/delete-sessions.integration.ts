@@ -64,6 +64,7 @@ async function countSkillRows(
 			"rudel.run_index",
 			"rudel.weekly_totals",
 			"rudel.run_setup",
+			"rudel.call_facts",
 			"rudel.setup_texts",
 			"rudel.session_saved_outputs",
 			"rudel.session_images",
@@ -320,6 +321,30 @@ async function ingestSkillRows(
 		],
 	});
 	await ch.insert({
+		table: "rudel.call_facts",
+		values: [
+			{
+				organization_id: targetOrgId,
+				user_id: userId,
+				session_id: sessionId,
+				revision: "1",
+				parser_version: 15,
+				index_version: 10,
+				build_revision: "1",
+				agent_id: "",
+				record_idx: 2,
+				block_idx: 0,
+				source: "claude_code",
+				call_id: "call-1",
+				tool_name: "Bash",
+				command: "cat purge-me.txt",
+				files_read: ["/w/purge-me.txt"],
+				session_date: "2026-07-29 10:00:00.000",
+				started_at: "2026-07-29 10:00:01.000",
+			},
+		],
+	});
+	await ch.insert({
 		table: "rudel.setup_texts",
 		values: [
 			{
@@ -472,6 +497,7 @@ afterAll(async () => {
 		"rudel.run_index",
 		"rudel.weekly_totals",
 		"rudel.run_setup",
+		"rudel.call_facts",
 		"rudel.setup_texts",
 		"rudel.session_saved_outputs",
 		"rudel.session_images",
@@ -510,7 +536,7 @@ describe("ClickHouse session purge (integration)", () => {
 			async () =>
 				(await countByOrg(orgId)) > 0 &&
 				(await countSnapshotsByOrg(orgId)) > 0 &&
-				(await countSkillRows("organization_id", orgId)) === 10 &&
+				(await countSkillRows("organization_id", orgId)) === 11 &&
 				(await countLineageRows("organization_id", orgId)) === 1,
 		);
 		expect(inserted).toBe(true);
@@ -543,8 +569,8 @@ describe("ClickHouse session purge (integration)", () => {
 				(await countByUser(userIdBeta)) > 0 &&
 				(await countSnapshotsByUser(userIdAlpha)) > 0 &&
 				(await countSnapshotsByUser(userIdBeta)) > 0 &&
-				(await countSkillRows("user_id", userIdAlpha)) === 10 &&
-				(await countSkillRows("user_id", userIdBeta)) === 10 &&
+				(await countSkillRows("user_id", userIdAlpha)) === 11 &&
+				(await countSkillRows("user_id", userIdBeta)) === 11 &&
 				(await countLineageRows("user_id", userIdAlpha)) === 1 &&
 				(await countLineageRows("user_id", userIdBeta)) === 1,
 		);
@@ -560,7 +586,7 @@ describe("ClickHouse session purge (integration)", () => {
 		expect(await countSnapshotsByUser(userIdAlpha)).toBe(0);
 		expect(await countSnapshotsByUser(userIdBeta)).toBeGreaterThan(0);
 		expect(await countSkillRows("user_id", userIdAlpha)).toBe(0);
-		expect(await countSkillRows("user_id", userIdBeta)).toBe(10);
+		expect(await countSkillRows("user_id", userIdBeta)).toBe(11);
 		expect(await countLineageRows("user_id", userIdAlpha)).toBe(0);
 		expect(await countLineageRows("user_id", userIdBeta)).toBe(1);
 

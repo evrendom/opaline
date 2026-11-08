@@ -1,23 +1,19 @@
 import { getSafeClickHouseTable } from "../../clickhouse.js";
 import { L1_EDGES_TABLE } from "../l1-edges/l1-edge-tables.js";
-import { commandColumnsSql, SHELL_TOOLS } from "./command-identity.js";
-import {
-	COMMAND_CLASSES_SQL,
-	commandProgramColumnsSql,
-	FILES_READ_SQL,
-} from "./command-programs.js";
-import { PREAMBLE, STRONG } from "./failure-classifier.js";
 import {
 	SETUP_SINCE_INDEX_VERSION,
 	SETUP_SINCE_PARSER_VERSION,
 } from "./received-setup.js";
-import { forkReplayOnceCtes, runToolErrorSql } from "./run-index-sql.js";
-import { records, toolErrorSql } from "./sql.js";
+import { forkReplayOnceCtes } from "./run-index-sql.js";
+import { records } from "./sql.js";
+import {
+	BACKGROUND_SINCE_PARSER_VERSION,
+	callRowsSql,
+} from "./sql-call-rows.js";
 import type { SqlWindow } from "./sql-guard.js";
 import { capturedSetupSessionsSql } from "./sql-setup-views.js";
 import type { SqlViewColumn } from "./sql-views.js";
 import {
-	editRouteSql,
 	OTHER_SHELL_EDIT_ROUTE,
 	SCRIPT_EDIT_ROUTE,
 	SHELL_EDIT_ROUTES,
@@ -186,21 +182,15 @@ export const RUN_MEASURE_COLUMNS: readonly SqlViewColumn[] = [
 	COVERAGE_COLUMN,
 ];
 
-/** First parser version that links background tasks and hook blocks to their calls. */
-const BACKGROUND_SINCE_PARSER_VERSION = 11;
-
-// From parser 11 a task notification carries the call id of the call whose
-// background work it reports on, so it joins the call's group (the only
-// injected context the scan keeps). One that ended the task records
-// interrupted (true when killed or stopped), is_error (failed or killed),
-// its exit code and the task's output file in the record's own columns,
-// and the hand-off result names that file. They fold into the call's
-// result states (its last record, failure and exit code), so a call costs
-// two more aggregate states, never a read of the facts map.
-export const CALL_TASK_NOTIFICATION_SQL = "kind = 'injected_context'";
-export const CALL_TASK_END_SQL = `${CALL_TASK_NOTIFICATION_SQL} AND interrupted IS NOT NULL`;
-export const CALL_COMPLETION_SQL = `kind = 'meta' AND call_id != '' AND (subtype IN ('exec_command_end', 'patch_apply_end') OR startsWith(subtype, 'item_completed:'))`;
-export const CALL_HAND_OFF_SQL = `kind = 'tool_result' AND parser_version >= ${BACKGROUND_SINCE_PARSER_VERSION} AND match(file_path, '/tasks/[A-Za-z0-9_-]+\\\\.output$')`;
+export {
+	CALL_COMPLETION_SQL,
+	CALL_HAND_OFF_SQL,
+	CALL_TASK_END_SQL,
+	CALL_TASK_NOTIFICATION_SQL,
+	errorLineSql,
+	regexLiteral,
+	sqlLiteral,
+} from "./sql-call-rows.js";
 
 /** First parser version that reads a Claude Code subagent call's timeout limit from its hand-off text. */
 const TIMEOUT_LIMIT_SINCE_PARSER_VERSION = 12;
@@ -212,8 +202,11 @@ export const CALL_COLUMNS: readonly SqlViewColumn[] = [
 	{
 		name: "run_id",
 		type: "String",
-		meaning: "The run the call belongs to; joins runs.run_id.",
-		traps: [],
+		meaning:
+			"The run the call belongs to; joins runs.run_id. Empty for a call made before its stream's first prompt (turn_idx 0), which belongs to no run.",
+		traps: [
+			"Calls before the first prompt (a subagent or session reading its instructions before its task arrives, hooks at start) are rows with turn_idx 0 and run_id empty: joins to runs leave them out, so count them from calls alone when they matter.",
+		],
 	},
 	{
 		name: "user_id",
@@ -231,7 +224,8 @@ export const CALL_COLUMNS: readonly SqlViewColumn[] = [
 	{
 		name: "turn_idx",
 		type: "UInt32",
-		meaning: "The run's number within the stream.",
+		meaning:
+			"The run's number within the stream; 0 for a call before the stream's first prompt.",
 		traps: [],
 	},
 	{
@@ -624,6 +618,40 @@ export const CALL_COLUMNS: readonly SqlViewColumn[] = [
 		traps: [],
 	},
 	COVERAGE_COLUMN,
+	{
+		name: "repository",
+		type: "String",
+		meaning:
+			"The session's repository as uploaded (runs.repository), on every call of the session, turn 0 included.",
+		traps: [
+			"One value per session: filter repository here instead of joining runs. A session started outside a repository puts all its calls on the repository the upload named; runs.cwd_repository says where a run worked.",
+		],
+	},
+	{
+		name: "stream_kind",
+		type: "LowCardinality(String)",
+		meaning:
+			"Which stream made the call: main (the session's own transcript), subagent (a Claude Code subagent stream, agent_id not empty) or codex_thread (a Codex thread a parent agent started: a stream of this session, or a session of its own whose thread_source is subagent).",
+		traps: [
+			"Every stream is here. Reads of instructions and skills mostly happen in subagents: filter stream_kind = 'main' only when the question is about the main transcript.",
+		],
+	},
+	{
+		name: "model",
+		type: "LowCardinality(Nullable(String))",
+		meaning:
+			"The model of the response that made the call (its request's usage model), else its run's model (runs.model).",
+		traps: [
+			"NULL for a call before the first prompt (no run) and when neither the response nor the run names a model; never `<synthetic>`.",
+			"Sessions not yet rebuilt at run index 10 give their run's model, so a call in a run that switched models carries the run's first.",
+		],
+	},
+	{
+		name: "run_started_at",
+		type: "Nullable(DateTime64(3, 'UTC'))",
+		meaning: "When the call's run started (runs.started_at). UTC.",
+		traps: ["NULL for a call before the first prompt (no run)."],
+	},
 ];
 
 /** How a view reads the run index: its table, the owner condition and committed builds. */
@@ -687,21 +715,6 @@ export function measuredRunsSql(
 		) AS r`;
 }
 
-/**
- * One row per tool call of the committed runs: what it called (its command
- * identity, `command-identity.ts`), its time from the call record to its
- * last result record, whether a result failed, and its run's coverage. A
- * call's result records share its `call_id` in its stream; a call recorded
- * twice (a resumed transcript repeats it) is one row, its first record. Calls
- * a forked Codex session replays from its parent, and their results, are left
- * out as the run index leaves them out (`forkReplayOnceCtes`).
- *
- * `window` is the started_at range the agent's query keeps, when the gateway
- * can tell (`sql-guard.ts`): only sessions with a call record in it are read
- * (`windowSessionsSql`), calls and results alike, so a short window over a
- * long history stays within the memory limit. Every call in the range has
- * its call record there, so the rows the query keeps are the same.
- */
 export function callsSql(
 	runs: CommittedRuns,
 	measuredRuns: (runs: CommittedRuns) => string,
@@ -720,208 +733,49 @@ export function callsSql(
 						GROUP BY user_id, session_id))${windowed?.sessions ?? ""}`;
 	const fresh = `facts['fork_replayed'] != 'true'
 				AND (user_id, session_id, agent_id, call_id) NOT IN (SELECT user_id, session_id, agent_id, call_id FROM replayed_calls)`;
-	const generation = "user_id, session_id, revision, parser_version, agent_id";
-	const programs =
+	const reads = (...names: string[]) =>
 		window.words === undefined ||
-		["command_programs", "command_prefixes", "*"].some((word) =>
-			window.words?.has(word),
-		);
-	/**
-	 * What the call's first record says, each its own aggregate, so a query
-	 * that reads none of the command columns reads no stored text.
-	 */
-	const first = [
-		"turn_idx",
-		"tool_name",
-		"subtype",
-		"parent",
-		"file_path",
-		"file_op",
-		"command_class",
-		"command_classes",
-		"command_from",
-		"command",
-		"command_chars",
-		"command_argv0",
-		"command_prefix",
-		"command_programs",
-		"command_prefixes",
-		"command_fingerprint",
-		"command_simhash",
-		"command_head",
-		"record_idx",
-		"block_idx",
-		"files_read",
-	].filter(
-		(name) =>
-			programs || (name !== "command_programs" && name !== "command_prefixes"),
-	);
-	const call = "kind = 'tool_call'";
-	const result = "kind = 'tool_result'";
-	const mirror = CALL_COMPLETION_SQL;
-	const change = `kind = 'file_change' AND file_path != '' AND (file_op IN ('write', 'edit', 'delete')
-				OR subtype IN ('shell_conditional', 'shell_script_conditional') AND file_op IN ('inferred_write', 'inferred_edit', 'inferred_delete'))`;
-	const stored = "if(lengthUTF8(text) >= lengthUTF8(head), text, head)";
-	const piece = `if(text_chars > lengthUTF8(${stored}) + lengthUTF8(tail),
-					concat(${stored}, '\\n[opaline: output cut, ', toString(lengthUTF8(${stored}) + lengthUTF8(tail)), ' of ', toString(text_chars), ' characters stored]\\n', tail),
-					${stored})`;
-	const notification = CALL_TASK_NOTIFICATION_SQL;
-	const taskEnd = CALL_TASK_END_SQL;
-	const handOff = CALL_HAND_OFF_SQL;
-	// A Claude Code subagent stream records a timeout only in its hand-off
-	// text, whose limit the parser reads from version 12; the run index
-	// counts that hand-off from parser 11, without the limit.
-	const timeoutUnknown = `has(r.unrecorded_facts, 'timed_out_calls') OR (r.source = 'claude_code' AND c.agent_id != '' AND c.parser_version < ${TIMEOUT_LIMIT_SINCE_PARSER_VERSION})`;
+		["*", ...names].some((word) => window.words?.has(word));
+	const programs = reads("command_programs", "command_prefixes");
+	const timeoutUnknown = `r.run_id = '' OR has(r.unrecorded_facts, 'timed_out_calls') OR (c.source = 'claude_code' AND c.agent_id != '' AND c.parser_version < ${TIMEOUT_LIMIT_SINCE_PARSER_VERSION})`;
+	const columns: Readonly<Record<string, string>> = {
+		run_id: "r.run_id",
+		interrupted: `if(r.run_id = '' OR has(r.unrecorded_facts, 'interrupted_calls'), NULL, c.result_interrupted)`,
+		timed_out: `if(${timeoutUnknown}, NULL, toUInt8(c.result_timed_out_after_ms IS NOT NULL))`,
+		timed_out_after_ms: `if(${timeoutUnknown}, NULL, c.result_timed_out_after_ms)`,
+		coverage_gaps: "r.coverage_gaps",
+		repository: "s.repository",
+		stream_kind: `toLowCardinality(${streamKindSql("c.agent_id", "c.source", "s.thread_source")})`,
+		model:
+			"toLowCardinality(if(r.run_id = '' OR r.model IN ('', '<synthetic>'), NULL, r.model))",
+		run_started_at: "if(r.run_id = '', NULL, r.started_at)",
+		output: reads("output") ? "c.output" : "''",
+		...(programs
+			? {}
+			: {
+					command_programs: "CAST([], 'Array(String)')",
+					command_prefixes: "CAST([], 'Array(String)')",
+				}),
+	};
 	return `WITH ${[...(windowed ? [windowed.with] : []), forkReplayOnceCtes(sessions, parentOwner)].join(",\n\t\t")}
-		SELECT r.run_id AS run_id, c.user_id AS user_id, c.session_id AS session_id,
-			c.agent_id AS agent_id, c.first_turn_idx AS turn_idx, r.source AS source,
-			c.session_date AS session_date, c.call_id AS call_id,
-			toLowCardinality(multiIf(r.source = 'codex' AND c.first_subtype IN ('nested', 'script'), 'inner',
-				c.first_command_from = 'script', 'script', 'top')) AS call_level,
-			multiIf(call_level != 'inner', '', c.first_parent != '', c.first_parent,
-				c.first_subtype = 'script' AND position(c.call_id, '#') > 0, substring(c.call_id, 1, position(c.call_id, '#') - 1), '') AS parent_call_id,
-			toLowCardinality(c.first_tool_name) AS tool_name,
-			c.started_at AS started_at,
-			if(finished_at IS NULL, NULL, greatest(0, dateDiff('millisecond', c.started_at, finished_at)) / 60000) AS call_minutes,
-			toUInt8(c.results > 0) AS has_result,
-			toUInt8(ifNull(c.result_failed, 0)) AS failed, c.error_from_call_id AS error_from_call_id,
-			c.result_exit_code AS exit_code,
-			toLowCardinality(c.result_denial_kind) AS denial_kind, c.denial_reason AS denial_reason,
-			if(has(r.unrecorded_facts, 'interrupted_calls'), NULL, toUInt8(c.result_interrupted)) AS interrupted,
-			if(${timeoutUnknown}, NULL, toUInt8(c.result_timed_out_after_ms IS NOT NULL)) AS timed_out,
-			if(${timeoutUnknown}, NULL, c.result_timed_out_after_ms) AS timed_out_after_ms,
-			toUInt8(c.task_file != '') AS backgrounded,
-			nullIf(extract(c.task_file, '/tasks/([A-Za-z0-9_-]+)\\\\.output$'), '') AS task_id,
-			if(c.task_end.1 IS NULL, NULL,
-				multiIf(c.task_end.1 AND c.task_end.2, 'killed', c.task_end.1, 'stopped', c.task_end.2, 'failed', 'completed')) AS background_status,
-			if(c.task_end.1 IS NULL, NULL, c.result_exit_code) AS background_exit_code,
-			if(c.task_file != '' AND c.task_end.1 IS NULL OR c.results = 0, NULL, c.result_at) AS finished_at,
-			${first
-				.filter(
-					(name) =>
-						![
-							"turn_idx",
-							"tool_name",
-							"subtype",
-							"parent",
-							"files_read",
-						].includes(name),
-				)
-				.map((name) =>
-					name === "file_path"
-						? "if(c.first_file_path != '', c.first_file_path, c.changes[1].2) AS file_path"
-						: name === "file_op"
-							? "toLowCardinality(if(c.first_file_op != '', c.first_file_op, c.changes[1].3)) AS file_op"
-							: name === "command_class"
-								? `toLowCardinality(c.first_${name}) AS ${name}`
-								: `c.first_${name} AS ${name}`,
-				)
-				.join(", ")},
-			arrayMap(x -> x.2, c.changes) AS changed_files, arrayMap(x -> x.3, c.changes) AS changed_file_ops,
-			arrayMap(x -> x.4, c.changes) AS changed_files_basis, c.first_files_read AS files_read,
-			toLowCardinality(${editRouteSql({ tool: "c.first_tool_name", from: "c.first_command_from", head: "c.first_command_head", files: "c.changes", basis: "arrayMap(x -> x.4, c.changes)" })}) AS edit_route,
-			if(ifNull(c.result_failed, 0) OR c.result_denial_kind != '',
-				multiIf(c.result_error_text, c.result_error_line, ifNull(d.done_line, '') != '', d.done_line,
-					c.running_process != '' AND c.settled_results = 0 AND c.result_exit_code IS NOT NULL,
-					concat('Process exited with code ', toString(c.result_exit_code), '; the output after it kept running is not recorded'),
-					c.results > 0, c.result_first_line, ${errorLineSql("char(10)")}), NULL) AS error,
-			arrayStringConcat(arrayMap(x -> x.2, c.outputs), char(10)) AS output,
-			c.output_chars AS output_chars, toUInt8(c.output_cut) AS output_cut,
-			r.coverage_gaps AS coverage_gaps
-		FROM (
-			SELECT ${generation}, session_date, call_id,
-				minIf(ts, ${call}) AS started_at,
-				${first.map((name) => `argMinIf(${name}, position, ${call}) AS first_${name}`).join(",\n\t\t\t\t")},
-				maxIf(ts, ${result} OR ${taskEnd}) AS result_at,
-				countIf(${result}) AS results,
-				max(${runToolErrorSql()} OR (${taskEnd} AND (is_error OR ifNull(exit_code, 0) != 0))) AS result_failed,
-				anyIf(exit_code, (${result} OR ${taskEnd} OR (${mirror})) AND exit_code IS NOT NULL) AS result_exit_code,
-				anyIf(denial_kind, ${result} AND denial_kind != '') AS result_denial_kind,
-				argMinIf(facts['denial_reason'], position, ${result} AND facts['denial_reason'] != '') AS denial_reason,
-				argMinIf(facts['error_from_call_id'], position, ${result} AND facts['error_from_call_id'] != '') AS error_from_call_id,
-				argMinIf(result_line, position, ${toolErrorSql()} OR (${result} AND refused)) AS result_error_line,
-				argMinIf(head != '' OR tail != '', position, ${toolErrorSql()} OR (${result} AND refused)) AS result_error_text,
-				argMinIf(result_line, position, ${result}) AS result_first_line,
-				argMinIf(process, position, process != '') AS running_process,
-				minIf(record_idx, process != '') AS running_record,
-				countIf(${result} AND subtype != 'running') AS settled_results,
-				arraySort(groupArrayIf((position, ${piece}), ${result})) AS outputs,
-				sumIf(text_chars, ${result}) AS output_chars,
-				maxIf(text_chars > lengthUTF8(${stored}), ${result}) AS output_cut,
-				arraySort(groupArrayIf((position, file_path, replaceRegexpOne(toString(file_op), '^inferred_', ''),
-					multiIf(subtype IN ('shell_script', 'shell_script_conditional'), 'script', startsWith(subtype, 'shell'), 'shell', 'tool')), ${change})) AS changes,
-				max(${result} AND ifNull(interrupted, false)) AS result_interrupted,
-				maxIf(timed_out_after_ms, ${result}) AS result_timed_out_after_ms,
-				anyIf(file_path, (${handOff} OR ${notification}) AND file_path != '') AS task_file,
-				argMaxIf((interrupted, is_error), position, ${taskEnd}) AS task_end
-			FROM (
-				SELECT ${generation}, session_date, call_id, kind, subtype, source, ts, turn_idx, record_idx, block_idx,
-					is_error, exit_code, denial_kind, denial_kind != '' AS refused, head, tail, text, text_chars, facts,
-					(record_idx, block_idx) AS position, tool_name, file_path, file_op, command_class,
-					interrupted, timed_out_after_ms, facts['script_call_id'] AS parent,
-					if(${result}, ${errorLineSql("concat(head, char(10), tail)")}, '') AS result_line,
-					if(${result} AND subtype = 'running', extract(head, ${sqlLiteral(`${RUNNING_PROCESS}([0-9]+)`)}), '') AS process,
-					${commandColumnsSql()},
-					${programs ? `${commandProgramColumnsSql()},` : ""}
-					${FILES_READ_SQL} AS files_read,
-					${COMMAND_CLASSES_SQL} AS command_classes,
-					if(command_from = '', NULL, ifNull(command_text, head)) AS command,
-					lengthUTF8(command_text) AS command_chars,
-					if(kind = 'tool_call' AND replaceRegexpOne(lower(tool_name), '^functions\\.', '') IN (${SHELL_TOOLS.map((tool) => `'${tool}'`).join(", ")}),
-						substring(head, 1, 300), NULL) AS command_head
-				FROM ${records()}
-				PREWHERE kind IN ('tool_call', 'tool_result')
-					OR (kind = 'injected_context' AND subtype = 'task_notification' AND call_id != '')
-					OR (${mirror}) OR (${change})
-				WHERE ${sessions} AND ${fresh}
-			)
-			GROUP BY ${generation}, session_date, call_id,
-				if(call_id = '', position, (0, 0))
-			HAVING countIf(${call}) > 0
-		) AS c
-		ASOF LEFT JOIN (${processEndsSql(sessions)}) AS d ON d.user_id = c.user_id AND d.session_id = c.session_id
-			AND d.revision = c.revision AND d.parser_version = c.parser_version AND d.agent_id = c.agent_id
-			AND d.polled_process = c.running_process AND c.running_record <= d.done_record
-		INNER JOIN (${measuredRuns(windowedRuns)}) AS r ON r.user_id = c.user_id AND r.session_id = c.session_id
+		SELECT ${CALL_COLUMNS.map((column) => `${columns[column.name] ?? `c.${column.name}`} AS ${column.name}`).join(",\n\t\t\t")}
+		FROM (${callRowsSql({ sessions, fresh, identity: true, programs, output: reads("output"), commandRows: false })}) AS c
+		LEFT JOIN (${measuredRuns(windowedRuns)}) AS r ON r.user_id = c.user_id AND r.session_id = c.session_id
 			AND r.revision = c.revision AND r.parser_version = c.parser_version
-			AND r.agent_id = c.agent_id AND r.turn_idx = c.first_turn_idx`;
+			AND r.agent_id = c.agent_id AND r.turn_idx = c.turn_idx
+		LEFT ANY JOIN (
+			SELECT user_id, session_id, repository, ifNull(thread_source, '') AS thread_source
+			FROM ${runs.table} FINAL
+			WHERE ${windowedRuns.owner} AND row_kind = 'receipt' AND ${runs.committed}
+		) AS s ON s.user_id = c.user_id AND s.session_id = c.session_id`;
 }
 
-const RUNNING_PROCESS = "Process running with session ID ";
-
-function processEndsSql(sessions: string): string {
-	const call = "kind = 'tool_call'";
-	const done = "kind = 'tool_result' AND exit_code IS NOT NULL";
-	return `SELECT * FROM (
-			SELECT user_id, session_id, revision, parser_version, agent_id,
-				anyIf(extract(head, ${sqlLiteral('"session_id"[[:space:]]*:[[:space:]]*([0-9]+)')}), ${call}) AS polled_process,
-				minIf(record_idx, ${done}) AS done_record,
-				argMinIf(${errorLineSql("concat(head, char(10), tail)")}, (record_idx, block_idx), ${done}) AS done_line
-			FROM ${records()}
-			PREWHERE kind IN ('tool_call', 'tool_result') AND replaceRegexpOne(lower(tool_name), '^functions\\.', '') = 'write_stdin'
-			WHERE ${sessions} AND source = 'codex'
-			GROUP BY user_id, session_id, revision, parser_version, agent_id, call_id
-			HAVING countIf(${done}) > 0
-		) WHERE polled_process != ''`;
-}
-
-export function sqlLiteral(text: string): string {
-	return `'${text.replaceAll("\\", "\\\\").replaceAll("'", "\\'")}'`;
-}
-
-export function regexLiteral(pattern: RegExp): string {
-	const source = pattern.source.replace(/\\u([0-9a-fA-F]{4})/gu, "\\x{$1}");
-	return sqlLiteral(pattern.flags.includes("i") ? `(?i)${source}` : source);
-}
-
-const STACK_FRAME = /^(?:at\s|node:internal|[\w.$]+\($|\^+$|\d+\s*\|)/;
-
-export function errorLineSql(text: string): string {
-	const lines = `arrayFilter(l -> l != '' AND NOT match(l, ${regexLiteral(PREAMBLE)}),
-				arrayMap(l -> trimBoth(l), splitByRegexp(${sqlLiteral("\\r?\\n")},
-					replaceRegexpAll(replaceRegexpAll(${text}, ${sqlLiteral("\\x1b\\[[0-?]*[ -/]*[@-~]")}, ''), ${sqlLiteral("</?tool_use_error>")}, char(10)))))`;
-	const strong = `arrayFirst(l -> match(l, ${regexLiteral(STRONG)}) AND length(l) > 6 AND NOT match(l, ${regexLiteral(STACK_FRAME)}), ${lines})`;
-	return `substring(if(${strong} != '', ${strong}, if(empty(${lines}), '(no output)', ${lines}[1])), 1, 300)`;
+export function streamKindSql(
+	agentId: string,
+	source: string,
+	threadSource: string,
+): string {
+	return `multiIf(${agentId} != '', if(${source} = 'codex', 'codex_thread', 'subagent'), ${threadSource} = 'subagent', 'codex_thread', 'main')`;
 }
 
 export function cohortOwner(owner: string, window: SqlWindow): string {

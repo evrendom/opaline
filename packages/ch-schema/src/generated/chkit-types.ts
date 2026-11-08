@@ -60,6 +60,141 @@ export const RudelAnalysisFindingRunsRowSchema = z.object({
 export type RudelAnalysisFindingRunsRowInput = z.input<typeof RudelAnalysisFindingRunsRowSchema>
 export type RudelAnalysisFindingRunsRowOutput = z.output<typeof RudelAnalysisFindingRunsRowSchema>
 
+export type RudelCallFactsRow = {
+  organization_id: string
+  user_id: string
+  session_id: string
+  revision: string
+  parser_version: number
+  index_version: number
+  build_revision: string
+  agent_id: string
+  record_idx: number
+  block_idx: number
+  source: string
+  stream_kind: string
+  call_id: string
+  run_id: string
+  turn_idx: number
+  repository: string
+  model: string | null
+  run_started_at: string | null
+  session_date: string
+  built_at: string
+  call_level: string
+  parent_call_id: string
+  tool_name: string
+  started_at: string
+  finished_at: string | null
+  call_minutes: number | null
+  has_result: number
+  failed: number
+  error_from_call_id: string
+  exit_code: number | null
+  denial_kind: string
+  denial_reason: string
+  interrupted: number | null
+  timed_out: number | null
+  timed_out_after_ms: number | null
+  backgrounded: number
+  task_id: string | null
+  background_status: string | null
+  background_exit_code: number | null
+  file_path: string
+  file_op: string
+  command_class: string
+  command_classes: string[]
+  command_from: string
+  command: string | null
+  command_chars: string | null
+  command_argv0: string | null
+  command_prefix: string | null
+  command_programs: string[]
+  command_prefixes: string[]
+  command_fingerprint: string | null
+  command_simhash: string | null
+  command_head: string | null
+  changed_files: string[]
+  changed_file_ops: string[]
+  changed_files_basis: string[]
+  files_read: string[]
+  setup_files_read: string[]
+  setup_paths_read: string[]
+  edit_route: string
+  error: string | null
+  output_chars: string
+  output_cut: number
+}
+
+export const RudelCallFactsRowSchema = z.object({
+  organization_id: z.string(),
+  user_id: z.string(),
+  session_id: z.string(),
+  revision: z.string(),
+  parser_version: z.number(),
+  index_version: z.number(),
+  build_revision: z.string(),
+  agent_id: z.string(),
+  record_idx: z.number(),
+  block_idx: z.number(),
+  source: z.string(),
+  stream_kind: z.string(),
+  call_id: z.string(),
+  run_id: z.string(),
+  turn_idx: z.number(),
+  repository: z.string(),
+  model: z.string().nullable(),
+  run_started_at: z.string().nullable(),
+  session_date: z.string(),
+  built_at: z.string(),
+  call_level: z.string(),
+  parent_call_id: z.string(),
+  tool_name: z.string(),
+  started_at: z.string(),
+  finished_at: z.string().nullable(),
+  call_minutes: z.number().nullable(),
+  has_result: z.number(),
+  failed: z.number(),
+  error_from_call_id: z.string(),
+  exit_code: z.number().nullable(),
+  denial_kind: z.string(),
+  denial_reason: z.string(),
+  interrupted: z.number().nullable(),
+  timed_out: z.number().nullable(),
+  timed_out_after_ms: z.number().nullable(),
+  backgrounded: z.number(),
+  task_id: z.string().nullable(),
+  background_status: z.string().nullable(),
+  background_exit_code: z.number().nullable(),
+  file_path: z.string(),
+  file_op: z.string(),
+  command_class: z.string(),
+  command_classes: z.array(z.string()),
+  command_from: z.string(),
+  command: z.string().nullable(),
+  command_chars: z.string().nullable(),
+  command_argv0: z.string().nullable(),
+  command_prefix: z.string().nullable(),
+  command_programs: z.array(z.string()),
+  command_prefixes: z.array(z.string()),
+  command_fingerprint: z.string().nullable(),
+  command_simhash: z.string().nullable(),
+  command_head: z.string().nullable(),
+  changed_files: z.array(z.string()),
+  changed_file_ops: z.array(z.string()),
+  changed_files_basis: z.array(z.string()),
+  files_read: z.array(z.string()),
+  setup_files_read: z.array(z.string()),
+  setup_paths_read: z.array(z.string()),
+  edit_route: z.string(),
+  error: z.string().nullable(),
+  output_chars: z.string(),
+  output_cut: z.number(),
+})
+
+export type RudelCallFactsRowInput = z.input<typeof RudelCallFactsRowSchema>
+export type RudelCallFactsRowOutput = z.output<typeof RudelCallFactsRowSchema>
+
 export type RudelClaudeSessionsRow = {
   session_date: string
   last_interaction_date: string

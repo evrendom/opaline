@@ -44,6 +44,7 @@ const TRANSCRIPT_DERIVED = [
 	"transcript_chunk_hits",
 	"run_index",
 	"run_requests",
+	"call_facts",
 	// Received setup: each run's setup file versions and the texts themselves.
 	"run_setup",
 	"setup_texts",

@@ -102,6 +102,7 @@ export const ALLOWED_CLICKHOUSE_TABLES: ReadonlySet<string> = new Set([
 	"rudel.github_ci_runs",
 	"rudel.github_ci_run_pull_requests",
 	"rudel.github_ci_jobs",
+	"rudel.call_facts",
 	"rudel.claude_sessions",
 	"rudel.l1_edges",
 	"rudel.l1_edges_by_target",

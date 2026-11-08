@@ -3,7 +3,9 @@ import {
 	encodeTranscriptRecordsReceipt,
 	TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
 } from "@rudel/api-routes/transcript-records";
+import { CALL_FACTS_TABLE } from "@rudel/ch-schema/call-facts";
 import type {
+	RudelCallFactsRow,
 	RudelRunIndexRow,
 	RudelRunRequestsRow,
 	RudelRunSetupRow,
@@ -28,6 +30,7 @@ import {
 } from "../analysis/run-index-sql.js";
 import { buildRunFactsStatement } from "../analysis/run-queries.js";
 import { selectRetiredGenerations } from "../transcript-records-ingest.service.js";
+import { callTuple } from "./call-facts.fixtures.js";
 import { runNodeId } from "./l1-edge-ids.js";
 import { RUN_REQUESTS_TABLE } from "./l1-edge-tables.js";
 import {
@@ -142,6 +145,7 @@ interface Fake {
 	table: RudelRunIndexRow[];
 	requests: RudelRunRequestsRow[];
 	setup: RudelRunSetupRow[];
+	calls: RudelCallFactsRow[];
 	inserts: { values: RudelRunIndexRow[]; token?: string }[];
 	executed: ClickHouseStatement[];
 	events: string[];
@@ -186,12 +190,14 @@ function fakeClickHouse(state: {
 	directories?: Record<string, unknown>[];
 	evidence?: Record<string, unknown>[];
 	mcpStates?: Record<string, unknown>[];
+	calls?: unknown[];
 }): Fake {
 	const usage = [...(state.usage ?? [CONSISTENT])];
 	const fake: Fake = {
 		table: state.table ?? [],
 		requests: [],
 		setup: [],
+		calls: [],
 		inserts: [],
 		executed: [],
 		events: [],
@@ -205,6 +211,11 @@ function fakeClickHouse(state: {
 				if (params.table === RUN_REQUESTS_TABLE) {
 					fake.events.push("insert:requests");
 					fake.requests.push(...(params.values as RudelRunRequestsRow[]));
+					return;
+				}
+				if (params.table === CALL_FACTS_TABLE) {
+					fake.events.push("insert:calls");
+					fake.calls.push(...(params.values as RudelCallFactsRow[]));
 					return;
 				}
 				if (params.table === RUN_SETUP_TABLE) {
@@ -288,6 +299,7 @@ function fakeClickHouse(state: {
 								cost_state: { cost_usd: "1.25" },
 								cost_state_duration_ms: 9000,
 								has_cost_state: "1",
+								calls: state.calls ?? [],
 							},
 						];
 					if (sql.includes("session_analytics"))
@@ -488,6 +500,31 @@ describe("building a session's run index", () => {
 			output_tokens: null,
 		});
 		expect(unknown.requests[0]?.unrecorded_facts).toContain("output_tokens");
+	});
+
+	test("writes every call after the runs and before the receipt, with its run's id, behind the fence", async () => {
+		const fake = fakeClickHouse({
+			runs,
+			calls: [
+				callTuple({ turn_idx: 1, record_idx: 4, call_id: "a" }),
+				callTuple({ turn_idx: 0, record_idx: 1, call_id: "b" }),
+			],
+		});
+		await build(fake);
+		expect(fake.events).toEqual([
+			"fence",
+			"insert:runs",
+			"fence",
+			"insert:calls",
+			"fence",
+			"insert:receipt",
+		]);
+		expect(
+			fake.calls.map((row) => [row.call_id, row.run_id, row.index_version]),
+		).toEqual([
+			["a", runNodeId(session, "", 3), RUN_INDEX_VERSION],
+			["b", "", RUN_INDEX_VERSION],
+		]);
 	});
 
 	test("writes each run's received setup after the requests and before the receipt, named by setup file and version", async () => {

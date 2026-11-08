@@ -71,7 +71,7 @@ const sessions = [
 ];
 
 describe("retireRunIndexSnapshots", () => {
-	test("reads the sessions once and deletes setup, requests, then runs by full snapshot key", async () => {
+	test("reads the sessions once and deletes calls, setup, requests, then runs by full snapshot key", async () => {
 		const run = recording();
 		const retirement = await retireRunIndexSnapshots(
 			run.executor,
@@ -90,7 +90,7 @@ describe("retireRunIndexSnapshots", () => {
 			settled: true,
 		});
 		expect(run.deletes.map((statement) => statement.query)).toEqual(
-			["run_setup", "run_requests", "run_index"].map(
+			["call_facts", "run_setup", "run_requests", "run_index"].map(
 				(table) =>
 					`DELETE FROM rudel.${table} WHERE organization_id = {organizationId:String} AND (user_id, session_id, revision, parser_version, index_version, build_revision) IN {keys:Array(Tuple(String, String, UInt64, UInt16, UInt16, UInt64))}`,
 			),
@@ -115,11 +115,13 @@ describe("retireRunIndexSnapshots", () => {
 		);
 		expect(retirement).toMatchObject({ retired: 2, settled: true });
 		expect(retirement.outcomes.map((outcome) => outcome.status)).toEqual([
+			"completed",
 			"empty",
 			"completed",
 			"completed",
 		]);
 		expect(run.deletes.map((statement) => statement.query)).toEqual([
+			expect.stringContaining("DELETE FROM rudel.call_facts "),
 			expect.stringContaining("DELETE FROM rudel.run_requests "),
 			expect.stringContaining("DELETE FROM rudel.run_index "),
 		]);
@@ -137,9 +139,11 @@ describe("retireRunIndexSnapshots", () => {
 		expect(retirement).toMatchObject({ retired: 0, settled: false });
 		expect(retirement.outcomes.map((outcome) => outcome.status)).toEqual([
 			"completed",
+			"completed",
 			"deferred",
 		]);
 		expect(run.deletes.map((statement) => statement.query)).toEqual([
+			expect.stringContaining("DELETE FROM rudel.call_facts "),
 			expect.stringContaining("DELETE FROM rudel.run_setup "),
 		]);
 	});

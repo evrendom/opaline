@@ -20,6 +20,10 @@ export const CALL_FILTER_UNSUPPORTED = [
 	"background_status",
 	"background_exit_code",
 	"coverage_gaps",
+	"repository",
+	"stream_kind",
+	"model",
+	"run_started_at",
 ] as const;
 
 function viewColumns(name: string) {

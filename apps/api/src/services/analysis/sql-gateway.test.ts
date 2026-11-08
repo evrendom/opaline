@@ -226,6 +226,53 @@ describe("sql over the setup_files view", () => {
 	});
 });
 
+describe("sql over the calls view", () => {
+	const query =
+		"SELECT tool_name, count() AS calls FROM calls WHERE started_at >= '2026-11-01' GROUP BY tool_name";
+	const legacyCheck = (statement: ClickHouseStatement) =>
+		statement.query.includes("AS legacy");
+
+	test("reads call facts only, when every session's committed build has them", async () => {
+		const { env, statements } = environment((statement) =>
+			legacyCheck(statement) ? [{ legacy: 0 }] : [],
+		);
+		ok(await runSql(teammate, { query, title: "Tools" }, env));
+		const sent = agentStatement(statements)?.query ?? "";
+		expect(sent).toContain("call_facts FINAL");
+		expect(sent).not.toContain("UNION ALL");
+		expect(sent).not.toContain("transcript_records");
+	});
+
+	test("also computes the calls of sessions built before call facts, from their records", async () => {
+		const { env, statements } = environment((statement) =>
+			legacyCheck(statement) ? [{ legacy: 1 }] : [],
+		);
+		ok(await runSql(teammate, { query, title: "Tools" }, env));
+		const sent = agentStatement(statements)?.query ?? "";
+		expect(sent).toContain("call_facts FINAL");
+		expect(sent).toContain("UNION ALL");
+		expect(sent).toContain("transcript_records");
+	});
+
+	test("reads output from the transcript only when the query names it", async () => {
+		const { env, statements } = environment((statement) =>
+			legacyCheck(statement) ? [{ legacy: 0 }] : [],
+		);
+		ok(
+			await runSql(
+				teammate,
+				{
+					query:
+						"SELECT call_id FROM calls WHERE started_at >= '2026-11-01' AND output ILIKE '%error TS%'",
+					title: "Errors",
+				},
+				env,
+			),
+		);
+		expect(agentStatement(statements)?.query).toContain("transcript_records");
+	});
+});
+
 describe("sql over the finding_runs view", () => {
 	test("a member reads the cited runs of findings in analyses they wrote or that are shared, bound as parameters", async () => {
 		const { env, statements } = environment();

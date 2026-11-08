@@ -53,7 +53,9 @@ import {
  * run's directory from its turn and workdir. 9: each build is followed by
  * the session's context snapshot (`rudel.session_context_snapshots`).
  */
-export const RUN_INDEX_VERSION = 9;
+export const RUN_INDEX_VERSION = 10;
+
+export const CALL_FACTS_SINCE_INDEX_VERSION = 10;
 
 /**
  * A run's own activity: the prompt, the model's responses and the calls they
@@ -524,8 +526,8 @@ function literalRunFacts(): string {
 			"hook_stop_reason",
 			"fallback_model",
 		].map((key) => `${first(f(key))} AS l_${key}`),
-		`${first(f("model"), `${f("model")} != '' AND lifecycle = 0`)} AS l_model`,
-		`arraySort(groupUniqArrayIf(${f("model")}, ${f("model")} != '' AND lifecycle = 0)) AS l_models`,
+		`${first(f("model"), `${f("model")} NOT IN ('', '<synthetic>') AND lifecycle = 0`)} AS l_model`,
+		`arraySort(groupUniqArrayIf(${f("model")}, ${f("model")} NOT IN ('', '<synthetic>') AND lifecycle = 0)) AS l_models`,
 		`${first(f("effort"), `${f("effort")} != '' AND lifecycle = 0`)} AS l_effort`,
 		`arraySort(groupUniqArrayIf(${f("effort")}, ${f("effort")} != '' AND lifecycle = 0)) AS l_efforts`,
 		`${first(`arrayElement(${componentStringsSql(f("abort_reason_components"), ".*")}, 1)`)} AS l_abort_reason`,
@@ -1219,12 +1221,11 @@ export type RunIndexSessionFacts = z.infer<typeof RunIndexSessionFactsSchema>;
 export function buildRunIndexSessionStatement(
 	scope: TranscriptReadScope,
 	generation: SessionGeneration,
+	calls?: { readonly ctes: string; readonly sql: string },
 ): ClickHouseStatement {
 	const costState =
 		"agent_id = '' AND kind = 'meta' AND subtype = 'cost-state'";
-	return {
-		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
-		query: `SELECT
+	const facts = `SELECT
 				toUnixTimestamp64Milli(anyIf(session_date, record_idx = ${TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX})) AS session_date_ms,
 				argMinIf(facts['thread_source'], record_idx, agent_id = '' AND kind = 'meta' AND subtype = 'session_meta' AND facts['thread_source'] != '') AS thread_source,
 				argMaxIf(facts['title'], tuple(record_idx, block_idx), agent_id = '' AND kind = 'meta' AND subtype = 'ai-title' AND facts['title'] != '') AS title,
@@ -1235,15 +1236,32 @@ export function buildRunIndexSessionStatement(
 			FROM ${records()}
 			WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
 				AND session_id = {sessionId:String} AND revision = toUInt64({revision:String})
-				AND parser_version = {parserVersion:UInt16}`,
-		query_params: {
-			...scope,
-			sessionId: generation.sessionId,
-			revision: generation.revision,
-			parserVersion: generation.parserVersion,
+				AND parser_version = {parserVersion:UInt16}`;
+	const params = {
+		...scope,
+		sessionId: generation.sessionId,
+		revision: generation.revision,
+		parserVersion: generation.parserVersion,
+	};
+	if (!calls)
+		return {
+			clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
+			query: facts,
+			query_params: params,
+		};
+	return {
+		clickhouse_settings: {
+			...ANALYSIS_QUERY_SETTINGS,
+			max_result_bytes: SESSION_CALLS_MAX_RESULT_BYTES,
 		},
+		query: `WITH ${calls.ctes}
+			SELECT f.*, k.calls AS calls
+			FROM (${facts}) AS f CROSS JOIN (${calls.sql}) AS k`,
+		query_params: { ...pinnedParams(scope, [generation]), ...params },
 	};
 }
+
+const SESSION_CALLS_MAX_RESULT_BYTES = "268435456";
 
 /**
  * A Claude Code record of its MCP servers' state: a deferred_tools_delta
