@@ -9,6 +9,7 @@ export type SettingsRouteId =
 	| "team"
 	| "invitations"
 	| "account"
+	| "mcp"
 	| "create-workspace";
 
 export type SettingsRouteDefinition = {
@@ -70,6 +71,12 @@ export const settingsRouteMap: Record<
 		segment: "account",
 		path: appRoutes.settingsAccount(),
 	},
+	mcp: {
+		id: "mcp",
+		label: "MCP",
+		segment: "mcp",
+		path: appRoutes.settingsMcp(),
+	},
 	"create-workspace": {
 		id: "create-workspace",
 		label: "Create workspace",
@@ -86,7 +93,8 @@ export type PrimarySettingsRouteId =
 	| "sessions"
 	| "reports"
 	| "members"
-	| "account";
+	| "account"
+	| "mcp";
 
 export const primarySettingsRoutes = [
 	settingsRouteMap.workspace,
@@ -95,6 +103,7 @@ export const primarySettingsRoutes = [
 	settingsRouteMap.reports,
 	settingsRouteMap.members,
 	settingsRouteMap.account,
+	settingsRouteMap.mcp,
 ] as const satisfies readonly SettingsRouteDefinition[];
 
 export function getActiveSettingsRouteId(
@@ -115,6 +124,7 @@ export function getActiveSettingsRouteId(
 	if (matchedRoute === "sessions") return "sessions";
 	if (matchedRoute === "reports") return "reports";
 	if (matchedRoute === "github") return "github";
+	if (matchedRoute === "mcp") return "mcp";
 
 	if (matchedRoute === "members" || matchedRoute === "team") {
 		return "members";

@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { usePasswordSignIn } from "@/features/auth/password-sign-in";
+import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import { authClient } from "@/lib/auth-client";
 import type { CliConnectionSnapshot } from "../../../../../packages/api-routes/src/cli-connection";
 import {
@@ -16,6 +17,7 @@ import {
 	signInCliWithProvider,
 	signOutCliSession,
 } from "./cli-onboarding-auth";
+import "@/features/self-hosted/self-hosted.css";
 import "@/features/shell/website-button.css";
 import "./cli-onboarding.css";
 
@@ -36,6 +38,7 @@ type CliSignInProps =
 	  };
 
 export function CliSignIn(props: CliSignInProps) {
+	const selfHost = useSelfHost();
 	const { refetch } = authClient.useSession();
 	const [session, setSession] = useState<CliSession>(null);
 	const [checking, setChecking] = useState(true);
@@ -159,6 +162,19 @@ export function CliSignIn(props: CliSignInProps) {
 					await refetch();
 				}}
 			/>
+		);
+	if (selfHost)
+		return (
+			<div data-cli-sign-in>
+				<h2>Sign in to continue</h2>
+				<p>Use your account on this Opaline server.</p>
+				<a
+					className="self-hosted-welcome-open"
+					href={`/login?redirect=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}`}
+				>
+					Sign in
+				</a>
+			</div>
 		);
 	return (
 		<div data-cli-sign-in>

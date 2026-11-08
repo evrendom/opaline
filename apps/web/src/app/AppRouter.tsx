@@ -13,6 +13,7 @@ import { loadSessionsPage } from "@/app/session-page-loader";
 import { NotFoundPage } from "@/app/system/NotFoundPage";
 import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
 import { AcceptInvitationPage } from "@/features/invitations/AcceptInvitationPage";
+import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import { SessionReaderFallback } from "@/features/sessions/reader/session-reader-light-samples";
 import { SettingsPageSkeleton } from "@/features/settings/components/settings-page-skeleton";
 import { settingsRouteMap } from "@/features/settings/config/settings-routes";
@@ -102,6 +103,10 @@ const MembersSettingsPage = lazyNamed(
 const AccountSettingsPage = lazyNamed(
 	() => import("@/features/settings/account/AccountSettingsPage"),
 	"AccountSettingsPage",
+);
+const McpSettingsPage = lazyNamed(
+	() => import("@/features/self-hosted/McpSettingsPage"),
+	"McpSettingsPage",
 );
 const ReportPage = lazyNamed(
 	() => import("@/features/reports/ReportPage"),
@@ -206,6 +211,7 @@ function getShellRouteElements(
 	routePaths: ShellRoutePaths,
 	SessionComponent: ComponentType = SessionsPage,
 	DashboardComponent: ComponentType = DashboardPage,
+	selfHosted = false,
 ) {
 	return (
 		<>
@@ -344,6 +350,12 @@ function getShellRouteElements(
 						/>
 					}
 				/>
+				{selfHosted ? (
+					<Route
+						path={settingsRouteMap.mcp.segment}
+						element={<LazyRoute Component={McpSettingsPage} />}
+					/>
+				) : null}
 				<Route
 					path={settingsRouteMap["create-workspace"].segment}
 					element={
@@ -368,6 +380,7 @@ export function AppRouter({
 	dashboardComponent?: ComponentType;
 }) {
 	const rootRedirect = rootRedirectTarget || shellRouteMap.dashboard.path;
+	const selfHosted = useSelfHost() !== null;
 	return (
 		<Routes>
 			<Route path="/" element={<Navigate to={rootRedirect} replace />} />
@@ -404,6 +417,7 @@ export function AppRouter({
 					canonicalShellRoutePaths,
 					sessionComponent,
 					dashboardComponent,
+					selfHosted,
 				)}
 
 				<Route
@@ -451,6 +465,7 @@ export function AppRouter({
 						workspaceShellRoutePaths,
 						sessionComponent,
 						dashboardComponent,
+						selfHosted,
 					)}
 					<Route
 						path="/:workspaceSlug"

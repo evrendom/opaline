@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { SelfHostedWelcome } from "@/features/self-hosted/SelfHostedWelcome";
+import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import { useProductWindowConnectionTone } from "@/features/shell/components/product-window-backdrop";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
 import { authClient } from "@/lib/auth-client";
@@ -10,6 +12,15 @@ import { useCliOnboarding } from "./use-cli-onboarding";
 import "../../../../marketing/src/components/InstantV2DemoExperience.css";
 
 export function CliOnboardingPage() {
+	const selfHost = useSelfHost();
+	const { search } = useLocation();
+	const params = new URLSearchParams(search);
+	if (selfHost && !params.has("user_code") && !params.has("connect"))
+		return <SelfHostedWelcome />;
+	return <CliPairingOnboardingPage />;
+}
+
+function CliPairingOnboardingPage() {
 	const navigate = useNavigate();
 	const location = useLocation();
 	const searchParams = new URLSearchParams(location.search);
