@@ -61,6 +61,8 @@ test("schema lists the approved impact measures with their definitions next to t
 	expect(outcome.result.views.map((view) => view.name)).toEqual([
 		"runs",
 		"calls",
+		"requests",
+		"session_activity",
 		"events",
 		"prompts",
 		"git_events",

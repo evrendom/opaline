@@ -30,6 +30,7 @@ import {
 	measuredRunsSql,
 	RUN_MEASURE_COLUMNS,
 } from "./sql-measures.js";
+import { requestSqlViews } from "./sql-request-views.js";
 import { sessionLinksView } from "./sql-session-links.js";
 import { setupSnapshotsView } from "./sql-setup-views.js";
 
@@ -350,6 +351,7 @@ const RUN_ANSWERS: SqlView = {
 export const SQL_VIEWS: readonly SqlView[] = [
 	RUNS,
 	CALLS,
+	...requestSqlViews(committedRuns),
 	eventsView(committedRuns),
 	...l1SqlViews(SQL_SCOPE_PARAMS),
 	sessionLinksView(committedRuns, memberOwner),
