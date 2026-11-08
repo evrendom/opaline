@@ -1,4 +1,5 @@
 import { sqlClient } from "../db.js";
+import { isSelfHosted } from "../lib/self-hosted.js";
 
 export const FREE_WORKSPACE_MONTHLY_AGENT_RUN_LIMIT = 50_000;
 
@@ -15,6 +16,7 @@ export async function assertCanStartOrganizationAgentRun(
 	organizationId: string,
 	sessionId: string,
 ): Promise<void> {
+	if (isSelfHosted()) return;
 	const [state] = await sqlClient.unsafe<
 		Array<{ already_recorded: boolean; paid: boolean; run_count: number }>
 	>(

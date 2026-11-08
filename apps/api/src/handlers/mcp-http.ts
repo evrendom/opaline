@@ -9,6 +9,7 @@ import {
 import { getClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
 import { getFrontendOrigin } from "../frontend-origin.js";
+import { isSelfHosted, isSelfHostedAdmin } from "../lib/self-hosted.js";
 import { splitAnalyticsInputs } from "../mcp/analytics-inputs.js";
 import {
 	DASHBOARD_WIDGET_URI,
@@ -19,6 +20,7 @@ import {
 	readDashboardWidgetHtml,
 	withAbsoluteAvatars,
 } from "../mcp/dashboard-widget.js";
+import { mcpOpenToEveryone } from "../mcp/mcp-availability.js";
 import {
 	APP_ONLY,
 	listedTool,
@@ -99,7 +101,7 @@ const UNAVAILABLE_HTML =
  * Opaline team workspace (VITE_ADMIN_ORGANIZATION_ID) can connect or call tools.
  */
 async function isMcpAvailable(userId: string) {
-	if (process.env.MCP_PLUGIN_PUBLIC === "true") return true;
+	if (mcpOpenToEveryone()) return true;
 	const team = process.env.VITE_ADMIN_ORGANIZATION_ID;
 	if (!team) return false;
 	const rows = await sqlClient`
@@ -119,7 +121,10 @@ async function listingFor(
 		LEFT JOIN organization o ON o.id = m.organization_id
 		WHERE m.user_id = ${userId}
 	`;
-	return workspacesListing(memberships);
+	const listing = workspacesListing(memberships);
+	return isSelfHosted()
+		? { ...listing, admin: await isSelfHostedAdmin(sqlClient, userId) }
+		: listing;
 }
 
 function listedTools(listing: { retro: boolean; admin: boolean }) {

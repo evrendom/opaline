@@ -1,4 +1,5 @@
 import { getLogger } from "@logtape/logtape";
+import { isSelfHosted } from "../../lib/self-hosted.js";
 import { purgeAnalysisLog } from "./analysis-log.service.js";
 import { createConvexAnalysisStore } from "./convex-store.js";
 import { parseSigningKey } from "./convex-token.js";
@@ -27,9 +28,16 @@ let configured: AnalysisLog | null | undefined;
  * `ANALYSIS_LOG_SIGNING_KEY`, and always OpenAI, because its vectors persist.
  */
 export function getAnalysisLog(workspaceId: string): AnalysisLog | null {
-	return listsWorkspace("ANALYSIS_LOG_WORKSPACES", workspaceId, false)
+	return (isSelfHosted() && workspaceId !== "") ||
+		listsWorkspace("ANALYSIS_LOG_WORKSPACES", workspaceId, false)
 		? configuredAnalysisLog()
 		: null;
+}
+
+export function analysisLogStore(): "memory" | "convex" | null {
+	if (isSelfHosted()) return "memory";
+	const store = process.env.ANALYSIS_LOG_STORE;
+	return store === "memory" || store === "convex" ? store : null;
 }
 
 /**
@@ -152,8 +160,7 @@ export function analysisPurgeStores(signal: AbortSignal): AnalysisStore[] {
 		stores.push(createConvexAnalysisStore({ url, signingKey, signal }));
 	}
 	const log = configuredAnalysisLog();
-	if (process.env.ANALYSIS_LOG_STORE === "memory" && log)
-		stores.push(log.store);
+	if (analysisLogStore() === "memory" && log) stores.push(log.store);
 	return stores;
 }
 
@@ -192,13 +199,14 @@ export function setAnalysisLogForTests(
 function configuredLog(): AnalysisLog | null {
 	const apiKey = process.env.OPENAI_API_KEY?.trim();
 	const now = () => new Date();
-	if (process.env.ANALYSIS_LOG_STORE === "memory")
+	const store = analysisLogStore();
+	if (store === "memory")
 		return {
 			store: createMemoryAnalysisStore(),
 			embedder: apiKey ? createOpenAiEmbedder(apiKey) : createLocalEmbedder(),
 			now,
 		};
-	if (process.env.ANALYSIS_LOG_STORE !== "convex") return null;
+	if (store !== "convex") return null;
 	const url = process.env.CONVEX_URL?.trim();
 	const signingKey = parseSigningKey(
 		process.env.ANALYSIS_LOG_SIGNING_KEY ?? "",

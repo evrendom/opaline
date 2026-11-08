@@ -12,6 +12,7 @@ import { PostHog } from "posthog-node";
 import { sqlClient } from "../db.js";
 import { isVercelRuntime } from "./api-runtime.js";
 import { readProductAnalyticsExcludedOrgIds } from "./env.js";
+import { isSelfHosted } from "./self-hosted.js";
 
 type ApiAutoProps = "event_version" | "surface" | "environment";
 type ApiCapturePayload<Name extends ProductAnalyticsEventName> = Omit<
@@ -23,6 +24,7 @@ let client: PostHog | null | undefined;
 
 function isAnalyticsEnabled() {
 	return (
+		!isSelfHosted() &&
 		(process.env.POSTHOG_ENABLED ?? process.env.VITE_POSTHOG_ENABLED) === "true"
 	);
 }

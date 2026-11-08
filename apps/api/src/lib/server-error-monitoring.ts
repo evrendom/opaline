@@ -1,5 +1,6 @@
 import { getLogger } from "@logtape/logtape";
 import { readBooleanEnv } from "./env.js";
+import { isSelfHosted } from "./self-hosted.js";
 
 const logger = getLogger(["rudel", "api", "sentry"]);
 const SENTRY_FLUSH_TIMEOUT_MS = 2_000;
@@ -46,7 +47,7 @@ function getSentrySdk(): Promise<SentryNodeSdk | null> {
 
 async function initializeSentrySdk(): Promise<SentryNodeSdk | null> {
 	const dsn = process.env.SENTRY_API_DSN?.trim();
-	if (!readBooleanEnv("SENTRY_API_ENABLED", false) || !dsn) {
+	if (isSelfHosted() || !readBooleanEnv("SENTRY_API_ENABLED", false) || !dsn) {
 		return null;
 	}
 

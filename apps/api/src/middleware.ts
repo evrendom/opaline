@@ -2,6 +2,7 @@ import { type Implementer, implement, ORPCError } from "@orpc/server";
 import { contract } from "@rudel/api-routes";
 import type { Session } from "./auth.js";
 import { sqlClient } from "./db.js";
+import { isSelfHosted, isSelfHostedAdmin } from "./lib/self-hosted.js";
 import { readWorkspaceMember } from "./services/session-reader.service.js";
 
 export interface AppContext {
@@ -103,24 +104,32 @@ export const adminMiddleware = os.middleware(async ({ context, next }) => {
 		throw new ORPCError("UNAUTHORIZED");
 	}
 
-	if (!ADMIN_ORGANIZATION_ID) {
-		throw new ORPCError("FORBIDDEN", {
-			message: "Admin panel is not configured",
-		});
-	}
+	if (isSelfHosted()) {
+		if (!(await isSelfHostedAdmin(sqlClient, context.user.id))) {
+			throw new ORPCError("FORBIDDEN", {
+				message: "Admin access required",
+			});
+		}
+	} else {
+		if (!ADMIN_ORGANIZATION_ID) {
+			throw new ORPCError("FORBIDDEN", {
+				message: "Admin panel is not configured",
+			});
+		}
 
-	const membership = await sqlClient<Array<{ id: string }>>`
-		SELECT id
-		FROM member
-		WHERE organization_id = ${ADMIN_ORGANIZATION_ID}
-			AND user_id = ${context.user.id}
-		LIMIT 1
-	`;
+		const membership = await sqlClient<Array<{ id: string }>>`
+			SELECT id
+			FROM member
+			WHERE organization_id = ${ADMIN_ORGANIZATION_ID}
+				AND user_id = ${context.user.id}
+			LIMIT 1
+		`;
 
-	if (membership.length === 0) {
-		throw new ORPCError("FORBIDDEN", {
-			message: "Admin access required",
-		});
+		if (membership.length === 0) {
+			throw new ORPCError("FORBIDDEN", {
+				message: "Admin access required",
+			});
+		}
 	}
 
 	return next({

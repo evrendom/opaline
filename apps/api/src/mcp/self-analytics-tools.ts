@@ -1,6 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 import type { ClickHouseExecutor } from "../clickhouse.js";
+import { isSelfHosted } from "../lib/self-hosted.js";
 import { table } from "../services/analysis/find-text.js";
 import {
 	MCP_STATS_ACTIONS,
@@ -188,6 +189,7 @@ export const agentFeedbackTool: McpTool = {
 export function mcpStatsTool(
 	executor: () => Pick<ClickHouseExecutor, "query">,
 	now: () => number = Date.now,
+	selfHostedAdmin: (userId: string) => Promise<boolean> = async () => false,
 ): McpTool {
 	return {
 		name: "mcp_stats",
@@ -202,7 +204,10 @@ export function mcpStatsTool(
 		].join("\n"),
 		inputSchema: withWorkspaceDescription(jsonInput(McpStatsInputSchema)),
 		run: async (_client, { workspace: _workspace, ...args }, context) => {
-			if (!isAdminWorkspace(context.workspace.id))
+			if (
+				!isAdminWorkspace(context.workspace.id) &&
+				!(isSelfHosted() && (await selfHostedAdmin(context.userId)))
+			)
 				throw new ORPCError("FORBIDDEN", {
 					message:
 						"refused, do not retry: mcp_stats is only available in the Opaline team's own workspace.",

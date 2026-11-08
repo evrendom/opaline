@@ -33,6 +33,7 @@ import {
 import { z } from "zod";
 import { getClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
+import { isSelfHostedAdmin } from "../lib/self-hosted.js";
 import type { AppContext } from "../middleware.js";
 import type { router } from "../router.js";
 import { retroToolsEnabled } from "../services/analysis/retro-tools.js";
@@ -1828,7 +1829,9 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		},
 	},
 	agentFeedbackTool,
-	mcpStatsTool(getClickhouse),
+	mcpStatsTool(getClickhouse, Date.now, (userId) =>
+		isSelfHostedAdmin(sqlClient, userId),
+	),
 ];
 
 export const SESSION_RESOURCE_PREFIX = "opaline://sessions/";

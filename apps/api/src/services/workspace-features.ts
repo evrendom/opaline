@@ -5,6 +5,7 @@ import {
 	type WorkspaceFeatureKey,
 } from "@rudel/api-routes";
 import type postgres from "postgres";
+import { isSelfHosted, selfHostedFeatureDefault } from "../lib/self-hosted.js";
 import { listsWorkspace } from "./analysis-log/config.js";
 import { agentTracesEnabled } from "./run-questions/agent-traces-rollout.js";
 import { runQuestionTagsEnabled } from "./run-questions/tags-rollout.js";
@@ -57,7 +58,18 @@ export async function workspaceFeatureEnabled(
 	workspaceId: string,
 ): Promise<boolean> {
 	const switches = await cachedSwitches(sql, workspaceId);
-	return switches.get(feature)?.enabled ?? ENVIRONMENT[feature](workspaceId);
+	return (
+		switches.get(feature)?.enabled ?? environmentDefault(feature, workspaceId)
+	);
+}
+
+export function environmentDefault(
+	feature: WorkspaceFeatureKey,
+	workspaceId: string,
+): boolean {
+	return isSelfHosted()
+		? selfHostedFeatureDefault(feature)
+		: ENVIRONMENT[feature](workspaceId);
 }
 
 /** Workspaces with their members and every feature's state, newest first. */
@@ -209,7 +221,7 @@ function workspaceRow(
 		members: workspace.members,
 		features: WORKSPACE_FEATURES.map(({ key }) => {
 			const set = switches.get(key);
-			const environment = ENVIRONMENT[key](workspace.id);
+			const environment = environmentDefault(key, workspace.id);
 			return {
 				key,
 				override: set?.enabled ?? null,

@@ -4,6 +4,7 @@ import {
 	type OpalineBillingMode,
 } from "@rudel/api-routes";
 import Stripe from "stripe";
+import { isSelfHosted } from "./lib/self-hosted.js";
 
 export interface StripeWebhookConfig {
 	client: Stripe;
@@ -18,6 +19,7 @@ export function getStripeBillingConfiguration(): BillingConfiguration {
 	const mode = getStripeBillingMode();
 	return {
 		configured:
+			!isSelfHosted() &&
 			mode !== null &&
 			(mode === "live" || sandboxUsesLocalDatabase()) &&
 			Boolean(process.env.STRIPE_SECRET_KEY?.trim()) &&
@@ -56,7 +58,7 @@ export function getStripeWebhookConfig(): StripeWebhookConfig | null {
 
 export function getStripeClient(): Stripe | null {
 	const secretKey = process.env.STRIPE_SECRET_KEY?.trim() ?? "";
-	if (!secretKey) return null;
+	if (!secretKey || isSelfHosted()) return null;
 	assertSecretKeyMatchesBillingMode(secretKey, requireStripeBillingMode());
 	stripeClient ??= new Stripe(secretKey, {
 		apiVersion: STRIPE_API_VERSION,

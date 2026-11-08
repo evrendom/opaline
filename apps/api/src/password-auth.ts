@@ -5,6 +5,7 @@ import {
 	createAuthMiddleware,
 } from "better-auth/api";
 import { z } from "zod";
+import { isSelfHosted } from "./lib/self-hosted.js";
 
 /**
  * Email+password sign-in and sign-up are limited to the emails listed in
@@ -28,6 +29,15 @@ export function parsePasswordAuthEmails(
 		.filter((entry) => entry.length > 0);
 	if (entries.includes("*")) return { kind: "everyone" };
 	return { kind: "emails", emails: new Set(entries) };
+}
+
+export function readPasswordAuthAllowlist(
+	env: Readonly<Record<string, string | undefined>> = process.env,
+): PasswordAuthAllowlist {
+	if (isSelfHosted(env)) return { kind: "everyone" };
+	return parsePasswordAuthEmails(env.PASSWORD_AUTH_EMAILS, [
+		env.DEMO_ACCOUNT_EMAIL,
+	]);
 }
 
 export function isPasswordAuthAllowed(

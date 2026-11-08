@@ -1,4 +1,5 @@
 import { getLogger } from "@logtape/logtape";
+import { isSelfHosted } from "../../lib/self-hosted.js";
 import { listsWorkspace } from "../analysis-log/config.js";
 
 const logger = getLogger(["rudel", "api", "retro-tools"]);
@@ -29,6 +30,7 @@ export interface RetroWorkspace {
  */
 export function retroToolsEnabled(workspace: RetroWorkspace): boolean {
 	if (workspace.id === "") return false;
+	if (isSelfHosted()) return true;
 	const team = process.env.VITE_ADMIN_ORGANIZATION_ID?.trim();
 	if (team && workspace.id === team) return true;
 	const since = retroToolsNewSince();

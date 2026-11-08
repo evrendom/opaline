@@ -1,5 +1,6 @@
 import { getLogger } from "@logtape/logtape";
 import { readPositiveSafeIntegerEnv } from "../../lib/env.js";
+import { isSelfHosted } from "../../lib/self-hosted.js";
 import { listsWorkspace } from "../analysis-log/config.js";
 import {
 	OPENAI_EMBEDDING_MODEL,
@@ -83,6 +84,7 @@ export function transcriptEmbedder(): TranscriptEmbedder | null {
  * (`*` mixed with ids) is logged and lists nobody.
  */
 export function embedsWorkspace(workspaceId: string): boolean {
+	if (isSelfHosted() && workspaceId !== "") return true;
 	return listsWorkspace("TRANSCRIPT_EMBEDDINGS_WORKSPACES", workspaceId, false);
 }
 

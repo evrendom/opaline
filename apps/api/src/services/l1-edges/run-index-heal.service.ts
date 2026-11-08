@@ -17,6 +17,7 @@ import {
 	getSafeClickHouseTable,
 } from "../../clickhouse.js";
 import type { MaintenanceDeadline } from "../../lib/bounded-maintenance.js";
+import { isSelfHosted } from "../../lib/self-hosted.js";
 import {
 	RUN_INDEX_PRICING_VERSION,
 	RUN_INDEX_VERSION,
@@ -67,12 +68,13 @@ type Environment = Readonly<Record<string, string | undefined>>;
 export function readRunIndexHealConfig(
 	env: Environment = process.env,
 ): RunIndexHealConfig {
-	const retro = readRetroWorkspaces(env);
+	const retro = isSelfHosted(env) ? "all" : readRetroWorkspaces(env);
 	return {
 		enabled:
 			readFlag(env, "RUN_INDEX_HEAL_ENABLED", true) &&
 			env.L1_EDGES_ENQUEUE_ENABLED !== "false",
-		workerEnabled: readFlag(env, "L1_EDGES_WORKER_ENABLED", false),
+		workerEnabled:
+			isSelfHosted(env) || readFlag(env, "L1_EDGES_WORKER_ENABLED", false),
 		reparse: readFlag(env, "RUN_INDEX_HEAL_REPARSE_ENABLED", false),
 		maxPerTick: readCount(env, "RUN_INDEX_HEAL_MAX_PER_TICK", 25, 1),
 		maxReparsePerTick: readCount(
