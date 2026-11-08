@@ -16,7 +16,7 @@ import {
 } from "../clickhouse.js";
 import { createLocalObjectStoreClient } from "./local-object-store.js";
 import {
-	createObjectStoreS3Client,
+	createObjectStorePresignClient,
 	type R2IngestConfiguration,
 } from "./r2-ingest-storage.service.js";
 
@@ -211,7 +211,7 @@ export function createR2ImageUrlSigner(
 				objectKey: input.objectKey,
 			});
 	}
-	const client = createObjectStoreS3Client(configuration);
+	const client = createObjectStorePresignClient(configuration);
 	return (input) =>
 		getSignedUrl(
 			client,

@@ -47,6 +47,10 @@ function fakeAuth(overrides: Partial<SelfHostAuth["api"]> = {}) {
 				calls.push(`apiKey ${body.userId} ${body.name} ${body.expiresIn}`);
 				return { id: "key-id", key: "secret-key" };
 			},
+			getSession: async ({ headers }) =>
+				headers.get("cookie")?.includes("better-auth.session_token=admin")
+					? { user: { id: "user-2" } }
+					: null,
 			...overrides,
 		},
 		handler: async (request) => {
@@ -121,7 +125,12 @@ describe("self-hosted HTTP routes", () => {
 			appUrl: "http://localhost:4100",
 			mcpUrl: "http://localhost:4100/api/mcp",
 			setupComplete: false,
-			auth: { password: true, emailCodes: true, social: ["github"] },
+			auth: {
+				password: true,
+				emailCodes: true,
+				social: ["github"],
+				openSignup: false,
+			},
 		});
 		expect(
 			(await (
@@ -134,8 +143,18 @@ describe("self-hosted HTTP routes", () => {
 		).toMatchObject({
 			setupComplete: true,
 			version: "dev",
-			auth: { emailCodes: false },
+			auth: { emailCodes: false, openSignup: false },
 		});
+		expect(
+			(await (
+				await call(
+					deps(() => [{ users: true }], { ...ENV, OPALINE_OPEN_SIGNUP: "1" })
+						.deps,
+					"GET",
+					"/api/selfhost/info",
+				)
+			)?.json()) as object,
+		).toMatchObject({ auth: { openSignup: true } });
 		expect((await call(d.deps, "GET", "/api/selfhost/nope"))?.status).toBe(404);
 	});
 
@@ -253,7 +272,11 @@ describe("self-hosted HTTP routes", () => {
 	});
 
 	test("a login link needs a valid API key; the login itself is handed to Better Auth", async () => {
-		const d = deps(() => []);
+		const d = deps((query) =>
+			query.startsWith('SELECT id, email, name FROM "user" WHERE id')
+				? [{ id: "user-1", email: "owner@example.com", name: "Owner" }]
+				: [],
+		);
 		expect(
 			(
 				await call(d.deps, "POST", "/api/selfhost/login-link", {
@@ -261,14 +284,171 @@ describe("self-hosted HTTP routes", () => {
 				})
 			)?.status,
 		).toBe(401);
+		expect(
+			(await call(d.deps, "POST", "/api/selfhost/login-link"))?.status,
+		).toBe(401);
 		const link = await call(d.deps, "POST", "/api/selfhost/login-link", {
 			headers: { "x-api-key": "good-key" },
 		});
-		expect(((await link?.json()) as { loginUrl: string }).loginUrl).toStartWith(
+		const json = (await link?.json()) as {
+			loginUrl: string;
+			expiresAt: string;
+			user: unknown;
+		};
+		expect(json.loginUrl).toStartWith(
 			"http://localhost:4100/api/selfhost/login?token=",
 		);
+		expect(json.user).toEqual({
+			id: "user-1",
+			email: "owner@example.com",
+			name: "Owner",
+		});
+		expect(Date.parse(json.expiresAt) - Date.now()).toBeWithin(
+			590_000,
+			601_000,
+		);
+		expect(
+			d.queries.find((entry) =>
+				entry.query.startsWith("INSERT INTO verification"),
+			)?.values[3],
+		).toBe(600);
 		await call(d.deps, "GET", "/api/selfhost/login?token=abc");
 		expect(d.calls).toEqual(["auth /api/auth/selfhost/login?token=abc"]);
+	});
+
+	const MEMBER = { id: "user-3", email: "bob@example.com", name: "Bob" };
+	const memberLookup =
+		(allowed: boolean): Answer =>
+		(query, values) => {
+			if (
+				query.startsWith(
+					'SELECT id, email, name FROM "user" WHERE lower(email)',
+				)
+			)
+				return values[0] === MEMBER.email ? [MEMBER] : [];
+			if (query.startsWith("SELECT EXISTS ( SELECT 1 FROM member actor"))
+				return [{ allowed }];
+			return [];
+		};
+	const memberLink = (
+		d: SelfHostDependencies,
+		headers: Record<string, string>,
+		body: unknown,
+	) =>
+		call(d, "POST", "/api/selfhost/login-link", {
+			headers,
+			body: JSON.stringify(body),
+		});
+
+	test("the setup token makes an hour-long sign-in link for anyone, by email", async () => {
+		const d = deps(memberLookup(false));
+		const headers = { "X-Opaline-Setup-Token": ENV.OPALINE_SETUP_TOKEN };
+		const response = await memberLink(d.deps, headers, {
+			email: " Bob@Example.com ",
+		});
+		expect(response?.status).toBe(200);
+		const json = (await response?.json()) as {
+			user: unknown;
+			expiresAt: string;
+		};
+		expect(json.user).toEqual(MEMBER);
+		expect(Date.parse(json.expiresAt) - Date.now()).toBeWithin(
+			3_590_000,
+			3_601_000,
+		);
+		const insert = d.queries.find((entry) =>
+			entry.query.startsWith("INSERT INTO verification"),
+		);
+		expect(insert?.values.slice(2)).toEqual(["user-3", 3600]);
+		expect(
+			d.queries.some((entry) => entry.query.includes("FROM member actor")),
+		).toBe(false);
+
+		expect((await memberLink(d.deps, headers, {}))?.status).toBe(400);
+		expect(
+			(await memberLink(d.deps, headers, { email: "nobody@example.com" }))
+				?.status,
+		).toBe(404);
+		expect(
+			(
+				await memberLink(
+					d.deps,
+					{ "X-Opaline-Setup-Token": "setup-token-012345678X" },
+					{ email: MEMBER.email },
+				)
+			)?.status,
+		).toBe(401);
+		expect(
+			(await memberLink(d.deps, headers, { email: "not an email" }))?.status,
+		).toBe(400);
+	});
+
+	test("an owner or admin makes a member's link with an API key or the browser session; others are refused", async () => {
+		const allowed = deps(memberLookup(true));
+		const byKey = await memberLink(
+			allowed.deps,
+			{ "x-api-key": "good-key" },
+			{ email: MEMBER.email },
+		);
+		expect(byKey?.status).toBe(200);
+		const check = allowed.queries.find((entry) =>
+			entry.query.includes("FROM member actor"),
+		);
+		expect(check?.values).toEqual(["user-1", "user-3"]);
+		expect(check?.query).toContain(
+			"actor.role = 'owner' OR (actor.role = 'admin' AND target.role <> 'owner')",
+		);
+		const bySession = await memberLink(
+			allowed.deps,
+			{ cookie: "better-auth.session_token=admin.sig" },
+			{ email: MEMBER.email },
+		);
+		expect(bySession?.status).toBe(200);
+		expect(
+			allowed.queries.filter((entry) =>
+				entry.query.includes("FROM member actor"),
+			)[1]?.values,
+		).toEqual(["user-2", "user-3"]);
+
+		const refused = deps(memberLookup(false));
+		const response = await memberLink(
+			refused.deps,
+			{ "x-api-key": "good-key" },
+			{ email: MEMBER.email },
+		);
+		expect(response?.status).toBe(403);
+		expect(((await response?.json()) as { error: string }).error).toBe(
+			"forbidden",
+		);
+		expect(
+			refused.queries.some((entry) =>
+				entry.query.startsWith("INSERT INTO verification"),
+			),
+		).toBe(false);
+	});
+
+	test("asking for your own email with an API key is your own ten-minute link", async () => {
+		const d = deps((query, values) =>
+			query.startsWith(
+				'SELECT id, email, name FROM "user" WHERE lower(email)',
+			) && values[0] === "owner@example.com"
+				? [{ id: "user-1", email: "owner@example.com", name: "Owner" }]
+				: [],
+		);
+		const response = await memberLink(
+			d.deps,
+			{ "x-api-key": "good-key" },
+			{ email: "owner@example.com" },
+		);
+		expect(response?.status).toBe(200);
+		expect(
+			d.queries.some((entry) => entry.query.includes("FROM member actor")),
+		).toBe(false);
+		expect(
+			d.queries.find((entry) =>
+				entry.query.startsWith("INSERT INTO verification"),
+			)?.values[3],
+		).toBe(600);
 	});
 });
 

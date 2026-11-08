@@ -1,4 +1,4 @@
-import { IconTrash } from "@tabler/icons-react";
+import { IconLink, IconTrash } from "@tabler/icons-react";
 import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
 import { Button } from "@/app/ui/button";
@@ -62,6 +62,17 @@ function MemberActivity({ row }: { row: TeamPageMemberRow | undefined }) {
 	);
 }
 
+type MemberRow = {
+	id: string;
+	role: string;
+	user: {
+		id: string;
+		name: string;
+		email: string;
+		image: string | null;
+	};
+};
+
 export function WorkspaceMembersTable({
 	members,
 	activity,
@@ -69,22 +80,18 @@ export function WorkspaceMembersTable({
 	pendingKey,
 	onRoleChange,
 	onRemove,
+	signInLink,
 }: {
-	members: readonly {
-		id: string;
-		role: string;
-		user: {
-			id: string;
-			name: string;
-			email: string;
-			image: string | null;
-		};
-	}[];
+	members: readonly MemberRow[];
 	canEdit: boolean;
 	pendingKey: string | null;
 	onRoleChange: (memberId: string, role: "member" | "admin") => void;
 	onRemove: (memberId: string) => void;
 	activity?: ReadonlyMap<string, TeamPageMemberRow>;
+	signInLink?: {
+		canCopy: (member: MemberRow) => boolean;
+		onCopy: (member: MemberRow) => void;
+	} | null;
 }) {
 	const [removing, setRemoving] = useState<(typeof members)[number] | null>(
 		null,
@@ -180,6 +187,31 @@ export function WorkspaceMembersTable({
 									</span>
 								)}
 							</div>
+							{signInLink ? (
+								signInLink.canCopy(member) ? (
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon-sm"
+										className="workspace-settings-icon-button"
+										aria-label={
+											pendingKey === `link:${member.id}`
+												? `Making a sign-in link for ${member.user.name || member.user.email}`
+												: `Copy a sign-in link for ${member.user.name || member.user.email}`
+										}
+										title="Copy sign-in link"
+										onClick={() => signInLink.onCopy(member)}
+										disabled={Boolean(pendingKey)}
+									>
+										<IconLink aria-hidden="true" />
+									</Button>
+								) : (
+									<span
+										aria-hidden="true"
+										className="workspace-settings-icon-slot"
+									/>
+								)
+							) : null}
 							{canEdit && member.role === "owner" ? (
 								<span
 									aria-hidden="true"

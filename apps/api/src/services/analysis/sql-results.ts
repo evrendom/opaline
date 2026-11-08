@@ -6,6 +6,7 @@ import {
 	AnalysisSqlOutputSchema,
 } from "@rudel/api-routes";
 import type postgres from "postgres";
+import { isSelfHosted, parseSqlQuotaPerHour } from "../../lib/self-hosted.js";
 import { driftNotice } from "./retro-measures.js";
 
 /**
@@ -143,6 +144,31 @@ export async function expireSqlResults(
  * 5.4 GiB for everyone, ingest and merges included.
  */
 export const SQL_QUOTA = { queries: 120, windowMs: 3_600_000 } as const;
+
+export function readSqlQuotaLimits(
+	env: Readonly<Record<string, string | undefined>> = process.env,
+): { queries: number; windowMs: number } | null {
+	if (!isSelfHosted(env)) return SQL_QUOTA;
+	if (!env.OPALINE_SQL_QUOTA_PER_HOUR?.trim()) return null;
+	const queries = parseSqlQuotaPerHour(env.OPALINE_SQL_QUOTA_PER_HOUR);
+	return queries === null
+		? SQL_QUOTA
+		: { queries, windowMs: SQL_QUOTA.windowMs };
+}
+
+const UNLIMITED_SQL_QUOTA: SqlQuota = {
+	queries: Number.POSITIVE_INFINITY,
+	windowMs: SQL_QUOTA.windowMs,
+	take: async () => ({ allowed: true }),
+};
+
+export function createSqlQuota(
+	sql: postgres.Sql,
+	env: Readonly<Record<string, string | undefined>> = process.env,
+): SqlQuota {
+	const limits = readSqlQuotaLimits(env);
+	return limits ? createPostgresSqlQuota(sql, limits) : UNLIMITED_SQL_QUOTA;
+}
 
 /** Stored sql result ids start with it; analysis query ids do not. */
 export const SQL_RESULT_ID_PREFIX = "sr_";

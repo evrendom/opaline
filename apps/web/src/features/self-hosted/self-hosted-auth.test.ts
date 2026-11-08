@@ -2,10 +2,15 @@ import { describe, expect, it } from "vitest";
 import type { SelfHostInfo } from "./self-host-info";
 import {
 	describeAuthError,
+	forgetInvite,
 	initialSelfHostedAuthMode,
+	inviteFromLocation,
 	isInvitePath,
 	readLoginLinkError,
+	rememberInvite,
 	runAuthRequest,
+	selfHostedAuthCopy,
+	selfHostedSignUp,
 	selfHostedSocialProviders,
 	validateCredentials,
 } from "./self-hosted-auth";
@@ -16,7 +21,7 @@ const info: SelfHostInfo = {
 	appUrl: "http://localhost:4790",
 	mcpUrl: "http://localhost:4790/api/mcp",
 	setupComplete: true,
-	auth: { password: true, emailCodes: false, social: [] },
+	auth: { password: true, emailCodes: false, social: [], openSignup: false },
 };
 
 describe("initialSelfHostedAuthMode", () => {
@@ -142,5 +147,64 @@ describe("readLoginLinkError", () => {
 		);
 		expect(readLoginLinkError("?error=other")).toBeNull();
 		expect(readLoginLinkError("")).toBeNull();
+	});
+});
+
+describe("invites", () => {
+	it("reads the invite from an invite path or from a redirect to one", () => {
+		expect(inviteFromLocation("/acme/join/tok_123", "")).toBe("tok_123");
+		expect(inviteFromLocation("/team/invite/tok_123/", "")).toBe("tok_123");
+		expect(inviteFromLocation("/invitation/inv_1", "")).toBe("inv_1");
+		expect(
+			inviteFromLocation("/login", "?redirect=%2Finvitation%2Finv_2%3Fx%3D1"),
+		).toBe("inv_2");
+		expect(inviteFromLocation("/", "?redirect=//evil/invitation/x")).toBeNull();
+		expect(inviteFromLocation("/acme/sessions", "")).toBeNull();
+		expect(inviteFromLocation("/invitation/a%20b", "")).toBeNull();
+		expect(inviteFromLocation("/invitation/%E0%A4%A", "")).toBeNull();
+	});
+
+	it("keeps the invite in a cookie the server reads on sign-up", () => {
+		forgetInvite();
+		rememberInvite(null);
+		rememberInvite("bad value;");
+		expect(document.cookie).not.toContain("opaline_invite=");
+		rememberInvite("tok_123");
+		expect(document.cookie).toContain("opaline_invite=tok_123");
+		forgetInvite();
+	});
+
+	it("sign-up needs an invite unless the server is open, and setup comes first", () => {
+		expect(selfHostedSignUp(info, null)).toBe("needs-invite");
+		expect(selfHostedSignUp(info, "tok")).toBe("invite");
+		expect(selfHostedSignUp({ ...info, setupComplete: false }, null)).toBe(
+			"needs-setup",
+		);
+		expect(
+			selfHostedSignUp(
+				{ ...info, auth: { ...info.auth, openSignup: true } },
+				null,
+			),
+		).toBe("open");
+		expect(
+			selfHostedAuthCopy("sign-up", { info, pathname: "/", search: "" }).title,
+		).toBe("Ask for an invite");
+		expect(
+			selfHostedAuthCopy("sign-up", {
+				info,
+				pathname: "/",
+				search: "?user_code=ABCD",
+			}).title,
+		).toBe("Ask for an invite");
+		expect(
+			selfHostedAuthCopy("sign-up", {
+				info,
+				pathname: "/acme/join/tok",
+				search: "",
+			}).title,
+		).toBe("Join your team");
+		expect(
+			describeAuthError({ code: "INVITE_REQUIRED", status: 403 }, "sign-up"),
+		).toContain("invite-only");
 	});
 });

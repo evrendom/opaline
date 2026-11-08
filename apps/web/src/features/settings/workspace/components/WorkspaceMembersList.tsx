@@ -1,15 +1,22 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
+import {
+	canCopySignInLink,
+	describeLinkLifetime,
+	requestSignInLink,
+} from "@/features/self-hosted/account-recovery";
 import { WorkspaceMembersTable } from "@/features/settings/workspace/components/WorkspaceMembersTable";
 import type { TeamPageMemberRow } from "@/features/team/use-team-page-data";
 import { authClient } from "@/lib/auth-client";
+import { copyTextToClipboardWithResult } from "@/lib/clipboard";
 
 export function WorkspaceMembersList({
 	members,
 	activity,
 	canManage,
 	onInvalidate,
+	signInLinks,
 }: {
 	activity?: ReadonlyMap<string, TeamPageMemberRow>;
 	members: readonly {
@@ -24,6 +31,7 @@ export function WorkspaceMembersList({
 	}[];
 	canManage: boolean;
 	onInvalidate: () => void;
+	signInLinks?: { viewerId: string; viewerRole: string | null } | null;
 }) {
 	const { trackOrganizationAction } = useAnalyticsTracking({
 		pageName: "organization",
@@ -73,6 +81,31 @@ export function WorkspaceMembersList({
 		}
 	};
 
+	const copySignInLink = async (member: (typeof members)[number]) => {
+		const name = member.user.name || member.user.email;
+		setPendingMemberKey(`link:${member.id}`);
+		try {
+			const link = await requestSignInLink(member.user.email);
+			const lifetime = describeLinkLifetime(link.expiresAt, Date.now());
+			const result = await copyTextToClipboardWithResult(link.loginUrl, {
+				allowPromptFallback: true,
+				promptMessage: `Sign-in link for ${name}. ${lifetime}`,
+			});
+			if (result === "copied")
+				toast.success(`Sign-in link for ${name} copied. ${lifetime}`);
+			else if (result === "failed")
+				toast.error(`Could not copy the sign-in link for ${name}.`);
+		} catch (cause) {
+			toast.error(
+				cause instanceof Error
+					? cause.message
+					: "Could not make a sign-in link.",
+			);
+		} finally {
+			setPendingMemberKey(null);
+		}
+	};
+
 	return (
 		<WorkspaceMembersTable
 			members={members}
@@ -81,6 +114,18 @@ export function WorkspaceMembersList({
 			pendingKey={pendingMemberKey}
 			onRoleChange={(memberId, role) => void updateRole(memberId, role)}
 			onRemove={(memberId) => void removeMember(memberId)}
+			signInLink={
+				signInLinks
+					? {
+							canCopy: (member) =>
+								canCopySignInLink(
+									{ id: signInLinks.viewerId, role: signInLinks.viewerRole },
+									member,
+								),
+							onCopy: (member) => void copySignInLink(member),
+						}
+					: null
+			}
 		/>
 	);
 }

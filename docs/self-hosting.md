@@ -1,291 +1,298 @@
-# Self-Hosting Opaline
+# Self-hosting Opaline
 
-This guide walks through deploying Opaline using **ObsessionDB** (ClickHouse), **Neon** (Postgres), and **Fly.io** (app server). It is one supported self-hosting stack; production infrastructure may differ.
+Opaline runs on your own hardware with one command. A self-hosted server is a single-team install:
+every feature is on, there are no plans or billing, nothing is sent to Stripe, PostHog, Sentry,
+Slack or CRM, and the background jobs run inside the server.
 
-> **This is an opinionated guide.** Opaline is a Bun server that needs Postgres and ClickHouse — it can run anywhere those are available. You don't have to use these specific providers. Any Postgres instance, any ClickHouse instance (that supports `SharedReplacingMergeTree` or `ReplacingMergeTree`), and any platform that can run a Bun/Node.js server will work. This example uses ObsessionDB, Neon, and Fly.io because they all have free tiers and are easy to set up.
+What runs:
 
-## Services
+| Part | Holds |
+| --- | --- |
+| Opaline server (Bun) | API, MCP endpoint, dashboard, background jobs |
+| Postgres | Accounts, workspaces, invites, saved answers |
+| ClickHouse | Sessions and everything computed from them |
+| Object storage | Large uploads, evidence images and transcripts. A directory on disk by default, or any S3-compatible store |
 
-| Component | Provider | Free Tier | Purpose |
-|-----------|----------|-----------|---------|
-| **ClickHouse** | [ObsessionDB](https://obsessiondb.com) | Yes | Session transcript storage and analytics |
-| **Postgres** | [Neon](https://neon.tech) | Yes (0.5 GB) | Authentication (users, sessions, accounts) |
-| **App Server** | [Fly.io](https://fly.io) | Yes (3 shared VMs) | HTTP API + static frontend serving |
+## Pick a setup
 
-## 1. Provision ClickHouse (ObsessionDB)
+| You want | Run |
+| --- | --- |
+| Everything on this computer | `npx opaline@latest server` |
+| Your own ClickHouse (ClickHouse Cloud, a cluster) | `npx opaline@latest server --clickhouse-url https://… --clickhouse-user …` |
+| ClickHouse on a NAS, Opaline on your laptop | `deploy/selfhost/install.sh --clickhouse-only` on the NAS, then `opaline server --clickhouse-url http://nas:8123 …` on the laptop |
+| The whole stack on a NAS or small server for a team | `deploy/selfhost/install.sh --email you@example.com` |
 
-1. Create an account at [obsessiondb.com](https://obsessiondb.com)
-2. Create a new ClickHouse instance
-3. Note your connection details:
-   - **Host** — the HTTPS endpoint (e.g. `https://your-instance.obsessiondb.com`)
-   - **Username** — your username
-   - **Password** — your password
-4. Apply the schema migration:
+## Everything on this computer
 
-```bash
-# From the repo root — set the env vars that chkit reads
-CLICKHOUSE_URL=https://your-instance.obsessiondb.com \
-CLICKHOUSE_USERNAME=your-username \
-CLICKHOUSE_PASSWORD=your-password \
-CLICKHOUSE_DB=default \
-  bun run --cwd packages/ch-schema ch:bootstrap
+```sh
+npx opaline@latest server
 ```
 
-Bootstrap replays the checked-in migrations into an empty `rudel` database, including the controlled F16 migration and its live verification checkpoints. It establishes `subagent_count` before the historical analytics-view recreation, without editing any historical SQL or its journal checksum. Run it before starting any API writers; this offline path assumes one writer endpoint. Existing local installations with an ordered, checksum-verified journal prefix receive only the missing migrations, through the controlled F16 runner, existing forward scripts, or stock chkit restricted to each pending migration. As with fresh replay, this local path permits checked-in destructive DDL and must not run against production. Production upgrades continue to use the controlled forward migration scripts, not bootstrap or a historical replay.
+The first run:
 
-Bootstrap is a no-op when the complete ordered history is already journaled with its original checksums. It refuses unjournaled existing tables, gaps, reordered/unknown/duplicate entries, checksum mismatches, and partial F16 state. Interrupted F16 migrations require the controlled recovery procedure. If a disposable fresh bootstrap fails, drop both `rudel` and `default._chkit_migrations` before retrying; never do this on an existing installation.
+1. uses ClickHouse, Postgres and Bun from your system when they are recent enough (ClickHouse
+   25.8+, Postgres 16+, Bun 1.3+), otherwise downloads pinned versions and checks their checksums;
+2. creates both databases under `~/.opaline/server` and starts everything in the background, bound
+   to `127.0.0.1`, on port 4100;
+3. creates your account (your `git config user.email`, or `--email`) as the owner of a workspace;
+4. logs this machine's CLI in, installs the Claude Code and Codex hooks and registers the MCP in
+   Claude Code, Codex and Cursor;
+5. prints a one-time sign-in link for the dashboard and opens it.
 
-Local ClickHouse also needs the historical storage policy named `s3`. Docker Compose and CI mount `.github/clickhouse/config.d/storage-policy.xml`, which maps its `default` volume to the local default disk; no actual S3 service is needed.
+Later runs start whatever is stopped. Day to day:
 
-> **Note**: `CLICKHOUSE_DB` must be set to `default` for the migration because the `rudel` database doesn't exist yet — the migration creates it. Use `CLICKHOUSE_USERNAME` throughout; `CLICKHOUSE_USER` is accepted as a legacy fallback, and setting both to different values is an error.
->
-> `CLICKHOUSE_USERNAME` is **required** for a hosted endpoint. The migration tool assumes the `default` superuser only when the URL is local (`localhost`/loopback), so a missing username against a remote host fails loudly instead of quietly connecting as `default`.
-
-## 2. Provision Postgres (Neon)
-
-1. Create an account at [neon.tech](https://neon.tech)
-2. Create a new project and database named `rudel`
-3. Copy your connection string (looks like `postgres://user:pass@host/rudel?sslmode=require`)
-4. Run the Drizzle migrations:
-
-```bash
-PG_CONNECTION_STRING="postgres://user:pass@host/rudel?sslmode=require" \
-  bun run --cwd packages/sql-schema migrate
+```sh
+opaline server status        # what runs, ports, paths
+opaline server open          # the dashboard, through a new one-time sign-in link
+opaline server logs -f       # --service server|postgres|clickhouse
+opaline server stop
 ```
 
-This creates the auth tables (users, sessions, accounts, verification tokens) used by `better-auth`.
+Until the server package is published on npm, point the CLI at a packed server or at an athena
+checkout:
 
-### Ingest rate-limiter deployment contract
+```sh
+bun run build:selfhost --version 0.18.0                     # in athena
+OPALINE_SERVER_ARTIFACT=dist-selfhost/opaline-server-0.18.0.tgz npx opaline@latest server
 
-Postgres migration `0028_postgres_ingest_rate_limit.sql` must be applied before
-deploying API code that uses the Postgres-backed ingest limiter. The Fly CI
-workflow already runs Postgres migrations before `flyctl deploy`; manual,
-Vercel, and other self-hosted deployment processes must preserve that order.
-
-The limiter fails closed. If Postgres is unavailable, ingest returns HTTP 503
-with the `SERVICE_UNAVAILABLE` code and does not continue to downstream
-storage. The current CLI treats 503 as retryable and makes at most three total
-attempts, waiting 1 second and then 2 seconds between attempts.
-
-Request and byte budgets are per authenticated user and are shared by all API
-keys owned by that user. Rejection caches are local to each API instance, so
-their database-shedding effectiveness and cached 429 responses are likewise
-per instance rather than globally shared. Cache deadlines are bounded by the
-configured window duration. If the Postgres wall clock is corrected forward
-after a deadline is cached, an instance can continue returning that cached 429
-until its monotonic deadline passes even though a fresh database statement
-would already roll the window. When changing rate-limit window or cap
-configuration, restart or drain all API instances together: an instance running
-old configuration can serve cached rejections computed under the old windows
-until its cached deadlines pass.
-
-## 3. Deploy to Fly.io
-
-1. Install the Fly CLI: `curl -L https://fly.io/install.sh | sh`
-2. Sign up or log in: `fly auth login`
-3. Create a new app:
-
-```bash
-fly launch --name your-app-name --no-deploy
+bun run --cwd apps/web build && bun run --cwd apps/web build:widget
+OPALINE_SERVER_DIR=~/code/athena npx opaline@latest server   # or run a checkout directly
 ```
 
-4. Set secrets:
+All flags and CLI variables are in the CLI's
+[self-hosting page](https://github.com/opalinehq/cli/blob/main/docs/self-hosting.md).
 
-```bash
-fly secrets set \
-  PG_CONNECTION_STRING="postgres://user:pass@host/rudel?sslmode=require" \
-  BETTER_AUTH_SECRET="$(openssl rand -base64 32)" \
-  CLICKHOUSE_URL="https://your-instance.obsessiondb.com" \
-  CLICKHOUSE_USERNAME="your-username" \
-  CLICKHOUSE_PASSWORD="your-password" \
-  APP_URL="https://your-app-name.fly.dev" \
-  ALLOWED_ORIGIN="https://your-app-name.fly.dev"
+## Your own ClickHouse
+
+```sh
+OPALINE_CLICKHOUSE_PASSWORD=… npx opaline@latest server \
+  --clickhouse-url https://abc123.eu-west-1.aws.clickhouse.cloud:8443 \
+  --clickhouse-user opaline
 ```
 
-5. Deploy (the `Dockerfile` in the repo root handles building the frontend and running the API):
+Postgres and the server still run locally. Before starting anything the CLI pings the endpoint,
+checks the credentials and the grants on the `rudel` database: CREATE TABLE, INSERT, SELECT, ALTER,
+and CREATE DATABASE when `rudel` does not exist yet. The server then creates or upgrades the schema
+itself. It probes what the ClickHouse supports (`Shared*MergeTree` engines, an `s3` storage policy)
+and creates plain tables on the default disk where they are missing; `CLICKHOUSE_FLAVOR=oss|cloud`
+skips the probe.
 
-```bash
-fly deploy
+## ClickHouse on a NAS, Opaline on your laptop
+
+On the NAS, from `deploy/selfhost` (see its README for requirements):
+
+```sh
+./install.sh --clickhouse-only
 ```
 
-6. Verify it's running:
+It starts only ClickHouse, on the LAN at port 8123 with the user `opaline`, and prints the command
+for the laptop:
 
-```bash
-curl https://your-app-name.fly.dev/health
+```sh
+OPALINE_CLICKHOUSE_PASSWORD=<from the NAS .env> npx opaline@latest server \
+  --clickhouse-url http://192.168.1.10:8123 --clickhouse-user opaline
 ```
 
-### Custom domain
+The sessions live on the NAS; accounts and saved answers live in the laptop's Postgres. ClickHouse
+speaks plain HTTP here, so keep port 8123 on your LAN.
 
-If you want to use a custom domain instead of `*.fly.dev`:
+## The whole stack on a NAS
 
-```bash
-fly certs add your-domain.com
+`deploy/selfhost` is a Docker Compose stack (Opaline, Postgres 17, ClickHouse, optional Caddy for
+HTTPS). On the NAS:
+
+```sh
+./install.sh --email you@example.com --workspace "Acme"
+./install.sh --domain opaline.example.com --email you@example.com   # with HTTPS through Caddy
 ```
 
-Then update `APP_URL` and `ALLOWED_ORIGIN` to match:
+`install.sh` writes `.env` with fresh secrets, builds the image, starts the stack, creates your
+owner account and prints a sign-in link plus the command each computer runs to connect. Its README
+covers profiles, settings (`compose.override.yaml`), logs, upgrades and the volumes to back up. Run
+`./install.sh` again for a new sign-in link.
 
-```bash
-fly secrets set \
-  APP_URL="https://your-domain.com" \
-  ALLOWED_ORIGIN="https://your-domain.com"
+## Teammates
+
+Sign-up is invite-only. The owner account comes from setup; everyone else needs one of:
+
+- the workspace invite link from Settings, Members, Invite link (valid 7 days, until replaced or
+  revoked), or
+- an invitation for their email from Settings, Members (no email is sent unless `RESEND_API_KEY`
+  is set; copy the link it shows and send it yourself).
+
+The teammate opens the link, creates an account with a password, then connects their machine:
+
+```sh
+npx opaline@latest login --server https://opaline.example.com
+npx opaline@latest mcp install
 ```
 
-## Social Login (Optional)
+For a plain-HTTP server on the LAN add `--allow-insecure-api-base` to `login` once. The server must
+be reachable from their machine: start it with `--host 0.0.0.0` (it then serves
+`http://<LAN address>:4100`), or put it behind HTTPS (below).
 
-To enable GitHub or Google OAuth login, create OAuth apps with the respective providers and set the client credentials:
+`OPALINE_OPEN_SIGNUP=1` lets anyone who can reach the server sign up without an invite. The server
+enforces invite-only itself, for password, email-code and social sign-up alike; the sign-up page
+only explains it.
 
-```bash
-fly secrets set \
-  GITHUB_CLIENT_ID="your-client-id" \
-  GITHUB_CLIENT_SECRET="your-client-secret"
-```
+## Sign-in links and passwords
 
-Set the OAuth callback URL to `https://your-domain.com/api/auth/callback/github` (or `/google`).
+There is no email by default, so sign-in links replace "forgot password":
 
-Without these, users can still sign up and log in with email codes. Password sign-in is limited to the emails in `PASSWORD_AUTH_EMAILS` (`*` allows everyone).
+| You need | Do |
+| --- | --- |
+| The dashboard, on the server's machine | `opaline server open` (link valid 10 minutes, once) |
+| A link for a teammate | `opaline server open --email teammate@example.com`, or the link icon on their row in Settings, Members (valid one hour, once) |
+| A new password | Settings, Account, Password |
 
-## GitHub Repository Evidence (Optional)
+Owners can make a link for anyone in their workspace, admins for anyone but an owner. On the
+server's machine the CLI uses the server's setup token instead, which works for every account.
+Right after signing in with a link, a password can be set without the old one for an hour;
+otherwise the current password is required. Changing it signs you out in other browsers; CLI and
+MCP API keys keep working. Every link made for someone else, and every password change, is logged
+at info level with user ids (never the link).
 
-Repository evidence uses a separate, read-only GitHub App. Its credentials are
-not interchangeable with `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`, which
-configure social login.
+Links come from `POST /api/selfhost/login-link` with the setup token (`X-Opaline-Setup-Token`), an
+API key (`x-api-key` or `Authorization: Bearer`) or a browser session, and an optional
+`{ "email": "…" }`.
 
-Configure the GitHub App with these repository permissions set to read-only:
-Actions, Checks, Contents, Metadata, Pull requests, and Commit statuses. Leave
-**Request user authorization (OAuth) during installation** disabled so the App
-can use a Setup URL. Set both the App's **Setup URL** and one of its **Callback
-URLs** to the public API callback:
+## Connect your agents (MCP)
 
-```text
-https://your-api-domain.com/api/github/setup
-```
+Claude Code, Codex and Cursor connect with an API key. `opaline server` registers them on the
+server's machine; elsewhere `opaline mcp install` does it after `opaline login --server …`:
 
-Then configure all of the repository App variables:
+| Agent | Written |
+| --- | --- |
+| Claude Code | `claude mcp add --scope user --transport http opaline <server>/api/mcp --header "Authorization: Bearer <key>"` |
+| Codex | `[mcp_servers.opaline]` with `url` and `http_headers` in `~/.codex/config.toml` |
+| Cursor | The `opaline` entry in `~/.cursor/mcp.json` |
 
-```bash
-GITHUB_REPOSITORY_APP_ID="numeric-app-id"
-GITHUB_REPOSITORY_APP_SLUG="your-app-slug"
-GITHUB_REPOSITORY_APP_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n..."
-GITHUB_REPOSITORY_APP_CLIENT_ID="your-github-app-client-id"
-GITHUB_REPOSITORY_APP_CLIENT_SECRET="your-github-app-client-secret"
-GITHUB_REPOSITORY_APP_CALLBACK_URL="https://your-api-domain.com/api/github/setup"
-GITHUB_REPOSITORY_APP_STATE_SECRET="at-least-32-random-characters"
-GITHUB_REPOSITORY_APP_WEBHOOK_SECRET="at-least-32-random-characters"
-```
+claude.ai and ChatGPT connectors are different: their servers call your `/api/mcp` from the
+internet and sign in with OAuth, so the server needs a public HTTPS URL. Two ways:
 
-`GITHUB_REPOSITORY_APP_STATE_SECRET` may be omitted to use
-`BETTER_AUTH_SECRET`. Any missing or partial repository App configuration makes
-the connection control unavailable instead of accepting an unverified
-installation.
+- **Your domain.** Run the NAS stack with `--domain`, or any reverse proxy that forwards to port
+  4100, and start the server with `--public-url https://opaline.example.com`.
+- **Tailscale Funnel.** On the server's machine run `tailscale funnel --bg 4100`, then
+  `opaline server --public-url https://<machine>.<tailnet>.ts.net --yes`.
 
-The user-facing GitHub experience (the workspace settings GitHub section and the
-dashboard's Merged PRs metric) stays hidden until you also set
-`GITHUB_EVIDENCE_UI_ENABLED=true`. Collection, the maintenance cron, and
-webhooks do not depend on it.
+Use that URL for the dashboard from then on: the server trusts browser requests only from its
+public origin. Add `https://…/api/mcp` as a custom connector in claude.ai (Settings, Connectors) or in
+ChatGPT (a custom connector, in developer mode). Anyone on the internet can now reach the sign-in
+page; invite-only sign-up is what keeps them out, so leave `OPALINE_OPEN_SIGNUP` unset.
 
-Connection is a two-step GitHub flow. The Setup URL returns an installation ID,
-then Opaline requests a short-lived GitHub App user authorization and verifies
-the signed-in GitHub user's access to that exact installation. The user token
-is used once and is not stored. Opaline binds only the repositories returned by
-GitHub for both that user and that installation; repositories accessible only
-to the App are not added to the workspace. This association check does not
-grant or prove GitHub organization-owner status. Opaline separately requires
-the connecting user to be an owner or administrator of the Opaline workspace.
-The repository set is a verified snapshot. Use **Reconnect** in workspace
-settings after changing GitHub repository selection or user access; Opaline
-does not continuously synchronize later GitHub user-access revocations.
+## Settings
 
-Accepting a repository capture only records a durable collection request; the
-GitHub calls run afterwards in the bounded evidence worker. The resident worker
-(Fly) is woken immediately and otherwise polls every five minutes. Deployments
-without a resident worker (Vercel) collect on the scheduled maintenance cron.
-Collection persists each filtered job log as it is fetched, stops fetching logs
-after a 256 MiB per-collection budget (recorded as partial coverage), and runs
-at most two collections per API process. Objects are registered in a durable
-intent table before they are written, so an interrupted collection or a
-workspace deletion can always find and remove them.
+`opaline server` gives the server a fixed environment. Put extra settings in
+`~/.opaline/server/server.env`, one `NAME=value` per line, and restart with
+`opaline server stop && opaline server`. The CLI prints which settings it passed and refuses to
+override the ones it sets itself (port, URLs, database connections, secrets). In the Docker stack
+they go in `compose.override.yaml`.
 
-### GitHub App webhooks (optional)
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `OPALINE_OPEN_SIGNUP` | unset | `1`: anyone who reaches the server can sign up |
+| `OPALINE_SQL_QUOTA_PER_HOUR` | unset (no quota) | Limit `sql`, `run`, `measures`, `patterns` and `search` calls per workspace per hour |
+| `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE`, `S3_PUBLIC_ENDPOINT` | local disk | S3-compatible object storage, below |
+| `OPENAI_API_KEY` | unset | Embeddings for search by meaning and for finding saved answers; without it search matches exact text and regexes, and saved answers use local word vectors |
+| `RESEND_API_KEY` | unset | Email: sign-in codes and invitation emails |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | unset | Social sign-in; callback `<public URL>/api/auth/callback/github` (or `/google`). Invite-only still applies |
+| `ANTHROPIC_API_KEY` | unset | Compass moment observations |
+| `SUBQ_API_KEY` | unset | Run question tags and the frustration check |
+| `GITHUB_REPOSITORY_APP_*` | unset | Pull requests and CI next to sessions, below |
 
-Webhooks make merges and CI results appear within minutes instead of after the
-next reconciliation cron run. On Vercel, the webhook acknowledges with HTTP 202
-and registers a platform-managed `context.waitUntil` continuation: it waits
-30 seconds plus 1 second of timer slack, then collects only the affected
-collection identities in batches of at most 25 under one 240-second pass
-budget. The function's 300-second maximum duration covers both debounce and
-collection. Concurrent attempts retain the existing reservation and lease
-protection; unfinished work remains durable for the reconciliation cron. Self-hosted
-Bun/Fly servers still wake their resident worker, which otherwise polls every
-five minutes. In the App settings, activate the webhook, set the
-**Webhook URL** to `https://your-api-domain.com/api/webhooks/github`, set the
-**Webhook secret** to the value of `GITHUB_REPOSITORY_APP_WEBHOOK_SECRET`
-(generate it with `openssl rand -hex 32`), and subscribe to **Pull request**,
-**Check suite**, **Workflow run** and **Status**. Installation events are sent
-to every App automatically. No permission beyond the read-only set above is
-required.
+### Object storage
 
-The endpoint rejects unsigned or mis-signed requests, deduplicates by
-`X-GitHub-Delivery`, and only schedules work: a pull request or CI event for a
-bound repository pulls the next refresh of the matching session-linked
-collections forward (debounced by 30 seconds), and installation events keep
-installation and repository-binding state current. Events for installations or
-repositories that are not bound to a workspace are dropped without being
-stored, and payloads are never persisted. Added repositories are not bound
-automatically; use **Reconnect**. Without the secret the endpoint responds 503
-and the reconciliation cron remains the only refresh path. The cron also remains the
-fallback for missed deliveries in any configuration.
+By default objects live in `~/.opaline/server/data/object-store` and the server signs its own upload
+and download URLs. To use S3, MinIO, SeaweedFS or R2 instead, set `S3_BUCKET`,
+`S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` and either `S3_ENDPOINT` or (AWS) `S3_REGION`. With
+`S3_ENDPOINT` set, path-style addressing is on unless `S3_FORCE_PATH_STYLE=false`.
 
-## Direct-to-R2 Ingest Lifecycle Backstop
+The CLI uploads large sessions and the dashboard loads images straight from presigned URLs, so
+every CLI and browser must reach the URL they are signed for. When the server reaches the store at
+an internal address, such as `http://seaweedfs:8333` inside Docker, set `S3_PUBLIC_ENDPOINT` to the
+address everyone else uses, such as `http://nas.local:8333`. Presigned URLs are signed for that
+host; the server keeps using `S3_ENDPOINT`.
 
-When direct-to-R2 ingest is enabled, configure an object lifecycle rule on the
-ingest bucket with the prefix `ingest/` and a seven-day object expiration. The
-application job sweeper and terminal-state cleanup are the primary deletion
-mechanisms; this lifecycle rule is defense in depth for completed objects that
-survive an application or database outage. Cloudflare's default seven-day rule
-only aborts incomplete multipart uploads and does not delete completed objects.
+### GitHub pull requests and CI
 
-In the Cloudflare dashboard, open the bucket's **Settings** page and add an
-enabled Object Lifecycle Rule with these values:
+A read-only GitHub App links sessions to pull requests and CI runs. Create one with read-only
+Actions, Checks, Contents, Metadata, Pull requests and Commit statuses, leave "Request user
+authorization during installation" off, and set its Setup URL and a Callback URL to
+`<public URL>/api/github/setup`. Then set `GITHUB_REPOSITORY_APP_ID`, `_SLUG`, `_PRIVATE_KEY`,
+`_CLIENT_ID`, `_CLIENT_SECRET`, `_CALLBACK_URL` and optionally `_STATE_SECRET` (defaults to
+`BETTER_AUTH_SECRET`). For updates within minutes, activate the App's webhook at
+`<public URL>/api/webhooks/github` with `GITHUB_REPOSITORY_APP_WEBHOOK_SECRET` (`openssl rand -hex
+32`) and subscribe to Pull request, Check suite, Workflow run and Status; without it a job polls
+every five minutes. The App's credentials are separate from `GITHUB_CLIENT_ID` (sign-in).
 
-- Rule name: `expire-abandoned-ingest-objects`
-- Prefix: `ingest/`
-- Delete objects after: `7 days`
+## Memory and disk
 
-Verify the rule after provisioning with:
+- ClickHouse gets a memory cap: a quarter of the machine's RAM between 3 and 8 GiB with
+  `opaline server` (`--clickhouse-memory <GiB>` sets it), 3 GiB in the Docker stack
+  (`CLICKHOUSE_MEMORY`). Do not go below 2 GiB: run index queries need 0.5 to 0.9 GiB each, and at
+  2 GiB the first insert of a 140 MiB session needed a retry. 3 GiB is enough for a small team.
+- The server and Postgres take up to about 1.5 GiB at peak (preparing a 136 MiB session's detail
+  view added 0.6 GiB). Plan for 4 GiB of RAM in total, 8 GiB for large sessions.
+- ClickHouse stores about 1 MiB per session. Repository evidence (transcripts, images, saved
+  outputs) sits in object storage at its raw size; staged uploads are deleted after 7 days.
 
-```bash
-npx wrangler r2 bucket lifecycle list <bucket-name>
-```
+## Backups
 
-## Environment Variables Reference
+- `opaline server`: run `opaline server stop` and copy `~/.opaline/server`. It holds both
+  databases, the object store and `server.json`, whose secrets (auth secret, setup token, database
+  passwords) a restored copy needs. Keep the copy private.
+- Docker stack: the volumes `opaline_postgres-data`, `opaline_clickhouse-data` and
+  `opaline_opaline-data`, plus `.env`.
+- Your own ClickHouse: back it up with that service's tools; Postgres still lives in the data
+  directory.
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `PG_CONNECTION_STRING` | Yes | Postgres connection string |
-| `BETTER_AUTH_SECRET` | Yes | Auth secret (`openssl rand -base64 32`) |
-| `PASSWORD_AUTH_EMAILS` | No | Comma-separated, case-insensitive emails allowed to sign in or sign up with a password; `*` allows everyone. Missing or empty allows nobody |
-| `CLICKHOUSE_URL` | Yes | ClickHouse HTTPS endpoint |
-| `CLICKHOUSE_USERNAME` | Yes | ClickHouse username |
-| `CLICKHOUSE_PASSWORD` | Yes | ClickHouse password |
-| `R2_ACCOUNT_ID` | No | Cloudflare account ID for optional EU-jurisdiction direct-to-R2 ingest |
-| `R2_ACCESS_KEY_ID` | No | R2 S3 access key ID; all three R2 variables are required to enable the protocol |
-| `R2_SECRET_ACCESS_KEY` | No | R2 S3 secret access key |
-| `APP_URL` | Yes | Public URL of the deployed app |
-| `ALLOWED_ORIGIN` | Yes | CORS origin (same as `APP_URL` for single-domain) |
-| `GITHUB_CLIENT_ID` | No | GitHub OAuth client ID |
-| `GITHUB_CLIENT_SECRET` | No | GitHub OAuth client secret |
-| `GITHUB_REPOSITORY_APP_ID` | No | Numeric ID of the repository evidence GitHub App |
-| `GITHUB_REPOSITORY_APP_SLUG` | No | URL slug of the repository evidence GitHub App |
-| `GITHUB_REPOSITORY_APP_PRIVATE_KEY` | No | Private key used only for GitHub App JWTs |
-| `GITHUB_REPOSITORY_APP_CLIENT_ID` | No | Client ID of the same repository evidence GitHub App |
-| `GITHUB_REPOSITORY_APP_CLIENT_SECRET` | No | Client secret used for the one-shot user authorization exchange |
-| `GITHUB_REPOSITORY_APP_CALLBACK_URL` | No | Public `/api/github/setup` URL registered as the App Setup and OAuth callback URL |
-| `GITHUB_REPOSITORY_APP_STATE_SECRET` | No | Dedicated 32+ character callback-state secret; defaults to `BETTER_AUTH_SECRET` |
-| `GITHUB_REPOSITORY_APP_WEBHOOK_SECRET` | No | 32+ character GitHub App webhook secret; enables `/api/webhooks/github` |
-| `GITHUB_EVIDENCE_UI_ENABLED` | No | Set to `true` to show the Merged PRs dashboard metric and the workspace settings GitHub section. Evidence collection runs regardless; missing or invalid values keep the UI hidden |
-| `GOOGLE_CLIENT_ID` | No | Google OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | No | Google OAuth client secret |
+## Upgrades
 
-## Vercel Hobby and the frequent crons
+- `npx opaline@latest server` installs the server release that matches the CLI, restarts only the
+  server process, and keeps the previous release for a rollback. Postgres migrations and the
+  ClickHouse schema upgrade run on every start and do nothing when there is nothing to do; they
+  only go forward, so an older release may refuse the newer schema.
+- From an athena checkout: pull, rebuild the web (`build` and `build:widget`), then
+  `opaline server stop && opaline server`.
+- Docker stack: `./install.sh --upgrade`.
 
-`vercel.json` schedules `/api/cron/r2-ingest` every minute, so ingest jobs that were left pending during a ClickHouse outage are picked up again within minutes. It also runs `/api/cron/github-evidence` every five minutes: Vercel has no resident worker, so pending GitHub evidence collections and the repository history sweep only advance when this cron runs (up to about four minutes per run; an idle run returns immediately). `/api/cron/l1-edges` runs every minute and builds the L1 edges between sessions, pull requests and CI runs when `L1_EDGES_WORKER_ENABLED=true` (otherwise it returns immediately and requests stay queued). `/api/cron/run-index-heal` runs every five minutes and queues run index rebuilds for sessions whose run index is stale (`RUN_INDEX_HEAL_ENABLED=false` turns it off; it does nothing while the L1 worker is off). `/api/cron/run-questions` runs every minute and answers queued run questions when a provider is configured (`SUBQ_API_KEY`; otherwise it returns immediately). Vercel Hobby only allows daily cron jobs and rejects deployments with more frequent schedules. On Hobby, remove the `/api/cron/r2-ingest` entry and change `/api/cron/github-evidence`, `/api/cron/l1-edges`, `/api/cron/run-index-heal` and `/api/cron/run-questions` to a daily schedule. The daily `/api/cron/repair` job still re-picks pending ingest jobs, and the initial GitHub history then takes much longer to complete.
+## Troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| Anything | `opaline server status`, then `opaline server logs --service server -n 200` |
+| "port 4100 is already in use" | Stop the other process, or `opaline server --port 4200 --yes` (the CLI login and MCP registration follow) |
+| "This sign-in link expired or was already used" | `opaline server open` for a new one |
+| "This Opaline server is invite-only" | Open an invite link from an owner or admin, or set `OPALINE_OPEN_SIGNUP=1` |
+| "ClickHouse ran out of memory for all of its queries" | Raise the ClickHouse memory cap |
+| A teammate's CLI refuses `http://` | `opaline login --server http://… --allow-insecure-api-base` |
+| `opaline server` warns that the checkout has no web build | Build `apps/web` (`build` and `build:widget`) in the checkout |
+| The server stops answering for minutes after a very large upload | Known: the first view of a session above about 100 MiB is prepared in the server process (136 MiB took 166 s). It recovers by itself |
+| Evidence of a transcript above 128 MiB is incomplete | It is sent in several deliveries; `opaline upload --retry` sends what is left |
+| Agents do not see the Opaline tools | `opaline mcp install`, then restart the agent |
+
+## Running the server without the CLI
+
+`bun apps/api/src/selfhost/main.ts` (from a checkout or the packaged server) is the entry point
+that `opaline server` and the Docker image run. It validates the environment and reports every
+problem at once, migrates Postgres, creates or upgrades the ClickHouse schema, serves the API, MCP
+and dashboard, runs the jobs, and prints `ready <url>` on stdout.
+
+| Variable | Required | Meaning |
+| --- | --- | --- |
+| `PG_CONNECTION_STRING` | Yes | Postgres; its user must own the database |
+| `CLICKHOUSE_URL`, `CLICKHOUSE_USERNAME`, `CLICKHOUSE_PASSWORD` | Yes (username for non-local hosts) | ClickHouse HTTP interface |
+| `BETTER_AUTH_SECRET` | Yes | 32+ characters |
+| `PORT`, `HOST` | No | Default 4100 and 127.0.0.1 |
+| `APP_URL`, `ALLOWED_ORIGIN` | No | Public origin; default `http://localhost:<PORT>` |
+| `OPALINE_SETUP_TOKEN` | No | 16+ characters; enables `POST /api/selfhost/setup` (first account) and setup-token sign-in links |
+| `OPALINE_DATA_DIR` | No | Server files, including the local object store |
+| `OPALINE_WEB_DIR` | No | The built web app (`apps/web/dist`); without it the server is API only |
+| `CLICKHOUSE_FLAVOR` | No | `auto` (default), `oss` or `cloud` |
+| `CRON_SECRET` | No | Generated per process when unset |
+| `OPALINE_VERSION` | No | What `/api/selfhost/info` reports |
+
+`GET /api/selfhost/info` says whether a server is self-hosted, its version and URLs, whether setup
+is done and how people sign in (`auth.openSignup` included). `POST /api/selfhost/setup` with
+`X-Opaline-Setup-Token` and `{ email, name, workspaceName }` creates the owner account while no
+account exists and returns an API key and a sign-in link.

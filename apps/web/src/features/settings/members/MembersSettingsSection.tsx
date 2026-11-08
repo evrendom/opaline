@@ -89,6 +89,14 @@ export function MembersSettingsSection() {
 							activity={activity}
 							canManage={data.canManage}
 							onInvalidate={data.invalidate}
+							signInLinks={
+								selfHost && data.canManage
+									? {
+											viewerId: data.currentUserId,
+											viewerRole: data.currentUserRole,
+										}
+									: null
+							}
 						/>
 						<WorkspaceSentInvitations
 							invitations={data.pendingInvitations}

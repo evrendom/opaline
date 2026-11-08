@@ -30,6 +30,8 @@ test("defaults: loopback on port 4100, the public origin is the app origin, and 
 		allowedOrigin: "http://localhost:4100",
 		webDir: null,
 		setupToken: null,
+		sqlQuotaPerHour: null,
+		openSignup: false,
 	});
 	expect(config.cronSecret.length).toBeGreaterThanOrEqual(16);
 	expect(env).toEqual({
@@ -150,4 +152,30 @@ test("object storage env is checked at startup: incomplete S3, S3 next to R2 and
 			S3_SECRET_ACCESS_KEY: "s",
 		}),
 	).toEqual([]);
+});
+
+test("sign-up is invite only and the SQL quota is off unless the environment says otherwise", () => {
+	expect(
+		readSelfHostConfig({
+			...base,
+			OPALINE_SQL_QUOTA_PER_HOUR: "600",
+			OPALINE_OPEN_SIGNUP: "1",
+		}).config,
+	).toMatchObject({ sqlQuotaPerHour: 600, openSignup: true });
+	expect(
+		readSelfHostConfig({ ...base, OPALINE_OPEN_SIGNUP: "0" }).config.openSignup,
+	).toBe(false);
+	expect(
+		problems({
+			...base,
+			OPALINE_SQL_QUOTA_PER_HOUR: "0",
+			OPALINE_OPEN_SIGNUP: "yes",
+		}),
+	).toEqual([
+		'OPALINE_SQL_QUOTA_PER_HOUR must be a whole number above 0, not "0"; leave it unset for no quota',
+		'OPALINE_OPEN_SIGNUP must be 1 (anyone who reaches the server can sign up) or 0, not "yes"',
+	]);
+	expect(
+		problems({ ...base, OPALINE_SQL_QUOTA_PER_HOUR: "12.5" }),
+	).toHaveLength(1);
 });

@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { resolveClickHouseUsername } from "@rudel/ch-schema/connection";
+import { parseSqlQuotaPerHour } from "../lib/self-hosted.js";
 import { objectStoreConfigurationProblems } from "../services/r2-ingest-storage.service.js";
 
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -15,6 +16,8 @@ export interface SelfHostConfig {
 	readonly dataDir: string | null;
 	readonly setupToken: string | null;
 	readonly cronSecret: string;
+	readonly sqlQuotaPerHour: number | null;
+	readonly openSignup: boolean;
 }
 
 export class SelfHostConfigError extends Error {
@@ -101,6 +104,18 @@ export function readSelfHostConfig(env: Environment): {
 	const dataDir = env.OPALINE_DATA_DIR?.trim() || null;
 	problems.push(...objectStoreConfigurationProblems(env));
 
+	const rawSqlQuota = env.OPALINE_SQL_QUOTA_PER_HOUR?.trim() ?? "";
+	const sqlQuotaPerHour = parseSqlQuotaPerHour(rawSqlQuota);
+	if (rawSqlQuota && sqlQuotaPerHour === null)
+		problems.push(
+			`OPALINE_SQL_QUOTA_PER_HOUR must be a whole number above 0, not ${JSON.stringify(env.OPALINE_SQL_QUOTA_PER_HOUR)}; leave it unset for no quota`,
+		);
+	const rawOpenSignup = env.OPALINE_OPEN_SIGNUP?.trim() ?? "";
+	if (rawOpenSignup && rawOpenSignup !== "1" && rawOpenSignup !== "0")
+		problems.push(
+			`OPALINE_OPEN_SIGNUP must be 1 (anyone who reaches the server can sign up) or 0, not ${JSON.stringify(env.OPALINE_OPEN_SIGNUP)}`,
+		);
+
 	if (problems.length > 0) throw new SelfHostConfigError(problems);
 
 	return {
@@ -113,6 +128,8 @@ export function readSelfHostConfig(env: Environment): {
 			dataDir,
 			setupToken,
 			cronSecret,
+			sqlQuotaPerHour,
+			openSignup: rawOpenSignup === "1",
 		},
 		env: {
 			OPALINE_SELF_HOSTED: "1",

@@ -15,6 +15,7 @@ import {
 	R2_INGEST_BUCKET,
 	readR2IngestAvailability,
 } from "./r2-ingest-storage.service.js";
+import { createR2ImageUrlSigner } from "./session-image-read.service.js";
 
 const R2_ENV = {
 	R2_ACCESS_KEY_ID: "access-key",
@@ -210,6 +211,85 @@ describe("object store backend selection", () => {
 		expect(url.searchParams.get("X-Amz-SignedHeaders")).toBe(
 			"content-length;host",
 		);
+	});
+
+	test("S3_PUBLIC_ENDPOINT moves presigned part and image URLs to the address browsers and CLIs reach; the server keeps S3_ENDPOINT", async () => {
+		const env = {
+			...SELF_HOSTED,
+			...S3_ENV,
+			S3_ENDPOINT: "http://seaweedfs:8333",
+			S3_PUBLIC_ENDPOINT: "http://nas.local:8333",
+		};
+		const availability = readR2IngestAvailability(env);
+		if (!availability.enabled || availability.configuration.backend !== "s3")
+			throw new Error("expected the S3 backend");
+		expect(availability.configuration).toMatchObject({
+			endpoint: "http://seaweedfs:8333",
+			publicEndpoint: "http://nas.local:8333",
+			forcePathStyle: true,
+		});
+		expect(describeObjectStore(availability)).toBe(
+			"S3 bucket opaline at http://seaweedfs:8333, presigned URLs at http://nas.local:8333",
+		);
+		const internal = createObjectStoreS3Client(availability.configuration);
+		const endpoint = await internal.config.endpoint?.();
+		expect(endpoint?.hostname).toBe("seaweedfs");
+
+		const part = new URL(
+			await createR2MultipartUploadClient(
+				availability.configuration,
+			).presignUploadPart({
+				byteLength: 8,
+				objectKey: "ingest/job/main.jsonl",
+				partNumber: 1,
+				uploadId: "upload",
+			}),
+		);
+		expect(part.origin).toBe("http://nas.local:8333");
+		expect(part.pathname).toBe("/opaline/ingest/job/main.jsonl");
+		expect(part.searchParams.get("X-Amz-SignedHeaders")).toBe(
+			"content-length;host",
+		);
+		const image = new URL(
+			await createR2ImageUrlSigner(availability.configuration)({
+				objectKey: "evidence/w/image.png",
+				contentType: "image/png",
+				contentDisposition: "inline",
+				expiresInSeconds: 300,
+			}),
+		);
+		expect(image.origin).toBe("http://nas.local:8333");
+		expect(image.pathname).toBe("/opaline/evidence/w/image.png");
+
+		const withoutPublic = readR2IngestAvailability({
+			...SELF_HOSTED,
+			...S3_ENV,
+		});
+		if (!withoutPublic.enabled) throw new Error("expected the S3 backend");
+		expect(
+			new URL(
+				await createR2ImageUrlSigner(withoutPublic.configuration)({
+					objectKey: "evidence/w/image.png",
+					contentType: "image/png",
+					contentDisposition: "inline",
+					expiresInSeconds: 300,
+				}),
+			).origin,
+		).toBe("http://nas.local:8333");
+		expect(
+			objectStoreConfigurationProblems({
+				...S3_ENV,
+				S3_PUBLIC_ENDPOINT: "nas.local:8333",
+			}),
+		).toEqual([
+			'S3_PUBLIC_ENDPOINT must be an http:// or https:// URL, not "nas.local:8333"',
+		]);
+		expect(
+			readR2IngestAvailability({
+				...R2_ENV,
+				S3_PUBLIC_ENDPOINT: "http://nas.local:8333",
+			}),
+		).toEqual({ enabled: true, configuration: R2_CONFIGURATION });
 	});
 
 	test("the local backend gets the local client and each backend describes itself", () => {

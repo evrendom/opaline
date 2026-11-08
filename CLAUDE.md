@@ -66,6 +66,17 @@ A platform for ingesting, storing, and analyzing Claude Code / Codex session tra
 | `CH_MIGRATE_SKIP_CONFIRMED_SHA` | No | Outage-only operator override for production builds: the full commit SHA that may deploy without its ClickHouse forward migrations while ClickHouse is unreachable. Set it only after confirming that commit changes no ClickHouse schema (`packages/ch-schema`), and remove it after the deploy. The deploy workflow passes `CH_DEPLOY_SHA`. |
 | `APP_URL` | No | API base URL (default: `http://localhost:4010`) |
 | `ALLOWED_ORIGIN` | No | CORS origin (default: `http://localhost:4011`) |
+| `OPALINE_SELF_HOSTED` | No | `1` makes the server a single-team self-hosted install (`apps/api/src/selfhost/main.ts` sets it): every workspace gate open, no billing, no Stripe/PostHog/Sentry/Slack/CRM calls, jobs run in process, `/api/selfhost/*` exists. Anything that only applies to it checks `isSelfHosted()` (`lib/self-hosted.ts`), so production is unchanged. See [docs/self-hosting.md](docs/self-hosting.md). |
+| `OPALINE_SETUP_TOKEN` | Self-hosted | Shared secret (16+ characters) between `opaline server` and the server: `POST /api/selfhost/setup` (`X-Opaline-Setup-Token`) creates the owner account while no account exists, and `POST /api/selfhost/login-link` with it makes a sign-in link for any account. Unset: setup answers 403. |
+| `OPALINE_DATA_DIR` | Self-hosted | Directory for server files; the local object store lives in `<dir>/object-store` unless `S3_*` or `R2_*` select another store. |
+| `OPALINE_WEB_DIR` | Self-hosted | The built web app (`apps/web/dist`, with `dist-plugin` next to it); must contain `index.html`. Unset: API only. |
+| `OPALINE_VERSION` | Self-hosted | Version reported by `GET /api/selfhost/info` (default `dev`). |
+| `HOST` | Self-hosted | Listen address (default `127.0.0.1`; `PORT` defaults to 4100 when self-hosted). |
+| `CLICKHOUSE_FLAVOR` | Self-hosted | `auto` (default) probes `system.table_engines` for Shared engines and `system.storage_policies` for `s3`, and creates plain tables on the default disk without them; `oss` skips the engine probe, `cloud` assumes both. |
+| `OPALINE_OPEN_SIGNUP` | Self-hosted | Sign-up on a self-hosted server needs a live team invite link or a pending invitation for the email (the `opaline_invite` cookie or `x-opaline-invite` header, checked in Better Auth's user-create hook for password, email-code and social sign-up); the owner comes from setup. `1` lets anyone who reaches the server sign up. Reported as `auth.openSignup` by `/api/selfhost/info`. |
+| `OPALINE_SQL_QUOTA_PER_HOUR` | Self-hosted | Per-workspace hourly limit on `sql`, `run`, `measures`, `patterns` and `search` calls. Unset: no limit on a self-hosted server. Production always uses 120 (`SQL_QUOTA`) and ignores this. |
+| `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE` | Self-hosted | S3-compatible object store instead of the local disk (any `S3_*` selects it; incomplete sets, a non-http endpoint or `S3_*` next to `R2_*` stop startup). `S3_REGION` defaults to `us-east-1` with an endpoint; path style defaults on with an endpoint. Ignored outside self-hosted mode. |
+| `S3_PUBLIC_ENDPOINT` | Self-hosted | Host that presigned part-upload and image URLs are signed for, when CLIs and browsers reach the store at another address than the server (a NAS: `http://seaweedfs:8333` inside Docker, `http://nas.local:8333` outside). Server-side calls keep `S3_ENDPOINT`. |
 | `TRUSTED_PROXY_HOPS` | No | Number of trusted reverse proxies in front of the API (or in front of Fly Proxy); used to resolve client IPs from right to left in `X-Forwarded-For` (default: 0) |
 | `MAX_REQUEST_BODY_BYTES` | No | Positive integer HTTP request-body ceiling in bytes (default: 160 MiB) |
 | `SESSION_DETAIL_DERIVATION_CACHE_MAX_BYTES` | No | Per-process byte budget for revision-keyed session-detail derivations (default: 512 MiB) |
@@ -219,7 +230,7 @@ Shared avatar constants (size caps, MIME allowlist, regex patterns) live in `pac
 
 ## Self-Hosting
 
-See [docs/self-hosting.md](docs/self-hosting.md) for deploying with ObsessionDB + Neon + Fly.io.
+See [docs/self-hosting.md](docs/self-hosting.md): `npx opaline@latest server` runs Opaline on one machine with a local or your own ClickHouse, `deploy/selfhost` runs it as a Docker Compose stack on a NAS. The entry point is `apps/api/src/selfhost/main.ts` (env checks, migrations, schema, HTTP, scheduler in `selfhost/scheduler.ts`); the `/api/selfhost/*` routes are in `handlers/selfhost-http.ts`. Self-hosted behaviour stays behind `isSelfHosted()` so production does not change. Fly.io (`fly.toml`, `fly-lifecycle.ts`) is dead code; do not build on it.
 
 ## ClickHouse Schema Management (chkit)
 

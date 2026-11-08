@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { appRoutes } from "@/app/routes";
 import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
 import { useTrackProductPageView } from "@/features/analytics/tracking/useTrackProductPageView";
+import { PasswordCard } from "@/features/self-hosted/PasswordCard";
 import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import { sendsEmail } from "@/features/self-hosted/surfaces";
 import { AccountDangerZoneCard } from "@/features/settings/account/components/AccountDangerZoneCard";
@@ -156,6 +157,7 @@ export function AccountSettingsSection() {
 				isSigningOut={isSigningOut}
 				onSignOut={() => void handleSignOut()}
 			/>
+			{selfHost ? <PasswordCard /> : null}
 			<AppearanceCard />
 			{sendsEmail(selfHost) ? (
 				<div id="email-digests" className="scroll-mt-24">

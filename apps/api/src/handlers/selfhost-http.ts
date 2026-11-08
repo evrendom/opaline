@@ -1,4 +1,5 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
+import { getLogger } from "@logtape/logtape";
 import { validateOrgSlug } from "@rudel/api-routes/reserved-slugs";
 import type postgres from "postgres";
 import { z } from "zod";
@@ -10,11 +11,19 @@ import {
 	apiKeyUserId,
 } from "../selfhost/api-key-auth.js";
 import { SELF_HOSTED_LOGIN_PATH } from "../selfhost/login-plugin.js";
-import { issueLoginToken, loginUrl } from "../selfhost/login-tokens.js";
+import {
+	issueLoginToken,
+	LOGIN_TOKEN_TTL_SECONDS,
+	loginUrl,
+	MEMBER_LOGIN_TOKEN_TTL_SECONDS,
+} from "../selfhost/login-tokens.js";
+import { isOpenSignup } from "../selfhost/signup-gate.js";
 
 export const SELFHOST_PATH_PREFIX = "/api/selfhost/";
 export const SETUP_TOKEN_HEADER = "x-opaline-setup-token";
 export const CLI_API_KEY_NAME = "rudel-cli-ingest";
+
+const logger = getLogger(["rudel", "api", "selfhost"]);
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -26,6 +35,9 @@ export interface SelfHostAuth {
 		createApiKey(input: {
 			body: { userId: string; name: string; expiresIn: null };
 		}): Promise<{ id: string; key: string }>;
+		getSession(input: {
+			headers: Headers;
+		}): Promise<{ user: { id: string } } | null>;
 	};
 	handler(request: Request): Promise<Response>;
 }
@@ -42,6 +54,10 @@ const SetupBodySchema = z.object({
 	name: z.string().trim().min(1).max(200),
 	workspaceName: z.string().trim().min(1).max(100),
 });
+
+const LoginLinkBodySchema = z
+	.object({ email: z.string().trim().toLowerCase().email().max(320) })
+	.partial();
 
 let setupQueue: Promise<unknown> = Promise.resolve();
 
@@ -101,6 +117,7 @@ async function info(deps: SelfHostDependencies): Promise<Response> {
 			password: true,
 			emailCodes: Boolean(deps.env.RESEND_API_KEY?.trim()),
 			social: [...deps.socialProviders],
+			openSignup: isOpenSignup(deps.env),
 		},
 	});
 }
@@ -242,24 +259,138 @@ async function renameFirstWorkspace(
 	`;
 }
 
+type LoginLinkActor =
+	| { readonly kind: "setup" }
+	| { readonly kind: "user"; readonly userId: string; readonly via: string };
+
+async function loginLinkActor(
+	request: Request,
+	deps: SelfHostDependencies,
+): Promise<LoginLinkActor | Response> {
+	const setupToken = request.headers.get(SETUP_TOKEN_HEADER);
+	if (setupToken !== null) {
+		const expected = deps.env.OPALINE_SETUP_TOKEN?.trim();
+		return expected && sameSecret(setupToken.trim(), expected)
+			? { kind: "setup" }
+			: Response.json({ error: "invalid_setup_token" }, { status: 401 });
+	}
+	const key = apiKeyFromHeaders(request.headers);
+	if (key) {
+		const userId = await apiKeyUserId(deps.auth.api, key);
+		return userId
+			? { kind: "user", userId, via: "api key" }
+			: Response.json(
+					{
+						error: "invalid_api_key",
+						message: "Send the server's API key as x-api-key or Bearer.",
+					},
+					{ status: 401 },
+				);
+	}
+	const session = await deps.auth.api
+		.getSession({ headers: request.headers })
+		.catch(() => null);
+	return session
+		? { kind: "user", userId: session.user.id, via: "browser session" }
+		: Response.json(
+				{
+					error: "unauthorized",
+					message:
+						"Send the setup token, an API key, or a browser session cookie.",
+				},
+				{ status: 401 },
+			);
+}
+
 async function loginLink(
 	request: Request,
 	deps: SelfHostDependencies,
 ): Promise<Response> {
-	const userId = await apiKeyUserId(
-		deps.auth.api,
-		apiKeyFromHeaders(request.headers),
-	);
-	if (!userId)
+	const actor = await loginLinkActor(request, deps);
+	if (actor instanceof Response) return actor;
+	const text = await request.text().catch(() => "");
+	let raw: unknown = {};
+	try {
+		raw = text.trim() ? JSON.parse(text) : {};
+	} catch {
+		raw = null;
+	}
+	const parsed = LoginLinkBodySchema.safeParse(raw);
+	if (!parsed.success)
+		return Response.json(
+			{ error: "invalid_body", message: "Send {} or { email }." },
+			{ status: 400 },
+		);
+	const email = parsed.data.email;
+	if (email === undefined && actor.kind === "setup")
 		return Response.json(
 			{
-				error: "invalid_api_key",
-				message: "Send the server's API key as x-api-key or Bearer.",
+				error: "email_required",
+				message: "Say whose sign-in link to make: { email }.",
 			},
-			{ status: 401 },
+			{ status: 400 },
 		);
-	const token = await issueLoginToken(deps.sql, userId);
-	return Response.json({ loginUrl: loginUrl(appUrlOf(deps.env), token) });
+	type Target = { id: string; email: string; name: string };
+	const [target] =
+		email === undefined && actor.kind === "user"
+			? await deps.sql<Target[]>`
+				SELECT id, email, name FROM "user" WHERE id = ${actor.userId}
+			`
+			: await deps.sql<Target[]>`
+				SELECT id, email, name FROM "user"
+				WHERE lower(email) = ${email ?? ""}
+				ORDER BY created_at, id
+				LIMIT 1
+			`;
+	if (!target)
+		return Response.json(
+			{
+				error: "user_not_found",
+				message: `No account on this server has the email ${email ?? ""}.`,
+			},
+			{ status: 404 },
+		);
+	const own = actor.kind === "user" && actor.userId === target.id;
+	if (actor.kind === "user" && !own) {
+		const [row] = await deps.sql<{ allowed: boolean }[]>`
+			SELECT EXISTS (
+				SELECT 1
+				FROM member actor
+				JOIN member target ON target.organization_id = actor.organization_id
+				WHERE actor.user_id = ${actor.userId}
+					AND target.user_id = ${target.id}
+					AND (actor.role = 'owner' OR (actor.role = 'admin' AND target.role <> 'owner'))
+			) AS allowed
+		`;
+		if (row?.allowed !== true)
+			return Response.json(
+				{
+					error: "forbidden",
+					message:
+						"Only an owner or admin of a workspace this person belongs to can make their sign-in link; admins cannot make one for an owner.",
+				},
+				{ status: 403 },
+			);
+	}
+	const ttlSeconds = own
+		? LOGIN_TOKEN_TTL_SECONDS
+		: MEMBER_LOGIN_TOKEN_TTL_SECONDS;
+	const token = await issueLoginToken(deps.sql, target.id, ttlSeconds);
+	if (!own)
+		logger.info(
+			"Sign-in link for user {targetUserId} issued by {issuer} ({via}), valid {minutes} minutes",
+			{
+				targetUserId: target.id,
+				issuer: actor.kind === "setup" ? "the setup token" : actor.userId,
+				via: actor.kind === "setup" ? "setup token" : actor.via,
+				minutes: ttlSeconds / 60,
+			},
+		);
+	return Response.json({
+		loginUrl: loginUrl(appUrlOf(deps.env), token),
+		expiresAt: new Date(Date.now() + ttlSeconds * 1000).toISOString(),
+		user: { id: target.id, email: target.email, name: target.name },
+	});
 }
 
 function sameSecret(given: string, expected: string): boolean {

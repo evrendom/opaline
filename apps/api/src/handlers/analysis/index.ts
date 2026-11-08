@@ -29,8 +29,8 @@ import { openRun } from "../../services/analysis/run-view.service.js";
 import { findScope } from "../../services/analysis/scope.js";
 import { describeSchema, runSql } from "../../services/analysis/sql-gateway.js";
 import {
-	createPostgresSqlQuota,
 	createPostgresSqlResultStore,
+	createSqlQuota,
 	openSqlResult,
 	type SqlQuota,
 	type SqlResultStore,
@@ -210,7 +210,7 @@ export function createAnalysisRouter(
 			return trace && traced ? withReadTrace(output, trace) : output;
 		});
 
-	const sqlQuota = env.sqlQuota ?? createPostgresSqlQuota(sqlClient);
+	const sqlQuota = env.sqlQuota ?? createSqlQuota(sqlClient);
 	// One set of query slots for every agent read of ClickHouse: sql, search.
 	const queryLimiter =
 		env.queryLimiter ??

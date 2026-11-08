@@ -7,6 +7,13 @@ export function isSelfHosted(env: Environment = process.env): boolean {
 	return env.OPALINE_SELF_HOSTED === "1";
 }
 
+export function parseSqlQuotaPerHour(raw: string | undefined): number | null {
+	const value = raw?.trim();
+	if (!value || !/^[0-9]+$/u.test(value)) return null;
+	const queries = Number(value);
+	return Number.isSafeInteger(queries) && queries > 0 ? queries : null;
+}
+
 export const SELF_HOSTED_DISABLED_ENV = [
 	"STRIPE_SECRET_KEY",
 	"STRIPE_WEBHOOK_SECRET",

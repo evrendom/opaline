@@ -7,6 +7,15 @@ export type SocialProvider = "github" | "google";
 export const MIN_PASSWORD_LENGTH = 8;
 export const MAX_PASSWORD_LENGTH = 128;
 export const LOGIN_LINK_INVALID = "LOGIN_LINK_INVALID";
+export const INVITE_COOKIE = "opaline_invite";
+export const INVITE_REQUIRED = "INVITE_REQUIRED";
+const INVITE_COOKIE_MAX_AGE_SECONDS = 86_400;
+const INVITE_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
+const INVITE_PATHS = [
+	/^\/team\/invite\/([^/]+)\/?$/u,
+	/^\/[^/]+\/join\/([^/]+)\/?$/u,
+	/^\/invitation\/([^/]+)\/?$/u,
+];
 
 const SOCIAL_PROVIDERS: readonly SocialProvider[] = ["github", "google"];
 
@@ -19,11 +28,64 @@ export function selfHostedSocialProviders(
 }
 
 export function isInvitePath(pathname: string): boolean {
+	return INVITE_PATHS.some((pattern) => pattern.test(pathname));
+}
+
+function inviteInPath(pathname: string): string | null {
+	for (const pattern of INVITE_PATHS) {
+		const raw = pattern.exec(pathname)?.[1];
+		if (!raw) continue;
+		try {
+			const invite = decodeURIComponent(raw);
+			return INVITE_PATTERN.test(invite) ? invite : null;
+		} catch {
+			return null;
+		}
+	}
+	return null;
+}
+
+export function inviteFromLocation(
+	pathname: string,
+	search: string,
+): string | null {
+	const redirect = new URLSearchParams(search).get("redirect");
 	return (
-		/^\/team\/invite\/[^/]+\/?$/u.test(pathname) ||
-		/^\/[^/]+\/join\/[^/]+\/?$/u.test(pathname) ||
-		/^\/invitation\/[^/]+\/?$/u.test(pathname)
+		inviteInPath(pathname) ??
+		(redirect?.startsWith("/") && !redirect.startsWith("//")
+			? inviteInPath(redirect.split(/[?#]/u)[0] ?? "")
+			: null)
 	);
+}
+
+function writeInviteCookie(value: string, maxAgeSeconds: number): void {
+	const secure = window.location.protocol === "https:" ? "; Secure" : "";
+	// biome-ignore lint/suspicious/noDocumentCookie: the Cookie Store API does not exist on plain-http LAN origins, where self-hosted servers often run
+	document.cookie = `${INVITE_COOKIE}=${value}; Path=/; Max-Age=${maxAgeSeconds}; SameSite=Lax${secure}`;
+}
+
+export function rememberInvite(invite: string | null): void {
+	if (!invite || !INVITE_PATTERN.test(invite)) return;
+	writeInviteCookie(invite, INVITE_COOKIE_MAX_AGE_SECONDS);
+}
+
+export function forgetInvite(): void {
+	writeInviteCookie("", 0);
+}
+
+export type SelfHostedSignUp =
+	| "open"
+	| "invite"
+	| "needs-invite"
+	| "needs-setup";
+
+export function selfHostedSignUp(
+	info: SelfHostInfo,
+	invite: string | null,
+): SelfHostedSignUp {
+	if (info.auth.openSignup) return "open";
+	if (!info.setupComplete) return "needs-setup";
+	return invite ? "invite" : "needs-invite";
 }
 
 export function initialSelfHostedAuthMode(
@@ -41,6 +103,20 @@ export function selfHostedAuthCopy(
 		search,
 	}: { info: SelfHostInfo; pathname: string; search: string },
 ): { title: string; description: string } {
+	if (mode === "sign-up") {
+		const signUp = selfHostedSignUp(info, inviteFromLocation(pathname, search));
+		if (signUp === "needs-setup")
+			return {
+				title: "Finish setting up this server",
+				description:
+					"Run “opaline server” on the machine that runs it. That creates the owner account and prints a sign-in link.",
+			};
+		if (signUp === "needs-invite")
+			return {
+				title: "Ask for an invite",
+				description: "This Opaline server is invite-only.",
+			};
+	}
 	if (new URLSearchParams(search).has("user_code"))
 		return mode === "sign-in"
 			? {
@@ -116,6 +192,8 @@ export function describeAuthError(
 		code === "CREDENTIAL_ACCOUNT_NOT_FOUND"
 	)
 		return "That email and password do not match an account on this server.";
+	if (code === INVITE_REQUIRED)
+		return "This server is invite-only. Open the invite link a workspace owner or admin sent you, then create your account there.";
 	if (code.startsWith("USER_ALREADY_EXISTS"))
 		return "An account with this email already exists. Sign in instead.";
 	if (code === "PASSWORD_TOO_SHORT")

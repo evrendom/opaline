@@ -49,6 +49,86 @@ test("arguments and results keep every key and character, NUL and lone surrogate
 	await store.deleteAnalysesByWorkspace(analysis.workspaceId);
 });
 
+test("questions, answers, findings, topics, notes, labels and embedded text keep NUL characters and lone surrogates", async () => {
+	const store = createPostgresAnalysisStore(connect);
+	const { analysis, step, query } = records();
+	const odd = (label: string) => `${label}\u0000tail \ud83d \u0001json:"x"`;
+	const saved: StoredAnalysis = {
+		...analysis,
+		draft: true,
+		question: odd("question"),
+		scope: {
+			from: odd("from"),
+			to: null,
+			filters: { [odd("key")]: odd("value") },
+		},
+		topics: [odd("topic"), "\u0001json:plain"],
+		notes: [odd("note")],
+		changes: [
+			{
+				step: step.id,
+				finding: odd("prior"),
+				change: "confirmed",
+				evidence: odd("evidence"),
+			},
+		],
+	};
+	await store.createAnalysis(saved);
+	await store.createStep({
+		...step,
+		question: odd("step"),
+		reply: odd("reply"),
+	});
+	await store.createQuery({
+		...query,
+		redaction: { args: { source: "runs" }, label: odd("label") },
+	});
+	await store.saveAnalysis(analysis.id, {
+		findings: [{ stepId: step.id, finding: odd("finding") }],
+		clarifications: [],
+		patch: { finalAnswer: odd("answer"), status: "finished" },
+	});
+	await store.addEmbedding(analysis.workspaceId, {
+		analysisId: analysis.id,
+		stepId: step.id,
+		kind: "step",
+		text: odd("embedded"),
+		model: MODEL,
+		vector: vector(1, 0),
+	});
+
+	const reopened = createPostgresAnalysisStore(async () => plain);
+	expect(await reopened.getAnalysis(analysis.id)).toEqual({
+		...saved,
+		draft: false,
+		status: "finished",
+		finalAnswer: odd("answer"),
+		queryCount: 1,
+		stepCount: 1,
+	});
+	const [stored] = await reopened.getSteps(analysis.id);
+	expect(stored).toMatchObject({
+		question: odd("step"),
+		reply: odd("reply"),
+		finding: odd("finding"),
+	});
+	expect((await reopened.getQuery(query.id))?.redaction?.label).toBe(
+		odd("label"),
+	);
+	const [match] = await reopened.searchEmbeddings(
+		analysis.workspaceId,
+		MODEL,
+		vector(1, 0),
+		1,
+	);
+	expect(match?.text).toBe(odd("embedded"));
+	const [raw] = await plain<{ question: string }[]>`
+		SELECT question FROM analysis_log_analysis WHERE id = ${analysis.id}
+	`;
+	expect(raw?.question.includes("\u0000")).toBe(false);
+	await store.deleteAnalysesByWorkspace(analysis.workspaceId);
+});
+
 test("a failed store call names only the operation, never its arguments", async () => {
 	const store = createPostgresAnalysisStore(connect);
 	const { analysis, step, query } = records();

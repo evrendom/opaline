@@ -13,7 +13,7 @@ const serverInfo = {
 	appUrl: "http://localhost:4790",
 	mcpUrl: "http://localhost:4790/api/mcp",
 	setupComplete: true,
-	auth: { password: true, emailCodes: false, social: [] },
+	auth: { password: true, emailCodes: false, social: [], openSignup: false },
 };
 
 afterEach(() => {
@@ -33,7 +33,12 @@ describe("parseSelfHostInfo", () => {
 			appUrl: "",
 			mcpUrl: "",
 			setupComplete: true,
-			auth: { password: true, emailCodes: false, social: [] },
+			auth: {
+				password: true,
+				emailCodes: false,
+				social: [],
+				openSignup: false,
+			},
 		});
 	});
 
