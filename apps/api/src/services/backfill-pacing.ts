@@ -1,3 +1,4 @@
+import { getLogger } from "@logtape/logtape";
 import { z } from "zod";
 import type { ClickHouseExecutor } from "../clickhouse.js";
 
@@ -28,6 +29,7 @@ export const REAL_BACKFILL_CLOCK: BackfillClock = {
 		}),
 };
 
+const logger = getLogger(["rudel", "api", "backfill-pacing"]);
 const LoadRowSchema = z.object({ value: z.coerce.number() });
 
 export async function readClickHouseLoadAverage(
@@ -39,9 +41,16 @@ export async function readClickHouseLoadAverage(
 				"SELECT value FROM system.asynchronous_metrics WHERE metric = 'LoadAverage1'",
 		}),
 	);
-	if (!row)
-		throw new Error(
-			"ClickHouse reports no LoadAverage1 in system.asynchronous_metrics; the backfill cannot pace itself.",
-		);
+	if (!row) {
+		if (!reportedMissingLoad) {
+			reportedMissingLoad = true;
+			logger.warn(
+				"ClickHouse reports no LoadAverage1 in system.asynchronous_metrics (macOS servers do not); pacing treats its load as 0",
+			);
+		}
+		return 0;
+	}
 	return row.value;
 }
+
+let reportedMissingLoad = false;
