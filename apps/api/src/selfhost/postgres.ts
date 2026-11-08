@@ -2,15 +2,20 @@ import postgres from "postgres";
 
 export const SELF_HOSTED_SETTING = "opaline.self_hosted";
 
-export async function preparePostgres(
-	connectionString: string,
-	migrateScript: string,
-): Promise<{ database: string; migrated: string }> {
-	const sql = postgres(connectionString, {
+function connect(connectionString: string): postgres.Sql {
+	return postgres(connectionString, {
 		max: 1,
 		connect_timeout: 10,
 		onnotice: () => {},
 	});
+}
+
+export async function preparePostgres(
+	connectionString: string,
+	migrateScript: string,
+	open: (connectionString: string) => postgres.Sql = connect,
+): Promise<{ database: string; migrated: string }> {
+	const sql = open(connectionString);
 	let database: string;
 	try {
 		const [row] = await sql<{ database: string }[]>`
@@ -36,11 +41,7 @@ export async function preparePostgres(
 
 	const migrated = await runMigrations(connectionString, migrateScript);
 
-	const check = postgres(connectionString, {
-		max: 1,
-		connect_timeout: 10,
-		onnotice: () => {},
-	});
+	const check = open(connectionString);
 	try {
 		const [setting] = await check<{ value: string | null }[]>`
 			SELECT current_setting(${SELF_HOSTED_SETTING}, true) AS value
