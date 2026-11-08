@@ -6,7 +6,6 @@ import {
 	WorkspaceSettingsGroup,
 	WorkspaceSettingsRow,
 } from "@/features/settings/workspace/components/workspace-settings-group";
-import { refreshAuthClientState } from "@/lib/auth-client";
 import {
 	changePassword,
 	readPasswordStatus,
@@ -65,7 +64,6 @@ export function PasswordCard() {
 		setNewPassword("");
 		setRepeated("");
 		setCurrentPasswordRequired(true);
-		refreshAuthClientState();
 		toast.success("Password changed. Other browsers were signed out.");
 	}
 

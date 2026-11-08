@@ -14,8 +14,6 @@ vi.mock("./account-recovery", async (importOriginal) => ({
 	changePassword: recovery.changePassword,
 }));
 
-vi.mock("@/lib/auth-client", () => ({ refreshAuthClientState: vi.fn() }));
-
 afterEach(() => {
 	vi.clearAllMocks();
 });

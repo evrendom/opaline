@@ -161,8 +161,14 @@ export function selfHostedLoginPlugin(
 						linkSessionIdentifier(session.id),
 					);
 					await ctx.context.internalAdapter.deleteSessions(user.id);
+					const { activeOrganizationId } = session as {
+						activeOrganizationId?: string | null;
+					};
 					const fresh = await ctx.context.internalAdapter.createSession(
 						user.id,
+						false,
+						activeOrganizationId ? { activeOrganizationId } : undefined,
+						true,
 					);
 					if (!fresh)
 						throw APIError.from(
