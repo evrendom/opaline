@@ -1,6 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import assert from "node:assert/strict";
-import { getBootstrapMode } from "../../scripts/bootstrap.js";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+	forwardScriptPath,
+	getBootstrapMode,
+	usesChkitForUpgrade,
+} from "../../scripts/bootstrap.js";
 import { F16_MIGRATIONS } from "../../scripts/migrate-f16.js";
 
 const migrations = [
@@ -132,5 +139,35 @@ describe("ClickHouse bootstrap prefix guard", () => {
 		expect(() => getBootstrapMode([], { applied: [] }, 0)).toThrow(
 			"No ClickHouse migrations found",
 		);
+	});
+});
+
+describe("ClickHouse bootstrap outside a checkout", () => {
+	test("runs a forward script from source when present, else its bundled .js", () => {
+		const schemaDir = mkdtempSync(join(tmpdir(), "ch-schema-layout-"));
+		mkdirSync(join(schemaDir, "scripts"));
+		writeFileSync(join(schemaDir, "scripts", "migrate-source.ts"), "");
+		expect(forwardScriptPath(schemaDir, "migrate-source.ts")).toBe(
+			join(schemaDir, "scripts", "migrate-source.ts"),
+		);
+		expect(forwardScriptPath(schemaDir, "migrate-bundled.ts")).toBe(
+			join(schemaDir, "scripts", "migrate-bundled.js"),
+		);
+	});
+
+	test("hands upgrades to chkit only on Cloud capabilities with chkit installed", () => {
+		const cloud = {
+			flavor: "cloud",
+			sharedEngines: true,
+			storagePolicy: "s3",
+		} as const;
+		const ossWithS3 = {
+			flavor: "oss",
+			sharedEngines: false,
+			storagePolicy: "s3",
+		} as const;
+		expect(usesChkitForUpgrade(cloud, true)).toBe(true);
+		expect(usesChkitForUpgrade(cloud, false)).toBe(false);
+		expect(usesChkitForUpgrade(ossWithS3, true)).toBe(false);
 	});
 });
