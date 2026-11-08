@@ -7,7 +7,11 @@ import {
 	test,
 } from "bun:test";
 import assert from "node:assert";
-import { extractTranscriptUsageMetrics } from "@rudel/api-routes";
+import {
+	extractTranscriptUsageMetrics,
+	getModelPricingCatalog,
+	MODEL_UNPRICED_IDENTITIES,
+} from "@rudel/api-routes";
 import {
 	ingestRudelSessionAnalytics,
 	ingestRudelSessionLineage,
@@ -26,6 +30,7 @@ import {
 import { buildNativeSessionLineageRow } from "../services/session-lineage-persistence.service.js";
 import { getSessionFilterCatalog } from "../services/session-list-filters.js";
 import {
+	buildCanonicalPricingModelSql,
 	buildUsageCostSubtotalSql,
 	buildUsageEventAnalyticsCte,
 } from "../services/usage-event-analytics.service.js";
@@ -1358,6 +1363,50 @@ describe("usage-event analytics ClickHouse rollups", () => {
 		});
 
 		expect(rows).toEqual([{ cost: 338.22, incomplete_sessions: 4 }]);
+	});
+
+	test("resolves every model identity in ClickHouse as the first matching rate-card pattern", async () => {
+		const names = [
+			...getModelPricingCatalog().map((entry) => entry.model),
+			...MODEL_UNPRICED_IDENTITIES.map((entry) => entry.model),
+			"o3",
+			"claude-3-opus-latest",
+			"claude-haiku-3-5-20241022",
+		];
+		const corpus = [
+			...names.flatMap((name) => [
+				name,
+				name.toUpperCase(),
+				` ${name} `,
+				`${name}-20260101`,
+				`${name}-2026-01-01`,
+				`${name}-2025-04-16`,
+				`${name}-latest`,
+				`${name}[1m]`,
+				`x-${name}`,
+			]),
+			"",
+			"unknown",
+			"<synthetic>",
+		];
+		const rows = await executor.query<{ model: string; resolved: string }>({
+			query: `
+				SELECT model, ${buildCanonicalPricingModelSql("model")} AS resolved
+				FROM (SELECT arrayJoin({models:Array(String)}) AS model)
+			`,
+			query_params: { models: corpus },
+		});
+		const expected = corpus.map((model) => {
+			const normalized = model.trim().toLowerCase();
+			const match = getModelPricingCatalog().find((entry) =>
+				entry.match.some((pattern) =>
+					new RegExp(pattern, "u").test(normalized),
+				),
+			);
+			return { model, resolved: match?.model ?? "" };
+		});
+
+		expect(rows).toEqual(expected);
 	});
 
 	test("keeps bounded key prefixes visible across the shared query families", async () => {

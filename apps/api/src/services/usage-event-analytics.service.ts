@@ -28,6 +28,7 @@ const USAGE_EVENTS_TABLE = "rudel.usage_events";
 const SESSION_ANALYTICS_TABLE = "rudel.session_analytics";
 const READY_TTL_MS = 60_000;
 const DEGRADED_TTL_MS = 5_000;
+const OPEN_ENDED_DATE = "2299-12-31";
 // A development Cloud service can idle and take several seconds to wake. Keep
 // the SQL execution limit short, but allow that connection setup to complete.
 const PROBE_TIMEOUT_MS =
@@ -90,11 +91,30 @@ function escapeSqlString(value: string): string {
 	return value.replaceAll("\\", "\\\\").replaceAll("'", "\\'");
 }
 
+function sqlString(value: string): string {
+	return `'${escapeSqlString(value)}'`;
+}
+
+function sqlArray(values: readonly string[]): string {
+	return `[${values.join(", ")}]`;
+}
+
 function buildEventPricingRateCardSql(): string {
-	const catalog = getModelPricingCatalog();
-	const rows = catalog.map((entry) => {
-		return `tuple('${escapeSqlString(entry.model)}', '${entry.provider}', '${entry.contextBand}', toDate('${entry.effectiveFrom}'), toDate('${entry.effectiveTo ?? "2299-12-31"}'), toFloat64(${entry.inputPerMTok}), toFloat64(${entry.cacheReadPerMTok ?? -1}), toFloat64(${entry.cacheWrite5mPerMTok ?? -1}), toFloat64(${entry.cacheWrite1hPerMTok ?? -1}), toFloat64(${entry.outputPerMTok}))`;
-	});
+	const rows = getModelPricingCatalog().map(
+		(entry) =>
+			`(${[
+				sqlString(entry.model),
+				sqlString(entry.provider),
+				sqlString(entry.contextBand),
+				sqlString(entry.effectiveFrom),
+				sqlString(entry.effectiveTo ?? OPEN_ENDED_DATE),
+				entry.inputPerMTok,
+				entry.cacheReadPerMTok ?? -1,
+				entry.cacheWrite5mPerMTok ?? -1,
+				entry.cacheWrite1hPerMTok ?? -1,
+				entry.outputPerMTok,
+			].join(", ")})`,
+	);
 
 	return `
 		SELECT
@@ -109,9 +129,10 @@ function buildEventPricingRateCardSql(): string {
 			rate.9 AS cache_write_1h_rate,
 			rate.10 AS output_rate
 		FROM (
-			SELECT arrayJoin([
-				${rows.join(",\n\t\t\t\t")}
-			]) AS rate
+			SELECT arrayJoin(CAST(
+				${sqlArray(rows)},
+				'Array(Tuple(String, String, String, Date, Date, Float64, Float64, Float64, Float64, Float64))'
+			)) AS rate
 		)
 	`;
 }
@@ -129,14 +150,29 @@ export function buildCanonicalPricingModelSql(modelExpr: string): string {
 			canonicalModelByPattern.set(pattern, entry.model);
 		}
 	}
+	for (const pattern of canonicalModelByPattern.keys()) {
+		assertAlternationSafePattern(pattern);
+	}
 
-	const clauses = [...canonicalModelByPattern.entries()].flatMap(
-		([pattern, model]) => [
-			`match(lowerUTF8(trimBoth(${modelExpr})), '${escapeSqlString(pattern)}')`,
-			`'${escapeSqlString(model)}'`,
-		],
-	);
-	return `multiIf(${clauses.join(", ")}, '')`;
+	const alternation = [...canonicalModelByPattern.keys()]
+		.map((pattern) => `(${pattern})`)
+		.join("|");
+	const models = [...canonicalModelByPattern.values()].map(sqlString);
+	return `arrayElement(${sqlArray(models)}, arrayFirstIndex(group -> group != '', extractGroups(lowerUTF8(trimBoth(${modelExpr})), ${sqlString(alternation)})))`;
+}
+
+// RE2 prefers the earliest alternative that matches at the leftmost position.
+function assertAlternationSafePattern(pattern: string): void {
+	const capturing = /(?<!\\)\((?!\?)/u;
+	if (
+		!pattern.startsWith("^") ||
+		capturing.test(pattern) ||
+		new RegExp(pattern, "u").test("")
+	) {
+		throw new Error(
+			`Pricing pattern ${pattern} must start with ^, have no capture group and never match an empty model`,
+		);
+	}
 }
 
 export function resolveCanonicalPricingModel(model: string): string {
@@ -175,15 +211,13 @@ function buildLongContextThresholdSql(identityExpr: string): string {
 }
 
 function buildLongContextAvailableSql(): string {
-	const clauses = getModelPricingCatalog()
+	const periods = getModelPricingCatalog()
 		.filter((entry) => entry.contextBand === "long")
-		.flatMap((entry) => [
-			`g.pricing_model = '${escapeSqlString(entry.model)}'
-				AND g.usage_date >= toDate('${entry.effectiveFrom}')
-				AND g.usage_date <= toDate('${entry.effectiveTo ?? "2299-12-31"}')`,
-			"toUInt8(1)",
-		]);
-	return `multiIf(${clauses.join(", ")}, toUInt8(0))`;
+		.map(
+			(entry) =>
+				`(${sqlString(entry.model)}, ${sqlString(entry.effectiveFrom)}, ${sqlString(entry.effectiveTo ?? OPEN_ENDED_DATE)})`,
+		);
+	return `arrayExists(period -> g.pricing_model = period.1 AND g.usage_date >= period.2 AND g.usage_date <= period.3, CAST(${sqlArray(periods)}, 'Array(Tuple(String, Date, Date))'))`;
 }
 
 function buildEventGroupCostSql(): string {
@@ -245,6 +279,7 @@ function buildModifierDimensionSql(
 	dimension: PricingModifierDimension,
 	valueExpr: string,
 ): string {
+	const value = `lowerUTF8(trimBoth(${valueExpr}))`;
 	const baseValues =
 		dimension === "service_tier"
 			? `if(
@@ -255,30 +290,35 @@ function buildModifierDimensionSql(
 			: dimension === "inference_speed"
 				? "['', 'standard']"
 				: "['', 'global']";
-	const clauses = getModelPricingModifierCatalog()
-		.filter((rule) => rule.dimension === dimension)
-		.flatMap((rule) => {
-			const conditions = [
-				`g.pricing_model = '${escapeSqlString(rule.model)}'`,
-				`lowerUTF8(trimBoth(${valueExpr})) IN (${rule.values
-					.map((value) => `'${escapeSqlString(value)}'`)
-					.join(", ")})`,
-				`g.usage_date >= toDate('${rule.effectiveFrom}')`,
-			];
-			if (rule.effectiveTo) {
-				conditions.push(`g.usage_date <= toDate('${rule.effectiveTo}')`);
-			}
-			if (rule.contextBand) {
-				conditions.push(`r.context_band = '${rule.contextBand}'`);
-			}
-			return [conditions.join(" AND "), `toNullable(${rule.multiplier})`];
-		});
+	const rules = getModelPricingModifierCatalog().filter(
+		(rule) => rule.dimension === dimension,
+	);
+	const conditions = rules.map(
+		(rule) =>
+			`(${[
+				sqlString(rule.model),
+				sqlArray(rule.values.map(sqlString)),
+				sqlString(rule.effectiveFrom),
+				sqlString(rule.effectiveTo ?? OPEN_ENDED_DATE),
+				sqlString(rule.contextBand ?? ""),
+			].join(", ")})`,
+	);
+	const multipliers = rules.map((rule) => String(rule.multiplier));
 
-	return `multiIf(
-		lowerUTF8(trimBoth(${valueExpr})) IN ${baseValues},
+	return `if(
+		${value} IN ${baseValues},
 		toNullable(1.0),
-		${clauses.join(",\n\t\t")},
-		CAST(NULL, 'Nullable(Float64)')
+		arrayElement(
+			CAST(${sqlArray(multipliers)}, 'Array(Nullable(Float64))'),
+			arrayFirstIndex(
+				rule -> g.pricing_model = rule.1
+					AND has(rule.2, ${value})
+					AND g.usage_date >= rule.3
+					AND g.usage_date <= rule.4
+					AND (rule.5 = '' OR rule.5 = r.context_band),
+				CAST(${sqlArray(conditions)}, 'Array(Tuple(String, Array(String), Date, Date, String))')
+			)
+		)
 	)`;
 }
 

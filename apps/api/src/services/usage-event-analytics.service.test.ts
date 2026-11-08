@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { buildEstimatedCostSql } from "@rudel/api-routes";
 import {
+	buildEstimatedCostSql,
+	getModelPricingCatalog,
+	getModelPricingModifierCatalog,
+	MODEL_UNPRICED_IDENTITIES,
+} from "@rudel/api-routes";
+import {
+	buildCanonicalPricingModelSql,
 	buildLegacyUsageAnalyticsCte,
 	buildPricedUsageEventsCte,
 	buildUsageCostSubtotalSql,
@@ -86,14 +92,16 @@ describe("usage-event analytics query contract", () => {
 		expect(sql).toContain("usage_event_pricing_candidates AS");
 		expect(sql).toContain("usage_event_pricing_groups AS");
 		expect(sql).toContain("usage_event_pricing_rate_card AS");
-		expect(sql).toContain("match(lowerUTF8(trimBoth(c.pricing_identity))");
+		expect(sql).toContain(
+			"extractGroups(lowerUTF8(trimBoth(c.pricing_identity))",
+		);
 		expect(sql).toContain("ON g.pricing_model = r.model");
 		expect(sql).toContain("ANY LEFT JOIN usage_event_pricing_rate_card AS r");
 		expect(sql.indexOf("usage_event_pricing_candidates AS")).toBeLessThan(
-			sql.indexOf("match(lowerUTF8(trimBoth(c.pricing_identity))"),
+			sql.indexOf("extractGroups(lowerUTF8(trimBoth(c.pricing_identity))"),
 		);
 		expect(
-			sql.indexOf("match(lowerUTF8(trimBoth(c.pricing_identity))"),
+			sql.indexOf("extractGroups(lowerUTF8(trimBoth(c.pricing_identity))"),
 		).toBeLessThan(
 			sql.indexOf("ANY LEFT JOIN usage_event_pricing_rate_card AS r"),
 		);
@@ -134,7 +142,7 @@ describe("usage-event analytics query contract", () => {
 		);
 		expect(sql).toContain("lowerUTF8(trimBoth(g.inference_speed))");
 		expect(sql).toContain("lowerUTF8(trimBoth(g.inference_geo))");
-		expect(sql).toContain("IN ('fast', 'priority')");
+		expect(sql).toContain("['fast', 'priority']");
 		expect(sql).toContain("service_tier_conflict");
 		expect(sql).toContain("unrecognized_service_tier");
 		expect(sql).toContain("provider_model_mismatch");
@@ -253,6 +261,95 @@ describe("usage-event analytics query contract", () => {
 		]) {
 			expect(sql).toContain(`e.context_input_tokens > ${expected}`);
 			expect(sql).not.toContain("e.context_input_tokens > 272000");
+		}
+	});
+});
+
+function unquoteSqlString(literal: string): string {
+	return literal.slice(1, -1).replace(/\\(.)/gu, "$1");
+}
+
+function firstMatchingModel(model: string): string {
+	const normalized = model.trim().toLowerCase();
+	return (
+		getModelPricingCatalog().find((entry) =>
+			entry.match.some((pattern) => new RegExp(pattern, "u").test(normalized)),
+		)?.model ?? ""
+	);
+}
+
+describe("pricing SQL size", () => {
+	test("resolves a model through one alternation exactly as the first matching pattern", () => {
+		const sql = buildCanonicalPricingModelSql("m");
+		const parsed = sql.match(
+			/^arrayElement\(\[(.*)\], arrayFirstIndex\(group -> group != '', extractGroups\(lowerUTF8\(trimBoth\(m\)\), ('.*')\)\)\)$/u,
+		);
+		expect(parsed).not.toBeNull();
+		const models = (parsed?.[1] ?? "").split(", ").map(unquoteSqlString);
+		const alternation = new RegExp(unquoteSqlString(parsed?.[2] ?? "''"), "u");
+		const resolve = (model: string) => {
+			const groups = alternation.exec(model.trim().toLowerCase());
+			const index = groups?.slice(1).findIndex((group) => !!group) ?? -1;
+			return index < 0 ? "" : (models[index] ?? "");
+		};
+
+		const names = [
+			...getModelPricingCatalog().map((entry) => entry.model),
+			...MODEL_UNPRICED_IDENTITIES.map((entry) => entry.model),
+			"o3",
+			"claude-3-opus-latest",
+			"claude-haiku-3-5-20241022",
+			"gpt-5.6",
+		];
+		const corpus = names.flatMap((name) => [
+			name,
+			name.toUpperCase(),
+			` ${name} `,
+			`${name}-20260101`,
+			`${name}-2026-01-01`,
+			`${name}-2025-04-16`,
+			`${name}-latest`,
+			`${name}-preview`,
+			`${name}[1m]`,
+			`x-${name}`,
+		]);
+		expect(
+			corpus.filter((model) => firstMatchingModel(model) !== ""),
+		).not.toHaveLength(0);
+		for (const model of [...corpus, "", "unknown", "<synthetic>"]) {
+			expect([model, resolve(model)]).toEqual([
+				model,
+				firstMatchingModel(model),
+			]);
+		}
+	});
+
+	test("prices from one literal per table instead of a clause per rule", () => {
+		const sql = buildUsageEventAnalyticsCte();
+
+		expect(sql).not.toContain(
+			"multiIf(match(lowerUTF8(trimBoth(c.pricing_identity))",
+		);
+		expect(sql).not.toContain("toFloat64(");
+		expect(sql.match(/arrayJoin\(CAST\(/gu)).toHaveLength(1);
+		expect(sql.match(/arrayFirstIndex\(\s*rule ->/gu)).toHaveLength(3);
+		for (const rule of getModelPricingModifierCatalog()) {
+			expect(sql).toContain(
+				`('${rule.model}', [${rule.values.map((value) => `'${value}'`).join(", ")}], '${rule.effectiveFrom}', '${rule.effectiveTo ?? "2299-12-31"}', '${rule.contextBand ?? ""}')`,
+			);
+		}
+		for (const dimension of [
+			"service_tier",
+			"inference_speed",
+			"inference_geo",
+		] as const) {
+			const multipliers = getModelPricingModifierCatalog()
+				.filter((rule) => rule.dimension === dimension)
+				.map((rule) => rule.multiplier)
+				.join(", ");
+			expect(sql).toContain(
+				`CAST([${multipliers}], 'Array(Nullable(Float64))')`,
+			);
 		}
 	});
 });
