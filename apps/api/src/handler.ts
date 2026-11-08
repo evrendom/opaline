@@ -24,6 +24,7 @@ import {
 } from "./handlers/github-webhook-http.js";
 import { handleInvitationPresentationRequest } from "./handlers/invitation-presentation-http.js";
 import { handleMcpRoute } from "./handlers/mcp-http.js";
+import { handleSelfHostRoute, selfHostAuth } from "./handlers/selfhost-http.js";
 import { handleSessionArrivalsRequest } from "./handlers/session-arrivals-http.js";
 import { handleSessionDetailStatsRequest } from "./handlers/session-detail-stats-http.js";
 import {
@@ -64,6 +65,7 @@ import type { ApiKeyAuthFailure } from "./middleware.js";
 import { readPasswordAuthAllowlist } from "./password-auth.js";
 import { readResendConfig } from "./resend-config.js";
 import { router } from "./router.js";
+import { consumeLoginToken } from "./selfhost/login-tokens.js";
 import { getIngestFilterQueueMetrics } from "./services/ingest-filter.service.js";
 import { UNSUBSCRIBE_PATH as USAGE_DIGEST_UNSUBSCRIBE_PATH } from "./services/usage-digest/unsubscribe-token.js";
 import { getStripeWebhookConfig } from "./stripe-client.js";
@@ -169,7 +171,17 @@ export const auth = createAuth(db, {
 	trustedOrigins,
 	cliDeviceVerificationUrl: cliDeviceVerification.url,
 	slackWebhookUrl: process.env.SLACK_WEBHOOK_URL,
+	selfHostedLogin: isSelfHosted()
+		? (token) => consumeLoginToken(sqlClient, token)
+		: undefined,
 });
+
+const selfHostDependencies = {
+	auth: selfHostAuth(auth),
+	sql: sqlClient,
+	env: process.env,
+	socialProviders: Object.keys(socialProviders),
+};
 
 const rpcHandler = new RPCHandler(router, {
 	clientInterceptors: [
@@ -456,6 +468,12 @@ async function handleRequest(
 	if (url.pathname === GITHUB_WEBHOOK_PATH) {
 		return handleConfiguredGitHubWebhookRequest(request);
 	}
+	const selfHostResponse = handleSelfHostRoute(
+		request,
+		url,
+		selfHostDependencies,
+	);
+	if (selfHostResponse) return selfHostResponse;
 	const mcpResponse = handleMcpRoute(request, url, {
 		auth,
 		allowedOrigins: trustedOrigins,

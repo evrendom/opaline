@@ -30,6 +30,7 @@ import {
 	type PasswordAuthAllowlist,
 	passwordAuthAllowlistPlugin,
 } from "./password-auth.js";
+import { selfHostedLoginPlugin } from "./selfhost/login-plugin.js";
 import {
 	enqueueBillingTraitsForUser,
 	reconcileOrganizationBillingSeats,
@@ -105,6 +106,7 @@ export interface AuthConfig {
 	trustedOrigins?: string[];
 	cliDeviceVerificationUrl?: string;
 	slackWebhookUrl?: string;
+	selfHostedLogin?: (token: string) => Promise<string | null>;
 }
 
 /**
@@ -239,6 +241,9 @@ export function createAuth(db: object, config: AuthConfig) {
 					allowPlainCodeChallengeMethod: false,
 				},
 			}) as BetterAuthPlugin,
+			...((config.selfHostedLogin
+				? [selfHostedLoginPlugin(config.selfHostedLogin)]
+				: []) as []),
 			createOrganizationPlugin(
 				{ frontendURL: config.frontendURL },
 				{

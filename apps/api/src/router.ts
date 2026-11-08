@@ -74,6 +74,7 @@ import {
 	hashProjectPath,
 } from "./lib/product-analytics.js";
 import { readRepositoryEvidenceCapturePauseSeconds } from "./lib/repository-evidence-capture.js";
+import { isSelfHosted } from "./lib/self-hosted.js";
 import {
 	type AppContext,
 	authMiddleware,
@@ -421,7 +422,11 @@ const cliAuthStatus = os.cli.authStatus
 				repositoryEvidenceImages: true as const,
 				dataExport: true as const,
 				sessionInventory: true as const,
-				...(isLiveSessionsEnabled() ? { liveSessions: true as const } : {}),
+				...(isLiveSessionsEnabled() &&
+				(!isSelfHosted() || readR2IngestAvailability().enabled)
+					? { liveSessions: true as const }
+					: {}),
+				...(isSelfHosted() ? { selfHosted: true as const } : {}),
 			},
 		};
 	});

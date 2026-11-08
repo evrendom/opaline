@@ -40,6 +40,7 @@ import {
 } from "../mcp/tool-errors.js";
 import type { AppContext } from "../middleware.js";
 import { router } from "../router.js";
+import { apiKeyFromHeaders, apiKeyUserId } from "../selfhost/api-key-auth.js";
 import {
 	recordToolCall,
 	toolCallRow,
@@ -270,7 +271,19 @@ async function handleMcpRequest(
 	const token = await mcpApi(dependencies.auth).getMcpSession({
 		headers: request.headers,
 	});
-	if (!token?.userId || token.accessTokenExpiresAt < new Date()) {
+	const oauthUserId =
+		token?.userId && token.accessTokenExpiresAt >= new Date()
+			? token.userId
+			: null;
+	const userId =
+		oauthUserId ??
+		(isSelfHosted()
+			? await apiKeyUserId(
+					dependencies.auth.api,
+					apiKeyFromHeaders(request.headers),
+				)
+			: null);
+	if (!userId) {
 		const metadataUrl = new URL(
 			`/.well-known/oauth-protected-resource${MCP_PATH}`,
 			request.url,
@@ -285,7 +298,7 @@ async function handleMcpRequest(
 			},
 		);
 	}
-	if (!(await isMcpAvailable(token.userId))) {
+	if (!(await isMcpAvailable(userId))) {
 		return Response.json({ error: "not_available" }, { status: 403 });
 	}
 
@@ -339,12 +352,12 @@ async function handleMcpRequest(
 			return rpcResult(message.id, {});
 		case "tools/list":
 			return rpcResult(message.id, {
-				tools: listedTools(await listingFor(token.userId)),
+				tools: listedTools(await listingFor(userId)),
 			});
 		case "tools/call":
 			return rpcResult(
 				message.id,
-				await callTool(token.userId, params, dependencies),
+				await callTool(userId, params, dependencies),
 			);
 		case "resources/list":
 			return rpcResult(message.id, {
@@ -367,12 +380,7 @@ async function handleMcpRequest(
 				],
 			});
 		case "resources/read":
-			return readResource(
-				message.id,
-				`${params.uri}`,
-				token.userId,
-				dependencies,
-			);
+			return readResource(message.id, `${params.uri}`, userId, dependencies);
 		default:
 			return rpcError(message.id, -32601, "Method not found");
 	}

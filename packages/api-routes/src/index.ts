@@ -735,6 +735,7 @@ export const CliUploadCapabilitiesSchema = z.object({
 	liveSessions: z.literal(true).optional(),
 	dataExport: z.literal(true).optional(),
 	sessionInventory: z.literal(true).optional(),
+	selfHosted: z.literal(true).optional(),
 });
 
 export const CliUserSchema = z.object({
