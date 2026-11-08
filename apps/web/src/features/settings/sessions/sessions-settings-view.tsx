@@ -24,8 +24,10 @@ export function SessionsSettingsView({
 	pending,
 	repositories,
 	search,
+	signInCommand,
 	visible,
 }: {
+	signInCommand?: string;
 	copied: boolean;
 	error: boolean;
 	fetching: boolean;
@@ -73,6 +75,12 @@ export function SessionsSettingsView({
 						Changes apply on the computer running the command. Existing sessions
 						stay in your workspace.
 					</p>
+					{signInCommand ? (
+						<p className="sessions-settings-note">
+							On a computer that has not signed in to this server yet, run{" "}
+							<code>{signInCommand}</code> first.
+						</p>
+					) : null}
 				</div>
 			</section>
 			<section

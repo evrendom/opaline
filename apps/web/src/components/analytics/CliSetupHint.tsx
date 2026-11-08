@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
-import { type CliSetupStepId, cliSetupCommands } from "./cli-setup-commands";
+import { type CliSetupStepId, getCliSetupCommands } from "./cli-setup-commands";
 
-export { cliSetupCommands };
+export { getCliSetupCommands };
 export type { CliSetupStepId };
 
 export function CliSetupHint({
@@ -12,7 +12,7 @@ export function CliSetupHint({
 	const completedSteps = new Set(completedStepIds);
 	return (
 		<div className="mt-4 mx-auto grid w-full max-w-xl gap-3">
-			{cliSetupCommands.map((step) => (
+			{getCliSetupCommands(window.location.origin).map((step) => (
 				<DefaultCliSetupCommand
 					key={step.command}
 					label={step.title}

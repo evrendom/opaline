@@ -3,6 +3,8 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
+import { cliLoginCommand } from "@/features/self-hosted/cli-commands";
+import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { orpc } from "@/lib/orpc";
 import {
@@ -12,6 +14,7 @@ import {
 } from "./sessions-settings-view";
 
 export function SessionsSettingsPage() {
+	const selfHost = useSelfHost();
 	const [search, setSearch] = useState("");
 	const [copied, setCopied] = useState(false);
 	const copyTimer = useRef<number | undefined>(undefined);
@@ -56,6 +59,9 @@ export function SessionsSettingsPage() {
 			error={query.isError}
 			repositories={query.data ? repositories : undefined}
 			search={search}
+			signInCommand={
+				selfHost ? cliLoginCommand(window.location.origin) : undefined
+			}
 			visible={visible}
 		/>
 	);

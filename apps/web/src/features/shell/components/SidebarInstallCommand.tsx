@@ -1,6 +1,8 @@
 "use client";
 
 import { SidebarMenuButton, SidebarMenuItem } from "@/app/ui/sidebar";
+import { cliLoginCommand } from "@/features/self-hosted/cli-commands";
+import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import {
 	CopyIcon,
 	useCopyFeedback,
@@ -11,10 +13,14 @@ const INSTALL_COMMAND = "npx opaline@latest";
 // The landing page's install command, always a click away above Settings.
 // The copy icon sits in the nav icon lane and plays the landing animation.
 export function SidebarInstallCommand() {
-	const { copied, copy } = useCopyFeedback(INSTALL_COMMAND);
+	const selfHost = useSelfHost();
+	const command = selfHost
+		? cliLoginCommand(window.location.origin)
+		: INSTALL_COMMAND;
+	const { copied, copy } = useCopyFeedback(command);
 	const label = copied
 		? "Copied — paste in your terminal"
-		: `Copy install command: ${INSTALL_COMMAND}`;
+		: `Copy install command: ${command}`;
 
 	return (
 		<SidebarMenuItem>
@@ -29,7 +35,7 @@ export function SidebarInstallCommand() {
 				<span className="grid size-4.5 shrink-0 place-items-center text-[color:color-mix(in_srgb,var(--muted-foreground)_70%,var(--sidebar))]">
 					<CopyIcon className="size-4.5!" />
 				</span>
-				<span className="min-w-0 flex-1 truncate">{INSTALL_COMMAND}</span>
+				<span className="min-w-0 flex-1 truncate">{command}</span>
 			</SidebarMenuButton>
 		</SidebarMenuItem>
 	);
