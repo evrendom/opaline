@@ -35,6 +35,7 @@ import {
 	buildUsageEventAnalyticsCte,
 } from "../services/usage-event-analytics.service.js";
 import { buildUsageEventRows } from "../services/usage-event-ingest.service.js";
+import { refreshUsageSessionRollups } from "../services/usage-session-rollup.service.js";
 import { codexForkFixture } from "./helpers/codex-fork-fixture.js";
 
 setDefaultTimeout(30_000);
@@ -1456,6 +1457,56 @@ describe("usage-event analytics ClickHouse rollups", () => {
 
 			expect(plan).toContain("PrimaryKey");
 			expect(plan).toContain("organization_id");
+		}
+	});
+
+	test("prices every fixture session from its stored rollup exactly as from its events", async () => {
+		const sessions = await executor.query<{
+			organization_id: string;
+			session_id: string;
+			source: string;
+			user_id: string;
+		}>({
+			query: `SELECT DISTINCT organization_id, user_id, toString(source) AS source, session_id
+				FROM rudel.usage_events
+				WHERE position(organization_id, {runId:String}) > 0`,
+			query_params: { runId },
+		});
+		expect(sessions.length).toBeGreaterThan(10);
+		await refreshUsageSessionRollups(
+			executor,
+			sessions.map((session) => ({
+				organizationId: session.organization_id,
+				sessionId: session.session_id,
+				source: session.source,
+				userId: session.user_id,
+			})),
+		);
+		try {
+			for (const orgId of new Set(
+				sessions.map((session) => session.organization_id),
+			)) {
+				for (const query of [
+					"SELECT * FROM usage_analytics_sessions ORDER BY ALL",
+					"SELECT * FROM usage_analytics_daily_sessions ORDER BY ALL",
+					"SELECT * EXCEPT (receipt_generation, latest_receipt_event_count, latest_receipt_is_complete, latest_receipt_is_deleted, active_event_count) FROM priced_usage_groups ORDER BY ALL",
+				]) {
+					const read = (source: "events" | "rollups") =>
+						executor.query({
+							query: `WITH ${buildUsageEventAnalyticsCte({}, false, source)} ${query}`,
+							query_params: { orgId },
+						});
+					expect(await read("rollups")).toEqual(await read("events"));
+				}
+			}
+		} finally {
+			await executor
+				.execute({
+					query:
+						"DELETE FROM rudel.usage_session_rollups WHERE position(organization_id, {runId:String}) > 0 SETTINGS lightweight_deletes_sync = 3",
+					query_params: { runId },
+				})
+				.catch(() => {});
 		}
 	});
 });

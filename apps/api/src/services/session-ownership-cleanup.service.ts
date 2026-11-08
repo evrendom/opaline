@@ -1,5 +1,6 @@
 import type { ClickHouseSettings } from "@clickhouse/client-web";
 import { getAllAdapters } from "@rudel/agent-adapters";
+import { USAGE_SESSION_ROLLUPS_TABLE } from "@rudel/ch-schema/usage-session-rollups";
 import { getClickhouse, getSafeClickHouseTable } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
 
@@ -110,6 +111,7 @@ export async function cleanupNonCanonicalSessionRows(
 		`);
 		const plan = await getCleanupPlan(cutoff, ownershipRows);
 		if (plan.rowCount === 0) {
+			await deleteNonCanonicalUsageRollups(ownershipRows);
 			return createCleanupResult(plan, cutoff, "already_clean", 0);
 		}
 		if (plan.rowCount > expectedRowCount) {
@@ -121,6 +123,7 @@ export async function cleanupNonCanonicalSessionRows(
 		for (const table of plan.tables) {
 			await deleteNonCanonicalKeys(table);
 		}
+		await deleteNonCanonicalUsageRollups(ownershipRows);
 
 		const currentOwnershipRows = await transaction.unsafe<OwnershipRow[]>(`
 			SELECT organization_id, session_id, user_id
@@ -198,6 +201,38 @@ async function getCleanupPlan(
 		),
 		tables,
 	};
+}
+
+async function deleteNonCanonicalUsageRollups(
+	ownershipRows: readonly OwnershipRow[],
+): Promise<void> {
+	const owners = new Map(
+		ownershipRows.map((row) => [
+			getOwnershipKey(row.organization_id, row.session_id),
+			row.user_id,
+		]),
+	);
+	const keys = await getClickhouse().query<SessionRowGroup>({
+		clickhouse_settings: CLEANUP_QUERY_SETTINGS,
+		query: `
+			SELECT
+				organization_id,
+				session_id,
+				user_id,
+				count() AS row_count
+			FROM ${getSafeClickHouseTable(USAGE_SESSION_ROLLUPS_TABLE)}
+			GROUP BY organization_id, session_id, user_id
+		`,
+	});
+	await deleteNonCanonicalKeys({
+		keyKind: "session",
+		keys: keys.filter(
+			(row) =>
+				owners.get(getOwnershipKey(row.organization_id, row.session_id)) !==
+				row.user_id,
+		),
+		table: USAGE_SESSION_ROLLUPS_TABLE,
+	});
 }
 
 async function getSkillContentRowGroups(

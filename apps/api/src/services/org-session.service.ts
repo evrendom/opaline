@@ -12,6 +12,7 @@ import { SESSION_CONTEXT_SNAPSHOTS_TABLE } from "@rudel/ch-schema/session-contex
 import { SESSION_IMAGES_TABLE } from "@rudel/ch-schema/session-images";
 import { SESSION_INVENTORY_TABLE } from "@rudel/ch-schema/session-inventory";
 import { SESSION_SAVED_OUTPUTS_TABLE } from "@rudel/ch-schema/session-saved-outputs";
+import { USAGE_SESSION_ROLLUPS_TABLE } from "@rudel/ch-schema/usage-session-rollups";
 import { WEEKLY_TOTALS_TABLE } from "@rudel/ch-schema/weekly-totals";
 import {
 	type ClickHouseStatement,
@@ -268,6 +269,7 @@ export function getClickHouseSessionPurgePlans(
 		// removes answers a run_questions job stored while the first ran.
 		{ column, table: RUN_QUESTION_ANSWERS_TABLE },
 		{ column, table: USAGE_EVENTS_TABLE },
+		{ column, table: USAGE_SESSION_ROLLUPS_TABLE },
 		{ column, table: WRAPPED_USER_ARCHETYPE_SNAPSHOTS_TABLE },
 		{ column, table: `rudel.${REPOSITORY_EVIDENCE_INDEX_TABLE}` },
 		// Saved outputs (task outputs, large tool outputs), published with the

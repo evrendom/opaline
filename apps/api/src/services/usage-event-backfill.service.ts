@@ -1,3 +1,4 @@
+import { getLogger } from "@logtape/logtape";
 import {
 	type IngestSessionInput,
 	IngestSessionInputSchema,
@@ -23,7 +24,9 @@ import {
 	hasMatchingUsageExtractionReceipt,
 	writeUsageExtraction,
 } from "./usage-event-ingest.service.js";
+import { refreshUsageSessionRollups } from "./usage-session-rollup.service.js";
 
+const logger = getLogger(["rudel", "api", "usage-event-backfill"]);
 const DEFAULT_MAX_SESSION_BYTES = 512 * 1024 * 1024;
 const MAX_CONFIGURED_SESSION_BYTES = 8 * 1024 * 1024 * 1024;
 const MAX_ISSUES = 100;
@@ -232,6 +235,7 @@ async function runUsageEventsBackfill(
 		const rawBySession = new Map(
 			rawRows.map((raw) => [rawSessionKey(raw), raw]),
 		);
+		const written: RawSessionCandidate[] = [];
 		for (const candidate of batch.candidates) {
 			const candidateResult = await processCandidate(
 				executor,
@@ -247,7 +251,21 @@ async function runUsageEventsBackfill(
 				}),
 			);
 			applyCandidateResult(result, candidateResult);
+			if (
+				candidateResult.status !== "already_complete" &&
+				candidateResult.status !== "would_write"
+			)
+				written.push(candidate);
 		}
+		if (execute)
+			await refreshUsageSessionRollups(executor, written).catch(
+				(error: unknown) => {
+					logger.warn(
+						"Usage rollup refresh of {count} backfilled sessions failed: {error}",
+						{ count: written.length, error: describeError(error) },
+					);
+				},
+			);
 		processedCandidateCount += batch.candidates.length;
 		options.onProgress?.({
 			batchCount: batches.length,
@@ -348,6 +366,7 @@ async function processCandidate(
 		generation,
 		ingestedAt: parseClickHouseUtc(raw.raw_ingested_at),
 		organizationId: candidate.organizationId,
+		refreshRollup: false,
 		replaceAbsentEvents: extraction.status === "complete",
 		sessionDate: parseClickHouseUtc(raw.raw_session_date),
 		sessionId: candidate.sessionId,

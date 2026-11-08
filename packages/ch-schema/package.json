@@ -20,7 +20,8 @@
 		"./mcp-tool-calls": "./src/mcp-tool-calls.ts",
 		"./session-context-snapshots": "./src/session-context-snapshots.ts",
 		"./session-inventory": "./src/session-inventory.ts",
-		"./call-facts": "./src/call-facts.ts"
+		"./call-facts": "./src/call-facts.ts",
+		"./usage-session-rollups": "./src/usage-session-rollups.ts"
 	},
 	"scripts": {
 		"backfill:subagent-metrics": "bun scripts/backfill-subagent-metrics.ts",
@@ -70,8 +71,9 @@
 		"ch:migrate:session-context-snapshots": "bun scripts/migrate-session-context-snapshots.ts",
 		"ch:migrate:mcp-tool-calls": "bun scripts/migrate-mcp-tool-calls.ts",
 		"ch:migrate:session-inventory": "bun scripts/migrate-session-inventory.ts",
+		"ch:migrate:usage-session-rollups": "bun scripts/migrate-usage-session-rollups.ts",
 		"ch:migrate:transcript-record-uuid": "bun scripts/migrate-transcript-record-uuid.ts",
-		"ch:migrate:production": "bun scripts/production-migration-gate.ts ch:migrate:language-signals ch:migrate:transcript-records ch:migrate:transcript-record-uuid ch:migrate:repository-evidence-index ch:migrate:github-outcomes ch:migrate:session-git-observations ch:migrate:session-analytics-retirement ch:migrate:l1-edges ch:migrate:run-index ch:migrate:run-requests ch:migrate:parser-v9 ch:migrate:l1-retention ch:migrate:analysis-finding-runs ch:migrate:weekly-totals ch:migrate:not-found-unknown ch:migrate:run-question-answers ch:migrate:transcript-search ch:migrate:received-setup ch:migrate:session-saved-outputs ch:migrate:session-images ch:migrate:run-index-messages ch:migrate:run-index-capture-gaps ch:migrate:run-index-approvals ch:migrate:run-activity-end ch:migrate:mcp-tool-calls ch:migrate:string-defaults ch:migrate:session-context-snapshots ch:migrate:session-inventory ch:migrate:call-facts",
+		"ch:migrate:production": "bun scripts/production-migration-gate.ts ch:migrate:language-signals ch:migrate:transcript-records ch:migrate:transcript-record-uuid ch:migrate:repository-evidence-index ch:migrate:github-outcomes ch:migrate:session-git-observations ch:migrate:session-analytics-retirement ch:migrate:l1-edges ch:migrate:run-index ch:migrate:run-requests ch:migrate:parser-v9 ch:migrate:l1-retention ch:migrate:analysis-finding-runs ch:migrate:weekly-totals ch:migrate:not-found-unknown ch:migrate:run-question-answers ch:migrate:transcript-search ch:migrate:received-setup ch:migrate:session-saved-outputs ch:migrate:session-images ch:migrate:run-index-messages ch:migrate:run-index-capture-gaps ch:migrate:run-index-approvals ch:migrate:run-activity-end ch:migrate:mcp-tool-calls ch:migrate:string-defaults ch:migrate:session-context-snapshots ch:migrate:session-inventory ch:migrate:call-facts ch:migrate:usage-session-rollups",
 		"ch:migrate:github-outcomes": "bun scripts/migrate-github-outcomes.ts"
 	},
 	"dependencies": {

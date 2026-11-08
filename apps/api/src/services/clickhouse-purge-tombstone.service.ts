@@ -58,3 +58,51 @@ export async function hasClickHousePurgeTombstone(
 	);
 	return rows.length > 0;
 }
+
+export function clickHousePurgeTargetKey(target: {
+	readonly organizationId: string;
+	readonly userId: string;
+}): string {
+	return `${target.organizationId}\u0000${target.userId}`;
+}
+
+export async function findClickHousePurgeTombstones(
+	targets: readonly {
+		readonly organizationId: string;
+		readonly userId: string;
+	}[],
+	env: ClickHousePurgeTombstoneEnv,
+): Promise<Set<string>> {
+	if (targets.length === 0) return new Set();
+	const rows = await env.database.unsafe<
+		Array<{ target_id: string; target_type: string }>
+	>(
+		`SELECT target_type, target_id
+		 FROM clickhouse_purge_job
+		 WHERE (target_type = 'account' AND target_id = ANY($1::text[]))
+			OR (target_type = 'organization' AND target_id = ANY($2::text[]))`,
+		[
+			[...new Set(targets.map((target) => target.userId))],
+			[...new Set(targets.map((target) => target.organizationId))],
+		],
+	);
+	const accounts = new Set(
+		rows
+			.filter((row) => row.target_type === "account")
+			.map((row) => row.target_id),
+	);
+	const organizations = new Set(
+		rows
+			.filter((row) => row.target_type === "organization")
+			.map((row) => row.target_id),
+	);
+	return new Set(
+		targets
+			.filter(
+				(target) =>
+					accounts.has(target.userId) ||
+					organizations.has(target.organizationId),
+			)
+			.map(clickHousePurgeTargetKey),
+	);
+}

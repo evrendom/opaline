@@ -1,4 +1,5 @@
 import { ORPCError } from "@orpc/server";
+import { USAGE_SESSION_ROLLUPS_TABLE } from "@rudel/ch-schema/usage-session-rollups";
 import {
 	type ClickHouseExecutor,
 	getClickhouse,
@@ -6,6 +7,7 @@ import {
 } from "../clickhouse.js";
 import {
 	readUsageEventAnalyticsCutoverConfig,
+	shouldReadUsageRollups,
 	shouldUseUsageEventAnalytics,
 } from "../lib/env.js";
 import {
@@ -375,7 +377,7 @@ export interface UsageAnalyticsWindow {
 	 * A parameterized SELECT of `organization_id, user_id, source, session_id`.
 	 * It may read the lineage CTEs. Never place request values in it directly.
 	 */
-	readonly sessionsSql: string;
+	readonly sessionsSql: string | ((usageSource: UsageSource) => string);
 	/**
 	 * Also read every native Codex descendant of those sessions, so a family
 	 * cost stays whole. The query must then start with `WITH RECURSIVE`.
@@ -402,8 +404,18 @@ export function buildSessionAnalyticsWindowSql(filterSql: string): string {
 					AND ${filterSql}`;
 }
 
-export function buildDateRangeWindowSql(): string {
+export function buildDateRangeWindowSql(
+	usageSource: UsageSource = "events",
+): string {
 	const start = "toDateTime({startDate:String}, 'UTC')";
+	const usageSessions =
+		usageSource === "rollups"
+			? `FROM ${getSafeClickHouseTable(USAGE_SESSION_ROLLUPS_TABLE)}
+							WHERE ${organizationMatchSql("organization_id")}
+								AND arrayExists(day -> day BETWEEN toDate({startDate:String}) AND toDate({endDate:String}), usage_dates)`
+			: `FROM ${getSafeClickHouseTable(USAGE_EVENTS_TABLE)}
+							WHERE ${organizationMatchSql("organization_id")}
+								AND usage_date BETWEEN toDate({startDate:String}) AND toDate({endDate:String})`;
 	return `
 				SELECT session.1 AS organization_id, session.2 AS user_id,
 					session.3 AS source, session.4 AS session_id
@@ -418,17 +430,22 @@ export function buildDateRangeWindowSql(): string {
 								AND (session_date >= ${start} OR last_interaction_date >= ${start})
 							UNION ALL
 							SELECT organization_id, user_id, toString(source) AS source, session_id
-							FROM ${getSafeClickHouseTable(USAGE_EVENTS_TABLE)}
-							WHERE ${organizationMatchSql("organization_id")}
-								AND usage_date BETWEEN toDate({startDate:String}) AND toDate({endDate:String})
+							${usageSessions}
 						)
 					)) AS session
 				)`;
 }
 
 /** Defines `usage_window_sessions`; needs the lineage CTEs before it. */
-function buildUsageWindowCte(window: UsageAnalyticsWindow): string {
-	const roots = `usage_window_roots AS (${window.sessionsSql}
+function buildUsageWindowCte(
+	window: UsageAnalyticsWindow,
+	usageSource: UsageSource,
+): string {
+	const sessionsSql =
+		typeof window.sessionsSql === "string"
+			? window.sessionsSql
+			: window.sessionsSql(usageSource);
+	const roots = `usage_window_roots AS (${sessionsSql}
 		)`;
 	if (!window.includeNativeDescendants) {
 		return `${roots},
@@ -704,11 +721,9 @@ export function buildRunPricedUsageCte(runWindowsRelation: string): string {
 		)`;
 }
 
-export function buildUsageEventAnalyticsCte(
-	scope: UsageAnalyticsScope = {},
-	lineageEnabled?: boolean,
+export function buildUsageEventCandidateCtes(
+	usageEventFilters: string,
 ): string {
-	const usageEventFilters = buildUsageEventFilters(scope);
 	// The organization/key filters follow the table's primary-key prefix, so FINAL
 	// resolves exact ReplacingMergeTree state without scanning unrelated tenants.
 	// Per-session state is grouped once and joined back instead of computed with
@@ -717,8 +732,6 @@ export function buildUsageEventAnalyticsCte(
 	// reference (about 0.8 GiB per copy on the largest organization). Reading
 	// latest_usage_records again for the joins is cheap by comparison.
 	return `
-		${buildSessionLineageCteDefinitions(lineageEnabled, scope.tenant)},
-		${scope.window ? `${buildUsageWindowCte(scope.window)},` : ""}
 		latest_usage_records AS (
 			SELECT *
 			FROM ${getSafeClickHouseTable(USAGE_EVENTS_TABLE)} FINAL
@@ -804,7 +817,78 @@ export function buildUsageEventAnalyticsCte(
 		),
 		usage_event_pricing_candidates AS (
 			${buildPricingCandidatesSelect("usage_records_with_display_model")}
-		),
+		)`;
+}
+
+function buildUsageRollupCandidatesCte(usageEventFilters: string): string {
+	return `
+		usage_event_pricing_candidates AS (
+			SELECT
+				organization_id,
+				user_id,
+				source,
+				session_id,
+				record_kind,
+				usage_date,
+				pricing_identity,
+				model_provider,
+				service_tier,
+				inference_speed,
+				inference_geo,
+				context_band,
+				is_priceable,
+				has_geo_gap,
+				latest_main_model,
+				latest_event_model,
+				group_uncached_input_tokens,
+				group_cache_read_input_tokens,
+				group_cache_write_5m_input_tokens,
+				group_cache_write_1h_input_tokens,
+				group_output_tokens
+			FROM ${getSafeClickHouseTable(USAGE_SESSION_ROLLUPS_TABLE)} FINAL
+			ARRAY JOIN
+				record_kinds AS record_kind,
+				usage_dates AS usage_date,
+				pricing_identities AS pricing_identity,
+				model_providers AS model_provider,
+				service_tiers AS service_tier,
+				inference_speeds AS inference_speed,
+				inference_geos AS inference_geo,
+				context_bands AS context_band,
+				priceable AS is_priceable,
+				geo_gaps AS has_geo_gap,
+				uncached_input_tokens AS group_uncached_input_tokens,
+				cache_read_input_tokens AS group_cache_read_input_tokens,
+				cache_write_5m_input_tokens AS group_cache_write_5m_input_tokens,
+				cache_write_1h_input_tokens AS group_cache_write_1h_input_tokens,
+				output_tokens AS group_output_tokens
+			WHERE ${usageEventFilters} AND is_consistent = 1
+		)`;
+}
+
+export type UsageSource = "events" | "rollups";
+
+export function buildUsageEventAnalyticsCte(
+	scope: UsageAnalyticsScope = {},
+	lineageEnabled?: boolean,
+	usageSource: UsageSource = "events",
+): string {
+	const usageEventFilters = buildUsageEventFilters(scope);
+	// The organization/key filters follow the table's primary-key prefix, so FINAL
+	// resolves exact ReplacingMergeTree state without scanning unrelated tenants.
+	// Per-session state is grouped once and joined back instead of computed with
+	// window functions: ClickHouse inlines repeated CTE references, and a window
+	// over every event of an organization sorts all of them in memory for each
+	// reference (about 0.8 GiB per copy on the largest organization). Reading
+	// latest_usage_records again for the joins is cheap by comparison.
+	return `
+		${buildSessionLineageCteDefinitions(lineageEnabled, scope.tenant)},
+		${scope.window ? `${buildUsageWindowCte(scope.window, usageSource)},` : ""}
+		${
+			usageSource === "rollups"
+				? buildUsageRollupCandidatesCte(usageEventFilters)
+				: buildUsageEventCandidateCtes(usageEventFilters)
+		},
 		usage_event_pricing_groups AS (
 			SELECT
 				c.*,
@@ -921,7 +1005,7 @@ export function buildLegacyUsageAnalyticsCte(
 ): string {
 	return `
 		${buildSessionLineageCteDefinitions(lineageEnabled, tenant)},
-		${window ? `${buildUsageWindowCte(window)},` : ""}
+		${window ? `${buildUsageWindowCte(window, "events")},` : ""}
 		usage_analytics_metadata_base AS (
 			SELECT *
 			FROM ${getSafeClickHouseTable(SESSION_ANALYTICS_TABLE)} FINAL
@@ -1003,6 +1087,18 @@ function throwAnalyticsUnavailable(): never {
 	});
 }
 
+async function resolveUsageSource(
+	organizationId: string,
+): Promise<UsageSource> {
+	if (!shouldReadUsageRollups(organizationId)) return "events";
+	const { hasOnlyCurrentUsageRollups } = await import(
+		"./usage-session-rollup.service.js"
+	);
+	return (await hasOnlyCurrentUsageRollups(getClickhouse(), organizationId))
+		? "rollups"
+		: "events";
+}
+
 export async function getUsageAnalyticsQueryContext(
 	organizationId: string,
 	scope: UsageAnalyticsScope = {},
@@ -1023,7 +1119,11 @@ export async function getUsageAnalyticsQueryContext(
 
 	await readinessGate.assertReady();
 	return {
-		cteDefinitions: buildUsageEventAnalyticsCte(scope),
+		cteDefinitions: buildUsageEventAnalyticsCte(
+			scope,
+			undefined,
+			await resolveUsageSource(organizationId),
+		),
 		dailySessionsRelation: "usage_analytics_daily_sessions",
 		metadataRelation: "usage_analytics_metadata",
 		mode: "events",

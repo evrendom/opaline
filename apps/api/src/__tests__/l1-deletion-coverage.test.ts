@@ -52,6 +52,7 @@ const TRANSCRIPT_DERIVED = [
 	"l1_edges_by_target",
 	"l1_edge_resolutions",
 	"usage_events",
+	"usage_session_rollups",
 	"session_git_observations",
 	"session_lineage",
 	"session_language_signals",

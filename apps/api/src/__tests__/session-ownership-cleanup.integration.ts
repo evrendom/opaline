@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { getAdapter } from "@rudel/agent-adapters";
 import type { IngestSessionInput } from "@rudel/api-routes";
+import { USAGE_SESSION_ROLLUPS_TABLE } from "@rudel/ch-schema/usage-session-rollups";
 import { getClickhouse, getSafeClickHouseTable } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
 import {
@@ -144,6 +145,7 @@ afterAll(async () => {
 			"rudel.skill_receipts",
 			"rudel.skill_uses",
 			"rudel.skill_version_contents",
+			USAGE_SESSION_ROLLUPS_TABLE,
 		].map((table) =>
 			clickhouse
 				.execute({
@@ -165,7 +167,25 @@ afterAll(async () => {
 
 describe("non-canonical session cleanup", () => {
 	test("keeps canonical rows, deletes mismatches, and is safe to retry", async () => {
+		await getClickhouse().insert({
+			table: USAGE_SESSION_ROLLUPS_TABLE,
+			values: [
+				[CANONICAL_SESSION_ID, owner.userId],
+				[MISMATCHED_SESSION_ID, otherUser.userId],
+			].map(([sessionId, userId]) => ({
+				built_at: "2099-01-01 00:00:00.000",
+				is_consistent: 1,
+				organization_id: organizationId,
+				receipt_generation: 9_000_000_000,
+				session_id: sessionId,
+				source: "claude_code",
+				user_id: userId,
+			})),
+		});
 		const preview = await previewNonCanonicalSessionCleanup(CLEANUP_CUTOFF);
+		expect(preview.tables.map((table) => table.table)).not.toContain(
+			USAGE_SESSION_ROLLUPS_TABLE,
+		);
 		expect(preview.status).toBe("preview");
 		expect(preview.nonCanonicalKeyCount).toBeGreaterThanOrEqual(4);
 		expect(preview.nonCanonicalRowCount).toBeGreaterThanOrEqual(4);
@@ -276,6 +296,21 @@ describe("non-canonical session cleanup", () => {
 		);
 		expect(await countSkillContentRows(owner.userId)).toBeGreaterThan(0);
 		expect(await countSkillContentRows(otherUser.userId)).toBe(0);
+
+		expect(
+			await countSessionRowsInTable(
+				USAGE_SESSION_ROLLUPS_TABLE,
+				MISMATCHED_SESSION_ID,
+				otherUser.userId,
+			),
+		).toBe(0);
+		expect(
+			await countSessionRowsInTable(
+				USAGE_SESSION_ROLLUPS_TABLE,
+				CANONICAL_SESSION_ID,
+				owner.userId,
+			),
+		).toBeGreaterThan(0);
 
 		await expectCleanupApiResults();
 

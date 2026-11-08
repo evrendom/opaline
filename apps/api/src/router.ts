@@ -1315,6 +1315,11 @@ async function processPreparedIngestSession({
 					})
 				) {
 					await writeUsageExtraction(clickhouse, {
+						assertWritable: () =>
+							assertNoClickHousePurgeTombstone(
+								{ organizationId: orgId, userId: context.user.id },
+								{ database: sqlClient },
+							),
 						contentSha256: contentHash,
 						extraction: error.extraction,
 						filterVersion: SESSION_INGEST_FILTER_VERSION,
@@ -1323,6 +1328,7 @@ async function processPreparedIngestSession({
 						organizationId: orgId,
 						sessionDate: new Date(timestamps.sessionDate),
 						sessionId: input.sessionId,
+						signal,
 						source: filteredInput.source,
 						userId: context.user.id,
 					});
@@ -1395,6 +1401,11 @@ async function processPreparedIngestSession({
 			return { contentSha256: contentHash, result: response };
 		}
 		await writeUsageExtraction(clickhouse, {
+			assertWritable: () =>
+				assertNoClickHousePurgeTombstone(
+					{ organizationId: orgId, userId: context.user.id },
+					{ database: sqlClient },
+				),
 			contentSha256: contentHash,
 			extraction: usageExtraction,
 			filterVersion: SESSION_INGEST_FILTER_VERSION,
@@ -1406,6 +1417,7 @@ async function processPreparedIngestSession({
 				shouldReplaceUsageEventsForVersion(ownership),
 			sessionDate: new Date(timestamps.sessionDate),
 			sessionId: input.sessionId,
+			signal,
 			source: filteredInput.source,
 			userId: context.user.id,
 		});

@@ -227,7 +227,7 @@ async function querySessionMetricRows(
 						? {
 								window: {
 									includeNativeDescendants: false,
-									sessionsSql: buildDateRangeWindowSql(),
+									sessionsSql: buildDateRangeWindowSql,
 								},
 							}
 						: {},

@@ -189,6 +189,59 @@ export function shouldUseUsageEventAnalytics(
 	);
 }
 
+function readOrganizationIdList(value: string | undefined): Set<string> {
+	return new Set(
+		(value ?? "")
+			.split(",")
+			.map((organizationId) => organizationId.trim())
+			.filter((organizationId) => organizationId !== ""),
+	);
+}
+
+export function readUsageRollupBackfillSkippedOrgIds(
+	environment: Readonly<Record<string, string | undefined>> = process.env,
+): string[] {
+	return [
+		...readOrganizationIdList(environment.USAGE_ROLLUP_BACKFILL_SKIP_ORG_IDS),
+	];
+}
+
+export function shouldReadUsageRollups(
+	organizationId: string,
+	environment: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+	if (
+		readOrganizationIdList(environment.USAGE_ROLLUP_BACKFILL_SKIP_ORG_IDS).has(
+			organizationId,
+		)
+	)
+		return false;
+	const enabled = readOrganizationIdList(environment.USAGE_ROLLUP_ORG_IDS);
+	return enabled.has(organizationId) || enabled.has("all");
+}
+
+const SWITCH_ON = new Set(["1", "on", "true", "yes"]);
+const SWITCH_OFF = new Set(["0", "off", "false", "no"]);
+
+function readSwitch(value: string | undefined, defaultValue: boolean): boolean {
+	const normalized = value?.trim().toLowerCase() ?? "";
+	if (SWITCH_ON.has(normalized)) return true;
+	if (SWITCH_OFF.has(normalized)) return false;
+	return defaultValue;
+}
+
+export function isUsageRollupBackfillEnabled(
+	environment: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+	return readSwitch(environment.USAGE_ROLLUP_BACKFILL_ENABLED, false);
+}
+
+export function isUsageRollupWriteEnabled(
+	environment: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+	return readSwitch(environment.USAGE_ROLLUP_WRITES_ENABLED, true);
+}
+
 export function readSkillAnalyticsCutoverConfig(
 	environment: Readonly<Record<string, string | undefined>> = process.env,
 ): SkillAnalyticsCutoverConfig {

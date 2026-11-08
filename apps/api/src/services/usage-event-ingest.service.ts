@@ -16,6 +16,7 @@ import {
 	type ClickHouseExecutor,
 	getSafeClickHouseTable,
 } from "../clickhouse.js";
+import { refreshUsageSessionRollupAfterWrite } from "./usage-session-rollup.service.js";
 
 const USAGE_EVENTS_TABLE = "rudel.usage_events";
 const ZERO_SHA256 = "0".repeat(64);
@@ -73,14 +74,17 @@ export interface UsageExtractionReceiptState {
 }
 
 export interface UsageEventWriteInput {
+	assertWritable?: () => Promise<void>;
 	contentSha256: string;
 	extraction: UsageExtractionResult;
 	filterVersion: number;
 	generation: string;
 	ingestedAt: Date;
 	organizationId: string;
+	refreshRollup?: boolean;
 	replaceAbsentEvents?: boolean;
 	sessionDate: Date;
+	signal?: AbortSignal;
 	sessionId: string;
 	source: UsageEventSource;
 	userId: string;
@@ -120,6 +124,17 @@ export async function writeUsageExtraction(
 		executor,
 		input,
 	);
+	if (input.refreshRollup !== false)
+		await refreshUsageSessionRollupAfterWrite(
+			executor,
+			{
+				organizationId: input.organizationId,
+				sessionId: input.sessionId,
+				source: input.source,
+				userId: input.userId,
+			},
+			{ assertWritable: input.assertWritable, signal: input.signal },
+		);
 	if (consistency.status === "repair_required") {
 		logger.error(
 			"Usage-event write needs asynchronous consistency repair (organization_id={organizationId} session_id={sessionId} generation={generation} actual_event_count={actualEventCount} expected_event_count={expectedEventCount})",
