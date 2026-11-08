@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import {
 	AbortMultipartUploadCommand,
 	CompleteMultipartUploadCommand,
@@ -15,6 +16,8 @@ import {
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getLogger } from "@logtape/logtape";
 import { R2_INGEST_UPLOAD_URL_TTL_SECONDS } from "@rudel/api-routes";
+import { isSelfHosted } from "../lib/self-hosted.js";
+import { createLocalObjectStoreClient } from "./local-object-store.js";
 
 const logger = getLogger(["rudel", "api", "r2-ingest-storage"]);
 const LOOPBACK_R2_ENDPOINT_HOSTNAMES = new Set([
@@ -34,7 +37,29 @@ export const R2_INGEST_ENVIRONMENT_VARIABLES = [
 	"R2_SECRET_ACCESS_KEY",
 ] as const;
 
-export interface R2IngestConfiguration {
+export const S3_OBJECT_STORE_ENVIRONMENT_VARIABLES = [
+	"S3_ENDPOINT",
+	"S3_BUCKET",
+	"S3_REGION",
+	"S3_ACCESS_KEY_ID",
+	"S3_SECRET_ACCESS_KEY",
+	"S3_FORCE_PATH_STYLE",
+] as const;
+export const LOCAL_OBJECT_STORE_DIRECTORY = "object-store";
+const S3_REQUIRED_ENVIRONMENT_VARIABLES = [
+	"S3_BUCKET",
+	"S3_ACCESS_KEY_ID",
+	"S3_SECRET_ACCESS_KEY",
+] as const;
+const LOCAL_OBJECT_STORE_ENVIRONMENT_VARIABLES = [
+	"OPALINE_DATA_DIR",
+	"APP_URL",
+	"BETTER_AUTH_SECRET",
+] as const;
+const DEFAULT_S3_REGION = "us-east-1";
+
+export interface CloudflareR2Configuration {
+	readonly backend?: "r2";
 	accessKeyId: string;
 	accountId: string;
 	bucket: typeof R2_INGEST_BUCKET;
@@ -42,6 +67,28 @@ export interface R2IngestConfiguration {
 	forcePathStyle: boolean;
 	secretAccessKey: string;
 }
+
+export interface S3CompatibleConfiguration {
+	readonly backend: "s3";
+	accessKeyId: string;
+	bucket: string;
+	endpoint: string | undefined;
+	forcePathStyle: boolean;
+	region: string;
+	secretAccessKey: string;
+}
+
+export interface LocalDiskConfiguration {
+	readonly backend: "local";
+	directory: string;
+	publicOrigin: string;
+	signingSecret: string;
+}
+
+export type R2IngestConfiguration =
+	| CloudflareR2Configuration
+	| S3CompatibleConfiguration
+	| LocalDiskConfiguration;
 
 export type R2IngestAvailability =
 	| { enabled: true; configuration: R2IngestConfiguration }
@@ -126,6 +173,17 @@ export interface R2StorageClient
 	extends R2EvidenceStorageClient,
 		R2ObjectListingClient {}
 
+export interface IncompleteMultipartUpload {
+	readonly initiatedAt: Date;
+	readonly objectKey: string;
+	readonly uploadId: string;
+}
+
+export interface ObjectStoreClient extends R2StorageClient {
+	incompleteMultipartUploads: () => AsyncIterable<IncompleteMultipartUpload>;
+	removeStaleScratch?: (olderThan: Date) => Promise<number>;
+}
+
 export interface R2ClientOptions {
 	/** Per-request socket timeout; unset keeps the SDK default (none). */
 	readonly requestTimeoutMs?: number;
@@ -136,6 +194,71 @@ export function readR2IngestAvailability(
 	warnIgnoredEndpoint: (
 		reason: IgnoredR2EndpointOverrideReason,
 	) => void = warnIgnoredR2Endpoint,
+): R2IngestAvailability {
+	if (!isSelfHosted(environment)) {
+		return readCloudflareR2Availability(environment, warnIgnoredEndpoint);
+	}
+	if (hasAnyVariable(environment, S3_OBJECT_STORE_ENVIRONMENT_VARIABLES)) {
+		const s3 = parseS3Configuration(environment);
+		return s3.ok
+			? { enabled: true, configuration: s3.configuration }
+			: { enabled: false, missingVariables: s3.missingVariables };
+	}
+	if (hasAnyVariable(environment, R2_INGEST_ENVIRONMENT_VARIABLES)) {
+		return readCloudflareR2Availability(environment, warnIgnoredEndpoint);
+	}
+	return readLocalDiskAvailability(environment);
+}
+
+export function objectStoreConfigurationProblems(
+	environment: Readonly<Record<string, string | undefined>>,
+): string[] {
+	const usesS3 = hasAnyVariable(
+		environment,
+		S3_OBJECT_STORE_ENVIRONMENT_VARIABLES,
+	);
+	const r2Variables = R2_INGEST_ENVIRONMENT_VARIABLES.filter((name) =>
+		environment[name]?.trim(),
+	);
+	if (usesS3 && r2Variables.length > 0) {
+		return [
+			`set either the S3_* variables or ${r2Variables.join(", ")}, not both`,
+		];
+	}
+	if (usesS3) {
+		const s3 = parseS3Configuration(environment);
+		return s3.ok ? [] : s3.problems;
+	}
+	if (
+		r2Variables.length > 0 &&
+		r2Variables.length < R2_INGEST_ENVIRONMENT_VARIABLES.length
+	) {
+		return [
+			`${R2_INGEST_ENVIRONMENT_VARIABLES.join(", ")} must be set together to use Cloudflare R2`,
+		];
+	}
+	return [];
+}
+
+export function describeObjectStore(
+	availability: R2IngestAvailability,
+): string {
+	if (!availability.enabled) {
+		return `off (missing ${availability.missingVariables.join(", ")})`;
+	}
+	const configuration = availability.configuration;
+	if (configuration.backend === "local") {
+		return `local disk ${configuration.directory}`;
+	}
+	if (configuration.backend === "s3") {
+		return `S3 bucket ${configuration.bucket} at ${configuration.endpoint ?? `AWS ${configuration.region}`}`;
+	}
+	return `Cloudflare R2 bucket ${configuration.bucket}`;
+}
+
+function readCloudflareR2Availability(
+	environment: Readonly<Record<string, string | undefined>>,
+	warnIgnoredEndpoint: (reason: IgnoredR2EndpointOverrideReason) => void,
 ): R2IngestAvailability {
 	const missingVariables = R2_INGEST_ENVIRONMENT_VARIABLES.filter(
 		(name) => !environment[name]?.trim(),
@@ -170,6 +293,125 @@ export function readR2IngestAvailability(
 			secretAccessKey,
 		},
 	};
+}
+
+function parseS3Configuration(
+	environment: Readonly<Record<string, string | undefined>>,
+):
+	| { ok: true; configuration: S3CompatibleConfiguration }
+	| { ok: false; missingVariables: string[]; problems: string[] } {
+	const read = (name: (typeof S3_OBJECT_STORE_ENVIRONMENT_VARIABLES)[number]) =>
+		environment[name]?.trim() || undefined;
+	const missingVariables: string[] = S3_REQUIRED_ENVIRONMENT_VARIABLES.filter(
+		(name) => !read(name),
+	);
+	const problems = missingVariables.map(
+		(name) => `${name} is not set: it is needed for S3 object storage`,
+	);
+	const endpoint = read("S3_ENDPOINT");
+	if (endpoint !== undefined) {
+		let url: URL | undefined;
+		try {
+			url = new URL(endpoint);
+		} catch {}
+		if (
+			!url ||
+			(url.protocol !== "http:" && url.protocol !== "https:") ||
+			url.search ||
+			url.hash
+		) {
+			missingVariables.push("S3_ENDPOINT");
+			problems.push(
+				`S3_ENDPOINT must be an http:// or https:// URL, not ${JSON.stringify(endpoint)}`,
+			);
+		}
+	}
+	const region =
+		read("S3_REGION") ?? (endpoint ? DEFAULT_S3_REGION : undefined);
+	if (region === undefined) {
+		missingVariables.push("S3_ENDPOINT");
+		problems.push(
+			"S3_ENDPOINT is not set: point it at the S3-compatible server, or set S3_REGION for AWS S3",
+		);
+	}
+	const pathStyle = read("S3_FORCE_PATH_STYLE")?.toLowerCase();
+	if (
+		pathStyle !== undefined &&
+		!["true", "false", "1", "0"].includes(pathStyle)
+	) {
+		missingVariables.push("S3_FORCE_PATH_STYLE");
+		problems.push(
+			`S3_FORCE_PATH_STYLE must be true or false, not ${JSON.stringify(environment.S3_FORCE_PATH_STYLE)}`,
+		);
+	}
+	const bucket = read("S3_BUCKET");
+	const accessKeyId = read("S3_ACCESS_KEY_ID");
+	const secretAccessKey = read("S3_SECRET_ACCESS_KEY");
+	if (
+		problems.length > 0 ||
+		!bucket ||
+		!accessKeyId ||
+		!secretAccessKey ||
+		!region
+	) {
+		return { ok: false, missingVariables, problems };
+	}
+	return {
+		ok: true,
+		configuration: {
+			accessKeyId,
+			backend: "s3",
+			bucket,
+			endpoint,
+			forcePathStyle:
+				pathStyle === undefined
+					? endpoint !== undefined
+					: pathStyle === "true" || pathStyle === "1",
+			region,
+			secretAccessKey,
+		},
+	};
+}
+
+function readLocalDiskAvailability(
+	environment: Readonly<Record<string, string | undefined>>,
+): R2IngestAvailability {
+	const missingVariables = LOCAL_OBJECT_STORE_ENVIRONMENT_VARIABLES.filter(
+		(name) => !environment[name]?.trim(),
+	);
+	const dataDirectory = environment.OPALINE_DATA_DIR?.trim();
+	const appUrl = environment.APP_URL?.trim();
+	const signingSecret = environment.BETTER_AUTH_SECRET?.trim();
+	if (
+		missingVariables.length > 0 ||
+		!dataDirectory ||
+		!appUrl ||
+		!signingSecret
+	) {
+		return { enabled: false, missingVariables };
+	}
+	let publicOrigin: string;
+	try {
+		publicOrigin = new URL(appUrl).origin;
+	} catch {
+		return { enabled: false, missingVariables: ["APP_URL"] };
+	}
+	return {
+		enabled: true,
+		configuration: {
+			backend: "local",
+			directory: resolve(dataDirectory, LOCAL_OBJECT_STORE_DIRECTORY),
+			publicOrigin,
+			signingSecret,
+		},
+	};
+}
+
+function hasAnyVariable(
+	environment: Readonly<Record<string, string | undefined>>,
+	names: readonly string[],
+): boolean {
+	return names.some((name) => Boolean(environment[name]?.trim()));
 }
 
 function readTestR2EndpointOverride(
@@ -208,14 +450,37 @@ export function createR2MultipartUploadClient(
 	configuration: R2IngestConfiguration,
 	options: R2ClientOptions = {},
 ): R2StorageClient {
-	const client = new S3Client({
+	return createObjectStoreClient(configuration, options);
+}
+
+export function createObjectStoreClient(
+	configuration: R2IngestConfiguration,
+	options: R2ClientOptions = {},
+): ObjectStoreClient {
+	if (configuration.backend === "local") {
+		return createLocalObjectStoreClient(configuration);
+	}
+	return createS3ObjectStoreClient(configuration, options);
+}
+
+export function createObjectStoreS3Client(
+	configuration: CloudflareR2Configuration | S3CompatibleConfiguration,
+	options: R2ClientOptions = {},
+): S3Client {
+	return new S3Client({
 		credentials: {
 			accessKeyId: configuration.accessKeyId,
 			secretAccessKey: configuration.secretAccessKey,
 		},
 		endpoint: configuration.endpoint,
 		forcePathStyle: configuration.forcePathStyle,
-		region: "auto",
+		region: configuration.backend === "s3" ? configuration.region : "auto",
+		...(configuration.backend === "s3"
+			? {
+					requestChecksumCalculation: "WHEN_REQUIRED" as const,
+					responseChecksumValidation: "WHEN_REQUIRED" as const,
+				}
+			: {}),
 		...(options.requestTimeoutMs === undefined
 			? {}
 			: {
@@ -225,6 +490,13 @@ export function createR2MultipartUploadClient(
 					},
 				}),
 	});
+}
+
+function createS3ObjectStoreClient(
+	configuration: CloudflareR2Configuration | S3CompatibleConfiguration,
+	options: R2ClientOptions,
+): ObjectStoreClient {
+	const client = createObjectStoreS3Client(configuration, options);
 
 	return {
 		async abortMultipartUpload(input) {
@@ -335,6 +607,31 @@ export function createR2MultipartUploadClient(
 					initiatedAt: upload.Initiated as Date,
 					uploadId: upload.UploadId as string,
 				}));
+		},
+		async *incompleteMultipartUploads() {
+			let keyMarker: string | undefined;
+			let uploadIdMarker: string | undefined;
+			for (;;) {
+				const result = await client.send(
+					new ListMultipartUploadsCommand({
+						Bucket: configuration.bucket,
+						KeyMarker: keyMarker,
+						UploadIdMarker: uploadIdMarker,
+					}),
+				);
+				for (const upload of result.Uploads ?? []) {
+					if (upload.Key && upload.UploadId && upload.Initiated) {
+						yield {
+							initiatedAt: upload.Initiated,
+							objectKey: upload.Key,
+							uploadId: upload.UploadId,
+						};
+					}
+				}
+				if (!result.IsTruncated || !result.NextKeyMarker) return;
+				keyMarker = result.NextKeyMarker;
+				uploadIdMarker = result.NextUploadIdMarker;
+			}
 		},
 		async headObject(objectKey, signal) {
 			try {
