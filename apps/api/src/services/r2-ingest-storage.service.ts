@@ -44,6 +44,7 @@ export const S3_OBJECT_STORE_ENVIRONMENT_VARIABLES = [
 	"S3_ACCESS_KEY_ID",
 	"S3_SECRET_ACCESS_KEY",
 	"S3_FORCE_PATH_STYLE",
+	"S3_PUBLIC_ENDPOINT",
 ] as const;
 export const LOCAL_OBJECT_STORE_DIRECTORY = "object-store";
 const S3_REQUIRED_ENVIRONMENT_VARIABLES = [
@@ -74,6 +75,7 @@ export interface S3CompatibleConfiguration {
 	bucket: string;
 	endpoint: string | undefined;
 	forcePathStyle: boolean;
+	publicEndpoint?: string | undefined;
 	region: string;
 	secretAccessKey: string;
 }
@@ -251,7 +253,7 @@ export function describeObjectStore(
 		return `local disk ${configuration.directory}`;
 	}
 	if (configuration.backend === "s3") {
-		return `S3 bucket ${configuration.bucket} at ${configuration.endpoint ?? `AWS ${configuration.region}`}`;
+		return `S3 bucket ${configuration.bucket} at ${configuration.endpoint ?? `AWS ${configuration.region}`}${configuration.publicEndpoint ? `, presigned URLs at ${configuration.publicEndpoint}` : ""}`;
 	}
 	return `Cloudflare R2 bucket ${configuration.bucket}`;
 }
@@ -309,23 +311,17 @@ function parseS3Configuration(
 		(name) => `${name} is not set: it is needed for S3 object storage`,
 	);
 	const endpoint = read("S3_ENDPOINT");
-	if (endpoint !== undefined) {
-		let url: URL | undefined;
-		try {
-			url = new URL(endpoint);
-		} catch {}
-		if (
-			!url ||
-			(url.protocol !== "http:" && url.protocol !== "https:") ||
-			url.search ||
-			url.hash
-		) {
-			missingVariables.push("S3_ENDPOINT");
+	const publicEndpoint = read("S3_PUBLIC_ENDPOINT");
+	for (const [name, value] of [
+		["S3_ENDPOINT", endpoint],
+		["S3_PUBLIC_ENDPOINT", publicEndpoint],
+	] as const)
+		if (value !== undefined && !isHttpBaseUrl(value)) {
+			missingVariables.push(name);
 			problems.push(
-				`S3_ENDPOINT must be an http:// or https:// URL, not ${JSON.stringify(endpoint)}`,
+				`${name} must be an http:// or https:// URL, not ${JSON.stringify(value)}`,
 			);
 		}
-	}
 	const region =
 		read("S3_REGION") ?? (endpoint ? DEFAULT_S3_REGION : undefined);
 	if (region === undefined) {
@@ -367,6 +363,7 @@ function parseS3Configuration(
 				pathStyle === undefined
 					? endpoint !== undefined
 					: pathStyle === "true" || pathStyle === "1",
+			publicEndpoint,
 			region,
 			secretAccessKey,
 		},
@@ -405,6 +402,19 @@ function readLocalDiskAvailability(
 			signingSecret,
 		},
 	};
+}
+
+function isHttpBaseUrl(value: string): boolean {
+	try {
+		const url = new URL(value);
+		return (
+			(url.protocol === "http:" || url.protocol === "https:") &&
+			!url.search &&
+			!url.hash
+		);
+	} catch {
+		return false;
+	}
 }
 
 function hasAnyVariable(
@@ -492,11 +502,27 @@ export function createObjectStoreS3Client(
 	});
 }
 
+export function createObjectStorePresignClient(
+	configuration: CloudflareR2Configuration | S3CompatibleConfiguration,
+	options: R2ClientOptions = {},
+): S3Client {
+	return configuration.backend === "s3" && configuration.publicEndpoint
+		? createObjectStoreS3Client(
+				{ ...configuration, endpoint: configuration.publicEndpoint },
+				options,
+			)
+		: createObjectStoreS3Client(configuration, options);
+}
+
 function createS3ObjectStoreClient(
 	configuration: CloudflareR2Configuration | S3CompatibleConfiguration,
 	options: R2ClientOptions,
 ): ObjectStoreClient {
 	const client = createObjectStoreS3Client(configuration, options);
+	const presigner =
+		configuration.backend === "s3" && configuration.publicEndpoint
+			? createObjectStorePresignClient(configuration, options)
+			: client;
 
 	return {
 		async abortMultipartUpload(input) {
@@ -691,7 +717,7 @@ function createS3ObjectStoreClient(
 		},
 		presignUploadPart(input) {
 			return getSignedUrl(
-				client,
+				presigner,
 				new UploadPartCommand({
 					Bucket: configuration.bucket,
 					ContentLength: input.byteLength,
