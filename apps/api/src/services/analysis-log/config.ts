@@ -5,6 +5,7 @@ import { createConvexAnalysisStore } from "./convex-store.js";
 import { parseSigningKey } from "./convex-token.js";
 import { createLocalEmbedder, createOpenAiEmbedder } from "./embedder.js";
 import { createMemoryAnalysisStore } from "./memory-store.js";
+import { createPostgresAnalysisStore } from "./postgres-store.js";
 import type { AnalysisLog, AnalysisStore } from "./types.js";
 
 const logger = getLogger(["rudel", "api", "analysis-log"]);
@@ -34,10 +35,12 @@ export function getAnalysisLog(workspaceId: string): AnalysisLog | null {
 		: null;
 }
 
-export function analysisLogStore(): "memory" | "convex" | null {
-	if (isSelfHosted()) return "memory";
+export function analysisLogStore(): "memory" | "convex" | "postgres" | null {
 	const store = process.env.ANALYSIS_LOG_STORE;
-	return store === "memory" || store === "convex" ? store : null;
+	if (isSelfHosted()) return store === "memory" ? "memory" : "postgres";
+	return store === "memory" || store === "convex" || store === "postgres"
+		? store
+		: null;
 }
 
 /**
@@ -133,8 +136,9 @@ export async function purgeAnalysisLogs(target: {
 
 /**
  * Cleanup does not depend on capture: the Convex deployment is purged
- * whenever `CONVEX_URL` is set, whatever `ANALYSIS_LOG_STORE` says, and the
- * in-process store when capture uses memory. `ANALYSIS_LOG_PURGE_BACKENDS`
+ * whenever `CONVEX_URL` is set, whatever `ANALYSIS_LOG_STORE` says, Postgres
+ * when the server is self-hosted or declares it, and the in-process store
+ * when capture uses memory. `ANALYSIS_LOG_PURGE_BACKENDS`
  * is the operator's durable statement of which backends may hold analyses:
  * a declared backend without working configuration throws, as does a
  * deployment without a valid signing key, so the durable purge retries
@@ -159,6 +163,8 @@ export function analysisPurgeStores(signal: AbortSignal): AnalysisStore[] {
 			);
 		stores.push(createConvexAnalysisStore({ url, signingKey, signal }));
 	}
+	if (purgesPostgres(declared.backends))
+		stores.push(createPostgresAnalysisStore(postgresClient));
 	const log = configuredAnalysisLog();
 	if (analysisLogStore() === "memory" && log) stores.push(log.store);
 	return stores;
@@ -166,7 +172,7 @@ export function analysisPurgeStores(signal: AbortSignal): AnalysisStore[] {
 
 /**
  * Backends that may hold analyses (comma-separated `ANALYSIS_LOG_PURGE_BACKENDS`;
- * only `convex` persists), or an error for any other name. Capture and
+ * `convex` and `postgres` persist), or an error for any other name. Capture and
  * cleanup read it the same way; removing one is a decommission step (README).
  */
 function purgeBackends(): { backends: string[]; error: string | null } {
@@ -174,14 +180,24 @@ function purgeBackends(): { backends: string[]; error: string | null } {
 		.split(",")
 		.map((backend) => backend.trim())
 		.filter(Boolean);
-	const unknown = backends.find((backend) => backend !== "convex");
+	const unknown = backends.find(
+		(backend) => backend !== "convex" && backend !== "postgres",
+	);
 	return {
 		backends,
 		error:
 			unknown === undefined
 				? null
-				: `ANALYSIS_LOG_PURGE_BACKENDS names ${JSON.stringify(unknown)}; only convex can hold analyses`,
+				: `ANALYSIS_LOG_PURGE_BACKENDS names ${JSON.stringify(unknown)}; only convex and postgres can hold analyses`,
 	};
+}
+
+function purgesPostgres(backends: string[]): boolean {
+	return isSelfHosted() || backends.includes("postgres");
+}
+
+async function postgresClient() {
+	return (await import("../../db.js")).sqlClient;
 }
 
 function configuredAnalysisLog(): AnalysisLog | null {
@@ -200,17 +216,11 @@ function configuredLog(): AnalysisLog | null {
 	const apiKey = process.env.OPENAI_API_KEY?.trim();
 	const now = () => new Date();
 	const store = analysisLogStore();
+	const embedder = () =>
+		apiKey ? createOpenAiEmbedder(apiKey) : createLocalEmbedder();
 	if (store === "memory")
-		return {
-			store: createMemoryAnalysisStore(),
-			embedder: apiKey ? createOpenAiEmbedder(apiKey) : createLocalEmbedder(),
-			now,
-		};
-	if (store !== "convex") return null;
-	const url = process.env.CONVEX_URL?.trim();
-	const signingKey = parseSigningKey(
-		process.env.ANALYSIS_LOG_SIGNING_KEY ?? "",
-	);
+		return { store: createMemoryAnalysisStore(), embedder: embedder(), now };
+	if (store !== "convex" && store !== "postgres") return null;
 	// Capture only into a backend the purge is told about and accepts, so
 	// losing CONVEX_URL later fails purges instead of skipping the analyses.
 	const declared = purgeBackends();
@@ -220,6 +230,22 @@ function configuredLog(): AnalysisLog | null {
 		});
 		return null;
 	}
+	if (store === "postgres") {
+		if (purgesPostgres(declared.backends))
+			return {
+				store: createPostgresAnalysisStore(postgresClient),
+				embedder: embedder(),
+				now,
+			};
+		logger.error(
+			"Analysis log capture is off: ANALYSIS_LOG_STORE=postgres requires postgres in ANALYSIS_LOG_PURGE_BACKENDS",
+		);
+		return null;
+	}
+	const url = process.env.CONVEX_URL?.trim();
+	const signingKey = parseSigningKey(
+		process.env.ANALYSIS_LOG_SIGNING_KEY ?? "",
+	);
 	if (!url || !signingKey || !apiKey || !declared.backends.includes("convex")) {
 		logger.error(
 			"Analysis log capture is off: ANALYSIS_LOG_STORE=convex requires CONVEX_URL, an ES256 JWK in ANALYSIS_LOG_SIGNING_KEY, OPENAI_API_KEY and convex in ANALYSIS_LOG_PURGE_BACKENDS",

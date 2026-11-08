@@ -17,6 +17,7 @@ const originalEnvironment = {
 	ANALYSIS_LOG_WORKSPACES: process.env.ANALYSIS_LOG_WORKSPACES,
 	ANALYSIS_LOG_RESTRICTED_WORKSPACES:
 		process.env.ANALYSIS_LOG_RESTRICTED_WORKSPACES,
+	OPALINE_SELF_HOSTED: process.env.OPALINE_SELF_HOSTED,
 };
 const WORKSPACE = "workspace_one";
 const { signingKey } = await createSigningKeys();
@@ -159,12 +160,12 @@ test("Convex logging stays off for a backend list the purge would reject", () =>
 	process.env.CONVEX_URL = "https://test-deployment.convex.cloud";
 	process.env.ANALYSIS_LOG_SIGNING_KEY = JSON.stringify(signingKey);
 	process.env.OPENAI_API_KEY = "sk-test";
-	for (const backends of ["convex,postgres", "convex, convx"]) {
+	for (const backends of ["convex,mysql", "convex, convx"]) {
 		process.env.ANALYSIS_LOG_PURGE_BACKENDS = backends;
 		setAnalysisLogForTests(undefined);
 		expect(getAnalysisLog(WORKSPACE)).toBeNull();
 		expect(() => analysisPurgeStores(AbortSignal.timeout(1_000))).toThrow(
-			"only convex can hold analyses",
+			"only convex and postgres can hold analyses",
 		);
 	}
 });
@@ -225,9 +226,9 @@ test("a purge fails while a declared backend lacks its URL, whatever capture use
 			purgeAnalysisLogs({ targetType: "account", targetId: "user" }),
 		).rejects.toThrow("declares convex but CONVEX_URL is not set");
 	}
-	process.env.ANALYSIS_LOG_PURGE_BACKENDS = "convex,postgres";
+	process.env.ANALYSIS_LOG_PURGE_BACKENDS = "convex,mysql";
 	expect(() => analysisPurgeStores(AbortSignal.timeout(1_000))).toThrow(
-		"only convex can hold analyses",
+		"only convex and postgres can hold analyses",
 	);
 });
 
@@ -250,4 +251,63 @@ test("without Convex the purge cleans the memory store, or nothing", async () =>
 		log ? [log.store] : [],
 	);
 	expect(log).not.toBeNull();
+});
+
+test("Postgres logging captures only once the purge is told Postgres may hold analyses", () => {
+	process.env.ANALYSIS_LOG_STORE = "postgres";
+	delete process.env.CONVEX_URL;
+	delete process.env.OPENAI_API_KEY;
+	for (const backends of [undefined, "convex", "convex,mysql"]) {
+		if (backends === undefined) delete process.env.ANALYSIS_LOG_PURGE_BACKENDS;
+		else process.env.ANALYSIS_LOG_PURGE_BACKENDS = backends;
+		setAnalysisLogForTests(undefined);
+		expect(getAnalysisLog(WORKSPACE)).toBeNull();
+	}
+	process.env.ANALYSIS_LOG_PURGE_BACKENDS = " postgres ";
+	setAnalysisLogForTests(undefined);
+	expect(getAnalysisLog(WORKSPACE)?.embedder.model).toBe(
+		"local-word-vectors-1",
+	);
+	expect(getAnalysisLog("workspace_two")).toBeNull();
+	process.env.OPENAI_API_KEY = "sk-test";
+	setAnalysisLogForTests(undefined);
+	expect(getAnalysisLog(WORKSPACE)?.embedder.model).toBe(
+		"text-embedding-3-small",
+	);
+});
+
+test("the purge cleans Postgres whenever postgres is declared, without contacting it", () => {
+	delete process.env.CONVEX_URL;
+	process.env.ANALYSIS_LOG_PURGE_BACKENDS = "postgres";
+	for (const store of [undefined, "memory", "postgres"]) {
+		if (store === undefined) delete process.env.ANALYSIS_LOG_STORE;
+		else process.env.ANALYSIS_LOG_STORE = store;
+		setAnalysisLogForTests(undefined);
+		expect(analysisPurgeStores(AbortSignal.timeout(1_000))).toHaveLength(
+			store === "memory" ? 2 : 1,
+		);
+	}
+});
+
+test("a self-hosted server keeps every workspace's analyses in Postgres unless memory is asked for, and always purges Postgres", () => {
+	process.env.OPALINE_SELF_HOSTED = "1";
+	delete process.env.ANALYSIS_LOG_WORKSPACES;
+	delete process.env.ANALYSIS_LOG_PURGE_BACKENDS;
+	delete process.env.CONVEX_URL;
+	delete process.env.OPENAI_API_KEY;
+	for (const store of [undefined, "postgres", "convex"]) {
+		if (store === undefined) delete process.env.ANALYSIS_LOG_STORE;
+		else process.env.ANALYSIS_LOG_STORE = store;
+		setAnalysisLogForTests(undefined);
+		expect(getAnalysisLog("any_workspace")?.embedder.model).toBe(
+			"local-word-vectors-1",
+		);
+		expect(getAnalysisLog("")).toBeNull();
+		expect(analysisPurgeStores(AbortSignal.timeout(1_000))).toHaveLength(1);
+	}
+	process.env.ANALYSIS_LOG_STORE = "memory";
+	setAnalysisLogForTests(undefined);
+	const stores = analysisPurgeStores(AbortSignal.timeout(1_000));
+	expect(stores).toHaveLength(2);
+	expect(stores[1]).toBe(getAnalysisLog("any_workspace")?.store);
 });
