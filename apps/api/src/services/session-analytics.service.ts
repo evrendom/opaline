@@ -288,10 +288,13 @@ async function getSessionAnalyticsBaseRows(
 		"projectPath",
 		project_path,
 	);
+	let windowFilter = dateFilter;
 	if (repo_key) {
 		const repoFilter = await getRepositorySqlFilter(orgId, repo_key);
 		filters.push(repoFilter.sql);
 		Object.assign(query_params, repoFilter.params);
+		windowFilter = `${dateFilter}
+	  AND ${repoFilter.sql}`;
 	}
 	if (repository) {
 		filters.push(
@@ -326,7 +329,7 @@ async function getSessionAnalyticsBaseRows(
 		// descendants, not the organization's whole history.
 		window: {
 			includeNativeDescendants: true,
-			sessionsSql: buildSessionAnalyticsWindowSql(dateFilter),
+			sessionsSql: buildSessionAnalyticsWindowSql(windowFilter),
 		},
 	});
 	const estimatedCostSql = "sa.estimated_cost";

@@ -126,4 +126,30 @@ describe("session list date range", () => {
 			expect(query).not.toContain("{startDate:String}");
 		}
 	});
+
+	test("prices only the open repo's sessions when the list is scoped to a repo", async () => {
+		const mode = process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE;
+		process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE = "all";
+		try {
+			await getSessionAnalytics("org-1", {
+				days: 31,
+				start_date: "2026-08-01",
+				end_date: "2026-08-31",
+				repo_key: "remote:github.com/acme/app",
+			});
+		} finally {
+			if (mode === undefined)
+				delete process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE;
+			else process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE = mode;
+		}
+
+		const { query } = lastQuery();
+		const window = query.slice(
+			query.indexOf("usage_window_roots AS ("),
+			query.indexOf("usage_window_sessions AS ("),
+		);
+
+		expect(window).toContain("{startDate:String}");
+		expect(window).toContain("{repositoryFingerprints:Array(String)}");
+	});
 });
