@@ -1,3 +1,4 @@
+export * from "./analysis-log-schema.js";
 export * from "./analysis-sql-schema.js";
 export * from "./auth-schema.js";
 export * from "./avatar-schema.js";

@@ -19,13 +19,13 @@ const migrationsFolder = join(import.meta.dir, "..", "..", "db", "migrations");
 
 setDefaultTimeout(120_000);
 
-test("applies migrations 0020-0072 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, GitHub webhook delivery 0046, repository evidence index publication 0048, GitHub outcomes 0049, organization feature readiness 0050, CLI version 0051, coordination lease 0052, and L1 edges 0055, and creates the analysis sql result and quota tables (0058) the agent query slots (0059), lets a result be removed with the visibility sync queue (0060), creates the transcript embedding quota and run question tables (0061), lets run question jobs be precomputed (0062), and creates the live session tables with a per-budget rate-limit row (0063), creates the usage digest tables (0064), gives run questions a label (0065), creates the workspace feature switches (0066), creates the moment observation, feedback and fix tables (0067), creates the Compass settings and prompt frustration tables (0068), drops the Free member cap (0069), stages saved outputs with evidence captures (0070), stages images with evidence captures and accepts image objects (0071), and creates the analysis check table (0072)", async () => {
+test("applies migrations 0020-0074 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, GitHub webhook delivery 0046, repository evidence index publication 0048, GitHub outcomes 0049, organization feature readiness 0050, CLI version 0051, coordination lease 0052, and L1 edges 0055, and creates the analysis sql result and quota tables (0058) the agent query slots (0059), lets a result be removed with the visibility sync queue (0060), creates the transcript embedding quota and run question tables (0061), lets run question jobs be precomputed (0062), and creates the live session tables with a per-budget rate-limit row (0063), creates the usage digest tables (0064), gives run questions a label (0065), creates the workspace feature switches (0066), creates the moment observation, feedback and fix tables (0067), creates the Compass settings and prompt frustration tables (0068), drops the Free member cap (0069), stages saved outputs with evidence captures (0070), stages images with evidence captures and accepts image objects (0071), creates the analysis check table (0072), lifts the free-plan run limit on self-hosted databases (0073), and creates the Postgres analysis log tables (0074)", async () => {
 	const journalValue: unknown = JSON.parse(
 		await readFile(join(migrationsFolder, "meta", "_journal.json"), "utf8"),
 	);
 	const entries = readMigrationEntries(journalValue);
 	const latestMigration = entries.at(-1);
-	expect(latestMigration?.tag).toBe("0072_analysis_check");
+	expect(latestMigration?.tag).toBe("0074_analysis_log_store");
 	for (const [index, entry] of entries.entries()) {
 		if (index > 0) {
 			expect(entry.when).toBeGreaterThan(entries[index - 1]?.when ?? 0);
@@ -351,6 +351,95 @@ test("applies migrations 0020-0072 to a database already migrated through 0019, 
 				{ indexname: "analysis_check_owner_idx" },
 				{ indexname: "analysis_check_pkey" },
 			]);
+			const [runLimit] = await migrationSql<{ source: string }[]>`
+				SELECT prosrc AS source FROM pg_proc
+				WHERE proname = 'enforce_free_workspace_agent_run_limit'
+			`;
+			expect(runLimit?.source).toContain(
+				"current_setting('opaline.self_hosted', true) = 'on'",
+			);
+			expect([
+				...(await migrationSql<{ name: string }[]>`
+					SELECT tablename AS name FROM pg_tables
+					WHERE schemaname = 'public' AND tablename LIKE 'analysis_log_%'
+					ORDER BY tablename
+				`),
+			]).toEqual([
+				{ name: "analysis_log_analysis" },
+				{ name: "analysis_log_embedding" },
+				{ name: "analysis_log_query" },
+				{ name: "analysis_log_query_output" },
+				{ name: "analysis_log_query_session" },
+				{ name: "analysis_log_session_link" },
+				{ name: "analysis_log_step" },
+			]);
+			expect([
+				...(await migrationSql<{ child: string; definition: string }[]>`
+					SELECT conrelid::regclass::text AS child, pg_get_constraintdef(oid) AS definition
+					FROM pg_constraint
+					WHERE contype = 'f' AND conrelid::regclass::text LIKE 'analysis_log_%'
+					ORDER BY child, conname
+				`),
+			]).toEqual([
+				{
+					child: "analysis_log_embedding",
+					definition:
+						"FOREIGN KEY (analysis_id) REFERENCES analysis_log_analysis(id) ON DELETE CASCADE",
+				},
+				{
+					child: "analysis_log_query",
+					definition:
+						"FOREIGN KEY (analysis_id) REFERENCES analysis_log_analysis(id) ON DELETE CASCADE",
+				},
+				{
+					child: "analysis_log_query_output",
+					definition:
+						"FOREIGN KEY (query_id) REFERENCES analysis_log_query(id) ON DELETE CASCADE",
+				},
+				{
+					child: "analysis_log_query_session",
+					definition:
+						"FOREIGN KEY (query_id) REFERENCES analysis_log_query(id) ON DELETE CASCADE",
+				},
+				{
+					child: "analysis_log_session_link",
+					definition:
+						"FOREIGN KEY (analysis_id) REFERENCES analysis_log_analysis(id) ON DELETE CASCADE",
+				},
+				{
+					child: "analysis_log_step",
+					definition:
+						"FOREIGN KEY (analysis_id) REFERENCES analysis_log_analysis(id) ON DELETE CASCADE",
+				},
+			]);
+			expect([
+				...(await migrationSql<{ indexname: string; indexdef: string }[]>`
+					SELECT indexname, indexdef FROM pg_indexes
+					WHERE schemaname = 'public' AND tablename = 'analysis_log_query'
+					ORDER BY indexname
+				`),
+			]).toEqual([
+				{
+					indexname: "analysis_log_query_analysis_idx",
+					indexdef:
+						"CREATE INDEX analysis_log_query_analysis_idx ON public.analysis_log_query USING btree (analysis_id)",
+				},
+				{
+					indexname: "analysis_log_query_output_created_idx",
+					indexdef:
+						"CREATE INDEX analysis_log_query_output_created_idx ON public.analysis_log_query USING btree (has_output, created_at)",
+				},
+				{
+					indexname: "analysis_log_query_owner_ids_idx",
+					indexdef:
+						"CREATE INDEX analysis_log_query_owner_ids_idx ON public.analysis_log_query USING gin (owner_ids)",
+				},
+				{
+					indexname: "analysis_log_query_pkey",
+					indexdef:
+						"CREATE UNIQUE INDEX analysis_log_query_pkey ON public.analysis_log_query USING btree (id)",
+				},
+			]);
 			await expectIngestJobSizeBound(migrationSql);
 			await expectEdgeScopeKinds(migrationSql);
 			// 0057: existing workspaces keep the own-sessions-only option off.
@@ -390,7 +479,7 @@ test("applies migrations 0020-0072 to a database already migrated through 0019, 
 				SELECT to_regclass('public.clickhouse_purge_job')::text AS name
 			`;
 			expect(after0052).toEqual({
-				count: 73,
+				count: 75,
 				latestTimestamp: String(latestMigration?.when),
 			});
 			const [trendsSourceTable] = await migrationSql<TableState[]>`
