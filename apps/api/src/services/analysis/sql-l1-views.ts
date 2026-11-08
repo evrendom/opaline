@@ -5,7 +5,11 @@ import {
 	RUN_SETUP_TABLE,
 } from "@rudel/ch-schema/received-setup";
 import { getSafeClickHouseTable } from "../../clickhouse.js";
-import { L1_EDGES_TABLE, RUN_INDEX_TABLE } from "../l1-edges/l1-edge-tables.js";
+import {
+	L1_EDGES_TABLE,
+	RUN_INDEX_TABLE,
+	RUN_REQUESTS_TABLE,
+} from "../l1-edges/l1-edge-tables.js";
 import { committedBuildSql } from "./run-index-reader.js";
 import { GENUINE_PROMPT_SQL, records } from "./sql.js";
 import { cohortOwner, windowSessionsSql } from "./sql-measures.js";
@@ -77,6 +81,7 @@ export function l1SqlViews(params: SqlScopeParams): SqlView[] {
 		}`;
 	return [
 		promptsView(owner),
+		modelTextView(owner),
 		gitEventsView(owner),
 		edgesView(edgeOwner),
 		setupFilesView(owner),
@@ -168,6 +173,121 @@ function promptsView(owner: Owner): SqlView {
 						AND facts['fork_replayed'] != 'true'
 				) AS p
 				LEFT ANY JOIN (${committedRunsSql(scope)}${sessions}) AS r ON ${sameKey("p", "r", "turn_idx")}`;
+		},
+	};
+}
+
+const HARNESS_MODELS = "('', '<synthetic>')";
+
+function modelTextView(owner: Owner): SqlView {
+	const columns: readonly SqlViewColumn[] = [
+		...SESSION_COLUMNS,
+		column(
+			"turn_idx",
+			"UInt32",
+			"Run number within the stream: runs.turn_idx; 0 before the first prompt.",
+		),
+		column(
+			"record_idx",
+			"UInt32",
+			"Raw transcript line; read takes it as record.",
+		),
+		column("block_idx", "UInt16", "Content block within the line."),
+		column("at", "DateTime64(3, 'UTC')", "When the model wrote it.", [UTC]),
+		column(
+			"kind",
+			"LowCardinality(String)",
+			"reasoning (the thinking the transcript shows) or assistant_text (a reply).",
+		),
+		column(
+			"subtype",
+			"LowCardinality(String)",
+			"redacted for Claude Code thinking the API sent encrypted (its text is empty); empty otherwise.",
+		),
+		column(
+			"request_record",
+			"Nullable(UInt32)",
+			"requests.record_idx of the response the block belongs to.",
+			[
+				"Join requests ON (session_id, agent_id, request_record) = (requests.session_id, requests.agent_id, requests.record_idx) for its tokens and calls; NULL before the first prompt.",
+			],
+		),
+		column(
+			"model",
+			"LowCardinality(Nullable(String))",
+			"The model that wrote it: the model of its response's usage, else its run's model.",
+			[
+				"Never the harness placeholder <synthetic>; NULL when neither names a model.",
+			],
+		),
+		column(
+			"effort",
+			"LowCardinality(Nullable(String))",
+			"Its run's effort (runs.effort).",
+		),
+		column("text", "String", "The text as stored.", [
+			"Empty where the transcript holds no text for it: redacted or encrypted reasoning, or thinking the harness did not display. Count shares over text != '' and say how many were empty.",
+			"Long texts are stored cut: text_cut says so, and read (record) returns the rest.",
+		]),
+		column("text_chars", "UInt32", "Characters of the whole text, cut or not."),
+		column("text_cut", "UInt8", "1 when text is shorter than the original."),
+	];
+	return {
+		name: "model_text",
+		grain:
+			"One row per block of text the model wrote, of every stream: its reasoning as the transcript shows it, and its replies, from the transcript generation each session's runs were built from, each with the model of the response it belongs to.",
+		traps: [
+			"Each block is one row: older transcript generations, repeated copies and the blocks a forked Codex session copied from its parent are already left out, so count rows directly.",
+			SCOPE_TRAP,
+			INDEXED_TRAP,
+			"Reasoning text is what the harness shows, which can be a summary of the model's thinking: a change in its style can be a change in the summarizer. Thinking tokens per response are requests.reasoning_output_tokens.",
+			"For a rate per day or hour, select count() per bucket next to it: days with few blocks are not measurements, and a day without blocks is missing, not 0.",
+			"Keep the time range as at >= … (and at < …) in the WHERE of the query that reads model_text, joined to the rest with AND: the server then reads only the sessions with text in it. Without it, or behind OR, every session's text is read and a long history can pass the memory or time limit.",
+		],
+		columns,
+		recent: { column: "at", rows: "blocks written" },
+		windowColumn: "at",
+		sql(memberOnly, window = {}) {
+			const scope = cohortOwner(owner(memberOnly), window);
+			const windowed = windowSessionsSql(
+				scope,
+				"kind IN ('reasoning', 'assistant_text')",
+				window,
+			);
+			const sessions = windowed?.sessions ?? "";
+			const runIndex = getSafeClickHouseTable(RUN_INDEX_TABLE);
+			const committed = committedBuildSql(runIndex, scope, [
+				"user_id",
+				"session_id",
+			]);
+			const inRequest = "q.user_id != '' AND t.record_idx < q.end_record";
+			return `${windowed ? `WITH ${windowed.with}\n\t\t\t\t` : ""}SELECT r.run_id AS run_id, t.user_id AS user_id, t.source AS source, t.session_id AS session_id,
+					t.agent_id AS agent_id, t.session_date AS session_date, t.turn_idx AS turn_idx,
+					t.record_idx AS record_idx, t.block_idx AS block_idx, t.ts AS at, t.kind AS kind, t.subtype AS subtype,
+					if(${inRequest}, q.start_record, NULL) AS request_record,
+					toLowCardinality(multiIf(${inRequest} AND q.usage_model NOT IN ${HARNESS_MODELS}, q.usage_model,
+						r.model IN ${HARNESS_MODELS}, NULL, r.model)) AS model,
+					toLowCardinality(nullIf(r.effort, '')) AS effort,
+					t.shown AS text, t.text_chars AS text_chars, toUInt8(lengthUTF8(t.shown) < t.text_chars) AS text_cut
+				FROM (
+					SELECT user_id, source, session_id, agent_id, session_date, turn_idx, record_idx, block_idx,
+						ts, kind, subtype, text_chars, if(lengthUTF8(text) >= lengthUTF8(head), text, head) AS shown
+					FROM ${records()} FINAL
+					PREWHERE kind IN ('reasoning', 'assistant_text')
+					WHERE ${scope} AND ${indexedGenerationSql(scope)}${sessions}
+						AND facts['fork_replayed'] != 'true'
+				) AS t
+				LEFT ANY JOIN (
+					SELECT user_id, session_id, agent_id, turn_idx, run_id, model, effort
+					FROM ${runIndex} FINAL
+					WHERE ${scope} AND row_kind = 'run' AND ${committed}${sessions}
+				) AS r ON ${sameKey("t", "r", "turn_idx")}
+				ASOF LEFT JOIN (
+					SELECT user_id, session_id, agent_id, start_record, end_record, usage_model
+					FROM ${getSafeClickHouseTable(RUN_REQUESTS_TABLE)} FINAL
+					WHERE ${scope} AND ${committed}${sessions}
+				) AS q ON t.user_id = q.user_id AND t.session_id = q.session_id AND t.agent_id = q.agent_id
+					AND t.record_idx >= q.start_record`;
 		},
 	};
 }

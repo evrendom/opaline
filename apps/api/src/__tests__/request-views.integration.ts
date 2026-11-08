@@ -291,3 +291,27 @@ test("session_activity: a session idle for an hour between two prompts is two sp
 		),
 	).toEqual(["working_at_0930 | working_at_1004", "0 | 1"]);
 });
+
+test("model_text: each block the model wrote, with the model and the response it belongs to", async () => {
+	expect(
+		await sql(
+			`SELECT t.kind AS kind, t.model AS model, t.text AS text, q.reasoning_output_tokens AS tokens
+			FROM model_text AS t
+			INNER JOIN requests AS q ON q.session_id = t.session_id AND q.agent_id = t.agent_id AND q.record_idx = t.request_record
+			ORDER BY t.record_idx, t.block_idx`,
+		),
+	).toEqual([
+		"kind | model | text | tokens",
+		"reasoning | claude-opus-5-5 | I'm running the tests. | 80",
+		"assistant_text | claude-opus-5-5 | All pass. | 0",
+		"reasoning | claude-opus-5-5 | I'm rerunning. | 30",
+		"reasoning | claude-opus-5-5 | One failed. | 40",
+		"assistant_text | claude-opus-5-5 | One failed. | 40",
+	]);
+	expect(
+		await sql(
+			`SELECT count() AS n, round(100 * countIf(startsWith(text, 'I''m')) / n, 1) AS starts_im
+			FROM model_text WHERE kind = 'reasoning' AND text != '' AND at >= toDateTime64('2026-10-01 00:00:00', 3, 'UTC')`,
+		),
+	).toEqual(["n | starts_im", "3 | 66.7"]);
+});

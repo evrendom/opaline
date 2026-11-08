@@ -65,6 +65,7 @@ test("schema lists the approved impact measures with their definitions next to t
 		"session_activity",
 		"events",
 		"prompts",
+		"model_text",
 		"git_events",
 		"edges",
 		"setup_files",

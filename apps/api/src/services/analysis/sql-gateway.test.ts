@@ -1422,6 +1422,7 @@ describe("schema", () => {
 			"session_activity",
 			"events",
 			"prompts",
+			"model_text",
 			"git_events",
 			"edges",
 			"setup_files",
