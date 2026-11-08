@@ -1,5 +1,7 @@
 import { CardContent } from "@/app/ui/card";
 import { useTrackProductPageView } from "@/features/analytics/tracking/useTrackProductPageView";
+import { useSelfHost } from "@/features/self-hosted/self-host-info";
+import { showsBilling } from "@/features/self-hosted/surfaces";
 import { SettingsPageSkeleton } from "@/features/settings/components/settings-page-skeleton";
 import { SettingsSectionCard } from "@/features/settings/components/settings-section";
 import { buildWorkspaceSettingsTracking } from "@/features/settings/settings-page-tracking";
@@ -13,6 +15,7 @@ import { useWorkspaceSettingsData } from "@/features/settings/workspace/use-work
 
 export function WorkspaceSettingsSection() {
 	const data = useWorkspaceSettingsData();
+	const selfHost = useSelfHost();
 	const memberCount = data.fullOrg?.members.length ?? 0;
 	const pendingOutgoingInvitationCount = data.pendingInvitations.length;
 
@@ -59,7 +62,7 @@ export function WorkspaceSettingsSection() {
 						canManage={data.canManage}
 						onInvalidate={data.invalidate}
 					/>
-					{data.currentUserRole === "owner" ? (
+					{data.currentUserRole === "owner" && showsBilling(selfHost) ? (
 						<>
 							<BillingManagementCard
 								organizationId={data.activeOrg.id}

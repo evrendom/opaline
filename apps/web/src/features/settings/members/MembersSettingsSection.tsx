@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import { CardContent } from "@/app/ui/card";
 import { useTrackProductPageView } from "@/features/analytics/tracking/useTrackProductPageView";
+import { useSelfHost } from "@/features/self-hosted/self-host-info";
+import { sendsEmail } from "@/features/self-hosted/surfaces";
 import { SettingsPageSkeleton } from "@/features/settings/components/settings-page-skeleton";
 import { SettingsSectionCard } from "@/features/settings/components/settings-section";
 import { buildMembersSettingsTracking } from "@/features/settings/settings-page-tracking";
@@ -16,6 +18,7 @@ import { useTeamPageData } from "@/features/team/use-team-page-data";
 
 export function MembersSettingsSection() {
 	const data = useWorkspaceSettingsData();
+	const selfHost = useSelfHost();
 	const team = useTeamPageData();
 	const activity = useMemo(
 		() =>
@@ -71,7 +74,11 @@ export function MembersSettingsSection() {
 					    invitations still pending. */}
 					<WorkspaceSettingsGroup
 						title="People"
-						description="Invite teammates by email. Admins and owners can manage members. Usage covers the last 12 months."
+						description={
+							sendsEmail(selfHost)
+								? "Invite teammates by email. Admins and owners can manage members. Usage covers the last 12 months."
+								: "Invite a teammate by email to get a link to send them; this server sends no email. Admins and owners can manage members. Usage covers the last 12 months."
+						}
 					>
 						<WorkspaceInviteMemberForm
 							canManage={data.canManage}

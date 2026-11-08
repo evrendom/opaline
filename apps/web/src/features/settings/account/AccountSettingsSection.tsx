@@ -4,6 +4,8 @@ import { toast } from "sonner";
 import { appRoutes } from "@/app/routes";
 import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
 import { useTrackProductPageView } from "@/features/analytics/tracking/useTrackProductPageView";
+import { useSelfHost } from "@/features/self-hosted/self-host-info";
+import { sendsEmail } from "@/features/self-hosted/surfaces";
 import { AccountDangerZoneCard } from "@/features/settings/account/components/AccountDangerZoneCard";
 import { AppearanceCard } from "@/features/settings/account/components/AppearanceCard";
 import { EmailDigestsCard } from "@/features/settings/account/components/EmailDigestsCard";
@@ -20,6 +22,7 @@ import { authClient, signOut } from "@/lib/auth-client";
 
 export function AccountSettingsSection() {
 	const navigate = useNavigate();
+	const selfHost = useSelfHost();
 	const getShellRoutePath = useShellRoutePath();
 	const data = useAccountSettingsData();
 	const invitationsData = useInvitationsSettingsData();
@@ -154,9 +157,11 @@ export function AccountSettingsSection() {
 				onSignOut={() => void handleSignOut()}
 			/>
 			<AppearanceCard />
-			<div id="email-digests" className="scroll-mt-24">
-				<EmailDigestsCard />
-			</div>
+			{sendsEmail(selfHost) ? (
+				<div id="email-digests" className="scroll-mt-24">
+					<EmailDigestsCard />
+				</div>
+			) : null}
 			<ProfileLinkedAccountsCard
 				isPending={data.state.isPending}
 				linkedProviders={data.linkedProviders}

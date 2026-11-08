@@ -1,12 +1,14 @@
 import { IconChevronLeft } from "@tabler/icons-react";
 import { createContext, type ReactNode, useContext, useState } from "react";
 import { createPortal } from "react-dom";
+import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import { ProductBrand } from "@/features/shell/components/product-brand";
 
 const ProgressTarget = createContext<HTMLDivElement | null>(null);
 const STEPS = ["Sign in", "Workspace", "Profile", "Invite"];
 
 export function WelcomePanel({ children }: { children: ReactNode }) {
+	const selfHost = useSelfHost();
 	const [progressTarget, setProgressTarget] = useState<HTMLDivElement | null>(
 		null,
 	);
@@ -15,8 +17,8 @@ export function WelcomePanel({ children }: { children: ReactNode }) {
 			<header className="cli-welcome-brand-row">
 				<a
 					className="cli-welcome-brand"
-					href="/home"
-					aria-label="Opaline website"
+					href={selfHost ? "/" : "/home"}
+					aria-label={selfHost ? "Opaline" : "Opaline website"}
 				>
 					<ProductBrand />
 				</a>
@@ -34,14 +36,16 @@ export function WelcomePanel({ children }: { children: ReactNode }) {
 			</div>
 			<footer className="cli-welcome-footer">
 				<p>Pull back the curtain on your coding sessions.</p>
-				<nav aria-label="Legal">
-					<a href="/legal/privacy-policy" target="_blank" rel="noreferrer">
-						Privacy
-					</a>
-					<a href="/legal/terms-of-service" target="_blank" rel="noreferrer">
-						Terms
-					</a>
-				</nav>
+				{selfHost ? null : (
+					<nav aria-label="Legal">
+						<a href="/legal/privacy-policy" target="_blank" rel="noreferrer">
+							Privacy
+						</a>
+						<a href="/legal/terms-of-service" target="_blank" rel="noreferrer">
+							Terms
+						</a>
+					</nav>
+				)}
 			</footer>
 		</div>
 	);

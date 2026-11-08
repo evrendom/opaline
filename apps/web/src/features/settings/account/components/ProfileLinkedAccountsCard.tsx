@@ -1,4 +1,6 @@
 import { Button } from "@/app/ui/button";
+import { useSelfHost } from "@/features/self-hosted/self-host-info";
+import { linkableProviders } from "@/features/self-hosted/surfaces";
 import {
 	WorkspaceSettingsGroup,
 	WorkspaceSettingsRow,
@@ -20,6 +22,12 @@ export function ProfileLinkedAccountsCard({
 	linkingProvider: string | null;
 	onLinkProvider: (provider: "google" | "github") => void;
 }) {
+	const linkable = new Set(
+		linkableProviders(
+			useSelfHost(),
+			providerDefinitions.map((provider) => provider.id),
+		),
+	);
 	return (
 		<WorkspaceSettingsGroup
 			title="Linked accounts"
@@ -30,24 +38,29 @@ export function ProfileLinkedAccountsCard({
 					{linkedProviders.has("credential") ? "Connected" : "Not linked"}
 				</span>
 			</WorkspaceSettingsRow>
-			{providerDefinitions.map((provider) => (
-				<WorkspaceSettingsRow key={provider.id} label={provider.label}>
-					{linkedProviders.has(provider.id) ? (
-						<span className="workspace-settings-status">Connected</span>
-					) : (
-						<Button
-							type="button"
-							variant="outline"
-							size="sm"
-							aria-label={`Link ${provider.label}`}
-							onClick={() => onLinkProvider(provider.id)}
-							disabled={isPending || linkingProvider !== null}
-						>
-							{linkingProvider === provider.id ? "Linking…" : "Link"}
-						</Button>
-					)}
-				</WorkspaceSettingsRow>
-			))}
+			{providerDefinitions
+				.filter(
+					(provider) =>
+						linkable.has(provider.id) || linkedProviders.has(provider.id),
+				)
+				.map((provider) => (
+					<WorkspaceSettingsRow key={provider.id} label={provider.label}>
+						{linkedProviders.has(provider.id) ? (
+							<span className="workspace-settings-status">Connected</span>
+						) : (
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								aria-label={`Link ${provider.label}`}
+								onClick={() => onLinkProvider(provider.id)}
+								disabled={isPending || linkingProvider !== null}
+							>
+								{linkingProvider === provider.id ? "Linking…" : "Link"}
+							</Button>
+						)}
+					</WorkspaceSettingsRow>
+				))}
 		</WorkspaceSettingsGroup>
 	);
 }

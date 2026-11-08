@@ -31,6 +31,7 @@ import {
 } from "@/app/ui/select";
 import { IconPlugFilled } from "@/components/ui/icon-plug-filled";
 import { useSelfHost } from "@/features/self-hosted/self-host-info";
+import { showsGitHubSettings } from "@/features/self-hosted/surfaces";
 import {
 	getActiveSettingsRouteId,
 	primarySettingsRoutes,
@@ -63,7 +64,7 @@ export function SettingsLayout() {
 	const selfHost = useSelfHost();
 	const routes = primarySettingsRoutes.filter((route) =>
 		route.id === "github"
-			? query.data?.visibility === "visible"
+			? showsGitHubSettings(selfHost, query.data)
 			: route.id !== "mcp" || selfHost !== null,
 	);
 	const getShellRoutePath = useShellRoutePath();
