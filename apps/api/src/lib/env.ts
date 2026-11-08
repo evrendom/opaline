@@ -317,8 +317,10 @@ export function readGitHubEvidenceUiForceOrgIds(
 ): string[] {
 	return [
 		...new Set(
-			(environment.GITHUB_EVIDENCE_UI_FORCE_ORG_IDS ?? "")
-				.split(",")
+			[
+				...(environment.GITHUB_EVIDENCE_UI_FORCE_ORG_IDS ?? "").split(","),
+				environment.DEMO_ORGANIZATION_ID ?? "",
+			]
 				.map((value) => value.trim())
 				.filter(Boolean),
 		),

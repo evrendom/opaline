@@ -290,6 +290,7 @@ export function RepoSetupView({
 			: sectionFiles?.filter((file) => home === "all" || homeOf(file) === home);
 	const picked = searchParams.get(SETUP_PARAM);
 	const groups = files ? setupGroups(files) : [];
+	const repeated = repeatedSetupNames(groups.flatMap((group) => group.files));
 	const listed = useMemo(
 		() =>
 			section === "skills"
@@ -439,6 +440,9 @@ export function RepoSetupView({
 														: undefined
 												}
 												onPick={pick}
+												root={
+													repeated.has(setupName(file)) ? setupRoot(file) : null
+												}
 												showHome={home === "all"}
 											/>
 											{section === "mcp" ? (
@@ -772,9 +776,11 @@ function RepoSetupRow({
 	meta,
 	muted = false,
 	onPick,
+	root = null,
 	showHome,
 }: {
 	file: RepositorySetupFile;
+	root?: string | null;
 	meta?: string | null;
 	muted?: boolean;
 	index: number;
@@ -837,6 +843,11 @@ function RepoSetupRow({
 						{owner}
 					</span>
 				) : null}
+				{root ? (
+					<span className="shrink-0 text-[11px] text-muted-foreground">
+						{root}
+					</span>
+				) : null}
 				{meta !== undefined ? (
 					meta ? (
 						<span className="ml-auto shrink-0 text-[11px] text-muted-foreground tabular-nums">
@@ -851,6 +862,21 @@ function RepoSetupRow({
 			</span>
 		</button>
 	);
+}
+
+function repeatedSetupNames(files: readonly { kind: string; path: string }[]) {
+	const seen = new Set<string>();
+	const repeated = new Set<string>();
+	for (const file of files) {
+		const name = setupName(file as RepositorySetupFile);
+		if (seen.has(name)) repeated.add(name);
+		seen.add(name);
+	}
+	return repeated;
+}
+
+function setupRoot(file: { path: string }) {
+	return /^(~\/)?\.[^/]+/u.exec(file.path)?.[0] ?? null;
 }
 
 const LIST_SKELETON = [62, 48, 70, 54, 40, 66, 58, 44, 72, 50, 60, 46, 68, 52];
