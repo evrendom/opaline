@@ -67,6 +67,39 @@ function writeStoredTheme(theme: ThemeSetting) {
 	for (const listener of storedThemeListeners) listener();
 }
 
+const PAGE_STORAGE_KEY = "page-theme";
+const pageThemeListeners = new Set<() => void>();
+let pageThemeInMemory: ThemeSetting | null = null;
+
+function isThemeSetting(value: unknown): value is ThemeSetting {
+	return value === "light" || value === "dark" || value === "system";
+}
+
+function readPageTheme(): ThemeSetting | null {
+	try {
+		const stored = sessionStorage.getItem(PAGE_STORAGE_KEY);
+		if (isThemeSetting(stored)) return stored;
+	} catch {}
+	return pageThemeInMemory;
+}
+
+function subscribeToPageTheme(onChange: () => void) {
+	pageThemeListeners.add(onChange);
+	return () => {
+		pageThemeListeners.delete(onChange);
+	};
+}
+
+function writePageTheme(theme: ThemeSetting) {
+	pageThemeInMemory = theme;
+	try {
+		sessionStorage.setItem(PAGE_STORAGE_KEY, theme);
+	} catch {}
+	for (const listener of pageThemeListeners) listener();
+}
+
+const readServerPageTheme = (): ThemeSetting | null => null;
+
 function subscribeToSystemTheme(onChange: () => void) {
 	const media = window.matchMedia(DARK_QUERY);
 	media.addEventListener("change", onChange);
@@ -108,20 +141,23 @@ function applyTheme(theme: ResolvedTheme) {
 export function ThemeProvider({
 	children,
 	forcedTheme,
-	systemOnly = false,
+	pageTheme,
 }: {
 	children: ReactNode;
 	forcedTheme?: ResolvedTheme;
-	/** Ignore the saved setting and follow the system preference (the
-	 * landing-page demo, which matches the marketing page around it). */
-	systemOnly?: boolean;
+	pageTheme?: ResolvedTheme;
 }) {
 	const storedTheme = useSyncExternalStore(
 		subscribeToStoredTheme,
 		readStoredTheme,
 		readServerStoredTheme,
 	);
-	const theme = systemOnly ? "system" : storedTheme;
+	const pageSetting = useSyncExternalStore(
+		subscribeToPageTheme,
+		readPageTheme,
+		readServerPageTheme,
+	);
+	const theme = pageTheme ? (pageSetting ?? pageTheme) : storedTheme;
 	const systemTheme = useSyncExternalStore(
 		subscribeToSystemTheme,
 		readSystemTheme,
@@ -134,9 +170,13 @@ export function ThemeProvider({
 		applyTheme(resolvedTheme);
 	}, [resolvedTheme]);
 
-	const setTheme = useCallback((next: ThemeSetting) => {
-		writeStoredTheme(next);
-	}, []);
+	const setTheme = useCallback(
+		(next: ThemeSetting) => {
+			if (pageTheme) writePageTheme(next);
+			else writeStoredTheme(next);
+		},
+		[pageTheme],
+	);
 
 	const value = useMemo(
 		() => ({ theme, resolvedTheme, forcedTheme, setTheme }),

@@ -119,7 +119,7 @@ export function DemoRoot({ seed }: { seed: DemoSeed }) {
 	});
 	return (
 		<DemoRuntimeContext.Provider value={{ seed, live }}>
-			<ThemeProvider systemOnly>
+			<ThemeProvider pageTheme="dark">
 				<QueryClientProvider client={client}>
 					<MemoryRouter
 						initialEntries={[
