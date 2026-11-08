@@ -11,6 +11,7 @@ const SelfHostAuthSchema = z.object({
 	password: z.boolean().catch(true),
 	emailCodes: z.boolean().catch(false),
 	social: z.array(z.string()).catch([]),
+	openSignup: z.boolean().catch(false),
 });
 
 const SelfHostInfoSchema = z.object({
@@ -23,6 +24,7 @@ const SelfHostInfoSchema = z.object({
 		password: true,
 		emailCodes: false,
 		social: [],
+		openSignup: false,
 	}),
 });
 

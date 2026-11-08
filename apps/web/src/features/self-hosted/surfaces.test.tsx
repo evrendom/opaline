@@ -79,7 +79,7 @@ const info: SelfHostInfo = {
 	appUrl: "http://localhost:4790",
 	mcpUrl: "http://localhost:4790/api/mcp",
 	setupComplete: true,
-	auth: { password: true, emailCodes: false, social: [] },
+	auth: { password: true, emailCodes: false, social: [], openSignup: false },
 };
 
 function connection(configured: boolean): GitHubRepositoryEvidenceStatus {

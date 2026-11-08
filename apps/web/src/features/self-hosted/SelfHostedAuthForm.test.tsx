@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GuestApp } from "@/features/auth/GuestApp";
 import { SelfHostContext, type SelfHostInfo } from "./self-host-info";
+import { forgetInvite } from "./self-hosted-auth";
 
 const auth = vi.hoisted(() => ({
 	signInEmail: vi.fn(),
@@ -42,7 +43,7 @@ const info: SelfHostInfo = {
 	appUrl: "http://localhost:4011",
 	mcpUrl: "http://localhost:4011/api/mcp",
 	setupComplete: true,
-	auth: { password: true, emailCodes: false, social: [] },
+	auth: { password: true, emailCodes: false, social: [], openSignup: false },
 };
 
 function renderGuest(selfHost: SelfHostInfo | null = info) {
@@ -113,8 +114,8 @@ describe("GuestApp on a self-hosted server", () => {
 		expect(auth.navigate).not.toHaveBeenCalled();
 	});
 
-	it("creates an account with a name and a password, then opens setup", async () => {
-		renderGuest();
+	it("creates an account with a name and a password on an open server, then opens setup", async () => {
+		renderGuest({ ...info, auth: { ...info.auth, openSignup: true } });
 		fireEvent.click(screen.getByRole("button", { name: "Create one" }));
 		expect(
 			screen.getByRole("heading", { name: "Create your account" }),
@@ -138,8 +139,39 @@ describe("GuestApp on a self-hosted server", () => {
 		});
 	});
 
-	it("opens sign-up on a team invite link and returns to it", async () => {
+	it("says how to get an invite instead of offering sign-up without one", () => {
+		renderGuest();
+		fireEvent.click(screen.getByRole("button", { name: "Create one" }));
+
+		expect(
+			screen.getByRole("heading", { name: "Ask for an invite" }),
+		).toBeVisible();
+		expect(screen.getByText(/Ask a workspace owner or admin/)).toBeVisible();
+		expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+		expect(
+			screen.queryByRole("button", { name: "Create account" }),
+		).not.toBeInTheDocument();
+		fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+		expect(screen.getByRole("heading", { name: "Welcome back" })).toBeVisible();
+	});
+
+	it("points a server without an owner at its setup", () => {
+		renderGuest({ ...info, setupComplete: false });
+
+		expect(
+			screen.getByRole("heading", { name: "Finish setting up this server" }),
+		).toBeVisible();
+		expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+	});
+
+	it("opens sign-up on a team invite link, sends the invite with it and returns to it", async () => {
+		forgetInvite();
 		window.history.replaceState(null, "", "/acme/join/tok_123");
+		let cookieAtSignUp = "";
+		auth.signUpEmail.mockImplementation(async () => {
+			cookieAtSignUp = document.cookie;
+			return { data: {}, error: null };
+		});
 		renderGuest();
 
 		expect(
@@ -157,6 +189,26 @@ describe("GuestApp on a self-hosted server", () => {
 			password: "long enough",
 			name: "Grace",
 		});
+		expect(cookieAtSignUp).toContain("opaline_invite=tok_123");
+		expect(document.cookie).not.toContain("opaline_invite=tok_123");
+	});
+
+	it("explains a sign-up the server refused for want of an invite", async () => {
+		window.history.replaceState(null, "", "/invitation/inv_1");
+		auth.signUpEmail.mockResolvedValue({
+			data: null,
+			error: { code: "INVITE_REQUIRED", status: 403 },
+		});
+		renderGuest();
+		fill("Email", "grace@example.com");
+		fill("Password", "long enough");
+		fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+
+		expect(await screen.findByRole("alert")).toHaveTextContent(
+			"This server is invite-only.",
+		);
+		expect(auth.navigate).not.toHaveBeenCalled();
+		forgetInvite();
 	});
 
 	it("explains an expired one-time login link", () => {
@@ -171,7 +223,12 @@ describe("GuestApp on a self-hosted server", () => {
 	it("offers social sign-in and email codes only when the server configured them", () => {
 		renderGuest({
 			...info,
-			auth: { password: true, emailCodes: true, social: ["github"] },
+			auth: {
+				password: true,
+				emailCodes: true,
+				social: ["github"],
+				openSignup: false,
+			},
 		});
 
 		expect(

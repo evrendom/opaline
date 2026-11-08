@@ -21,11 +21,15 @@ import { getInitialSignupName } from "@/lib/auth-signup-name";
 import { cn } from "@/lib/utils";
 import type { SelfHostInfo } from "./self-host-info";
 import {
+	forgetInvite,
+	inviteFromLocation,
 	MAX_PASSWORD_LENGTH,
 	readLoginLinkError,
+	rememberInvite,
 	runAuthRequest,
 	type SelfHostedAuthMode,
 	type SocialProvider,
+	selfHostedSignUp,
 	selfHostedSocialProviders,
 	validateCredentials,
 } from "./self-hosted-auth";
@@ -59,11 +63,17 @@ export function SelfHostedAuthForm({
 	});
 	const providers = selfHostedSocialProviders(info);
 	const emailCodes = info.auth.emailCodes && mode === "sign-in";
+	const invite = inviteFromLocation(
+		window.location.pathname,
+		window.location.search,
+	);
+	const signUp = selfHostedSignUp(info, invite);
 
 	async function attempt(
 		request: () => Promise<{ error: unknown }>,
 		destination: string,
 	) {
+		rememberInvite(invite);
 		setLoading(true);
 		const problem = await runAuthRequest(request, mode);
 		setLoading(false);
@@ -71,6 +81,7 @@ export function SelfHostedAuthForm({
 			setFeedback({ kind: "error", message: problem });
 			return;
 		}
+		forgetInvite();
 		refreshAuthClientState();
 		navigateToDestination(destination);
 	}
@@ -151,6 +162,7 @@ export function SelfHostedAuthForm({
 			mode === "sign-in"
 				? getSocialLoginRedirectOptions()
 				: getSocialSignupRedirectOptions();
+		rememberInvite(invite);
 		const problem = await runAuthRequest(
 			() =>
 				authClient.signIn.social({ provider, callbackURL, newUserCallbackURL }),
@@ -158,6 +170,39 @@ export function SelfHostedAuthForm({
 		);
 		if (problem) setFeedback({ kind: "error", message: problem });
 	}
+
+	const switchMode = () => {
+		setFeedback(null);
+		setCodeSentTo(null);
+		onSwitchMode();
+	};
+
+	if (
+		mode === "sign-up" &&
+		(signUp === "needs-invite" || signUp === "needs-setup")
+	)
+		return (
+			<div
+				className="flex w-full max-w-sm flex-col gap-4"
+				data-self-hosted-auth="invite-only"
+			>
+				<div className="rounded-3xl bg-muted/35 px-3 py-2 text-sm leading-5 text-muted-foreground ring-1 ring-border/60">
+					{signUp === "needs-setup"
+						? "No account exists yet. The owner account comes from the server's setup, not from this page."
+						: "Ask a workspace owner or admin for an invite link (Settings, Members, Invite link) and open it here to create your account."}
+				</div>
+				<p className="text-center text-sm text-muted-foreground">
+					Already have an account?{" "}
+					<button
+						type="button"
+						onClick={switchMode}
+						className="underline underline-offset-4 hover:text-primary"
+					>
+						Sign in
+					</button>
+				</p>
+			</div>
+		);
 
 	return (
 		<div
@@ -351,11 +396,7 @@ export function SelfHostedAuthForm({
 					: "Already have an account? "}
 				<button
 					type="button"
-					onClick={() => {
-						setFeedback(null);
-						setCodeSentTo(null);
-						onSwitchMode();
-					}}
+					onClick={switchMode}
 					className="underline underline-offset-4 hover:text-primary"
 				>
 					{mode === "sign-in" ? "Create one" : "Sign in"}
