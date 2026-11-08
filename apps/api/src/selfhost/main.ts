@@ -36,12 +36,19 @@ async function main(): Promise<void> {
 		{ createStaticFallback },
 		scheduler,
 		{ sqlClient },
+		storage,
+		{ registerR2IngestCleanupWorker },
 	] = await Promise.all([
 		import("../handler.js"),
 		import("../static-site.js"),
 		import("./scheduler.js"),
 		import("../db.js"),
+		import("../services/r2-ingest-storage.service.js"),
+		import("../services/r2-ingest-cleanup.service.js"),
 	]);
+	status(
+		`object storage: ${storage.describeObjectStore(storage.readR2IngestAvailability())}`,
+	);
 	const fallback = config.webDir
 		? createStaticFallback({
 				directory: config.webDir,
@@ -68,6 +75,10 @@ async function main(): Promise<void> {
 		lock: scheduler.leaseJobLock(sqlClient),
 		cronSecret: config.cronSecret,
 	});
+	if (jobs.jobs.includes("r2-ingest"))
+		registerR2IngestCleanupWorker({
+			wake: async () => jobs.runNow("r2-ingest"),
+		});
 	status(
 		`listening on ${config.host}:${server.port}; jobs: ${jobs.jobs.join(", ")}${config.webDir ? `; web: ${config.webDir}` : "; no OPALINE_WEB_DIR, API only"}`,
 	);

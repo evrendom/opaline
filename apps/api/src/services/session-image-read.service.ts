@@ -1,4 +1,4 @@
-import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getLogger } from "@logtape/logtape";
 import {
@@ -14,7 +14,11 @@ import {
 	type ClickHouseExecutor,
 	getSafeClickHouseTable,
 } from "../clickhouse.js";
-import type { R2IngestConfiguration } from "./r2-ingest-storage.service.js";
+import { createLocalObjectStoreClient } from "./local-object-store.js";
+import {
+	createObjectStoreS3Client,
+	type R2IngestConfiguration,
+} from "./r2-ingest-storage.service.js";
 
 const logger = getLogger(["rudel", "api", "session-images"]);
 
@@ -196,15 +200,18 @@ function notCaptured(sha256: string): SessionImage {
 export function createR2ImageUrlSigner(
 	configuration: R2IngestConfiguration,
 ): (input: SignImageUrlInput) => Promise<string> {
-	const client = new S3Client({
-		credentials: {
-			accessKeyId: configuration.accessKeyId,
-			secretAccessKey: configuration.secretAccessKey,
-		},
-		endpoint: configuration.endpoint,
-		forcePathStyle: configuration.forcePathStyle,
-		region: "auto",
-	});
+	if (configuration.backend === "local") {
+		const store = createLocalObjectStoreClient(configuration);
+		return async (input) =>
+			store.signDownload({
+				cacheControl: "private, max-age=300",
+				contentDisposition: input.contentDisposition,
+				contentType: input.contentType,
+				expiresInSeconds: input.expiresInSeconds,
+				objectKey: input.objectKey,
+			});
+	}
+	const client = createObjectStoreS3Client(configuration);
 	return (input) =>
 		getSignedUrl(
 			client,

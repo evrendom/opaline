@@ -119,3 +119,35 @@ test("Postgres identifiers are quoted and passwords never printed", () => {
 	);
 	expect(redact("not a url")).toBe("the configured PG_CONNECTION_STRING");
 });
+
+test("object storage env is checked at startup: incomplete S3, S3 next to R2 and partial R2 are refused", () => {
+	expect(
+		problems({ ...base, S3_BUCKET: "opaline", S3_ENDPOINT: "http://nas:8333" }),
+	).toEqual([
+		"S3_ACCESS_KEY_ID is not set: it is needed for S3 object storage",
+		"S3_SECRET_ACCESS_KEY is not set: it is needed for S3 object storage",
+	]);
+	expect(
+		problems({
+			...base,
+			S3_ACCESS_KEY_ID: "k",
+			S3_BUCKET: "opaline",
+			S3_ENDPOINT: "http://nas:8333",
+			S3_SECRET_ACCESS_KEY: "s",
+			R2_ACCOUNT_ID: "a",
+		}),
+	).toEqual(["set either the S3_* variables or R2_ACCOUNT_ID, not both"]);
+	expect(problems({ ...base, R2_ACCESS_KEY_ID: "b" })).toEqual([
+		"R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY must be set together to use Cloudflare R2",
+	]);
+	expect(
+		problems({
+			...base,
+			OPALINE_DATA_DIR: "/tmp/opaline-data",
+			S3_ACCESS_KEY_ID: "k",
+			S3_BUCKET: "opaline",
+			S3_ENDPOINT: "http://127.0.0.1:8333",
+			S3_SECRET_ACCESS_KEY: "s",
+		}),
+	).toEqual([]);
+});

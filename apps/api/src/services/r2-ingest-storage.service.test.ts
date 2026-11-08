@@ -4,11 +4,236 @@ import {
 	getR2IngestPartByteLengths,
 	sortR2IngestObjects,
 } from "../lib/r2-ingest-manifest.js";
+import { LocalObjectStore } from "./local-object-store.js";
 import {
+	type CloudflareR2Configuration,
+	createObjectStoreClient,
+	createObjectStoreS3Client,
 	createR2MultipartUploadClient,
+	describeObjectStore,
+	objectStoreConfigurationProblems,
 	R2_INGEST_BUCKET,
 	readR2IngestAvailability,
 } from "./r2-ingest-storage.service.js";
+
+const R2_ENV = {
+	R2_ACCESS_KEY_ID: "access-key",
+	R2_ACCOUNT_ID: "account-id",
+	R2_SECRET_ACCESS_KEY: "secret-key",
+};
+const R2_CONFIGURATION: CloudflareR2Configuration = {
+	accessKeyId: "access-key",
+	accountId: "account-id",
+	bucket: R2_INGEST_BUCKET,
+	endpoint: "https://account-id.eu.r2.cloudflarestorage.com",
+	forcePathStyle: false,
+	secretAccessKey: "secret-key",
+};
+const S3_ENV = {
+	S3_ACCESS_KEY_ID: "s3-key",
+	S3_BUCKET: "opaline",
+	S3_ENDPOINT: "http://nas.local:8333",
+	S3_SECRET_ACCESS_KEY: "s3-secret",
+};
+const LOCAL_ENV = {
+	APP_URL: "http://localhost:4791",
+	BETTER_AUTH_SECRET: "0123456789abcdef0123456789abcdef",
+	OPALINE_DATA_DIR: "/srv/opaline/data",
+};
+const SELF_HOSTED = { OPALINE_SELF_HOSTED: "1" };
+
+describe("object store backend selection", () => {
+	test("without the self-hosted switch, R2 env gives exactly today's R2 configuration whatever else is set", () => {
+		for (const extra of [{}, S3_ENV, LOCAL_ENV, { ...S3_ENV, ...LOCAL_ENV }]) {
+			const availability = readR2IngestAvailability({ ...R2_ENV, ...extra });
+			expect(availability).toEqual({
+				enabled: true,
+				configuration: R2_CONFIGURATION,
+			});
+			expect(
+				availability.enabled && "backend" in availability.configuration,
+			).toBe(false);
+		}
+	});
+
+	test("without the self-hosted switch and without R2 there is no object store, only R2 is named", () => {
+		expect(readR2IngestAvailability({ ...S3_ENV, ...LOCAL_ENV })).toEqual({
+			enabled: false,
+			missingVariables: [
+				"R2_ACCOUNT_ID",
+				"R2_ACCESS_KEY_ID",
+				"R2_SECRET_ACCESS_KEY",
+			],
+		});
+		expect(objectStoreConfigurationProblems({ ...R2_ENV })).toEqual([]);
+	});
+
+	test("self-hosted with nothing configured stores objects on local disk under OPALINE_DATA_DIR", () => {
+		expect(readR2IngestAvailability({ ...SELF_HOSTED, ...LOCAL_ENV })).toEqual({
+			enabled: true,
+			configuration: {
+				backend: "local",
+				directory: "/srv/opaline/data/object-store",
+				publicOrigin: "http://localhost:4791",
+				signingSecret: LOCAL_ENV.BETTER_AUTH_SECRET,
+			},
+		});
+		expect(
+			readR2IngestAvailability({
+				...SELF_HOSTED,
+				...LOCAL_ENV,
+				OPALINE_DATA_DIR: "",
+			}),
+		).toEqual({ enabled: false, missingVariables: ["OPALINE_DATA_DIR"] });
+	});
+
+	test("self-hosted S3 env selects the S3-compatible backend with path-style defaults", () => {
+		expect(
+			readR2IngestAvailability({ ...SELF_HOSTED, ...LOCAL_ENV, ...S3_ENV }),
+		).toEqual({
+			enabled: true,
+			configuration: {
+				accessKeyId: "s3-key",
+				backend: "s3",
+				bucket: "opaline",
+				endpoint: "http://nas.local:8333",
+				forcePathStyle: true,
+				region: "us-east-1",
+				secretAccessKey: "s3-secret",
+			},
+		});
+		expect(
+			readR2IngestAvailability({
+				...SELF_HOSTED,
+				...S3_ENV,
+				S3_ENDPOINT: "",
+				S3_REGION: "eu-central-1",
+			}),
+		).toMatchObject({
+			configuration: {
+				endpoint: undefined,
+				forcePathStyle: false,
+				region: "eu-central-1",
+			},
+		});
+		expect(
+			readR2IngestAvailability({
+				...SELF_HOSTED,
+				...S3_ENV,
+				S3_FORCE_PATH_STYLE: "false",
+			}),
+		).toMatchObject({ configuration: { forcePathStyle: false } });
+	});
+
+	test("self-hosted R2 env keeps the R2 configuration", () => {
+		expect(
+			readR2IngestAvailability({ ...SELF_HOSTED, ...LOCAL_ENV, ...R2_ENV }),
+		).toEqual({ enabled: true, configuration: R2_CONFIGURATION });
+	});
+
+	test("incomplete or conflicting object store env turns storage off and is reported", () => {
+		const partialS3 = { ...SELF_HOSTED, ...LOCAL_ENV, S3_BUCKET: "opaline" };
+		expect(readR2IngestAvailability(partialS3)).toEqual({
+			enabled: false,
+			missingVariables: [
+				"S3_ACCESS_KEY_ID",
+				"S3_SECRET_ACCESS_KEY",
+				"S3_ENDPOINT",
+			],
+		});
+		expect(objectStoreConfigurationProblems(partialS3)).toEqual([
+			"S3_ACCESS_KEY_ID is not set: it is needed for S3 object storage",
+			"S3_SECRET_ACCESS_KEY is not set: it is needed for S3 object storage",
+			"S3_ENDPOINT is not set: point it at the S3-compatible server, or set S3_REGION for AWS S3",
+		]);
+		expect(
+			objectStoreConfigurationProblems({
+				...S3_ENV,
+				S3_ENDPOINT: "nas.local:8333",
+				S3_FORCE_PATH_STYLE: "maybe",
+			}),
+		).toEqual([
+			'S3_ENDPOINT must be an http:// or https:// URL, not "nas.local:8333"',
+			'S3_FORCE_PATH_STYLE must be true or false, not "maybe"',
+		]);
+		expect(objectStoreConfigurationProblems({ ...S3_ENV, ...R2_ENV })).toEqual([
+			"set either the S3_* variables or R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, not both",
+		]);
+		const partialR2 = { ...SELF_HOSTED, ...LOCAL_ENV, R2_ACCOUNT_ID: "a" };
+		expect(objectStoreConfigurationProblems(partialR2)).toEqual([
+			"R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY must be set together to use Cloudflare R2",
+		]);
+		expect(readR2IngestAvailability(partialR2).enabled).toBe(false);
+	});
+
+	test("the R2 client keeps region auto and default checksums; an S3 client gets its region and only required checksums", async () => {
+		const r2 = createObjectStoreS3Client(R2_CONFIGURATION);
+		expect(await r2.config.region()).toBe("auto");
+		expect(await r2.config.requestChecksumCalculation()).toBe("WHEN_SUPPORTED");
+		const s3Availability = readR2IngestAvailability({
+			...SELF_HOSTED,
+			...S3_ENV,
+			S3_REGION: "eu-west-3",
+		});
+		if (
+			!s3Availability.enabled ||
+			s3Availability.configuration.backend !== "s3"
+		)
+			throw new Error("expected the S3 backend");
+		const s3 = createObjectStoreS3Client(s3Availability.configuration);
+		expect(await s3.config.region()).toBe("eu-west-3");
+		expect(await s3.config.requestChecksumCalculation()).toBe("WHEN_REQUIRED");
+		expect(await s3.config.responseChecksumValidation()).toBe("WHEN_REQUIRED");
+	});
+
+	test("S3 part URLs are signed for the configured bucket, endpoint and region", async () => {
+		const availability = readR2IngestAvailability({
+			...SELF_HOSTED,
+			...S3_ENV,
+		});
+		if (!availability.enabled) throw new Error("expected the S3 backend");
+		const url = new URL(
+			await createR2MultipartUploadClient(
+				availability.configuration,
+			).presignUploadPart({
+				byteLength: 8,
+				objectKey: "ingest/job/main.jsonl",
+				partNumber: 1,
+				uploadId: "upload",
+			}),
+		);
+		expect(url.origin).toBe("http://nas.local:8333");
+		expect(url.pathname).toBe("/opaline/ingest/job/main.jsonl");
+		expect(url.searchParams.get("X-Amz-Credential")).toContain(
+			"/us-east-1/s3/aws4_request",
+		);
+		expect(url.searchParams.get("X-Amz-SignedHeaders")).toBe(
+			"content-length;host",
+		);
+	});
+
+	test("the local backend gets the local client and each backend describes itself", () => {
+		const local = readR2IngestAvailability({ ...SELF_HOSTED, ...LOCAL_ENV });
+		if (!local.enabled) throw new Error("expected the local backend");
+		expect(createObjectStoreClient(local.configuration)).toBeInstanceOf(
+			LocalObjectStore,
+		);
+		expect(describeObjectStore(local)).toBe(
+			"local disk /srv/opaline/data/object-store",
+		);
+		expect(
+			describeObjectStore(
+				readR2IngestAvailability({ ...SELF_HOSTED, ...S3_ENV }),
+			),
+		).toBe("S3 bucket opaline at http://nas.local:8333");
+		expect(describeObjectStore(readR2IngestAvailability(R2_ENV))).toBe(
+			`Cloudflare R2 bucket ${R2_INGEST_BUCKET}`,
+		);
+		expect(
+			describeObjectStore(readR2IngestAvailability({ ...SELF_HOSTED })),
+		).toBe("off (missing OPALINE_DATA_DIR, APP_URL, BETTER_AUTH_SECRET)");
+	});
+});
 
 describe("R2 ingest storage configuration", () => {
 	test("fails closed with the exact missing variable names", () => {

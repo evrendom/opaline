@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import type postgres from "postgres";
 import {
+	delayUntilDue,
 	type JobLock,
 	type JobOutcome,
 	leaseJobLock,
@@ -71,6 +72,115 @@ test("without providers only the jobs that need none run, and billing, trends an
 	expect(
 		selfHostedJobs({ TYPESAFE_API_KEY: "jev" }).map((job) => job.name),
 	).toContain("run-questions");
+});
+
+test("a local or S3 object store turns on live sessions, ingest repair and the expiry sweep; R2 keeps its lifecycle rule", () => {
+	const storageJobs = (env: Record<string, string>) =>
+		selfHostedJobs(env)
+			.map((job) => job.name)
+			.filter((name) =>
+				["live-sessions", "r2-ingest", "object-store-sweep"].includes(name),
+			);
+	const local = {
+		APP_URL: "http://localhost:4100",
+		BETTER_AUTH_SECRET: "0123456789abcdef0123456789abcdef",
+		OPALINE_DATA_DIR: "/tmp/opaline-data",
+	};
+	expect(storageJobs(local)).toEqual([
+		"live-sessions",
+		"r2-ingest",
+		"object-store-sweep",
+	]);
+	expect(
+		storageJobs({
+			...local,
+			S3_ACCESS_KEY_ID: "k",
+			S3_BUCKET: "b",
+			S3_ENDPOINT: "http://127.0.0.1:8333",
+			S3_SECRET_ACCESS_KEY: "s",
+		}),
+	).toEqual(["live-sessions", "r2-ingest", "object-store-sweep"]);
+	expect(
+		storageJobs({
+			...local,
+			R2_ACCOUNT_ID: "a",
+			R2_ACCESS_KEY_ID: "b",
+			R2_SECRET_ACCESS_KEY: "c",
+		}),
+	).toEqual(["live-sessions", "r2-ingest"]);
+	expect(storageJobs({ ...local, S3_BUCKET: "only-a-bucket" })).toEqual([]);
+	const sweep = selfHostedJobs(local).find(
+		(job) => job.name === "object-store-sweep",
+	);
+	expect(sweep).toMatchObject({ everyMs: 3_600_000, firstAfterMs: 180_000 });
+});
+
+test("runNow starts a waiting job at once and reruns a running one right after it finishes", async () => {
+	let runs = 0;
+	let release: () => void = () => {};
+	const outcomes: JobOutcome[] = [];
+	const scheduler = startScheduler({
+		jobs: [
+			{
+				name: "r2-ingest",
+				everyMs: 60_000,
+				firstAfterMs: 60_000,
+				handler: async () => async () => {
+					runs++;
+					if (runs === 1)
+						await new Promise<void>((resolve) => {
+							release = resolve;
+						});
+					return Response.json({ ok: true });
+				},
+			},
+		],
+		lock: unlocked,
+		cronSecret: "0123456789abcdef",
+		onOutcome: (outcome) => outcomes.push(outcome),
+	});
+	scheduler.runNow("unknown-job");
+	scheduler.runNow("r2-ingest");
+	await Bun.sleep(20);
+	expect(runs).toBe(1);
+	scheduler.runNow("r2-ingest");
+	scheduler.runNow("r2-ingest");
+	release();
+	await Bun.sleep(30);
+	expect(runs).toBe(2);
+	await scheduler.stop();
+	scheduler.runNow("r2-ingest");
+	await Bun.sleep(20);
+	expect(runs).toBe(2);
+	expect(outcomes.map((outcome) => outcome.status)).toEqual(["ok", "ok"]);
+});
+
+test("a job that reports earlier due work runs again then, never sooner than a second or later than its period", () => {
+	const ok = (body: unknown): JobOutcome => ({
+		job: "r2-ingest",
+		status: "ok",
+		ms: 1,
+		body,
+	});
+	const now = Date.parse("2026-11-08T21:46:36.315Z");
+	expect(
+		delayUntilDue(ok({ nextDueAt: "2026-11-08T21:46:41.309Z" }), 60_000, now),
+	).toBe(4_994);
+	expect(
+		delayUntilDue(ok({ nextDueAt: "2026-11-08T21:46:36.000Z" }), 60_000, now),
+	).toBe(1_000);
+	expect(
+		delayUntilDue(ok({ nextDueAt: "2026-11-08T23:00:00.000Z" }), 60_000, now),
+	).toBe(60_000);
+	expect(delayUntilDue(ok({ nextDueAt: null }), 60_000, now)).toBe(60_000);
+	expect(delayUntilDue(ok(null), 60_000, now)).toBe(60_000);
+	expect(
+		delayUntilDue(
+			{ ...ok({ nextDueAt: "2026-11-08T21:46:41.309Z" }), status: "failed" },
+			60_000,
+			now,
+		),
+	).toBe(60_000);
 });
 
 test("a run calls the cron handler with the cron secret and reports its status", async () => {
