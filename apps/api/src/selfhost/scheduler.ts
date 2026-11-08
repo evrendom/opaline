@@ -1,6 +1,8 @@
 import { getLogger } from "@logtape/logtape";
 import type postgres from "postgres";
+import { needsObjectStoreSweep } from "../services/object-store-sweep.service.js";
 import { withPostgresLease } from "../services/postgres-lease.service.js";
+import { readR2IngestAvailability } from "../services/r2-ingest-storage.service.js";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 type CronHandler = (request: Request) => Promise<Response>;
@@ -35,6 +37,7 @@ export interface JobOutcome {
 
 export interface Scheduler {
 	readonly jobs: readonly string[];
+	runNow(name: string): void;
 	stop(): Promise<void>;
 }
 
@@ -42,10 +45,14 @@ function hasAll(env: Environment, names: readonly string[]): boolean {
 	return names.every((name) => Boolean(env[name]?.trim()));
 }
 
-const R2_ENV = ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"];
-
 export function selfHostedJobs(env: Environment = process.env): SchedulerJob[] {
-	const r2 = hasAll(env, R2_ENV);
+	const storage = readR2IngestAvailability({
+		...env,
+		OPALINE_SELF_HOSTED: "1",
+	});
+	const objectStore = storage.enabled;
+	const objectStoreSweep =
+		storage.enabled && needsObjectStoreSweep(storage.configuration);
 	const jobs: (SchedulerJob & { readonly when: boolean })[] = [
 		{
 			name: "l1-edges",
@@ -126,7 +133,7 @@ export function selfHostedJobs(env: Environment = process.env): SchedulerJob[] {
 			name: "live-sessions",
 			everyMs: HOUR,
 			firstAfterMs: 10 * MINUTE,
-			when: r2,
+			when: objectStore,
 			handler: async () =>
 				(await import("../handlers/live-sessions-maintenance.js"))
 					.handleLiveSessionsMaintenanceRequest,
@@ -135,10 +142,19 @@ export function selfHostedJobs(env: Environment = process.env): SchedulerJob[] {
 			name: "r2-ingest",
 			everyMs: MINUTE,
 			firstAfterMs: 20_000,
-			when: r2,
+			when: objectStore,
 			handler: async () =>
 				(await import("../handlers/api-maintenance.js"))
 					.handleR2IngestMaintenanceRequest,
+		},
+		{
+			name: "object-store-sweep",
+			everyMs: HOUR,
+			firstAfterMs: 3 * MINUTE,
+			when: objectStoreSweep,
+			handler: async () =>
+				(await import("../handlers/object-store-sweep-maintenance.js"))
+					.handleObjectStoreSweepRequest,
 		},
 	];
 	return jobs.filter((job) => job.when).map(({ when: _when, ...job }) => job);
@@ -205,6 +221,8 @@ export function startScheduler(options: {
 	let stopped = false;
 	const timers = new Map<string, ReturnType<typeof setTimeout>>();
 	const running = new Map<string, Promise<void>>();
+	const rerun = new Set<string>();
+	const byName = new Map(options.jobs.map((job) => [job.name, job]));
 	const report = options.onOutcome ?? logOutcome;
 
 	const schedule = (job: SchedulerJob, delayMs: number) => {
@@ -217,7 +235,7 @@ export function startScheduler(options: {
 					.then(report)
 					.finally(() => {
 						running.delete(job.name);
-						schedule(job, job.everyMs);
+						schedule(job, rerun.delete(job.name) ? 0 : job.everyMs);
 					});
 				running.set(job.name, run);
 			}, delayMs),
@@ -228,6 +246,17 @@ export function startScheduler(options: {
 
 	return {
 		jobs: options.jobs.map((job) => job.name),
+		runNow(name) {
+			const job = byName.get(name);
+			if (stopped || !job) return;
+			if (running.has(name)) {
+				rerun.add(name);
+				return;
+			}
+			clearTimeout(timers.get(name));
+			timers.delete(name);
+			schedule(job, 0);
+		},
 		async stop() {
 			stopped = true;
 			for (const timer of timers.values()) clearTimeout(timer);

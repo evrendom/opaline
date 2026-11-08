@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { resolveClickHouseUsername } from "@rudel/ch-schema/connection";
+import { objectStoreConfigurationProblems } from "../services/r2-ingest-storage.service.js";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -98,6 +99,7 @@ export function readSelfHostConfig(env: Environment): {
 			`OPALINE_WEB_DIR=${webDir} has no index.html; point it at the built web app (apps/web/dist)`,
 		);
 	const dataDir = env.OPALINE_DATA_DIR?.trim() || null;
+	problems.push(...objectStoreConfigurationProblems(env));
 
 	if (problems.length > 0) throw new SelfHostConfigError(problems);
 
