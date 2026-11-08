@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { appRoutes } from "@/app/routes";
+import { cliConnectCommand } from "@/features/self-hosted/cli-commands";
 import { authClient } from "@/lib/auth-client";
 import {
 	CLI_CONNECTION_PATH,
@@ -369,8 +370,11 @@ export function useCliOnboarding(
 
 	async function copyCommand(): Promise<boolean> {
 		function command(value: string) {
-			const local = ["localhost", "127.0.0.1"].includes(location.hostname);
-			return `${localCommand ?? SETUP_COMMAND} --code ${value}${local ? ` --api-base ${location.origin}` : ""}`;
+			return cliConnectCommand(
+				localCommand ?? SETUP_COMMAND,
+				value,
+				location.origin,
+			);
 		}
 		const immediate: PreparedCliCommand | null =
 			snapshot?.state === "waiting" &&

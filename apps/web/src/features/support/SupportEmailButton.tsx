@@ -1,5 +1,7 @@
 import { useLayoutEffect, useSyncExternalStore } from "react";
 import { useLocation } from "react-router-dom";
+import { useSelfHost } from "@/features/self-hosted/self-host-info";
+import { showsSupportEmail } from "@/features/self-hosted/surfaces";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
 import { cn } from "@/lib/utils";
 
@@ -83,7 +85,9 @@ function SupportEmailLink({ className }: { className: string }) {
 }
 
 export function SupportEmailButton() {
-	if (useSupportDocked()) return null;
+	const selfHost = useSelfHost();
+	const docked = useSupportDocked();
+	if (docked || !showsSupportEmail(selfHost)) return null;
 	return (
 		<SupportEmailLink className="fixed right-[max(1rem,env(safe-area-inset-right))] bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 size-9 bg-popover shadow-lg ring-1 ring-foreground/10 hover:bg-accent dark:shadow-none" />
 	);
@@ -94,10 +98,12 @@ export function DockedSupportEmailButton({
 }: {
 	className?: string;
 }) {
+	const selfHost = useSelfHost();
 	useLayoutEffect(() => {
 		setDocked(1);
 		return () => setDocked(-1);
 	}, []);
+	if (!showsSupportEmail(selfHost)) return null;
 	return (
 		<SupportEmailLink
 			className={cn(

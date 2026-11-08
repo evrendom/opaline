@@ -1,4 +1,6 @@
 import { Navigate } from "react-router-dom";
+import { useSelfHost } from "@/features/self-hosted/self-host-info";
+import { showsGitHubSettings } from "@/features/self-hosted/surfaces";
 import { SettingsPageSkeleton } from "@/features/settings/components/settings-page-skeleton";
 import { settingsRouteMap } from "@/features/settings/config/settings-routes";
 import { useGitHubConnection } from "@/features/settings/github/use-github-connection";
@@ -11,12 +13,13 @@ export function GitHubSettingsPage() {
 	const organizationId = state.activeOrg?.id ?? null;
 	const { query } = useGitHubConnection(organizationId);
 	const getShellRoutePath = useShellRoutePath();
+	const selfHost = useSelfHost();
 
 	if (state.isLoading || (organizationId && query.isPending)) {
 		return <SettingsPageSkeleton routeId="workspace" />;
 	}
 	// The page exists only while GitHub is enabled for this workspace.
-	if (!organizationId || query.data?.visibility !== "visible") {
+	if (!organizationId || !showsGitHubSettings(selfHost, query.data)) {
 		return (
 			<Navigate
 				replace

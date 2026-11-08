@@ -9,6 +9,8 @@ import {
 import { Button } from "@/app/ui/button";
 import { Input } from "@/app/ui/input";
 import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
+import { useSelfHost } from "@/features/self-hosted/self-host-info";
+import { workspaceUrlPrefix } from "@/features/self-hosted/surfaces";
 import {
 	WorkspaceSettingsGroup,
 	WorkspaceSettingsRow,
@@ -26,6 +28,7 @@ export function WorkspaceIdentityCard({
 	onInvalidate: () => void;
 }) {
 	const navigate = useNavigate();
+	const selfHost = useSelfHost();
 	const { pathname, search, hash } = useLocation();
 	const { trackOrganizationAction } = useAnalyticsTracking({
 		pageName: "organization",
@@ -155,7 +158,7 @@ export function WorkspaceIdentityCard({
 			<WorkspaceSettingsRow label="Workspace URL" controlId="workspace-slug">
 				<div className="workspace-settings-url-control">
 					<div className="workspace-settings-url-field">
-						<span aria-hidden="true">opaline.so/</span>
+						<span aria-hidden="true">{workspaceUrlPrefix(selfHost)}</span>
 						<Input
 							id="workspace-slug"
 							name="workspace-slug"

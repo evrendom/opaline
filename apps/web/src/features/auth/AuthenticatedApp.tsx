@@ -7,6 +7,7 @@ import {
 	getWorkspaceAppPath,
 	getWorkspaceRelativePath,
 } from "@/app/routes";
+import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import { ProductLoadingScreen } from "@/features/shell/product-loading-screen";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
 import { orpc } from "@/lib/orpc";
@@ -18,6 +19,7 @@ export function AuthenticatedApp({
 	rootRedirectTarget: string | null;
 }) {
 	const { state } = useOrganization();
+	const selfHost = useSelfHost();
 	const { pathname, search, hash } = useLocation();
 	const isRootEntry =
 		(pathname === "/" || pathname === "/login") && !rootRedirectTarget;
@@ -35,6 +37,8 @@ export function AuthenticatedApp({
 			<Navigate
 				to={getAuthenticatedRootPath({
 					hasUploadedSessions: setupStatus.data?.hasUploadedSessions === true,
+					hasCliLogin: setupStatus.data?.hasCliLogin === true,
+					selfHosted: selfHost !== null,
 					workspaceSlug: workspace?.slug ?? null,
 				})}
 				replace

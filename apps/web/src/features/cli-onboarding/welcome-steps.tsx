@@ -5,6 +5,8 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { z } from "zod";
+import { useSelfHost } from "@/features/self-hosted/self-host-info";
+import { workspaceUrlPrefix } from "@/features/self-hosted/surfaces";
 import {
 	GITHUB_CONNECTION_QUERY_KEY,
 	useGitHubConnection,
@@ -53,6 +55,7 @@ export function WelcomeSteps({
 	onSignOut: () => Promise<void>;
 }) {
 	const { state, meta } = useOrganization();
+	const selfHost = useSelfHost();
 	const queryClient = useQueryClient();
 	const location = useLocation();
 	const navigate = useNavigate();
@@ -528,7 +531,7 @@ export function WelcomeSteps({
 						<div className="cli-welcome-field">
 							<label htmlFor="welcome-workspace-slug">URL</label>
 							<div className="cli-welcome-url-input">
-								<span aria-hidden="true">opaline.so/</span>
+								<span aria-hidden="true">{workspaceUrlPrefix(selfHost)}</span>
 								<input
 									id="welcome-workspace-slug"
 									name="workspaceSlug"

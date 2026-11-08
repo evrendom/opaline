@@ -4,6 +4,12 @@ import { useTheme } from "@/app/providers/ThemeProvider";
 import { readPendingEmailCodeDraft } from "@/features/auth/email-code-auth";
 import { LoginForm } from "@/features/auth/LoginForm";
 import { SignupForm } from "@/features/auth/SignupForm";
+import { SelfHostedAuthForm } from "@/features/self-hosted/SelfHostedAuthForm";
+import { useSelfHost } from "@/features/self-hosted/self-host-info";
+import {
+	initialSelfHostedAuthMode,
+	selfHostedAuthCopy,
+} from "@/features/self-hosted/self-hosted-auth";
 import { useRootMark } from "@/hooks/use-root-mark";
 import "@/features/shell/website-button.css";
 import "./guest-app.css";
@@ -20,14 +26,30 @@ interface GuestAppProps {
 export function GuestApp(props: GuestAppProps = {}) {
 	const { description, eyebrow, showLogo = true, title } = props;
 	const { resolvedTheme } = useTheme();
+	const selfHost = useSelfHost();
 	useRootMark("data-auth-shell");
-	const [page, setPage] = useState<Page>(
-		() => readPendingEmailCodeDraft()?.mode ?? "login",
+	const [page, setPage] = useState<Page>(() =>
+		selfHost
+			? initialSelfHostedAuthMode(selfHost, window.location.pathname) ===
+				"sign-up"
+				? "signup"
+				: "login"
+			: (readPendingEmailCodeDraft()?.mode ?? "login"),
 	);
+	const selfHostedCopy = selfHost
+		? selfHostedAuthCopy(page === "login" ? "sign-in" : "sign-up", {
+				info: selfHost,
+				pathname: window.location.pathname,
+				search: window.location.search,
+			})
+		: null;
 	const pageTitle =
-		title ?? (page === "login" ? "Welcome back" : "Create your account");
+		title ??
+		selfHostedCopy?.title ??
+		(page === "login" ? "Welcome back" : "Create your account");
 	const pageDescription =
 		description ??
+		selfHostedCopy?.description ??
 		(page === "login"
 			? "Sign in to continue to Opaline."
 			: "Create an account to start exploring your coding sessions.");
@@ -53,7 +75,15 @@ export function GuestApp(props: GuestAppProps = {}) {
 						<p>{pageDescription}</p>
 					</div>
 
-					{page === "login" ? (
+					{selfHost ? (
+						<SelfHostedAuthForm
+							mode={page === "login" ? "sign-in" : "sign-up"}
+							info={selfHost}
+							onSwitchMode={() =>
+								setPage((current) => (current === "login" ? "signup" : "login"))
+							}
+						/>
+					) : page === "login" ? (
 						<LoginForm />
 					) : (
 						<SignupForm onSwitchToLogin={() => setPage("login")} />

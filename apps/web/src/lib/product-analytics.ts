@@ -20,6 +20,7 @@ import {
 	getCanonicalAppPath,
 	isSessionDetailPath,
 } from "@/app/routes";
+import { getSelfHostInfo } from "@/features/self-hosted/self-host-info";
 import { client } from "@/lib/orpc";
 
 const EVENT_VERSION = PRODUCT_ANALYTICS_EVENT_VERSION;
@@ -54,7 +55,13 @@ function getConfig() {
 	const enabled =
 		(import.meta.env.VITE_POSTHOG_ENABLED ?? "false").trim() === "true";
 	// Hosts of the plugin app allow no third-party connections.
-	if (!enabled || import.meta.env.MODE === "plugin" || !key || !host) {
+	if (
+		!enabled ||
+		import.meta.env.MODE === "plugin" ||
+		!key ||
+		!host ||
+		getSelfHostInfo() !== null
+	) {
 		return null;
 	}
 	return { key, host };

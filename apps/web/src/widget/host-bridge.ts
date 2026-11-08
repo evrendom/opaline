@@ -225,8 +225,13 @@ export function setWidgetState(update: WidgetState) {
 	window.openai?.setWidgetState?.(widgetState);
 }
 
+function pluginAppOrigin() {
+	const base = document.querySelector("base")?.href;
+	return base ? new URL(base).origin : "https://opaline.so";
+}
+
 export function openPluginLink(path: string) {
-	const href = `https://opaline.so${path.startsWith("/") ? path : `/${path}`}`;
+	const href = `${pluginAppOrigin()}${path.startsWith("/") ? path : `/${path}`}`;
 	if (window.openai?.openExternal) window.openai.openExternal({ href });
 	else void requestHost("ui/open-link", { url: href }).catch(console.error);
 }

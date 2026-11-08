@@ -12,6 +12,7 @@ import {
 	IconMailFilled,
 	IconMessage2,
 	IconMessage2Filled,
+	IconPlug,
 	IconSettings,
 	IconSettingsFilled,
 	IconSquareRoundedPlus,
@@ -28,6 +29,9 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/app/ui/select";
+import { IconPlugFilled } from "@/components/ui/icon-plug-filled";
+import { useSelfHost } from "@/features/self-hosted/self-host-info";
+import { showsGitHubSettings } from "@/features/self-hosted/surfaces";
 import {
 	getActiveSettingsRouteId,
 	primarySettingsRoutes,
@@ -50,14 +54,18 @@ const settingsTabIcons: Record<SettingsRouteId, [Icon, Icon]> = {
 	team: [IconChartArea, IconChartAreaFilled],
 	invitations: [IconMail, IconMailFilled],
 	account: [IconId, IconIdFilled],
+	mcp: [IconPlug, IconPlugFilled],
 	"create-workspace": [IconSquareRoundedPlus, IconSquareRoundedPlusFilled],
 };
 
 export function SettingsLayout() {
 	const { state } = useOrganization();
 	const { query } = useGitHubConnection(state.activeOrg?.id ?? null);
-	const routes = primarySettingsRoutes.filter(
-		(route) => route.id !== "github" || query.data?.visibility === "visible",
+	const selfHost = useSelfHost();
+	const routes = primarySettingsRoutes.filter((route) =>
+		route.id === "github"
+			? showsGitHubSettings(selfHost, query.data)
+			: route.id !== "mcp" || selfHost !== null,
 	);
 	const getShellRoutePath = useShellRoutePath();
 	const location = useLocation();
