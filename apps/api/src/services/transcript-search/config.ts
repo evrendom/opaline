@@ -120,5 +120,6 @@ const reported = new Set<string>();
 function reportOnce(message: string): void {
 	if (reported.has(message)) return;
 	reported.add(message);
-	logger.error(message);
+	if (isSelfHosted()) logger.info(message);
+	else logger.error(message);
 }
