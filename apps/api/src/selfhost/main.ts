@@ -2,6 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { disableExternalProviders } from "../lib/self-hosted.js";
 import { readSelfHostConfig, SelfHostConfigError } from "./config.js";
+import { layoutEnvironment, resolveServerLayout } from "./layout.js";
 
 const SHUTDOWN_GRACE_MS = 10_000;
 
@@ -10,9 +11,14 @@ function status(line: string): void {
 }
 
 async function main(): Promise<void> {
+	const layout = resolveServerLayout(import.meta.dir);
+	Object.assign(process.env, layoutEnvironment(process.env, layout));
 	const disabled = disableExternalProviders(process.env);
 	const { config, env } = readSelfHostConfig(process.env);
 	Object.assign(process.env, env);
+	status(
+		`version ${process.env.OPALINE_VERSION?.trim() || "dev"} (${layout.kind} ${layout.root})`,
+	);
 	if (disabled.length > 0)
 		status(`ignoring ${disabled.join(", ")} (never called when self-hosted)`);
 	if (config.dataDir) await mkdir(config.dataDir, { recursive: true });
@@ -20,6 +26,7 @@ async function main(): Promise<void> {
 	const { preparePostgres } = await import("./postgres.js");
 	const postgresReady = await preparePostgres(
 		process.env.PG_CONNECTION_STRING ?? "",
+		layout.postgresMigrateScript,
 	);
 	status(
 		`postgres ${postgresReady.database}: ${postgresReady.migrated || "migrations applied"}`,
@@ -28,7 +35,10 @@ async function main(): Promise<void> {
 	const { bootstrapClickHouseSchema } = await import(
 		"@rudel/ch-schema/bootstrap"
 	);
-	const schema = await bootstrapClickHouseSchema({ env: process.env });
+	const schema = await bootstrapClickHouseSchema({
+		env: process.env,
+		schemaDir: layout.clickHouseSchemaDir,
+	});
 	status(schema.summary);
 
 	const [
