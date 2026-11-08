@@ -31,6 +31,8 @@ import {
 	MAX_QUERY_ARGS_BYTES,
 	MAX_SESSIONS_PER_ANALYSIS,
 	MAX_STEPS_PER_ANALYSIS,
+	RESULT_RETENTION_MS,
+	SHARED_RESULT_RETENTION_MS,
 } from "./limits.js";
 import type {
 	AnalysisLog,
@@ -45,9 +47,6 @@ import type {
 
 const logger = getLogger(["rudel", "api", "analysis-log"]);
 
-/** Query results expire after this; shared or pinned analyses keep them longer (ADR 0001). */
-const RESULT_RETENTION_MS = 90 * 86_400_000;
-const SHARED_RESULT_RETENTION_MS = 365 * 86_400_000;
 /** What a draft is called until save_answer gives it the asker's question. */
 const UNSAVED_QUESTION = "(unsaved answer)";
 /** Longest automatic step label; steps hold at most 500 characters. */
