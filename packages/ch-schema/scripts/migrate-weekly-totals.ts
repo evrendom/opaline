@@ -1,18 +1,11 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import {
-	type ClickHouseExecutor,
-	createClickHouseExecutor,
-} from "@chkit/clickhouse";
+import type { ClickHouseExecutor } from "@chkit/clickhouse";
 import {
 	checksumSQL,
 	createJournalStore,
 	extractExecutableStatements,
 } from "chkit/dist/bin/lib.js";
-import {
-	isLocalClickHouseEndpoint,
-	resolveClickHouseUsername,
-} from "../src/clickhouse-connection.js";
 import { weeklyTotalsTable } from "../src/db/schema/weekly-totals.js";
 import {
 	appendJournalEntryWithReconciliation,
@@ -20,6 +13,7 @@ import {
 } from "./migrate-f16.js";
 import { weeklyTotalsNotFoundStatement } from "./migrate-not-found-unknown.js";
 import { commentIsRunActivityEnd } from "./migrate-run-activity-end.js";
+import { openMigrationTarget } from "./migration-target.js";
 
 /** Weekly totals and the refreshable view that appends them (docs/l1-literal-schema.md, "Weekly totals"). */
 export const WEEKLY_TOTALS_MIGRATION = "20261011150000_weekly_totals.sql";
@@ -182,14 +176,8 @@ async function schemaMismatch(schema: {
 }
 
 async function main(): Promise<void> {
-	const url = process.env.CLICKHOUSE_URL;
-	if (!url) throw new Error("CLICKHOUSE_URL is required");
-	const executor = createClickHouseExecutor({
-		url,
-		username: resolveClickHouseUsername(process.env, url),
-		password: process.env.CLICKHOUSE_PASSWORD ?? "",
-		database: "default",
-	});
+	const target = await openMigrationTarget();
+	const { executor } = target;
 	try {
 		await runWeeklyTotalsMigration({
 			executor,
@@ -199,14 +187,12 @@ async function main(): Promise<void> {
 				"utf8",
 			),
 			targetDatabase: "rudel",
-			expectedEngine: isLocalClickHouseEndpoint(url)
-				? "MergeTree"
-				: "SharedMergeTree",
-			expectedStoragePolicy: "s3",
+			expectedEngine: target.engine("MergeTree"),
+			expectedStoragePolicy: target.capabilities.storagePolicy,
 		});
 		console.log(`Applied/validated: ${WEEKLY_TOTALS_MIGRATION}`);
 	} finally {
-		await executor.close();
+		await target.close();
 	}
 }
 

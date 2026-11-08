@@ -1,18 +1,16 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import {
-	type ClickHouseExecutor,
-	createClickHouseExecutor,
-} from "@chkit/clickhouse";
+import type { ClickHouseExecutor } from "@chkit/clickhouse";
 import {
 	checksumSQL,
 	createJournalStore,
 	extractExecutableStatements,
 } from "chkit/dist/bin/lib.js";
+import { isLocalClickHouseEndpoint } from "../src/clickhouse-connection.js";
 import {
-	isLocalClickHouseEndpoint,
-	resolveClickHouseUsername,
-} from "../src/clickhouse-connection.js";
+	type ClickHouseCapabilities,
+	expectedEngine as expectedEngineFor,
+} from "../src/clickhouse-flavor.js";
 import {
 	REPOSITORY_EVIDENCE_INDEX_TABLE,
 	REPOSITORY_EVIDENCE_SETUP_COLUMNS,
@@ -22,6 +20,7 @@ import {
 	appendJournalEntryWithReconciliation,
 	type MigrationJournalStore,
 } from "./migrate-f16.js";
+import { openMigrationTarget } from "./migration-target.js";
 
 export const REPOSITORY_EVIDENCE_INDEX_MIGRATION =
 	"20260930120000_repository_evidence_index.sql";
@@ -148,9 +147,13 @@ export interface RepositoryEvidenceIndexRuntimeConfig {
 
 export function resolveRepositoryEvidenceIndexRuntimeConfig(
 	env: RepositoryEvidenceIndexRuntimeEnv,
+	capabilities?: ClickHouseCapabilities,
 ): RepositoryEvidenceIndexRuntimeConfig {
 	const expectedEngine =
-		env.REPOSITORY_EVIDENCE_INDEX_EXPECTED_ENGINE ?? "SharedReplacingMergeTree";
+		env.REPOSITORY_EVIDENCE_INDEX_EXPECTED_ENGINE ??
+		(capabilities
+			? expectedEngineFor(capabilities, "ReplacingMergeTree")
+			: "SharedReplacingMergeTree");
 	if (
 		expectedEngine !== "ReplacingMergeTree" &&
 		expectedEngine !== "SharedReplacingMergeTree"
@@ -160,7 +163,9 @@ export function resolveRepositoryEvidenceIndexRuntimeConfig(
 		);
 	}
 	const expectedStoragePolicy =
-		env.REPOSITORY_EVIDENCE_INDEX_EXPECTED_STORAGE_POLICY ?? "s3";
+		env.REPOSITORY_EVIDENCE_INDEX_EXPECTED_STORAGE_POLICY ??
+		capabilities?.storagePolicy ??
+		"s3";
 	assertClickHouseIdentifier(expectedStoragePolicy);
 	const targetDatabase =
 		env.REPOSITORY_EVIDENCE_INDEX_TARGET_DATABASE ??
@@ -172,7 +177,9 @@ export function resolveRepositoryEvidenceIndexRuntimeConfig(
 		targetDatabase !== DEFAULT_REPOSITORY_EVIDENCE_INDEX_DATABASE;
 	if (
 		usesNonProductionOverride &&
-		!isLocalClickHouseEndpoint(env.CLICKHOUSE_URL)
+		!(capabilities
+			? !capabilities.sharedEngines
+			: isLocalClickHouseEndpoint(env.CLICKHOUSE_URL))
 	) {
 		throw new Error(
 			"Repository evidence index runtime overrides are only allowed for a local ClickHouse endpoint",
@@ -414,18 +421,16 @@ function assertClickHouseIdentifier(identifier: string): void {
 }
 
 async function run(): Promise<void> {
-	const url = process.env.CLICKHOUSE_URL;
-	if (!url) throw new Error("CLICKHOUSE_URL is required");
-	const runtimeConfig = resolveRepositoryEvidenceIndexRuntimeConfig(
+	const target = await openMigrationTarget(
 		process.env,
+		process.env.CLICKHOUSE_DB ?? "default",
 	);
-	const executor = createClickHouseExecutor({
-		url,
-		username: resolveClickHouseUsername(process.env, url),
-		password: process.env.CLICKHOUSE_PASSWORD ?? "",
-		database: process.env.CLICKHOUSE_DB ?? "default",
-	});
+	const { executor } = target;
 	try {
+		const runtimeConfig = resolveRepositoryEvidenceIndexRuntimeConfig(
+			process.env,
+			target.capabilities,
+		);
 		const canonicalMigrationSql = await readFile(
 			resolve(
 				import.meta.dir,
@@ -461,7 +466,7 @@ async function run(): Promise<void> {
 			targetDatabase: runtimeConfig.targetDatabase,
 		});
 	} finally {
-		await executor.close();
+		await target.close();
 	}
 }
 

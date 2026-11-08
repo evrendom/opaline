@@ -10,10 +10,18 @@ import {
 } from "chkit/dist/bin/lib.js";
 import { resolveClickHouseUsername } from "../src/clickhouse-connection.js";
 import {
+	adaptExecutor,
+	adaptStatement,
+	type ClickHouseCapabilities,
+	needsAdaptation,
+	probeClickHouseCapabilities,
+} from "../src/clickhouse-flavor.js";
+import {
 	appendJournalEntryWithReconciliation,
 	createExecutor,
 	createMigrationClient,
 	F16_MIGRATIONS,
+	type MigrationHttpClient,
 	type MigrationJournal,
 	type MigrationRuntime,
 	runF16MigrationCore,
@@ -109,38 +117,105 @@ interface BootstrapMigration {
 	checksum: string;
 }
 
+type Environment = Record<string, string | undefined>;
+
+export interface BootstrapOptions {
+	readonly env?: Environment;
+	readonly log?: (line: string) => void;
+	readonly verbose?: boolean;
+}
+
+export interface BootstrapResult {
+	readonly mode: "empty" | "upgrade" | "complete";
+	readonly total: number;
+	readonly applied: number;
+	readonly capabilities: ClickHouseCapabilities;
+	readonly ms: number;
+	readonly summary: string;
+}
+
+interface BootstrapContext {
+	readonly env: Environment;
+	readonly url: string;
+	readonly capabilities: ClickHouseCapabilities;
+	readonly verbose: boolean;
+}
+
 async function runMigrationCommand(
+	context: BootstrapContext,
 	args: readonly string[],
-	environment: Record<string, string> = {},
 ): Promise<void> {
 	const child = Bun.spawn([process.execPath, ...args], {
 		cwd: resolve(import.meta.dir, ".."),
 		env: {
-			...process.env,
-			...environment,
+			...context.env,
 			CLICKHOUSE_DB: "default",
-			CLICKHOUSE_URL:
-				process.env.CLICKHOUSE_URL?.trim() || "http://localhost:8123",
+			CLICKHOUSE_URL: context.url,
 		},
-		stdout: "inherit",
-		stderr: "inherit",
+		stdout: context.verbose ? "inherit" : "pipe",
+		stderr: context.verbose ? "inherit" : "pipe",
 	});
-	if ((await child.exited) !== 0) {
-		throw new Error(`Bootstrap migration command failed: ${args.join(" ")}`);
+	const [exitCode, stdout, stderr] = await Promise.all([
+		child.exited,
+		context.verbose ? "" : new Response(child.stdout as ReadableStream).text(),
+		context.verbose ? "" : new Response(child.stderr as ReadableStream).text(),
+	]);
+	if (exitCode !== 0) {
+		throw new Error(
+			[
+				`Bootstrap migration command failed: ${args.join(" ")}`,
+				stdout.trim(),
+				stderr.trim(),
+			]
+				.filter(Boolean)
+				.join("\n"),
+		);
 	}
 }
 
+async function applyMigrationStatements(
+	executor: Pick<ClickHouseExecutorLike, "execute">,
+	migration: BootstrapMigration,
+): Promise<void> {
+	for (const statement of extractExecutableStatements(migration.sql))
+		await executor.execute(statement);
+}
+
+type ClickHouseExecutorLike = ReturnType<typeof createClickHouseExecutor>;
+
+function adaptMigrationClient(
+	client: MigrationHttpClient,
+	capabilities: ClickHouseCapabilities,
+): MigrationHttpClient {
+	if (!needsAdaptation(capabilities)) return client;
+	return {
+		close: () => client.close(),
+		query: (query, timeoutMs) => client.query(query, timeoutMs),
+		async command(query, timeoutMs) {
+			const statement = adaptStatement(query, capabilities);
+			if (statement !== null) await client.command(statement, timeoutMs);
+		},
+	};
+}
+
 async function applyForwardMigration(
+	context: BootstrapContext,
+	executor: ClickHouseExecutorLike,
+	journalStore: ReturnType<typeof createJournalStore>,
 	migration: BootstrapMigration,
 ): Promise<void> {
 	const script = FORWARD_SCRIPTS.get(migration.name);
 	if (script) {
-		await runMigrationCommand(
-			[resolve(import.meta.dir, script)],
-			script === "migrate-repository-evidence-index.ts"
-				? { REPOSITORY_EVIDENCE_INDEX_EXPECTED_ENGINE: "ReplacingMergeTree" }
-				: {},
-		);
+		await runMigrationCommand(context, [resolve(import.meta.dir, script)]);
+		return;
+	}
+	if (context.capabilities.storagePolicy !== "s3") {
+		await applyMigrationStatements(executor, migration);
+		await appendJournalEntryWithReconciliation(journalStore, {
+			name: migration.name,
+			checksum: migration.checksum,
+			appliedAt: new Date().toISOString().replace("Z", ""),
+		});
 		return;
 	}
 	const directory = await mkdtemp(resolve(tmpdir(), "opaline-ch-upgrade-"));
@@ -151,7 +226,7 @@ async function applyForwardMigration(
 			configPath,
 			`import config from ${JSON.stringify(resolve(import.meta.dir, "../clickhouse.config.ts"))};\nexport default { ...config, migrationsDir: ${JSON.stringify(directory)} };\n`,
 		);
-		await runMigrationCommand([
+		await runMigrationCommand(context, [
 			"--bun",
 			resolve(import.meta.dir, "../node_modules/chkit/dist/bin/chkit.js"),
 			"migrate",
@@ -165,25 +240,36 @@ async function applyForwardMigration(
 	}
 }
 
-async function run(): Promise<void> {
-	const url = process.env.CLICKHOUSE_URL?.trim() || "http://localhost:8123";
-	const username = resolveClickHouseUsername(process.env, url);
-	const password = process.env.CLICKHOUSE_PASSWORD ?? "";
-	const executor = createClickHouseExecutor({
+export async function bootstrapClickHouseSchema(
+	options: BootstrapOptions = {},
+): Promise<BootstrapResult> {
+	const startedAt = performance.now();
+	const env = options.env ?? process.env;
+	const verbose = options.verbose ?? false;
+	const detail = verbose ? (options.log ?? console.log) : () => {};
+	const url = env.CLICKHOUSE_URL?.trim() || "http://localhost:8123";
+	const username = resolveClickHouseUsername(env, url);
+	const password = env.CLICKHOUSE_PASSWORD ?? "";
+	const raw = createClickHouseExecutor({
 		url,
 		username,
 		password,
 		database: "default",
 	});
 	try {
+		const capabilities = await probeClickHouseCapabilities(
+			(sql) => raw.query<Record<string, unknown>>(sql),
+			env,
+		);
+		const executor = adaptExecutor(raw, capabilities);
+		const context: BootstrapContext = { env, url, capabilities, verbose };
 		const migrations = await Promise.all(
 			(await listMigrations(MIGRATIONS_DIR)).map(async (name) => {
 				const sql = await readFile(resolve(MIGRATIONS_DIR, name), "utf8");
 				return { name, sql, checksum: checksumSQL(sql) };
 			}),
 		);
-		const journalName =
-			process.env.CHKIT_JOURNAL_TABLE?.trim() || "_chkit_migrations";
+		const journalName = env.CHKIT_JOURNAL_TABLE?.trim() || "_chkit_migrations";
 		if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(journalName)) {
 			throw new Error("Invalid CHKIT_JOURNAL_TABLE identifier");
 		}
@@ -230,33 +316,53 @@ async function run(): Promise<void> {
 			FROM system.tables WHERE database = 'rudel' AND position(name, 'f16') > 0
 			SETTINGS max_execution_time = 10
 		`);
+		const finish = (
+			finalMode: BootstrapResult["mode"],
+			applied: number,
+			summary: string,
+		): BootstrapResult => {
+			const ms = Math.round(performance.now() - startedAt);
+			return {
+				mode: finalMode,
+				total: migrations.length,
+				applied,
+				capabilities,
+				ms,
+				summary: `${summary} in ${(ms / 1000).toFixed(1)}s`,
+			};
+		};
 		const mode = getBootstrapMode(migrations, journal, tableCount, f16State);
+		const flavor = `${capabilities.flavor}, storage policy ${capabilities.storagePolicy}`;
 		if (mode === "complete") {
-			console.log(
-				`Nothing pending (${migrations.length} migrations; checksums verified).`,
+			return finish(
+				"complete",
+				0,
+				`ClickHouse schema up to date (${migrations.length} migrations, ${flavor})`,
 			);
-			return;
 		}
 		const pending = migrations.slice(journal.applied.length);
-		console.log(
+		detail(
 			`Bootstrap ${mode}: ${pending.length} pending migrations (${journal.applied.length} applied; checksums verified).`,
 		);
 		const runId = crypto.randomUUID();
 		const topology = { mode: "single-node" } as const;
-		const primaryClient = createMigrationClient({
-			url,
-			username,
-			password,
-			database: "default",
-			ddlTimeoutSeconds: 180,
-			requestTimeoutMs: 600_000,
-			maxBytesBeforeExternalGroupBy: 268_435_456,
-			maxBytesBeforeExternalSort: 268_435_456,
-			maxMemoryUsage: 2_147_483_648,
-			maxTemporaryDataOnDiskBytes: 4_294_967_296,
-			runQueryPrefix: `rudel-f16-${runId}`,
-			topology,
-		});
+		const primaryClient = adaptMigrationClient(
+			createMigrationClient({
+				url,
+				username,
+				password,
+				database: "default",
+				ddlTimeoutSeconds: 180,
+				requestTimeoutMs: 600_000,
+				maxBytesBeforeExternalGroupBy: 268_435_456,
+				maxBytesBeforeExternalSort: 268_435_456,
+				maxMemoryUsage: 2_147_483_648,
+				maxTemporaryDataOnDiskBytes: 4_294_967_296,
+				runQueryPrefix: `rudel-f16-${runId}`,
+				topology,
+			}),
+			capabilities,
+		);
 		const runtime: MigrationRuntime = {
 			autoApproveCheckpoints: true,
 			backfillBucketCount: 2,
@@ -278,7 +384,7 @@ async function run(): Promise<void> {
 						journalStore,
 						loadMigration: (name) =>
 							readFile(resolve(MIGRATIONS_DIR, name), "utf8"),
-						log: console.log,
+						log: detail,
 						phaseNames: F16_MIGRATIONS,
 					});
 				}
@@ -287,7 +393,7 @@ async function run(): Promise<void> {
 					await executor.execute(
 						"ALTER TABLE rudel.session_analytics ADD COLUMN IF NOT EXISTS subagent_count UInt32 DEFAULT 0",
 					);
-					console.log("Established subagent_count prerequisite.");
+					detail("Established subagent_count prerequisite.");
 				}
 				if (
 					mode === "upgrade" ||
@@ -300,18 +406,21 @@ async function run(): Promise<void> {
 						)
 					)
 						continue;
-					await applyForwardMigration(migration);
+					await applyForwardMigration(
+						context,
+						executor,
+						journalStore,
+						migration,
+					);
 					continue;
 				}
-				for (const statement of extractExecutableStatements(migration.sql)) {
-					await executor.execute(statement);
-				}
+				await applyMigrationStatements(executor, migration);
 				await appendJournalEntryWithReconciliation(journalStore, {
 					name: migration.name,
 					checksum: migration.checksum,
 					appliedAt: new Date().toISOString().replace("Z", ""),
 				});
-				console.log(`Applied: ${migration.name}`);
+				detail(`Applied: ${migration.name}`);
 			}
 			if (
 				getBootstrapMode(
@@ -324,14 +433,16 @@ async function run(): Promise<void> {
 					"Bootstrap did not complete the checked-in migration history",
 				);
 			}
-			console.log(
-				`Bootstrap complete (${migrations.length} migrations; ${pending.length} applied).`,
+			return finish(
+				mode,
+				pending.length,
+				`ClickHouse schema ${mode === "empty" ? "created" : "upgraded"}: ${pending.length} of ${migrations.length} migrations applied (${flavor})`,
 			);
 		} finally {
 			await primaryClient.close();
 		}
 	} finally {
-		await executor.close();
+		await raw.close();
 	}
 }
 
@@ -381,8 +492,10 @@ export function getBootstrapMode(
 }
 
 if (import.meta.main) {
-	run().catch((error: unknown) => {
-		console.error(error instanceof Error ? error.message : String(error));
-		process.exitCode = 1;
-	});
+	bootstrapClickHouseSchema({ verbose: process.argv.includes("--verbose") })
+		.then((result) => console.log(result.summary))
+		.catch((error: unknown) => {
+			console.error(error instanceof Error ? error.message : String(error));
+			process.exitCode = 1;
+		});
 }

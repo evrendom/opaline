@@ -1,13 +1,12 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { createClickHouseExecutor } from "@chkit/clickhouse";
 import {
 	checksumSQL,
 	createJournalStore,
 	extractExecutableStatements,
 } from "chkit/dist/bin/lib.js";
-import { resolveClickHouseUsername } from "../src/clickhouse-connection.js";
 import { appendJournalEntryWithReconciliation } from "./migrate-f16.js";
+import { openMigrationTarget } from "./migration-target.js";
 
 // Apply only the additive columns required by the Dashboard and Repos.
 // Never replay historical migrations against an existing database.
@@ -16,14 +15,8 @@ const names = [
 	"20260916210000_signal_phrase_counts.sql",
 	"20260918120000_agent_run_summaries.sql",
 ];
-const url = process.env.CLICKHOUSE_URL;
-if (!url) throw new Error("CLICKHOUSE_URL is required");
-const executor = createClickHouseExecutor({
-	url,
-	username: resolveClickHouseUsername(process.env, url),
-	password: process.env.CLICKHOUSE_PASSWORD ?? "",
-	database: "default",
-});
+const target = await openMigrationTarget();
+const { executor } = target;
 try {
 	for (const name of names) {
 		const sql = await readFile(
@@ -75,5 +68,5 @@ try {
 		console.log(`${applied ? "Already applied" : "Applied"}: ${name}`);
 	}
 } finally {
-	await executor.close();
+	await target.close();
 }

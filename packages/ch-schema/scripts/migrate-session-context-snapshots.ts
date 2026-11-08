@@ -1,18 +1,11 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import {
-	type ClickHouseExecutor,
-	createClickHouseExecutor,
-} from "@chkit/clickhouse";
+import type { ClickHouseExecutor } from "@chkit/clickhouse";
 import {
 	checksumSQL,
 	createJournalStore,
 	extractExecutableStatements,
 } from "chkit/dist/bin/lib.js";
-import {
-	isLocalClickHouseEndpoint,
-	resolveClickHouseUsername,
-} from "../src/clickhouse-connection.js";
 import {
 	SESSION_CONTEXT_SNAPSHOT_COLUMNS,
 	SESSION_CONTEXT_SNAPSHOTS_COMMENT,
@@ -24,6 +17,7 @@ import {
 	appendJournalEntryWithReconciliation,
 	type MigrationJournalStore,
 } from "./migrate-f16.js";
+import { openMigrationTarget } from "./migration-target.js";
 
 export const SESSION_CONTEXT_SNAPSHOTS_MIGRATION =
 	"20261107120000_session_context_snapshots.sql";
@@ -173,14 +167,8 @@ async function schemaMismatch(
 }
 
 async function main(): Promise<void> {
-	const url = process.env.CLICKHOUSE_URL;
-	if (!url) throw new Error("CLICKHOUSE_URL is required");
-	const executor = createClickHouseExecutor({
-		url,
-		username: resolveClickHouseUsername(process.env, url),
-		password: process.env.CLICKHOUSE_PASSWORD ?? "",
-		database: "default",
-	});
+	const target = await openMigrationTarget();
+	const { executor } = target;
 	try {
 		await runSessionContextSnapshotsMigration({
 			executor,
@@ -194,14 +182,12 @@ async function main(): Promise<void> {
 				"utf8",
 			),
 			targetDatabase: "rudel",
-			expectedEngine: isLocalClickHouseEndpoint(url)
-				? "ReplacingMergeTree"
-				: "SharedReplacingMergeTree",
-			expectedStoragePolicy: "s3",
+			expectedEngine: target.engine("ReplacingMergeTree"),
+			expectedStoragePolicy: target.capabilities.storagePolicy,
 		});
 		console.log(`Applied/validated: ${SESSION_CONTEXT_SNAPSHOTS_MIGRATION}`);
 	} finally {
-		await executor.close();
+		await target.close();
 	}
 }
 

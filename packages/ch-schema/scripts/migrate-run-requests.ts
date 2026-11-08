@@ -1,18 +1,11 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import {
-	type ClickHouseExecutor,
-	createClickHouseExecutor,
-} from "@chkit/clickhouse";
+import type { ClickHouseExecutor } from "@chkit/clickhouse";
 import {
 	checksumSQL,
 	createJournalStore,
 	extractExecutableStatements,
 } from "chkit/dist/bin/lib.js";
-import {
-	isLocalClickHouseEndpoint,
-	resolveClickHouseUsername,
-} from "../src/clickhouse-connection.js";
 import { RUN_REQUEST_COLUMNS } from "../src/run-index.js";
 import { countReplicas } from "./cluster-replicas.js";
 import {
@@ -20,6 +13,7 @@ import {
 	type MigrationJournalStore,
 } from "./migrate-f16.js";
 import { commentIsRunActivityEnd } from "./migrate-run-activity-end.js";
+import { openMigrationTarget } from "./migration-target.js";
 
 /** The requests of each run index build (docs/l1-literal-schema.md, "Scale"). */
 export const RUN_REQUESTS_MIGRATION = "20261012150000_run_requests.sql";
@@ -180,14 +174,8 @@ async function schemaMismatch(
 }
 
 async function main(): Promise<void> {
-	const url = process.env.CLICKHOUSE_URL;
-	if (!url) throw new Error("CLICKHOUSE_URL is required");
-	const executor = createClickHouseExecutor({
-		url,
-		username: resolveClickHouseUsername(process.env, url),
-		password: process.env.CLICKHOUSE_PASSWORD ?? "",
-		database: "default",
-	});
+	const target = await openMigrationTarget();
+	const { executor } = target;
 	try {
 		await runRunRequestsMigration({
 			executor,
@@ -197,14 +185,12 @@ async function main(): Promise<void> {
 				"utf8",
 			),
 			targetDatabase: "rudel",
-			expectedEngine: isLocalClickHouseEndpoint(url)
-				? "ReplacingMergeTree"
-				: "SharedReplacingMergeTree",
-			expectedStoragePolicy: "s3",
+			expectedEngine: target.engine("ReplacingMergeTree"),
+			expectedStoragePolicy: target.capabilities.storagePolicy,
 		});
 		console.log(`Applied/validated: ${RUN_REQUESTS_MIGRATION}`);
 	} finally {
-		await executor.close();
+		await target.close();
 	}
 }
 

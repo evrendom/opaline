@@ -1,20 +1,17 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import {
-	type ClickHouseExecutor,
-	createClickHouseExecutor,
-} from "@chkit/clickhouse";
+import type { ClickHouseExecutor } from "@chkit/clickhouse";
 import {
 	checksumSQL,
 	createJournalStore,
 	extractExecutableStatements,
 } from "chkit/dist/bin/lib.js";
-import { resolveClickHouseUsername } from "../src/clickhouse-connection.js";
 import { RETIRED_SESSION_ANALYTICS_COLUMNS } from "../src/session-analytics-mv.js";
 import {
 	appendJournalEntryWithReconciliation,
 	type MigrationJournalStore,
 } from "./migrate-f16.js";
+import { openMigrationTarget } from "./migration-target.js";
 
 /**
  * Retirement step 3 (docs/l1-literal-schema.md): both session analytics
@@ -109,14 +106,8 @@ async function staleViews(
 }
 
 async function main(): Promise<void> {
-	const url = process.env.CLICKHOUSE_URL;
-	if (!url) throw new Error("CLICKHOUSE_URL is required");
-	const executor = createClickHouseExecutor({
-		url,
-		username: resolveClickHouseUsername(process.env, url),
-		password: process.env.CLICKHOUSE_PASSWORD ?? "",
-		database: "default",
-	});
+	const target = await openMigrationTarget();
+	const { executor } = target;
 	try {
 		await runSessionAnalyticsRetirementMigration({
 			executor,
@@ -133,7 +124,7 @@ async function main(): Promise<void> {
 		});
 		console.log(`Applied/validated: ${SESSION_ANALYTICS_RETIREMENT_MIGRATION}`);
 	} finally {
-		await executor.close();
+		await target.close();
 	}
 }
 

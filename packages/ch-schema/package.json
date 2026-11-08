@@ -6,6 +6,7 @@
 	"exports": {
 		".": "./src/index.ts",
 		"./connection": "./src/clickhouse-connection.ts",
+		"./bootstrap": "./scripts/bootstrap.ts",
 		"./generated": "./src/generated/index.ts",
 		"./repository-evidence-index": "./src/repository-evidence-index.ts",
 		"./session-analytics-mv": "./src/session-analytics-mv.ts",

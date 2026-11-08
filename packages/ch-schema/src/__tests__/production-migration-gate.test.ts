@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { decideProductionMigration } from "../../scripts/production-migration-gate.js";
+import {
+	decideProductionMigration,
+	productionMigrationEnv,
+} from "../../scripts/production-migration-gate.js";
 
 const SHA = "0123456789abcdef0123456789abcdef01234567";
 const OTHER = "fedcba9876543210fedcba9876543210fedcba98";
@@ -47,5 +50,15 @@ describe("production migration gate", () => {
 				}).action,
 			).toBe("migrate");
 		}
+	});
+});
+
+test("production forward migrations keep the cloud engines and s3 policy without probing", () => {
+	expect(productionMigrationEnv({ CLICKHOUSE_URL: "https://ch" })).toEqual({
+		CLICKHOUSE_URL: "https://ch",
+		CLICKHOUSE_FLAVOR: "cloud",
+	});
+	expect(productionMigrationEnv({ CLICKHOUSE_FLAVOR: "auto" })).toEqual({
+		CLICKHOUSE_FLAVOR: "auto",
 	});
 });

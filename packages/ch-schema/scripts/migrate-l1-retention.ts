@@ -1,15 +1,11 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import {
-	type ClickHouseExecutor,
-	createClickHouseExecutor,
-} from "@chkit/clickhouse";
+import type { ClickHouseExecutor } from "@chkit/clickhouse";
 import {
 	checksumSQL,
 	createJournalStore,
 	extractExecutableStatements,
 } from "chkit/dist/bin/lib.js";
-import { resolveClickHouseUsername } from "../src/clickhouse-connection.js";
 import {
 	RUN_INDEX_TEXT_COLUMNS,
 	runIndexTable,
@@ -20,6 +16,7 @@ import {
 	type MigrationJournalStore,
 } from "./migrate-f16.js";
 import { columnDeclaration } from "./migrate-run-index.js";
+import { openMigrationTarget } from "./migration-target.js";
 
 /**
  * Raw transcripts, `transcript_records`, `run_index` and `session_lineage` are kept until a
@@ -219,14 +216,8 @@ async function retentionMismatch(
 }
 
 async function main(): Promise<void> {
-	const url = process.env.CLICKHOUSE_URL;
-	if (!url) throw new Error("CLICKHOUSE_URL is required");
-	const executor = createClickHouseExecutor({
-		url,
-		username: resolveClickHouseUsername(process.env, url),
-		password: process.env.CLICKHOUSE_PASSWORD ?? "",
-		database: "default",
-	});
+	const target = await openMigrationTarget();
+	const { executor } = target;
 	try {
 		await runL1RetentionMigration({
 			executor,
@@ -239,7 +230,7 @@ async function main(): Promise<void> {
 		});
 		console.log(`Applied/validated: ${L1_RETENTION_MIGRATION}`);
 	} finally {
-		await executor.close();
+		await target.close();
 	}
 }
 

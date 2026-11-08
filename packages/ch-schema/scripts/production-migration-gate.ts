@@ -40,8 +40,17 @@ async function isClickHouseReachable(
 	}
 }
 
+export function productionMigrationEnv(
+	env: Readonly<Record<string, string | undefined>>,
+): Record<string, string | undefined> {
+	return { ...env, CLICKHOUSE_FLAVOR: env.CLICKHOUSE_FLAVOR ?? "cloud" };
+}
+
 function runStep(step: string): void {
-	const result = spawnSync("bun", ["run", step], { stdio: "inherit" });
+	const result = spawnSync("bun", ["run", step], {
+		env: productionMigrationEnv(process.env),
+		stdio: "inherit",
+	});
 	if (result.status !== 0) process.exit(result.status ?? 1);
 }
 

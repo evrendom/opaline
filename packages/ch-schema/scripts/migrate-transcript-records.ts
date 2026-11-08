@@ -1,20 +1,17 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import {
-	type ClickHouseExecutor,
-	createClickHouseExecutor,
-} from "@chkit/clickhouse";
+import type { ClickHouseExecutor } from "@chkit/clickhouse";
 import {
 	checksumSQL,
 	createJournalStore,
 	extractExecutableStatements,
 } from "chkit/dist/bin/lib.js";
-import { resolveClickHouseUsername } from "../src/clickhouse-connection.js";
 import transcriptRecordsSchema from "../src/db/schema/transcript-records.js";
 import {
 	appendJournalEntryWithReconciliation,
 	type MigrationJournalStore,
 } from "./migrate-f16.js";
+import { openMigrationTarget } from "./migration-target.js";
 
 // Apply only these forward migrations, in order: the merged history contains
 // older schema experiments that must never be replayed against an existing
@@ -143,14 +140,8 @@ type InstalledColumn = {
 };
 
 async function main(): Promise<void> {
-	const url = process.env.CLICKHOUSE_URL;
-	if (!url) throw new Error("CLICKHOUSE_URL is required");
-	const executor = createClickHouseExecutor({
-		url,
-		username: resolveClickHouseUsername(process.env, url),
-		password: process.env.CLICKHOUSE_PASSWORD ?? "",
-		database: "default",
-	});
+	const target = await openMigrationTarget();
+	const { executor } = target;
 	try {
 		const read = (name: string) =>
 			readFile(resolve(import.meta.dir, "../chx/migrations", name), "utf8");
@@ -165,7 +156,7 @@ async function main(): Promise<void> {
 			`Applied/validated: ${TRANSCRIPT_RECORDS_MIGRATION}, ${TRANSCRIPT_RECORDS_FACTS_MIGRATION}`,
 		);
 	} finally {
-		await executor.close();
+		await target.close();
 	}
 }
 

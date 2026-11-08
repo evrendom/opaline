@@ -1,21 +1,18 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import {
-	type ClickHouseExecutor,
-	createClickHouseExecutor,
-} from "@chkit/clickhouse";
+import type { ClickHouseExecutor } from "@chkit/clickhouse";
 import {
 	checksumSQL,
 	createJournalStore,
 	extractExecutableStatements,
 } from "chkit/dist/bin/lib.js";
-import { resolveClickHouseUsername } from "../src/clickhouse-connection.js";
 import { runIndexTable } from "../src/db/schema/run-index.js";
 import { countReplicas } from "./cluster-replicas.js";
 import {
 	appendJournalEntryWithReconciliation,
 	type MigrationJournalStore,
 } from "./migrate-f16.js";
+import { openMigrationTarget } from "./migration-target.js";
 
 /**
  * OPL-387: the run index keeps what a run's messages say (the word-list
@@ -146,14 +143,8 @@ export async function runRunIndexMessagesMigration(options: {
 }
 
 async function main(): Promise<void> {
-	const url = process.env.CLICKHOUSE_URL;
-	if (!url) throw new Error("CLICKHOUSE_URL is required");
-	const executor = createClickHouseExecutor({
-		url,
-		username: resolveClickHouseUsername(process.env, url),
-		password: process.env.CLICKHOUSE_PASSWORD ?? "",
-		database: "default",
-	});
+	const target = await openMigrationTarget();
+	const { executor } = target;
 	try {
 		await runRunIndexMessagesMigration({
 			executor,
@@ -170,7 +161,7 @@ async function main(): Promise<void> {
 		});
 		console.log(`Applied/validated: ${RUN_INDEX_MESSAGES_MIGRATION}`);
 	} finally {
-		await executor.close();
+		await target.close();
 	}
 }
 if (import.meta.main)
