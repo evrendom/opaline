@@ -1706,7 +1706,8 @@
 				"userNegative": 12,
 				"userPositive": 56,
 				"complete": true
-			}
+			},
+			"dashboardIds": ["github.com/acme/loomrail"]
 		},
 		{
 			"identity": {
@@ -1731,7 +1732,8 @@
 				"userNegative": 6,
 				"userPositive": 15,
 				"complete": true
-			}
+			},
+			"dashboardIds": ["github.com/acme/loomrail-ui"]
 		},
 		{
 			"identity": {
@@ -1756,7 +1758,8 @@
 				"userNegative": 2,
 				"userPositive": 15,
 				"complete": true
-			}
+			},
+			"dashboardIds": ["github.com/acme/loomrail-workers"]
 		}
 	],
 	"dashboard": {

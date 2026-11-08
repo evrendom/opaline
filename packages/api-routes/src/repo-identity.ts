@@ -175,3 +175,17 @@ export function unifyRepoIdentities(
 		},
 	};
 }
+
+export const MAX_DASHBOARD_REPOSITORY_IDS = 100;
+
+export function dashboardRepositoryId(session: {
+	git_remote?: string | null;
+	project_path: string;
+}) {
+	if (!session.git_remote) return session.project_path;
+	const urlRemote = /^[a-z][a-z\d+.-]*:\/\/([^/]*@)?([^/:]*)(:\d*)?/iu;
+	const remote = urlRemote.test(session.git_remote)
+		? session.git_remote.replace(urlRemote, "$2")
+		: session.git_remote.replace(/^[^/@]+@/u, "").replace(":", "/");
+	return remote.replace(/[.]git\/?$/u, "");
+}

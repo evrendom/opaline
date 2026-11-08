@@ -267,6 +267,7 @@ const SAMPLE_REPOS: RepositorySummary[] = [
 ].map(([name, sessionCount, totalTokens, estimatedCost, signals]) => {
 	const [userPositive, userNegative, modelApologies] = signals as number[];
 	return {
+		dashboardIds: [`sample/${name}`],
 		estimatedCost: estimatedCost as number | null,
 		identity: {
 			repoKey: `sample/${name}`,

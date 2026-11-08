@@ -443,6 +443,8 @@ export * from "./model-rate-card.js";
 export * from "./plugin-tool-names.js";
 export * from "./product-analytics.js";
 export {
+	dashboardRepositoryId,
+	MAX_DASHBOARD_REPOSITORY_IDS,
 	type RepoIdentity,
 	type RepoIdentityInput,
 	type RepoIdentityResolver,

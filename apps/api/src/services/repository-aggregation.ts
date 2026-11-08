@@ -1,4 +1,9 @@
-import { type RepositorySummary, unifyRepoIdentities } from "@rudel/api-routes";
+import {
+	dashboardRepositoryId,
+	MAX_DASHBOARD_REPOSITORY_IDS,
+	type RepositorySummary,
+	unifyRepoIdentities,
+} from "@rudel/api-routes";
 import { toRepoIdentityInput } from "./repo-identity-rows.js";
 
 export interface RepositoryAggregateRow {
@@ -22,7 +27,11 @@ export function aggregateRepositories(
 ): RepositorySummary[] {
 	const groups = new Map<
 		string,
-		{ summary: RepositorySummary; users: Map<string, number> }
+		{
+			summary: RepositorySummary;
+			users: Map<string, number>;
+			dashboardIds: Set<string>;
+		}
 	>();
 	const resolver = unifyRepoIdentities(rows.map(toRepoIdentityInput));
 	for (const row of rows) {
@@ -32,6 +41,7 @@ export function aggregateRepositories(
 			group = {
 				summary: {
 					identity: { ...identity, worktree: null },
+					dashboardIds: [],
 					sessionCount: 0,
 					totalTokens: 0,
 					estimatedCost: 0,
@@ -46,10 +56,13 @@ export function aggregateRepositories(
 					},
 				},
 				users: new Map(),
+				dashboardIds: new Set(),
 			};
 			groups.set(identity.repoKey, group);
 		}
-		const { summary, users } = group;
+		const { summary, users, dashboardIds } = group;
+		const dashboardId = dashboardRepositoryId(row);
+		if (dashboardId) dashboardIds.add(dashboardId);
 		summary.sessionCount += Number(row.session_count);
 		summary.totalTokens += Number(row.total_tokens);
 		summary.estimatedCost =
@@ -69,8 +82,11 @@ export function aggregateRepositories(
 		);
 	}
 	return [...groups.values()]
-		.map(({ summary, users }) => ({
+		.map(({ summary, users, dashboardIds }) => ({
 			...summary,
+			dashboardIds: [...dashboardIds]
+				.sort()
+				.slice(0, MAX_DASHBOARD_REPOSITORY_IDS),
 			userCount: users.size,
 			topUsers: [...users]
 				.map(([userId, sessionCount]) => ({ userId, sessionCount }))

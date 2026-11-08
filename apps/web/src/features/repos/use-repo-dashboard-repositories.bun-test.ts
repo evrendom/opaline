@@ -1,8 +1,6 @@
 import { expect, test } from "bun:test";
-import {
-	dashboardRepositoryId,
-	githubRepositoryIds,
-} from "./use-repo-dashboard-repositories";
+import { dashboardRepositoryId } from "@rudel/api-routes";
+import { githubRepositoryIds } from "./use-repo-dashboard-repositories";
 
 test("matches the dashboard's repository ids", () => {
 	const id = (git_remote: string | undefined, project_path = "/code/app") =>

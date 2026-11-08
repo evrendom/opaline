@@ -17,6 +17,7 @@ export const RepositoryScopedInputSchema = z.object({
 });
 export const RepositorySummarySchema = z.object({
 	identity: RepoIdentitySchema,
+	dashboardIds: z.array(z.string()),
 	sessionCount: z.number(),
 	totalTokens: z.number(),
 	estimatedCost: z.number().nullable(),

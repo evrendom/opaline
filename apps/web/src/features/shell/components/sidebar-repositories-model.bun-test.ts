@@ -24,6 +24,7 @@ function repo(
 			source: "remote",
 			worktree: null,
 		},
+		dashboardIds: [`github.com/${label}`],
 		sessionCount,
 		lastActiveAt: new Date(NOW - daysAgo * DAY).toISOString(),
 		totalTokens: 0,

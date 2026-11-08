@@ -147,3 +147,23 @@ test("keeps the full user count while displaying the three most active users", (
 		"bea",
 	]);
 });
+
+test("lists the dashboard ids a repo spans, so its rail filters without paging sessions", () => {
+	const repos = aggregateRepositories([
+		{ ...row, git_remote: "git@github.com:acme/app.git", project_path: "/a" },
+		{ ...row, git_remote: "https://github.com/acme/app", project_path: "/b" },
+		{ ...row, project_path: "/opt/conductor/workspaces/app/tunis" },
+		{ ...row, project_path: "/opt/conductor/workspaces/app/osaka" },
+	]);
+	expect(
+		Object.fromEntries(
+			repos.map((repo) => [repo.identity.repoKey, repo.dashboardIds]),
+		),
+	).toEqual({
+		"remote:github.com/acme/app": [
+			"/opt/conductor/workspaces/app/osaka",
+			"/opt/conductor/workspaces/app/tunis",
+			"github.com/acme/app",
+		],
+	});
+});
