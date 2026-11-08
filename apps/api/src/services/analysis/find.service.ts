@@ -121,7 +121,9 @@ import {
 } from "./scope.js";
 import {
 	chunkByParamBytes,
+	clickHouseMemoryPressureError,
 	isAnalysisWorkLimit,
+	isClickHouseMemoryPressure,
 	paramValueBytes,
 	pinnedParams,
 	query,
@@ -282,6 +284,8 @@ export function findAnalysisWithOwners(
 						owners: found.owners,
 					};
 				} catch (error) {
+					if (isClickHouseMemoryPressure(error))
+						throw clickHouseMemoryPressureError(error);
 					if (!isAnalysisWorkLimit(error)) throw error;
 					return {
 						output: emptyResult(input, workLimitHeader(input)),
@@ -412,6 +416,8 @@ export function findAnalysisWithOwners(
 					throw new ORPCError("BAD_REQUEST", {
 						message: `filters: ClickHouse could not compile a regex (re2 syntax: no lookaround or backreferences; (?i) for case-insensitive): ${error instanceof Error ? error.message.slice(0, 300) : ""}`,
 					});
+				if (isClickHouseMemoryPressure(error))
+					throw clickHouseMemoryPressureError(error);
 				if (!isAnalysisWorkLimit(error)) throw error;
 				return { output: emptyResult(input, workLimitHeader(input)), owners };
 			}

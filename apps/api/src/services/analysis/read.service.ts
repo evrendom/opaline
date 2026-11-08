@@ -31,7 +31,12 @@ import {
 } from "./read-queries.js";
 import { queryRunFacts, type RunRow } from "./run-queries.js";
 import { batchByRecords, queryCountedGenerations } from "./scope.js";
-import { isAnalysisWorkLimit, query } from "./sql.js";
+import {
+	clickHouseMemoryPressureError,
+	isAnalysisWorkLimit,
+	isClickHouseMemoryPressure,
+	query,
+} from "./sql.js";
 import {
 	childRef,
 	isDelegationTool,
@@ -81,6 +86,8 @@ export function readAnalysis(
 					),
 				);
 			} catch (error) {
+				if (isClickHouseMemoryPressure(error))
+					throw clickHouseMemoryPressureError(error);
 				if (!isAnalysisWorkLimit(error)) throw error;
 				return budgetReadOutput(
 					{

@@ -30,7 +30,11 @@ import { fitCount } from "./output-ceiling.js";
 import { cell } from "./read-output.js";
 import { limitRefusal, runSplit, splitBudget } from "./refused-split.js";
 import type { MeasureParams } from "./retro-measure-sql.js";
-import { ANALYSIS_QUERY_SETTINGS, query } from "./sql.js";
+import {
+	ANALYSIS_QUERY_SETTINGS,
+	isClickHouseMemoryPressure,
+	query,
+} from "./sql.js";
 import { workspaceHasLegacyCalls } from "./sql-call-facts-view.js";
 import {
 	carriesText,
@@ -1089,10 +1093,7 @@ function classify(
 			...(type === "TOO_MANY_ROWS_OR_BYTES" ? {} : { limit: "time" as const }),
 		};
 	// The server's or the user's memory, not this query's: others hold it.
-	if (
-		type === "MEMORY_LIMIT_EXCEEDED" &&
-		/\((?:total|for user)\)|(?:total|user) memory limit/iu.test(error.message)
-	)
+	if (type === "MEMORY_LIMIT_EXCEEDED" && isClickHouseMemoryPressure(error))
 		return BUSY;
 	const read = READ_LIMITS[type];
 	if (read)

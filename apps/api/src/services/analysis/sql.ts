@@ -1,3 +1,4 @@
+import { ORPCError } from "@orpc/server";
 import type { RunRef } from "@rudel/api-routes";
 import { TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX } from "@rudel/api-routes/transcript-records";
 import { z } from "zod";
@@ -92,6 +93,7 @@ export const GenerationRowSchema = z
 /** ClickHouse refused because a row, byte or memory ceiling was hit (not a bug or a deadline). */
 export function isAnalysisWorkLimit(error: unknown): boolean {
 	if (!(error instanceof Error)) return false;
+	if (isClickHouseMemoryPressure(error)) return false;
 	const type =
 		"type" in error && typeof error.type === "string" ? error.type : "";
 	return (
@@ -100,6 +102,29 @@ export function isAnalysisWorkLimit(error: unknown): boolean {
 			error.message,
 		)
 	);
+}
+
+export function isClickHouseMemoryPressure(error: unknown): boolean {
+	if (!(error instanceof Error)) return false;
+	return (
+		/memory limit/iu.test(error.message) &&
+		/\((?:total|for user)\)|(?:total|user) memory limit|OvercommitTracker/iu.test(
+			error.message,
+		)
+	);
+}
+
+export const CLICKHOUSE_MEMORY_PRESSURE =
+	"ClickHouse ran out of memory for all of its queries (its server-wide limit), so nothing was counted. This is not an empty result: retry in a minute, and if it keeps happening give ClickHouse more memory.";
+
+export function clickHouseMemoryPressureError(
+	cause: unknown,
+): ORPCError<"SERVICE_UNAVAILABLE", { reason: string; kind: string }> {
+	return new ORPCError("SERVICE_UNAVAILABLE", {
+		message: CLICKHOUSE_MEMORY_PRESSURE,
+		data: { reason: "clickhouse_memory_pressure", kind: "retry" },
+		cause,
+	});
 }
 
 /** Runs a statement and validates every row. */

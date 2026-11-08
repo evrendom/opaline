@@ -17,6 +17,10 @@ import {
 import type { AgentQueryLimiter } from "../analysis/agent-query-slots.js";
 import { committedBuildSql } from "../analysis/run-index-reader.js";
 import {
+	CLICKHOUSE_MEMORY_PRESSURE,
+	isClickHouseMemoryPressure,
+} from "../analysis/sql.js";
+import {
 	SQL_SETTINGS,
 	type SqlCaller,
 	type SqlServerFunction,
@@ -929,6 +933,13 @@ function readFailure(error: unknown): SqlFailure | null {
 			message: `The regex does not compile in RE2: ${/error: ([^.]*)/u.exec(error.message)?.[1] ?? "invalid pattern"}.`,
 			fragment: null,
 			fix: "RE2 has no lookaround or backreferences; escape . ( ) [ ] { } * + ? | ^ $ \\ to match them literally, prefix (?i) to ignore case, or search the literal string with mode exact.",
+		};
+	if (type === "MEMORY_LIMIT_EXCEEDED" && isClickHouseMemoryPressure(error))
+		return {
+			kind: "recoverable",
+			message: CLICKHOUSE_MEMORY_PRESSURE,
+			fragment: null,
+			fix: "Run the same search again in a minute; nothing in it needs to change.",
 		};
 	if (
 		type === "TIMEOUT_EXCEEDED" ||
