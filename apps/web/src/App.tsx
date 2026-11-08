@@ -23,6 +23,7 @@ import { useOAuthDebugAutoDump } from "@/features/auth/oauth-debug";
 import { ResetPasswordApp } from "@/features/auth/ResetPasswordApp";
 import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
 import { GetStartedRouteGate } from "@/features/get-started/GetStartedRouteGate";
+import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import { ProductLoadingScreen } from "@/features/shell/product-loading-screen";
 import { SupportEmailButton } from "@/features/support/SupportEmailButton";
 import { authClient } from "./lib/auth-client";
@@ -101,7 +102,9 @@ function SessionAwareApp() {
 	const isResolvingSession = isPending && !sessionResolved;
 	useOAuthDebugAutoDump(session);
 	const deviceUserCode = getDeviceUserCode(location.search);
+	const selfHost = useSelfHost();
 	const isCliSetupPath = location.pathname === CLI_SETUP_PATH;
+	const opensWithoutSession = isCliSetupPath && selfHost === null;
 	const isLegacyDevicePath = location.pathname === "/device";
 	const rootRedirectTarget =
 		getValidRedirect(location.search) ??
@@ -134,7 +137,7 @@ function SessionAwareApp() {
 		);
 	}
 
-	if (isResolvingSession && !isCliSetupPath) {
+	if (isResolvingSession && !opensWithoutSession) {
 		return (
 			<>
 				<ProductAnalyticsSessionSync session={session} />
@@ -149,7 +152,7 @@ function SessionAwareApp() {
 		);
 	}
 
-	if (session || isCliSetupPath) {
+	if (session || opensWithoutSession) {
 		return (
 			<>
 				<ProductAnalyticsSessionSync session={session} />
