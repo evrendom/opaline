@@ -60,11 +60,21 @@ We also use limited product analytics on the hosted service to understand whethe
 
 This product analytics layer is intentionally limited. It does not enable blanket click autocapture, session replay, or surveys by default. It is designed to capture product events and operational context like page name, action name, date range, normalized error codes, and organization or user identifiers where needed. It should not include raw transcript content, source code, prompts, tool output, command output, or file contents from your sessions. By using the hosted app, you agree to this limited analytics processing as part of the service.
 
+## Self-host in one command
+
+```bash
+npx opaline@latest server
+```
+
+This runs Opaline on your machine: the server, dashboard and MCP endpoint, Postgres and ClickHouse
+(downloaded when your system has none). It creates your account, connects the CLI, Claude Code and
+Codex, and prints a sign-in link. Use your own ClickHouse with `--clickhouse-url`; run the whole
+stack on a NAS with `deploy/selfhost/install.sh`. Teammates join through an invite link. See
+[docs/self-hosting.md](docs/self-hosting.md).
+
 ## Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, development commands, and PR guidelines.
-
-For self-hosting your own instance, see [docs/self-hosting.md](docs/self-hosting.md).
 
 The hosted development preview uses a stable address:
 [opaline-dev-opalinehq.vercel.app](https://opaline-dev-opalinehq.vercel.app).
