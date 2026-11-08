@@ -48,11 +48,15 @@ opaline server logs -f       # --service server|postgres|clickhouse
 opaline server stop
 ```
 
-Until the server package is published on npm, the CLI runs the server from an athena checkout:
+Until the server package is published on npm, point the CLI at a packed server or at an athena
+checkout:
 
 ```sh
+bun run build:selfhost --version 0.18.0                     # in athena
+OPALINE_SERVER_ARTIFACT=dist-selfhost/opaline-server-0.18.0.tgz npx opaline@latest server
+
 bun run --cwd apps/web build && bun run --cwd apps/web build:widget
-OPALINE_SERVER_DIR=~/code/athena npx opaline@latest server
+OPALINE_SERVER_DIR=~/code/athena npx opaline@latest server   # or run a checkout directly
 ```
 
 All flags and CLI variables are in the CLI's
@@ -223,10 +227,12 @@ every five minutes. The App's credentials are separate from `GITHUB_CLIENT_ID` (
 
 ## Memory and disk
 
-- ClickHouse is capped at 2 GiB of memory by `opaline server` and 3 GiB in the Docker stack
-  (`CLICKHOUSE_MEMORY`). Do not go below 2 GiB: run index queries need 0.5 to 0.9 GiB each. At
-  2 GiB the first insert of a 140 MiB session needed a retry; 3 GiB leaves headroom.
-- The server and Postgres take up to about 1.5 GiB at peak. Plan for 4 GiB of RAM in total.
+- ClickHouse gets a memory cap: a quarter of the machine's RAM between 3 and 8 GiB with
+  `opaline server` (`--clickhouse-memory <GiB>` sets it), 3 GiB in the Docker stack
+  (`CLICKHOUSE_MEMORY`). Do not go below 2 GiB: run index queries need 0.5 to 0.9 GiB each, and at
+  2 GiB the first insert of a 140 MiB session needed a retry. 3 GiB is enough for a small team.
+- The server and Postgres take up to about 1.5 GiB at peak (preparing a 136 MiB session's detail
+  view added 0.6 GiB). Plan for 4 GiB of RAM in total, 8 GiB for large sessions.
 - ClickHouse stores about 1 MiB per session. Repository evidence (transcripts, images, saved
   outputs) sits in object storage at its raw size; staged uploads are deleted after 7 days.
 
@@ -242,8 +248,10 @@ every five minutes. The App's credentials are separate from `GITHUB_CLIENT_ID` (
 
 ## Upgrades
 
-- `opaline server stop && npx opaline@latest server` runs the newest release. Postgres migrations
-  and the ClickHouse schema upgrade run on every start and do nothing when there is nothing to do.
+- `npx opaline@latest server` installs the server release that matches the CLI, restarts only the
+  server process, and keeps the previous release for a rollback. Postgres migrations and the
+  ClickHouse schema upgrade run on every start and do nothing when there is nothing to do; they
+  only go forward, so an older release may refuse the newer schema.
 - From an athena checkout: pull, rebuild the web (`build` and `build:widget`), then
   `opaline server stop && opaline server`.
 - Docker stack: `./install.sh --upgrade`.
