@@ -5,6 +5,8 @@ import {
 	encodeVector,
 	MAX_EMBEDDING_MATCHES,
 	rankByCosine,
+	readText,
+	storedText,
 } from "./postgres-store.js";
 
 test("vectors are stored as little-endian float32 at unit length, four bytes per dimension", () => {
@@ -69,4 +71,25 @@ test("local word vectors rank a question sharing more words higher", async () =>
 		),
 	).toEqual(["close", "far"]);
 	expect(MAX_EMBEDDING_MATCHES).toBe(256);
+});
+
+test("text Postgres cannot hold is stored escaped and read back as it was; other text is stored as is", () => {
+	for (const plain of ["", "Parity — 错 ✓", "a\\u0000b", '"json:"', "😀"])
+		expect(storedText(plain)).toBe(plain);
+	for (const odd of [
+		"nul\u0000inside",
+		"lone \ud800 high",
+		"lone \udfff low",
+		"\u0001json:looks escaped",
+		'\u0001json:"x"',
+	]) {
+		const stored = storedText(odd);
+		expect(stored).not.toContain("\u0000");
+		expect(stored).not.toMatch(/[\uD800-\uDFFF]/u);
+		expect(readText(stored)).toBe(odd);
+	}
+	expect(storedText(null)).toBeNull();
+	expect(readText(null)).toBeNull();
+	expect(() => readText("\u0001json:not json")).toThrow();
+	expect(() => readText("\u0001json:42")).toThrow("not a string");
 });

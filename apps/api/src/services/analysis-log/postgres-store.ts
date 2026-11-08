@@ -37,6 +37,8 @@ const OWNER_BATCH = 100;
 const VECTOR_FETCH_BATCH = 1_000;
 const MAX_CACHED_VECTORS = 16_384;
 const TEXT_OID = 25;
+const ESCAPED_TEXT = "\u0001json:";
+const LONE_SURROGATE = /[\uD800-\uDFFF]/u;
 
 type Sql = postgres.Sql;
 // postgres-js types TransactionSql as Omit<Sql, ...>, which drops the tagged-template call signature.
@@ -165,10 +167,10 @@ export function createPostgresAnalysisStore(
 						changes, notes, cost, query_count, step_count, visibility_revision
 					) VALUES (
 						${analysis.id}, ${analysis.workspaceId}, ${analysis.authorId},
-						${analysis.host}, ${analysis.question}, ${analysis.status},
+						${analysis.host}, ${storedText(analysis.question)}, ${analysis.status},
 						${analysis.draft}, ${analysis.shared}, ${analysis.pinned},
 						${analysis.createdAt}, ${analysis.cutoff}, ${jsonb(sql, analysis.scope)},
-						${analysis.finalAnswer}, ${jsonb(sql, analysis.topics)},
+						${storedText(analysis.finalAnswer)}, ${jsonb(sql, analysis.topics)},
 						${analysis.updates}, ${jsonb(sql, analysis.changes)},
 						${jsonb(sql, analysis.notes)}, ${jsonb(sql, analysis.cost)},
 						${analysis.queryCount}, ${analysis.stepCount},
@@ -241,7 +243,7 @@ export function createPostgresAnalysisStore(
 
 				for (const { stepId, finding } of findings)
 					await tx`
-						UPDATE analysis_log_step SET finding = ${finding} WHERE id = ${stepId}
+						UPDATE analysis_log_step SET finding = ${storedText(finding)} WHERE id = ${stepId}
 					`;
 				for (const step of clarifications) await insertStep(tx, step);
 				await tx`
@@ -352,7 +354,7 @@ export function createPostgresAnalysisStore(
 						${query.outputChars}, ${output !== null}, ${owners}::text[],
 						${query.createdAt}, ${query.removed}, ${query.counts},
 						${query.redaction ? JSON.stringify(query.redaction.args) : null},
-						${query.redaction?.label ?? null}
+						${storedText(query.redaction?.label ?? null)}
 					)
 				`;
 				if (output !== null)
@@ -540,7 +542,7 @@ export function createPostgresAnalysisStore(
 						(analysis_id, workspace_id, step_id, kind, text, model, vector)
 					VALUES (
 						${embedding.analysisId}, ${workspaceId}, ${embedding.stepId},
-						${embedding.kind}, ${embedding.text}, ${embedding.model}, ${vector}
+						${embedding.kind}, ${storedText(embedding.text)}, ${embedding.model}, ${vector}
 					)
 				`;
 			});
@@ -584,7 +586,7 @@ export function createPostgresAnalysisStore(
 											analysisId: candidate.analysis_id,
 											stepId: candidate.step_id,
 											kind: candidate.kind,
-											text: candidate.text,
+											text: readText(candidate.text),
 										},
 									},
 								]
@@ -730,7 +732,8 @@ async function insertStep(tx: Transaction, step: StoredStep): Promise<void> {
 			id, analysis_id, parent_id, ordinal, question, reply, finding, created_at
 		) VALUES (
 			${step.id}, ${step.analysisId}, ${step.parentId}, ${step.ordinal},
-			${step.question}, ${step.reply}, ${step.finding}, ${step.createdAt}
+			${storedText(step.question)}, ${storedText(step.reply)},
+			${storedText(step.finding)}, ${step.createdAt}
 		)
 	`;
 }
@@ -856,7 +859,9 @@ function patchValues(
 		if (value === undefined) continue;
 		values[column] = json
 			? jsonb(sql, value)
-			: (value as string | boolean | null);
+			: typeof value === "string"
+				? storedText(value)
+				: (value as boolean | null);
 	}
 	return values;
 }
@@ -867,20 +872,20 @@ function analysisOf(row: AnalysisRow): StoredAnalysis {
 		workspaceId: row.workspace_id,
 		authorId: row.author_id,
 		host: row.host,
-		question: row.question,
+		question: readText(row.question),
 		status: row.status,
 		draft: row.draft,
 		shared: row.shared,
 		pinned: row.pinned,
 		createdAt: row.created_at,
 		cutoff: row.cutoff,
-		scope: row.scope,
-		finalAnswer: row.final_answer,
-		topics: row.topics,
+		scope: readJson(row.scope),
+		finalAnswer: readText(row.final_answer),
+		topics: readJson(row.topics),
 		updates: row.updates,
-		changes: row.changes,
-		notes: row.notes,
-		cost: row.cost,
+		changes: readJson(row.changes),
+		notes: readJson(row.notes),
+		cost: readJson(row.cost),
 		queryCount: row.query_count,
 		stepCount: row.step_count,
 		visibilityRevision: row.visibility_revision,
@@ -893,9 +898,9 @@ function stepOf(row: StepRow): StoredStep {
 		analysisId: row.analysis_id,
 		parentId: row.parent_id,
 		ordinal: row.ordinal,
-		question: row.question,
-		reply: row.reply,
-		finding: row.finding,
+		question: readText(row.question),
+		reply: readText(row.reply),
+		finding: readText(row.finding),
 		createdAt: row.created_at,
 	};
 }
@@ -919,7 +924,7 @@ function queryFieldsOf(
 			row.redaction_args_json !== null && row.redaction_label !== null
 				? {
 						args: ArgsSchema.parse(JSON.parse(row.redaction_args_json)),
-						label: row.redaction_label,
+						label: readText(row.redaction_label),
 					}
 				: null,
 	};
@@ -928,7 +933,44 @@ function queryFieldsOf(
 function jsonb(sql: Sql, value: unknown): Fragment | null {
 	return value === null
 		? null
-		: sql`${sql.typed(JSON.stringify(value), TEXT_OID)}::jsonb`;
+		: sql`${sql.typed(JSON.stringify(mapStrings(value, storedText)), TEXT_OID)}::jsonb`;
+}
+
+export function storedText(value: string): string;
+export function storedText(value: string | null): string | null;
+export function storedText(value: string | null): string | null {
+	if (value === null) return null;
+	return value.includes("\u0000") ||
+		LONE_SURROGATE.test(value) ||
+		value.startsWith(ESCAPED_TEXT)
+		? `${ESCAPED_TEXT}${JSON.stringify(value)}`
+		: value;
+}
+
+export function readText(value: string): string;
+export function readText(value: string | null): string | null;
+export function readText(value: string | null): string | null {
+	if (value === null || !value.startsWith(ESCAPED_TEXT)) return value;
+	const decoded: unknown = JSON.parse(value.slice(ESCAPED_TEXT.length));
+	if (typeof decoded !== "string")
+		throw new SanitizedError("Stored escaped text is not a string");
+	return decoded;
+}
+
+function readJson<T>(value: T): T {
+	return mapStrings(value, readText) as T;
+}
+
+function mapStrings(value: unknown, map: (text: string) => string): unknown {
+	if (typeof value === "string") return map(value);
+	if (Array.isArray(value)) return value.map((item) => mapStrings(item, map));
+	if (value === null || typeof value !== "object") return value;
+	return Object.fromEntries(
+		Object.entries(value).map(([key, item]) => [
+			map(key),
+			mapStrings(item, map),
+		]),
+	);
 }
 
 function compare(left: string, right: string): number {
