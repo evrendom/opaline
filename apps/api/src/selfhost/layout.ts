@@ -3,6 +3,8 @@ import { join, resolve } from "node:path";
 
 export const ARTIFACT_PACKAGE_NAME = "@opalinehq/server";
 
+export const ARTIFACT_MINIMUM_BUN = "1.3.8";
+
 export const ARTIFACT_LAYOUT = {
 	manifest: "opaline-server.json",
 	entry: "server/main.js",

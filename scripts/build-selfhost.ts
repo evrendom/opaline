@@ -6,6 +6,7 @@ import type { BunPlugin } from "bun";
 import { FORWARD_SCRIPTS } from "../packages/ch-schema/scripts/bootstrap";
 import {
 	ARTIFACT_LAYOUT,
+	ARTIFACT_MINIMUM_BUN,
 	ARTIFACT_PACKAGE_NAME,
 	type ArtifactManifest,
 } from "../apps/api/src/selfhost/layout";
@@ -18,7 +19,6 @@ import {
 	relativeUrlReferences,
 } from "./selfhost-artifact";
 
-const MINIMUM_BUN = "1.3.8";
 const LEFT_OUT_NATIVE_MODULES = ["@resvg/resvg-js"];
 const WEB_BUILD_ENV_DROPPED = /^(VITE_|SENTRY_|POSTHOG_|PUBLIC_POSTHOG_)/u;
 
@@ -121,13 +121,21 @@ async function run(command: string[], cwd: string, env: NodeJS.ProcessEnv) {
 		throw new Error(`${command.join(" ")} failed in ${cwd}`);
 }
 
-async function text(command: string[]): Promise<string> {
-	const child = Bun.spawn(command, { cwd: root, stdout: "pipe", stderr: "pipe" });
-	const [output] = await Promise.all([
-		new Response(child.stdout).text(),
-		child.exited,
-	]);
-	return output.trim();
+async function git(args: string[]): Promise<string | null> {
+	try {
+		const child = Bun.spawn(["git", ...args], {
+			cwd: root,
+			stdout: "pipe",
+			stderr: "pipe",
+		});
+		const [output, code] = await Promise.all([
+			new Response(child.stdout).text(),
+			child.exited,
+		]);
+		return code === 0 ? output.trim() : null;
+	} catch {
+		return null;
+	}
 }
 
 async function buildWeb(): Promise<void> {
@@ -244,14 +252,14 @@ await buildServer();
 await buildSchemas();
 await buildWeb();
 
-const commit = await text(["git", "rev-parse", "HEAD"]);
-const dirty = (await text(["git", "status", "--porcelain"])) !== "";
+const commit = (await git(["rev-parse", "HEAD"])) ?? "unknown";
+const dirty = Boolean(await git(["status", "--porcelain"]));
 const manifest: ArtifactManifest = {
 	name: ARTIFACT_PACKAGE_NAME,
 	version,
 	entry: ARTIFACT_LAYOUT.entry,
 	webDir: ARTIFACT_LAYOUT.webDir,
-	minimumBun: MINIMUM_BUN,
+	minimumBun: ARTIFACT_MINIMUM_BUN,
 	builtAt: new Date().toISOString(),
 	commit: dirty ? `${commit}-dirty` : commit,
 };
@@ -270,7 +278,7 @@ await writeFile(
 			license: "MIT",
 			type: "module",
 			main: ARTIFACT_LAYOUT.entry,
-			engines: { bun: `>=${MINIMUM_BUN}` },
+			engines: { bun: `>=${ARTIFACT_MINIMUM_BUN}` },
 		},
 		null,
 		"\t",
@@ -301,7 +309,7 @@ await writeFile(
 			size: tarball.length,
 			sha256,
 			integrity,
-			minimumBun: MINIMUM_BUN,
+			minimumBun: ARTIFACT_MINIMUM_BUN,
 			builtAt: manifest.builtAt,
 			commit: manifest.commit,
 		},
