@@ -58,6 +58,7 @@ import {
 } from "./lib/http-response-policy.js";
 import { isAuthorizedIngestOperatorRequest } from "./lib/ingest-quiescence.js";
 import { resolvePublicLookupSource } from "./lib/public-lookup-source.js";
+import { isSelfHosted } from "./lib/self-hosted.js";
 import { setupLogging } from "./logging.js";
 import type { ApiKeyAuthFailure } from "./middleware.js";
 import { readPasswordAuthAllowlist } from "./password-auth.js";
@@ -114,11 +115,13 @@ if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
 const preferredFrontendOrigin =
 	process.env.ALLOWED_ORIGIN ?? DEFAULT_DEV_ORIGIN;
 const rawAppURL = process.env.APP_URL ?? DEFAULT_DEV_API_ORIGIN;
-const appURL = resolveAuthAppURL({
-	defaultDevApiOrigin: DEFAULT_DEV_API_ORIGIN,
-	preferredFrontendOrigin,
-	rawAppURL,
-});
+const appURL = isSelfHosted()
+	? rawAppURL
+	: resolveAuthAppURL({
+			defaultDevApiOrigin: DEFAULT_DEV_API_ORIGIN,
+			preferredFrontendOrigin,
+			rawAppURL,
+		});
 const configuredTrustedOrigins = process.env.TRUSTED_ORIGINS
 	? process.env.TRUSTED_ORIGINS.split(",").map((o) => o.trim())
 	: [];

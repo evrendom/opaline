@@ -1,0 +1,153 @@
+import { randomBytes } from "node:crypto";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { resolveClickHouseUsername } from "@rudel/ch-schema/connection";
+
+type Environment = Readonly<Record<string, string | undefined>>;
+
+export interface SelfHostConfig {
+	readonly port: number;
+	readonly host: string;
+	readonly appUrl: string;
+	readonly allowedOrigin: string;
+	readonly webDir: string | null;
+	readonly dataDir: string | null;
+	readonly setupToken: string | null;
+	readonly cronSecret: string;
+}
+
+export class SelfHostConfigError extends Error {
+	constructor(readonly problems: readonly string[]) {
+		super(
+			`Opaline cannot start:\n${problems.map((problem) => `  - ${problem}`).join("\n")}`,
+		);
+		this.name = "SelfHostConfigError";
+	}
+}
+
+const DEFAULT_PORT = 4100;
+const LOOPBACK = new Set(["127.0.0.1", "localhost", "::1"]);
+
+export function readSelfHostConfig(env: Environment): {
+	config: SelfHostConfig;
+	env: Record<string, string>;
+} {
+	const problems: string[] = [];
+	const require = (name: string, hint: string): string => {
+		const value = env[name]?.trim();
+		if (!value) problems.push(`${name} is not set: ${hint}`);
+		return value ?? "";
+	};
+
+	const port = readPort(env.PORT, problems);
+	const host = env.HOST?.trim() || "127.0.0.1";
+	const appUrl = readOrigin(
+		"APP_URL",
+		env.APP_URL?.trim() ||
+			`http://${LOOPBACK.has(host) || host === "0.0.0.0" ? "localhost" : host}:${port}`,
+		problems,
+	);
+	const allowedOrigin = readOrigin(
+		"ALLOWED_ORIGIN",
+		env.ALLOWED_ORIGIN?.trim() || appUrl,
+		problems,
+	);
+
+	const pg = require("PG_CONNECTION_STRING", "the Postgres URL, e.g. postgres://opaline@127.0.0.1:5432/opaline");
+	if (pg && !/^postgres(?:ql)?:\/\//u.test(pg))
+		problems.push(
+			"PG_CONNECTION_STRING must start with postgres:// or postgresql://",
+		);
+
+	const clickhouse = require("CLICKHOUSE_URL", "the ClickHouse HTTP endpoint, e.g. http://127.0.0.1:8123");
+	if (clickhouse) {
+		if (!/^https?:\/\/[^/]/u.test(clickhouse))
+			problems.push(
+				"CLICKHOUSE_URL must be an http:// or https:// URL of the ClickHouse HTTP interface",
+			);
+		else
+			try {
+				resolveClickHouseUsername(env, clickhouse);
+			} catch (error) {
+				problems.push(error instanceof Error ? error.message : String(error));
+			}
+	}
+	const flavor = env.CLICKHOUSE_FLAVOR?.trim().toLowerCase();
+	if (flavor && !["auto", "oss", "cloud"].includes(flavor))
+		problems.push(
+			`CLICKHOUSE_FLAVOR must be auto, oss or cloud, not ${JSON.stringify(env.CLICKHOUSE_FLAVOR)}`,
+		);
+
+	const secret = require("BETTER_AUTH_SECRET", "a random secret of at least 32 characters (openssl rand -base64 32)");
+	if (secret && secret.length < 32)
+		problems.push("BETTER_AUTH_SECRET must be at least 32 characters");
+
+	const setupToken = env.OPALINE_SETUP_TOKEN?.trim() || null;
+	if (setupToken !== null && setupToken.length < 16)
+		problems.push("OPALINE_SETUP_TOKEN must be at least 16 characters");
+
+	const configuredCronSecret = env.CRON_SECRET?.trim() ?? "";
+	if (configuredCronSecret && configuredCronSecret.length < 16)
+		problems.push("CRON_SECRET must be at least 16 characters");
+	const cronSecret =
+		configuredCronSecret || randomBytes(24).toString("base64url");
+
+	const webDir = env.OPALINE_WEB_DIR?.trim() || null;
+	if (webDir !== null && !existsSync(join(webDir, "index.html")))
+		problems.push(
+			`OPALINE_WEB_DIR=${webDir} has no index.html; point it at the built web app (apps/web/dist)`,
+		);
+	const dataDir = env.OPALINE_DATA_DIR?.trim() || null;
+
+	if (problems.length > 0) throw new SelfHostConfigError(problems);
+
+	return {
+		config: {
+			port,
+			host,
+			appUrl,
+			allowedOrigin,
+			webDir,
+			dataDir,
+			setupToken,
+			cronSecret,
+		},
+		env: {
+			OPALINE_SELF_HOSTED: "1",
+			PORT: String(port),
+			APP_URL: appUrl,
+			ALLOWED_ORIGIN: allowedOrigin,
+			CRON_SECRET: cronSecret,
+			NODE_ENV: env.NODE_ENV?.trim() || "production",
+		},
+	};
+}
+
+function readPort(raw: string | undefined, problems: string[]): number {
+	if (raw === undefined || raw.trim() === "") return DEFAULT_PORT;
+	const port = Number(raw);
+	if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+		problems.push(`PORT must be a port number, not ${JSON.stringify(raw)}`);
+		return DEFAULT_PORT;
+	}
+	return port;
+}
+
+function readOrigin(name: string, raw: string, problems: string[]): string {
+	try {
+		const url = new URL(raw);
+		if (
+			(url.protocol !== "http:" && url.protocol !== "https:") ||
+			url.pathname !== "/" ||
+			url.search ||
+			url.hash
+		)
+			throw new Error("not an origin");
+		return url.origin;
+	} catch {
+		problems.push(
+			`${name} must be an origin like http://localhost:4100, not ${JSON.stringify(raw)}`,
+		);
+		return raw;
+	}
+}

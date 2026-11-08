@@ -1,0 +1,121 @@
+import { expect, test } from "bun:test";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { readSelfHostConfig, SelfHostConfigError } from "./config.js";
+import { quoteIdentifier, redact } from "./postgres.js";
+
+const base = {
+	PG_CONNECTION_STRING: "postgres://opaline@127.0.0.1:5432/opaline",
+	CLICKHOUSE_URL: "http://127.0.0.1:8123",
+	BETTER_AUTH_SECRET: "0123456789abcdef0123456789abcdef",
+};
+
+function problems(env: Record<string, string | undefined>): readonly string[] {
+	try {
+		readSelfHostConfig(env);
+	} catch (error) {
+		if (error instanceof SelfHostConfigError) return error.problems;
+		throw error;
+	}
+	return [];
+}
+
+test("defaults: loopback on port 4100, the public origin is the app origin, and a cron secret is made up", () => {
+	const { config, env } = readSelfHostConfig(base);
+	expect(config).toMatchObject({
+		port: 4100,
+		host: "127.0.0.1",
+		appUrl: "http://localhost:4100",
+		allowedOrigin: "http://localhost:4100",
+		webDir: null,
+		setupToken: null,
+	});
+	expect(config.cronSecret.length).toBeGreaterThanOrEqual(16);
+	expect(env).toEqual({
+		OPALINE_SELF_HOSTED: "1",
+		PORT: "4100",
+		APP_URL: "http://localhost:4100",
+		ALLOWED_ORIGIN: "http://localhost:4100",
+		CRON_SECRET: config.cronSecret,
+		NODE_ENV: "production",
+	});
+});
+
+test("explicit settings are kept, origins are normalized", () => {
+	const web = mkdtempSync(join(tmpdir(), "opaline-web-"));
+	writeFileSync(join(web, "index.html"), "<!doctype html>");
+	const { config, env } = readSelfHostConfig({
+		...base,
+		PORT: "4200",
+		HOST: "0.0.0.0",
+		APP_URL: "https://opaline.acme.lan/",
+		CRON_SECRET: "cron-secret-0123456789",
+		OPALINE_SETUP_TOKEN: "setup-token-0123456789",
+		OPALINE_WEB_DIR: web,
+		NODE_ENV: "development",
+	});
+	expect(config).toMatchObject({
+		port: 4200,
+		host: "0.0.0.0",
+		appUrl: "https://opaline.acme.lan",
+		allowedOrigin: "https://opaline.acme.lan",
+		cronSecret: "cron-secret-0123456789",
+		setupToken: "setup-token-0123456789",
+		webDir: web,
+	});
+	expect(env.NODE_ENV).toBe("development");
+	expect(
+		readSelfHostConfig({ ...base, HOST: "192.168.2.74" }).config.appUrl,
+	).toBe("http://192.168.2.74:4100");
+});
+
+test("every problem is reported at once, in words a user can act on", () => {
+	const found = problems({
+		PORT: "http",
+		APP_URL: "localhost:4100/app",
+		CLICKHOUSE_URL: "http://nas.local:8123",
+		CLICKHOUSE_FLAVOR: "nas",
+		BETTER_AUTH_SECRET: "short",
+		OPALINE_SETUP_TOKEN: "short",
+		CRON_SECRET: "short",
+		OPALINE_WEB_DIR: "/nonexistent/dist",
+	});
+	expect(found).toEqual([
+		'PORT must be a port number, not "http"',
+		'APP_URL must be an origin like http://localhost:4100, not "localhost:4100/app"',
+		'ALLOWED_ORIGIN must be an origin like http://localhost:4100, not "localhost:4100/app"',
+		"PG_CONNECTION_STRING is not set: the Postgres URL, e.g. postgres://opaline@127.0.0.1:5432/opaline",
+		expect.stringContaining("CLICKHOUSE_USERNAME is required for a non-local"),
+		'CLICKHOUSE_FLAVOR must be auto, oss or cloud, not "nas"',
+		"BETTER_AUTH_SECRET must be at least 32 characters",
+		"OPALINE_SETUP_TOKEN must be at least 16 characters",
+		"CRON_SECRET must be at least 16 characters",
+		"OPALINE_WEB_DIR=/nonexistent/dist has no index.html; point it at the built web app (apps/web/dist)",
+	]);
+	expect(
+		problems({
+			...base,
+			PG_CONNECTION_STRING: "mysql://x",
+			CLICKHOUSE_URL: "nas:8123",
+		}),
+	).toEqual([
+		"PG_CONNECTION_STRING must start with postgres:// or postgresql://",
+		"CLICKHOUSE_URL must be an http:// or https:// URL of the ClickHouse HTTP interface",
+	]);
+	expect(
+		problems({
+			...base,
+			CLICKHOUSE_URL: "http://192.168.2.74:8123",
+			CLICKHOUSE_USERNAME: "opaline",
+		}),
+	).toEqual([]);
+});
+
+test("Postgres identifiers are quoted and passwords never printed", () => {
+	expect(quoteIdentifier('we"ird')).toBe('"we""ird"');
+	expect(redact("postgres://opaline:secret@db:5432/opaline")).toBe(
+		"postgres://opaline:***@db:5432/opaline",
+	);
+	expect(redact("not a url")).toBe("the configured PG_CONNECTION_STRING");
+});
