@@ -21,7 +21,7 @@ import {
 } from "../services/r2-ingest-processing-error.js";
 
 describe("R2 ingest processing error classification", () => {
-	test("awaits best-effort language signals on both Vercel R2 processing paths", async () => {
+	test("awaits best-effort language signals on both R2 processing paths on Vercel and self-hosted servers", async () => {
 		const [routerSource, repairSource] = await Promise.all([
 			Bun.file(new URL("../router.ts", import.meta.url)).text(),
 			Bun.file(
@@ -33,13 +33,13 @@ describe("R2 ingest processing error classification", () => {
 			/const r2IngestCommit[\s\S]*?commitR2IngestJob\([\s\S]*?awaitLanguageSignals: false,/u,
 		);
 		expect(routerSource).toMatch(
-			/const r2IngestCommit[\s\S]*?commitR2IngestJob\([\s\S]*?awaitBestEffortLanguageSignals: isVercelRuntime\(\),/u,
+			/const r2IngestCommit[\s\S]*?commitR2IngestJob\([\s\S]*?awaitBestEffortLanguageSignals: awaitsDurableLanguageSignals\(\),/u,
 		);
 		expect(repairSource).toMatch(
 			/repairRecoverableR2IngestJobs\([\s\S]*?awaitLanguageSignals: false,/u,
 		);
 		expect(repairSource).toMatch(
-			/repairRecoverableR2IngestJobs\([\s\S]*?awaitBestEffortLanguageSignals: isVercelRuntime\(\),/u,
+			/repairRecoverableR2IngestJobs\([\s\S]*?awaitBestEffortLanguageSignals: awaitsDurableLanguageSignals\(\),/u,
 		);
 		expect(routerSource).toMatch(
 			/shouldStartBestEffortLanguageSignals\(\{[\s\S]*?durableProcessing: durableProcessing !== undefined,/u,
