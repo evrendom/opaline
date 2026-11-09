@@ -1,9 +1,18 @@
 import { getLogger } from "@logtape/logtape";
+import { isSelfHosted } from "../../lib/self-hosted.js";
 import { enqueueL1EdgeScope } from "./l1-edge-queue.service.js";
 
 const logger = getLogger(["rudel", "api", "l1-edges"]);
 /** Sessions are re-uploaded often; their rebuild waits for the uploads to settle. */
 export const L1_EDGE_SESSION_DEBOUNCE_MS = 2 * 60_000;
+
+export function sessionEdgeDebounceMs(
+	env: Readonly<Record<string, string | undefined>> = process.env,
+): number {
+	return isSelfHosted(env) && env.OPALINE_LOCAL_INGEST === "1"
+		? 0
+		: L1_EDGE_SESSION_DEBOUNCE_MS;
+}
 
 interface QueuedSession {
 	organizationId: string;
@@ -36,7 +45,7 @@ export async function enqueueSessionEdgesBestEffort(
 		await enqueueL1EdgeScope(
 			sqlClient,
 			{ kind: "session", ...session },
-			{ debounceMs: L1_EDGE_SESSION_DEBOUNCE_MS, priority: options.priority },
+			{ debounceMs: sessionEdgeDebounceMs(), priority: options.priority },
 		);
 	} catch (error) {
 		logger.warn("Could not queue edges for session {sessionId}: {error}", {

@@ -3,6 +3,7 @@ import type { RudelSessionGitObservationsRow } from "@rudel/ch-schema/generated"
 import { filterKnownSecrets } from "@rudel/secret-filter";
 import type { ClickHouseExecutor } from "../clickhouse.js";
 import { ClickHouseWriteFencedError } from "../lib/clickhouse-write-fence.js";
+import { readPositiveSafeIntegerEnv } from "../lib/env.js";
 import {
 	type GenerationRetirement,
 	type GenerationRetirementOptions,
@@ -62,7 +63,7 @@ export async function persistGitObservationsBestEffort(
 ): Promise<"written" | "skipped" | "failed"> {
 	if (process.env.GIT_OBSERVATION_EXTRACTION_ENABLED === "false")
 		return "skipped";
-	if (activeJobs >= 2) {
+	if (activeJobs >= readPositiveSafeIntegerEnv("GIT_OBSERVATION_MAX_JOBS", 2)) {
 		logger.warn(
 			"Git observation extraction admission full; backfill can retry",
 		);

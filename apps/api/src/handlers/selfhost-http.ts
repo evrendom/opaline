@@ -88,6 +88,12 @@ export function handleSelfHostRoute(
 			return loginLink(request, deps);
 		case "GET /api/selfhost/github":
 			return githubStatus(request, deps);
+		case "GET /api/selfhost/ingest/timings":
+			return ingestTimings(request, deps);
+		case "GET /api/selfhost/ingest/status":
+			return ingestStatus(request, deps);
+		case "POST /api/selfhost/ingest/notify":
+			return ingestNotify(request, deps);
 		case "GET /api/selfhost/login":
 			return deps.auth.handler(
 				new Request(
@@ -220,6 +226,9 @@ async function createFirstUser(
 		body: { userId: user.id, name: CLI_API_KEY_NAME, expiresIn: null },
 	});
 	const token = await issueLoginToken(deps.sql, user.id);
+	void import("../selfhost/local-ingest/index.js").then((module) =>
+		module.getLocalIngest()?.wake(),
+	);
 	return Response.json({
 		user,
 		organization,
@@ -447,4 +456,62 @@ function sameSecret(given: string, expected: string): boolean {
 	const left = Buffer.from(given);
 	const right = Buffer.from(expected);
 	return left.length === right.length && timingSafeEqual(left, right);
+}
+
+async function ingestTimings(
+	request: Request,
+	deps: SelfHostDependencies,
+): Promise<Response> {
+	const actor = await loginLinkActor(request, deps);
+	if (actor instanceof Response) return actor;
+	const { readIngestPhaseTotals, resetIngestPhaseTotals } = await import(
+		"../services/ingest-phase-timings.js"
+	);
+	const phases = readIngestPhaseTotals();
+	if (new URL(request.url).searchParams.get("reset") === "1")
+		resetIngestPhaseTotals();
+	return Response.json({ phases });
+}
+
+const NotifyBodySchema = z
+	.object({
+		paths: z.array(z.string().min(1).max(4_096)).max(256).default([]),
+		final: z.boolean().default(false),
+	})
+	.strict();
+
+async function ingestStatus(
+	request: Request,
+	deps: SelfHostDependencies,
+): Promise<Response> {
+	const { getLocalIngest } = await import("../selfhost/local-ingest/index.js");
+	const ingest = getLocalIngest();
+	if (!ingest) return Response.json({ error: "not_found" }, { status: 404 });
+	const actor = await loginLinkActor(request, deps);
+	if (actor instanceof Response) return actor;
+	return Response.json(ingest.status());
+}
+
+async function ingestNotify(
+	request: Request,
+	deps: SelfHostDependencies,
+): Promise<Response> {
+	const { getLocalIngest } = await import("../selfhost/local-ingest/index.js");
+	const ingest = getLocalIngest();
+	if (!ingest) return Response.json({ error: "not_found" }, { status: 404 });
+	const actor = await loginLinkActor(request, deps);
+	if (actor instanceof Response) return actor;
+	const parsed = NotifyBodySchema.safeParse(
+		await request.json().catch(() => null),
+	);
+	if (!parsed.success)
+		return Response.json(
+			{
+				error: "invalid_body",
+				message: "Send { paths: string[], final?: boolean }.",
+			},
+			{ status: 400 },
+		);
+	const accepted = await ingest.notify(parsed.data.paths, parsed.data.final);
+	return Response.json({ accepted }, { status: 202 });
 }

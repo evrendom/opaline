@@ -582,3 +582,87 @@ describe("helpers", () => {
 		);
 	});
 });
+
+describe("local ingest endpoints", () => {
+	const status = {
+		state: "importing" as const,
+		sessionsSeen: 420,
+		sessionsIngested: 100,
+		sessionsQueued: 320,
+		bytesQueued: 2_000_000_000,
+		lastIngestAt: "2026-11-09T19:00:00.000Z",
+		etaSeconds: 90,
+		backgroundPriority: true,
+	};
+
+	test("status and notify answer 404 while local ingest is off", async () => {
+		const { registerLocalIngest } = await import(
+			"../selfhost/local-ingest/index.js"
+		);
+		registerLocalIngest(null);
+		const { deps: d } = deps(() => []);
+		for (const [method, path] of [
+			["GET", "/api/selfhost/ingest/status"],
+			["POST", "/api/selfhost/ingest/notify"],
+		] as const) {
+			const request = new Request(`http://localhost:4100${path}`, {
+				method,
+				headers: { "x-api-key": "good-key" },
+			});
+			const response = await handleSelfHostRoute(
+				request,
+				new URL(request.url),
+				d,
+			);
+			expect(response?.status).toBe(404);
+		}
+	});
+
+	test("status needs a key and returns the contract shape; notify queues paths", async () => {
+		const { registerLocalIngest } = await import(
+			"../selfhost/local-ingest/index.js"
+		);
+		const notified: [readonly string[], boolean][] = [];
+		registerLocalIngest({
+			status: () => status,
+			notify: async (paths, final) => {
+				notified.push([paths, final]);
+				return paths.length;
+			},
+			wake: () => {},
+			stop: async () => {},
+		});
+		try {
+			const { deps: d } = deps(() => []);
+			const call = (path: string, init: RequestInit) => {
+				const request = new Request(`http://localhost:4100${path}`, init);
+				return handleSelfHostRoute(request, new URL(request.url), d);
+			};
+			expect((await call("/api/selfhost/ingest/status", {}))?.status).toBe(401);
+			const answered = await call("/api/selfhost/ingest/status", {
+				headers: { "x-api-key": "good-key" },
+			});
+			expect(answered?.status).toBe(200);
+			expect(await answered?.json()).toEqual(status);
+			const bad = await call("/api/selfhost/ingest/notify", {
+				method: "POST",
+				headers: { "x-api-key": "good-key" },
+				body: JSON.stringify({ paths: "nope" }),
+			});
+			expect(bad?.status).toBe(400);
+			const queued = await call("/api/selfhost/ingest/notify", {
+				method: "POST",
+				headers: { authorization: "Bearer good-key" },
+				body: JSON.stringify({
+					paths: ["/h/.codex/sessions/a.jsonl"],
+					final: true,
+				}),
+			});
+			expect(queued?.status).toBe(202);
+			expect(await queued?.json()).toEqual({ accepted: 1 });
+			expect(notified).toEqual([[["/h/.codex/sessions/a.jsonl"], true]]);
+		} finally {
+			registerLocalIngest(null);
+		}
+	});
+});
