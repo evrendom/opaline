@@ -386,6 +386,7 @@ async function getSessionAnalyticsBaseRows(
 
 	const rows = await queryClickhouse<SessionAnalyticsListRow>({
 		clickhouse_settings: {
+			...usage.clickhouseSettings,
 			join_use_nulls: 0,
 			log_comment: "analytics.sessions.list",
 		},
@@ -584,6 +585,7 @@ export async function getSessionAnalyticsSummaryComparison(
 		Record<string, number | null | undefined>
 	>({
 		clickhouse_settings: {
+			...usage.clickhouseSettings,
 			log_comment: "analytics.sessions.summaryComparison",
 		},
 		query: `
@@ -791,6 +793,7 @@ export async function getSessionDimensionAnalysis(
 	}
 
 	const results = await queryClickhouse<DimensionRow>({
+		clickhouse_settings: usage.clickhouseSettings,
 		query,
 		query_params,
 	});

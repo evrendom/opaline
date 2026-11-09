@@ -487,6 +487,34 @@ describe("usage session rollups", () => {
 		);
 		expect(await countRows(sessionId)).toBe(0);
 	});
+
+	test("a row written without stored prices reads as unpriced groups, never an error", async () => {
+		const sessionId = `unpriced_${runId}`;
+		await upload(sessionId, "90", [usageEvent(sessionId, "1")]);
+		const [row] = await readRollups(sessionId);
+		expect(row?.estimated_costs).toEqual([expect.any(Number), 0]);
+		await executor.insert({
+			table: USAGE_SESSION_ROLLUPS_TABLE,
+			values: [
+				Object.fromEntries(
+					Object.entries(row ?? {}).filter(
+						([column]) =>
+							column !== "estimated_costs" && column !== "pricing_models",
+					),
+				),
+			],
+		});
+		const groups = await executor.query({
+			query: `WITH ${buildUsageEventAnalyticsCte({}, false, "rollups")}
+				SELECT record_kind, pricing_model, group_estimated_cost FROM priced_usage_groups
+				WHERE session_id = {sessionId:String} ORDER BY record_kind`,
+			query_params: { orgId: organizationId, sessionId },
+		});
+		expect(groups).toEqual([
+			{ group_estimated_cost: null, pricing_model: "", record_kind: "event" },
+			{ group_estimated_cost: null, pricing_model: "", record_kind: "receipt" },
+		]);
+	});
 });
 
 function clickHouseTime(agoMs: number): string {

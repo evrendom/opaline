@@ -26,6 +26,7 @@ async function getFavoriteModelByUser(orgId: string, days: number) {
 		window: buildSessionDateWindow(buildDateFilter("days", "sa.session_date")),
 	});
 	const rows = await queryClickhouse<FavoriteModelRow>({
+		clickhouse_settings: usage.clickhouseSettings,
 		query: `
 	WITH ${usage.cteDefinitions}
     SELECT
@@ -110,6 +111,7 @@ export async function getDeveloperList(
 
 	const [summaryRows, favoriteModelByUser] = await Promise.all([
 		queryClickhouse<Omit<DeveloperSummary, "favorite_model" | "username">>({
+			clickhouse_settings: usage.clickhouseSettings,
 			query,
 			query_params,
 		}),
@@ -190,6 +192,7 @@ export async function getDeveloperTeamCards(
 
 	const [summaryRows, favoriteModelByUser, skillRows] = await Promise.all([
 		queryClickhouse<SummaryRow>({
+			clickhouse_settings: usage.clickhouseSettings,
 			query: summaryQuery,
 			query_params,
 		}),

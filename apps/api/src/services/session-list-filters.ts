@@ -67,7 +67,10 @@ export async function getSessionFilterCatalog(
 		ranges: [number | null, number | null][];
 	};
 	const [row] = await queryClickhouse<CatalogRow>({
-		clickhouse_settings: { log_comment: "analytics.sessions.filterCatalog" },
+		clickhouse_settings: {
+			...usage.clickhouseSettings,
+			log_comment: "analytics.sessions.filterCatalog",
+		},
 		query: `WITH RECURSIVE ${usage.cteDefinitions},
    ${buildSessionFamilyCostCte({
 			inputRelation: usage.sessionsRelation,

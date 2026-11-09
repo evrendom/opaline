@@ -498,7 +498,12 @@ function buildUsageWindowCte(
 		)`;
 }
 
+export const USAGE_ANALYTICS_CLICKHOUSE_SETTINGS = {
+	optimize_and_compare_chain: 0,
+} as const;
+
 export interface UsageAnalyticsQueryContext {
+	readonly clickhouseSettings: typeof USAGE_ANALYTICS_CLICKHOUSE_SETTINGS;
 	readonly cteDefinitions: string;
 	readonly dailySessionsRelation: "usage_analytics_daily_sessions";
 	/** Session metadata with lineage, without usage: a cheap superset of `sessionsRelation`. */
@@ -831,9 +836,9 @@ export function buildUsageEventCandidateCtes(
 		)`;
 }
 
-function buildUsageRollupCandidatesCte(usageEventFilters: string): string {
+function buildUsageRollupPricedGroupsCte(usageEventFilters: string): string {
 	return `
-		usage_event_pricing_candidates AS (
+		priced_usage_groups AS (
 			SELECT
 				organization_id,
 				user_id,
@@ -855,7 +860,9 @@ function buildUsageRollupCandidatesCte(usageEventFilters: string): string {
 				group_cache_read_input_tokens,
 				group_cache_write_5m_input_tokens,
 				group_cache_write_1h_input_tokens,
-				group_output_tokens
+				group_output_tokens,
+				pricing_model,
+				group_estimated_cost
 			FROM ${getSafeClickHouseTable(USAGE_SESSION_ROLLUPS_TABLE)} FINAL
 			ARRAY JOIN
 				record_kinds AS record_kind,
@@ -872,8 +879,26 @@ function buildUsageRollupCandidatesCte(usageEventFilters: string): string {
 				cache_read_input_tokens AS group_cache_read_input_tokens,
 				cache_write_5m_input_tokens AS group_cache_write_5m_input_tokens,
 				cache_write_1h_input_tokens AS group_cache_write_1h_input_tokens,
-				output_tokens AS group_output_tokens
+				output_tokens AS group_output_tokens,
+				pricing_models AS pricing_model,
+				estimated_costs AS group_estimated_cost
 			WHERE ${usageEventFilters} AND is_consistent = 1
+		)`;
+}
+
+export function buildPricedUsageGroupsCtes(candidatesRelation: string): string {
+	return `
+		usage_event_pricing_groups AS (
+			SELECT
+				c.*,
+				${EVENT_CANONICAL_PRICING_MODEL_SQL} AS pricing_model
+			FROM ${candidatesRelation} AS c
+		),
+		usage_event_pricing_rate_card AS (
+			${EVENT_PRICING_RATE_CARD_SQL}
+		),
+		priced_usage_groups AS (
+			${buildPricedGroupsSelect("usage_event_pricing_groups")}
 		)`;
 }
 
@@ -897,21 +922,10 @@ export function buildUsageEventAnalyticsCte(
 		${scope.window ? `${buildUsageWindowCte(scope.window, usageSource)},` : ""}
 		${
 			usageSource === "rollups"
-				? buildUsageRollupCandidatesCte(usageEventFilters)
-				: buildUsageEventCandidateCtes(usageEventFilters)
+				? buildUsageRollupPricedGroupsCte(usageEventFilters)
+				: `${buildUsageEventCandidateCtes(usageEventFilters)},
+		${buildPricedUsageGroupsCtes("usage_event_pricing_candidates")}`
 		},
-		usage_event_pricing_groups AS (
-			SELECT
-				c.*,
-				${EVENT_CANONICAL_PRICING_MODEL_SQL} AS pricing_model
-			FROM usage_event_pricing_candidates AS c
-		),
-		usage_event_pricing_rate_card AS (
-			${EVENT_PRICING_RATE_CARD_SQL}
-		),
-		priced_usage_groups AS (
-			${buildPricedGroupsSelect("usage_event_pricing_groups")}
-		),
 		usage_event_session_rollups AS (
 			SELECT
 				p.organization_id,
@@ -1116,6 +1130,7 @@ export async function getUsageAnalyticsQueryContext(
 ): Promise<UsageAnalyticsQueryContext> {
 	if (!shouldUseUsageEventAnalytics(organizationId)) {
 		return {
+			clickhouseSettings: USAGE_ANALYTICS_CLICKHOUSE_SETTINGS,
 			cteDefinitions: buildLegacyUsageAnalyticsCte(
 				undefined,
 				"organization",
@@ -1131,6 +1146,7 @@ export async function getUsageAnalyticsQueryContext(
 	await readinessGate.assertReady();
 	const usageSource = await resolveUsageSource(organizationId);
 	return {
+		clickhouseSettings: USAGE_ANALYTICS_CLICKHOUSE_SETTINGS,
 		cteDefinitions: buildUsageEventAnalyticsCte(
 			usageSource === "rollups" && scope.window?.onlyForEventPricing
 				? { ...scope, window: undefined }
@@ -1150,6 +1166,7 @@ export async function getUsageAnalyticsQueryContext(
 export async function getAllOrganizationsUsageAnalyticsQueryContext(): Promise<UsageAnalyticsQueryContext> {
 	if (readUsageEventAnalyticsCutoverConfig().mode !== "all") {
 		return {
+			clickhouseSettings: USAGE_ANALYTICS_CLICKHOUSE_SETTINGS,
 			cteDefinitions: buildLegacyUsageAnalyticsCte(
 				undefined,
 				"allOrganizations",
@@ -1163,6 +1180,7 @@ export async function getAllOrganizationsUsageAnalyticsQueryContext(): Promise<U
 
 	await readinessGate.assertReady();
 	return {
+		clickhouseSettings: USAGE_ANALYTICS_CLICKHOUSE_SETTINGS,
 		cteDefinitions: buildUsageEventAnalyticsCte({ tenant: "allOrganizations" }),
 		dailySessionsRelation: "usage_analytics_daily_sessions",
 		metadataRelation: "usage_analytics_metadata",

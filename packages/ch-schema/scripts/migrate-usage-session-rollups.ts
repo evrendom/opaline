@@ -27,6 +27,12 @@ import {
 
 export const USAGE_SESSION_ROLLUPS_MIGRATION =
 	"20261108150000_usage_session_rollups.sql";
+export const USAGE_SESSION_ROLLUP_COSTS_MIGRATION =
+	"20261109120000_usage_session_rollup_costs.sql";
+export const USAGE_SESSION_ROLLUPS_MIGRATIONS = [
+	USAGE_SESSION_ROLLUPS_MIGRATION,
+	USAGE_SESSION_ROLLUP_COSTS_MIGRATION,
+] as const;
 
 const TABLE = "usage_session_rollups";
 const KEY = USAGE_SESSION_ROLLUPS_KEY.join(", ");
@@ -37,10 +43,15 @@ const SETTINGS = [
 
 type Engine = "ReplacingMergeTree" | "SharedReplacingMergeTree";
 
+export interface UsageSessionRollupsMigration {
+	readonly name: string;
+	readonly sql: string;
+}
+
 export async function runUsageSessionRollupsMigration(options: {
 	executor: ClickHouseExecutor;
 	journalStore: MigrationJournalStore;
-	migrationSql: string;
+	migrations: readonly UsageSessionRollupsMigration[];
 	targetDatabase: string;
 	expectedEngine: Engine;
 	expectedStoragePolicy: string;
@@ -48,17 +59,22 @@ export async function runUsageSessionRollupsMigration(options: {
 }): Promise<void> {
 	if (!/^[A-Za-z_][A-Za-z0-9_]*$/u.test(options.targetDatabase))
 		throw new Error("Unsafe ClickHouse database");
-	const checksum = checksumSQL(options.migrationSql);
-	const applied = (await options.journalStore.readJournal()).applied.filter(
-		(entry) => entry.name === USAGE_SESSION_ROLLUPS_MIGRATION,
-	);
-	if (applied.some((entry) => entry.checksum !== checksum))
-		throw new Error("Usage session rollups migration checksum mismatch");
+	const journal = (await options.journalStore.readJournal()).applied;
+	const pending = options.migrations.filter((migration) => {
+		const checksum = checksumSQL(migration.sql);
+		const applied = journal.filter((entry) => entry.name === migration.name);
+		if (applied.some((entry) => entry.checksum !== checksum))
+			throw new Error(
+				`Usage session rollups migration checksum mismatch: ${migration.name}`,
+			);
+		return applied.length === 0;
+	});
 	const apply = async () => {
-		for (const statement of extractExecutableStatements(options.migrationSql))
-			await options.executor.execute(statement);
+		for (const migration of pending)
+			for (const statement of extractExecutableStatements(migration.sql))
+				await options.executor.execute(statement);
 	};
-	if (applied.length === 0) await apply();
+	await apply();
 
 	const { attempts, delayMs } = options.readBack ?? {
 		attempts: 13,
@@ -72,14 +88,14 @@ export async function runUsageSessionRollupsMigration(options: {
 		const mismatch = await schemaMismatch(options, replicas);
 		if (mismatch === null) break;
 		if (attempt >= attempts) throw new Error(mismatch);
-		if (applied.length === 0 && attempt === Math.ceil(attempts / 2))
+		if (pending.length > 0 && attempt === Math.ceil(attempts / 2))
 			await apply();
 		await new Promise((resolveWait) => setTimeout(resolveWait, delayMs));
 	}
-	if (applied.length === 0)
+	for (const migration of pending)
 		await appendJournalEntryWithReconciliation(options.journalStore, {
-			name: USAGE_SESSION_ROLLUPS_MIGRATION,
-			checksum,
+			name: migration.name,
+			checksum: checksumSQL(migration.sql),
 			appliedAt: new Date().toISOString().replace("Z", ""),
 		});
 }
@@ -140,7 +156,7 @@ async function schemaMismatch(
 				found?.name !== column.name ||
 				found.type !== column.type ||
 				found.comment !== column.comment ||
-				found.default_kind !== ""
+				found.default_kind !== (column.default === undefined ? "" : "DEFAULT")
 			);
 		});
 		const engine = table?.engine_full.split(" PRIMARY KEY ", 1)[0] ?? "";
@@ -185,13 +201,14 @@ async function main(): Promise<void> {
 		await runUsageSessionRollupsMigration({
 			executor,
 			journalStore: createJournalStore(executor),
-			migrationSql: await readFile(
-				resolve(
-					import.meta.dir,
-					"../chx/migrations",
-					USAGE_SESSION_ROLLUPS_MIGRATION,
-				),
-				"utf8",
+			migrations: await Promise.all(
+				USAGE_SESSION_ROLLUPS_MIGRATIONS.map(async (name) => ({
+					name,
+					sql: await readFile(
+						resolve(import.meta.dir, "../chx/migrations", name),
+						"utf8",
+					),
+				})),
 			),
 			targetDatabase: "rudel",
 			expectedEngine: isLocalClickHouseEndpoint(url)
@@ -199,7 +216,9 @@ async function main(): Promise<void> {
 				: "SharedReplacingMergeTree",
 			expectedStoragePolicy: "s3",
 		});
-		console.log(`Applied/validated: ${USAGE_SESSION_ROLLUPS_MIGRATION}`);
+		console.log(
+			`Applied/validated: ${USAGE_SESSION_ROLLUPS_MIGRATIONS.join(", ")}`,
+		);
 	} finally {
 		await executor.close();
 	}

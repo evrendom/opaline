@@ -10,7 +10,10 @@ import { getUsageAnalyticsQueryContext } from "./usage-event-analytics.service.j
 export async function listRepositories(orgId: string) {
 	const usage = await getUsageAnalyticsQueryContext(orgId);
 	const rows = await queryClickhouse<RepositoryAggregateRow>({
-		clickhouse_settings: REPOSITORY_QUERY_SETTINGS,
+		clickhouse_settings: {
+			...REPOSITORY_QUERY_SETTINGS,
+			...usage.clickhouseSettings,
+		},
 		query: `WITH ${usage.cteDefinitions}
    SELECT sa.git_remote, sa.package_name, sa.project_path, sa.user_id,
     count() AS session_count, sum(sa.total_tokens) AS total_tokens,

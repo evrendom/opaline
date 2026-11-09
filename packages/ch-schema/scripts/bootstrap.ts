@@ -101,6 +101,10 @@ const FORWARD_SCRIPTS = new Map([
 		"20261108150000_usage_session_rollups.sql",
 		"migrate-usage-session-rollups.ts",
 	],
+	[
+		"20261109120000_usage_session_rollup_costs.sql",
+		"migrate-usage-session-rollups.ts",
+	],
 ]);
 
 interface BootstrapMigration {

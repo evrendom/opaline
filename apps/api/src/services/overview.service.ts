@@ -93,6 +93,7 @@ export async function getUsersDailyTrend(
 	});
 
 	return queryClickhouse<UserDailyTrendData>({
+		clickhouse_settings: usage.clickhouseSettings,
 		query: `
 	WITH ${usage.cteDefinitions}
     SELECT

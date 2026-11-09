@@ -30,6 +30,7 @@ import {
 	getAllOrganizationsUsageAnalyticsQueryContext,
 	getUsageAnalyticsQueryContext,
 	resolveCanonicalPricingModel,
+	USAGE_ANALYTICS_CLICKHOUSE_SETTINGS,
 } from "./usage-event-analytics.service.js";
 
 export { buildDurationPeriods } from "./dashboard-duration-periods.js";
@@ -555,6 +556,7 @@ async function querySessionMetricRows(
 			skillsUsed: input.skillsUsed,
 		},
 		clickhouse_settings: {
+			...usage.clickhouseSettings,
 			max_execution_time: 20,
 			max_rows_to_read: "100000000",
 			max_bytes_to_read: "10000000000",
@@ -676,6 +678,7 @@ async function queryAgentRunDurationStats(
 			skillsUsed: input.skillsUsed,
 		},
 		clickhouse_settings: {
+			...USAGE_ANALYTICS_CLICKHOUSE_SETTINGS,
 			max_execution_time: 20,
 			max_rows_to_read: "100000000",
 			max_bytes_to_read: "10000000000",

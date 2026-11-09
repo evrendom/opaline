@@ -10,7 +10,10 @@ import {
 } from "../clickhouse.js";
 import { ClickHouseWriteFencedError } from "../lib/clickhouse-write-fence.js";
 import { isUsageRollupWriteEnabled } from "../lib/env.js";
-import { buildUsageEventCandidateCtes } from "./usage-event-analytics.service.js";
+import {
+	buildPricedUsageGroupsCtes,
+	buildUsageEventCandidateCtes,
+} from "./usage-event-analytics.service.js";
 
 export interface UsageRollupSessionKey {
 	readonly organizationId: string;
@@ -69,6 +72,8 @@ const GROUP_FIELDS = [
 	["cache_write_5m_input_tokens", "group_cache_write_5m_input_tokens"],
 	["cache_write_1h_input_tokens", "group_cache_write_1h_input_tokens"],
 	["output_tokens", "group_output_tokens"],
+	["estimated_costs", "group_estimated_cost"],
+	["pricing_models", "pricing_model"],
 ] as const;
 
 const COLUMN_NAMES = USAGE_SESSION_ROLLUP_COLUMNS.map((column) => column.name);
@@ -83,6 +88,7 @@ function buildInsertSqlTemplate(): string {
 		WITH
 		${ROLLUP_KEYS_CTE},
 		${buildUsageEventCandidateCtes(ROLLUP_KEYS_FILTER)},
+		${buildPricedUsageGroupsCtes("usage_event_pricing_candidates")},
 		usage_rollup_groups AS (
 			SELECT
 				organization_id,
@@ -92,7 +98,7 @@ function buildInsertSqlTemplate(): string {
 				any(latest_main_model) AS latest_main_model,
 				any(latest_event_model) AS latest_event_model,
 				arraySort(groupArray(tuple(${groupTuple}))) AS groups
-			FROM usage_event_pricing_candidates
+			FROM priced_usage_groups
 			GROUP BY organization_id, user_id, source, session_id
 		)
 		SELECT
