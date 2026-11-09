@@ -1,6 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import { sqlClient } from "../../db.js";
 import { orgMiddleware, os } from "../../middleware.js";
+import { selfHostedRead } from "../../selfhost/read-cache.js";
 import { isLiveSessionsReadable } from "../../services/live-session/live-session-config.js";
 import { LiveSessionStorageError } from "../../services/live-session/live-session-gate.js";
 import { getLiveSessionR2Client } from "../../services/live-session/live-session-r2.js";
@@ -326,24 +327,26 @@ const agentRuns = os.analytics.sessions.agentRuns
 
 const list = os.analytics.sessions.list
 	.use(orgMiddleware)
-	.handler(async ({ input, context }) => {
-		return getSessionAnalytics(context.organizationId, {
-			filters: input.filters,
-			skill_name: input.skillName,
-			days: input.days,
-			start_date: input.startDate,
-			end_date: input.endDate,
-			user_id: input.userId,
-			project_path: input.projectPath,
-			repository: input.repository,
-			repo_key: input.repoKey,
-			source: input.source,
-			limit: input.limit,
-			offset: input.offset,
-			sort_by: sortByMap[input.sortBy] ?? "date",
-			sort_order: input.sortOrder,
-		});
-	});
+	.handler(async ({ input, context }) =>
+		selfHostedRead("sessions.list", [context.organizationId, input], () =>
+			getSessionAnalytics(context.organizationId, {
+				filters: input.filters,
+				skill_name: input.skillName,
+				days: input.days,
+				start_date: input.startDate,
+				end_date: input.endDate,
+				user_id: input.userId,
+				project_path: input.projectPath,
+				repository: input.repository,
+				repo_key: input.repoKey,
+				source: input.source,
+				limit: input.limit,
+				offset: input.offset,
+				sort_by: sortByMap[input.sortBy] ?? "date",
+				sort_order: input.sortOrder,
+			}),
+		),
+	);
 
 const lastUpload = os.analytics.sessions.lastUpload
 	.use(orgMiddleware)
@@ -352,11 +355,16 @@ const lastUpload = os.analytics.sessions.lastUpload
 const filterCatalog = os.analytics.sessions.filterCatalog
 	.use(orgMiddleware)
 	.handler(({ input, context }) =>
-		getSessionFilterCatalog(context.organizationId, {
-			days: input.days,
-			start_date: input.startDate,
-			end_date: input.endDate,
-		}),
+		selfHostedRead(
+			"sessions.filterCatalog",
+			[context.organizationId, input],
+			() =>
+				getSessionFilterCatalog(context.organizationId, {
+					days: input.days,
+					start_date: input.startDate,
+					end_date: input.endDate,
+				}),
+		),
 	);
 
 const summaryComparison = os.analytics.sessions.summaryComparison
