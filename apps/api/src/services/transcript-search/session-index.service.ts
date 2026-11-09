@@ -317,8 +317,6 @@ export async function indexSessionText(
 			const { chunks, hits } = chunkRecords(records);
 			hitCount += hits.length;
 
-			// The months each chunk appeared in: a chunk is stored once per member
-			// and month, so a search window reads only its months' chunks.
 			const months = new Map<string, Set<string>>();
 			for (const hit of hits)
 				months.set(
@@ -382,8 +380,6 @@ export async function indexSessionText(
 					: vector
 						? (looked?.vector_model ?? "")
 						: "";
-				// A month needs a row when it has none, or has one without a vector
-				// that this pass can give it.
 				return [...(months.get(hash) ?? [])]
 					.filter((month) =>
 						vector

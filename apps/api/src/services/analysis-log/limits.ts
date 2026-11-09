@@ -16,6 +16,5 @@ export const MAX_QUERY_ARGS_BYTES = 32 * 1024;
  * Mirrored in convex/retention.ts.
  */
 export const DRAFT_RETENTION_MS = 7 * 86_400_000;
-/** Query results expire after this; shared or pinned analyses keep them longer (ADR 0001). */
 export const RESULT_RETENTION_MS = 90 * 86_400_000;
 export const SHARED_RESULT_RETENTION_MS = 365 * 86_400_000;
