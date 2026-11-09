@@ -110,6 +110,10 @@ export const FORWARD_SCRIPTS = new Map([
 		"20261108150000_usage_session_rollups.sql",
 		"migrate-usage-session-rollups.ts",
 	],
+	[
+		"20261109200000_transcript_record_commands.sql",
+		"migrate-transcript-record-commands.ts",
+	],
 ]);
 
 interface BootstrapMigration {
