@@ -408,7 +408,9 @@ function foundNothingSql(): string {
 				maxIf(match(substringUTF8(head, 1, ${FACT_TEXT_CHARS}), '${SILENCED_COMMAND.replaceAll("\\", "\\\\")}'), kind = 'tool_call') AS silenced`;
 }
 
-export const FORK_REPLAY_FILTER = `facts['fork_replayed'] != 'true' AND (session_id, agent_id, call_id) NOT IN (SELECT session_id, agent_id, call_id FROM replayed_calls)`;
+const REPLAYED_CALLS = "opaline_replayed_calls";
+
+export const FORK_REPLAY_FILTER = `facts['fork_replayed'] != 'true' AND (session_id, agent_id, call_id) NOT IN ${REPLAYED_CALLS}`;
 
 /**
  * The calls a forked Codex stream replays from its parent (`replayed_calls`):
@@ -429,7 +431,8 @@ export function forkReplayCtes(
 		replayed_calls AS (
 			SELECT f.user_id AS user_id, f.session_id AS session_id, f.agent_id AS agent_id, p.call_id AS call_id
 			FROM fork_links f INNER JOIN parent_calls p ON f.user_id = p.user_id AND f.parent_session_id = p.session_id
-		)`;
+		),
+		(SELECT groupUniqArray((session_id, agent_id, call_id)) FROM replayed_calls) AS ${REPLAYED_CALLS}`;
 }
 
 export function forkReplayOnceCtes(children: string, owner?: string): string {
@@ -1036,6 +1039,21 @@ export const REQUEST_TEXT_HEAD_CHARS = 160;
 /** Records a model writes in a response; any other non-meta record is input to the next one. */
 const RESPONSE_RECORD_KINDS = "('assistant_text', 'reasoning', 'tool_call')";
 
+const PLACED_USAGE = "opaline_placed_usage";
+const PLACED_USAGE_COLUMNS = [
+	"session_id",
+	"stream",
+	"line",
+	"verified",
+	"estimated_cost",
+	"resolved_model",
+	"raw_model",
+	"first_observed_line",
+	"event_version",
+	"event_id",
+	...TOKEN_KINDS,
+] as const;
+
 /**
  * The requests of each run (docs/l1-literal-schema.md, "Scale"): one model
  * response and the calls it made. A request starts at a response record
@@ -1070,14 +1088,16 @@ function runRequestsCtes(): string {
 				WHERE ${pinnedFilter()} AND kind != 'meta' AND ${FORK_REPLAY_FILTER}
 				GROUP BY session_id, agent_id, record_idx
 			),
+			(SELECT groupArray((${PLACED_USAGE_COLUMNS.join(", ")}))
+				FROM (
+					SELECT e.*, if(e.source = 'claude_code' AND l.response = 1, l.record_idx, e.first_observed_line) AS line
+					FROM resolved_usage e
+					ASOF LEFT JOIN response_lines l
+						ON e.session_id = l.session_id AND e.stream = l.agent_id AND e.first_observed_line <= l.record_idx
+				)) AS ${PLACED_USAGE},
 			placed_usage AS (
-				SELECT e.*, if(e.source = 'claude_code' AND l.response = 1, l.record_idx, e.first_observed_line) AS line
-				FROM resolved_usage e
-				ASOF LEFT JOIN response_lines l
-					ON e.session_id = l.session_id AND e.stream = l.agent_id AND e.first_observed_line <= l.record_idx
-			),
-			event_lines AS (
-				SELECT DISTINCT session_id, stream AS agent_id, line FROM placed_usage
+				SELECT ${PLACED_USAGE_COLUMNS.map((column, index) => `u.${index + 1} AS ${column}`).join(", ")}
+				FROM (SELECT arrayJoin(${PLACED_USAGE}) AS u)
 			),
 			call_outcomes AS (
 				SELECT session_id, agent_id, call_id, max(${runToolErrorSql()}) AS failed
@@ -1099,8 +1119,8 @@ function runRequestsCtes(): string {
 			request_candidates AS (
 				SELECT *, toUInt8(response = 1 AND ifNull(previous_class, 0) = 0) AS candidate,
 					sum(candidate) OVER (${run} ${order} ROWS UNBOUNDED PRECEDING) AS candidate_number,
-					toUInt8((session_id, agent_id, record_idx) IN (SELECT session_id, agent_id, line FROM event_lines)) AS event_line,
-					toUInt8((session_id, agent_id) IN (SELECT session_id, agent_id FROM event_lines)) AS stream_has_usage
+					toUInt8((session_id, agent_id, record_idx) IN arrayMap(p -> (p.1, p.2, p.3), ${PLACED_USAGE})) AS event_line,
+					toUInt8((session_id, agent_id) IN arrayMap(p -> (p.1, p.2), ${PLACED_USAGE})) AS stream_has_usage
 				FROM request_work
 			),
 			request_marks AS (

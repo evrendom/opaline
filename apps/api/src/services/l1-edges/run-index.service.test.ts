@@ -1406,6 +1406,24 @@ describe("run index statements", () => {
 		});
 	});
 
+	test("a build reads the pinned generation by its key and resolves shared sets once", () => {
+		const requests = buildRunRequestsStatement(scope, generation).query;
+		for (const query of [
+			requests,
+			buildRunIndexStatement(scope, generation).query,
+			buildUnattributedUsageStatement(scope, generation).query,
+		]) {
+			expect(query).toContain(
+				"(session_id, revision, parser_version) IN arrayZip({sessionIds:Array(String)}",
+			);
+			expect(query).not.toContain("arrayJoin(arrayZip(");
+			expect(query.match(/FROM replayed_calls\)/gu)).toHaveLength(1);
+		}
+		expect(requests.match(/AS opaline_placed_usage/gu)).toHaveLength(1);
+		expect(requests.match(/FROM resolved_usage e/gu)).toHaveLength(1);
+		expect(requests).not.toContain("event_lines");
+	});
+
 	test("unattributed usage is every event no run claims, verified or not", () => {
 		const statement = buildUnattributedUsageStatement(scope, generation);
 		expect(statement.query).toContain("FROM unassigned_usage e");
