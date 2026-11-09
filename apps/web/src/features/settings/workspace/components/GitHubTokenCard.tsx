@@ -27,7 +27,7 @@ export function GitHubTokenCard({
 				: null;
 	return (
 		<WorkspaceSettingsGroup
-			title="GitHub"
+			title="Connection"
 			description="This server reads pull requests and CI runs with a GitHub token: GITHUB_TOKEN or GH_TOKEN in its environment, otherwise the GitHub CLI's login where it runs. It only reads, and the token never leaves the server."
 		>
 			<WorkspaceSettingsRow
