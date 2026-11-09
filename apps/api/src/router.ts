@@ -140,6 +140,7 @@ import { getGitHubRepositoryConnectionStatus } from "./services/github-repositor
 import { disconnectGitHubRepositoryInstallation } from "./services/github-repository-disconnect.service.js";
 import { resolveGitHubRepositoryEvidenceStatus } from "./services/github-repository-evidence-status.service.js";
 import {
+	awaitsDurableLanguageSignals,
 	shouldAwaitBestEffortLanguageSignals,
 	shouldPersistUsageExtractionFailureReceipt,
 	shouldStartBestEffortLanguageSignals,
@@ -2222,10 +2223,11 @@ const r2IngestCommit = os.ingest.commit
 				process: (sessionInput, identity, processingSignal) =>
 					processIngestSession({
 						allowQuiescedIngest: context.ingestOperatorAuthorized,
-						awaitBestEffortLanguageSignals: isVercelRuntime(),
-						// Signals are derived and durably repairable. Vercel awaits their
-						// best-effort scan after the required facts; Fly leaves them to its
-						// resident reconciler. Scanner failure never fails this upload.
+						awaitBestEffortLanguageSignals: awaitsDurableLanguageSignals(),
+						// Signals are derived and durably repairable. Vercel and self-hosted
+						// servers await their best-effort scan after the required facts; Fly
+						// leaves them to its resident reconciler. Scanner failure never
+						// fails this upload.
 						awaitLanguageSignals: false,
 						context: {
 							apiKeyId: context.apiKeyId,
