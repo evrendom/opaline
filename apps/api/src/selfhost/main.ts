@@ -114,6 +114,9 @@ async function main(): Promise<void> {
 			import("../services/session-language-signal-scanner.service.js").then(
 				(module) => module.shutdownSessionLanguageSignalScanner(),
 			),
+			import("../services/session-detail-derivation-thread.js").then((module) =>
+				module.shutdownSessionDetailDerivationThread(),
+			),
 		]);
 		if (settled === timedOut)
 			status("jobs still running after 10s; stopping anyway");

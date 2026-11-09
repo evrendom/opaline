@@ -7,6 +7,7 @@ import type {
 } from "@rudel/api-routes";
 import { isLiveSessionDetailRevision } from "@rudel/api-routes";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
+import { isSelfHosted } from "../lib/self-hosted.js";
 import { isLiveSessionsReadable } from "./live-session/live-session-config.js";
 import {
 	readLiveSessionDetailRevision,
@@ -41,6 +42,7 @@ import {
 	SESSION_DETAIL_DERIVATION_MAX_CONCURRENCY,
 } from "./session-detail-derivation-limits.js";
 import { createSessionDetailDerivationSemaphore } from "./session-detail-derivation-semaphore.js";
+import { deriveSessionDetailOffThread } from "./session-detail-derivation-thread.js";
 import { buildSessionDetailInitial } from "./session-detail-initial.js";
 import { createSessionDetailInstrumentation } from "./session-detail-instrumentation.js";
 import {
@@ -247,7 +249,9 @@ async function loadDerivation(
 					);
 				}
 				const derivationStartedAt = performance.now();
-				const value = deriveSessionDetail(snapshot);
+				const value = isSelfHosted()
+					? await deriveSessionDetailOffThread(snapshot)
+					: deriveSessionDetail(snapshot);
 				const derivationDurationMs = Math.round(
 					performance.now() - derivationStartedAt,
 				);
