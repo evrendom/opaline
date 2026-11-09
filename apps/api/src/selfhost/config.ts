@@ -36,6 +36,12 @@ export class SelfHostConfigError extends Error {
 }
 
 const DEFAULT_PORT = 4100;
+export const SELF_HOSTED_READ_PATHS = {
+	USAGE_EVENT_ANALYTICS_CUTOVER_MODE: "all",
+	USAGE_ROLLUP_ORG_IDS: "all",
+	USAGE_ROLLUP_BACKFILL_ENABLED: "1",
+	SKILL_ANALYTICS_CUTOVER_MODE: "all",
+} as const;
 const LOOPBACK = new Set(["127.0.0.1", "localhost", "::1"]);
 
 export function readSelfHostConfig(env: Environment): {
@@ -153,6 +159,12 @@ export function readSelfHostConfig(env: Environment): {
 			ALLOWED_ORIGIN: allowedOrigin,
 			CRON_SECRET: cronSecret,
 			NODE_ENV: env.NODE_ENV?.trim() || "production",
+			...Object.fromEntries(
+				Object.entries(SELF_HOSTED_READ_PATHS).map(([name, value]) => [
+					name,
+					env[name]?.trim() || value,
+				]),
+			),
 		},
 	};
 }
