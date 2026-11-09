@@ -16,12 +16,20 @@ const MIN_DUE_DELAY_MS = 1_000;
 
 const logger = getLogger(["rudel", "api", "selfhost", "scheduler"]);
 
+export interface JobRest {
+	readonly quiet: (body: unknown) => boolean;
+	readonly maxMs: number;
+}
+
 export interface SchedulerJob {
 	readonly name: string;
 	readonly everyMs: number;
 	readonly firstAfterMs: number;
 	readonly handler: () => Promise<CronHandler>;
+	readonly rest?: JobRest;
 }
+
+export type PendingWork = (job: string, sinceMs: number) => Promise<boolean>;
 
 export type JobLock = <T>(
 	name: string,
@@ -45,6 +53,111 @@ export interface Scheduler {
 
 function hasAll(env: Environment, names: readonly string[]): boolean {
 	return names.every((name) => Boolean(env[name]?.trim()));
+}
+
+function numberAt(body: unknown, path: readonly string[]): number {
+	let value: unknown = body;
+	for (const key of path)
+		value =
+			typeof value === "object" && value !== null
+				? Reflect.get(value, key)
+				: undefined;
+	return typeof value === "number" ? value : 0;
+}
+
+function trueAt(body: unknown, path: readonly string[]): boolean {
+	let value: unknown = body;
+	for (const key of path)
+		value =
+			typeof value === "object" && value !== null
+				? Reflect.get(value, key)
+				: undefined;
+	return value === true;
+}
+
+const nothingAt =
+	(
+		counts: readonly (readonly string[])[],
+		more: readonly (readonly string[])[],
+	) =>
+	(body: unknown) =>
+		counts.every((path) => numberAt(body, path) === 0) &&
+		!more.some((path) => trueAt(body, path));
+
+export const JOB_RESTS = {
+	"l1-edges": {
+		maxMs: HOUR,
+		quiet: nothingAt(
+			[
+				["l1Edges", "built"],
+				["contextSnapshots", "written"],
+				["usageRollups", "written"],
+			],
+			[],
+		),
+	},
+	"run-index-heal": {
+		maxMs: HOUR,
+		quiet: nothingAt(
+			[
+				["runIndexHeal", "queued"],
+				["runIndexHeal", "remaining"],
+				["runIndexHeal", "reparsed"],
+				["runIndexHeal", "retiredGenerations"],
+				["runIndexHeal", "queue", "pending"],
+			],
+			[],
+		),
+	},
+	"github-evidence": {
+		maxMs: 30 * MINUTE,
+		quiet: nothingAt(
+			[
+				["githubEvidence", "attempted"],
+				["githubSweep", "requests"],
+			],
+			[
+				["githubEvidence", "hasMore"],
+				["githubSweep", "hasMore"],
+			],
+		),
+	},
+	"r2-ingest": {
+		maxMs: 10 * MINUTE,
+		quiet: nothingAt(
+			[
+				["attempted"],
+				["completed"],
+				["repositoryEvidenceIndex", "result", "attempted"],
+				["findingVisibility", "result", "attempted"],
+			],
+			[
+				["hasMore"],
+				["repositoryEvidenceIndex", "result", "hasMore"],
+				["findingVisibility", "result", "hasMore"],
+			],
+		),
+	},
+} as const satisfies Record<string, JobRest>;
+
+function restOf(name: string): JobRest | undefined {
+	return Reflect.get(JOB_RESTS, name) as JobRest | undefined;
+}
+
+const PENDING_CLOCK_MARGIN_MS = 10_000;
+
+export function postgresPendingWork(sql: postgres.Sql): PendingWork {
+	return async (_job, sinceMs) => {
+		const since = new Date(sinceMs - PENDING_CLOCK_MARGIN_MS);
+		const [row] = await sql<{ pending: boolean }[]>`
+			SELECT EXISTS (
+				SELECT 1 FROM l1_edge_scope
+				WHERE updated_at > ${since}
+					OR (request_count > built_request_count AND next_attempt_at <= now()
+						AND (lease_expires_at IS NULL OR lease_expires_at <= now()))
+			) AS pending`;
+		return row?.pending === true;
+	};
 }
 
 export function selfHostedJobs(env: Environment = process.env): SchedulerJob[] {
@@ -165,7 +278,12 @@ export function selfHostedJobs(env: Environment = process.env): SchedulerJob[] {
 					.handleObjectStoreSweepRequest,
 		},
 	];
-	return jobs.filter((job) => job.when).map(({ when: _when, ...job }) => job);
+	return jobs
+		.filter((job) => job.when)
+		.map(({ when: _when, ...job }) => {
+			const rest = restOf(job.name);
+			return rest ? { ...job, rest } : job;
+		});
 }
 
 export function leaseJobLock(
@@ -241,14 +359,43 @@ export function startScheduler(options: {
 	readonly cronSecret: string;
 	readonly onOutcome?: (outcome: JobOutcome) => void;
 	readonly now?: () => number;
+	readonly pending?: PendingWork;
 }): Scheduler {
 	const now = options.now ?? Date.now;
 	let stopped = false;
 	const timers = new Map<string, ReturnType<typeof setTimeout>>();
 	const running = new Map<string, Promise<void>>();
 	const rerun = new Set<string>();
+	const forced = new Set<string>();
+	const resting = new Set<string>();
+	const lastRunAt = new Map<string, number>();
 	const byName = new Map(options.jobs.map((job) => [job.name, job]));
 	const report = options.onOutcome ?? logOutcome;
+
+	const shouldRest = async (job: SchedulerJob): Promise<boolean> => {
+		const pending = options.pending;
+		if (forced.delete(job.name) || !job.rest || !pending) return false;
+		if (!resting.has(job.name)) return false;
+		const since = lastRunAt.get(job.name) ?? 0;
+		if (now() - since >= job.rest.maxMs) return false;
+		return !(await pending(job.name, since).catch(() => true));
+	};
+
+	const runOrRest = async (job: SchedulerJob): Promise<number> => {
+		if (await shouldRest(job)) return job.everyMs;
+		lastRunAt.set(job.name, now());
+		const outcome = await runJobOnce(
+			job,
+			options.lock,
+			options.cronSecret,
+			now,
+		);
+		if (outcome.status === "ok" && job.rest?.quiet(outcome.body))
+			resting.add(job.name);
+		else if (outcome.status !== "busy") resting.delete(job.name);
+		report(outcome);
+		return delayUntilDue(outcome, job.everyMs, now());
+	};
 
 	const schedule = (job: SchedulerJob, delayMs: number) => {
 		if (stopped) return;
@@ -257,10 +404,9 @@ export function startScheduler(options: {
 			setTimeout(() => {
 				timers.delete(job.name);
 				let nextDelayMs = job.everyMs;
-				const run = runJobOnce(job, options.lock, options.cronSecret, now)
-					.then((outcome) => {
-						nextDelayMs = delayUntilDue(outcome, job.everyMs, now());
-						report(outcome);
+				const run = runOrRest(job)
+					.then((delay) => {
+						nextDelayMs = delay;
 					})
 					.finally(() => {
 						running.delete(job.name);
@@ -278,6 +424,7 @@ export function startScheduler(options: {
 		runNow(name) {
 			const job = byName.get(name);
 			if (stopped || !job) return;
+			forced.add(name);
 			if (running.has(name)) {
 				rerun.add(name);
 				return;

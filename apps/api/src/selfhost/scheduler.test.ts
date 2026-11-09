@@ -2,9 +2,11 @@ import { expect, test } from "bun:test";
 import type postgres from "postgres";
 import {
 	delayUntilDue,
+	JOB_RESTS,
 	type JobLock,
 	type JobOutcome,
 	leaseJobLock,
+	postgresPendingWork,
 	runJobOnce,
 	type SchedulerJob,
 	selfHostedJobs,
@@ -303,4 +305,220 @@ test("the lease skips a job another process holds and releases it after the run"
 		}),
 	).rejects.toThrow("boom");
 	expect(statements.at(-1)?.sql).toContain("DELETE FROM coordination_lease");
+});
+
+test("a quiet job rests until Postgres has work for it, runNow wakes it, or its longest rest is over", async () => {
+	let runs = 0;
+	let pending = false;
+	const asked: number[] = [];
+	const started = Date.now();
+	const scheduler = startScheduler({
+		jobs: [
+			{
+				name: "l1-edges",
+				everyMs: 5,
+				firstAfterMs: 0,
+				rest: {
+					maxMs: 300,
+					quiet: (body) => Reflect.get(Object(body), "built") === 0,
+				},
+				handler: async () => async () => {
+					runs++;
+					return Response.json({ built: 0 });
+				},
+			},
+		],
+		lock: unlocked,
+		cronSecret: "0123456789abcdef",
+		onOutcome: () => {},
+		pending: async (_job, since) => {
+			asked.push(since);
+			return pending;
+		},
+	});
+	await Bun.sleep(80);
+	expect(runs).toBe(1);
+	expect(asked.length).toBeGreaterThan(3);
+	expect(asked[0]).toBeGreaterThanOrEqual(started);
+	pending = true;
+	await Bun.sleep(30);
+	pending = false;
+	const afterPending = runs;
+	expect(afterPending).toBeGreaterThan(1);
+	await Bun.sleep(60);
+	expect(runs).toBe(afterPending);
+	scheduler.runNow("l1-edges");
+	await Bun.sleep(20);
+	expect(runs).toBe(afterPending + 1);
+	await Bun.sleep(450);
+	expect(runs).toBe(afterPending + 2);
+	await scheduler.stop();
+});
+
+test("a job that found work, failed, or whose Postgres check fails keeps its period", async () => {
+	const runs = { busy: 0, failing: 0, unsure: 0 };
+	const scheduler = startScheduler({
+		jobs: [
+			{
+				name: "busy",
+				everyMs: 5,
+				firstAfterMs: 0,
+				rest: JOB_RESTS["l1-edges"],
+				handler: async () => async () => {
+					runs.busy++;
+					return Response.json({ l1Edges: { enabled: true, built: 2 } });
+				},
+			},
+			{
+				name: "failing",
+				everyMs: 5,
+				firstAfterMs: 0,
+				rest: JOB_RESTS["l1-edges"],
+				handler: async () => async () => {
+					runs.failing++;
+					return Response.json({ error: "no" }, { status: 500 });
+				},
+			},
+			{
+				name: "unsure",
+				everyMs: 5,
+				firstAfterMs: 0,
+				rest: JOB_RESTS["l1-edges"],
+				handler: async () => async () => {
+					runs.unsure++;
+					return Response.json({ l1Edges: { enabled: true, built: 0 } });
+				},
+			},
+		],
+		lock: unlocked,
+		cronSecret: "0123456789abcdef",
+		onOutcome: () => {},
+		pending: async (job) => {
+			if (job === "unsure") throw new Error("Postgres is down");
+			return false;
+		},
+	});
+	await Bun.sleep(80);
+	await scheduler.stop();
+	expect(runs.busy).toBeGreaterThan(3);
+	expect(runs.failing).toBeGreaterThan(3);
+	expect(runs.unsure).toBeGreaterThan(3);
+});
+
+test("the jobs that poll rest when their last run found nothing, the rare ones never do", () => {
+	const jobs = Object.fromEntries(
+		selfHostedJobs({
+			APP_URL: "http://localhost:4100",
+			BETTER_AUTH_SECRET: "0123456789abcdef0123456789abcdef",
+			OPALINE_DATA_DIR: "/tmp/opaline-data",
+		}).map((job) => [job.name, job.rest?.maxMs ?? null]),
+	);
+	expect(jobs).toEqual({
+		"l1-edges": 3_600_000,
+		"run-index-heal": 3_600_000,
+		"session-retirement": null,
+		repair: null,
+		"native-lineage": null,
+		"analysis-log-retention": null,
+		"github-evidence": 1_800_000,
+		"live-sessions": null,
+		"r2-ingest": 600_000,
+		"object-store-sweep": null,
+	});
+	const quiet = (name: keyof typeof JOB_RESTS, body: unknown) =>
+		JOB_RESTS[name].quiet(body);
+	expect(
+		quiet("l1-edges", {
+			l1Edges: { enabled: true, built: 0 },
+			contextSnapshots: { candidates: 2, written: 0 },
+			ok: true,
+			usageRollups: { enabled: false },
+		}),
+	).toBe(true);
+	expect(
+		quiet("l1-edges", {
+			l1Edges: { enabled: true, built: 0 },
+			contextSnapshots: { candidates: 4, written: 1 },
+		}),
+	).toBe(false);
+	expect(
+		quiet("l1-edges", {
+			l1Edges: { enabled: true, built: 0 },
+			contextSnapshots: { candidates: 0, written: 0 },
+			usageRollups: { enabled: true, candidates: 3, written: 3 },
+		}),
+	).toBe(false);
+	expect(quiet("l1-edges", { ok: true, skipped: "idle" })).toBe(true);
+	expect(
+		quiet("run-index-heal", {
+			ok: true,
+			runIndexHeal: {
+				status: "ran",
+				queue: { pending: 0, recentFailures: 0 },
+				remaining: 0,
+				queued: 0,
+				reparsed: 0,
+				retiredGenerations: 0,
+			},
+		}),
+	).toBe(true);
+	expect(
+		quiet("run-index-heal", {
+			runIndexHeal: { queue: { pending: 3 }, queued: 0 },
+		}),
+	).toBe(false);
+	expect(
+		quiet("github-evidence", {
+			githubEvidence: { enabled: true, attempted: 0, hasMore: false },
+			githubSweep: { enabled: true, requests: 0, hasMore: false },
+			ok: true,
+		}),
+	).toBe(true);
+	expect(
+		quiet("github-evidence", {
+			githubEvidence: { attempted: 0, hasMore: false },
+			githubSweep: { requests: 12, hasMore: false },
+		}),
+	).toBe(false);
+	expect(
+		quiet("github-evidence", {
+			githubEvidence: { attempted: 0, hasMore: false },
+			githubSweep: { requests: 0, hasMore: true },
+		}),
+	).toBe(false);
+	expect(
+		quiet("r2-ingest", {
+			attempted: 0,
+			completed: 0,
+			hasMore: false,
+			repositoryEvidenceIndex: {
+				result: { attempted: 0, published: 0, hasMore: false },
+				status: "ok",
+			},
+			findingVisibility: {
+				result: { attempted: 0, synced: 0, hasMore: false },
+				status: "ok",
+			},
+		}),
+	).toBe(true);
+	expect(
+		quiet("r2-ingest", {
+			attempted: 0,
+			repositoryEvidenceIndex: { result: { attempted: 1 } },
+		}),
+	).toBe(false);
+});
+
+test("pending work is a changed or due run index scope, read with a margin for clock skew", async () => {
+	const seen: unknown[][] = [];
+	const sql = (async (strings: TemplateStringsArray, ...values: unknown[]) => {
+		seen.push([strings.join("?"), ...values]);
+		return [{ pending: true }];
+	}) as unknown as postgres.Sql;
+	const since = Date.parse("2026-11-09T22:00:00.000Z");
+	expect(await postgresPendingWork(sql)("l1-edges", since)).toBe(true);
+	expect(String(seen[0]?.[0])).toContain("FROM l1_edge_scope");
+	expect(String(seen[0]?.[0])).toContain("updated_at > ?");
+	expect(String(seen[0]?.[0])).toContain("next_attempt_at <= now()");
+	expect(seen[0]?.[1]).toEqual(new Date("2026-11-09T21:59:50.000Z"));
 });
