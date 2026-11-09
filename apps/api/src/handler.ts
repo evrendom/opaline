@@ -71,6 +71,10 @@ import { readResendConfig } from "./resend-config.js";
 import { router } from "./router.js";
 import { consumeLoginToken } from "./selfhost/login-tokens.js";
 import { getIngestFilterQueueMetrics } from "./services/ingest-filter.service.js";
+import {
+	isIngestStillProcessingBody,
+	isIngestStillProcessingReply,
+} from "./services/r2-ingest-http-error.js";
 import { UNSUBSCRIBE_PATH as USAGE_DIGEST_UNSUBSCRIBE_PATH } from "./services/usage-digest/unsubscribe-token.js";
 import { getStripeWebhookConfig } from "./stripe-client.js";
 
@@ -205,6 +209,7 @@ const rpcHandler = new RPCHandler(router, {
 	],
 	interceptors: [
 		onError((error) => {
+			if (isIngestStillProcessingReply(error)) return;
 			const logError =
 				error instanceof Error && error.cause instanceof Error
 					? error.cause
@@ -724,11 +729,17 @@ async function handleRequest(
 	if (matched) {
 		if (response.status >= 500) {
 			const body = await response.clone().text();
-			logger.error("RPC error on {path}: {status} {body}", {
-				path: url.pathname,
-				status: response.status,
-				body,
-			});
+			if (isIngestStillProcessingBody(body))
+				logger.info(
+					"RPC {path}: {status}, the ingest job is still processing {body}",
+					{ path: url.pathname, status: response.status, body },
+				);
+			else
+				logger.error("RPC error on {path}: {status} {body}", {
+					path: url.pathname,
+					status: response.status,
+					body,
+				});
 		}
 		for (const [key, value] of Object.entries(cors)) {
 			response.headers.set(key, value);
