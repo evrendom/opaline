@@ -11,6 +11,7 @@ import {
 } from "chkit/dist/bin/lib.js";
 import { resolveClickHouseUsername } from "../src/clickhouse-connection.js";
 import { RETIRED_SESSION_ANALYTICS_COLUMNS } from "../src/session-analytics-mv.js";
+import { countReplicas } from "./cluster-replicas.js";
 import {
 	appendJournalEntryWithReconciliation,
 	type MigrationJournalStore,
@@ -19,8 +20,9 @@ import {
 /**
  * Retirement step 3 (docs/l1-literal-schema.md): both session analytics
  * views stop writing interpretations no one reads. `MODIFY QUERY` replaces
- * each view's query in place, so ingestion is never interrupted; the columns
- * keep their defaults until a later migration drops them.
+ * each view's query in place, so ingestion is never interrupted.
+ * `scripts/migrate-session-analytics-drop-retired.ts` later drops some of the
+ * columns, so every deploy checks the views on every replica.
  */
 export const SESSION_ANALYTICS_RETIREMENT_MIGRATION =
 	"20261008120000_session_analytics_retired_writes.sql";
@@ -45,6 +47,10 @@ export async function runSessionAnalyticsRetirementMigration(options: {
 	);
 	if (applied.some((entry) => entry.checksum !== checksum))
 		throw new Error("Session analytics retirement migration checksum mismatch");
+	const replicas = await countReplicas(
+		options.executor,
+		"the session analytics view queries",
+	);
 	const apply = async () => {
 		for (const statement of extractExecutableStatements(options.migrationSql))
 			await options.executor.execute(statement);
@@ -56,7 +62,11 @@ export async function runSessionAnalyticsRetirementMigration(options: {
 		// restart on 2026-10-20 reloaded both views with their pre-retirement
 		// queries. The statements are idempotent, so re-apply them rather than
 		// block every deploy on the read-back below.
-		const stale = await staleViews(options.executor, options.targetDatabase);
+		const stale = await staleViews(
+			options.executor,
+			options.targetDatabase,
+			replicas,
+		);
 		if (stale.length > 0) {
 			console.warn(
 				`${SESSION_ANALYTICS_RETIREMENT_MIGRATION}: views reverted since the migration was journaled; re-applying (${stale.join("; ")})`,
@@ -69,7 +79,11 @@ export async function runSessionAnalyticsRetirementMigration(options: {
 		delayMs: 10_000,
 	};
 	for (let attempt = 1; ; attempt++) {
-		const stale = await staleViews(options.executor, options.targetDatabase);
+		const stale = await staleViews(
+			options.executor,
+			options.targetDatabase,
+			replicas,
+		);
 		if (stale.length === 0) break;
 		if (attempt >= attempts)
 			throw new Error(
@@ -87,25 +101,43 @@ export async function runSessionAnalyticsRetirementMigration(options: {
 		});
 }
 
-/** Views that still name a retired column or lost `_dedupe_rank`, with why. */
-async function staleViews(
+/** Views that still name a retired column or lost `_dedupe_rank`, per replica, with why. */
+export async function staleViews(
 	executor: ClickHouseExecutor,
 	database: string,
+	replicas: number,
 ): Promise<string[]> {
-	const views = await executor.query<{ name: string; as_select: string }>(`
-		SELECT name, as_select FROM system.tables
+	const views = await executor.query<{
+		host: string;
+		name: string;
+		as_select: string;
+	}>(`
+		SELECT hostName() AS host, name, as_select
+		FROM ${replicas > 1 ? "clusterAllReplicas('default', system.tables)" : "system.tables"}
 		WHERE database = '${database}'
 			AND name IN (${VIEWS.map((view) => `'${view}'`).join(", ")})
-		LIMIT 4 SETTINGS max_execution_time = 10`);
-	return VIEWS.flatMap((view) => {
-		const query = views.find((row) => row.name === view)?.as_select;
-		const retired = RETIRED_SESSION_ANALYTICS_COLUMNS.filter((column) =>
-			new RegExp(`\\b${column}\\b`, "u").test(query ?? ""),
-		);
-		return !query?.includes("_dedupe_rank") || retired.length > 0
-			? [`${view}: ${retired.join(", ") || "missing view or dedupe"}`]
-			: [];
-	});
+		ORDER BY host, name LIMIT 4 BY host
+		SETTINGS max_execution_time = 10, skip_unavailable_shards = 0`);
+	const hosts = [...new Set(views.map((row) => row.host))];
+	if (hosts.length < replicas)
+		return [
+			`session analytics views visible on ${hosts.length} of ${replicas} replicas`,
+		];
+	return hosts.flatMap((host) =>
+		VIEWS.flatMap((view) => {
+			const query = views.find(
+				(row) => row.host === host && row.name === view,
+			)?.as_select;
+			const retired = RETIRED_SESSION_ANALYTICS_COLUMNS.filter((column) =>
+				new RegExp(`\\b${column}\\b`, "u").test(query ?? ""),
+			);
+			return !query?.includes("_dedupe_rank") || retired.length > 0
+				? [
+						`${view}${replicas > 1 ? ` on replica ${host}` : ""}: ${retired.join(", ") || "missing view or dedupe"}`,
+					]
+				: [];
+		}),
+	);
 }
 
 async function main(): Promise<void> {

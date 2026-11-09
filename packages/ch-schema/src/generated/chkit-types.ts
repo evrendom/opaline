@@ -1306,10 +1306,8 @@ export type RudelSessionAnalyticsRow = {
   normal_responses: number
   long_pauses: number
   error_count: number
-  error_pattern: string
   model_used: string
   has_commit: number
-  session_archetype: string
   success_score: number
   used_plan_mode: number
   inference_duration_sec: number
@@ -1351,10 +1349,8 @@ export const RudelSessionAnalyticsRowSchema = z.object({
   normal_responses: z.number(),
   long_pauses: z.number(),
   error_count: z.number(),
-  error_pattern: z.string(),
   model_used: z.string(),
   has_commit: z.number(),
-  session_archetype: z.string(),
   success_score: z.number(),
   used_plan_mode: z.number(),
   inference_duration_sec: z.number(),

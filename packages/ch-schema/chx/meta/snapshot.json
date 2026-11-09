@@ -1288,11 +1288,6 @@
 					"default": "fn:0"
 				},
 				{
-					"name": "error_pattern",
-					"type": "LowCardinality(String)",
-					"default": ""
-				},
-				{
 					"name": "model_used",
 					"type": "String",
 					"default": ""
@@ -1301,11 +1296,6 @@
 					"name": "has_commit",
 					"type": "UInt8",
 					"default": "fn:0"
-				},
-				{
-					"name": "session_archetype",
-					"type": "String",
-					"default": "standard"
 				},
 				{
 					"name": "success_score",

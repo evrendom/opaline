@@ -38,7 +38,8 @@ export const SESSION_ANALYTICS_INSERT_COLUMNS = [
 
 /**
  * Interpretations the views no longer write (docs/l1-literal-schema.md,
- * retirement step 3). The columns keep their defaults until they are dropped.
+ * retirement step 3). A view that names one again is stale, also after the
+ * column is dropped.
  */
 export const RETIRED_SESSION_ANALYTICS_COLUMNS = [
 	"avg_period_sec",
@@ -54,3 +55,9 @@ export const RETIRED_SESSION_ANALYTICS_COLUMNS = [
 	"inference_duration_sec",
 	"human_duration_sec",
 ] as const;
+
+/** Retired columns that `20261109150000_session_analytics_drop_retired.sql` drops. */
+export const DROPPED_SESSION_ANALYTICS_COLUMNS = [
+	"error_pattern",
+	"session_archetype",
+] as const satisfies readonly (typeof RETIRED_SESSION_ANALYTICS_COLUMNS)[number][];

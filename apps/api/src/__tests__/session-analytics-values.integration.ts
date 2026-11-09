@@ -10,8 +10,6 @@ import {
 import { getSessionAnalytics } from "../services/session-analytics.service.js";
 import { getSessionDetailRawSnapshot } from "../services/session-detail-snapshot.service.js";
 
-const RETIRED_ERROR_PATTERN_DEFAULT = "";
-
 /**
  * Value assertions for the session_analytics materialized views.
  *
@@ -247,7 +245,6 @@ interface AnalyticsRow {
 	inference_duration_sec: string | number;
 	human_duration_sec: string | number;
 	error_count: number;
-	error_pattern: string;
 	success_score: number;
 }
 
@@ -292,7 +289,7 @@ async function readAnalytics(
 				               total_interactions, actual_duration_min, avg_period_sec, median_period_sec,
 				               quick_responses, normal_responses, long_pauses,
 				               inference_duration_sec, human_duration_sec,
-					               error_count, error_pattern, success_score
+					               error_count, success_score
 					        FROM ${getSafeClickHouseTable("rudel.session_analytics")} FINAL
 				        WHERE organization_id = {orgId:String} AND session_id = {sessionId:String}`,
 				query_params: { orgId: ORG_ID, sessionId },
@@ -324,7 +321,7 @@ async function readAnalyticsAcrossOrganizations(
 				               total_interactions, actual_duration_min, avg_period_sec, median_period_sec,
 				               quick_responses, normal_responses, long_pauses,
 				               inference_duration_sec, human_duration_sec,
-				               error_count, error_pattern, success_score
+				               error_count, success_score
 				        FROM ${getSafeClickHouseTable("rudel.session_analytics")} FINAL
 				        WHERE session_id = {sessionId:String}`,
 				query_params: { sessionId },
@@ -561,7 +558,6 @@ describe("session_analytics computed values", () => {
 		expect(row.error_count).toBe(10);
 		expect(num(row.total_tokens)).toBe(1_600_100);
 		// Retirement step 3: interpretations keep their column defaults.
-		expect(row.error_pattern).toBe(RETIRED_ERROR_PATTERN_DEFAULT);
 		expect(row.success_score).toBe(0);
 	}, 180000);
 
@@ -581,7 +577,6 @@ describe("session_analytics computed values", () => {
 
 		expect(row.error_count).toBe(10);
 		expect(num(row.total_tokens)).toBe(1_600_100);
-		expect(row.error_pattern).toBe(RETIRED_ERROR_PATTERN_DEFAULT);
 		expect(row.success_score).toBe(0);
 	}, 180000);
 
@@ -641,7 +636,6 @@ describe("session_analytics computed values", () => {
 			expect(num(row.inference_duration_sec)).toBe(0);
 			expect(num(row.human_duration_sec)).toBe(0);
 			expect(row.error_count).toBe(testCase.errorCount);
-			expect(row.error_pattern).toBe(RETIRED_ERROR_PATTERN_DEFAULT);
 		}
 	}, 300000);
 
