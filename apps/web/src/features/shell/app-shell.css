@@ -6,6 +6,10 @@
 	box-shadow: var(--custom-shadow);
 }
 
+.dashboard-01-chrome-frame [data-slot="sidebar-inner"] {
+	background: transparent;
+}
+
 [data-slot="sidebar"],
 [data-slot="dashboard-header"] {
 	font-family: var(--font-sans);
