@@ -82,7 +82,7 @@ A platform for ingesting, storing, and analyzing Claude Code / Codex session tra
 | `SESSION_DETAIL_DERIVATION_CACHE_MAX_BYTES` | No | Per-process byte budget for revision-keyed session-detail derivations (default: 512 MiB) |
 | `SESSION_DETAIL_DERIVATION_CACHE_MAX_ENTRY_BYTES` | No | Maximum logical bytes retained for one session-detail derivation (default: 192 MiB) |
 | `USAGE_EVENT_EXTRACTION_ENABLED` | No | Usage-event extraction kill switch. Set `false` to keep raw ingest available while bypassing extraction (default: `true`). |
-| `USAGE_EVENT_ANALYTICS_CUTOVER_MODE` | No | Request-level analytics routing: `off`, `canary`, or `all`. Missing and invalid values fail closed to `off`. |
+| `USAGE_EVENT_ANALYTICS_CUTOVER_MODE` | No | Request-level analytics routing: `off`, `canary`, or `all`. Missing and invalid values fail closed to `off`. A self-hosted server defaults it to `all`, with `USAGE_ROLLUP_ORG_IDS=all` and `USAGE_ROLLUP_BACKFILL_ENABLED=1`, as production sets them. |
 | `USAGE_EVENT_ANALYTICS_CANARY_ORG_IDS` | No | Comma-separated organization IDs routed to request-level analytics in `canary` mode. An empty list keeps the cutover off. |
 | `USAGE_EXTRACTION_QUEUE_GLOBAL_MAX_BYTES` | No | Maximum active-plus-queued extraction bytes per API process (default: 256 MiB). |
 | `USAGE_EXTRACTION_QUEUE_GLOBAL_MAX_JOBS` | No | Maximum active-plus-queued extraction jobs per API process (default: 8). |
@@ -90,7 +90,7 @@ A platform for ingesting, storing, and analyzing Claude Code / Codex session tra
 | `USAGE_EXTRACTION_QUEUE_PER_USER_MAX_JOBS` | No | Maximum active-plus-queued extraction jobs for one authenticated user (default: 5). |
 | `USAGE_EXTRACTION_QUEUE_TIMEOUT_MS` | No | Extraction worker timeout in milliseconds (default: 30,000). |
 | `SKILL_EXTRACTION_ENABLED` | No | Ingest-time persistent skill extraction kill switch (default: `true`). Extraction reads the main transcript and every bundled Claude subagent transcript; skill receipts hash all streams (unchanged for sessions without subagents, so only sessions with subagents re-extract). The shared extraction worker is also bypassed when both usage and skill extraction are disabled. |
-| `SKILL_ANALYTICS_CUTOVER_MODE` | No | Persistent skill-read routing: `off`, `canary`, or `all`. Missing and invalid values fail closed to the temporary legacy reader. |
+| `SKILL_ANALYTICS_CUTOVER_MODE` | No | Persistent skill-read routing: `off`, `canary`, or `all`. Missing and invalid values fail closed to the temporary legacy reader. A self-hosted server defaults it to `all`. |
 | `SKILL_ANALYTICS_CANARY_ORG_IDS` | No | Comma-separated organization IDs routed to persistent skill reads in `canary` mode. An empty list keeps the cutover off. |
 | `SKILL_BACKFILL_MAX_SESSIONS` | No | Hard raw-session census bound for the skill backfill (default: 10,000). |
 | `SKILL_BACKFILL_MAX_SESSION_BYTES` | No | Maximum raw transcript bytes processed per skill-backfill session (default: 512 MiB). |
