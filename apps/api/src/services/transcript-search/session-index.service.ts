@@ -51,6 +51,8 @@ export const TRANSCRIPT_SEARCH_LIMITS = {
 	lookupHashes: 2_000,
 	/** Hits per insert. */
 	insertRows: 5_000,
+	pageRecords: 256,
+	pageMs: 0,
 } as const;
 
 const SCAN_SETTINGS = {
@@ -173,11 +175,8 @@ export async function indexSessionText(
 	const limits = { ...TRANSCRIPT_SEARCH_LIMITS, ...env.limits };
 	const now = env.now ?? (() => new Date());
 	const startedAt = Date.now();
-	const deadline = createTranscriptRecordsDeadline({
-		deadlineAt: startedAt + limits.passMs,
-		now: Date.now,
-		signal: input.signal,
-	});
+	let deadlineAt = startedAt + limits.passMs;
+	let deadline = passDeadline(deadlineAt, input.signal);
 	const identity = {
 		organizationId: input.organizationId,
 		userId: input.userId,
@@ -242,124 +241,7 @@ export async function indexSessionText(
 		)
 			return { status: "current" };
 
-		/** Records whose middle transcript records did not keep. */
-		let truncated = 0;
-		const records: RecordText[] = (
-			await read(
-				RecordRowSchema,
-				`SELECT agent_id, record_idx, block_idx, turn_idx, kind, tool_name,
-					toString(ts) AS ts, substringUTF8(text, 1, {searchChars:UInt32}) AS text, head, tail, text_chars
-				FROM rudel.transcript_records FINAL
-				WHERE ${SESSION_FILTER} AND revision = {revision:UInt64} AND parser_version = {parserVersion:UInt16}
-					AND record_idx < ${TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX} AND turn_idx >= 1
-					AND kind IN {kinds:Array(String)} AND (text != '' OR head != '')
-				ORDER BY agent_id, record_idx, block_idx`,
-				{
-					revision: generation.revision_text,
-					parserVersion: generation.parser_version,
-					kinds: [...SEARCH_KINDS],
-					searchChars: SEARCH_RECORD_TEXT_MAX_CHARS,
-				},
-			)
-		).flatMap((row) => {
-			const searchable = searchableText(row);
-			if (searchable === null) return [];
-			if (searchable.truncated) truncated++;
-			return [
-				{
-					agentId: row.agent_id,
-					recordIdx: row.record_idx,
-					blockIdx: row.block_idx,
-					turnIdx: row.turn_idx,
-					kind: row.kind,
-					toolName: row.tool_name,
-					ts: row.ts,
-					text: searchable.text,
-				},
-			];
-		});
-		const { chunks, hits } = chunkRecords(records);
-
-		// The months each chunk appeared in: a chunk is stored once per member
-		// and month, so a search window reads only its months' chunks.
-		const months = new Map<string, Set<string>>();
-		for (const hit of hits)
-			months.set(
-				hit.hash,
-				(months.get(hit.hash) ?? new Set()).add(monthOf(hit.ts)),
-			);
-		// What the member's sessions already hold of these chunks: the months
-		// stored, those with a vector, and a vector to copy to another month.
-		const known = new Map<string, z.infer<typeof KnownChunkSchema>>();
-		const hashes = [...chunks.keys()];
-		for (let start = 0; start < hashes.length; start += limits.lookupHashes)
-			for (const row of await read(
-				KnownChunkSchema,
-				`SELECT chunk_hash, groupUniqArray(toString(month)) AS months,
-					groupUniqArrayIf(toString(month), notEmpty(embedding)) AS embedded_months,
-					argMaxIf(embedding, embedded_at, notEmpty(embedding)) AS vector,
-					argMaxIf(model, embedded_at, notEmpty(embedding)) AS vector_model
-				FROM ${TRANSCRIPT_CHUNKS_TABLE}
-				WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
-					AND chunk_hash IN {hashes:Array(String)}
-				GROUP BY chunk_hash`,
-				{ hashes: hashes.slice(start, start + limits.lookupHashes) },
-			))
-				known.set(row.chunk_hash, row);
-
-		const unembedded = hashes.filter(
-			(hash) => (known.get(hash)?.embedded_months.length ?? 0) === 0,
-		);
-		const embedded = await embedChunks(
-			unembedded.map((hash) => ({ hash, text: chunks.get(hash) ?? "" })),
-			{
-				embedder: env.embedder,
-				quota: env.quota,
-				workspaceId: input.organizationId,
-				maxChunks: limits.embedChunks,
-				batchSize: limits.batchSize,
-				stopAt: startedAt + limits.embeddingMs,
-				wait: deadline.wait,
-				signal: deadline.signal,
-			},
-		);
-
 		const writtenAt = now().toISOString().replace("T", " ").replace("Z", "");
-		const chunkRows = hashes.flatMap((hash) => {
-			const stored = known.get(hash);
-			const fresh = embedded.vectors.get(hash);
-			const vector =
-				fresh ?? (stored?.vector.length ? stored.vector : undefined);
-			const model = fresh
-				? (env.embedder?.model ?? "")
-				: vector
-					? (stored?.vector_model ?? "")
-					: "";
-			// A month needs a row when it has none, or has one without a vector
-			// that this pass can give it.
-			return [...(months.get(hash) ?? [])]
-				.filter((month) =>
-					vector
-						? !stored?.embedded_months.includes(month)
-						: !stored?.months.includes(month),
-				)
-				.map((month) => ({
-					organization_id: input.organizationId,
-					user_id: input.userId,
-					month,
-					chunk_hash: hash,
-					text: chunks.get(hash) ?? "",
-					embedding: vector ?? [],
-					model,
-					embedded_at: vector ? writtenAt : "1970-01-01 00:00:00.000",
-				}));
-		});
-		for (let start = 0; start < chunkRows.length; start += limits.insertRows)
-			await write(
-				TRANSCRIPT_CHUNKS_TABLE,
-				chunkRows.slice(start, start + limits.insertRows),
-			);
-
 		const base = {
 			organization_id: input.organizationId,
 			user_id: input.userId,
@@ -369,28 +251,192 @@ export async function indexSessionText(
 			parser_version: generation.parser_version,
 			written_at: writtenAt,
 		};
-		const hitRows = hits.map((hit) => ({
-			...base,
-			agent_id: hit.agentId,
-			record_idx: hit.recordIdx,
-			block_idx: hit.blockIdx,
-			chunk_idx: hit.chunkIdx,
-			turn_idx: hit.turnIdx,
-			kind: hit.kind,
-			tool_name: hit.toolName,
-			ts: hit.ts,
-			chunk_hash: hit.hash,
-			pending_chunks: 0,
-			truncated_records: 0,
-		}));
-		// A later pass over the same generation adds vectors only: its hits are stored.
-		if (!sameGeneration)
-			for (let start = 0; start < hitRows.length; start += limits.insertRows)
-				await write(
-					TRANSCRIPT_CHUNK_HITS_TABLE,
-					hitRows.slice(start, start + limits.insertRows),
+		const stored = new Map<string, StoredChunk>();
+		const embedding = createChunkEmbedding({
+			embedder: env.embedder,
+			quota: env.quota,
+			workspaceId: input.organizationId,
+			maxChunks: limits.embedChunks,
+			batchSize: limits.batchSize,
+			stopAt: startedAt + limits.embeddingMs,
+			wait: (operation) => deadline.wait(operation),
+			signal: () => deadline.signal,
+		});
+		let truncated = 0;
+		let unembedded = 0;
+		let hitCount = 0;
+		let after: z.infer<typeof RecordRowSchema> | undefined;
+		for (let page = 0; ; page++) {
+			if (page > 0 && limits.pageMs > 0) {
+				deadline.dispose();
+				deadlineAt += limits.pageMs;
+				deadline = passDeadline(deadlineAt, input.signal);
+			}
+			const rows = await read(
+				RecordRowSchema,
+				`SELECT agent_id, record_idx, block_idx, turn_idx, kind, tool_name,
+					toString(ts) AS ts, substringUTF8(text, 1, {searchChars:UInt32}) AS text, head, tail, text_chars
+				FROM rudel.transcript_records FINAL
+				WHERE ${SESSION_FILTER} AND revision = {revision:UInt64} AND parser_version = {parserVersion:UInt16}
+					AND record_idx < ${TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX} AND turn_idx >= 1
+					AND kind IN {kinds:Array(String)} AND (text != '' OR head != '')${after ? AFTER_RECORD_FILTER : ""}
+				ORDER BY agent_id, record_idx, block_idx
+				LIMIT {pageRecords:UInt32}`,
+				{
+					revision: generation.revision_text,
+					parserVersion: generation.parser_version,
+					kinds: [...SEARCH_KINDS],
+					searchChars: SEARCH_RECORD_TEXT_MAX_CHARS,
+					pageRecords: limits.pageRecords,
+					...(after && {
+						afterAgentId: after.agent_id,
+						afterRecordIdx: after.record_idx,
+						afterBlockIdx: after.block_idx,
+					}),
+				},
+			);
+			if (rows.length === 0) break;
+			after = rows.at(-1);
+			const records: RecordText[] = rows.flatMap((row) => {
+				const searchable = searchableText(row);
+				if (searchable === null) return [];
+				if (searchable.truncated) truncated++;
+				return [
+					{
+						agentId: row.agent_id,
+						recordIdx: row.record_idx,
+						blockIdx: row.block_idx,
+						turnIdx: row.turn_idx,
+						kind: row.kind,
+						toolName: row.tool_name,
+						ts: row.ts,
+						text: searchable.text,
+					},
+				];
+			});
+			const { chunks, hits } = chunkRecords(records);
+			hitCount += hits.length;
+
+			// The months each chunk appeared in: a chunk is stored once per member
+			// and month, so a search window reads only its months' chunks.
+			const months = new Map<string, Set<string>>();
+			for (const hit of hits)
+				months.set(
+					hit.hash,
+					(months.get(hit.hash) ?? new Set()).add(monthOf(hit.ts)),
 				);
-		const pending = unembedded.length - embedded.vectors.size;
+			// What the member's sessions already hold of these chunks: the months
+			// stored, those with a vector, and a vector to copy to another month.
+			const lookup = [...chunks.keys()].filter((hash) => {
+				const chunk = stored.get(hash);
+				if (!chunk) return true;
+				return (
+					chunk.vector &&
+					!embedding.vectors.has(hash) &&
+					[...(months.get(hash) ?? [])].some(
+						(month) => !chunk.embeddedMonths.has(month),
+					)
+				);
+			});
+			const known = new Map<string, z.infer<typeof KnownChunkSchema>>();
+			for (let start = 0; start < lookup.length; start += limits.lookupHashes)
+				for (const row of await read(
+					KnownChunkSchema,
+					`SELECT chunk_hash, groupUniqArray(toString(month)) AS months,
+						groupUniqArrayIf(toString(month), notEmpty(embedding)) AS embedded_months,
+						argMaxIf(embedding, embedded_at, notEmpty(embedding)) AS vector,
+						argMaxIf(model, embedded_at, notEmpty(embedding)) AS vector_model
+					FROM ${TRANSCRIPT_CHUNKS_TABLE}
+					WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
+						AND chunk_hash IN {hashes:Array(String)}
+					GROUP BY chunk_hash`,
+					{ hashes: lookup.slice(start, start + limits.lookupHashes) },
+				))
+					known.set(row.chunk_hash, row);
+
+			const fresh: string[] = [];
+			for (const hash of chunks.keys()) {
+				if (stored.has(hash)) continue;
+				const row = known.get(hash);
+				stored.set(hash, {
+					months: new Set(row?.months),
+					embeddedMonths: new Set(row?.embedded_months),
+					vector: (row?.embedded_months.length ?? 0) > 0,
+				});
+				if ((row?.embedded_months.length ?? 0) === 0) fresh.push(hash);
+			}
+			unembedded += fresh.length;
+			await embedding.embed(
+				fresh.map((hash) => ({ hash, text: chunks.get(hash) ?? "" })),
+			);
+
+			const chunkRows = [...chunks.keys()].flatMap((hash) => {
+				const chunk = stored.get(hash);
+				if (!chunk) return [];
+				const looked = known.get(hash);
+				const made = embedding.vectors.get(hash);
+				const vector =
+					made ?? (looked?.vector.length ? looked.vector : undefined);
+				const model = made
+					? (env.embedder?.model ?? "")
+					: vector
+						? (looked?.vector_model ?? "")
+						: "";
+				// A month needs a row when it has none, or has one without a vector
+				// that this pass can give it.
+				return [...(months.get(hash) ?? [])]
+					.filter((month) =>
+						vector
+							? !chunk.embeddedMonths.has(month)
+							: !chunk.months.has(month),
+					)
+					.map((month) => {
+						chunk.months.add(month);
+						if (vector) chunk.embeddedMonths.add(month);
+						return {
+							organization_id: input.organizationId,
+							user_id: input.userId,
+							month,
+							chunk_hash: hash,
+							text: chunks.get(hash) ?? "",
+							embedding: vector ?? [],
+							model,
+							embedded_at: vector ? writtenAt : "1970-01-01 00:00:00.000",
+						};
+					});
+			});
+			for (let start = 0; start < chunkRows.length; start += limits.insertRows)
+				await write(
+					TRANSCRIPT_CHUNKS_TABLE,
+					chunkRows.slice(start, start + limits.insertRows),
+				);
+
+			// A later pass over the same generation adds vectors only: its hits are stored.
+			if (!sameGeneration) {
+				const hitRows = hits.map((hit) => ({
+					...base,
+					agent_id: hit.agentId,
+					record_idx: hit.recordIdx,
+					block_idx: hit.blockIdx,
+					chunk_idx: hit.chunkIdx,
+					turn_idx: hit.turnIdx,
+					kind: hit.kind,
+					tool_name: hit.toolName,
+					ts: hit.ts,
+					chunk_hash: hit.hash,
+					pending_chunks: 0,
+					truncated_records: 0,
+				}));
+				for (let start = 0; start < hitRows.length; start += limits.insertRows)
+					await write(
+						TRANSCRIPT_CHUNK_HITS_TABLE,
+						hitRows.slice(start, start + limits.insertRows),
+					);
+			}
+			if (rows.length < limits.pageRecords) break;
+		}
+
+		const pending = unembedded - embedding.vectors.size;
 		await write(TRANSCRIPT_CHUNK_HITS_TABLE, [
 			{
 				...base,
@@ -407,7 +453,7 @@ export async function indexSessionText(
 				truncated_records: truncated,
 			},
 		]);
-		if (embedded.stopped === "quota")
+		if (embedding.stopped === "quota")
 			logger.info(
 				"Transcript search: the workspace used its OpenAI quota; {pending} chunks wait without a vector (organization_id={organizationId} session_id={sessionId})",
 				{
@@ -418,12 +464,12 @@ export async function indexSessionText(
 			);
 		return {
 			status: "written",
-			chunks: chunks.size,
-			hits: hits.length,
-			embedded: embedded.vectors.size,
+			chunks: stored.size,
+			hits: hitCount,
+			embedded: embedding.vectors.size,
 			pending,
 			truncated,
-			stopped: pending > 0 ? embedded.stopped : null,
+			stopped: pending > 0 ? embedding.stopped : null,
 		};
 	} catch (error) {
 		// A purge began during the pass: remove the session's hits now; the
@@ -441,6 +487,21 @@ export async function indexSessionText(
 	} finally {
 		deadline.dispose();
 	}
+}
+
+interface StoredChunk {
+	readonly months: Set<string>;
+	readonly embeddedMonths: Set<string>;
+	readonly vector: boolean;
+}
+
+const AFTER_RECORD_FILTER = `
+					AND (agent_id > {afterAgentId:String}
+						OR (agent_id = {afterAgentId:String} AND (record_idx > {afterRecordIdx:UInt32}
+							OR (record_idx = {afterRecordIdx:UInt32} AND block_idx > {afterBlockIdx:UInt16}))))`;
+
+function passDeadline(deadlineAt: number, signal: AbortSignal | undefined) {
+	return createTranscriptRecordsDeadline({ deadlineAt, now: Date.now, signal });
 }
 
 export function retireOlderTranscriptChunkHits(
@@ -502,67 +563,88 @@ const SESSION_FILTER =
  * Vectors for as many chunks as the quota, the chunk cap and the time allow,
  * in order, charging the tokens of each batch to the workspace.
  */
-async function embedChunks(
-	pending: readonly { hash: string; text: string }[],
-	options: {
-		embedder: TranscriptEmbedder | null;
-		quota: EmbeddingQuota;
-		workspaceId: string;
-		maxChunks: number;
-		batchSize: number;
-		stopAt: number;
-		wait: <TResult>(operation: () => Promise<TResult>) => Promise<TResult>;
-		signal: AbortSignal;
-	},
-): Promise<{
-	vectors: Map<string, number[]>;
-	stopped: "quota" | "no_embedder" | "limit" | "error" | null;
-}> {
+function createChunkEmbedding(options: {
+	embedder: TranscriptEmbedder | null;
+	quota: EmbeddingQuota;
+	workspaceId: string;
+	maxChunks: number;
+	batchSize: number;
+	stopAt: number;
+	wait: <TResult>(operation: () => Promise<TResult>) => Promise<TResult>;
+	signal: () => AbortSignal;
+}) {
 	const vectors = new Map<string, number[]>();
-	if (pending.length === 0) return { vectors, stopped: null };
-	const { embedder } = options;
-	if (!embedder) return { vectors, stopped: "no_embedder" };
-	const usage = await options.wait(() =>
-		options.quota.usage(options.workspaceId),
-	);
-	let used = usage.used;
-	for (let start = 0; start < pending.length; start += options.batchSize) {
-		if (used >= usage.limit) return { vectors, stopped: "quota" };
-		if (start >= options.maxChunks || Date.now() >= options.stopAt)
-			return { vectors, stopped: "limit" };
-		const batch = pending.slice(
-			start,
-			Math.min(start + options.batchSize, options.maxChunks),
-		);
-		const texts = batch.map((chunk) => chunk.text);
-		let result: { vectors: number[][]; tokens: number };
-		try {
-			result = await options.wait(() => embedder.embed(texts, options.signal));
-		} catch (error) {
-			// Out of time or cancelled: nothing more can be written, and OpenAI
-			// may bill the abandoned request, so it is charged as estimated. An
-			// OpenAI failure stops embedding only; the chunks are still stored.
-			if (options.signal.aborted) {
-				await options.quota
-					.charge(options.workspaceId, estimateEmbeddingTokens(texts))
-					.catch(() => {});
-				throw error;
-			}
-			logger.warn("Transcript search embedding failed: {error}", {
-				error: filterKnownSecrets(
-					error instanceof Error ? error.message : "Embedding failed",
-				).text.slice(0, 512),
-			});
-			return { vectors, stopped: "error" };
+	let stopped: "quota" | "no_embedder" | "limit" | "error" | null = null;
+	let usage: { used: number; limit: number } | undefined;
+	let sent = 0;
+	const embed = async (
+		pending: readonly { hash: string; text: string }[],
+	): Promise<void> => {
+		if (pending.length === 0 || stopped) return;
+		const { embedder } = options;
+		if (!embedder) {
+			stopped = "no_embedder";
+			return;
 		}
-		const tokens =
-			result.tokens > 0 ? result.tokens : estimateEmbeddingTokens(texts);
-		await options.wait(() => options.quota.charge(options.workspaceId, tokens));
-		used += tokens;
-		batch.forEach((chunk, index) => {
-			const vector = result.vectors[index];
-			if (vector) vectors.set(chunk.hash, quantizeVector(vector));
-		});
-	}
-	return { vectors, stopped: null };
+		usage ??= {
+			...(await options.wait(() => options.quota.usage(options.workspaceId))),
+		};
+		for (let start = 0; start < pending.length; ) {
+			if (usage.used >= usage.limit) {
+				stopped = "quota";
+				return;
+			}
+			if (sent >= options.maxChunks || Date.now() >= options.stopAt) {
+				stopped = "limit";
+				return;
+			}
+			const batch = pending.slice(
+				start,
+				start + Math.min(options.batchSize, options.maxChunks - sent),
+			);
+			start += batch.length;
+			sent += batch.length;
+			const texts = batch.map((chunk) => chunk.text);
+			let result: { vectors: number[][]; tokens: number };
+			try {
+				result = await options.wait(() =>
+					embedder.embed(texts, options.signal()),
+				);
+			} catch (error) {
+				// Out of time or cancelled: nothing more can be written, and OpenAI
+				// may bill the abandoned request, so it is charged as estimated. An
+				// OpenAI failure stops embedding only; the chunks are still stored.
+				if (options.signal().aborted) {
+					await options.quota
+						.charge(options.workspaceId, estimateEmbeddingTokens(texts))
+						.catch(() => {});
+					throw error;
+				}
+				logger.warn("Transcript search embedding failed: {error}", {
+					error: filterKnownSecrets(
+						error instanceof Error ? error.message : "Embedding failed",
+					).text.slice(0, 512),
+				});
+				stopped = "error";
+				return;
+			}
+			const tokens =
+				result.tokens > 0 ? result.tokens : estimateEmbeddingTokens(texts);
+			await options.wait(() =>
+				options.quota.charge(options.workspaceId, tokens),
+			);
+			usage.used += tokens;
+			batch.forEach((chunk, index) => {
+				const vector = result.vectors[index];
+				if (vector) vectors.set(chunk.hash, quantizeVector(vector));
+			});
+		}
+	};
+	return {
+		vectors,
+		embed,
+		get stopped() {
+			return stopped;
+		},
+	};
 }

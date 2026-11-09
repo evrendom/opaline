@@ -1,5 +1,6 @@
 import { getLogger } from "@logtape/logtape";
 import type { ClickHouseExecutor } from "../../clickhouse.js";
+import { isSelfHosted } from "../../lib/self-hosted.js";
 import {
 	createSearchAccess,
 	postgresSubscriptions,
@@ -14,6 +15,7 @@ import { createPostgresEmbeddingQuota, type EmbeddingQuota } from "./quota.js";
 import {
 	indexSessionTextBestEffort,
 	type SessionIndexInput,
+	TRANSCRIPT_SEARCH_LIMITS,
 } from "./session-index.service.js";
 
 const logger = getLogger(["rudel", "api", "transcript-search"]);
@@ -48,6 +50,9 @@ export async function indexUploadedSessionBestEffort(
 			executor,
 			embedder: resolved.embedder,
 			quota: resolved.quota,
+			...(isSelfHosted() && {
+				limits: { pageMs: TRANSCRIPT_SEARCH_LIMITS.passMs },
+			}),
 		});
 	} catch (error) {
 		logger.warn("Transcript search indexing was not started: {error}", {
