@@ -1,9 +1,12 @@
 import { extractUsageEvents } from "@rudel/usage-events";
+import { lowerWorkerThreadPriority } from "../lib/background-work.js";
 import { extractSessionSkills } from "./skill-extraction.js";
 import type {
 	UsageExtractionWorkerRequest,
 	UsageExtractionWorkerResponse,
 } from "./usage-extraction.types.js";
+
+void lowerWorkerThreadPriority();
 
 declare const self: {
 	addEventListener(

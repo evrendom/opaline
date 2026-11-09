@@ -1,8 +1,11 @@
+import { lowerWorkerThreadPriority } from "../lib/background-work.js";
 import type {
 	SessionLanguageSignalScannerWorkerRequest,
 	SessionLanguageSignalScannerWorkerResponse,
 } from "./session-language-signal-scanner.types.js";
 import { captureSessionLanguageSignalsWithRuns } from "./session-language-signal-summary.js";
+
+void lowerWorkerThreadPriority();
 
 declare const self: {
 	addEventListener(

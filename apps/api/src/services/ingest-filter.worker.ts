@@ -3,6 +3,7 @@ import {
 	filterSessionTextFields,
 	getUtf8ByteLength,
 } from "@rudel/secret-filter";
+import { lowerWorkerThreadPriority } from "../lib/background-work.js";
 import { createIngestFilterWorkerError } from "./ingest-filter.error.js";
 import type {
 	IngestFilterFields,
@@ -10,6 +11,8 @@ import type {
 	IngestFilterWorkerRequest,
 	IngestFilterWorkerResponse,
 } from "./ingest-filter.types.js";
+
+void lowerWorkerThreadPriority();
 
 declare const self: {
 	addEventListener(

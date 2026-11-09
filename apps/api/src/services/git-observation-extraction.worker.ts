@@ -1,7 +1,10 @@
+import { lowerWorkerThreadPriority } from "../lib/background-work.js";
 import {
 	type GitObservationParseInput,
 	parseGitObservations,
 } from "./git-observation-parser.js";
+
+void lowerWorkerThreadPriority();
 
 declare const self: {
 	postMessage(message: unknown): void;

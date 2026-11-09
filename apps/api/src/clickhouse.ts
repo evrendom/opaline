@@ -12,6 +12,7 @@ import {
 	CODEX_SESSION_ANALYTICS_MV_SQL,
 	SESSION_ANALYTICS_INSERT_COLUMNS,
 } from "@rudel/ch-schema/session-analytics-mv";
+import { withBackgroundClickHouseSettings } from "./lib/background-work.js";
 
 const logger = getLogger(["rudel", "api", "clickhouse"]);
 
@@ -103,6 +104,7 @@ export const ALLOWED_CLICKHOUSE_TABLES: ReadonlySet<string> = new Set([
 	"rudel.github_ci_run_pull_requests",
 	"rudel.github_ci_jobs",
 	"rudel.call_facts",
+	"rudel.transcript_record_commands",
 	"rudel.claude_sessions",
 	"rudel.l1_edges",
 	"rudel.l1_edges_by_target",
@@ -334,7 +336,9 @@ export function createClickHouseExecutor(config: {
 					statement.abortSignal === undefined
 						? undefined
 						: AbortSignal.any([statement.abortSignal]),
-				clickhouse_settings: statement.clickhouse_settings,
+				clickhouse_settings: withBackgroundClickHouseSettings(
+					statement.clickhouse_settings,
+				),
 				query: statement.query,
 				query_params: statement.query_params,
 				query_id: statement.query_id,
@@ -348,7 +352,9 @@ export function createClickHouseExecutor(config: {
 					statement.abortSignal === undefined
 						? undefined
 						: AbortSignal.any([statement.abortSignal]),
-				clickhouse_settings: statement.clickhouse_settings,
+				clickhouse_settings: withBackgroundClickHouseSettings(
+					statement.clickhouse_settings,
+				),
 				query: statement.query,
 				query_params: statement.query_params,
 				query_id: statement.query_id,
@@ -372,8 +378,10 @@ export function createClickHouseExecutor(config: {
 					params.abortSignal === undefined
 						? undefined
 						: AbortSignal.any([params.abortSignal]),
-				clickhouse_settings: createClickHouseInsertDeduplicationSettings(
-					params.deduplicationToken,
+				clickhouse_settings: withBackgroundClickHouseSettings(
+					createClickHouseInsertDeduplicationSettings(
+						params.deduplicationToken,
+					),
 				),
 				query: `INSERT INTO ${table} SETTINGS ${insertSettings} FORMAT JSONEachRow ${rows}`,
 			});

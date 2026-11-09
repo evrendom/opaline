@@ -4,12 +4,15 @@ import {
 	summarizeSplit,
 	type TranscriptRecordDraft,
 } from "@rudel/api-routes/transcript-records";
+import { lowerWorkerThreadPriority } from "../lib/background-work.js";
 import {
 	estimateDraftMemoryBytes,
 	type TranscriptRecordsSplitRequest,
 	type TranscriptRecordsWorkerCommand,
 	type TranscriptRecordsWorkerMessage,
 } from "./transcript-records-stream.js";
+
+void lowerWorkerThreadPriority();
 
 declare const self: {
 	addEventListener(
