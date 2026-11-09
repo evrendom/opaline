@@ -1,3 +1,6 @@
+import { isVercelRuntime } from "../lib/api-runtime.js";
+import { isSelfHosted } from "../lib/self-hosted.js";
+
 export function shouldStartBestEffortLanguageSignals(input: {
 	awaitLanguageSignals: boolean;
 	durableProcessing: boolean;
@@ -29,4 +32,10 @@ export function shouldPersistUsageExtractionFailureReceipt(input: {
 	// A durable target receipt and deduplication token are final for that ledger.
 	// Diagnostic/incomplete output must not consume them before a retry succeeds.
 	return input.extractionAllowsReceipt && !input.durableProcessing;
+}
+
+export function awaitsDurableLanguageSignals(
+	environment: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+	return isVercelRuntime(environment) || isSelfHosted(environment);
 }

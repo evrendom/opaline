@@ -1,7 +1,6 @@
 import { getLogger } from "@logtape/logtape";
 import type { IngestSessionInput } from "@rudel/api-routes";
 import { sqlClient } from "../db.js";
-import { isVercelRuntime } from "../lib/api-runtime.js";
 import {
 	hasMaintenanceTimeRemaining,
 	type MaintenanceDeadline,
@@ -15,6 +14,7 @@ import {
 	getNextGitHubObjectWorkDueAt,
 	sweepGitHubEvidenceObjects,
 } from "./github-evidence-object-fence.service.js";
+import { awaitsDurableLanguageSignals } from "./ingest-derived-fact-policy.js";
 import {
 	getNextR2IngestWorkDueAt,
 	repairR2IngestCleanupJobs,
@@ -141,10 +141,11 @@ export function processRecoveredR2IngestJob(
 	signal: AbortSignal,
 ): ReturnType<R2IngestProcessor> {
 	return processIngestSession({
-		// Vercel has no resident reconciler, so recovered jobs must attempt
-		// their derived signals before completing. Best-effort persistence
-		// still keeps scanner availability outside the recovery contract.
-		awaitBestEffortLanguageSignals: isVercelRuntime(),
+		// Vercel and self-hosted servers have no resident reconciler, so
+		// recovered jobs must attempt their derived signals before completing.
+		// Best-effort persistence still keeps scanner availability outside the
+		// recovery contract.
+		awaitBestEffortLanguageSignals: awaitsDurableLanguageSignals(),
 		awaitLanguageSignals: false,
 		context: {
 			apiKeyId: null,

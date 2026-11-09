@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+	awaitsDurableLanguageSignals,
 	shouldAwaitBestEffortLanguageSignals,
 	shouldPersistUsageExtractionFailureReceipt,
 	shouldStartBestEffortLanguageSignals,
@@ -49,6 +50,17 @@ describe("ingest derived-fact policy", () => {
 				awaitLanguageSignals: false,
 				durableProcessing: false,
 			}),
+		).toBe(false);
+	});
+
+	test("durable uploads scan their signals where no resident reconciler runs: Vercel and self-hosted servers", () => {
+		expect(awaitsDurableLanguageSignals({ VERCEL: "1" })).toBe(true);
+		expect(awaitsDurableLanguageSignals({ OPALINE_SELF_HOSTED: "1" })).toBe(
+			true,
+		);
+		expect(awaitsDurableLanguageSignals({})).toBe(false);
+		expect(
+			awaitsDurableLanguageSignals({ VERCEL: "0", OPALINE_SELF_HOSTED: "0" }),
 		).toBe(false);
 	});
 

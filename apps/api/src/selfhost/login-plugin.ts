@@ -55,13 +55,15 @@ export function selfHostedLoginPlugin(
 				SELF_HOSTED_LOGIN_PATH,
 				{
 					method: "GET",
-					query: z.object({ token: z.string().max(256).optional() }),
+					query: z.object({ token: z.unknown().optional() }),
 				},
 				async (ctx) => {
 					if (!isSelfHosted()) throw new APIError("NOT_FOUND");
-					const userId = ctx.query.token
-						? await consume(ctx.query.token)
-						: null;
+					const token = ctx.query.token;
+					const userId =
+						typeof token === "string" && token !== "" && token.length <= 256
+							? await consume(token)
+							: null;
 					const user = userId
 						? await ctx.context.internalAdapter.findUserById(userId)
 						: null;
