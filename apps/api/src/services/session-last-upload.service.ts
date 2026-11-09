@@ -2,6 +2,7 @@ import type { LastSessionUpload } from "@rudel/api-routes";
 import { buildDateFilter, queryClickhouse } from "../clickhouse.js";
 import { createAnalyticsRequestGate } from "./analytics-request-gate.js";
 import {
+	buildScalarWindowSql,
 	buildSessionAnalyticsWindowSql,
 	getUsageAnalyticsQueryContext,
 	type UsageAnalyticsWindow,
@@ -54,15 +55,18 @@ async function readLastSessionUpload(
 ): Promise<LastSessionUpload | null> {
 	const newest = await readLastUpload(organizationId, {
 		includeNativeDescendants: false,
-		sessionsSql: `${buildSessionAnalyticsWindowSql(`${PERIOD_FILTER} AND ${TOP_LEVEL_FILTER}`)}
+		sessionsSql:
+			buildScalarWindowSql(`${buildSessionAnalyticsWindowSql(`${PERIOD_FILTER} AND ${TOP_LEVEL_FILTER}`)}
 				ORDER BY ${SESSION_ORDER}
-				LIMIT ${LAST_UPLOAD_CANDIDATES}`,
+				LIMIT ${LAST_UPLOAD_CANDIDATES}`),
 	});
 	if (newest) return newest;
 	return (
 		(await readLastUpload(organizationId, {
 			includeNativeDescendants: false,
-			sessionsSql: buildSessionAnalyticsWindowSql(PERIOD_FILTER),
+			sessionsSql: buildScalarWindowSql(
+				buildSessionAnalyticsWindowSql(PERIOD_FILTER),
+			),
 		})) ?? null
 	);
 }
