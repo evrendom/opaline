@@ -2,7 +2,10 @@ import { shouldUsePersistentSkillAnalytics } from "../../lib/env.js";
 import { orgMiddleware, os } from "../../middleware.js";
 import { listHistoricalSkills } from "../../services/historical-skills.service.js";
 import { listLegacyHistoricalCodexSkills } from "../../services/legacy-historical-skills.service.js";
-import { listRepositories } from "../../services/repositories.service.js";
+import {
+	listRepositories,
+	listRepositoryNavigation,
+} from "../../services/repositories.service.js";
 import { repositoryFileActivity } from "../../services/repository-file-activity.service.js";
 import {
 	listRepositoryFiles,
@@ -29,6 +32,9 @@ import { readableSessionOwner } from "../../services/session-visibility.js";
 const list = os.analytics.repositories.list
 	.use(orgMiddleware)
 	.handler(({ context }) => listRepositories(context.organizationId));
+const navigation = os.analytics.repositories.navigation
+	.use(orgMiddleware)
+	.handler(({ context }) => listRepositoryNavigation(context.organizationId));
 const detail = os.analytics.repositories.detail
 	.use(orgMiddleware)
 	.handler(async ({ input, context }) => ({
@@ -198,6 +204,7 @@ const sessionBoxes = os.analytics.repositories.sessionBoxes
 	);
 export const repositoriesRouter = os.analytics.repositories.router({
 	list,
+	navigation,
 	detail,
 	overview,
 	pullRequests,

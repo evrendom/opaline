@@ -5,6 +5,7 @@ import type {
 import { buildDateFilter, queryClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
 import {
+	buildSessionDateWindow,
 	buildUsageCostSubtotalSql,
 	getUsageAnalyticsQueryContext,
 } from "./usage-event-analytics.service.js";
@@ -21,7 +22,9 @@ interface FavoriteModelRow {
 }
 
 async function getFavoriteModelByUser(orgId: string, days: number) {
-	const usage = await getUsageAnalyticsQueryContext(orgId);
+	const usage = await getUsageAnalyticsQueryContext(orgId, {
+		window: buildSessionDateWindow(buildDateFilter("days", "sa.session_date")),
+	});
 	const rows = await queryClickhouse<FavoriteModelRow>({
 		query: `
 	WITH ${usage.cteDefinitions}
@@ -65,7 +68,11 @@ export async function getDeveloperList(
 		currentDays: d,
 		orgId,
 	};
-	const usage = await getUsageAnalyticsQueryContext(orgId);
+	const usage = await getUsageAnalyticsQueryContext(orgId, {
+		window: buildSessionDateWindow(
+			buildDateFilter("currentDays", "sa.session_date"),
+		),
+	});
 
 	const query = `
 	WITH ${usage.cteDefinitions},
@@ -127,7 +134,9 @@ export async function getDeveloperTeamCards(
 		days: d,
 		orgId,
 	};
-	const usage = await getUsageAnalyticsQueryContext(orgId);
+	const usage = await getUsageAnalyticsQueryContext(orgId, {
+		window: buildSessionDateWindow(buildDateFilter("days", "sa.session_date")),
+	});
 
 	const summaryQuery = `
 	WITH ${usage.cteDefinitions}

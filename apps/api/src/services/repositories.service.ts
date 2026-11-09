@@ -1,3 +1,4 @@
+import type { RepositoryNavigationItem } from "@rudel/api-routes";
 import { queryClickhouse } from "../clickhouse.js";
 import {
 	aggregateRepositories,
@@ -37,4 +38,49 @@ export async function listRepositories(orgId: string) {
 		query_params: { orgId },
 	});
 	return aggregateRepositories(rows);
+}
+
+export async function listRepositoryNavigation(
+	orgId: string,
+): Promise<RepositoryNavigationItem[]> {
+	const rows = await queryClickhouse<
+		Pick<
+			RepositoryAggregateRow,
+			| "git_remote"
+			| "package_name"
+			| "project_path"
+			| "user_id"
+			| "session_count"
+			| "last_active_at"
+		>
+	>({
+		clickhouse_settings: {
+			...REPOSITORY_QUERY_SETTINGS,
+			log_comment: "analytics.repositories.navigation",
+		},
+		query: `SELECT git_remote, package_name, project_path, user_id,
+				count() AS session_count,
+				formatDateTime(max(last_interaction_date), '%Y-%m-%dT%H:%i:%SZ') AS last_active_at
+			FROM rudel.session_analytics FINAL
+			WHERE organization_id = {orgId:String}
+			GROUP BY git_remote, package_name, project_path, user_id
+			LIMIT 10001`,
+		query_params: { orgId },
+	});
+	return aggregateRepositories(
+		rows.map((row) => ({
+			...row,
+			estimated_cost: 0,
+			incomplete_costs: 0,
+			incomplete_signals: 0,
+			model_apologies: 0,
+			total_tokens: 0,
+			user_negative: 0,
+			user_positive: 0,
+		})),
+	).map(({ identity, sessionCount, lastActiveAt }) => ({
+		identity,
+		lastActiveAt,
+		sessionCount,
+	}));
 }

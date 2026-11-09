@@ -31,7 +31,7 @@ export function SidebarRepositories({ reposActive }: { reposActive: boolean }) {
 	const getShellRoutePath = useShellRoutePath();
 	const [params] = useSearchParams();
 	const query = useAnalyticsQuery(
-		orpc.analytics.repositories.list.queryOptions({}),
+		orpc.analytics.repositories.navigation.queryOptions({}),
 	);
 	const now = useRepositoryClock();
 	const repos = useMemo(

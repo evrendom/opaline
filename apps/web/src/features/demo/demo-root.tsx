@@ -69,6 +69,14 @@ export function DemoRoot({ seed }: { seed: DemoSeed }) {
 				],
 				seed.repositories,
 			],
+			[
+				[
+					"org",
+					seed.organization.id,
+					...orpc.analytics.repositories.navigation.queryOptions({}).queryKey,
+				],
+				seed.repositories,
+			],
 			// Seed rows are newest first: the last upload bar's session.
 			[
 				[

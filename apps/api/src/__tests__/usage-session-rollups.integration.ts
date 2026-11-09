@@ -45,6 +45,7 @@ setDefaultTimeout(60_000);
 const runId = crypto.randomUUID();
 const organizationId = `usage_rollup_org_${runId}`;
 const skippedOrganizationId = `usage_rollup_skipped_${runId}`;
+const guardOrganizationId = `usage_rollup_guard_${runId}`;
 const userId = `usage_rollup_user_${runId}`;
 const executor = createClickHouseExecutor({
 	database: "default",
@@ -77,8 +78,12 @@ afterAll(async () => {
 	])
 		await executor
 			.execute({
-				query: `DELETE FROM ${table} WHERE organization_id IN ({organizationId:String}, {skippedOrganizationId:String}) SETTINGS lightweight_deletes_sync = 3`,
-				query_params: { organizationId, skippedOrganizationId },
+				query: `DELETE FROM ${table} WHERE organization_id IN ({organizationId:String}, {skippedOrganizationId:String}, {guardOrganizationId:String}) SETTINGS lightweight_deletes_sync = 3`,
+				query_params: {
+					guardOrganizationId,
+					organizationId,
+					skippedOrganizationId,
+				},
 			})
 			.catch(() => {});
 	await executor.close();
@@ -225,6 +230,7 @@ describe("usage session rollups", () => {
 	test("the switch prices enabled workspaces from the rollups and the rest from the events", async () => {
 		clearUsageRollupReadiness();
 		process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE = "all";
+		process.env.USAGE_ROLLUP_ORG_IDS = "none";
 		const events = await getUsageAnalyticsQueryContext(organizationId);
 		expect(events.cteDefinitions).not.toContain(USAGE_SESSION_ROLLUPS_TABLE);
 		process.env.USAGE_ROLLUP_ORG_IDS = organizationId;
@@ -308,25 +314,80 @@ describe("usage session rollups", () => {
 		expect(ours(await candidates())).toEqual([]);
 	});
 
-	test("a workspace holding rows of another build prices from the events until they are rebuilt", async () => {
-		const sessionId = `stale_build_${runId}`;
-		await upload(sessionId, "60", [usageEvent(sessionId, "1")]);
-		const [row] = await readRollups(sessionId);
+	test("a workspace prices from the rollups only while every session has a current one", async () => {
+		const key = (sessionId: string) => ({
+			organizationId: guardOrganizationId,
+			sessionId,
+			source: "claude_code",
+			userId,
+		});
+		const readsRollups = async () => {
+			clearUsageRollupReadiness();
+			return (
+				await getUsageAnalyticsQueryContext(guardOrganizationId)
+			).cteDefinitions.includes(USAGE_SESSION_ROLLUPS_TABLE);
+		};
+		const first = `guard_first_${runId}`;
+		const second = `guard_second_${runId}`;
+		process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE = "all";
+		process.env.USAGE_ROLLUP_WRITES_ENABLED = "false";
+		for (const [sessionId, generation] of [
+			[first, "80"],
+			[second, "81"],
+		] as const)
+			await upload(
+				sessionId,
+				generation,
+				[usageEvent(sessionId, "1")],
+				false,
+				"claude_code",
+				guardOrganizationId,
+			);
+		expect(await readsRollups()).toBe(false);
+
+		await refreshUsageSessionRollups(executor, [key(first)]);
+		expect(await readsRollups()).toBe(false);
+
+		await refreshUsageSessionRollups(executor, [key(second)]);
+		expect(await readsRollups()).toBe(true);
+
+		const [row] = await executor.query<Record<string, unknown>>({
+			query: `SELECT * FROM ${USAGE_SESSION_ROLLUPS_TABLE} FINAL WHERE organization_id = {organization:String} AND session_id = {sessionId:String}`,
+			query_params: { organization: guardOrganizationId, sessionId: first },
+		});
 		await executor.insert({
 			table: USAGE_SESSION_ROLLUPS_TABLE,
 			values: [{ ...row, build_version: 1 }],
 		});
-		process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE = "all";
-		process.env.USAGE_ROLLUP_ORG_IDS = organizationId;
-		clearUsageRollupReadiness();
-		expect(
-			(await getUsageAnalyticsQueryContext(organizationId)).cteDefinitions,
-		).not.toContain(USAGE_SESSION_ROLLUPS_TABLE);
-		await refreshUsageSessionRollups(executor, [rollupKey(sessionId)]);
-		clearUsageRollupReadiness();
-		expect(
-			(await getUsageAnalyticsQueryContext(organizationId)).cteDefinitions,
-		).toContain(USAGE_SESSION_ROLLUPS_TABLE);
+		expect(await readsRollups()).toBe(false);
+
+		await refreshUsageSessionRollups(executor, [key(first)]);
+		expect(await readsRollups()).toBe(true);
+
+		await upload(
+			first,
+			"82",
+			[usageEvent(first, "1", { outputTokens: 9 })],
+			true,
+			"claude_code",
+			guardOrganizationId,
+		);
+		expect(await readsRollups()).toBe(false);
+		const candidates = await executor.query<{ session_id: string }>(
+			buildUsageRollupCandidatesStatement({
+				checkReceipts: true,
+				limit: 1_000_000,
+				skippedOrganizationIds: [],
+			}),
+		);
+		expect(candidates.map((candidate) => candidate.session_id)).toContain(
+			first,
+		);
+		await refreshUsageSessionRollups(executor, [key(first)]);
+		expect(await readsRollups()).toBe(true);
+
+		process.env.USAGE_ROLLUP_ORG_IDS = "none";
+		expect(await readsRollups()).toBe(false);
 	});
 
 	test("the backfill rechecks rows built before their receipt or right after an upload, and waits out a back-off", async () => {

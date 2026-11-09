@@ -23,12 +23,20 @@ export function useRepositoryClock(): number | undefined {
 		: undefined;
 }
 
+const PLUGIN = import.meta.env.MODE === "plugin";
+
 export function useRepositoryHue(repoKey: string) {
 	const now = useRepositoryClock();
-	const query = useAnalyticsQuery(
-		orpc.analytics.repositories.list.queryOptions({}),
-	);
-	return query.data ? repositoryHue(query.data, repoKey, now) : null;
+	const navigation = useAnalyticsQuery({
+		...orpc.analytics.repositories.navigation.queryOptions({}),
+		enabled: !PLUGIN,
+	});
+	const list = useAnalyticsQuery({
+		...orpc.analytics.repositories.list.queryOptions({}),
+		enabled: PLUGIN,
+	});
+	const repositories = PLUGIN ? list.data : navigation.data;
+	return repositories ? repositoryHue(repositories, repoKey, now) : null;
 }
 
 export type RepoUploadStatus = "uploading" | "live" | null;

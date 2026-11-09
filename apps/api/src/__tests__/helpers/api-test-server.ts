@@ -22,6 +22,7 @@ export async function startApiTestServer(
 		NODE_ENV: "test",
 		PASSWORD_AUTH_EMAILS: "*",
 		PORT: "0",
+		USAGE_ROLLUP_ORG_IDS: "none",
 		...environmentOverrides,
 	};
 	const processHandle = Bun.spawn(["bun", entrypoint], {

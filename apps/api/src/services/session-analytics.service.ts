@@ -25,6 +25,7 @@ import { appendSessionListSqlFilters } from "./session-list-filters.js";
 import { buildActiveSkillUsesCte } from "./skill-extraction-ingest.service.js";
 import {
 	buildSessionAnalyticsWindowSql,
+	buildSessionDateWindow,
 	getUsageAnalyticsQueryContext,
 } from "./usage-event-analytics.service.js";
 
@@ -746,10 +747,10 @@ export async function getSessionDimensionAnalysis(
 	);
 
 	let query: string;
-	const usage = await getUsageAnalyticsQueryContext(
-		orgId,
-		user_id ? { userIdParam: "userId" } : {},
-	);
+	const usage = await getUsageAnalyticsQueryContext(orgId, {
+		userIdParam: user_id ? "userId" : undefined,
+		window: buildSessionDateWindow(buildDateFilter("days", "sa.session_date")),
+	});
 
 	if (split_by) {
 		query = `

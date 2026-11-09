@@ -73,6 +73,7 @@ A platform for ingesting, storing, and analyzing Claude Code / Codex session tra
 | `USAGE_EVENT_EXTRACTION_ENABLED` | No | Usage-event extraction kill switch. Set `false` to keep raw ingest available while bypassing extraction (default: `true`). |
 | `USAGE_EVENT_ANALYTICS_CUTOVER_MODE` | No | Request-level analytics routing: `off`, `canary`, or `all`. Missing and invalid values fail closed to `off`. |
 | `USAGE_EVENT_ANALYTICS_CANARY_ORG_IDS` | No | Comma-separated organization IDs routed to request-level analytics in `canary` mode. An empty list keeps the cutover off. |
+| `USAGE_ROLLUP_ORG_IDS` | No | Workspaces that price from per-session usage rollups, each only while every session has a current rollup. Unset or `all`: every workspace; `none`: none (kill switch); otherwise a comma-separated list. |
 | `USAGE_EXTRACTION_QUEUE_GLOBAL_MAX_BYTES` | No | Maximum active-plus-queued extraction bytes per API process (default: 256 MiB). |
 | `USAGE_EXTRACTION_QUEUE_GLOBAL_MAX_JOBS` | No | Maximum active-plus-queued extraction jobs per API process (default: 8). |
 | `USAGE_EXTRACTION_QUEUE_PER_USER_MAX_BYTES` | No | Maximum active-plus-queued extraction bytes for one authenticated user (default: 128 MiB). |

@@ -36,6 +36,7 @@ import {
 import {
 	backfillUsageSessionRollups,
 	buildUsageRollupCandidatesStatement,
+	isUsageRollupReceiptSweepDue,
 } from "./usage-session-rollup-backfill.service.js";
 
 const previousWrites = process.env.USAGE_ROLLUP_WRITES_ENABLED;
@@ -46,11 +47,25 @@ afterEach(() => {
 });
 
 describe("usage rollup switches", () => {
-	test("reads rollups only for listed workspaces, or every one with all, never a skipped one", () => {
+	test("reads rollups for every workspace unless listed, switched off with none, or skipped", () => {
 		const listed = { USAGE_ROLLUP_ORG_IDS: " org-a , org-b " };
 		expect(shouldReadUsageRollups("org-a", listed)).toBe(true);
 		expect(shouldReadUsageRollups("org-c", listed)).toBe(false);
-		expect(shouldReadUsageRollups("org-a", {})).toBe(false);
+		expect(shouldReadUsageRollups("org-a", {})).toBe(true);
+		expect(shouldReadUsageRollups("org-a", { USAGE_ROLLUP_ORG_IDS: " " })).toBe(
+			true,
+		);
+		expect(
+			shouldReadUsageRollups("org-a", { USAGE_ROLLUP_ORG_IDS: "none" }),
+		).toBe(false);
+		expect(
+			shouldReadUsageRollups("org-a", { USAGE_ROLLUP_ORG_IDS: "org-a,none" }),
+		).toBe(false);
+		expect(
+			shouldReadUsageRollups("internal-1", {
+				USAGE_ROLLUP_BACKFILL_SKIP_ORG_IDS: "internal-1",
+			}),
+		).toBe(false);
 		const all = {
 			USAGE_ROLLUP_BACKFILL_SKIP_ORG_IDS: "internal-1,internal-2",
 			USAGE_ROLLUP_ORG_IDS: "all",
@@ -247,7 +262,7 @@ describe("usage rollup build", () => {
 });
 
 describe("usage rollup backfill", () => {
-	test("selects missing, stale, unsettled, inconsistent and older-build rows outside skipped workspaces and back-offs", () => {
+	test("selects missing, stale, unsettled, inconsistent, older-build and older-receipt rows outside skipped workspaces and back-offs", () => {
 		const statement = buildUsageRollupCandidatesStatement({
 			limit: 300,
 			skippedOrganizationIds: ["internal-1"],
@@ -266,6 +281,22 @@ describe("usage rollup backfill", () => {
 			"r.build_version != {buildVersion:UInt32}",
 		);
 		expect(statement.query).toContain("OR r.built_at < sa.ingested_at");
+		expect(statement.query).not.toContain("rudel.usage_events");
+		const sweep = buildUsageRollupCandidatesStatement({
+			checkReceipts: true,
+			limit: 300,
+			skippedOrganizationIds: ["internal-1"],
+		}).query;
+		expect(sweep).toContain(
+			"OR (r.built_at < sa.ingested_at OR r.receipt_generation != e.receipt_generation)",
+		);
+		expect(sweep).toContain("AND record_kind = 'receipt'");
+		expect(isUsageRollupReceiptSweepDue(Date.UTC(2026, 10, 8, 12, 30))).toBe(
+			true,
+		);
+		expect(isUsageRollupReceiptSweepDue(Date.UTC(2026, 10, 8, 12, 31))).toBe(
+			false,
+		);
 		expect(statement.query).toContain(
 			"r.built_at < sa.ingested_at + INTERVAL 10 MINUTE",
 		);

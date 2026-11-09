@@ -383,6 +383,7 @@ export interface UsageAnalyticsWindow {
 	 * cost stays whole. The query must then start with `WITH RECURSIVE`.
 	 */
 	readonly includeNativeDescendants: boolean;
+	readonly onlyForEventPricing?: boolean;
 }
 
 const USAGE_WINDOW_FILTER_SQL =
@@ -402,6 +403,16 @@ export function buildSessionAnalyticsWindowSql(filterSql: string): string {
 				FROM ${getSafeClickHouseTable(SESSION_ANALYTICS_TABLE)} AS sa FINAL
 				WHERE ${organizationMatchSql("sa.organization_id")}
 					AND ${filterSql}`;
+}
+
+export function buildSessionDateWindow(
+	filterSql: string,
+): UsageAnalyticsWindow {
+	return {
+		includeNativeDescendants: false,
+		onlyForEventPricing: true,
+		sessionsSql: buildSessionAnalyticsWindowSql(filterSql),
+	};
 }
 
 export function buildDateRangeWindowSql(
@@ -1091,10 +1102,10 @@ async function resolveUsageSource(
 	organizationId: string,
 ): Promise<UsageSource> {
 	if (!shouldReadUsageRollups(organizationId)) return "events";
-	const { hasOnlyCurrentUsageRollups } = await import(
+	const { hasCompleteUsageRollups } = await import(
 		"./usage-session-rollup.service.js"
 	);
-	return (await hasOnlyCurrentUsageRollups(getClickhouse(), organizationId))
+	return (await hasCompleteUsageRollups(getClickhouse(), organizationId))
 		? "rollups"
 		: "events";
 }
@@ -1108,7 +1119,7 @@ export async function getUsageAnalyticsQueryContext(
 			cteDefinitions: buildLegacyUsageAnalyticsCte(
 				undefined,
 				"organization",
-				scope.window,
+				scope.window?.onlyForEventPricing ? undefined : scope.window,
 			),
 			dailySessionsRelation: "usage_analytics_daily_sessions",
 			metadataRelation: "usage_analytics_metadata",
@@ -1118,11 +1129,14 @@ export async function getUsageAnalyticsQueryContext(
 	}
 
 	await readinessGate.assertReady();
+	const usageSource = await resolveUsageSource(organizationId);
 	return {
 		cteDefinitions: buildUsageEventAnalyticsCte(
-			scope,
+			usageSource === "rollups" && scope.window?.onlyForEventPricing
+				? { ...scope, window: undefined }
+				: scope,
 			undefined,
-			await resolveUsageSource(organizationId),
+			usageSource,
 		),
 		dailySessionsRelation: "usage_analytics_daily_sessions",
 		metadataRelation: "usage_analytics_metadata",
