@@ -9,6 +9,7 @@ import {
 	formatLiveSessionAge,
 	formatLiveSessionSource,
 	isLiveSessionActive,
+	liveSessionListPollInterval,
 	liveSessionPollInterval,
 	mergeLiveSessionTail,
 	readLiveSessionState,
@@ -167,4 +168,13 @@ describe("formatLiveSessionSource", () => {
 		expect(formatLiveSessionSource("claude_code")).toBe("Claude Code");
 		expect(formatLiveSessionSource("codex")).toBe("Codex");
 	});
+});
+
+test("the live list polls every few seconds while a session runs or nothing pushes arrivals, else every minute", () => {
+	expect(liveSessionListPollInterval(true, 0, false)).toBe(5_000);
+	expect(liveSessionListPollInterval(true, 2, true)).toBe(5_000);
+	expect(liveSessionListPollInterval(true, 0, true)).toBe(60_000);
+	expect(liveSessionListPollInterval(30_000, 0, true)).toBe(60_000);
+	expect(liveSessionListPollInterval(120_000, 0, true)).toBe(120_000);
+	expect(liveSessionListPollInterval(false, 3, false)).toBe(false);
 });

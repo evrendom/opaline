@@ -10,6 +10,7 @@ import { appRoutes, getWorkspaceAppPath } from "@/app/routes";
 import { useOptionalOrganization } from "@/features/workspace/organization/useOrganization";
 import { SESSION_DETAIL_INITIAL_QUERY_PREFIX } from "./components/session-detail-fast-query";
 import { collectNewSessionArrivals } from "./session-arrival-tracker";
+import { setSessionArrivalsLive } from "./session-arrivals-live";
 
 export function SessionArrivalNotifications() {
 	const organization = useOptionalOrganization()?.state;
@@ -45,6 +46,10 @@ function WorkspaceSessionArrivalNotifications({
 		let handshake = true;
 		const onOpen = () => {
 			handshake = true;
+			setSessionArrivalsLive(true);
+		};
+		const onError = () => {
+			setSessionArrivalsLive(false);
 		};
 		const onSessions = (event: MessageEvent<string>) => {
 			let payload: unknown;
@@ -100,11 +105,13 @@ function WorkspaceSessionArrivalNotifications({
 				{ withCredentials: true },
 			);
 			events.addEventListener("open", onOpen);
+			events.addEventListener("error", onError);
 			events.addEventListener("sessions", onSessions);
 		};
 		const disconnect = () => {
 			events?.close();
 			events = null;
+			setSessionArrivalsLive(false);
 		};
 		const onVisibilityChange = () => {
 			if (document.visibilityState === "hidden") disconnect();

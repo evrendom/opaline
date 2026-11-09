@@ -20,8 +20,14 @@ import {
 } from "@/features/sessions/sessions-list-query";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
 import { orpc } from "@/lib/orpc";
+import {
+	pollUnlessPushed,
+	useSessionArrivalsLive,
+} from "./session-arrivals-live";
 import { mergeSessionUploadFailures } from "./session-upload-failure";
 import { useLiveSessionList } from "./use-live-sessions";
+
+const FAILURES_PUSHED_POLL_MS = 5 * 60_000;
 
 export function useSessionsPageData({
 	detail = false,
@@ -36,6 +42,7 @@ export function useSessionsPageData({
 }) {
 	const demo = useDemoRuntime();
 	const queryClient = useQueryClient();
+	const pushed = useSessionArrivalsLive();
 	const listed = !detail;
 	const [idleAfterDetail, setIdleAfterDetail] = useState(false);
 	useEffect(() => {
@@ -188,7 +195,9 @@ export function useSessionsPageData({
 			!!organization.activeOrg?.id &&
 			demo?.live !== false,
 		refetchInterval:
-			import.meta.env.MODE === "plugin" || !listed ? false : 10_000,
+			import.meta.env.MODE === "plugin" || !listed
+				? false
+				: pollUnlessPushed(pushed, 10_000, FAILURES_PUSHED_POLL_MS),
 	});
 	const previousFailures = useRef<
 		{ scope: string; ids: Set<string> } | undefined
