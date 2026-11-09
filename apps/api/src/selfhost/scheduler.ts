@@ -148,11 +148,11 @@ const PENDING_CLOCK_MARGIN_MS = 10_000;
 
 export function postgresPendingWork(sql: postgres.Sql): PendingWork {
 	return async (_job, sinceMs) => {
-		const since = new Date(sinceMs - PENDING_CLOCK_MARGIN_MS);
+		const since = new Date(sinceMs - PENDING_CLOCK_MARGIN_MS).toISOString();
 		const [row] = await sql<{ pending: boolean }[]>`
 			SELECT EXISTS (
 				SELECT 1 FROM l1_edge_scope
-				WHERE updated_at > ${since}
+				WHERE updated_at > ${since}::timestamptz
 					OR (request_count > built_request_count AND next_attempt_at <= now()
 						AND (lease_expires_at IS NULL OR lease_expires_at <= now()))
 			) AS pending`;
@@ -378,7 +378,13 @@ export function startScheduler(options: {
 		if (!resting.has(job.name)) return false;
 		const since = lastRunAt.get(job.name) ?? 0;
 		if (now() - since >= job.rest.maxMs) return false;
-		return !(await pending(job.name, since).catch(() => true));
+		return !(await pending(job.name, since).catch((error: unknown) => {
+			logger.warn("Checking for work of job {job} failed: {error}", {
+				job: job.name,
+				error: error instanceof Error ? error.message : String(error),
+			});
+			return true;
+		}));
 	};
 
 	const runOrRest = async (job: SchedulerJob): Promise<number> => {

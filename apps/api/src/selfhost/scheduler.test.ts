@@ -518,7 +518,7 @@ test("pending work is a changed or due run index scope, read with a margin for c
 	const since = Date.parse("2026-11-09T22:00:00.000Z");
 	expect(await postgresPendingWork(sql)("l1-edges", since)).toBe(true);
 	expect(String(seen[0]?.[0])).toContain("FROM l1_edge_scope");
-	expect(String(seen[0]?.[0])).toContain("updated_at > ?");
+	expect(String(seen[0]?.[0])).toContain("updated_at > ?::timestamptz");
 	expect(String(seen[0]?.[0])).toContain("next_attempt_at <= now()");
-	expect(seen[0]?.[1]).toEqual(new Date("2026-11-09T21:59:50.000Z"));
+	expect(seen[0]?.[1]).toBe("2026-11-09T21:59:50.000Z");
 });
