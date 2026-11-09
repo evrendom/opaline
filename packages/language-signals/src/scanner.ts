@@ -48,7 +48,7 @@ const COMPILED_SURFACES = LANGUAGE_SIGNAL_RULES.flatMap((rule, ruleOrder) =>
 	})),
 ).sort(compareCompiledSurfaces);
 
-const LANGUAGE_SIGNAL_PATTERN = new RegExp(
+export const LANGUAGE_SIGNAL_PATTERN = new RegExp(
 	`(${NEGATIVE_QUESTION_RUN.source})|(?<![\\p{L}\\p{N}])(?:${COMPILED_SURFACES.map(({ source }) => `(${source})`).join("|")})(?![\\p{L}\\p{N}])`,
 	"giu",
 );
@@ -86,12 +86,24 @@ const ADJACENT_POSITIVE_NEGATION_PATTERN =
 const SYSTEM_INSTRUCTION_BLOCK_PATTERN =
 	/<system_instruction>[\s\S]*?<\/system_instruction>/giu;
 
+const LANGUAGE_SIGNAL_CANDIDATE_PATTERN = new RegExp(
+	[
+		NEGATIVE_QUESTION_RUN.source,
+		...COMPILED_SURFACES.map(({ source }) => source),
+	].join("|"),
+	"giu",
+);
+const LANGUAGE_SIGNAL_AT_PATTERN = new RegExp(
+	LANGUAGE_SIGNAL_PATTERN.source,
+	"iuy",
+);
+
 export function scanLanguageSignals(
 	text: string,
 ): ReadonlyArray<LanguageSignalMatch> {
 	const matches: LanguageSignalMatch[] = [];
 
-	for (const match of text.matchAll(LANGUAGE_SIGNAL_PATTERN)) {
+	for (const match of languageSignalPatternMatches(text)) {
 		const compiledSurface = findCompiledSurface(match);
 		if (compiledSurface !== undefined) {
 			matches.push(buildLanguageSignalMatch(text, match, compiledSurface));
@@ -103,6 +115,29 @@ export function scanLanguageSignals(
 	}
 
 	return matches;
+}
+
+export function* languageSignalPatternMatches(
+	text: string,
+): Generator<RegExpExecArray> {
+	const candidates = new RegExp(LANGUAGE_SIGNAL_CANDIDATE_PATTERN);
+	const signalAt = new RegExp(LANGUAGE_SIGNAL_AT_PATTERN);
+	let from = 0;
+	while (from < text.length) {
+		candidates.lastIndex = from;
+		const candidate = candidates.exec(text);
+		if (candidate === null) return;
+		signalAt.lastIndex = candidate.index;
+		const match = signalAt.exec(text);
+		if (match === null) {
+			from =
+				candidate.index +
+				((text.codePointAt(candidate.index) ?? 0) > 0xffff ? 2 : 1);
+			continue;
+		}
+		yield match;
+		from = match.index + match[0].length;
+	}
 }
 
 export function scanMemberLanguageSignals(
