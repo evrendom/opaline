@@ -104,7 +104,7 @@ test("a link signs its user in once, with a session cookie that follows the serv
 	}
 });
 
-test("missing, unknown and orphaned links and refused sessions go back to the login page without a session", async () => {
+test("missing, unknown, orphaned, overlong and repeated links and refused sessions go back to the login page without a session", async () => {
 	const { consumed, login, sessions } = createLoginAuth(
 		"http://localhost:4100",
 		{ "orphan-token": "deleted-user" },
@@ -120,6 +120,8 @@ test("missing, unknown and orphaned links and refused sessions go back to the lo
 			login(""),
 			login("?token=unknown-token"),
 			login("?token=orphan-token"),
+			login(`?token=${"a".repeat(257)}`),
+			login("?token=unknown-token&token=orphan-token"),
 			refusing.login("?token=link-token"),
 		]),
 	);
