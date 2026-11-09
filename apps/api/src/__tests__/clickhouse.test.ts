@@ -411,6 +411,7 @@ describe("analytics service guardrails", () => {
 		expect(cleanupSource).toContain("max_bytes_to_read");
 		expect(cleanupSource).toContain("max_execution_time");
 		expect(cleanupSource).toContain('lightweight_deletes_sync: "3"');
+		expect(cleanupSource).toContain("buildKeyedDeleteOperations(");
 		expect(cleanupSource).not.toContain("ALTER TABLE");
 	});
 });
