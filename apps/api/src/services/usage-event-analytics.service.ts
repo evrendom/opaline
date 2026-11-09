@@ -362,6 +362,12 @@ export interface UsageAnalyticsScope {
 	readonly userIdParam?: string;
 	/** Read only these sessions' usage instead of the whole organization's. */
 	readonly window?: UsageAnalyticsWindow;
+	/**
+	 * Further `AND` conditions on `organization_id`, `user_id` and
+	 * `session_id` only, such as a primary-key window. Pricing and the
+	 * receipt-consistency check run per session, so whole sessions stay whole.
+	 */
+	readonly sessionKeyFilterSql?: string;
 }
 
 /**
@@ -626,7 +632,9 @@ function buildUsageEventFilters(scope: UsageAnalyticsScope): string {
 	if (scope.sessionIdParam) {
 		filters.push(`session_id = {${scope.sessionIdParam}:String}`);
 	}
-	return filters.join("\n\t\t\t\t\tAND ");
+	return `${filters.join("\n\t\t\t\t\tAND ")}${
+		scope.sessionKeyFilterSql ? `\n\t\t\t\t\t${scope.sessionKeyFilterSql}` : ""
+	}`;
 }
 
 /**
