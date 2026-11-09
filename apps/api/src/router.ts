@@ -168,6 +168,10 @@ import {
 	initR2IngestJob,
 } from "./services/ingest-job.service.js";
 import {
+	recordIngestPhase,
+	timedIngestPhase,
+} from "./services/ingest-phase-timings.js";
+import {
 	type IngestProcessingFailpoint,
 	passIngestProcessingBoundary,
 } from "./services/ingest-processing-boundary.js";
@@ -654,6 +658,7 @@ export async function processIngestSession({
 		aggregateBytes,
 		effectiveAggregateContentMaxBytes,
 	);
+	const filterStartedAt = performance.now();
 	const filteredText = await filterSessionTextFieldsOffThread({
 		bytes: aggregateBytes,
 		fields: {
@@ -713,6 +718,10 @@ export async function processIngestSession({
 		}
 		throw error;
 	});
+	recordIngestPhase(
+		"server.slim_and_secret_filter",
+		performance.now() - filterStartedAt,
+	);
 	const redactionBudgetAnomaly = getRedactionBudgetAnomaly(
 		filteredText.redactedBytes,
 		filteredText.filterInputBytes,
@@ -1152,27 +1161,29 @@ async function processPreparedIngestSession({
 	};
 	const revision = await allocateSessionRevision(revisionIdentity);
 	const ingestedAt = claimedLedger?.rawIngestedAt ?? getNextIngestedAt();
-	await adapter.ingest(
-		{
-			insert: ({ table, values }) =>
-				clickhouse.insert({
-					deduplicationToken: buildSessionRevisionDeduplicationToken(
-						revisionIdentity,
-						revision,
+	await timedIngestPhase("server.raw_insert", () =>
+		adapter.ingest(
+			{
+				insert: ({ table, values }) =>
+					clickhouse.insert({
+						deduplicationToken: buildSessionRevisionDeduplicationToken(
+							revisionIdentity,
+							revision,
+							table,
+						),
 						table,
-					),
-					table,
-					values,
-				}),
-		},
-		filteredInput,
-		{
-			ingestedAt,
-			organizationId: orgId,
-			revision,
-			timestamps,
-			userId: context.user.id,
-		},
+						values,
+					}),
+			},
+			filteredInput,
+			{
+				ingestedAt,
+				organizationId: orgId,
+				revision,
+				timestamps,
+				userId: context.user.id,
+			},
+		),
 	);
 	await recordSessionIngestContent(
 		orgId,
@@ -1229,7 +1240,9 @@ async function processPreparedIngestSession({
 			durableProcessing: durableProcessing !== undefined,
 		})
 	) {
-		void persistSessionLanguageSignalsBestEffort(languageSignalInput);
+		void timedIngestPhase("server.language_signals", () =>
+			persistSessionLanguageSignalsBestEffort(languageSignalInput),
+		);
 	}
 
 	// Derived data must never endanger the upload or the required extraction
@@ -1303,21 +1316,25 @@ async function processPreparedIngestSession({
 		let usageExtraction: UsageExtractionResult;
 		let skillExtraction: SkillExtractionResult | null;
 		try {
-			const extraction = await extractSessionFacts({
-				bytes: contentShape.contentBytes,
-				extractSkills: skillExtractionEnabled,
-				input: {
-					organizationId: orgId,
-					userId: context.user.id,
-					sessionId: input.sessionId,
-					source: filteredInput.source,
-					content: filteredInput.content,
-					subagents,
-				},
-				signal,
-				skillSessionDate: timestamps.sessionDate,
-				userId: context.user.id,
-			});
+			const extraction = await timedIngestPhase(
+				"server.usage_and_skills_extraction",
+				() =>
+					extractSessionFacts({
+						bytes: contentShape.contentBytes,
+						extractSkills: skillExtractionEnabled,
+						input: {
+							organizationId: orgId,
+							userId: context.user.id,
+							sessionId: input.sessionId,
+							source: filteredInput.source,
+							content: filteredInput.content,
+							subagents,
+						},
+						signal,
+						skillSessionDate: timestamps.sessionDate,
+						userId: context.user.id,
+					}),
+			);
 			usageExtraction = extraction.usage;
 			skillExtraction = extraction.skills;
 		} catch (error) {
@@ -1403,40 +1420,44 @@ async function processPreparedIngestSession({
 			throw error;
 		}
 		if (skillExtractionEnabled && skillExtraction) {
-			await writeSkillExtraction(clickhouse, {
-				extractedAt: claimedLedger?.rawIngestedAt ?? getNextIngestedAt(),
-				extraction: skillExtraction,
-				organizationId: orgId,
-				rawRevision: revision,
-				sessionDate: new Date(timestamps.sessionDate),
-				sessionId: input.sessionId,
-				userId: context.user.id,
-			});
+			await timedIngestPhase("server.skills_write", () =>
+				writeSkillExtraction(clickhouse, {
+					extractedAt: claimedLedger?.rawIngestedAt ?? getNextIngestedAt(),
+					extraction: skillExtraction,
+					organizationId: orgId,
+					rawRevision: revision,
+					sessionDate: new Date(timestamps.sessionDate),
+					sessionId: input.sessionId,
+					userId: context.user.id,
+				}),
+			);
 		}
 		if (!usageExtractionEnabled || usageGeneration === null) {
 			return { contentSha256: contentHash, result: response };
 		}
-		await writeUsageExtraction(clickhouse, {
-			assertWritable: () =>
-				assertNoClickHousePurgeTombstone(
-					{ organizationId: orgId, userId: context.user.id },
-					{ database: sqlClient },
-				),
-			contentSha256: contentHash,
-			extraction: usageExtraction,
-			filterVersion: SESSION_INGEST_FILTER_VERSION,
-			generation: usageGeneration,
-			ingestedAt,
-			organizationId: orgId,
-			replaceAbsentEvents:
-				input.force_replace === true ||
-				shouldReplaceUsageEventsForVersion(ownership),
-			sessionDate: new Date(timestamps.sessionDate),
-			sessionId: input.sessionId,
-			signal,
-			source: filteredInput.source,
-			userId: context.user.id,
-		});
+		await timedIngestPhase("server.usage_write", () =>
+			writeUsageExtraction(clickhouse, {
+				assertWritable: () =>
+					assertNoClickHousePurgeTombstone(
+						{ organizationId: orgId, userId: context.user.id },
+						{ database: sqlClient },
+					),
+				contentSha256: contentHash,
+				extraction: usageExtraction,
+				filterVersion: SESSION_INGEST_FILTER_VERSION,
+				generation: usageGeneration,
+				ingestedAt,
+				organizationId: orgId,
+				replaceAbsentEvents:
+					input.force_replace === true ||
+					shouldReplaceUsageEventsForVersion(ownership),
+				sessionDate: new Date(timestamps.sessionDate),
+				sessionId: input.sessionId,
+				signal,
+				source: filteredInput.source,
+				userId: context.user.id,
+			}),
+		);
 		if (usageExtraction.status === "incomplete") {
 			logger.warn(
 				"Usage extraction incomplete after raw ingest (organization_id={organizationId} session_id={sessionId} diagnostics={diagnostics})",
@@ -1526,18 +1547,20 @@ async function processPreparedIngestSession({
 		// Search indexing runs after the records extraction slot is released,
 		// for uploads only; it is bounded and never fails the upload.
 		if ((await transcriptRecordsJob) === "written")
-			await indexUploadedSessionBestEffort(getClickhouse(), {
-				assertWritable: () =>
-					assertNoClickHousePurgeTombstone(
-						{ organizationId: orgId, userId: context.user.id },
-						{ database: sqlClient },
-					),
-				organizationId: orgId,
-				sessionId: input.sessionId,
-				signal,
-				source: filteredInput.source,
-				userId: context.user.id,
-			});
+			await timedIngestPhase("server.search_index", () =>
+				indexUploadedSessionBestEffort(getClickhouse(), {
+					assertWritable: () =>
+						assertNoClickHousePurgeTombstone(
+							{ organizationId: orgId, userId: context.user.id },
+							{ database: sqlClient },
+						),
+					organizationId: orgId,
+					sessionId: input.sessionId,
+					signal,
+					source: filteredInput.source,
+					userId: context.user.id,
+				}),
+			);
 		if (
 			shouldAwaitBestEffortLanguageSignals({
 				awaitBestEffortLanguageSignals,
@@ -1545,7 +1568,9 @@ async function processPreparedIngestSession({
 				durableProcessing: durableProcessing !== undefined,
 			})
 		) {
-			await persistSessionLanguageSignalsBestEffort(languageSignalInput);
+			await timedIngestPhase("server.language_signals", () =>
+				persistSessionLanguageSignalsBestEffort(languageSignalInput),
+			);
 		}
 	}
 }
@@ -1628,21 +1653,23 @@ const ingestSessionHandler = os.ingestSession
 		const input = analysisOrganizationId
 			? { ...requested, organizationId: analysisOrganizationId }
 			: requested;
-		const processed = await processIngestSession({
-			// Sessions above the direct size upload only through R2.
-			aggregateContentMaxBytes: INGEST_DIRECT_CONTENT_MAX_BYTES,
-			allowQuiescedIngest: context.ingestOperatorAuthorized,
-			awaitLanguageSignals: isVercelRuntime(),
-			context: {
-				apiKeyId: context.apiKeyId,
-				session: context.session,
-				user: context.user,
-			},
-			enforceRateLimits: true,
-			errorFactories: createIngestErrorFactories(errors),
-			input,
-			signal,
-		});
+		const processed = await timedIngestPhase("server.ingest_rpc_total", () =>
+			processIngestSession({
+				// Sessions above the direct size upload only through R2.
+				aggregateContentMaxBytes: INGEST_DIRECT_CONTENT_MAX_BYTES,
+				allowQuiescedIngest: context.ingestOperatorAuthorized,
+				awaitLanguageSignals: isVercelRuntime(),
+				context: {
+					apiKeyId: context.apiKeyId,
+					session: context.session,
+					user: context.user,
+				},
+				enforceRateLimits: true,
+				errorFactories: createIngestErrorFactories(errors),
+				input,
+				signal,
+			}),
+		);
 		return processed.result;
 	});
 

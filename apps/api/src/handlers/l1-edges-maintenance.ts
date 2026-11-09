@@ -54,18 +54,27 @@ export async function handleL1EdgesMaintenanceRequest(
 			ok: true,
 			usageRollups: await backfillUsageRollups(budgets().usageRollupsMs),
 		});
-	const built = await runConfiguredL1EdgePass(budgets().l1PassMs);
+	const { timedIngestPhase } = await import(
+		"../services/ingest-phase-timings.js"
+	);
+	const built = await timedIngestPhase("jobs.run_index_pass", () =>
+		runConfiguredL1EdgePass(budgets().l1PassMs),
+	);
 	const [{ backfillContextSnapshots }, { getClickhouse }, { sqlClient }] =
 		await Promise.all([
 			import("../services/context-snapshot-backfill.service.js"),
 			import("../clickhouse.js"),
 			import("../db.js"),
 		]);
-	const contextSnapshots = await backfillContextSnapshots({
-		budgetMs: budgets().contextSnapshotsMs,
-		executor: getClickhouse(),
-		sql: sqlClient,
-	});
+	const contextSnapshots = await timedIngestPhase(
+		"jobs.context_snapshots",
+		() =>
+			backfillContextSnapshots({
+				budgetMs: budgets().contextSnapshotsMs,
+				executor: getClickhouse(),
+				sql: sqlClient,
+			}),
+	);
 	return Response.json({
 		l1Edges: { enabled: true, built },
 		contextSnapshots,
