@@ -28,7 +28,16 @@ import {
 import { omittedMarker } from "./compact.js";
 import { fitCount } from "./output-ceiling.js";
 import { cell } from "./read-output.js";
-import { limitRefusal, runSplit, splitBudget } from "./refused-split.js";
+import {
+	childBudget,
+	inOrder,
+	joinBudgets,
+	limitRefusal,
+	partConcurrency,
+	runSplit,
+	type SplitOutcome,
+	splitBudget,
+} from "./refused-split.js";
 import type { MeasureParams } from "./retro-measure-sql.js";
 import {
 	ANALYSIS_QUERY_SETTINGS,
@@ -303,7 +312,7 @@ async function runSplitParts<T>(
 	const budget = splitBudget();
 	const rows: SqlRow[] = [];
 	const notices: string[] = [];
-	const run = async (part: SqlPart) => {
+	const run = async (part: SqlPart, seen: string[]) => {
 		const done = await execute(
 			caller,
 			part.query,
@@ -314,7 +323,7 @@ async function runSplitParts<T>(
 			part.cohort ?? input.cohort,
 		);
 		if (done.ok) {
-			notices.push(...done.notices);
+			seen.push(...done.notices);
 			return done.value;
 		}
 		throw limitRefusal(done.error) ?? new PartFailed(done.error);
@@ -322,28 +331,35 @@ async function runSplitParts<T>(
 	let completed = 0;
 	let refused: SqlFailure | null = null;
 	try {
-		for (const part of input.parts.queries) {
-			const split = part.split;
-			if (!split) {
-				rows.push(...(await run(part)));
-				completed += 1;
-				continue;
-			}
-			const outcome = await runSplit(
-				split.stage,
-				split.window,
-				(window, piece) => run(piece ? split.build(window) : part),
-				budget,
-				split.approximate ? { approximate: split.approximate } : {},
-			);
+		const outcomes = await inOrder(
+			input.parts.queries.map((part) => async () => {
+				const own = childBudget(budget);
+				const seen: string[] = [];
+				const split = part.split;
+				const outcome: SplitOutcome<SqlRow[]> = split
+					? await runSplit(
+							split.stage,
+							split.window,
+							(window, piece) => run(piece ? split.build(window) : part, seen),
+							own,
+							split.approximate ? { approximate: split.approximate } : {},
+						)
+					: { ok: true, values: [await run(part, seen)] };
+				return { part, outcome, own, seen };
+			}),
+			partConcurrency(),
+		);
+		for (const { part, outcome, own, seen } of outcomes) {
+			notices.push(...seen);
+			joinBudgets(budget, [own]);
 			if (!outcome.ok) {
 				refused ??= outcome.refusal?.failure ?? null;
 				continue;
 			}
 			completed += 1;
 			rows.push(
-				...(outcome.values.length > 1 && split.merge
-					? split.merge(outcome.values)
+				...(outcome.values.length > 1 && part.split?.merge
+					? part.split.merge(outcome.values)
 					: outcome.values.flat()),
 			);
 		}
