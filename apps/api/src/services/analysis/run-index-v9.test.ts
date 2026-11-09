@@ -62,6 +62,7 @@ describe("parser 9 run interpretation", () => {
 				revision: "1",
 				sessionId: "session",
 				usageGeneration: "usage",
+				source: "claude_code",
 			},
 		).query;
 		const run = runFactsCtes();

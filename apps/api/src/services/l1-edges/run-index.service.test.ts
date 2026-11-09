@@ -20,6 +20,7 @@ import { NO_CODEX_LIFECYCLE_FACTS } from "../analysis/codex-lifecycle.js";
 import { gateRunIndexRow } from "../analysis/run-index-columns.js";
 import {
 	buildRunIndexStatement,
+	buildRunRequestsStatement,
 	buildUnattributedUsageStatement,
 	RUN_INDEX_PRICING_VERSION,
 	RUN_INDEX_VERSION,
@@ -38,6 +39,7 @@ import {
 	buildRunIndex,
 	carriedMcpUnavailable,
 	RunIndexUsageChangedError,
+	readRunIndexUsage,
 	runIndexUsage,
 	runRow,
 	runUnknownColumns,
@@ -1325,6 +1327,7 @@ describe("run index statements", () => {
 		revision: "7",
 		parserVersion: 8,
 		usageGeneration: "12",
+		source: "claude_code",
 	};
 	const finalScans = (query: string) =>
 		query.match(/rudel\.transcript_records FINAL/gu)?.length ?? 0;
@@ -1356,6 +1359,51 @@ describe("run index statements", () => {
 		expect(buildRunFactsStatement(scope, [generation]).query).not.toContain(
 			"usageGeneration",
 		);
+	});
+
+	test("every usage read of a build seeks the session's source in the usage key", async () => {
+		const usageReads = (query: string) =>
+			query
+				.split("rudel.usage_events")
+				.slice(1)
+				.map((tail) => tail.slice(0, tail.search(/\n\s*\)/u)));
+		for (const build of [
+			buildRunIndexStatement,
+			buildRunRequestsStatement,
+			buildUnattributedUsageStatement,
+		]) {
+			const statement = build(scope, generation);
+			const reads = usageReads(statement.query);
+			expect(reads.length).toBeGreaterThan(0);
+			for (const read of reads) expect(read).toMatch(/source = /u);
+			expect(statement.query).toContain("e.source = {source:String}");
+			expect(statement.query_params).toMatchObject({ source: "claude_code" });
+		}
+		expect(buildRunFactsStatement(scope, [generation]).query).not.toContain(
+			"{source:String}",
+		);
+
+		const statements: ClickHouseStatement[] = [];
+		await readRunIndexUsage(
+			{
+				async close() {},
+				async execute() {},
+				async insert() {},
+				async query<T>(statement: ClickHouseStatement) {
+					statements.push(statement);
+					return [] as T[];
+				},
+			},
+			"org",
+			{ ...session, source: "codex" },
+		);
+		expect(statements[0]?.query).toContain(
+			"AND source = {source:String} AND session_id = {sessionId:String}",
+		);
+		expect(statements[0]?.query_params).toMatchObject({
+			source: "codex",
+			sessionId: "s 1",
+		});
 	});
 
 	test("unattributed usage is every event no run claims, verified or not", () => {

@@ -100,6 +100,7 @@ describe("semantic run-index component projections", () => {
 				revision: "1",
 				parserVersion: 9,
 				usageGeneration: "1",
+				source: "codex",
 			},
 		);
 		expect(statement.query).toContain("facts['subagent_type_components']");

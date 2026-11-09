@@ -722,16 +722,17 @@ const TOKEN_KINDS = [
  * stored line that may belong to another stream. Unverified cost is reported
  * per session, never guessed onto a run.
  *
- * With `generation`, every usage read is bound to one usage extraction
- * (`{usageGeneration:UInt64}`): the run index prices a complete, consistent
- * set of events, never a mix of two extractions. `find` reads every active
- * event.
+ * With `generation`, every usage read is bound to one usage extraction of
+ * one session stream (`{usageGeneration:UInt64}`, `{source:String}`): the
+ * run index prices a complete, consistent set of events, never a mix of two
+ * extractions. `find` reads every active event.
  */
 export function usageEventCtes(options: { generation?: boolean } = {}): string {
 	const generation = options.generation
 		? " AND event_version = {usageGeneration:UInt64}"
 		: "";
-	return `${buildPricedUsageEventsCte(`e.organization_id = {organizationId:String} AND e.user_id = {userId:String} AND e.session_id IN {sessionIds:Array(String)}${generation.replace("event_version", "e.event_version")}`)},
+	const source = options.generation ? " AND e.source = {source:String}" : "";
+	return `${buildPricedUsageEventsCte(`e.organization_id = {organizationId:String} AND e.user_id = {userId:String}${source} AND e.session_id IN {sessionIds:Array(String)}${generation.replace("event_version", "e.event_version")}`)},
 		claude_single_lineages AS (
 			SELECT DISTINCT session_id, lineage_id FROM ${getSafeClickHouseTable("rudel.usage_events")} FINAL
 			WHERE organization_id = {organizationId:String} AND user_id = {userId:String} AND session_id IN {sessionIds:Array(String)}
@@ -830,6 +831,7 @@ const usageShape = {
  */
 export interface UsageBoundGeneration extends SessionGeneration {
 	readonly usageGeneration: string;
+	readonly source: string;
 }
 
 /** One run of a generation with its stored facts, before gating (`run-index-columns.ts`). */
@@ -966,6 +968,7 @@ export function buildRunIndexStatement(
 		query_params: {
 			...pinnedParams(scope, [generation]),
 			usageGeneration: generation.usageGeneration,
+			source: generation.source,
 		},
 	};
 }
@@ -1023,6 +1026,7 @@ export function buildUnattributedUsageStatement(
 		query_params: {
 			...pinnedParams(scope, [generation]),
 			usageGeneration: generation.usageGeneration,
+			source: generation.source,
 		},
 	};
 }
@@ -1198,6 +1202,7 @@ export function buildRunRequestsStatement(
 		query_params: {
 			...pinnedParams(scope, [generation]),
 			usageGeneration: generation.usageGeneration,
+			source: generation.source,
 		},
 	};
 }

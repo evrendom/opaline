@@ -257,6 +257,7 @@ export async function buildRunIndex(input: {
 		revision: committed.revision,
 		parserVersion: committed.parserVersion,
 		usageGeneration: usage.generation,
+		source: session.source,
 	};
 	const runs = await query(
 		executor,
@@ -551,7 +552,7 @@ function markerGeneration(marker: RudelRunIndexRow): RunIndexGeneration {
 export async function readRunIndexUsage(
 	executor: ClickHouseExecutor,
 	organizationId: string,
-	session: Pick<SessionIdentity, "userId" | "sessionId">,
+	session: SessionIdentity,
 ): Promise<RunIndexUsage> {
 	const [state] = await query(executor, UsageStateSchema, {
 		query: `SELECT toString(any(receipt_generation)) AS generation, any(receipt_count) AS receipts,
@@ -569,11 +570,12 @@ export async function readRunIndexUsage(
 					argMaxIf(receipt_checksum, event_version, record_kind = 'receipt') OVER () AS receipt_checksum_latest
 				FROM ${getSafeClickHouseTable("rudel.usage_events")} FINAL
 				WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
-					AND session_id = {sessionId:String}
+					AND source = {source:String} AND session_id = {sessionId:String}
 			)`,
 		query_params: {
 			organizationId,
 			userId: session.userId,
+			source: session.source,
 			sessionId: session.sessionId,
 		},
 		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
