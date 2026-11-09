@@ -62,7 +62,9 @@ function OrganizationStateProbe() {
 }
 
 it("recovers after full-organization is rate limited and auto-select succeeds", async () => {
-	mockUseSession.mockReturnValue({ data: { user: { id: "user-1" } } });
+	mockUseSession.mockReturnValue({
+		data: { user: { id: "user-1" }, session: { activeOrganizationId: null } },
+	});
 	let resolveSetActive:
 		| ((result: { data: typeof organization; error: null }) => void)
 		| undefined;

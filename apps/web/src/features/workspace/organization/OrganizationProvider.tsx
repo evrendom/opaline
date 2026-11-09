@@ -13,6 +13,10 @@ import { getWorkspaceSlugFromPath } from "@/app/routes";
 import type { WorkspaceContextValue } from "@/features/workspace/organization/types";
 import { authClient } from "@/lib/auth-client";
 import { orpc } from "@/lib/orpc";
+import {
+	getBootOrganization,
+	resolveActiveOrganization,
+} from "./boot-workspace";
 
 const OrganizationContext = createContext<WorkspaceContextValue | undefined>(
 	undefined,
@@ -121,6 +125,8 @@ function AuthenticatedOrganizationProvider({
 	children: ReactNode;
 }) {
 	const { pathname } = useLocation();
+	const urlSlug = getWorkspaceSlugFromPath(pathname);
+	const { data: session } = authClient.useSession();
 	const { data: activeOrg, isPending: activeLoading } =
 		authClient.useActiveOrganization();
 	const { data: orgs, isPending: listLoading } =
@@ -133,6 +139,7 @@ function AuthenticatedOrganizationProvider({
 	const [optimisticActiveOrgId, setOptimisticActiveOrgId] = useState<
 		string | null
 	>(null);
+	const [followedUrlOrgId, setFollowedUrlOrgId] = useState<string | null>(null);
 
 	const activeMembers = useMemo(
 		() =>
@@ -143,12 +150,22 @@ function AuthenticatedOrganizationProvider({
 		[activeOrg?.members],
 	);
 	const firstOrganizationId = orgs?.[0]?.id ?? null;
-	const optimisticActiveOrg =
-		orgs?.find((organization) => organization.id === optimisticActiveOrgId) ??
-		null;
-	const resolvedActiveOrg =
-		orgs?.find((organization) => organization.id === activeOrg?.id) ??
-		optimisticActiveOrg;
+	const resolvedActiveOrg = resolveActiveOrganization({
+		urlSlug,
+		organizations: orgs,
+		activeOrganizationId: activeOrg?.id,
+		optimisticActiveOrganizationId: optimisticActiveOrgId,
+		bootOrganization: getBootOrganization(),
+	});
+	const sessionActiveOrgId =
+		activeOrg?.id ?? session?.session.activeOrganizationId ?? null;
+	const urlOrgToActivate =
+		urlSlug &&
+		resolvedActiveOrg &&
+		resolvedActiveOrg.id !== sessionActiveOrgId &&
+		resolvedActiveOrg.id !== followedUrlOrgId
+			? resolvedActiveOrg.id
+			: null;
 	// Whose sessions the caller opens is the server's decision, per workspace.
 	const { data: sessionAccess } = useQuery({
 		...orpc.sessionAccess.queryOptions(),
@@ -156,7 +173,7 @@ function AuthenticatedOrganizationProvider({
 		enabled: Boolean(resolvedActiveOrg),
 	});
 	const shouldAutoSelect =
-		!getWorkspaceSlugFromPath(pathname) &&
+		!urlSlug &&
 		!activeLoading &&
 		!listLoading &&
 		!resolvedActiveOrg &&
@@ -178,12 +195,15 @@ function AuthenticatedOrganizationProvider({
 		}
 	}, []);
 
-	const memberRole = activeMember?.role;
-	const members =
-		activeOrg?.id === resolvedActiveOrg?.id ? activeMembers : undefined;
+	const activeOrgMatches = activeOrg?.id === resolvedActiveOrg?.id;
+	const memberRole = activeOrgMatches ? activeMember?.role : undefined;
+	const members = activeOrgMatches ? activeMembers : undefined;
 	const isLoading = activeLoading || listLoading || switching;
 	const isOrgAdmin =
-		!activeOrg || memberRole === "owner" || memberRole === "admin";
+		!activeOrg ||
+		!activeOrgMatches ||
+		memberRole === "owner" ||
+		memberRole === "admin";
 	const readsEverySession = sessionAccess?.readsEverySession ?? true;
 	const contextValue = useMemo<WorkspaceContextValue>(
 		() => ({
@@ -209,6 +229,15 @@ function AuthenticatedOrganizationProvider({
 
 	return (
 		<>
+			{urlOrgToActivate ? (
+				<OrganizationAutoSelectMount
+					key={urlOrgToActivate}
+					organizationId={urlOrgToActivate}
+					onAttempted={setFollowedUrlOrgId}
+					onSucceeded={() => undefined}
+					onSettled={() => undefined}
+				/>
+			) : null}
 			{shouldAutoSelect ? (
 				<OrganizationAutoSelectMount
 					key={firstOrganizationId}

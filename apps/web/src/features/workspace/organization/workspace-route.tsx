@@ -1,10 +1,7 @@
 import { validateOrgSlug } from "@rudel/api-routes/reserved-slugs";
-import { IconAlertTriangle, IconRefresh } from "@tabler/icons-react";
-import { type ReactNode, useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { useParams } from "react-router-dom";
 import { NotFoundPage } from "@/app/system/NotFoundPage";
-import { Button } from "@/components/dashboard/button";
-import { EmptyState } from "@/components/dashboard/page-parts";
 import { ProductLoadingScreen } from "@/features/shell/product-loading-screen";
 import { authClient } from "@/lib/auth-client";
 import { useOrganization } from "./useOrganization";
@@ -24,58 +21,14 @@ function WorkspaceRouteContent({
 	slug,
 	children,
 }: {
-	slug: string | undefined;
+	slug: string;
 	children: ReactNode;
 }) {
 	const { state } = useOrganization();
 	const { isRefetching: isRefreshingOrganizations } =
 		authClient.useListOrganizations();
-	const organization = state.organizations.find((item) => item.slug === slug);
-	const [attempted, setAttempted] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-	const needsSwitch = organization && state.activeOrg?.id !== organization.id;
-	useEffect(() => {
-		if (!state.isLoading && organization && !needsSwitch && attempted) {
-			setAttempted(false);
-			return;
-		}
-		if (state.isLoading || !needsSwitch || !organization || attempted) return;
-		setAttempted(true);
-		void authClient.organization
-			.setActive({ organizationId: organization.id })
-			.then((result) => {
-				if (result.error)
-					setError("Could not open this workspace. Please try again.");
-			})
-			.catch(() =>
-				setError("Could not open this workspace. Please try again."),
-			);
-	}, [state.isLoading, needsSwitch, organization, attempted]);
-	if (error)
-		return (
-			<ProductLoadingScreen>
-				<div className="flex min-h-0 flex-1 flex-col p-8" role="alert">
-					<EmptyState icon={IconAlertTriangle} title={error}>
-						<div className="mt-2 flex justify-center">
-							<Button
-								onClick={() => {
-									setError(null);
-									setAttempted(false);
-								}}
-								type="button"
-								variant="outline"
-							>
-								<IconRefresh />
-								Retry
-							</Button>
-						</div>
-					</EmptyState>
-				</div>
-			</ProductLoadingScreen>
-		);
-	if (state.isLoading || (!organization && isRefreshingOrganizations))
+	if (state.activeOrg?.slug === slug) return children;
+	if (state.isLoading || isRefreshingOrganizations)
 		return <ProductLoadingScreen />;
-	if (!organization) return <NotFoundPage />;
-	if (needsSwitch) return <ProductLoadingScreen />;
-	return children;
+	return <NotFoundPage />;
 }

@@ -58,8 +58,13 @@ import {
 } from "./lib/http-response-policy.js";
 import { isAuthorizedIngestOperatorRequest } from "./lib/ingest-quiescence.js";
 import { resolvePublicLookupSource } from "./lib/public-lookup-source.js";
+import { createRequestWorkspaceLookups } from "./lib/request-workspace.js";
+import {
+	createRpcBatchPlugin,
+	readWorkspaceFromRequest,
+} from "./lib/rpc-batch.js";
 import { setupLogging } from "./logging.js";
-import type { ApiKeyAuthFailure } from "./middleware.js";
+import type { ApiKeyAuthFailure, AppContext } from "./middleware.js";
 import { parsePasswordAuthEmails } from "./password-auth.js";
 import { readResendConfig } from "./resend-config.js";
 import { router } from "./router.js";
@@ -172,6 +177,8 @@ export const auth = createAuth(db, {
 });
 
 const rpcHandler = new RPCHandler(router, {
+	plugins: [createRpcBatchPlugin<AppContext>()],
+	rootInterceptors: [readWorkspaceFromRequest<AppContext>],
 	clientInterceptors: [
 		onError((error, { context }) => {
 			if (
@@ -831,6 +838,7 @@ async function getContext(
 		),
 		requestId,
 		publicLookupSource,
+		workspaceLookups: createRequestWorkspaceLookups(),
 	};
 }
 
