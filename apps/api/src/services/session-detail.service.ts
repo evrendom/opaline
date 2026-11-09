@@ -8,6 +8,7 @@ import type {
 import { isLiveSessionDetailRevision } from "@rudel/api-routes";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
 import { isSelfHosted } from "../lib/self-hosted.js";
+import { timedIngestPhase } from "./ingest-phase-timings.js";
 import { isLiveSessionsReadable } from "./live-session/live-session-config.js";
 import {
 	readLiveSessionDetailRevision,
@@ -49,6 +50,10 @@ import {
 	getSessionDetailCurrentRevision,
 	getSessionDetailRawSnapshot,
 } from "./session-detail-snapshot.service.js";
+import {
+	readStoredSessionDetail,
+	writeStoredSessionDetail,
+} from "./session-detail-store.js";
 import { getSessionFamilyCost } from "./session-family-cost.service.js";
 
 const logger = getLogger(["rudel", "api", "session-detail"]);
@@ -230,11 +235,17 @@ async function loadDerivation(
 	key: SessionDetailDerivationCacheKey,
 ): Promise<SessionDetailDerivation | null> {
 	try {
-		const derivation = await cache.getOrLoad(key, () =>
-			derivationSemaphore.run(async () => {
+		const derivation = await cache.getOrLoad(key, async () => {
+			const stored = await timedIngestPhase("detail.store_read", () =>
+				readStoredSessionDetail(key),
+			);
+			if (stored) return { bytes: stored.byteSize, value: stored };
+			return derivationSemaphore.run(async () => {
 				const memoryBefore = process.memoryUsage();
 				const startedAt = performance.now();
-				const snapshot = await loadRawSnapshot(key);
+				const snapshot = await timedIngestPhase("detail.raw_fetch", () =>
+					loadRawSnapshot(key),
+				);
 				const rawFetchDurationMs = Math.round(performance.now() - startedAt);
 				if (!snapshot) {
 					throw new SessionDetailSnapshotNotFoundError();
@@ -250,7 +261,9 @@ async function loadDerivation(
 				}
 				const derivationStartedAt = performance.now();
 				const value = isSelfHosted()
-					? await deriveSessionDetailOffThread(snapshot)
+					? await timedIngestPhase("detail.derive", () =>
+							deriveSessionDetailOffThread(snapshot),
+						)
 					: deriveSessionDetail(snapshot);
 				const derivationDurationMs = Math.round(
 					performance.now() - derivationStartedAt,
@@ -294,9 +307,10 @@ async function loadDerivation(
 						rawBytes,
 					},
 				);
+				void writeStoredSessionDetail(key, value);
 				return { bytes: value.byteSize, value };
-			}),
-		);
+			});
+		});
 		retainOnlyNewestLiveDerivation(key);
 		return derivation;
 	} catch (error) {
