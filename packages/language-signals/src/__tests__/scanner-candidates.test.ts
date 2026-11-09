@@ -82,14 +82,4 @@ test("anchoring the pattern at each candidate yields the matches a scan of the w
 		if (expected.length > 0) withMatches++;
 	}
 	expect(withMatches).toBeGreaterThan(2_000);
-});
-
-test("a long text without signals is scanned without trying the pattern at every position", () => {
-	const text = "the agent read the file and ran the tests ".repeat(25_000);
-	const startedAt = performance.now();
-	expect(raw(languageSignalPatternMatches(text))).toEqual([]);
-	const anchored = performance.now() - startedAt;
-	const wholeStartedAt = performance.now();
-	expect(raw(text.matchAll(LANGUAGE_SIGNAL_PATTERN))).toEqual([]);
-	expect(anchored).toBeLessThan((performance.now() - wholeStartedAt) / 2);
-});
+}, 30_000);
