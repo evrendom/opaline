@@ -9,7 +9,7 @@ import {
 } from "react";
 import { Link } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
-import { Bones } from "@/app/ui/bones";
+import { Reveal } from "@/app/ui/bones";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { sessionDetailInitialQueryOptions } from "@/features/sessions/components/session-detail-fast-query";
 import type { NormalizedSessionDetailOverview } from "@/features/sessions/components/session-detail-fast-response";
@@ -129,21 +129,25 @@ function FitContext({ children }: { children: ReactNode }) {
 	}, [ready]);
 	return (
 		<div ref={box} className="relative min-h-0 flex-1 overflow-hidden">
-			{children ? (
-				<div ref={content} inert>
-					<ContextPreview.Provider value>
-						<ContextAreaHeight.Provider value={areaHeight}>
-							{children}
-						</ContextAreaHeight.Provider>
-					</ContextPreview.Provider>
-				</div>
-			) : (
-				<div className="absolute inset-0">
-					<Bones fill label="Loading session">
-						<ContextMapSample fill />
-					</Bones>
-				</div>
-			)}
+			<div className="absolute inset-0">
+				<Reveal
+					fill
+					label="Loading session"
+					loading={!children}
+					sample={<ContextMapSample fill />}
+					sampleId="repo-session-preview"
+				>
+					{() => (
+						<div ref={content} inert>
+							<ContextPreview.Provider value>
+								<ContextAreaHeight.Provider value={areaHeight}>
+									{children}
+								</ContextAreaHeight.Provider>
+							</ContextPreview.Provider>
+						</div>
+					)}
+				</Reveal>
+			</div>
 		</div>
 	);
 }

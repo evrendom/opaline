@@ -6,7 +6,7 @@ import {
 	IconZoomCancel,
 } from "@tabler/icons-react";
 import { useMemo, useState } from "react";
-import { Bones } from "@/app/ui/bones";
+import { Reveal } from "@/app/ui/bones";
 import { Button } from "@/app/ui/button";
 import { SearchInput } from "@/components/dashboard/data-table";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
@@ -103,15 +103,7 @@ export function McpPageView({
 						sort={sort}
 					/>
 				</div>
-				{isPending ? (
-					<Bones
-						fill
-						className="min-h-0 min-w-0 flex-1"
-						label="Loading MCP servers"
-					>
-						<McpCardsGrid servers={SAMPLE_SERVERS} onSelect={NOOP} />
-					</Bones>
-				) : isError ? (
+				{!isPending && isError ? (
 					<UsageStateMessage
 						icon={<IconPlug aria-hidden="true" />}
 						title="MCP servers couldn’t be loaded"
@@ -130,13 +122,13 @@ export function McpPageView({
 							</Button>
 						}
 					/>
-				) : (servers?.length ?? 0) === 0 ? (
+				) : !isPending && (servers?.length ?? 0) === 0 ? (
 					<UsageStateMessage
 						icon={<IconPlug aria-hidden="true" />}
 						title="No MCP servers yet"
 						description="MCP servers appear here once a session connects one or calls its tools."
 					/>
-				) : visible.length === 0 ? (
+				) : !isPending && visible.length === 0 ? (
 					<UsageStateMessage
 						icon={<IconZoomCancel aria-hidden="true" />}
 						title="No matching MCP servers"
@@ -153,7 +145,16 @@ export function McpPageView({
 						}
 					/>
 				) : (
-					<McpCardsGrid servers={visible} onSelect={onSelect} />
+					<Reveal
+						fill
+						className="min-h-0 min-w-0 flex-1"
+						label="Loading MCP servers"
+						loading={isPending}
+						sample={<McpCardsGrid servers={SAMPLE_SERVERS} onSelect={NOOP} />}
+						sampleId="mcp"
+					>
+						{() => <McpCardsGrid servers={visible} onSelect={onSelect} />}
+					</Reveal>
 				)}
 			</section>
 		</div>

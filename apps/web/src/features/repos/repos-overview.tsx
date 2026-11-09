@@ -9,7 +9,7 @@ import {
 } from "@tabler/icons-react";
 import { memo, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Bones } from "@/app/ui/bones";
+import { Reveal } from "@/app/ui/bones";
 import { Button } from "@/app/ui/button";
 import { SearchInput } from "@/components/dashboard/data-table";
 import {
@@ -179,16 +179,7 @@ export function ReposOverview({
 						onClearAll={clearFilters}
 					/>
 				</div>
-				{isPending ? (
-					<Bones fill className="min-h-0 min-w-0 flex-1" label="Loading repos">
-						<ReposList
-							avatarMap={NO_AVATARS}
-							getRepoHref={sampleRepoHref}
-							repos={SAMPLE_REPOS}
-							userMap={SAMPLE_USERS}
-						/>
-					</Bones>
-				) : isError ? (
+				{!isPending && isError ? (
 					<UsageStateMessage
 						icon={<IconBook aria-hidden="true" />}
 						title="Repos couldn’t be loaded"
@@ -204,13 +195,13 @@ export function ReposOverview({
 							</Button>
 						}
 					/>
-				) : (repos?.length ?? 0) === 0 ? (
+				) : !isPending && (repos?.length ?? 0) === 0 ? (
 					<UsageStateMessage
 						icon={<IconBook aria-hidden="true" />}
 						title="No repos yet"
 						description="Repositories will appear here when sessions are uploaded."
 					/>
-				) : visibleRepos.length === 0 ? (
+				) : !isPending && visibleRepos.length === 0 ? (
 					<UsageStateMessage
 						icon={<IconZoomCancel aria-hidden="true" />}
 						title="No matching repos"
@@ -234,12 +225,30 @@ export function ReposOverview({
 						}
 					/>
 				) : (
-					<ReposList
-						avatarMap={avatarMap}
-						getRepoHref={getRepoHref}
-						repos={visibleRepos}
-						userMap={userMap}
-					/>
+					<Reveal
+						fill
+						className="min-h-0 min-w-0 flex-1"
+						label="Loading repos"
+						loading={isPending}
+						sample={
+							<ReposList
+								avatarMap={NO_AVATARS}
+								getRepoHref={sampleRepoHref}
+								repos={SAMPLE_REPOS}
+								userMap={SAMPLE_USERS}
+							/>
+						}
+						sampleId="repos"
+					>
+						{() => (
+							<ReposList
+								avatarMap={avatarMap}
+								getRepoHref={getRepoHref}
+								repos={visibleRepos}
+								userMap={userMap}
+							/>
+						)}
+					</Reveal>
 				)}
 			</section>
 		</div>

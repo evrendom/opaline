@@ -1,6 +1,6 @@
-import { type ReactNode, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
-import { Bones } from "@/app/ui/bones";
+import { Reveal } from "@/app/ui/bones";
 import { SearchInput } from "@/components/dashboard/data-table";
 import { FluidHoverHighlight } from "@/components/ui/fluid-hover-highlight";
 import { DashboardModelBadges } from "@/features/dashboard/components/DashboardModelBadges";
@@ -413,7 +413,6 @@ export function TeamMemberOverviewTable({
 	});
 	const visibleRows = useMemo(() => {
 		const query = search.trim().toLocaleLowerCase();
-		if (loading) return SAMPLE_ROWS;
 		return sortTeamRows(
 			query
 				? rows.filter((row) =>
@@ -424,13 +423,7 @@ export function TeamMemberOverviewTable({
 				: rows,
 			sort,
 		);
-	}, [loading, rows, search, sort]);
-	const containerRef = useRef<HTMLDivElement>(null);
-	const hover = useFluidHover(containerRef, {
-		axis: "y",
-		gapClick: false,
-		reflectActiveState: false,
-	});
+	}, [rows, search, sort]);
 	const showInvite = canInviteTeamMembers && organizationId !== null;
 
 	return (
@@ -452,81 +445,91 @@ export function TeamMemberOverviewTable({
 					onSortChange={setSort}
 					sort={sort}
 				/>
-				{loading ? (
+				{loading || showInvite ? (
 					<div className="ml-auto min-w-0">
-						<Bones label="Loading invite links">
-							<TeamInviteLinkActionsSample />
-						</Bones>
-					</div>
-				) : showInvite ? (
-					<div className="ml-auto min-w-0">
-						<TeamInviteLinkSurface
-							layout="toolbar"
-							organizationId={organizationId}
-						/>
+						<Reveal
+							label="Loading invite links"
+							loading={loading}
+							sample={<TeamInviteLinkActionsSample />}
+							sampleId="team-invite-links"
+						>
+							{() =>
+								organizationId ? (
+									<TeamInviteLinkSurface
+										layout="toolbar"
+										organizationId={organizationId}
+									/>
+								) : null
+							}
+						</Reveal>
 					</div>
 				) : null}
 			</div>
-			<MaybeBones loading={loading}>
-				<div className="overflow-x-auto whitespace-nowrap">
-					<div
-						ref={containerRef}
-						className="relative isolate inline-block min-w-full align-middle"
-						{...hover.handlers}
-					>
-						<FluidHoverHighlight
-							hover={hover}
-							className="z-0 rounded-none bg-(--session-overview-hover)"
-						/>
-						{/* Full-bleed rows, the outer cells padded to the page's 32px
-					    gutter; no rules between them, as in the sessions list. */}
-						<table className="relative w-full min-w-240 border-collapse [&_tr>*:first-child]:pl-2 [&_tr>*:last-child]:pr-2">
-							<colgroup>
-								<col className="w-[24%]" />
-								<col className="w-[21%]" />
-								<col className="w-[16%]" />
-								<col className="w-[9%]" />
-								<col className="w-[10%]" />
-								<col className="w-[9%]" />
-								<col className="w-[11%]" />
-							</colgroup>
-							<thead className="sr-only">
-								<tr>
-									{COLUMN_LABELS.map((label) => (
-										<th key={label} scope="col">
-											{label}
-										</th>
-									))}
-								</tr>
-							</thead>
-							<tbody>
-								{visibleRows.map((row, index) => (
-									<TeamMemberRow
-										key={row.userId}
-										index={index}
-										registerItem={hover.registerItem}
-										row={row}
-									/>
-								))}
-							</tbody>
-						</table>
-					</div>
-				</div>
-			</MaybeBones>
+			<Reveal
+				label="Loading teammates"
+				loading={loading}
+				sample={<MembersTable rows={SAMPLE_ROWS} />}
+				sampleId="team-members"
+			>
+				{() => <MembersTable rows={visibleRows} />}
+			</Reveal>
 		</div>
 	);
 }
 
-function MaybeBones({
-	children,
-	loading,
+function MembersTable({
+	rows,
 }: {
-	children: ReactNode;
-	loading: boolean;
+	rows: readonly TeamPageMemberOverviewRow[];
 }) {
-	return loading ? (
-		<Bones label="Loading teammates">{children}</Bones>
-	) : (
-		children
+	const containerRef = useRef<HTMLDivElement>(null);
+	const hover = useFluidHover(containerRef, {
+		axis: "y",
+		gapClick: false,
+		reflectActiveState: false,
+	});
+	return (
+		<div className="overflow-x-auto whitespace-nowrap">
+			<div
+				ref={containerRef}
+				className="relative isolate inline-block min-w-full align-middle"
+				{...hover.handlers}
+			>
+				<FluidHoverHighlight
+					hover={hover}
+					className="z-0 rounded-none bg-(--session-overview-hover)"
+				/>
+				<table className="relative w-full min-w-240 border-collapse [&_tr>*:first-child]:pl-2 [&_tr>*:last-child]:pr-2">
+					<colgroup>
+						<col className="w-[24%]" />
+						<col className="w-[21%]" />
+						<col className="w-[16%]" />
+						<col className="w-[9%]" />
+						<col className="w-[10%]" />
+						<col className="w-[9%]" />
+						<col className="w-[11%]" />
+					</colgroup>
+					<thead className="sr-only">
+						<tr>
+							{COLUMN_LABELS.map((label) => (
+								<th key={label} scope="col">
+									{label}
+								</th>
+							))}
+						</tr>
+					</thead>
+					<tbody>
+						{rows.map((row, index) => (
+							<TeamMemberRow
+								key={row.userId}
+								index={index}
+								registerItem={hover.registerItem}
+								row={row}
+							/>
+						))}
+					</tbody>
+				</table>
+			</div>
+		</div>
 	);
 }

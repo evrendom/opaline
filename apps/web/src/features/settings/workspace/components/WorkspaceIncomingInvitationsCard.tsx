@@ -1,4 +1,4 @@
-import { Bones } from "@/app/ui/bones";
+import { Reveal } from "@/app/ui/bones";
 import { Button } from "@/app/ui/button";
 import {
 	WorkspaceSettingsGroup,
@@ -36,45 +36,52 @@ export function WorkspaceIncomingInvitationsCard({
 }) {
 	return (
 		<WorkspaceSettingsGroup title={title} description={description}>
-			{isPending ? (
-				<Bones label="Loading invitations">
-					<p className="workspace-settings-empty">
-						No pending invitations right now.
-					</p>
-				</Bones>
-			) : invitations.length === 0 ? (
+			{!isPending && invitations.length === 0 ? (
 				<p className="workspace-settings-empty">
 					No pending invitations right now.
 				</p>
 			) : (
-				<ul className="workspace-settings-list" aria-label={title}>
-					{invitations.map((invitation) => (
-						<li key={invitation.id}>
-							<WorkspaceSettingsRow
-								label={invitation.organizationName}
-								description={`${invitation.role} · Invited ${formatDate(invitation.createdAt)}`}
-							>
-								<Button
-									type="button"
-									variant="outline"
-									size="sm"
-									onClick={() => onDecline(invitation.id)}
-									disabled={processingId !== null}
-								>
-									{processingId === invitation.id ? "Working…" : "Decline"}
-								</Button>
-								<Button
-									type="button"
-									size="sm"
-									onClick={() => onAccept(invitation.id)}
-									disabled={processingId !== null}
-								>
-									{processingId === invitation.id ? "Working…" : "Accept"}
-								</Button>
-							</WorkspaceSettingsRow>
-						</li>
-					))}
-				</ul>
+				<Reveal
+					label="Loading invitations"
+					loading={isPending}
+					sample={
+						<p className="workspace-settings-empty">
+							No pending invitations right now.
+						</p>
+					}
+					sampleId="incoming-invitations"
+				>
+					{() => (
+						<ul className="workspace-settings-list" aria-label={title}>
+							{invitations.map((invitation) => (
+								<li key={invitation.id}>
+									<WorkspaceSettingsRow
+										label={invitation.organizationName}
+										description={`${invitation.role} · Invited ${formatDate(invitation.createdAt)}`}
+									>
+										<Button
+											type="button"
+											variant="outline"
+											size="sm"
+											onClick={() => onDecline(invitation.id)}
+											disabled={processingId !== null}
+										>
+											{processingId === invitation.id ? "Working…" : "Decline"}
+										</Button>
+										<Button
+											type="button"
+											size="sm"
+											onClick={() => onAccept(invitation.id)}
+											disabled={processingId !== null}
+										>
+											{processingId === invitation.id ? "Working…" : "Accept"}
+										</Button>
+									</WorkspaceSettingsRow>
+								</li>
+							))}
+						</ul>
+					)}
+				</Reveal>
 			)}
 		</WorkspaceSettingsGroup>
 	);

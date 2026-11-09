@@ -4,7 +4,7 @@ import type {
 } from "@rudel/api-routes";
 import { type ReactNode, useMemo } from "react";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
-import { Bones } from "@/app/ui/bones";
+import { Reveal } from "@/app/ui/bones";
 import { formatCompactNumber } from "@/lib/format";
 import type { NormalizedSessionDetailOverview } from "../../components/session-detail-fast-response";
 import { useSessionSetupRuns } from "../../use-session-setup-runs";
@@ -288,31 +288,38 @@ function RunContext({
 	]);
 	if (state.status === "failed")
 		return <Unmapped>Its transcript couldn't be read.</Unmapped>;
-	if (!body)
-		return (
-			<div className="flex flex-col gap-3">
-				<ContextBar map={null} titleId={undefined} />
-				<ContextMapFrame>
-					<Bones label="Reading its context">
-						<ContextMapSample />
-					</Bones>
-				</ContextMapFrame>
-			</div>
-		);
-	if (!map) return <Unknown />;
+	if (body && !map) return <Unknown />;
 	return (
-		<ContextTiles
-			calls={agent ? undefined : turn.usageCalls}
-			cost={agent ? undefined : turn.estimatedCost}
-			subagentCosts={agent ? undefined : subagentCosts}
-			caption={
-				!agent && !fullestCall(turn) ? "before its compaction" : undefined
+		<Reveal
+			label="Reading its context"
+			loading={!body}
+			sample={
+				<div className="flex flex-col gap-3">
+					<ContextBar map={null} titleId={undefined} />
+					<ContextMapFrame>
+						<ContextMapSample />
+					</ContextMapFrame>
+				</div>
 			}
-			map={map}
-			measure={measure}
-			memory={`run:${turn.turnId}:${agent ?? ""}`}
-			problems={problems}
-			whole={whole}
-		/>
+			sampleId="context-run"
+		>
+			{() =>
+				map ? (
+					<ContextTiles
+						calls={agent ? undefined : turn.usageCalls}
+						cost={agent ? undefined : turn.estimatedCost}
+						subagentCosts={agent ? undefined : subagentCosts}
+						caption={
+							!agent && !fullestCall(turn) ? "before its compaction" : undefined
+						}
+						map={map}
+						measure={measure}
+						memory={`run:${turn.turnId}:${agent ?? ""}`}
+						problems={problems}
+						whole={whole}
+					/>
+				) : null
+			}
+		</Reveal>
 	);
 }

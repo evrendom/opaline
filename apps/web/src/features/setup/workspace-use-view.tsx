@@ -15,7 +15,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
-import { Bone, Bones } from "@/app/ui/bones";
+import { Bone, Bones, Reveal } from "@/app/ui/bones";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { FluidList, useFluidListItem } from "@/components/fluid-list";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
@@ -175,6 +175,7 @@ export function WorkspaceUseView({
 	const loading = !settled || (of !== null && runsQuery.isPending);
 	const missing =
 		settled && (!file || (runs !== undefined && runs.length === 0));
+	const shownFile = file && !file.setupFile.startsWith("called:") ? file : null;
 
 	return (
 		<div className="h-full overflow-hidden pt-2 pr-8 pb-2 pl-6">
@@ -191,16 +192,25 @@ export function WorkspaceUseView({
 						) : null}
 					</div>
 					<ScrollColumn className="-mx-1 px-1 pb-8">
-						{loading ? (
-							<RunListSkeleton />
-						) : runs && runs.length > 0 ? (
-							<RunList
-								onPick={(run) => pickRun(runKeyOf(run))}
-								picked={picked}
-								prefetch={section === "skills"}
-								runs={runs}
-								versionOf={versionOf}
-							/>
+						{loading || (runs && runs.length > 0) ? (
+							<Reveal
+								label="Reading the runs"
+								loading={loading}
+								sample={<RunListSample />}
+								sampleId="use-runs"
+							>
+								{() =>
+									runs ? (
+										<RunList
+											onPick={(run) => pickRun(runKeyOf(run))}
+											picked={picked}
+											prefetch={section === "skills"}
+											runs={runs}
+											versionOf={versionOf}
+										/>
+									) : null
+								}
+							</Reveal>
 						) : null}
 					</ScrollColumn>
 				</div>
@@ -263,24 +273,35 @@ export function WorkspaceUseView({
 					className={cn("flex min-h-0 shrink overflow-hidden", CARD)}
 					style={FILE_CARD_WIDTH}
 				>
-					{file && !file.setupFile.startsWith("called:") ? (
-						<SetupCard
-							details={false}
-							diffs
-							file={file}
-							versionPicker={false}
-							versions={{
-								...versions,
-								shown:
-									versions.versions.find(
-										(each) => each.version === pickedVersion?.version,
-									) ?? versions.shown,
-							}}
-						/>
+					{shownFile || (!server && loading) ? (
+						<Reveal
+							fill
+							className="min-w-0 flex-1"
+							label="Reading the file"
+							loading={!shownFile}
+							sample={<FileCardSample />}
+							sampleId="use-file"
+						>
+							{() =>
+								shownFile ? (
+									<SetupCard
+										details={false}
+										diffs
+										file={shownFile}
+										versionPicker={false}
+										versions={{
+											...versions,
+											shown:
+												versions.versions.find(
+													(each) => each.version === pickedVersion?.version,
+												) ?? versions.shown,
+										}}
+									/>
+								) : null
+							}
+						</Reveal>
 					) : server ? (
 						<CalledOnly server={server} />
-					) : loading ? (
-						<FileCardSample />
 					) : null}
 				</div>
 			</div>
@@ -522,28 +543,35 @@ function McpRunCalls({
 				>
 					<OpenRunLink run={run} />
 				</CenteredState>
-			) : !calls ? (
-				<Bones label="Reading the calls" className="min-w-0 flex-1">
-					<McpCallsSample />
-				</Bones>
 			) : (
-				<ScrollColumn className="-mx-1 min-h-0 flex-1 px-1 pb-8">
-					<ol className="flex flex-col gap-4 pt-2">
-						{calls.map((call) => (
-							<li key={call.callId}>
-								<ToolCard
-									call={<McpCall event={eventOf(call)} />}
-									collapsible
-									fit
-									model={run.model ?? null}
-									output={mcpResult(call.output?.text ?? null)}
-									scrolls={false}
-									wrapLines
-								/>
-							</li>
-						))}
-					</ol>
-				</ScrollColumn>
+				<Reveal
+					fill
+					className="min-h-0 min-w-0 flex-1"
+					label="Reading the calls"
+					loading={!calls}
+					sample={<McpCallsSample />}
+					sampleId="use-calls"
+				>
+					{() => (
+						<ScrollColumn className="-mx-1 min-h-0 flex-1 px-1 pb-8">
+							<ol className="flex flex-col gap-4 pt-2">
+								{(calls ?? []).map((call) => (
+									<li key={call.callId}>
+										<ToolCard
+											call={<McpCall event={eventOf(call)} />}
+											collapsible
+											fit
+											model={run.model ?? null}
+											output={mcpResult(call.output?.text ?? null)}
+											scrolls={false}
+											wrapLines
+										/>
+									</li>
+								))}
+							</ol>
+						</ScrollColumn>
+					)}
+				</Reveal>
 			)}
 		</div>
 	);
@@ -791,30 +819,40 @@ function SkillTrace({
 		);
 		return launch ? subagentBrief(launch).prompt : null;
 	}, [agent, model, run.prompt, turn, uses.body]);
-	if (uses.status === "loading") return <SkillTraceSample />;
 	return (
-		<div className="flex min-h-0 flex-1 flex-col">
-			<ScrollColumn className="-mx-1 min-h-0 flex-1 px-1">
-				{prompt ? (
-					<RunPrompt
-						agent={agent}
-						model={model}
-						startedAt={run.startedAt}
-						text={prompt}
-						userId={userId}
-					/>
-				) : null}
-				<SetupRunTrace
-					run={{
-						...uses,
-						uses: steps.map((step) => ({ file: NO_FILE, step })),
-					}}
-					stepId={first}
-					store={store}
-					turn={turn}
-				/>
-			</ScrollColumn>
-		</div>
+		<Reveal
+			fill
+			className="min-h-0 min-w-0 flex-1"
+			label="Reading this run"
+			loading={uses.status === "loading"}
+			sample={<SkillTraceBody />}
+			sampleId="use-trace"
+		>
+			{() => (
+				<div className="flex min-h-0 flex-1 flex-col">
+					<ScrollColumn className="-mx-1 min-h-0 flex-1 px-1">
+						{prompt ? (
+							<RunPrompt
+								agent={agent}
+								model={model}
+								startedAt={run.startedAt}
+								text={prompt}
+								userId={userId}
+							/>
+						) : null}
+						<SetupRunTrace
+							run={{
+								...uses,
+								uses: steps.map((step) => ({ file: NO_FILE, step })),
+							}}
+							stepId={first}
+							store={store}
+							turn={turn}
+						/>
+					</ScrollColumn>
+				</div>
+			)}
+		</Reveal>
 	);
 }
 
@@ -921,21 +959,16 @@ function OpenRunLink({
 	);
 }
 
-function RunListSkeleton() {
+function RunListSample() {
 	return (
-		<Bones label="Reading the runs">
-			<div className="flex flex-col gap-0.5 pt-1">
-				{[72, 56, 80, 64, 50, 76, 60, 68, 54, 74].map((width) => (
-					<div key={width} className="flex h-7 items-center gap-2.5 px-2.5">
-						<Bone className="size-4 shrink-0 rounded-full" />
-						<Bone
-							className="h-2.5 rounded-full"
-							style={{ width: `${width}%` }}
-						/>
-					</div>
-				))}
-			</div>
-		</Bones>
+		<div className="flex flex-col gap-0.5 pt-1">
+			{[72, 56, 80, 64, 50, 76, 60, 68, 54, 74].map((width) => (
+				<div key={width} className="flex h-7 items-center gap-2.5 px-2.5">
+					<Bone className="size-4 shrink-0 rounded-full" />
+					<Bone className="h-2.5 rounded-full" style={{ width: `${width}%` }} />
+				</div>
+			))}
+		</div>
 	);
 }
 
@@ -999,14 +1032,6 @@ function MiddleSample({ section }: { section: UseSection }) {
 				</div>
 				{section === "mcp" ? <McpCallsSample /> : <SkillTraceBody />}
 			</div>
-		</Bones>
-	);
-}
-
-function SkillTraceSample() {
-	return (
-		<Bones label="Reading this run" className="min-h-0 min-w-0 flex-1">
-			<SkillTraceBody />
 		</Bones>
 	);
 }
@@ -1095,27 +1120,25 @@ const FILE_LINES = [94, 88, 96, 70, 0, 90, 84, 92, 60, 0, 86, 94, 78].map(
 
 function FileCardSample() {
 	return (
-		<Bones label="Reading the file" className="min-w-0 flex-1">
-			<div className="flex flex-col">
-				<div className="flex items-center gap-2 border-b border-border/50 px-5 py-4">
-					<Bone className="size-4 shrink-0 rounded-full" />
-					<Bone className="h-3.5 w-28 rounded-sm" />
-				</div>
-				<div className="flex flex-col gap-2.5 px-5 py-5">
-					<Bone className="mb-1 h-4 w-1/3 rounded-sm" />
-					{FILE_LINES.map(({ line, width }) =>
-						width ? (
-							<Bone
-								key={line}
-								className="h-3 rounded-sm"
-								style={{ width: `${width}%` }}
-							/>
-						) : (
-							<span key={line} className="h-2" />
-						),
-					)}
-				</div>
+		<div className="flex flex-col">
+			<div className="flex items-center gap-2 border-b border-border/50 px-5 py-4">
+				<Bone className="size-4 shrink-0 rounded-full" />
+				<Bone className="h-3.5 w-28 rounded-sm" />
 			</div>
-		</Bones>
+			<div className="flex flex-col gap-2.5 px-5 py-5">
+				<Bone className="mb-1 h-4 w-1/3 rounded-sm" />
+				{FILE_LINES.map(({ line, width }) =>
+					width ? (
+						<Bone
+							key={line}
+							className="h-3 rounded-sm"
+							style={{ width: `${width}%` }}
+						/>
+					) : (
+						<span key={line} className="h-2" />
+					),
+				)}
+			</div>
+		</div>
 	);
 }

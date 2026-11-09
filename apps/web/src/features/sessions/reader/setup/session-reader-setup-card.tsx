@@ -1,7 +1,7 @@
 import type { SessionSetupFile } from "@rudel/api-routes";
 import { IconCode, IconFileDiff } from "@tabler/icons-react";
 import { useMemo, useState } from "react";
-import { Bone, Bones } from "@/app/ui/bones";
+import { Bone, Reveal } from "@/app/ui/bones";
 import { Button } from "@/app/ui/button";
 import { DiffView } from "@/components/pierre/diff-view";
 import { diffLines } from "@/components/pierre/line-diff";
@@ -129,44 +129,55 @@ export function SetupCard({
 			</header>
 			<div className="flex min-h-0 flex-1">
 				<div className="flex min-h-0 min-w-0 flex-1 flex-col">
-					{query.isLoading ? (
-						<Bones label="Reading its text">
-							<div className="flex flex-col gap-2 px-5 py-4">
-								{[88, 72, 80, 56, 64].map((width) => (
-									<Bone
-										key={width}
-										className="h-3.5 rounded-md"
-										style={{ width: `${width}%` }}
-									/>
-								))}
-							</div>
-						</Bones>
-					) : !shown ? (
+					{!query.isLoading && !shown ? (
 						<p className="px-5 py-4 text-[13px] text-muted-foreground">
 							{query.isError
 								? "Its text could not be read."
 								: "Its text was not kept for this session."}
 						</p>
 					) : (
-						<ScrollColumn className="px-5 py-4">
-							{hunks ? (
-								hunks.length === 0 ? (
-									<p className="text-[13px] text-muted-foreground">
-										No line changed since the version before.
-									</p>
-								) : (
-									<DiffView hunks={hunks} language="markdown" />
-								)
-							) : (
-								<SetupProse text={shown.text} />
-							)}
-							{shown.textCut ? (
-								<p className="pt-3 text-xs text-muted-foreground tabular-nums">
-									Only its start was kept: the whole text is{" "}
-									{shown.chars.toLocaleString()} characters.
-								</p>
-							) : null}
-						</ScrollColumn>
+						<Reveal
+							fill
+							className="min-h-0 flex-1"
+							label="Reading its text"
+							loading={query.isLoading}
+							sample={
+								<div className="flex flex-col gap-2 px-5 py-4">
+									{[88, 72, 80, 56, 64].map((width) => (
+										<Bone
+											key={width}
+											className="h-3.5 rounded-md"
+											style={{ width: `${width}%` }}
+										/>
+									))}
+								</div>
+							}
+							sampleId="reader-setup-text"
+						>
+							{() =>
+								shown ? (
+									<ScrollColumn className="px-5 py-4">
+										{hunks ? (
+											hunks.length === 0 ? (
+												<p className="text-[13px] text-muted-foreground">
+													No line changed since the version before.
+												</p>
+											) : (
+												<DiffView hunks={hunks} language="markdown" />
+											)
+										) : (
+											<SetupProse text={shown.text} />
+										)}
+										{shown.textCut ? (
+											<p className="pt-3 text-xs text-muted-foreground tabular-nums">
+												Only its start was kept: the whole text is{" "}
+												{shown.chars.toLocaleString()} characters.
+											</p>
+										) : null}
+									</ScrollColumn>
+								) : null
+							}
+						</Reveal>
 					)}
 				</div>
 			</div>

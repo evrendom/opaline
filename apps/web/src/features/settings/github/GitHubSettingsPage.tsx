@@ -1,5 +1,5 @@
 import { Navigate } from "react-router-dom";
-import { SettingsPageSkeleton } from "@/features/settings/components/settings-page-skeleton";
+import { SettingsPageReveal } from "@/features/settings/components/settings-page-skeleton";
 import { settingsRouteMap } from "@/features/settings/config/settings-routes";
 import { useGitHubConnection } from "@/features/settings/github/use-github-connection";
 import { WorkspaceGitHubConnection } from "@/features/settings/workspace/components/WorkspaceGitHubConnection";
@@ -12,11 +12,8 @@ export function GitHubSettingsPage() {
 	const { query } = useGitHubConnection(organizationId);
 	const getShellRoutePath = useShellRoutePath();
 
-	if (state.isLoading || (organizationId && query.isPending)) {
-		return <SettingsPageSkeleton routeId="workspace" />;
-	}
-	// The page exists only while GitHub is enabled for this workspace.
-	if (!organizationId || query.data?.visibility !== "visible") {
+	const loading = state.isLoading || Boolean(organizationId && query.isPending);
+	if (!loading && (!organizationId || query.data?.visibility !== "visible")) {
 		return (
 			<Navigate
 				replace
@@ -25,8 +22,14 @@ export function GitHubSettingsPage() {
 		);
 	}
 	return (
-		<div className="workspace-settings-page">
-			<WorkspaceGitHubConnection organizationId={organizationId} />
-		</div>
+		<SettingsPageReveal routeId="workspace" loading={loading}>
+			{() =>
+				organizationId ? (
+					<div className="workspace-settings-page">
+						<WorkspaceGitHubConnection organizationId={organizationId} />
+					</div>
+				) : null
+			}
+		</SettingsPageReveal>
 	);
 }

@@ -1,6 +1,6 @@
 import type { SessionDetailTurnSummary } from "@rudel/api-routes";
 import { useLayoutEffect, useMemo, useRef } from "react";
-import { Bone, Bones } from "@/app/ui/bones";
+import { Bone, Reveal } from "@/app/ui/bones";
 import { shortSubagentId } from "@/features/sessions/run-id";
 import { cn } from "@/lib/utils";
 import {
@@ -109,33 +109,40 @@ export function FocusedSubagent({
 					</div>
 				) : null}
 				<div {...TURN_ANSWER_MARK} className="flex flex-col gap-4">
-					{body ? (
-						<TurnTrace
-							agent={subagentId}
-							body={body}
-							head={(waterfall) => (
-								<RunSummaryBar
-									copyLabel="Copy subagent ID"
-									expanded
-									id={subagentId}
-									model={summary?.model ?? waterfall.model}
-									shortId={shortSubagentId(subagentId)}
-									waterfall={waterfall}
-								/>
-							)}
-							laterBodies={laterBodies}
-							model={model}
-							store={store}
-							turn={turn}
-						/>
-					) : (
-						<Bones label="Reading this subagent">
+					<Reveal
+						label="Reading this subagent"
+						loading={!body}
+						sample={
 							<div className="flex flex-col gap-2 px-1 pt-1">
 								<Bone className="h-3.5 w-full rounded-sm" />
 								<Bone className="h-3.5 w-2/3 rounded-sm" />
 							</div>
-						</Bones>
-					)}
+						}
+						sampleId="reader-subagent"
+					>
+						{() =>
+							body ? (
+								<TurnTrace
+									agent={subagentId}
+									body={body}
+									head={(waterfall) => (
+										<RunSummaryBar
+											copyLabel="Copy subagent ID"
+											expanded
+											id={subagentId}
+											model={summary?.model ?? waterfall.model}
+											shortId={shortSubagentId(subagentId)}
+											waterfall={waterfall}
+										/>
+									)}
+									laterBodies={laterBodies}
+									model={model}
+									store={store}
+									turn={turn}
+								/>
+							) : null
+						}
+					</Reveal>
 				</div>
 			</div>
 		</div>

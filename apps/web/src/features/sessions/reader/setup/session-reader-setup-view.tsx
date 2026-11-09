@@ -4,7 +4,7 @@ import type {
 } from "@rudel/api-routes";
 import { IconSettings2 } from "@tabler/icons-react";
 import { type CSSProperties, useMemo, useState } from "react";
-import { Bones } from "@/app/ui/bones";
+import { Reveal } from "@/app/ui/bones";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { cn } from "@/lib/utils";
 import type { NormalizedSessionDetailOverview } from "../../components/session-detail-fast-response";
@@ -166,32 +166,41 @@ export function SessionReaderSetupView({
 								description="This session's agents received no setup Opaline kept: it may have been read before setup was."
 							/>
 						</RailEmptyPane>
-					) : setup ? (
-						<ReaderSubagentsContext.Provider value={subagentsContext}>
-							<SetupPicked
-								key={`${run ?? ""}:${agent ?? ""}`}
-								agent={agent}
-								model={model}
-								overview={overview}
-								setup={setup}
-								turns={turns}
-								onPick={onPick}
-								received={received ?? []}
-								run={run}
-								sessionId={sessionId}
-								shown={shown}
-							/>
-						</ReaderSubagentsContext.Provider>
 					) : (
-						<Bones
+						<Reveal
 							fill
 							className="min-w-0 flex-1"
 							label="Reading the setup this session received"
+							loading={!setup}
+							sample={
+								<div className="flex h-full min-h-0 gap-6">
+									<SetupColumnsSample agent={agent} model={model} run={run} />
+								</div>
+							}
+							sampleId="reader-setup"
 						>
-							<div className="flex h-full min-h-0 gap-6">
-								<SetupColumnsSample agent={agent} model={model} run={run} />
-							</div>
-						</Bones>
+							{() =>
+								setup ? (
+									<ReaderSubagentsContext.Provider value={subagentsContext}>
+										<div className="flex h-full min-h-0 gap-6">
+											<SetupPicked
+												key={`${run ?? ""}:${agent ?? ""}`}
+												agent={agent}
+												model={model}
+												overview={overview}
+												setup={setup}
+												turns={turns}
+												onPick={onPick}
+												received={received ?? []}
+												run={run}
+												sessionId={sessionId}
+												shown={shown}
+											/>
+										</div>
+									</ReaderSubagentsContext.Provider>
+								) : null
+							}
+						</Reveal>
 					)}
 				</div>
 			</div>

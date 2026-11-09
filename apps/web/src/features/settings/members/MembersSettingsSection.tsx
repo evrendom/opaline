@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { CardContent } from "@/app/ui/card";
 import { useTrackProductPageView } from "@/features/analytics/tracking/useTrackProductPageView";
-import { SettingsPageSkeleton } from "@/features/settings/components/settings-page-skeleton";
+import { SettingsPageReveal } from "@/features/settings/components/settings-page-skeleton";
 import { SettingsSectionCard } from "@/features/settings/components/settings-section";
 import { buildMembersSettingsTracking } from "@/features/settings/settings-page-tracking";
 import { CreateWorkspaceCard } from "@/features/settings/workspace/components/CreateWorkspaceCard";
@@ -39,9 +39,7 @@ export function MembersSettingsSection() {
 		}),
 	);
 
-	if (data.state.isPending) return <SettingsPageSkeleton routeId="members" />;
-
-	if (!data.state.hasOrganization) {
+	if (!data.state.isPending && !data.state.hasOrganization) {
 		return (
 			<div className="workspace-settings-page">
 				<WorkspaceEmptyStateCard />
@@ -56,57 +54,61 @@ export function MembersSettingsSection() {
 	}
 
 	return (
-		<div className="workspace-settings-page">
-			{!data.state.isPending && data.state.isError ? (
-				<SettingsSectionCard>
-					<CardContent className="text-sm text-muted-foreground">
-						Member data couldn&apos;t be loaded right now.
-					</CardContent>
-				</SettingsSectionCard>
-			) : null}
+		<SettingsPageReveal routeId="members" loading={data.state.isPending}>
+			{() => (
+				<div className="workspace-settings-page">
+					{!data.state.isPending && data.state.isError ? (
+						<SettingsSectionCard>
+							<CardContent className="text-sm text-muted-foreground">
+								Member data couldn&apos;t be loaded right now.
+							</CardContent>
+						</SettingsSectionCard>
+					) : null}
 
-			{!data.state.isPending && !data.state.isError && data.activeOrg ? (
-				<>
-					{/* Members card: invite, then the roster, then any
+					{!data.state.isPending && !data.state.isError && data.activeOrg ? (
+						<>
+							{/* Members card: invite, then the roster, then any
 					    invitations still pending. */}
-					<WorkspaceSettingsGroup
-						title="People"
-						description="Invite teammates by email. Admins and owners can manage members. Usage covers the last 12 months."
-					>
-						<WorkspaceInviteMemberForm
-							canManage={data.canManage}
-							onInvalidate={data.invalidate}
-						/>
-						<WorkspaceMembersList
-							members={data.fullOrg?.members ?? []}
-							activity={activity}
-							canManage={data.canManage}
-							onInvalidate={data.invalidate}
-						/>
-						<WorkspaceSentInvitations
-							invitations={data.pendingInvitations}
-							canCancel={data.canManage}
-							onInvalidate={data.invalidate}
-						/>
-					</WorkspaceSettingsGroup>
-					<WorkspaceSettingsGroup
-						title="Invite link"
-						description="Share a link that lets teammates join this workspace as members."
-					>
-						{data.canManage ? (
-							<TeamInviteLinkSurface
-								key={data.activeOrg.id}
-								layout="settings"
-								organizationId={data.activeOrg.id}
-							/>
-						) : (
-							<p className="workspace-settings-empty">
-								Only admins and owners can manage invite links.
-							</p>
-						)}
-					</WorkspaceSettingsGroup>
-				</>
-			) : null}
-		</div>
+							<WorkspaceSettingsGroup
+								title="People"
+								description="Invite teammates by email. Admins and owners can manage members. Usage covers the last 12 months."
+							>
+								<WorkspaceInviteMemberForm
+									canManage={data.canManage}
+									onInvalidate={data.invalidate}
+								/>
+								<WorkspaceMembersList
+									members={data.fullOrg?.members ?? []}
+									activity={activity}
+									canManage={data.canManage}
+									onInvalidate={data.invalidate}
+								/>
+								<WorkspaceSentInvitations
+									invitations={data.pendingInvitations}
+									canCancel={data.canManage}
+									onInvalidate={data.invalidate}
+								/>
+							</WorkspaceSettingsGroup>
+							<WorkspaceSettingsGroup
+								title="Invite link"
+								description="Share a link that lets teammates join this workspace as members."
+							>
+								{data.canManage ? (
+									<TeamInviteLinkSurface
+										key={data.activeOrg.id}
+										layout="settings"
+										organizationId={data.activeOrg.id}
+									/>
+								) : (
+									<p className="workspace-settings-empty">
+										Only admins and owners can manage invite links.
+									</p>
+								)}
+							</WorkspaceSettingsGroup>
+						</>
+					) : null}
+				</div>
+			)}
+		</SettingsPageReveal>
 	);
 }

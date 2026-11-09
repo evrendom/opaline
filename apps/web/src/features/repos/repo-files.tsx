@@ -13,10 +13,11 @@ import {
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
+import { Reveal } from "@/app/ui/bones";
 import { Button } from "@/components/dashboard/button";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { Skeleton } from "@/components/dashboard/skeleton";
-import { CodeSkeleton } from "@/components/pierre/code-skeleton";
+import { CodeSample, CodeSkeleton } from "@/components/pierre/code-skeleton";
 import { DiffView, languageForPath } from "@/components/pierre/diff-view";
 import { FileTree } from "@/components/pierre/file-tree";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
@@ -317,16 +318,21 @@ function RepoFileDetail({
 					description="Reading it from GitHub failed. Pick it again in a moment."
 					className="mt-3"
 				/>
-			) : !file ? (
+			) : !file || hunks ? (
 				<ScrollColumn className="-mr-4 -ml-1.5 pr-4 pl-1.5">
 					<div className="flex flex-col gap-2 pt-2 pb-4">
-						<CodeSkeleton label="Loading the file" />
-					</div>
-				</ScrollColumn>
-			) : hunks ? (
-				<ScrollColumn className="-mr-4 -ml-1.5 pr-4 pl-1.5">
-					<div className="flex flex-col gap-2 pt-2 pb-4">
-						<DiffView hunks={hunks} language={languageForPath(path)} />
+						<Reveal
+							label="Loading the file"
+							loading={!file}
+							sample={<CodeSample />}
+							sampleId="repo-file"
+						>
+							{() =>
+								hunks ? (
+									<DiffView hunks={hunks} language={languageForPath(path)} />
+								) : null
+							}
+						</Reveal>
 					</div>
 				</ScrollColumn>
 			) : file.status !== "text" ? (

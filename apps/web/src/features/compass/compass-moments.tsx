@@ -24,7 +24,6 @@ import {
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { formatReaderCost } from "@/features/sessions/reader/model/session-reader-model";
 import "@/features/sessions/components/session-menu.css";
-import { Bones } from "@/app/ui/bones";
 import {
 	ShellNavIcon,
 	type ShellNavTone,
@@ -350,20 +349,16 @@ export const COMPASS_SAMPLE_RUN = sampleRun(
 
 const NO_SELECT = () => {};
 
-export function RowsSkeleton() {
-	return (
-		<Bones label="Loading runs">
-			{COMPASS_SAMPLE_RUNS.map((run, index) => (
-				<RunRow
-					key={run.id}
-					run={run}
-					selected={index === 0}
-					onSelect={NO_SELECT}
-					onKeyDown={NO_SELECT}
-				/>
-			))}
-		</Bones>
-	);
+export function RowsSample() {
+	return COMPASS_SAMPLE_RUNS.map((run, index) => (
+		<RunRow
+			key={run.id}
+			run={run}
+			selected={index === 0}
+			onSelect={NO_SELECT}
+			onKeyDown={NO_SELECT}
+		/>
+	));
 }
 
 export function ObservationCard({

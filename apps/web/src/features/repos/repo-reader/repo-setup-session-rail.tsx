@@ -5,7 +5,7 @@ import type {
 import { IconArrowUpRight } from "@tabler/icons-react";
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Skeleton } from "@/components/dashboard/skeleton";
+import { Bone, Reveal } from "@/app/ui/bones";
 import { FluidList, FluidListItem } from "@/components/fluid-list";
 import { ScrollColumn } from "@/features/sessions/reader/files/session-reader-files-parts";
 import { setupName } from "@/features/sessions/reader/setup/session-setup-files";
@@ -91,39 +91,48 @@ export function RepoSetupSessionRail({
 			className={cn(RAIL_SHELF, "w-[120px]")}
 		>
 			<ScrollColumn className="px-1.5 pt-2 pb-4">
-				{query.isPending ? (
-					<div className="flex flex-col gap-3 px-2 pt-1" aria-hidden="true">
-						{["w-3/4", "w-2/3", "w-4/5", "w-1/2"].map((width) => (
-							<Skeleton key={width} className={cn("h-3", width)} />
-						))}
-					</div>
-				) : query.isError ? (
+				{!query.isPending && query.isError ? (
 					<p className="px-2 py-2 text-xs text-muted-foreground">
 						Sessions could not be read.
 					</p>
-				) : sessions.length === 0 ? (
+				) : !query.isPending && sessions.length === 0 ? (
 					<p className="px-2 py-2 text-xs text-muted-foreground">
 						No session received it
 					</p>
 				) : (
-					<FluidList>
-						<ul className="flex flex-col gap-0.5">
-							{sessions.map((session, index) => (
-								<li key={session.sessionId}>
-									<FluidListItem<HTMLAnchorElement> index={index}>
-										{(item) => (
-											<SessionLink
-												file={file}
-												item={item}
-												repoKey={repoKey}
-												session={session}
-											/>
-										)}
-									</FluidListItem>
-								</li>
-							))}
-						</ul>
-					</FluidList>
+					<Reveal
+						label="Reading the sessions"
+						loading={query.isPending}
+						sample={
+							<div className="flex flex-col gap-3 px-2 pt-1">
+								{["w-3/4", "w-2/3", "w-4/5", "w-1/2"].map((width) => (
+									<Bone key={width} className={cn("h-3 rounded-md", width)} />
+								))}
+							</div>
+						}
+						sampleId="repo-setup-sessions"
+					>
+						{() => (
+							<FluidList>
+								<ul className="flex flex-col gap-0.5">
+									{sessions.map((session, index) => (
+										<li key={session.sessionId}>
+											<FluidListItem<HTMLAnchorElement> index={index}>
+												{(item) => (
+													<SessionLink
+														file={file}
+														item={item}
+														repoKey={repoKey}
+														session={session}
+													/>
+												)}
+											</FluidListItem>
+										</li>
+									))}
+								</ul>
+							</FluidList>
+						)}
+					</Reveal>
 				)}
 			</ScrollColumn>
 		</section>

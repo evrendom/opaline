@@ -18,6 +18,17 @@
 	min-height: 0;
 }
 
+.bones-fill {
+	display: flex;
+	flex-direction: column;
+}
+
+.bones-fill > [skullet-pane] {
+	display: flex;
+	flex-direction: column;
+	flex-grow: 1;
+}
+
 [skullet-bar] {
 	@apply corner-squircle;
 }

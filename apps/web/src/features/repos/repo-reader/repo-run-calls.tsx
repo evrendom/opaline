@@ -9,8 +9,9 @@ import { IconArrowUpRight } from "@tabler/icons-react";
 import { type ReactNode, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
+import { Reveal } from "@/app/ui/bones";
 import { EmptyState } from "@/components/dashboard/page-parts";
-import { CodeSkeleton } from "@/components/pierre/code-skeleton";
+import { CodeSample } from "@/components/pierre/code-skeleton";
 import { DiffView, languageForPath } from "@/components/pierre/diff-view";
 import type { DiffHunk } from "@/components/pierre/line-diff";
 import { diffLines } from "@/components/pierre/line-diff";
@@ -370,13 +371,7 @@ function CallCard({
 					{`‎${call.path}‎`}
 				</span>
 			) : null}
-			{query.isPending ? (
-				<ScrollColumn className="-mr-4 -ml-1.5 pr-4 pl-1.5">
-					<div className="flex flex-col gap-2 pt-2 pb-4">
-						<CodeSkeleton label="Loading the call" />
-					</div>
-				</ScrollColumn>
-			) : !call ? (
+			{!query.isPending && !call ? (
 				<EmptyState
 					icon={IconArrowUpRight}
 					title="No call to show"
@@ -385,11 +380,26 @@ function CallCard({
 				/>
 			) : (
 				<ScrollColumn className="-mr-4 -ml-1.5 pr-4 pl-1.5">
-					<CallBody
-						call={call}
-						file={file ? { path: file.path, text: fileText } : undefined}
-						run={run}
-					/>
+					<Reveal
+						label="Loading the call"
+						loading={query.isPending}
+						sample={
+							<div className="flex flex-col gap-2 pt-2 pb-4">
+								<CodeSample />
+							</div>
+						}
+						sampleId="repo-call"
+					>
+						{() =>
+							call ? (
+								<CallBody
+									call={call}
+									file={file ? { path: file.path, text: fileText } : undefined}
+									run={run}
+								/>
+							) : null
+						}
+					</Reveal>
 				</ScrollColumn>
 			)}
 		</div>
@@ -668,34 +678,47 @@ function FileCall({
 					: "This call's change wasn't recorded."}
 			</p>
 		);
-	if (text === undefined)
-		return (
-			<div className="flex flex-col gap-2 pt-2 pb-4">
-				<CodeSkeleton label="Loading the file" />
-			</div>
-		);
-	if (!hunks || !lit)
+	if (text !== undefined && (!hunks || !lit))
 		return (
 			<p className="pt-3 text-[13px] text-muted-foreground">
 				The file's text isn't available to show what was read.
 			</p>
 		);
 	return (
-		<div className="flex flex-col gap-2 pt-2 pb-4">
-			{call.input ? (
-				<ReadCommand
-					key={call.callId}
-					bash={call.tool === "Bash"}
-					text={readable(call.input.text)}
-				/>
-			) : null}
-			{lit.size === 0 ? (
-				<p className="text-xs text-muted-foreground">
-					What it read couldn't be matched to today's file.
-				</p>
-			) : null}
-			<DiffView hunks={hunks} language={languageForPath(file.path)} lit={lit} />
-		</div>
+		<Reveal
+			label="Loading the file"
+			loading={text === undefined}
+			sample={
+				<div className="flex flex-col gap-2 pt-2 pb-4">
+					<CodeSample />
+				</div>
+			}
+			sampleId="repo-call-read"
+		>
+			{() =>
+				hunks && lit ? (
+					<div className="flex flex-col gap-2 pt-2 pb-4">
+						{call.input ? (
+							<ReadCommand
+								key={call.callId}
+								bash={call.tool === "Bash"}
+								text={readable(call.input.text)}
+							/>
+						) : null}
+						{lit.size === 0 ? (
+							<p className="text-xs text-muted-foreground">
+								What it read couldn't be matched to today's file.
+							</p>
+						) : null}
+						<DiffView
+							hunks={hunks}
+							language={languageForPath(file.path)}
+							lit={lit}
+						/>
+					</div>
+				) : null
+			}
+		</Reveal>
 	);
 }
 

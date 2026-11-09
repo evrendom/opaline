@@ -7,7 +7,7 @@ import {
 	IconZoomCancel,
 } from "@tabler/icons-react";
 import { useMemo, useState } from "react";
-import { Bones } from "@/app/ui/bones";
+import { Reveal } from "@/app/ui/bones";
 import { Button } from "@/app/ui/button";
 import { SearchInput } from "@/components/dashboard/data-table";
 import {
@@ -159,11 +159,7 @@ export function SkillsPageView({
 						onClearAll={clearFilters}
 					/>
 				</div>
-				{isPending ? (
-					<Bones fill className="min-h-0 min-w-0 flex-1" label="Loading skills">
-						<SkillCardsGrid skills={SAMPLE_SKILLS} onSelect={NOOP} />
-					</Bones>
-				) : isError ? (
+				{!isPending && isError ? (
 					<UsageStateMessage
 						icon={<IconBook aria-hidden="true" />}
 						title="Skills couldn’t be loaded"
@@ -179,13 +175,13 @@ export function SkillsPageView({
 							</Button>
 						}
 					/>
-				) : (skills?.length ?? 0) === 0 ? (
+				) : !isPending && (skills?.length ?? 0) === 0 ? (
 					<UsageStateMessage
 						icon={<IconBook aria-hidden="true" />}
 						title="No skills yet"
 						description="Skills will appear here when Claude or Codex sessions include a recorded skill use."
 					/>
-				) : visibleSkills.length === 0 ? (
+				) : !isPending && visibleSkills.length === 0 ? (
 					<UsageStateMessage
 						icon={<IconZoomCancel aria-hidden="true" />}
 						title="No matching skills"
@@ -209,7 +205,18 @@ export function SkillsPageView({
 						}
 					/>
 				) : (
-					<SkillCardsGrid skills={visibleSkills} onSelect={onSelectSkill} />
+					<Reveal
+						fill
+						className="min-h-0 min-w-0 flex-1"
+						label="Loading skills"
+						loading={isPending}
+						sample={<SkillCardsGrid skills={SAMPLE_SKILLS} onSelect={NOOP} />}
+						sampleId="skills"
+					>
+						{() => (
+							<SkillCardsGrid skills={visibleSkills} onSelect={onSelectSkill} />
+						)}
+					</Reveal>
 				)}
 			</section>
 		</div>

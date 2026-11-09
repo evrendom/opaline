@@ -183,7 +183,7 @@ export function SessionsOverviewPendingRow({
 							title="Error count will appear after upload"
 						>
 							<IconAlertCircle aria-hidden="true" className="size-3 shrink-0" />
-							<span className="inline-block h-1.5 w-2 rounded-sm bg-current opacity-20" />
+							<span className="inline-block h-1.5 w-2 rounded-sm bg-current/20" />
 						</span>
 					)}
 				</div>
@@ -251,6 +251,6 @@ export function SessionsOverviewPendingRow({
 
 function PendingSignalText() {
 	return (
-		<span className="my-1 inline-block h-1.5 w-9 rounded-sm bg-current opacity-20" />
+		<span className="my-1 inline-block h-1.5 w-9 rounded-sm bg-current/20" />
 	);
 }

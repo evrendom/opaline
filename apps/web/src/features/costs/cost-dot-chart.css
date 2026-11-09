@@ -70,13 +70,13 @@
 	color: var(--cost-foreground);
 }
 .cost-dot-axis > div {
-	transition: opacity 120ms ease-out;
+	transition: filter 120ms ease-out;
 }
 .cost-dot-axis > div[data-faded] {
-	opacity: 0.35;
+	filter: opacity(0.35);
 }
 .cost-dot-axis > div[data-hidden] {
-	opacity: 0;
+	filter: opacity(0);
 }
 .cost-dot-axis[data-axis="x"] > div[data-rolling] {
 	left: 0;
@@ -192,8 +192,7 @@
 	width: 36%;
 	aspect-ratio: 1;
 	border-radius: 9999px;
-	background: white;
-	opacity: 0.45;
+	background: rgb(255 255 255 / 0.45);
 	transform: translate(-50%, -50%);
 }
 .cost-dot-label {

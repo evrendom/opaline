@@ -5,7 +5,7 @@ import { CardContent } from "@/app/ui/card";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
 import { useTrackProductPageView } from "@/features/analytics/tracking/useTrackProductPageView";
 import { dataWindow, formatDay } from "@/features/reports/report-dates";
-import { SettingsPageSkeleton } from "@/features/settings/components/settings-page-skeleton";
+import { SettingsPageReveal } from "@/features/settings/components/settings-page-skeleton";
 import { SettingsSectionCard } from "@/features/settings/components/settings-section";
 import { buildReportsSettingsTracking } from "@/features/settings/settings-page-tracking";
 import {
@@ -49,9 +49,7 @@ export function ReportsSettingsPage() {
 		}),
 	);
 
-	if (query.isPending) return <SettingsPageSkeleton routeId="reports" />;
-
-	if (query.isError) {
+	if (!query.isPending && query.isError) {
 		return (
 			<div className="workspace-settings-page">
 				<SettingsSectionCard>
@@ -64,37 +62,43 @@ export function ReportsSettingsPage() {
 	}
 
 	return (
-		<div className="workspace-settings-page">
-			<WorkspaceSettingsGroup
-				title="Reports"
-				description={
-					listed.length >= REPORTS_SETTINGS_LIMIT
-						? `${REPORTS_SETTINGS_DESCRIPTION} Showing the latest ${REPORTS_SETTINGS_LIMIT}.`
-						: REPORTS_SETTINGS_DESCRIPTION
-				}
-			>
-				{reports.length ? (
-					<ul
-						className="workspace-settings-list reports-settings-list"
-						aria-label="Saved reports"
+		<SettingsPageReveal routeId="reports" loading={query.isPending}>
+			{() => (
+				<div className="workspace-settings-page">
+					<WorkspaceSettingsGroup
+						title="Reports"
+						description={
+							listed.length >= REPORTS_SETTINGS_LIMIT
+								? `${REPORTS_SETTINGS_DESCRIPTION} Showing the latest ${REPORTS_SETTINGS_LIMIT}.`
+								: REPORTS_SETTINGS_DESCRIPTION
+						}
 					>
-						{reports.map((report) => (
-							<li key={report.id}>
-								<ReportRow
-									report={report}
-									href={appRoutes.workspaceReport(workspaceSlug, report.id)}
-									authorName={
-										report.mine ? "you" : (userMap[report.authorId] ?? null)
-									}
-								/>
-							</li>
-						))}
-					</ul>
-				) : (
-					<p className="workspace-settings-empty">{REPORTS_SETTINGS_EMPTY}</p>
-				)}
-			</WorkspaceSettingsGroup>
-		</div>
+						{reports.length ? (
+							<ul
+								className="workspace-settings-list reports-settings-list"
+								aria-label="Saved reports"
+							>
+								{reports.map((report) => (
+									<li key={report.id}>
+										<ReportRow
+											report={report}
+											href={appRoutes.workspaceReport(workspaceSlug, report.id)}
+											authorName={
+												report.mine ? "you" : (userMap[report.authorId] ?? null)
+											}
+										/>
+									</li>
+								))}
+							</ul>
+						) : (
+							<p className="workspace-settings-empty">
+								{REPORTS_SETTINGS_EMPTY}
+							</p>
+						)}
+					</WorkspaceSettingsGroup>
+				</div>
+			)}
+		</SettingsPageReveal>
 	);
 }
 

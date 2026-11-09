@@ -10,8 +10,8 @@ import {
 } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useLatestValueRef } from "@/app/hooks/useLatestValueRef";
+import { Bone, Reveal } from "@/app/ui/bones";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
-import { Skeleton } from "@/components/dashboard/skeleton";
 import { FluidList, useFluidListItem } from "@/components/fluid-list";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
 import { sessionDetailInitialQueryOptions } from "@/features/sessions/components/session-detail-fast-query";
@@ -299,29 +299,43 @@ function RunsList({
 	return (
 		<section aria-label={label} className={cn(COLUMN, className)}>
 			<ScrollColumn className="px-1.5 pt-2 pb-4">
-				{query.isPending ? (
-					<RunsSkeleton />
-				) : query.isError ? (
+				{!query.isPending && query.isError ? (
 					<p className="px-2 py-2 text-xs text-muted-foreground">
 						Runs could not be read.
 					</p>
-				) : runs && runs.length > 0 ? (
-					<FluidList>
-						<ul ref={listRef} className="flex flex-col gap-0.5">
-							{runs.map((run, index) => (
-								<li key={runKeyOf(run)} data-day={run.startedAt.slice(0, 10)}>
-									<RunRow
-										index={index}
-										isPicked={picked === runKeyOf(run)}
-										onPick={() =>
-											pick(picked === runKeyOf(run) ? null : runKeyOf(run))
-										}
-										run={run}
-									/>
-								</li>
-							))}
-						</ul>
-					</FluidList>
+				) : query.isPending || (runs && runs.length > 0) ? (
+					<Reveal
+						label="Reading the runs"
+						loading={query.isPending}
+						sample={<RunsSample />}
+						sampleId="repo-runs"
+					>
+						{() =>
+							runs ? (
+								<FluidList>
+									<ul ref={listRef} className="flex flex-col gap-0.5">
+										{runs.map((run, index) => (
+											<li
+												key={runKeyOf(run)}
+												data-day={run.startedAt.slice(0, 10)}
+											>
+												<RunRow
+													index={index}
+													isPicked={picked === runKeyOf(run)}
+													onPick={() =>
+														pick(
+															picked === runKeyOf(run) ? null : runKeyOf(run),
+														)
+													}
+													run={run}
+												/>
+											</li>
+										))}
+									</ul>
+								</FluidList>
+							) : null
+						}
+					</Reveal>
 				) : (
 					<p className="px-2 py-2 text-xs text-muted-foreground">{empty}</p>
 				)}
@@ -434,14 +448,14 @@ const SKELETON_RUNS = Array.from({ length: 24 }, (_, index) => ({
 	subagent: [0, 3, 4, 8, 11, 15, 19].includes(index),
 }));
 
-function RunsSkeleton() {
+function RunsSample() {
 	return (
-		<ul className="flex flex-col gap-0.5" aria-hidden="true">
+		<ul className="flex flex-col gap-0.5">
 			{SKELETON_RUNS.map((row) => (
 				<li key={row.id} className="flex h-7 items-center gap-1.5 px-2">
-					<Skeleton className="h-3 w-11 rounded-sm" />
+					<Bone className="h-3 w-11 rounded-sm" />
 					{row.subagent ? (
-						<Skeleton className="size-4 shrink-0 rounded-full" />
+						<Bone className="size-4 shrink-0 rounded-full" />
 					) : null}
 				</li>
 			))}
