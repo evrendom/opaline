@@ -198,7 +198,9 @@ they go in `compose.override.yaml`.
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | unset | Social sign-in; callback `<public URL>/api/auth/callback/github` (or `/google`). Invite-only still applies |
 | `ANTHROPIC_API_KEY` | unset | Compass moment observations |
 | `SUBQ_API_KEY` | unset | Run question tags and the frustration check |
-| `GITHUB_REPOSITORY_APP_*` | unset | Pull requests and CI next to sessions, below |
+| `GITHUB_TOKEN`, `GH_TOKEN` | unset: the GitHub CLI's login | Read-only GitHub token for pull requests and CI, below |
+| `GH_HOST`, `GH_CONFIG_DIR` | `github.com`, gh's default | Which host and which gh configuration `gh auth token` uses |
+| `OPALINE_GITHUB_HISTORY_DAYS` | 90 | Days of pull request and CI history read for a new repository (1 to 730) |
 
 ### Object storage
 
@@ -215,15 +217,49 @@ host; the server keeps using `S3_ENDPOINT`.
 
 ### GitHub pull requests and CI
 
-A read-only GitHub App links sessions to pull requests and CI runs. Create one with read-only
-Actions, Checks, Contents, Metadata, Pull requests and Commit statuses, leave "Request user
-authorization during installation" off, and set its Setup URL and a Callback URL to
-`<public URL>/api/github/setup`. Then set `GITHUB_REPOSITORY_APP_ID`, `_SLUG`, `_PRIVATE_KEY`,
-`_CLIENT_ID`, `_CLIENT_SECRET`, `_CALLBACK_URL` and optionally `_STATE_SECRET` (defaults to
-`BETTER_AUTH_SECRET`). For updates within minutes, activate the App's webhook at
-`<public URL>/api/webhooks/github` with `GITHUB_REPOSITORY_APP_WEBHOOK_SECRET` (`openssl rand -hex
-32`) and subscribe to Pull request, Check suite, Workflow run and Status; without it a job polls
-every five minutes. The App's credentials are separate from `GITHUB_CLIENT_ID` (sign-in).
+The server reads pull requests, reviews, checks, Actions runs and their logs with a read-only GitHub
+token. It uses the first it finds:
+
+1. `GITHUB_TOKEN`, then `GH_TOKEN`, in the server's environment;
+2. the GitHub CLI's login where the server runs (`gh auth token`).
+
+On your own computer that usually means nothing to do, or once:
+
+```sh
+gh auth login --scopes repo
+```
+
+For a server on another machine (a NAS, a VM, your cloud), give it a token: `GITHUB_TOKEN=…` in
+`~/.opaline/server/server.env` there (with `opaline server`) or in `compose.override.yaml` (Docker
+stack). A classic token needs the `repo` scope for private repositories and their CI logs. A
+fine-grained token needs read access to Contents, Metadata, Pull requests, Actions, Checks and
+Commit statuses of the repositories it should cover.
+
+There is nothing to connect and no webhook. Every five minutes the server reads the git remotes of
+the sessions uploaded to each workspace, asks GitHub which of those repositories the token can read,
+and collects them: the last 90 days at first (`OPALINE_GITHUB_HISTORY_DAYS`), then what changed.
+Repositories the token cannot read are skipped and asked about again every six hours. The token is
+read when it is needed and never stored or logged, so `gh auth login` or a new token takes effect
+within a minute, without a restart.
+
+Settings, GitHub shows where the token comes from, its account and scopes, the repositories it
+collects and the ones it cannot read, the last sweep and the rate limit, and the command that fixes
+a missing token. `opaline server start` and `opaline server status` print the same in one line, and
+the server log has a `github:` line at startup.
+
+A user token may make 5,000 requests an hour. Collection uses at most half of what is left and then
+waits for the hour to renew, so your own `gh` keeps working; the first pass over a busy repository
+can therefore take an hour or two.
+
+On a server shared with teammates, anyone who can upload sessions to a workspace can make the server
+collect any repository the token can read, by naming it as a git remote. Give a shared server a
+token that reads only the team's repositories (a fine-grained token, or one of a machine account).
+
+`GH_HOST` points `gh auth token` and the API at GitHub Enterprise Server. Pull requests and CI are
+collected there too, but sessions link to them in the run index only for `github.com` remotes.
+
+The GitHub App (`GITHUB_REPOSITORY_APP_*`) is for the hosted service; a self-hosted server ignores
+those variables.
 
 ## Memory and disk
 
@@ -270,6 +306,8 @@ every five minutes. The App's credentials are separate from `GITHUB_CLIENT_ID` (
 | The server stops answering for minutes after a very large upload | Known: the first view of a session above about 100 MiB is prepared in the server process (136 MiB took 166 s). It recovers by itself |
 | Evidence of a transcript above 128 MiB is incomplete | It is sent in several deliveries; `opaline upload --retry` sends what is left |
 | Agents do not see the Opaline tools | `opaline mcp install`, then restart the agent |
+| Settings, GitHub says "No token" | `gh auth login --scopes repo` where the server runs, or `GITHUB_TOKEN=…` in `server.env` |
+| A repository is missing from Settings, GitHub | Its sessions need a GitHub remote, and the token must be able to read it (otherwise it is listed as not readable); new ones appear within five minutes of the first upload |
 
 ## Running the server without the CLI
 
@@ -293,6 +331,7 @@ and dashboard, runs the jobs, and prints `ready <url>` on stdout.
 | `OPALINE_VERSION` | No | What `/api/selfhost/info` reports |
 
 `GET /api/selfhost/info` says whether a server is self-hosted, its version and URLs, whether setup
-is done and how people sign in (`auth.openSignup` included). `POST /api/selfhost/setup` with
+is done and how people sign in (`auth.openSignup` included). `GET /api/selfhost/github` with the setup token or
+an admin's API key returns the GitHub token status (never the token). `POST /api/selfhost/setup` with
 `X-Opaline-Setup-Token` and `{ email, name, workspaceName }` creates the owner account while no
 account exists and returns an API key and a sign-in link.

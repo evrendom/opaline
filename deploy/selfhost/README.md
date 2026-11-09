@@ -83,16 +83,20 @@ ClickHouse speaks plain HTTP here, so keep port 8123 on your LAN. Running `./ins
 
 `COMPOSE_PROFILES` in `.env` picks what runs: `server` (Opaline + Postgres + ClickHouse, the
 default), `server,https` (plus Caddy), or empty (ClickHouse only). Every setting is in
-`.env.example`. Optional integrations (OpenAI embeddings, email through Resend, a GitHub App,
-S3-compatible storage) are environment variables of the `opaline` service; add them in a
-`compose.override.yaml` next to `compose.yaml`, for example:
+`.env.example`. Optional integrations (OpenAI embeddings, email through Resend, a GitHub token
+for pull requests and CI, S3-compatible storage) are environment variables of the `opaline`
+service; add them in a `compose.override.yaml` next to `compose.yaml`, for example:
 
 ```yaml
 services:
   opaline:
     environment:
       OPENAI_API_KEY: sk-...
+      GITHUB_TOKEN: github_pat_...
 ```
+
+The image has no GitHub CLI, so GitHub needs `GITHUB_TOKEN` here (read-only; a classic token with
+the `repo` scope, or a fine-grained one).
 
 ## Operating it
 
