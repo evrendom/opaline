@@ -15,12 +15,17 @@ import {
 } from "@rudel/secret-filter";
 import type postgres from "postgres";
 import { readGitHubSyncSkippedOrgIds } from "../lib/env.js";
+import { isSelfHosted } from "../lib/self-hosted.js";
 import { demoRepositoryFilesDependencies } from "./demo-repository-files.js";
 import {
 	createGitHubInstallationAccessToken,
 	type GitHubRepositoryAppConfig,
 	readGitHubRepositoryAppConfig,
 } from "./github-app.service.js";
+import {
+	GitHubTokenUnavailableError,
+	readResolvedGitHubTokenCredentials,
+} from "./github-token.service.js";
 
 // Both caps keep a response well under the API's 3.75 MB limit.
 export const MAX_TREE_ENTRIES = 20_000;
@@ -137,9 +142,14 @@ async function locate(
 		organizationId: input.organizationId,
 		...repo,
 	});
-	const source = binding ? deps.sourceFor(binding.installationId) : null;
-	if (!binding || !source) return UNAVAILABLE("not-connected");
-	return { binding, source: await source };
+	const pending = binding ? deps.sourceFor(binding.installationId) : null;
+	if (!binding || !pending) return UNAVAILABLE("not-connected");
+	const source = await pending.catch((error: unknown) => {
+		if (error instanceof GitHubTokenUnavailableError) return null;
+		throw error;
+	});
+	if (!source) return UNAVAILABLE("not-connected");
+	return { binding, source };
 }
 
 async function readOrUnreachable<T>(
@@ -179,6 +189,16 @@ function defaultDependencies(): RepositoryFilesDependencies {
 			return findGitHubRepositoryBindingByName(sqlClient, input);
 		},
 		sourceFor: (installationId) => {
+			if (isSelfHosted())
+				return readResolvedGitHubTokenCredentials().then((credentials) => {
+					if (!credentials) throw new GitHubTokenUnavailableError();
+					return credentials.read().then((token) =>
+						createGitHubFileSource({
+							authorization: createGitHubAuthorization(token),
+							baseUrl: credentials.apiBaseUrl,
+						}),
+					);
+				});
 			const config = readGitHubRepositoryAppConfig();
 			if (!config) return null;
 			return installationToken(config, installationId).then((token) =>

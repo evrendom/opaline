@@ -14,6 +14,17 @@ export function parseSqlQuotaPerHour(raw: string | undefined): number | null {
 	return Number.isSafeInteger(queries) && queries > 0 ? queries : null;
 }
 
+export const DEFAULT_GITHUB_HISTORY_DAYS = 90;
+export const MAX_GITHUB_HISTORY_DAYS = 730;
+
+export function parseGitHubHistoryDays(raw: string | undefined): number | null {
+	const value = raw?.trim();
+	if (!value) return DEFAULT_GITHUB_HISTORY_DAYS;
+	if (!/^[0-9]+$/u.test(value)) return null;
+	const days = Number(value);
+	return days >= 1 && days <= MAX_GITHUB_HISTORY_DAYS ? days : null;
+}
+
 export const SELF_HOSTED_DISABLED_ENV = [
 	"STRIPE_SECRET_KEY",
 	"STRIPE_WEBHOOK_SECRET",
@@ -28,6 +39,14 @@ export const SELF_HOSTED_DISABLED_ENV = [
 	"VITE_POSTHOG_HOST",
 	"SENTRY_API_ENABLED",
 	"SENTRY_API_DSN",
+	"GITHUB_REPOSITORY_APP_ID",
+	"GITHUB_REPOSITORY_APP_SLUG",
+	"GITHUB_REPOSITORY_APP_PRIVATE_KEY",
+	"GITHUB_REPOSITORY_APP_CLIENT_ID",
+	"GITHUB_REPOSITORY_APP_CLIENT_SECRET",
+	"GITHUB_REPOSITORY_APP_CALLBACK_URL",
+	"GITHUB_REPOSITORY_APP_STATE_SECRET",
+	"GITHUB_REPOSITORY_APP_WEBHOOK_SECRET",
 ] as const;
 
 export function disableExternalProviders(
@@ -50,11 +69,7 @@ const FEATURE_PROVIDERS: Record<
 		Boolean(env.SUBQ_API_KEY?.trim() || env.TYPESAFE_API_KEY?.trim()),
 	moment_observations: (env) => Boolean(env.ANTHROPIC_API_KEY?.trim()),
 	frustration_check: (env) => Boolean(env.SUBQ_API_KEY?.trim()),
-	run_ci: (env) =>
-		Boolean(
-			env.GITHUB_REPOSITORY_APP_ID?.trim() &&
-				env.GITHUB_REPOSITORY_APP_PRIVATE_KEY?.trim(),
-		),
+	run_ci: () => true,
 };
 
 export function selfHostedFeatureDefault(

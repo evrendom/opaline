@@ -1,6 +1,6 @@
 import type postgres from "postgres";
-import type { GitHubRepositoryAppConfig } from "./github-app.service.js";
 import { collectAndPersistGitHubCommitEvidence } from "./github-evidence-persistence.service.js";
+import type { GitHubRepositoryCredentials } from "./github-token.service.js";
 import type { R2EvidenceStorageClient } from "./r2-ingest-storage.service.js";
 
 type CollectInput = Parameters<typeof collectAndPersistGitHubCommitEvidence>[0];
@@ -31,7 +31,7 @@ export interface GitHubEvidenceMaintenanceResult {
 }
 
 export async function runGitHubEvidenceCollectionMaintenance(input: {
-	readonly config: GitHubRepositoryAppConfig;
+	readonly config: GitHubRepositoryCredentials;
 	readonly collectionIds?: readonly string[];
 	readonly createInstallationToken?: CollectInput["createInstallationToken"];
 	readonly database: postgres.Sql;

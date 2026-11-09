@@ -7,10 +7,7 @@ import type postgres from "postgres";
 import { z } from "zod";
 import { getClickhouse } from "../clickhouse.js";
 import { readGitHubSyncSkippedOrgIds } from "../lib/env.js";
-import {
-	createGitHubInstallationAccessToken,
-	type GitHubRepositoryAppConfig,
-} from "./github-app.service.js";
+import { createGitHubInstallationAccessToken } from "./github-app.service.js";
 import { latestGitHubEvidenceAttempt } from "./github-evidence-maintenance.service.js";
 import {
 	flushGitHubOutcomesBatch,
@@ -25,6 +22,10 @@ import {
 	persistGitHubStatuses,
 } from "./github-outcomes-persistence.service.js";
 import { refreshPrTotalsReadiness } from "./github-outcomes-readiness.service.js";
+import {
+	type GitHubRepositoryCredentials,
+	isGitHubTokenCredentials,
+} from "./github-token.service.js";
 import { L1_EDGE_SESSION_DEBOUNCE_MS } from "./l1-edges/l1-edge-enqueue.js";
 import { enqueueL1EdgeScope } from "./l1-edges/l1-edge-queue.service.js";
 import {
@@ -126,6 +127,7 @@ export async function enqueueGitHubRepositorySweep(
 	now: Date,
 	database: postgres.Sql | postgres.TransactionSql,
 	restart = false,
+	historyDays?: number,
 ): Promise<void> {
 	if (restart)
 		await database.unsafe(
@@ -151,7 +153,9 @@ export async function enqueueGitHubRepositorySweep(
 	)
 		return;
 	const horizon = new Date(now);
-	horizon.setUTCFullYear(horizon.getUTCFullYear() - 2);
+	if (historyDays === undefined)
+		horizon.setUTCFullYear(horizon.getUTCFullYear() - 2);
+	else horizon.setTime(now.getTime() - historyDays * DAY_MS);
 	const from = horizon;
 	const to = new Date(Math.floor(now.getTime() / 1000) * 1000);
 	const start = new Date(Math.floor(from.getTime() / 1000) * 1000);
@@ -197,8 +201,9 @@ export async function enqueueGitHubRepositorySweep(
 
 export async function runGitHubRepositorySweep(input: {
 	readonly database: postgres.Sql;
-	readonly config: GitHubRepositoryAppConfig;
+	readonly config: GitHubRepositoryCredentials;
 	readonly environment?: Readonly<Record<string, string | undefined>>;
+	readonly historyDays?: number;
 	readonly fetch?: typeof globalThis.fetch;
 	readonly createToken?: typeof createGitHubInstallationAccessToken;
 	readonly now?: () => Date;
@@ -292,14 +297,17 @@ export async function runGitHubRepositorySweep(input: {
 								},
 								{ preconnect: requestFetch.preconnect },
 							);
-							const token = await (
-								input.createToken ?? createGitHubInstallationAccessToken
-							)({
-								config: input.config,
-								installationId: binding.installation_id,
-								fetch: tokenFetch,
-								now: now(),
-							});
+							const credentials = input.config;
+							const token = isGitHubTokenCredentials(credentials)
+								? await credentials.read()
+								: await (
+										input.createToken ?? createGitHubInstallationAccessToken
+									)({
+										config: credentials,
+										installationId: binding.installation_id,
+										fetch: tokenFetch,
+										now: now(),
+									});
 							const boundedFetch: typeof globalThis.fetch = Object.assign(
 								async (url: string | URL | Request, init?: RequestInit) => {
 									if (
@@ -341,6 +349,9 @@ export async function runGitHubRepositorySweep(input: {
 							);
 							source = createGitHubSweepSource({
 								authorization: createGitHubAuthorization(token),
+								baseUrl: isGitHubTokenCredentials(credentials)
+									? credentials.apiBaseUrl
+									: undefined,
 								fetch: boundedFetch,
 							});
 						}
