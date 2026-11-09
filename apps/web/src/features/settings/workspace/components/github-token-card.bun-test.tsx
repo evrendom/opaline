@@ -74,6 +74,8 @@ test("without a token the card says why and gives the command that fixes it", ()
 	expect(markup).toContain("nothing needs a restart");
 	expect(markup).toContain("Not yet");
 	expect(markup).toContain("Not known yet.");
+	expect(markup).toContain(">Unknown</span>");
+	expect(markup).not.toContain("Within limit");
 	expect(markup).not.toContain("Scopes");
 	expect(markup).not.toContain("Open dashboard");
 });

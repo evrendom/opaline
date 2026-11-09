@@ -85,12 +85,20 @@ export function GitHubTokenCard({
 			>
 				<span
 					className="sessions-settings-status"
-					data-state={token.pausedUntil ? "needs_attention" : "enabled"}
+					data-state={
+						token.pausedUntil
+							? "needs_attention"
+							: token.rateLimit
+								? "enabled"
+								: "unknown"
+					}
 				>
 					<span className="sessions-settings-status-dot" aria-hidden="true" />
 					{token.pausedUntil
 						? `Waiting until ${formatDateTime(token.pausedUntil)}`
-						: "Within limit"}
+						: token.rateLimit
+							? "Within limit"
+							: "Unknown"}
 				</span>
 			</WorkspaceSettingsRow>
 			{dashboard === "visible" ? (
