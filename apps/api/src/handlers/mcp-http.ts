@@ -286,7 +286,9 @@ async function handleMcpRequest(
 	if (!userId) {
 		const metadataUrl = new URL(
 			`/.well-known/oauth-protected-resource${MCP_PATH}`,
-			request.url,
+			isSelfHosted()
+				? (dependencies.auth.options.baseURL ?? request.url)
+				: request.url,
 		);
 		return Response.json(
 			{ error: "invalid_token" },
