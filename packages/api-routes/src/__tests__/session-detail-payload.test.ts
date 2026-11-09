@@ -519,6 +519,7 @@ describe("session detail payload contracts", () => {
 				{
 					...summary,
 					body: null,
+					bodyChunks: { sha256: "c".repeat(64), totalCodeUnits: 600_000 },
 					bodyOmitted: "oversized",
 					index: 2,
 					turnId: "turn-3",
@@ -531,6 +532,8 @@ describe("session detail payload contracts", () => {
 			userItems: [],
 		});
 		expect(parsed.turns[2]?.bodyOmitted).toBe("oversized");
+		expect(parsed.turns[2]?.bodyChunks?.totalCodeUnits).toBe(600_000);
+		expect(parsed.turns[1]?.bodyChunks).toBeUndefined();
 	});
 
 	test("accepts a summary item after a JSON round trip drops its undefined timestamp", () => {
@@ -596,5 +599,45 @@ describe("turn step kinds and subagent git actions", () => {
 		]);
 		expect(gitActions.safeParse({ git: 1 }).success).toBe(false);
 		expect(gitActions.safeParse({ commit: 0 }).success).toBe(false);
+	});
+
+	test("chunk totals are asked for, and only by the initial view and windows", () => {
+		const initial =
+			sessionDetailProcedureContracts.detailInitial["~orpc"].inputSchema;
+		const relationships =
+			sessionDetailProcedureContracts.detailRelationships["~orpc"].inputSchema;
+		assert(initial && relationships);
+		expect(initial.safeParse({ sessionId: "s" }).success).toBe(true);
+		expect(
+			initial.safeParse({ bodyChunks: true, sessionId: "s" }).success,
+		).toBe(true);
+		expect(
+			initial.safeParse({ bodyChunks: false, sessionId: "s" }).success,
+		).toBe(false);
+		expect(
+			relationships.safeParse({ bodyChunks: true, sessionId: "s" }).success,
+		).toBe(false);
+		const anchor = {
+			anchorTurnId: "turn-1",
+			includeBodies: true,
+			mode: "anchor",
+			revision: "1",
+			sessionId: "s",
+		};
+		expect(SessionDetailWindowRequestSchema.safeParse(anchor).success).toBe(
+			true,
+		);
+		expect(
+			SessionDetailWindowRequestSchema.safeParse({
+				...anchor,
+				bodyChunks: true,
+			}).success,
+		).toBe(true);
+		expect(
+			SessionDetailWindowRequestSchema.safeParse({
+				...anchor,
+				bodyChunks: false,
+			}).success,
+		).toBe(false);
 	});
 });

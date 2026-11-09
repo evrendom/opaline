@@ -1,3 +1,7 @@
+import {
+	clickHouseWorkloadForPath,
+	runAsClickHouseWorkload,
+} from "../clickhouse-workload.js";
 import { captureApiServerError } from "./server-error-monitoring.js";
 
 const INTERNAL_PATH_PARAMETER = "__opaline_path";
@@ -28,7 +32,10 @@ export function createVercelFunctionHandler(input: {
 			recordActivity(context);
 
 		try {
-			const response = await input.fetch(routedRequest);
+			const response = await runAsClickHouseWorkload(
+				clickHouseWorkloadForPath(new URL(routedRequest.url).pathname),
+				() => input.fetch(routedRequest),
+			);
 			// Readiness 503s are handled by the uptime monitor. Do not generate
 			// an exception (and wait for telemetry delivery) on every failed probe.
 			const isUnavailableProbe =

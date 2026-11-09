@@ -1124,6 +1124,7 @@ export function assembleSessionDetailWindow(input: {
 			derivation,
 			index,
 			input.budget?.maxTurnBytes,
+			request.bodyChunks === true,
 		);
 		if (!turn) {
 			continue;
@@ -1280,6 +1281,7 @@ function createSessionDetailWindowTurn(
 	derivation: SessionDetailDerivation,
 	index: number,
 	maxTurnBytes = SESSION_DETAIL_WINDOW_MAX_TURN_BYTES,
+	withBodyChunks = false,
 ) {
 	const summary = derivation.turnSummaries[index];
 	if (!summary) {
@@ -1287,12 +1289,17 @@ function createSessionDetailWindowTurn(
 	}
 	// The spine already measures response items. Don't inflate a multi-megabyte
 	// response just to discover again that it needs the chunk endpoint.
+	const bodyChunks = withBodyChunks
+		? derivation.turnBodies.chunks?.(summary.turnId)
+		: undefined;
+	const chunked = bodyChunks ? { bodyChunks } : {};
 	if ((derivation.spine[index]?.responseBytes ?? 0) > maxTurnBytes) {
 		return {
 			oversized: true,
 			value: {
 				...summary,
 				body: null,
+				...chunked,
 				bodyOmitted: "oversized",
 			} satisfies SessionDetailWindowTurn,
 		};
@@ -1310,6 +1317,7 @@ function createSessionDetailWindowTurn(
 		value: {
 			...summary,
 			body: oversized ? null : body,
+			...(oversized ? chunked : {}),
 			bodyOmitted: oversized ? "oversized" : null,
 		} satisfies SessionDetailWindowTurn,
 	};

@@ -285,7 +285,8 @@ export function CostChart({
 		splitBy === "none" &&
 		!overrides?.has("signals") &&
 		previews !== undefined;
-	const loading = pending || (perRunChart && !previews?.languageSplit);
+	const loading =
+		pending || (perRunChart && previews?.languageSplit === undefined);
 	const [phase, setPhase] = useState<ChartPhase>(loading ? "loading" : "idle");
 	const [hoverStore] = useState(createHoverDateStore);
 	const metricsRef = useRef<HTMLFieldSetElement>(null);
@@ -309,7 +310,7 @@ export function CostChart({
 		: deepViewOf(
 				selectedMetric,
 				getMetricData(dashboard, selectedMetric),
-				getMetricData(previews?.languageSplit, "signals"),
+				previews?.languageSplit,
 			);
 	const deepSplit = useDeepSplit(inputFor, filtered ? null : expanded);
 	const [wasPending, setWasPending] = useState(loading);
@@ -751,7 +752,7 @@ export function CostChart({
 								filtered
 									? null
 									: expanded === "signals"
-										? getMetricData(previews?.languageSplit, "signals")
+										? previews?.languageSplit
 										: deepSplit
 							}
 							metric={expanded}

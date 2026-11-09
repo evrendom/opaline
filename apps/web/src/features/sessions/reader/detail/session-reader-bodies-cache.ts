@@ -1,4 +1,7 @@
-import type { SessionDetailWindow } from "@rudel/api-routes";
+import type {
+	SessionDetailBodyChunks,
+	SessionDetailWindow,
+} from "@rudel/api-routes";
 import type { QueryClient } from "@tanstack/react-query";
 import {
 	sessionDetailTurnQueryPrefix,
@@ -12,10 +15,10 @@ export function cachedBodies(
 	revision: string,
 ): {
 	bodies: Map<string, SessionReaderBody>;
-	oversized: Set<string>;
+	oversized: Map<string, SessionDetailBodyChunks | undefined>;
 } {
 	const bodies = new Map<string, SessionReaderBody>();
-	const oversized = new Set<string>();
+	const oversized = new Map<string, SessionDetailBodyChunks | undefined>();
 	const windows = queryClient.getQueriesData<SessionDetailWindow>({
 		queryKey: sessionDetailWindowQueryPrefix(sessionId),
 	});
@@ -23,7 +26,11 @@ export function cachedBodies(
 		if (!window || window.revision !== revision) continue;
 		for (const turn of window.turns) {
 			if (turn.body) bodies.set(turn.turnId, turn.body);
-			else if (turn.bodyOmitted === "oversized") oversized.add(turn.turnId);
+			else if (turn.bodyOmitted === "oversized")
+				oversized.set(
+					turn.turnId,
+					turn.bodyChunks ?? oversized.get(turn.turnId),
+				);
 		}
 	}
 	const turns = queryClient.getQueriesData<SessionReaderBody>({

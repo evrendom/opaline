@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { CostDashboard, DashboardMetricData } from "@rudel/api-routes";
+import type { DashboardMetricData } from "@rudel/api-routes";
 import { formatPerRun, languageRates } from "./cost-language-rates";
 
 const point = (
@@ -33,25 +33,23 @@ const runs = {
 	],
 } as unknown as DashboardMetricData;
 
-const split = { metrics: { signals } } as unknown as CostDashboard;
-
 describe("languageRates", () => {
 	test("divides swears and apologies by the agent runs of each day", () => {
-		const rates = languageRates(split, runs, "daily");
+		const rates = languageRates(signals, runs, "daily");
 		expect(rates?.swears).toEqual([0.2, 0.6, 0]);
 		expect(rates?.apologies).toEqual([0.4, 0, 0]);
 		expect(rates?.dates).toEqual(["2026-10-05", "2026-10-06", "2026-10-07"]);
 	});
 
 	test("the range total divides summed counts by summed runs", () => {
-		const rates = languageRates(split, runs, "daily");
+		const rates = languageRates(signals, runs, "daily");
 		expect(rates?.total.swears).toBeCloseTo(5 / 15);
 		expect(rates?.total.apologies).toBeCloseTo(4 / 15);
 	});
 
 	test("without the split or the runs there is nothing to show", () => {
 		expect(languageRates(undefined, runs, "daily")).toBeUndefined();
-		expect(languageRates(split, null, "daily")).toBeUndefined();
+		expect(languageRates(signals, null, "daily")).toBeUndefined();
 	});
 
 	test("a rate reads as one per N runs", () => {

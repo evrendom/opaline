@@ -50,7 +50,8 @@ export function pluginToolCall(
 		(input === null || typeof input !== "object" || Array.isArray(input))
 	)
 		throw new ORPCError("BAD_REQUEST");
-	return { name, arguments: { ...input, workspace } };
+	const { bodyChunks: _, ...args } = (input ?? {}) as Record<string, unknown>;
+	return { name, arguments: { ...args, workspace } };
 }
 
 export function createPluginLink(

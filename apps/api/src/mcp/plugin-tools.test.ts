@@ -111,5 +111,18 @@ describe("plugin tools", () => {
 			window.safeParse({ workspace: "team", sessionId: "s", mode: "anchor" })
 				.success,
 		).toBe(false);
+		expect(
+			detail.safeParse({ workspace: "team", sessionId: "s", bodyChunks: true })
+				.success,
+		).toBe(false);
+		expect(
+			window.safeParse({
+				workspace: "team",
+				sessionId: "s",
+				mode: "initial",
+				includeBodies: true,
+				bodyChunks: true,
+			}).success,
+		).toBe(false);
 	});
 });

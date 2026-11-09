@@ -271,6 +271,7 @@ const costDashboardOutputSchema = z.object({
 		ciFailuresPerPullRequest: DashboardMetricDataSchema.nullable(),
 		ciRuns: DashboardMetricDataSchema.nullable().default(null),
 	}),
+	languageSplit: DashboardMetricDataSchema.nullable().optional(),
 });
 export type DashboardSignal = z.infer<typeof DashboardSignalSchema>;
 export type DashboardMetric = z.infer<typeof DashboardMetricSchema>;

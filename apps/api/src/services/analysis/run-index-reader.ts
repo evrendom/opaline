@@ -79,13 +79,22 @@ export function committedBuildSql(
 	table: string,
 	owner: string,
 	sessionKey: readonly ("user_id" | "session_id")[],
+	runsStarted?: { readonly from: string; readonly to: string },
 ): string {
 	const key = sessionKey.join(", ");
+	const started = runsStarted
+		? `
+								AND (${key}) IN (
+									SELECT ${key} FROM ${table}
+									WHERE ${owner} AND row_kind = 'run'
+										AND started_at >= ${runsStarted.from} AND started_at < ${runsStarted.to}
+								)`
+		: "";
 	return `(${key}, revision, parser_version, index_version, build_revision) IN (
 						SELECT ${key}, committed.1, committed.2, committed.3, committed.4 FROM (
 							SELECT ${key}, max((revision, parser_version, index_version, build_revision)) AS committed
 							FROM ${table}
-							WHERE ${owner} AND row_kind = 'receipt'
+							WHERE ${owner} AND row_kind = 'receipt'${started}
 							GROUP BY ${key}
 						)
 					)`;

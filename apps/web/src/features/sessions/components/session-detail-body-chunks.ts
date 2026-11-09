@@ -1,12 +1,14 @@
 import {
 	SESSION_DETAIL_BODY_CHUNK_CODE_UNITS,
-	type SessionDetailBodyChunk,
 	type SessionDetailBodyChunkInput,
 	SessionDetailBodyChunkSchema,
+	type SessionDetailBodyChunks,
 } from "@rudel/api-routes";
 import { scheduleBodyRequest } from "./body-request-scheduler";
 
 type BodyIdentity = Omit<SessionDetailBodyChunkInput, "offset">;
+
+const BODY_CHUNKS_IN_FLIGHT = 4;
 
 export class SessionDetailBodyIntegrityError extends Error {
 	constructor() {
@@ -26,31 +28,31 @@ export async function readSessionDetailBodyChunks(
 			signal: AbortSignal,
 		) => Promise<unknown>;
 	},
+	known?: SessionDetailBodyChunks,
 ): Promise<unknown> {
 	const controller = new AbortController();
 	const signal = AbortSignal.any([querySignal, controller.signal]);
-	const request = (offset: number) =>
+	const request = (offset: number, expected?: SessionDetailBodyChunks) =>
 		scheduleBodyRequest(input.targetId, signal, () =>
 			env.request({ ...input, offset }, signal),
-		);
+		).then((value) => parseChunk(value, input, offset, expected));
 	try {
 		signal.throwIfAborted();
-		const first = parseChunk(await request(0), input, 0);
-		const rest: Promise<SessionDetailBodyChunk>[] = [];
+		const head = known ? undefined : await request(0);
+		const expected = known ?? head;
+		if (!expected) throw new SessionDetailBodyIntegrityError();
+		const offsets: number[] = [];
 		for (
-			let offset = first.data.length;
-			offset < first.totalCodeUnits;
+			let offset = head ? head.data.length : 0;
+			offset < expected.totalCodeUnits;
 			offset += SESSION_DETAIL_BODY_CHUNK_CODE_UNITS
-		) {
-			const chunkOffset = offset;
-			rest.push(
-				request(chunkOffset).then((value) =>
-					parseChunk(value, input, chunkOffset, first),
-				),
-			);
-		}
-		const chunks = [first.data];
-		for (const chunk of await Promise.all(rest)) chunks.push(chunk.data);
+		)
+			offsets.push(offset);
+		const rest = await mapWithLimit(offsets, BODY_CHUNKS_IN_FLIGHT, (offset) =>
+			request(offset, expected),
+		);
+		const chunks = head ? [head.data] : [];
+		for (const chunk of rest) chunks.push(chunk.data);
 		signal.throwIfAborted();
 		const json = chunks.join("");
 		const digest = await crypto.subtle.digest(
@@ -61,7 +63,7 @@ export async function readSessionDetailBodyChunks(
 			byte.toString(16).padStart(2, "0"),
 		).join("");
 		signal.throwIfAborted();
-		if (json.length !== first.totalCodeUnits || sha256 !== first.sha256) {
+		if (json.length !== expected.totalCodeUnits || sha256 !== expected.sha256) {
 			throw new SessionDetailBodyIntegrityError();
 		}
 		return JSON.parse(json);
@@ -71,11 +73,30 @@ export async function readSessionDetailBodyChunks(
 	}
 }
 
+async function mapWithLimit<T, R>(
+	items: readonly T[],
+	limit: number,
+	run: (item: T) => Promise<R>,
+): Promise<R[]> {
+	const results = new Array<R>(items.length);
+	let next = 0;
+	const worker = async () => {
+		while (next < items.length) {
+			const index = next++;
+			results[index] = await run(items[index] as T);
+		}
+	};
+	await Promise.all(
+		Array.from({ length: Math.min(limit, items.length) }, worker),
+	);
+	return results;
+}
+
 function parseChunk(
 	value: unknown,
 	input: BodyIdentity,
 	offset: number,
-	first?: SessionDetailBodyChunk,
+	expected?: SessionDetailBodyChunks,
 ) {
 	const parsed = SessionDetailBodyChunkSchema.safeParse(value);
 	if (!parsed.success) throw new SessionDetailBodyIntegrityError();
@@ -91,9 +112,9 @@ function parseChunk(
 				SESSION_DETAIL_BODY_CHUNK_CODE_UNITS,
 				chunk.totalCodeUnits - offset,
 			) ||
-		(first &&
-			(chunk.sha256 !== first.sha256 ||
-				chunk.totalCodeUnits !== first.totalCodeUnits))
+		(expected &&
+			(chunk.sha256 !== expected.sha256 ||
+				chunk.totalCodeUnits !== expected.totalCodeUnits))
 	)
 		throw new SessionDetailBodyIntegrityError();
 	return chunk;

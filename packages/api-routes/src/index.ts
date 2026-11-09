@@ -533,6 +533,8 @@ export {
 	type SessionDetailBodyChunkInput,
 	SessionDetailBodyChunkInputSchema,
 	SessionDetailBodyChunkSchema,
+	type SessionDetailBodyChunks,
+	SessionDetailBodyChunksSchema,
 	SessionDetailChunkedSubagentSchema,
 	type SessionDetailContextUse,
 	type SessionDetailInitial,

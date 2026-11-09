@@ -1,4 +1,7 @@
-import type { SessionDetailWindow } from "@rudel/api-routes";
+import type {
+	SessionDetailBodyChunks,
+	SessionDetailWindow,
+} from "@rudel/api-routes";
 import type { ReadyBody } from "@rudel/api-routes/session-context/session-reader-body";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
@@ -19,6 +22,7 @@ import {
 	sessionDetailWindowQueryKey,
 } from "../../components/session-detail-fast-query";
 import type { SessionReaderBody } from "../model/session-reader-model";
+import { canStartWindow } from "./reader-window-slots";
 import { cachedBodies } from "./session-reader-bodies-cache";
 
 export type SessionReaderBodyState =
@@ -29,16 +33,17 @@ export type SessionReaderBodyState =
 type BodyStore = {
 	bodies: ReadonlyMap<string, SessionReaderBody>;
 	failed: ReadonlySet<string>;
-	oversized: ReadonlySet<string>;
+	oversized: ReadonlyMap<string, SessionDetailBodyChunks | undefined>;
 };
 
 function mergeWindow(store: BodyStore, window: SessionDetailWindow): BodyStore {
 	const bodies = new Map(store.bodies);
-	const oversized = new Set(store.oversized);
+	const oversized = new Map(store.oversized);
 	for (const turn of window.turns) {
 		if (turn.body && !bodies.has(turn.turnId))
 			bodies.set(turn.turnId, turn.body);
-		else if (turn.bodyOmitted === "oversized") oversized.add(turn.turnId);
+		else if (turn.bodyOmitted === "oversized")
+			oversized.set(turn.turnId, turn.bodyChunks ?? oversized.get(turn.turnId));
 	}
 	return { ...store, bodies, oversized };
 }
@@ -83,7 +88,7 @@ export function useSessionReaderBodies({
 	}, [startTurnId]);
 	const queueRef = useRef<string[]>([]);
 	const inFlightRef = useRef(new Set<string>());
-	const windowInFlightRef = useRef(false);
+	const windowAnchorsRef = useRef(new Set<string>());
 	const [appliedWindow, setAppliedWindow] = useState(initialWindow);
 	if (
 		initialWindow &&
@@ -112,7 +117,8 @@ export function useSessionReaderBodies({
 					!inFlightRef.current.has(turnId),
 			);
 			const canStart = (id: string) =>
-				current.oversized.has(id) || !windowInFlightRef.current;
+				current.oversized.has(id) ||
+				canStartWindow(windowAnchorsRef.current, id, turnsRef.current);
 			let queued = queueRef.current.length - 1;
 			while (queued >= 0 && !canStart(queueRef.current[queued] as string))
 				queued--;
@@ -141,15 +147,20 @@ export function useSessionReaderBodies({
 			if (!turnId) return;
 			if (queued === -1) raiseBodyPriority(turnId, BODY_PRIORITY.idle);
 			const windowed = !current.oversized.has(turnId);
-			if (windowed) windowInFlightRef.current = true;
+			if (windowed) windowAnchorsRef.current.add(turnId);
 			inFlightRef.current.add(turnId);
 			void pump();
 			try {
-				if (current.oversized.has(turnId)) {
+				if (!windowed) {
+					const bodyChunks = current.oversized.get(turnId);
 					const turn = await queryClient.fetchQuery({
 						gcTime: SESSION_DETAIL_BODY_CACHE_TIME_MS,
 						queryFn: ({ signal }) =>
-							fetchSessionDetailTurn({ revision, sessionId, turnId }, signal),
+							fetchSessionDetailTurn(
+								{ revision, sessionId, turnId },
+								signal,
+								bodyChunks,
+							),
 						queryKey: sessionDetailTurnQueryKey({
 							revision,
 							sessionId,
@@ -195,7 +206,7 @@ export function useSessionReaderBodies({
 				storeRef.current = { ...storeRef.current, failed };
 			} finally {
 				inFlightRef.current.delete(turnId);
-				if (windowed) windowInFlightRef.current = false;
+				if (windowed) windowAnchorsRef.current.delete(turnId);
 				setStore(storeRef.current);
 			}
 			void pump();

@@ -81,11 +81,15 @@ export const SessionDetailOverviewInputSchema = z
 	})
 	.strict();
 
-export const SessionDetailInitialInputSchema =
-	SessionDetailOverviewInputSchema.pick({ sessionId: true });
+const SessionDetailBodyChunksRequestSchema = z.literal(true).optional();
 
 export const SessionDetailRelationshipsInputSchema =
-	SessionDetailInitialInputSchema;
+	SessionDetailOverviewInputSchema.pick({ sessionId: true });
+
+export const SessionDetailInitialInputSchema =
+	SessionDetailRelationshipsInputSchema.extend({
+		bodyChunks: SessionDetailBodyChunksRequestSchema,
+	}).strict();
 
 const NativeSessionRelationshipSchema = z.object({
 	agentPath: z.string().nullable(),
@@ -101,6 +105,7 @@ export const SessionDetailRelationshipsSchema = z.object({
 export const SessionDetailWindowRequestSchema = z.discriminatedUnion("mode", [
 	z
 		.object({
+			bodyChunks: SessionDetailBodyChunksRequestSchema,
 			includeBodies: z.literal(true),
 			mode: z.literal("initial"),
 			sessionId: z.string().max(MAX_SESSION_ID_LENGTH),
@@ -109,6 +114,7 @@ export const SessionDetailWindowRequestSchema = z.discriminatedUnion("mode", [
 	z
 		.object({
 			anchorTurnId: SessionDetailTurnIdSchema,
+			bodyChunks: SessionDetailBodyChunksRequestSchema,
 			includeBodies: z.literal(true),
 			mode: z.literal("anchor"),
 			revision: SessionDetailRevisionSchema,
@@ -118,6 +124,7 @@ export const SessionDetailWindowRequestSchema = z.discriminatedUnion("mode", [
 	z
 		.object({
 			cursor: SessionDetailWindowCursorSchema,
+			bodyChunks: SessionDetailBodyChunksRequestSchema,
 			includeBodies: z.literal(true),
 			mode: z.literal("older"),
 			sessionId: z.string().max(MAX_SESSION_ID_LENGTH),
@@ -126,6 +133,7 @@ export const SessionDetailWindowRequestSchema = z.discriminatedUnion("mode", [
 	z
 		.object({
 			cursor: SessionDetailWindowCursorSchema,
+			bodyChunks: SessionDetailBodyChunksRequestSchema,
 			includeBodies: z.literal(true),
 			mode: z.literal("newer"),
 			sessionId: z.string().max(MAX_SESSION_ID_LENGTH),
@@ -161,6 +169,16 @@ export const SessionDetailBodyChunkSchema =
 		totalCodeUnits: z.number().int().positive().safe(),
 	}).strict();
 
+export const SessionDetailBodyChunksSchema = z
+	.object({
+		sha256: z.string().regex(/^[a-f0-9]{64}$/u),
+		totalCodeUnits: z.number().int().positive().safe(),
+	})
+	.strict();
+
+export type SessionDetailBodyChunks = z.infer<
+	typeof SessionDetailBodyChunksSchema
+>;
 export type SessionDetailBodyChunkInput = z.infer<
 	typeof SessionDetailBodyChunkInputSchema
 >;
@@ -873,6 +891,7 @@ export const SessionDetailTurnBodySchema = z
 export const SessionDetailWindowTurnSchema =
 	SessionDetailTurnSummarySchema.extend({
 		body: SessionDetailTurnBodySchema.nullable(),
+		bodyChunks: SessionDetailBodyChunksSchema.optional(),
 		bodyOmitted: z.enum(["oversized"]).nullable(),
 	}).strict();
 

@@ -107,6 +107,15 @@ export interface FlagContext {
 	readonly frustration: number | null;
 }
 
+const RANGE_STARTED = {
+	from: "toDateTime64({startDate:String}, 3, 'UTC')",
+	to: "toDateTime64({endDate:String}, 3, 'UTC') + INTERVAL 1 DAY",
+};
+const EVIDENCE_STARTED = {
+	...RANGE_STARTED,
+	to: "toDateTime64({endDate:String}, 3, 'UTC') + INTERVAL 3 DAY",
+};
+
 /**
  * Every run of the range's committed builds, newest first, with what the
  * rules need: run index facts, the next run's prompt reactions, and the
@@ -135,7 +144,7 @@ export function runEvidenceStatement(
 					) AS next_reactions
 				FROM ${runs} FINAL
 				WHERE ${owner} AND row_kind = 'run'
-					AND ${committedBuildSql(runs, owner, ["user_id", "session_id"])}
+					AND ${committedBuildSql(runs, owner, ["user_id", "session_id"], one ? undefined : EVIDENCE_STARTED)}
 					AND ${
 						one
 							? "user_id = {runUser:String} AND session_id = {runSession:String} AND agent_id = {runAgent:String}"
@@ -252,7 +261,7 @@ export function rankValuesStatement(
 		schema: RankValueSchema,
 		query: `SELECT cost_usd, minutes FROM ${runs} FINAL
 			WHERE ${owner} AND row_kind = 'run'
-				AND ${committedBuildSql(runs, owner, ["user_id", "session_id"])}
+				AND ${committedBuildSql(runs, owner, ["user_id", "session_id"], RANGE_STARTED)}
 				AND started_at >= toDateTime64({startDate:String}, 3, 'UTC')
 				AND started_at < toDateTime64({endDate:String}, 3, 'UTC') + INTERVAL 1 DAY
 			ORDER BY started_at DESC

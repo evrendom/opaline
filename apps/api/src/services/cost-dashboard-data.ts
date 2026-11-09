@@ -293,6 +293,24 @@ function buildAgentRuns(
 	return result;
 }
 
+export function buildLanguageSplit(
+	rows: CostAggregateRow[],
+	input: CostDashboardInput,
+	members: ReadonlyMap<string, MemberLabel>,
+): DashboardMetricData | null {
+	const split = buildSignal(
+		rows,
+		{ ...input, requestedMetric: "signals", splitBy: "signalTypes" },
+		members,
+	);
+	if (!split) return null;
+	const breakdowns = Object.fromEntries(
+		Object.keys(split.breakdowns).map((dimension) => [dimension, []]),
+	) as unknown as DashboardMetricData["breakdowns"];
+	breakdowns.signalTypes = split.breakdowns.signalTypes;
+	return { ...split, breakdowns };
+}
+
 function buildSignal(
 	rows: CostAggregateRow[],
 	input: CostDashboardInput,
