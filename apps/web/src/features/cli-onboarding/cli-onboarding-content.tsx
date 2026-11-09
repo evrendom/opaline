@@ -1,4 +1,6 @@
 import { createPortal } from "react-dom";
+import { useDesktop } from "@/features/desktop/desktop-bridge";
+import { DesktopRepositoryPicker } from "@/features/desktop/desktop-repository-picker";
 import { useShellOnboardingPanel } from "@/features/shell/shell-onboarding-panel";
 import type { CliConnectionSnapshot } from "../../../../../packages/api-routes/src/cli-connection";
 import type { CliAuthorization } from "./cli-authorization";
@@ -17,6 +19,7 @@ export function CliOnboardingContent({
 	connectionError,
 	displayCommand,
 	onCopy,
+	onPrepareCode,
 	onFinish,
 }: {
 	snapshot: CliConnectionSnapshot | null;
@@ -26,9 +29,11 @@ export function CliOnboardingContent({
 	connectionError: string | null;
 	displayCommand: string;
 	onCopy: () => Promise<boolean>;
+	onPrepareCode: () => Promise<string | null>;
 	onFinish: () => void;
 }) {
 	const panel = useShellOnboardingPanel();
+	const desktop = useDesktop();
 	const stopped =
 		snapshot && ["failed", "cancelled", "expired"].includes(snapshot.state);
 	const needsReconnect = Boolean(connectionError || stopped);
@@ -59,15 +64,25 @@ export function CliOnboardingContent({
 											: "Ready for your sessions"}
 								</h1>
 								<p>
-									{needsReconnect
-										? "Copy and run the command again to reconnect your terminal."
-										: !snapshot
-											? "Checking your connection…"
-											: snapshot.state === "awaiting_login"
-												? "Open the sign-in link from your terminal to continue here."
-												: "Copy and run the command, then choose your repositories in the terminal."}
+									{desktop
+										? needsReconnect
+											? "Choose your repositories again to reconnect this Mac."
+											: "Choose which repositories on this Mac sync with Opaline."
+										: needsReconnect
+											? "Copy and run the command again to reconnect your terminal."
+											: !snapshot
+												? "Checking your connection…"
+												: snapshot.state === "awaiting_login"
+													? "Open the sign-in link from your terminal to continue here."
+													: "Copy and run the command, then choose your repositories in the terminal."}
 								</p>
-								{needsReconnect || snapshot?.state !== "awaiting_login" ? (
+								{desktop ? (
+									<DesktopRepositoryPicker
+										bridge={desktop}
+										mode="setup"
+										getCode={onPrepareCode}
+									/>
+								) : needsReconnect || snapshot?.state !== "awaiting_login" ? (
 									<WelcomeCommandButton
 										displayCommand={displayCommand}
 										onCopy={onCopy}

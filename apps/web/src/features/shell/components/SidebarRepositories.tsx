@@ -11,6 +11,7 @@ import {
 	SidebarMenuItem,
 } from "@/app/ui/sidebar";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
+import { useWelcomeSelection } from "@/features/desktop/welcome-selection";
 import {
 	RepoNavIcon,
 	useRepositoryClock,
@@ -22,6 +23,7 @@ import { orpc } from "@/lib/orpc";
 import {
 	hasMoreRepositories,
 	REPOSITORY_HUES,
+	SIDEBAR_REPOSITORIES_SHOWN,
 	topRepositories,
 } from "./sidebar-repositories-model";
 import { useRepositoryUploadStatus } from "./use-repository-upload-status";
@@ -33,15 +35,24 @@ export function SidebarRepositories({ reposActive }: { reposActive: boolean }) {
 		orpc.analytics.repositories.list.queryOptions({}),
 	);
 	const now = useRepositoryClock();
-	const repos = useMemo(
+	const welcome = useWelcomeSelection();
+	const workspaceRepos = useMemo(
 		() => topRepositories(query.data ?? [], now),
 		[query.data, now],
 	);
+	const repos = welcome.length
+		? welcome.slice(0, SIDEBAR_REPOSITORIES_SHOWN).map((repo) => ({
+				key: repo.key,
+				label: repo.name,
+				title: `${repo.name} · ${repo.sessionCount} sessions`,
+			}))
+		: workspaceRepos;
 	const uploadStatus = useRepositoryUploadStatus();
 	const openRepo = reposActive ? params.get("repo") : null;
 	const allActive = reposActive && openRepo === null;
 	if (repos.length === 0) return null;
-	const more = hasMoreRepositories(query.data ?? [], repos.length);
+	const more =
+		!welcome.length && hasMoreRepositories(query.data ?? [], repos.length);
 	const route = shellRouteMap.repos;
 	return (
 		<SidebarGroup>

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useWelcomeSelection } from "@/features/desktop/welcome-selection";
 import { SessionsOverviewControls } from "@/features/sessions/components/sessions-overview-controls";
 import { SessionsOverviewFluidList } from "@/features/sessions/components/sessions-overview-fluid-list";
 import { SessionsOverviewHeader } from "@/features/sessions/components/sessions-overview-header";
@@ -26,10 +27,22 @@ export function WelcomeSessionPreview({
 }) {
 	const { state } = useOrganization();
 	const { avatarMap, userMap } = useUserMap();
-	const repositories =
+	const welcome = useWelcomeSelection();
+	const reported =
 		snapshot?.repositories.filter(
 			(repository) => repository.enabled && repository.sessionCount > 0,
 		) ?? [];
+	const repositories = reported.length
+		? reported
+		: welcome.map((repository) => ({
+				id: repository.key,
+				name: repository.name,
+				sessionCount: repository.sessionCount,
+				sources: repository.sources.filter(
+					(source): source is "claude_code" | "codex" =>
+						source === "claude_code" || source === "codex",
+				),
+			}));
 	const previewCount = Math.min(
 		MAX_PREVIEW_SESSIONS,
 		repositories.reduce(
@@ -84,18 +97,7 @@ export function WelcomeSessionPreview({
 		userMap,
 	});
 	const pendingRows = repositories.length
-		? repositories
-				.flatMap((repository) =>
-					Array.from(
-						{ length: Math.min(repository.sessionCount, MAX_PREVIEW_SESSIONS) },
-						(_, index) => ({
-							key: `${repository.id}-${index}`,
-							repositoryName: repository.name,
-							source: repository.sources[index % repository.sources.length],
-						}),
-					),
-				)
-				.slice(0, MAX_PREVIEW_SESSIONS)
+		? interleavePendingRows(repositories)
 		: Array.from({ length: MAX_PREVIEW_SESSIONS }, (_, index) => ({
 				key: `pending-${index}`,
 				repositoryName: "",
@@ -166,4 +168,34 @@ export function WelcomeSessionPreview({
 			</div>
 		</section>
 	);
+}
+
+function interleavePendingRows(
+	repositories: {
+		id: string;
+		name: string;
+		sessionCount: number;
+		sources: ("claude_code" | "codex")[];
+	}[],
+) {
+	const rows: {
+		key: string;
+		repositoryName: string;
+		source: "claude_code" | "codex" | undefined;
+	}[] = [];
+	for (let index = 0; rows.length < MAX_PREVIEW_SESSIONS; index += 1) {
+		const remaining = repositories.filter(
+			(repository) => index < repository.sessionCount,
+		);
+		if (!remaining.length) break;
+		for (const repository of remaining) {
+			if (rows.length >= MAX_PREVIEW_SESSIONS) break;
+			rows.push({
+				key: `${repository.id}-${index}`,
+				repositoryName: repository.name,
+				source: repository.sources[index % repository.sources.length],
+			});
+		}
+	}
+	return rows;
 }

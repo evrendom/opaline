@@ -536,4 +536,5 @@
 	flex: 1;
 	min-height: 0;
 	overflow: clip;
+	mask-image: linear-gradient(to bottom, #000 calc(100% - 56px), transparent);
 }

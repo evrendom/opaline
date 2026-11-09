@@ -13,6 +13,7 @@ import {
 	SidebarMenuItem,
 } from "@/app/ui/sidebar";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
+import { DesktopWindowBar } from "@/features/shell/components/desktop-window-bar";
 import { SidebarInstallCommand } from "@/features/shell/components/SidebarInstallCommand";
 import { SidebarRepositories } from "@/features/shell/components/SidebarRepositories";
 import { SidebarUserMenu } from "@/features/shell/components/SidebarUserMenu";
@@ -123,6 +124,7 @@ export function AppSidebar() {
 				{/* The plugin's host already titles it "Opaline". */}
 				{import.meta.env.MODE === "plugin" ? null : (
 					<SidebarHeader>
+						<DesktopWindowBar />
 						<SidebarWorkspaceSwitcher />
 					</SidebarHeader>
 				)}

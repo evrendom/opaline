@@ -1,0 +1,76 @@
+.desktop-repository-picker {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.desktop-repository-picker .sessions-settings-table :is(th, td):first-child {
+	width: 100%;
+	max-width: 0;
+}
+
+.desktop-repository-picker .sessions-settings-repo {
+	min-width: 0;
+}
+
+.desktop-repository-sources {
+	min-width: 0;
+	overflow: hidden;
+	color: var(--muted-foreground);
+	font-size: 12px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.desktop-repository-footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding-top: 4px;
+}
+
+.desktop-repository-status {
+	min-width: 0;
+	margin: 0;
+	color: var(--muted-foreground);
+	font-size: 13px;
+}
+
+.desktop-repository-status[data-status="error"] {
+	color: var(--destructive);
+}
+
+.desktop-repository-picker .sessions-settings-table :is(th, td):nth-child(3) {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+
+.desktop-repository-picker .sessions-settings-table :is(th, td):last-child {
+	width: 1%;
+	padding-left: 24px;
+	text-align: right;
+}
+
+.desktop-repository-picker td:last-child [data-slot="checkbox"] {
+	margin-left: auto;
+}
+
+.desktop-repository-more {
+	align-self: flex-start;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--muted-foreground);
+	font-size: 13px;
+	cursor: pointer;
+}
+
+.desktop-repository-more:hover {
+	color: var(--foreground);
+}
+
+.desktop-repository-picker .sessions-settings-table-wrap {
+	overflow-x: clip;
+}

@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import {
+	devOnboardingOverride,
+	useDevStage,
+} from "@/features/desktop/dev-stages";
+import {
+	setWelcomeSelection,
+	useWelcomeSelection,
+} from "@/features/desktop/welcome-selection";
 import { useProductWindowConnectionTone } from "@/features/shell/components/product-window-backdrop";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
 import { authClient } from "@/lib/auth-client";
@@ -18,7 +26,7 @@ export function CliOnboardingPage() {
 		: searchParams.get("user_code");
 	const invitedWorkspaceId = getInvitedWorkspaceId(location.search);
 	const { state } = useOrganization();
-	const { refetch } = authClient.useSession();
+	const { data: sessionData, refetch } = authClient.useSession();
 	const [destination, setDestination] = useState<{
 		organizationId: string;
 		path: string;
@@ -39,13 +47,40 @@ export function CliOnboardingPage() {
 		autoOpenDashboard: false,
 		onOpenDashboard: openDashboard,
 	});
-	const snapshot = onboarding.setupSnapshot;
+	const devStage = useDevStage();
+	const welcomeSelection = useWelcomeSelection();
+	const dev = devStage
+		? devOnboardingOverride(
+				devStage,
+				welcomeSelection,
+				state.activeOrg?.id ?? null,
+				sessionData?.user.id ?? null,
+			)
+		: null;
+	const snapshot = dev ? dev.snapshot : onboarding.setupSnapshot;
 	const tone = getCliConnectionTone(
 		snapshot,
-		onboarding.setupInactive,
-		onboarding.error,
+		dev ? false : onboarding.setupInactive,
+		dev ? null : onboarding.error,
 	);
 	useProductWindowConnectionTone(tone);
+	const reported =
+		snapshot?.repositories.filter(
+			(repository) => repository.enabled && repository.sessionCount > 0,
+		) ?? [];
+	const reportedKey = reported.map((repository) => repository.id).join("\n");
+	useEffect(() => {
+		if (!reportedKey) return;
+		setWelcomeSelection(
+			reported.map((repository) => ({
+				key: repository.id,
+				name: repository.name,
+				sessionCount: repository.sessionCount,
+				sources: repository.sources,
+			})),
+		);
+		return () => setWelcomeSelection([]);
+	}, [reportedKey]);
 
 	useEffect(() => {
 		if (
@@ -59,19 +94,25 @@ export function CliOnboardingPage() {
 
 	return (
 		<CliOnboardingContent
+			key={devStage ?? "live"}
 			snapshot={snapshot}
-			authorization={onboarding.authorization}
+			authorization={dev ? dev.authorization : onboarding.authorization}
 			invitedWorkspaceId={invitedWorkspaceId}
-			deviceUserCode={deviceUserCode}
+			deviceUserCode={dev ? dev.deviceUserCode : deviceUserCode}
 			connectionError={
-				onboarding.error ??
-				(onboarding.setupInactive
-					? "Your terminal stopped sending updates."
-					: null)
+				dev
+					? dev.connectionError
+					: (onboarding.error ??
+						(onboarding.setupInactive
+							? "Your terminal stopped sending updates."
+							: null))
 			}
 			displayCommand={onboarding.displayCommand}
 			onCopy={onboarding.copyCommand}
-			onFinish={() => void onboarding.openDashboard()}
+			onPrepareCode={onboarding.prepareCode}
+			onFinish={() => {
+				if (!dev) void onboarding.openDashboard();
+			}}
 		/>
 	);
 }

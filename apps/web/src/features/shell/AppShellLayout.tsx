@@ -10,6 +10,7 @@ import "@/features/dashboard/dashboard-theme.css";
 import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
 import { CliUpdateNotice } from "@/features/cli-update/CliUpdateNotice";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
+import { DevStagePanel } from "@/features/desktop/dev-stage-panel";
 import { ServiceStatusBanner } from "@/features/service-status/ServiceStatusBanner";
 import "./product-window-chrome.css";
 import "./welcome-shell.css";
@@ -248,6 +249,7 @@ export function LeftSidebarAppShellLayout() {
 					<SessionArrivalNotifications />
 				) : null}
 				<AppToaster richColors position="bottom-right" />
+				{import.meta.env.DEV ? <DevStagePanel /> : null}
 			</TooltipProvider>
 		</ShellOnboardingPanelContext.Provider>
 	);
