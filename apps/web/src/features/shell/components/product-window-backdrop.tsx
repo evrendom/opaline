@@ -13,6 +13,7 @@ import { getCanonicalAppPath } from "@/app/routes";
 import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
 import { initializeHeroCanvas } from "../../../../../marketing/src/scripts/hero-canvas";
 import type { CliConnectionTone } from "../../cli-onboarding/cli-connection-state";
+import { useDesktop } from "../../desktop/desktop-bridge";
 import "../product-window-chrome.css";
 
 const ConnectionToneContext = createContext<
@@ -49,7 +50,8 @@ function ProductWindowBackdrop({
 	const canvas = useRef<HTMLCanvasElement>(null);
 	const { pathname } = useLocation();
 	const canonicalPath = getCanonicalAppPath(pathname);
-	const visible = canonicalPath === CLI_SETUP_PATH;
+	const desktop = useDesktop();
+	const visible = canonicalPath === CLI_SETUP_PATH && !desktop;
 	const tone = setupTone;
 	useEffect(() => {
 		if (visible && canvas.current) return initializeHeroCanvas(canvas.current);

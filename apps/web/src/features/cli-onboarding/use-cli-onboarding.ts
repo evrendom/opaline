@@ -392,6 +392,16 @@ export function useCliOnboarding(
 		return copyCliCommand(prepared, immediate);
 	}
 
+	async function prepareCode(): Promise<string | null> {
+		if (
+			snapshot?.state === "waiting" &&
+			code &&
+			code.expiresAt > Date.now() + 30_000
+		)
+			return code.value;
+		return (await create())?.code ?? null;
+	}
+
 	const uploadSnapshot =
 		snapshot?.repositories.some((repository) => repository.enabled) &&
 		(snapshot.state === "uploading" ||
@@ -420,6 +430,7 @@ export function useCliOnboarding(
 		opening,
 		ready: mode === "demo" || code !== null || id !== null,
 		copyCommand,
+		prepareCode,
 		retry: create,
 		openDashboard,
 	};

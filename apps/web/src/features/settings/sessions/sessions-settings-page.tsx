@@ -3,6 +3,8 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
+import { useDesktop } from "@/features/desktop/desktop-bridge";
+import { DesktopRepositoryPicker } from "@/features/desktop/desktop-repository-picker";
 import { cliLoginCommand } from "@/features/self-hosted/cli-commands";
 import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import { copyTextToClipboard } from "@/lib/clipboard";
@@ -17,6 +19,7 @@ export function SessionsSettingsPage() {
 	const selfHost = useSelfHost();
 	const [search, setSearch] = useState("");
 	const [copied, setCopied] = useState(false);
+	const desktop = useDesktop();
 	const copyTimer = useRef<number | undefined>(undefined);
 	useMountEffect(() => () => window.clearTimeout(copyTimer.current));
 	const query = useAnalyticsQuery(
@@ -52,6 +55,11 @@ export function SessionsSettingsPage() {
 		<SessionsSettingsView
 			copied={copied}
 			fetching={query.isFetching}
+			localManager={
+				desktop ? (
+					<DesktopRepositoryPicker bridge={desktop} mode="settings" />
+				) : undefined
+			}
 			onCopy={copyCommand}
 			onRefresh={() => void query.refetch()}
 			onSearch={setSearch}

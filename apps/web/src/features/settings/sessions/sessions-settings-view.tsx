@@ -5,6 +5,7 @@ import {
 	IconFolder,
 	IconSearch,
 } from "@tabler/icons-react";
+import type { ReactNode } from "react";
 import { Button } from "@/app/ui/button";
 import { Skeleton } from "@/app/ui/skeleton";
 import "@/features/settings/components/settings-section.css";
@@ -18,6 +19,7 @@ export function SessionsSettingsView({
 	copied,
 	error,
 	fetching,
+	localManager,
 	onCopy,
 	onRefresh,
 	onSearch,
@@ -31,6 +33,7 @@ export function SessionsSettingsView({
 	copied: boolean;
 	error: boolean;
 	fetching: boolean;
+	localManager?: ReactNode;
 	onCopy: () => void;
 	onRefresh: () => void;
 	onSearch: (search: string) => void;
@@ -48,40 +51,47 @@ export function SessionsSettingsView({
 				<div className="sessions-settings-heading">
 					<h2 id="repository-upload-heading">Automatic uploads</h2>
 					<p>
-						Choose which repositories send new sessions to Opaline. Run this
-						command in your terminal to turn uploads on or off.
+						{localManager
+							? "Choose which repositories on this Mac send new sessions to Opaline."
+							: "Choose which repositories send new sessions to Opaline. Run this command in your terminal to turn uploads on or off."}
 					</p>
 				</div>
-				<div className="sessions-settings-card sessions-settings-manage settings-section-surface">
-					<div className="sessions-settings-command">
-						<code>{MANAGE_COMMAND}</code>
-						<Button
-							type="button"
-							variant="ghost"
-							size="sm"
-							className="rounded-md transition-none active:not-aria-[haspopup]:translate-y-0"
-							onClick={onCopy}
-							aria-label="Copy repository management command"
-						>
-							{copied ? (
-								<IconCheck size={16} aria-hidden="true" />
-							) : (
-								<IconCopy size={16} aria-hidden="true" />
-							)}
-							{copied ? "Copied" : "Copy"}
-						</Button>
+				{localManager ? (
+					<div className="sessions-settings-card settings-section-surface">
+						{localManager}
 					</div>
-					<p className="sessions-settings-note">
-						Changes apply on the computer running the command. Existing sessions
-						stay in your workspace.
-					</p>
-					{signInCommand ? (
+				) : (
+					<div className="sessions-settings-card sessions-settings-manage settings-section-surface">
+						<div className="sessions-settings-command">
+							<code>{MANAGE_COMMAND}</code>
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								className="rounded-md transition-none active:not-aria-[haspopup]:translate-y-0"
+								onClick={onCopy}
+								aria-label="Copy repository management command"
+							>
+								{copied ? (
+									<IconCheck size={16} aria-hidden="true" />
+								) : (
+									<IconCopy size={16} aria-hidden="true" />
+								)}
+								{copied ? "Copied" : "Copy"}
+							</Button>
+						</div>
 						<p className="sessions-settings-note">
-							On a computer that has not signed in to this server yet, run{" "}
-							<code>{signInCommand}</code> first.
+							Changes apply on the computer running the command. Existing
+							sessions stay in your workspace.
 						</p>
-					) : null}
-				</div>
+						{signInCommand ? (
+							<p className="sessions-settings-note">
+								On a computer that has not signed in to this server yet, run{" "}
+								<code>{signInCommand}</code> first.
+							</p>
+						) : null}
+					</div>
+				)}
 			</section>
 			<section
 				className="sessions-settings-section"
