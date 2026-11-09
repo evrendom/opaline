@@ -1,8 +1,10 @@
 import { getLogger } from "@logtape/logtape";
 import { sqlClient } from "../db.js";
+import { isSelfHosted } from "../lib/self-hosted.js";
 import { readGitHubRepositoryAppConfig } from "./github-app.service.js";
 import { runGitHubEvidenceCollectionMaintenance } from "./github-evidence-maintenance.service.js";
 import { runGitHubRepositorySweep } from "./github-repository-sweep.service.js";
+import { readGitHubRepositoryCredentials } from "./github-token.service.js";
 import { pruneGitHubWebhookDeliveries } from "./github-webhook-delivery.service.js";
 import {
 	createR2MultipartUploadClient,
@@ -33,6 +35,12 @@ export function wakeGitHubEvidenceWorker(delayMs = 0): void {
 }
 
 export async function runConfiguredGitHubRepositorySweep(signal?: AbortSignal) {
+	if (isSelfHosted()) {
+		const { runGitHubTokenRepositorySweep } = await import(
+			"./github-token-repositories.service.js"
+		);
+		return runGitHubTokenRepositorySweep({ database: sqlClient, signal });
+	}
 	const config = readGitHubRepositoryAppConfig();
 	if (!config) return { enabled: false, requests: 0, hasMore: false };
 	return runGitHubRepositorySweep({ config, database: sqlClient, signal });
@@ -43,7 +51,7 @@ export async function runConfiguredGitHubEvidenceMaintenance(
 	signal?: AbortSignal,
 	collectionIds?: readonly string[],
 ) {
-	const config = readGitHubRepositoryAppConfig();
+	const config = await readGitHubRepositoryCredentials();
 	if (!config) return { enabled: false as const, hasMore: false };
 	if (!collectionIds)
 		await pruneGitHubWebhookDeliveries({ database: sqlClient });

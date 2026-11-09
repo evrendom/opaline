@@ -35,10 +35,9 @@ test("without providers only the jobs that need none run, and billing, trends an
 		"repair",
 		"native-lineage",
 		"analysis-log-retention",
+		"github-evidence",
 	]);
 	const all = selfHostedJobs({
-		GITHUB_REPOSITORY_APP_ID: "1",
-		GITHUB_REPOSITORY_APP_PRIVATE_KEY: "key",
 		OPENAI_API_KEY: "sk",
 		SUBQ_API_KEY: "subq",
 		R2_ACCOUNT_ID: "a",
@@ -68,10 +67,8 @@ test("without providers only the jobs that need none run, and billing, trends an
 		"analysis-log-retention": 86_400_000,
 	});
 	expect(
-		selfHostedJobs({ GITHUB_REPOSITORY_APP_ID: "1", R2_ACCOUNT_ID: "a" }).map(
-			(job) => job.name,
-		),
-	).not.toContain("github-evidence");
+		Object.fromEntries(all.map((job) => [job.name, job.firstAfterMs])),
+	).toMatchObject({ "github-evidence": 60_000 });
 	expect(
 		selfHostedJobs({ TYPESAFE_API_KEY: "jev" }).map((job) => job.name),
 	).toContain("run-questions");

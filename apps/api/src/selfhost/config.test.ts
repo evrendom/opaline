@@ -32,6 +32,7 @@ test("defaults: loopback on port 4100, the public origin is the app origin, and 
 		setupToken: null,
 		sqlQuotaPerHour: null,
 		openSignup: false,
+		githubHistoryDays: 90,
 	});
 	expect(config.cronSecret.length).toBeGreaterThanOrEqual(16);
 	expect(env).toEqual({
@@ -178,4 +179,15 @@ test("sign-up is invite only and the SQL quota is off unless the environment say
 	expect(
 		problems({ ...base, OPALINE_SQL_QUOTA_PER_HOUR: "12.5" }),
 	).toHaveLength(1);
+});
+
+test("GitHub history is 90 days unless OPALINE_GITHUB_HISTORY_DAYS says 1 to 730", () => {
+	expect(readSelfHostConfig(base).config.githubHistoryDays).toBe(90);
+	expect(
+		readSelfHostConfig({ ...base, OPALINE_GITHUB_HISTORY_DAYS: "7" }).config
+			.githubHistoryDays,
+	).toBe(7);
+	expect(problems({ ...base, OPALINE_GITHUB_HISTORY_DAYS: "1000" })).toEqual([
+		'OPALINE_GITHUB_HISTORY_DAYS must be a whole number of days from 1 to 730, not "1000"; leave it unset for 90',
+	]);
 });

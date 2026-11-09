@@ -98,6 +98,17 @@ async function main(): Promise<void> {
 		`sign-up: ${config.openSignup ? "open to anyone who reaches the server" : "invite only"}; sql quota: ${config.sqlQuotaPerHour === null ? "off" : `${config.sqlQuotaPerHour} calls per workspace per hour`}`,
 	);
 	process.stdout.write(`ready ${config.appUrl}\n`);
+	void import("../services/github-token.service.js")
+		.then(async (github) =>
+			status(
+				`github: ${github.describeGitHubTokenStatus(await github.readGitHubTokenStatus())}; history ${config.githubHistoryDays} days, polled every 5 minutes`,
+			),
+		)
+		.catch((error: unknown) =>
+			status(
+				`github: status unknown (${error instanceof Error ? error.message : String(error)})`,
+			),
+		);
 
 	let stopping = false;
 	const shutdown = async (signal: string) => {

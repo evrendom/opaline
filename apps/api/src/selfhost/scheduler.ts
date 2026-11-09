@@ -113,10 +113,7 @@ export function selfHostedJobs(env: Environment = process.env): SchedulerJob[] {
 			name: "github-evidence",
 			everyMs: 5 * MINUTE,
 			firstAfterMs: MINUTE,
-			when: hasAll(env, [
-				"GITHUB_REPOSITORY_APP_ID",
-				"GITHUB_REPOSITORY_APP_PRIVATE_KEY",
-			]),
+			when: true,
 			handler: async () =>
 				(await import("../handlers/github-evidence-maintenance.js"))
 					.handleGitHubEvidenceMaintenanceRequest,

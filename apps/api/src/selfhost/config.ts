@@ -2,7 +2,12 @@ import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { resolveClickHouseUsername } from "@rudel/ch-schema/connection";
-import { parseSqlQuotaPerHour } from "../lib/self-hosted.js";
+import {
+	DEFAULT_GITHUB_HISTORY_DAYS,
+	MAX_GITHUB_HISTORY_DAYS,
+	parseGitHubHistoryDays,
+	parseSqlQuotaPerHour,
+} from "../lib/self-hosted.js";
 import { objectStoreConfigurationProblems } from "../services/r2-ingest-storage.service.js";
 
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -18,6 +23,7 @@ export interface SelfHostConfig {
 	readonly cronSecret: string;
 	readonly sqlQuotaPerHour: number | null;
 	readonly openSignup: boolean;
+	readonly githubHistoryDays: number;
 }
 
 export class SelfHostConfigError extends Error {
@@ -116,6 +122,14 @@ export function readSelfHostConfig(env: Environment): {
 			`OPALINE_OPEN_SIGNUP must be 1 (anyone who reaches the server can sign up) or 0, not ${JSON.stringify(env.OPALINE_OPEN_SIGNUP)}`,
 		);
 
+	const githubHistoryDays = parseGitHubHistoryDays(
+		env.OPALINE_GITHUB_HISTORY_DAYS,
+	);
+	if (githubHistoryDays === null)
+		problems.push(
+			`OPALINE_GITHUB_HISTORY_DAYS must be a whole number of days from 1 to ${MAX_GITHUB_HISTORY_DAYS}, not ${JSON.stringify(env.OPALINE_GITHUB_HISTORY_DAYS)}; leave it unset for ${DEFAULT_GITHUB_HISTORY_DAYS}`,
+		);
+
 	if (problems.length > 0) throw new SelfHostConfigError(problems);
 
 	return {
@@ -130,6 +144,7 @@ export function readSelfHostConfig(env: Environment): {
 			cronSecret,
 			sqlQuotaPerHour,
 			openSignup: rawOpenSignup === "1",
+			githubHistoryDays: githubHistoryDays ?? DEFAULT_GITHUB_HISTORY_DAYS,
 		},
 		env: {
 			OPALINE_SELF_HOSTED: "1",
