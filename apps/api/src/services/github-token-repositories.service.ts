@@ -335,20 +335,33 @@ export async function runGitHubTokenRepositorySweep(input: {
 			);
 		}
 	}
-	return runGitHubRepositorySweep({
-		config: {
-			kind: "token",
-			host,
-			apiBaseUrl,
-			read: async () => resolution.token,
-		},
-		database: input.database,
-		environment,
-		fetch: requestFetch,
-		historyDays,
-		now: input.now,
-		signal: input.signal,
-	});
+	try {
+		return await runGitHubRepositorySweep({
+			config: {
+				kind: "token",
+				host,
+				apiBaseUrl,
+				read: async () => resolution.token,
+			},
+			database: input.database,
+			environment,
+			fetch: requestFetch,
+			historyDays,
+			now: input.now,
+			signal: input.signal,
+		});
+	} catch (error) {
+		logger.warn(
+			"The GitHub repository sweep stopped; the next pass resumes where it was: {error}",
+			{
+				error:
+					error instanceof Error
+						? `${error.name}: ${error.message}`
+						: String(error),
+			},
+		);
+		throw error;
+	}
 }
 
 export async function readGitHubTokenCollection(
