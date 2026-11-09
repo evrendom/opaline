@@ -51,3 +51,16 @@
 		transition: none;
 	}
 }
+
+.github-token-fix {
+	display: grid;
+	gap: 8px;
+	padding: 14px 0;
+}
+
+.github-token-fix p {
+	margin: 0;
+	color: var(--muted-foreground);
+	font-size: 0.8125rem;
+	text-wrap: pretty;
+}

@@ -41,10 +41,19 @@ export function GitHubRepositoryList({
 						</h2>
 					</div>
 					<p className="sessions-settings-description">
-						{selection} on {status.accountLogin ?? "GitHub"}.
-						{status.canManage
-							? " Added repositories on GitHub? Reconnect to include them."
-							: null}
+						{status.token ? (
+							<>
+								From this workspace's sessions, read with the token of{" "}
+								{status.accountLogin ?? "GitHub"}.
+							</>
+						) : (
+							<>
+								{selection} on {status.accountLogin ?? "GitHub"}.
+								{status.canManage
+									? " Added repositories on GitHub? Reconnect to include them."
+									: null}
+							</>
+						)}
 					</p>
 				</div>
 				<div className="sessions-settings-card settings-section-surface">

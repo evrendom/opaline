@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { GitHubRepositoryList } from "@/features/settings/github/GitHubRepositoryList";
 import { useGitHubConnection } from "@/features/settings/github/use-github-connection";
 import { GitHubConnectionCard } from "@/features/settings/workspace/components/GitHubConnectionCard";
+import { GitHubTokenCard } from "@/features/settings/workspace/components/GitHubTokenCard";
 
 export const GITHUB_CALLBACK_MESSAGES = {
 	connected: {
@@ -114,6 +115,18 @@ export function WorkspaceGitHubConnectionView({
 }) {
 	if (evidenceStatus?.visibility !== "visible") return null;
 	const connection = evidenceStatus.connection;
+	if (connection.token)
+		return (
+			<>
+				<GitHubTokenCard
+					token={connection.token}
+					dashboard={evidenceStatus.dashboard}
+				/>
+				{connection.repositories.length > 0 ? (
+					<GitHubRepositoryList status={connection} />
+				) : null}
+			</>
+		);
 	return (
 		<>
 			<GitHubConnectionCard
