@@ -1,4 +1,5 @@
 import { isLoopbackHostname, parseSafeBrowserUrl } from "@rudel/api-routes";
+import { isSelfHosted } from "./self-hosted.js";
 
 const MINIMUM_AUTH_SECRET_LENGTH = 32;
 const VERCEL_DEPLOYMENT_HOST_ENV_VARS = [
@@ -362,7 +363,10 @@ export function shouldReadSessionLineage(
 export function isGitHubEvidenceUiEnabled(
 	environment: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
-	return environment.GITHUB_EVIDENCE_UI_ENABLED === "true";
+	return (
+		environment.GITHUB_EVIDENCE_UI_ENABLED === "true" ||
+		isSelfHosted(environment)
+	);
 }
 
 export function readGitHubEvidenceUiForceOrgIds(

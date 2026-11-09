@@ -138,7 +138,17 @@ import { wakeGitHubEvidenceWorker } from "./services/github-evidence-worker.serv
 import { readGitHubOutcomesReadiness } from "./services/github-outcomes-readiness.service.js";
 import { getGitHubRepositoryConnectionStatus } from "./services/github-repository-binding.service.js";
 import { disconnectGitHubRepositoryInstallation } from "./services/github-repository-disconnect.service.js";
-import { resolveGitHubRepositoryEvidenceStatus } from "./services/github-repository-evidence-status.service.js";
+import {
+	resolveGitHubRepositoryEvidenceStatus,
+	resolveGitHubTokenRepositoryEvidenceStatus,
+} from "./services/github-repository-evidence-status.service.js";
+import {
+	isGitHubRepositoryCollectionConfigured,
+	readGitHubHistoryDays,
+	readGitHubRepositoryCredentials,
+	readGitHubTokenStatus,
+} from "./services/github-token.service.js";
+import { readGitHubTokenCollection } from "./services/github-token-repositories.service.js";
 import {
 	awaitsDurableLanguageSignals,
 	shouldAwaitBestEffortLanguageSignals,
@@ -1851,8 +1861,26 @@ const liveSessionAppend = os.liveSession.append
 
 const githubRepositoryEvidenceStatus = os.githubRepositoryEvidence.status
 	.use(orgMiddleware)
-	.handler(({ context }) =>
-		resolveGitHubRepositoryEvidenceStatus({
+	.handler(({ context }) => {
+		if (isSelfHosted())
+			return resolveGitHubTokenRepositoryEvidenceStatus({
+				isOrgAdmin: context.isOrgAdmin,
+				historyDays: readGitHubHistoryDays(),
+				readToken: () => readGitHubTokenStatus(),
+				loadConnection: () =>
+					getGitHubRepositoryConnectionStatus({
+						database: sqlClient,
+						organizationId: context.organizationId,
+					}),
+				loadCollection: () =>
+					readGitHubTokenCollection(sqlClient, context.organizationId),
+				loadDashboard: async () =>
+					(await readGitHubOutcomesReadiness(sqlClient, context.organizationId))
+						?.firstReadyAt
+						? "visible"
+						: "syncing",
+			});
+		return resolveGitHubRepositoryEvidenceStatus({
 			uiEnabled:
 				isGitHubEvidenceUiEnabled() ||
 				readGitHubEvidenceUiForceOrgIds().includes(context.organizationId),
@@ -1876,8 +1904,8 @@ const githubRepositoryEvidenceStatus = os.githubRepositoryEvidence.status
 					?.firstReadyAt
 					? "visible"
 					: "syncing",
-		}),
-	);
+		});
+	});
 
 const githubRepositoryEvidenceCreateInstallation =
 	os.githubRepositoryEvidence.createInstallation
@@ -1936,10 +1964,12 @@ const githubRepositoryEvidenceSyncCommit =
 	os.githubRepositoryEvidence.syncCommit
 		.use(orgMiddleware)
 		.handler(async ({ context, input, signal }) => {
-			const config = readGitHubRepositoryAppConfig();
+			const config = await readGitHubRepositoryCredentials();
 			if (!config) {
 				throw new ORPCError("SERVICE_UNAVAILABLE", {
-					message: "GitHub repository evidence is not configured.",
+					message: isSelfHosted()
+						? "This server has no GitHub token; Settings, GitHub says how to add one."
+						: "GitHub repository evidence is not configured.",
 				});
 			}
 			const availability = readR2IngestAvailability();
@@ -2038,11 +2068,11 @@ const repositoryEvidenceCommit = os.repositoryEvidence.commit
 			});
 			const provider = committed.evidence.input.repository.provider;
 			const commitSha = committed.evidence.input.capture.headGitCommit;
-			const githubConfig = readGitHubRepositoryAppConfig();
+			const githubEnabled = isGitHubRepositoryCollectionConfigured();
 			if (
 				provider?.provider === "github" &&
 				commitSha &&
-				githubConfig &&
+				githubEnabled &&
 				(committed.evidence.input.capture.timing.lifecycle === "checkpoint" ||
 					committed.evidence.input.capture.timing.lifecycle === "end")
 			) {

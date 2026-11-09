@@ -1,10 +1,11 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { getLogger } from "@logtape/logtape";
+import type { GitHubTokenStatus } from "@rudel/api-routes";
 import { validateOrgSlug } from "@rudel/api-routes/reserved-slugs";
 import type postgres from "postgres";
 import { z } from "zod";
 import type { Auth } from "../auth.js";
-import { isSelfHosted } from "../lib/self-hosted.js";
+import { isSelfHosted, isSelfHostedAdmin } from "../lib/self-hosted.js";
 import {
 	type ApiKeyVerifier,
 	apiKeyFromHeaders,
@@ -47,6 +48,10 @@ export interface SelfHostDependencies {
 	readonly sql: postgres.Sql;
 	readonly env: Environment;
 	readonly socialProviders: readonly string[];
+	readonly readGitHub?: (
+		sql: postgres.Sql,
+		env: Environment,
+	) => Promise<GitHubTokenStatus>;
 }
 
 const SetupBodySchema = z.object({
@@ -81,6 +86,8 @@ export function handleSelfHostRoute(
 			return setup(request, deps);
 		case "POST /api/selfhost/login-link":
 			return loginLink(request, deps);
+		case "GET /api/selfhost/github":
+			return githubStatus(request, deps);
 		case "GET /api/selfhost/login":
 			return deps.auth.handler(
 				new Request(
@@ -391,6 +398,49 @@ async function loginLink(
 		expiresAt: new Date(Date.now() + ttlSeconds * 1000).toISOString(),
 		user: { id: target.id, email: target.email, name: target.name },
 	});
+}
+
+async function githubStatus(
+	request: Request,
+	deps: SelfHostDependencies,
+): Promise<Response> {
+	const actor = await loginLinkActor(request, deps);
+	if (actor instanceof Response) return actor;
+	if (
+		actor.kind === "user" &&
+		!(await isSelfHostedAdmin(deps.sql, actor.userId))
+	)
+		return Response.json(
+			{
+				error: "forbidden",
+				message:
+					"Only owners and admins of the server's first workspace can read its GitHub status.",
+			},
+			{ status: 403 },
+		);
+	return Response.json({
+		github: await (deps.readGitHub ?? readGitHubStatus)(deps.sql, deps.env),
+	});
+}
+
+async function readGitHubStatus(
+	sql: postgres.Sql,
+	env: Environment,
+): Promise<GitHubTokenStatus> {
+	const [token, repositories, status] = await Promise.all([
+		import("../services/github-token.service.js"),
+		import("../services/github-token-repositories.service.js"),
+		import("../services/github-repository-evidence-status.service.js"),
+	]);
+	const [current, collection] = await Promise.all([
+		token.readGitHubTokenStatus({ env }),
+		repositories.readGitHubTokenCollection(sql, null),
+	]);
+	return status.toGitHubTokenStatusBody(
+		current,
+		collection,
+		token.readGitHubHistoryDays(env),
+	);
 }
 
 function sameSecret(given: string, expected: string): boolean {

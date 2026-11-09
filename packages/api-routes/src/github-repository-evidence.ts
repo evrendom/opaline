@@ -24,6 +24,30 @@ export const GitHubRepositoryBindingSchema = z.object({
 		.optional(),
 });
 
+export const GitHubTokenStatusSchema = z.object({
+	state: z.enum(["ready", "missing", "rejected", "unreachable"]),
+	source: z.enum(["GITHUB_TOKEN", "GH_TOKEN", "gh"]).nullable(),
+	host: z.string().min(1).max(255),
+	login: z.string().max(100).nullable(),
+	scopes: z.array(z.string().max(100)).max(100).nullable(),
+	missingScopes: z.array(z.string().max(100)).max(10),
+	rateLimit: z
+		.object({
+			limit: z.number().int().nonnegative(),
+			remaining: z.number().int().nonnegative(),
+			resetAt: z.string(),
+		})
+		.nullable(),
+	message: z.string().max(1000).nullable(),
+	fix: z.string().max(300).nullable(),
+	checkedAt: z.string(),
+	repositories: z.number().int().nonnegative(),
+	unreadableRepositories: z.array(z.string().max(300)).max(1000),
+	lastSweepAt: z.string().nullable(),
+	pausedUntil: z.string().nullable(),
+	historyDays: z.number().int().positive(),
+});
+
 export const GitHubRepositoryConnectionStatusSchema = z.object({
 	accountLogin: z.string().nullable(),
 	accountType: z.enum(["Organization", "User"]).nullable().optional(),
@@ -40,6 +64,7 @@ export const GitHubRepositoryConnectionStatusSchema = z.object({
 	repositories: z.array(GitHubRepositoryBindingSchema).max(10_000),
 	repositorySelection: z.enum(["all", "selected"]).nullable(),
 	dashboard: z.enum(["notConnected", "syncing", "visible"]).optional(),
+	token: GitHubTokenStatusSchema.optional(),
 });
 
 /**
@@ -105,6 +130,7 @@ export const GitHubSyncCommitOutputSchema = z.object({
 export type GitHubRepositoryConnectionStatus = z.infer<
 	typeof GitHubRepositoryConnectionStatusSchema
 >;
+export type GitHubTokenStatus = z.infer<typeof GitHubTokenStatusSchema>;
 export type GitHubRepositoryEvidenceStatus = z.infer<
 	typeof GitHubRepositoryEvidenceStatusSchema
 >;

@@ -226,6 +226,14 @@ describe("GitHub evidence UI dark-launch switch", () => {
 			).toBe(false);
 		}
 	});
+
+	test("is on for a self-hosted server and only there without the switch", () => {
+		expect(isGitHubEvidenceUiEnabled({ OPALINE_SELF_HOSTED: "1" })).toBe(true);
+		for (const value of ["0", "true", ""])
+			expect(isGitHubEvidenceUiEnabled({ OPALINE_SELF_HOSTED: value })).toBe(
+				false,
+			);
+	});
 });
 
 describe("product analytics excluded workspaces", () => {

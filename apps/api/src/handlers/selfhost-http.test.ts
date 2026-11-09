@@ -452,6 +452,61 @@ describe("self-hosted HTTP routes", () => {
 	});
 });
 
+describe("GitHub status for the CLI", () => {
+	const GITHUB = {
+		state: "ready" as const,
+		source: "gh" as const,
+		host: "github.com",
+		login: "octo",
+		scopes: ["repo"],
+		missingScopes: [],
+		rateLimit: null,
+		message: null,
+		fix: null,
+		checkedAt: "2026-11-09T12:00:00.000Z",
+		repositories: 2,
+		unreadableRepositories: [],
+		lastSweepAt: null,
+		pausedUntil: null,
+		historyDays: 90,
+	};
+	const withGitHub = (admin: boolean) => {
+		const d = deps((query) =>
+			query.includes("FROM member m") ? [{ admin }] : [],
+		);
+		return { ...d, deps: { ...d.deps, readGitHub: async () => GITHUB } };
+	};
+
+	test("the setup token or a server admin's API key reads it; anyone else is refused", async () => {
+		const admin = withGitHub(true);
+		const bySetup = await call(admin.deps, "GET", "/api/selfhost/github", {
+			headers: { "X-Opaline-Setup-Token": ENV.OPALINE_SETUP_TOKEN },
+		});
+		expect(bySetup?.status).toBe(200);
+		expect(await bySetup?.json()).toEqual({ github: GITHUB });
+		const byKey = await call(admin.deps, "GET", "/api/selfhost/github", {
+			headers: { "x-api-key": "good-key" },
+		});
+		expect(byKey?.status).toBe(200);
+
+		const member = withGitHub(false);
+		const refused = await call(member.deps, "GET", "/api/selfhost/github", {
+			headers: { "x-api-key": "good-key" },
+		});
+		expect(refused?.status).toBe(403);
+		expect(
+			(await call(member.deps, "GET", "/api/selfhost/github"))?.status,
+		).toBe(401);
+		expect(
+			(
+				await call(member.deps, "GET", "/api/selfhost/github", {
+					headers: { "X-Opaline-Setup-Token": "wrong-token-0123456789" },
+				})
+			)?.status,
+		).toBe(401);
+	});
+});
+
 describe("helpers", () => {
 	test("workspace slugs are DNS labels, with the old slug when nothing usable is left", () => {
 		expect(workspaceSlug("Acme Team", "fallback")).toBe("acme-team");
