@@ -12,6 +12,7 @@ import { SESSION_CONTEXT_SNAPSHOTS_TABLE } from "@rudel/ch-schema/session-contex
 import { SESSION_IMAGES_TABLE } from "@rudel/ch-schema/session-images";
 import { SESSION_INVENTORY_TABLE } from "@rudel/ch-schema/session-inventory";
 import { SESSION_SAVED_OUTPUTS_TABLE } from "@rudel/ch-schema/session-saved-outputs";
+import { TRANSCRIPT_RECORD_COMMANDS_TABLE } from "@rudel/ch-schema/transcript-record-commands";
 import { USAGE_SESSION_ROLLUPS_TABLE } from "@rudel/ch-schema/usage-session-rollups";
 import { WEEKLY_TOTALS_TABLE } from "@rudel/ch-schema/weekly-totals";
 import {
@@ -256,6 +257,7 @@ export function getClickHouseSessionPurgePlans(
 		{ column, table: RUN_INDEX_TABLE },
 		{ column, table: RUN_REQUESTS_TABLE },
 		{ column, table: CALL_FACTS_TABLE },
+		{ column, table: TRANSCRIPT_RECORD_COMMANDS_TABLE },
 		// Received setup: each run's setup file versions, and each member's copy
 		// of the texts (written by the transcript-records writer). The follow-up
 		// pass removes texts a write already in flight stored after the first.

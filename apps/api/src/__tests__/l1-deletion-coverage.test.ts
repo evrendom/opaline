@@ -45,6 +45,7 @@ const TRANSCRIPT_DERIVED = [
 	"run_index",
 	"run_requests",
 	"call_facts",
+	"transcript_record_commands",
 	// Received setup: each run's setup file versions and the texts themselves.
 	"run_setup",
 	"setup_texts",
