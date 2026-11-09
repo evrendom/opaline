@@ -19,6 +19,10 @@ import {
 } from "../../clickhouse.js";
 import { sessionScopeId } from "../l1-edges/l1-edge-ids.js";
 import {
+	ensureCallCommands,
+	storedCallCommandsEnabled,
+} from "./call-commands.js";
+import {
 	buildCallExamplesStatement,
 	buildCallGroupsStatement,
 	buildCallRowsStatement,
@@ -181,6 +185,7 @@ interface FindContext {
 	/** `pullRequest`: the evidence rows that touch it, as their sessions' builds published them. */
 	pullRequest?: { touches: PullRequestTouches; published: PullRequestTouch[] };
 	filters?: CompiledFilters;
+	storedCommands?: boolean;
 	seed: string;
 }
 
@@ -439,11 +444,22 @@ function findBySource(context: FindContext): Promise<FoundPage> {
 		case "weekly":
 			throw new Error("weekly totals are read without a session scope");
 		case "calls":
-			if (isSessionsBehind(context.input)) return findCallSessions(context);
-			return context.input.groupBy
-				? findCallGroups(context, context.input.groupBy as CallGroupBy)
-				: findCalls(context);
+			return findCallsOfSource(context);
 	}
+}
+
+async function findCallsOfSource(found: FindContext): Promise<FoundPage> {
+	const storedCommands =
+		storedCallCommandsEnabled() &&
+		(await ensureCallCommands(found.executor, found.scope.batches).then(
+			() => true,
+			() => false,
+		));
+	const context = { ...found, storedCommands };
+	if (isSessionsBehind(context.input)) return findCallSessions(context);
+	return context.input.groupBy
+		? findCallGroups(context, context.input.groupBy as CallGroupBy)
+		: findCalls(context);
 }
 
 async function findCallSessions(context: FindContext): Promise<FoundPage> {
@@ -464,6 +480,7 @@ async function findCallSessions(context: FindContext): Promise<FoundPage> {
 					input,
 					refs,
 					filters: context.filters,
+					stored: context.storedCommands === true,
 				},
 				"session",
 			),
@@ -558,6 +575,7 @@ async function findCalls(context: FindContext): Promise<FoundPage> {
 					input,
 					refs,
 					filters: context.filters,
+					stored: context.storedCommands === true,
 				},
 				position,
 				context.limit + 1,
@@ -662,6 +680,7 @@ async function findCallGroups(
 					input,
 					refs,
 					filters: context.filters,
+					stored: context.storedCommands === true,
 				},
 				groupBy,
 			),
@@ -805,7 +824,12 @@ async function callExamples(
 			for (const row of await query(
 				context.executor,
 				CallExampleRowSchema,
-				buildCallExamplesStatement(batch.scope, batch.generations, chunk),
+				buildCallExamplesStatement(
+					batch.scope,
+					batch.generations,
+					chunk,
+					context.storedCommands === true,
+				),
 			))
 				texts.set(
 					exampleKey(

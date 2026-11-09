@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
-import { formatInlineImageMarker } from "./inline-image-marker.js";
+import {
+	formatInlineImageMarker,
+	parseInlineImageMarker,
+} from "./inline-image-marker.js";
 
 /**
  * Transcript slimming removes bytes Opaline never reads while keeping every
@@ -160,6 +163,46 @@ export function stripInlineImagesFromLine(line: string): string {
 		return line;
 	}
 	return text;
+}
+
+export interface InlineImage {
+	readonly sha256: string;
+	readonly mediaType: string;
+	readonly bytes: Uint8Array;
+}
+
+export function collectInlineImagesFromLine(line: string): InlineImage[] {
+	if (!mayContainInlineImage(line)) return [];
+	const stripped = stripInlineImagesFromLine(line);
+	if (stripped === line) return [];
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(line);
+	} catch {
+		return [];
+	}
+	const replacements: ImageReplacements = {
+		dataUrls: new Map(),
+		payloads: new Map(),
+	};
+	collectImageReplacements(parsed, replacements, 0);
+	const images = new Map<string, InlineImage>();
+	for (const group of [replacements.dataUrls, replacements.payloads]) {
+		for (const [key, marker] of group) {
+			const found = parseInlineImageMarker(marker);
+			if (!found || images.has(found.sha256) || !stripped.includes(marker))
+				continue;
+			const payload = key.startsWith("data:")
+				? key.slice(key.indexOf(",") + 1)
+				: key;
+			images.set(found.sha256, {
+				sha256: found.sha256,
+				mediaType: found.mediaType,
+				bytes: Buffer.from(payload, "base64"),
+			});
+		}
+	}
+	return [...images.values()];
 }
 
 function collectImageReplacements(

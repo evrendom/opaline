@@ -59,6 +59,7 @@ export interface L1EdgePassEnv {
 	budgetMs: number;
 	/** Only this workspace's scopes (tests building their own fixtures). */
 	organizationId?: string;
+	concurrency?: number;
 	/**
 	 * Runs after a session's run index build committed new runs (run
 	 * questions queue their answers). Best effort: a failure is logged and
@@ -80,14 +81,23 @@ export interface L1EdgePassEnv {
 export async function runL1EdgePass(env: L1EdgePassEnv): Promise<number> {
 	const started = Date.now();
 	let built = 0;
+	const concurrency = Math.max(1, env.concurrency ?? 1);
 	while (Date.now() - started < env.budgetMs) {
 		const claims = await claimL1EdgeScopes(env.sql, {
-			limit: CLAIM_BATCH,
+			limit: Math.max(CLAIM_BATCH, concurrency),
 			leaseMs: LEASE_MS,
 			organizationId: env.organizationId,
 		});
 		if (claims.length === 0) break;
-		for (const claim of claims) if (await processClaim(claim, env)) built += 1;
+		if (concurrency === 1) {
+			for (const claim of claims)
+				if (await processClaim(claim, env)) built += 1;
+			continue;
+		}
+		const results = await Promise.all(
+			claims.map((claim) => processClaim(claim, env)),
+		);
+		built += results.filter(Boolean).length;
 	}
 	return built;
 }

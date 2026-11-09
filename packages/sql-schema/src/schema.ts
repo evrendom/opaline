@@ -15,6 +15,7 @@ export * from "./ingest-processing-schema.js";
 export * from "./ingest-rate-limit-schema.js";
 export * from "./l1-edge-schema.js";
 export * from "./live-session-schema.js";
+export * from "./local-ingest-schema.js";
 export * from "./moment-schema.js";
 export * from "./repository-evidence-schema.js";
 export { repositoryUploadReport } from "./repository-upload-schema.js";

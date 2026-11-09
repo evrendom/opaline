@@ -526,33 +526,57 @@ export class IngestFilterQueue {
 	}
 }
 
-const ingestFilterQueue = new IngestFilterQueue({
-	globalMaxBytes: readPositiveSafeIntegerEnv(
-		"INGEST_FILTER_QUEUE_GLOBAL_MAX_BYTES",
-		INGEST_DIRECT_CONTENT_MAX_BYTES * 2,
-	),
-	globalMaxJobs: readPositiveSafeIntegerEnv(
-		"INGEST_FILTER_QUEUE_GLOBAL_MAX_JOBS",
-		8,
-	),
-	perUserMaxBytes: readPositiveSafeIntegerEnv(
-		"INGEST_FILTER_QUEUE_PER_USER_MAX_BYTES",
-		INGEST_DIRECT_CONTENT_MAX_BYTES,
-	),
-	perUserMaxJobs: readPositiveSafeIntegerEnv(
-		"INGEST_FILTER_QUEUE_PER_USER_MAX_JOBS",
-		5,
-	),
-	timeoutMs: readPositiveSafeIntegerEnv(
-		"INGEST_FILTER_QUEUE_TIMEOUT_MS",
-		DEFAULT_FILTER_TIMEOUT_MS,
-	),
-});
+function readIngestFilterQueueConfig(): IngestFilterQueueConfig {
+	return {
+		globalMaxBytes: readPositiveSafeIntegerEnv(
+			"INGEST_FILTER_QUEUE_GLOBAL_MAX_BYTES",
+			INGEST_DIRECT_CONTENT_MAX_BYTES * 2,
+		),
+		globalMaxJobs: readPositiveSafeIntegerEnv(
+			"INGEST_FILTER_QUEUE_GLOBAL_MAX_JOBS",
+			8,
+		),
+		perUserMaxBytes: readPositiveSafeIntegerEnv(
+			"INGEST_FILTER_QUEUE_PER_USER_MAX_BYTES",
+			INGEST_DIRECT_CONTENT_MAX_BYTES,
+		),
+		perUserMaxJobs: readPositiveSafeIntegerEnv(
+			"INGEST_FILTER_QUEUE_PER_USER_MAX_JOBS",
+			5,
+		),
+		timeoutMs: readPositiveSafeIntegerEnv(
+			"INGEST_FILTER_QUEUE_TIMEOUT_MS",
+			DEFAULT_FILTER_TIMEOUT_MS,
+		),
+	};
+}
+
+const ingestFilterQueues = Array.from(
+	{ length: readPositiveSafeIntegerEnv("INGEST_FILTER_WORKERS", 1) },
+	() => new IngestFilterQueue(readIngestFilterQueueConfig()),
+);
+const ingestFilterQueue = ingestFilterQueues[0] as IngestFilterQueue;
+
+function leastLoadedFilterQueue(): IngestFilterQueue {
+	let best = ingestFilterQueue;
+	let bestBytes = Number.POSITIVE_INFINITY;
+	for (const queue of ingestFilterQueues) {
+		const metrics = queue.getMetrics();
+		const load = metrics.queuedBytes + (metrics.activeJobs > 0 ? 1 : 0);
+		if (load < bestBytes) {
+			best = queue;
+			bestBytes = load;
+		}
+	}
+	return best;
+}
 
 export function filterSessionTextFieldsOffThread(
 	request: IngestFilterRequest,
 ): Promise<IngestFilterResult> {
-	return ingestFilterQueue.filter(request);
+	return ingestFilterQueues.length === 1
+		? ingestFilterQueue.filter(request)
+		: leastLoadedFilterQueue().filter(request);
 }
 
 export function getIngestFilterQueueMetrics(): IngestFilterQueueMetrics {
@@ -560,7 +584,7 @@ export function getIngestFilterQueueMetrics(): IngestFilterQueueMetrics {
 }
 
 export function shutdownIngestFilterQueue(): void {
-	ingestFilterQueue.close();
+	for (const queue of ingestFilterQueues) queue.close();
 }
 
 function createFilterWorker(): Worker {

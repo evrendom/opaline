@@ -19,13 +19,13 @@ const migrationsFolder = join(import.meta.dir, "..", "..", "db", "migrations");
 
 setDefaultTimeout(120_000);
 
-test("applies migrations 0020-0074 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, GitHub webhook delivery 0046, repository evidence index publication 0048, GitHub outcomes 0049, organization feature readiness 0050, CLI version 0051, coordination lease 0052, and L1 edges 0055, and creates the analysis sql result and quota tables (0058) the agent query slots (0059), lets a result be removed with the visibility sync queue (0060), creates the transcript embedding quota and run question tables (0061), lets run question jobs be precomputed (0062), and creates the live session tables with a per-budget rate-limit row (0063), creates the usage digest tables (0064), gives run questions a label (0065), creates the workspace feature switches (0066), creates the moment observation, feedback and fix tables (0067), creates the Compass settings and prompt frustration tables (0068), drops the Free member cap (0069), stages saved outputs with evidence captures (0070), stages images with evidence captures and accepts image objects (0071), creates the analysis check table (0072), lifts the free-plan run limit on self-hosted databases (0073), and creates the Postgres analysis log tables (0074)", async () => {
+test("applies migrations 0020-0075 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, GitHub webhook delivery 0046, repository evidence index publication 0048, GitHub outcomes 0049, organization feature readiness 0050, CLI version 0051, coordination lease 0052, and L1 edges 0055, and creates the analysis sql result and quota tables (0058) the agent query slots (0059), lets a result be removed with the visibility sync queue (0060), creates the transcript embedding quota and run question tables (0061), lets run question jobs be precomputed (0062), and creates the live session tables with a per-budget rate-limit row (0063), creates the usage digest tables (0064), gives run questions a label (0065), creates the workspace feature switches (0066), creates the moment observation, feedback and fix tables (0067), creates the Compass settings and prompt frustration tables (0068), drops the Free member cap (0069), stages saved outputs with evidence captures (0070), stages images with evidence captures and accepts image objects (0071), creates the analysis check table (0072), lifts the free-plan run limit on self-hosted databases (0073), creates the Postgres analysis log tables (0074), and creates the local ingest file table (0075)", async () => {
 	const journalValue: unknown = JSON.parse(
 		await readFile(join(migrationsFolder, "meta", "_journal.json"), "utf8"),
 	);
 	const entries = readMigrationEntries(journalValue);
 	const latestMigration = entries.at(-1);
-	expect(latestMigration?.tag).toBe("0074_analysis_log_store");
+	expect(latestMigration?.tag).toBe("0075_local_ingest_files");
 	for (const [index, entry] of entries.entries()) {
 		if (index > 0) {
 			expect(entry.when).toBeGreaterThan(entries[index - 1]?.when ?? 0);
@@ -373,6 +373,10 @@ test("applies migrations 0020-0074 to a database already migrated through 0019, 
 				{ name: "analysis_log_session_link" },
 				{ name: "analysis_log_step" },
 			]);
+			const [localIngestFile] = await migrationSql<{ name: string | null }[]>`
+				SELECT to_regclass('public.local_ingest_file')::text AS name
+			`;
+			expect(localIngestFile?.name).toBe("local_ingest_file");
 			expect([
 				...(await migrationSql<{ child: string; definition: string }[]>`
 					SELECT conrelid::regclass::text AS child, pg_get_constraintdef(oid) AS definition
@@ -479,7 +483,7 @@ test("applies migrations 0020-0074 to a database already migrated through 0019, 
 				SELECT to_regclass('public.clickhouse_purge_job')::text AS name
 			`;
 			expect(after0052).toEqual({
-				count: 75,
+				count: 76,
 				latestTimestamp: String(latestMigration?.when),
 			});
 			const [trendsSourceTable] = await migrationSql<TableState[]>`

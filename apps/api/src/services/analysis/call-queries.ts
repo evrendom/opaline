@@ -11,6 +11,7 @@ import type {
 	SessionGeneration,
 	TranscriptReadScope,
 } from "../transcript-records-queries.js";
+import { commandsTable } from "./call-commands.js";
 import { commandColumnsSql } from "./command-identity.js";
 import type { CompiledFilters } from "./find-filters.js";
 import { runToolErrorSql } from "./run-index-sql.js";
@@ -118,6 +119,7 @@ interface CallQuery {
 	/** Only the calls of these runs. */
 	refs?: readonly RunRef[];
 	filters?: CompiledFilters;
+	stored?: boolean;
 }
 
 /**
@@ -126,7 +128,20 @@ interface CallQuery {
  * before `FINAL` deduplicates exactly; results are reduced by `max`, so they
  * need no `FINAL`.
  */
-function callsSql({ input, refs, filters }: CallQuery): string {
+function commandRecordsSql(stored: boolean | undefined): string {
+	return stored
+		? `SELECT user_id, source, session_date, session_id, agent_id, record_idx, block_idx, turn_idx, ts,
+				toUnixTimestamp64Milli(ts) AS at_ms, tool_name, file_path, call_id, head, command_from, command_text,
+				command_argv0, command_prefix, command_normalized, command_fingerprint, command_simhash
+			FROM ${commandsTable()} FINAL
+			PREWHERE turn_idx >= 1`
+		: `SELECT user_id, source, session_date, session_id, agent_id, record_idx, block_idx, turn_idx, ts,
+				toUnixTimestamp64Milli(ts) AS at_ms, tool_name, file_path, call_id, head, ${commandColumnsSql()}
+			FROM ${records()} FINAL
+			PREWHERE turn_idx >= 1 AND (kind = 'tool_call' OR (kind = 'file_change' AND file_op = 'write'))`;
+}
+
+function callsSql({ input, refs, filters, stored }: CallQuery): string {
 	const conditions = [
 		input.commandFrom ? "command_from = {commandFrom:String}" : "",
 		input.commandArgv0 ? "command_argv0 = {commandArgv0:String}" : "",
@@ -141,10 +156,7 @@ function callsSql({ input, refs, filters }: CallQuery): string {
 	const result = "kind = 'tool_result'";
 	const ended = CALL_TASK_END_SQL;
 	return `calls AS (
-			SELECT user_id, source, session_date, session_id, agent_id, record_idx, block_idx, turn_idx, ts,
-				toUnixTimestamp64Milli(ts) AS at_ms, tool_name, file_path, call_id, head, ${commandColumnsSql()}
-			FROM ${records()} FINAL
-			PREWHERE turn_idx >= 1 AND (kind = 'tool_call' OR (kind = 'file_change' AND file_op = 'write'))
+			${commandRecordsSql(stored)}
 			WHERE ${pinnedFilter()} AND command_from != ''
 				${refs ? `AND (session_id, agent_id, turn_idx) IN (SELECT r.1, r.2, r.3 FROM (${REF_RUNS_SQL}))` : ""}
 				${conditions.map((condition) => `AND ${condition}`).join(" ")}
@@ -284,6 +296,7 @@ export function buildCallExamplesStatement(
 	scope: TranscriptReadScope,
 	generations: readonly SessionGeneration[],
 	calls: readonly (readonly [string, string, number, number])[],
+	stored = false,
 ): ClickHouseStatement {
 	return {
 		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
@@ -291,8 +304,8 @@ export function buildCallExamplesStatement(
 				substringUTF8(ifNull(command_text, head), 1, {commandChars:UInt32}) AS command,
 				substringUTF8(command_normalized, 1, {commandChars:UInt32}) AS normalized
 			FROM (
-				SELECT session_id, agent_id, record_idx, block_idx, head, ${commandColumnsSql()}
-				FROM ${records()}
+				SELECT session_id, agent_id, record_idx, block_idx, head, ${stored ? "command_from, command_text, command_normalized" : commandColumnsSql()}
+				FROM ${stored ? commandsTable() : records()}
 				WHERE ${pinnedFilter()}
 					AND (session_id, agent_id, record_idx, block_idx) IN (
 						SELECT e.1, e.2, e.3, e.4 FROM (SELECT arrayJoin(arrayZip({exampleSessions:Array(String)}, {exampleAgents:Array(String)}, {exampleRecords:Array(UInt32)}, {exampleBlocks:Array(UInt16)})) AS e)

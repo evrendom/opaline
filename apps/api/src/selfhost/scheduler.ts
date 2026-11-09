@@ -1,5 +1,6 @@
 import { getLogger } from "@logtape/logtape";
 import type postgres from "postgres";
+import { runAsBackgroundWork } from "../lib/background-work.js";
 import { needsObjectStoreSweep } from "../services/object-store-sweep.service.js";
 import { withPostgresLease } from "../services/postgres-lease.service.js";
 import { readR2IngestAvailability } from "../services/r2-ingest-storage.service.js";
@@ -192,10 +193,12 @@ export async function runJobOnce(
 	try {
 		const outcome = await lock(job.name, async () => {
 			const handle = await job.handler();
-			const response = await handle(
-				new Request(`http://selfhost.internal/api/cron/${job.name}`, {
-					headers: { Authorization: `Bearer ${cronSecret}` },
-				}),
+			const response = await runAsBackgroundWork(() =>
+				handle(
+					new Request(`http://selfhost.internal/api/cron/${job.name}`, {
+						headers: { Authorization: `Bearer ${cronSecret}` },
+					}),
+				),
 			);
 			const body = await response.json().catch(() => null);
 			return { httpStatus: response.status, body };

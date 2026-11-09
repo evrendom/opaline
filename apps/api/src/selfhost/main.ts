@@ -6,6 +6,12 @@ import { layoutEnvironment, resolveServerLayout } from "./layout.js";
 import { atPublicOrigin } from "./public-request.js";
 
 const SHUTDOWN_GRACE_MS = 10_000;
+const LOCAL_INGEST_DEFAULTS = {
+	OPALINE_BACKGROUND_WORKERS: "1",
+	INGEST_FILTER_WORKERS: "3",
+	TRANSCRIPT_RECORDS_QUEUE_MAX_JOBS: "4",
+	GIT_OBSERVATION_MAX_JOBS: "4",
+} as const;
 
 function status(line: string): void {
 	process.stderr.write(`opaline: ${line}\n`);
@@ -17,6 +23,9 @@ async function main(): Promise<void> {
 	const disabled = disableExternalProviders(process.env);
 	const { config, env } = readSelfHostConfig(process.env);
 	Object.assign(process.env, env);
+	if (process.env.OPALINE_LOCAL_INGEST === "1")
+		for (const [name, value] of Object.entries(LOCAL_INGEST_DEFAULTS))
+			process.env[name] ??= value;
 	status(
 		`version ${process.env.OPALINE_VERSION?.trim() || "dev"} (${layout.kind} ${layout.root})`,
 	);
@@ -91,6 +100,13 @@ async function main(): Promise<void> {
 		registerR2IngestCleanupWorker({
 			wake: async () => jobs.runNow("r2-ingest"),
 		});
+	const localIngest = await import("./local-ingest/index.js");
+	const ingest = localIngest.isLocalIngestEnabled()
+		? await localIngest.startLocalIngest({
+				wakeJobs: () => jobs.runNow("l1-edges"),
+				log: status,
+			})
+		: null;
 	status(
 		`listening on ${config.host}:${server.port}; jobs: ${jobs.jobs.join(", ")}${config.webDir ? `; web: ${config.webDir}` : "; no OPALINE_WEB_DIR, API only"}`,
 	);
@@ -118,7 +134,12 @@ async function main(): Promise<void> {
 		const timedOut = Symbol("timeout");
 		const [settled] = await Promise.all([
 			Promise.race([
-				Promise.all([jobs.stop(), purgeWorker.stop(), server.stop()]),
+				Promise.all([
+					ingest?.stop(),
+					jobs.stop(),
+					purgeWorker.stop(),
+					server.stop(),
+				]),
 				Bun.sleep(SHUTDOWN_GRACE_MS).then(() => timedOut),
 			]),
 			import("../services/ingest-filter.service.js").then((module) =>

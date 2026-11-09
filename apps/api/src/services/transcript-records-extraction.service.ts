@@ -18,6 +18,7 @@ import {
 	type GitObservationExtractionInput,
 	persistGitObservationsBestEffort,
 } from "./git-observation-extraction.service.js";
+import { timedIngestPhase } from "./ingest-phase-timings.js";
 import {
 	hashTranscriptContent,
 	hasMatchingTranscriptRecordsReceipt,
@@ -376,19 +377,23 @@ export async function persistTranscriptRecordsBestEffort(
 				},
 				{ signal: input.signal, timeoutMs: limits.timeoutMs },
 			);
-			await writeTranscriptRecords(executor, {
-				assertWritable: input.assertWritable,
-				contentSha256: hashTranscriptContent(input.content, input.subagents),
-				drafts: stream.drafts,
-				organizationId: input.organizationId,
-				revision: input.revision,
-				sessionDate: input.sessionDate,
-				sessionId: input.sessionId,
-				source: input.source,
-				summary: stream.summary,
-				userId: input.userId,
-			});
-			await persistGitObservationsBestEffort(executor, input);
+			await timedIngestPhase("server.transcript_records", () =>
+				writeTranscriptRecords(executor, {
+					assertWritable: input.assertWritable,
+					contentSha256: hashTranscriptContent(input.content, input.subagents),
+					drafts: stream.drafts,
+					organizationId: input.organizationId,
+					revision: input.revision,
+					sessionDate: input.sessionDate,
+					sessionId: input.sessionId,
+					source: input.source,
+					summary: stream.summary,
+					userId: input.userId,
+				}),
+			);
+			await timedIngestPhase("server.git_observations", () =>
+				persistGitObservationsBestEffort(executor, input),
+			);
 			return "written";
 		} finally {
 			release();
