@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { disableExternalProviders } from "../lib/self-hosted.js";
 import { readSelfHostConfig, SelfHostConfigError } from "./config.js";
 import { layoutEnvironment, resolveServerLayout } from "./layout.js";
+import { atPublicOrigin } from "./public-request.js";
 
 const SHUTDOWN_GRACE_MS = 10_000;
 
@@ -67,12 +68,13 @@ async function main(): Promise<void> {
 			})
 		: undefined;
 
+	const publicOrigin = new URL(config.appUrl).origin;
 	const server = Bun.serve({
 		hostname: config.host,
 		port: config.port,
 		maxRequestBodySize: MAX_REQUEST_BODY_BYTES,
 		fetch(request, bunServer) {
-			return fetchHandler(request, {
+			return fetchHandler(atPublicOrigin(request, publicOrigin), {
 				fallback,
 				socketIp: bunServer.requestIP(request)?.address ?? null,
 			});
