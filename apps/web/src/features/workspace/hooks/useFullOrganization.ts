@@ -32,6 +32,7 @@ export function useFullOrganization(orgId: string | undefined) {
 		queryFn: async () => {
 			const res = await authClient.organization.getFullOrganization({
 				query: { organizationId: orgId as string },
+				fetchOptions: { disableSignal: true },
 			});
 			return (res.data as unknown as FullOrganization) ?? null;
 		},

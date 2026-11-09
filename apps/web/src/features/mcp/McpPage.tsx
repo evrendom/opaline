@@ -1,6 +1,13 @@
+import { lazy } from "react";
 import { useSearchParams } from "react-router-dom";
+import { routeLoaders } from "@/app/route-loaders";
 import { McpPageView } from "@/features/mcp/mcp-page-view";
-import { WorkspaceSetupPage } from "@/features/setup/workspace-setup-page";
+
+const WorkspaceSetupPage = lazy(() =>
+	routeLoaders.workspaceSetup().then((module) => ({
+		default: module.WorkspaceSetupPage,
+	})),
+);
 
 const MCP_PARAM = "mcp";
 const PICK_PARAMS = ["setup", "tool", "pickedRun", "pickedCall"];

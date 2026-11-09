@@ -29,7 +29,7 @@ import {
 import { PatternPane, PatternRow } from "./compass-patterns";
 import { RunPane, RunPaneSample } from "./compass-run-detail";
 import { CompassSettingsButton } from "./compass-settings";
-import { useCompassAccess } from "./use-compass-access";
+import { useCompassAccess, useCompassEnabled } from "./use-compass-access";
 import "@/features/costs/cost-dashboard.css";
 import "./compass.css";
 
@@ -62,6 +62,7 @@ function CompassView({ observable }: { observable: boolean }) {
 	const queryClient = useQueryClient();
 	const { state: organization } = useOrganization();
 	const organizationId = organization.activeOrg?.id;
+	const allowed = useCompassEnabled();
 	const { state: range } = useDateRange();
 	const [view, setView] = useState<View>("runs");
 	const [kinds, setKinds] = useState<MomentKind[]>([]);
@@ -88,7 +89,7 @@ function CompassView({ observable }: { observable: boolean }) {
 	const list = useInfiniteQuery({
 		...listOptions,
 		queryKey: ["org", organizationId, ...listOptions.queryKey],
-		enabled: !!organizationId,
+		enabled: allowed && !!organizationId,
 		placeholderData: (previous, previousQuery) =>
 			previousQuery?.queryKey[1] === organizationId ? previous : undefined,
 		staleTime: 60_000,
@@ -99,7 +100,7 @@ function CompassView({ observable }: { observable: boolean }) {
 	const patterns = useQuery({
 		...patternOptions,
 		queryKey: ["org", organizationId, ...patternOptions.queryKey],
-		enabled: !!organizationId,
+		enabled: allowed && !!organizationId,
 		staleTime: 60_000,
 	});
 	const firstPage = list.data?.pages[0];

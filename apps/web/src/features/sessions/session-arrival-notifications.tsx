@@ -9,6 +9,13 @@ import { toast } from "sonner";
 import { appRoutes, getWorkspaceAppPath } from "@/app/routes";
 import { useOptionalOrganization } from "@/features/workspace/organization/useOrganization";
 import { SESSION_DETAIL_INITIAL_QUERY_PREFIX } from "./components/session-detail-fast-query";
+import {
+	isOrganizationQueryChangedByArrival,
+	isSessionDetailChangedByArrival,
+	mergeSessionArrivalChange,
+	SESSION_ARRIVAL_REFRESH_DELAY_MS,
+	type SessionArrivalChange,
+} from "./session-arrival-refresh";
 import { collectNewSessionArrivals } from "./session-arrival-tracker";
 
 export function SessionArrivalNotifications() {
@@ -43,6 +50,27 @@ function WorkspaceSessionArrivalNotifications({
 		const ids = toastIds.current;
 		let events: EventSource | null = null;
 		let handshake = true;
+		let pending: SessionArrivalChange | null = null;
+		let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+		const refresh = () => {
+			refreshTimer = null;
+			const change = pending;
+			pending = null;
+			if (!change) return;
+			void queryClient.invalidateQueries({
+				predicate: (query) =>
+					isOrganizationQueryChangedByArrival(
+						query.queryKey,
+						organizationId,
+						change,
+					),
+			});
+			void queryClient.invalidateQueries({
+				queryKey: SESSION_DETAIL_INITIAL_QUERY_PREFIX,
+				predicate: (query) =>
+					isSessionDetailChangedByArrival(query.queryKey[2], change),
+			});
+		};
 		const onOpen = () => {
 			handshake = true;
 		};
@@ -82,16 +110,11 @@ function WorkspaceSessionArrivalNotifications({
 					},
 				});
 			}
-			// Empty pages are change notifications for child uploads whose parent
-			// view needs refreshing without showing a top-level arrival toast.
-			void queryClient.invalidateQueries({
-				queryKey: ["org", organizationId],
-			});
-			// A child can change the family cost while the parent's transcript
-			// revision stays the same. Refresh the displayed overview as well.
-			void queryClient.invalidateQueries({
-				queryKey: SESSION_DETAIL_INITIAL_QUERY_PREFIX,
-			});
+			pending = mergeSessionArrivalChange(
+				pending,
+				page.data.sessions.map((session) => session.sessionId),
+			);
+			refreshTimer ??= setTimeout(refresh, SESSION_ARRIVAL_REFRESH_DELAY_MS);
 		};
 		const connect = () => {
 			if (events) return;
@@ -115,6 +138,7 @@ function WorkspaceSessionArrivalNotifications({
 		return () => {
 			document.removeEventListener("visibilitychange", onVisibilityChange);
 			disconnect();
+			if (refreshTimer) clearTimeout(refreshTimer);
 			for (const id of ids) toast.dismiss(id);
 		};
 	}, [organizationId, queryClient, workspaceSlug]);

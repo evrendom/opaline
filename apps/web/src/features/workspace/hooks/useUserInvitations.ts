@@ -11,7 +11,9 @@ export function useUserInvitations(enabled = true) {
 		enabled,
 		queryKey: USER_INVITATIONS_KEY,
 		queryFn: async () => {
-			const res = await authClient.organization.listUserInvitations();
+			const res = await authClient.organization.listUserInvitations({
+				fetchOptions: { disableSignal: true },
+			});
 			return res.data ?? [];
 		},
 	});

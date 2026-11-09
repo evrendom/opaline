@@ -6,29 +6,9 @@
 	box-shadow: var(--custom-shadow);
 }
 
-/* Face for the sidebar and page header: the canonical InterVariable
-   from rsms/inter (OFL-1.1), with the optical-size axis the fontsource build
-   lacks, plus grayscale smoothing. Not scoped to .product-app-shell so the
-   demo and the mobile sheet get it too. */
-@font-face {
-	font-family: "InterVariable";
-	font-style: normal;
-	font-weight: 100 900;
-	font-display: swap;
-	src: url("/fonts/InterVariable.woff2") format("woff2");
-}
-
-@font-face {
-	font-family: "InterVariable";
-	font-style: italic;
-	font-weight: 100 900;
-	font-display: swap;
-	src: url("/fonts/InterVariable-Italic.woff2") format("woff2");
-}
-
 [data-slot="sidebar"],
 [data-slot="dashboard-header"] {
-	font-family: "InterVariable", var(--font-sans);
+	font-family: var(--font-sans);
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
 }

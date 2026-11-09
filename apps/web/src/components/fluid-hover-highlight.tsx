@@ -5,7 +5,7 @@ import {
 	motion,
 	type Transition,
 	useReducedMotion,
-} from "framer-motion";
+} from "motion/react";
 import type { ItemRect, UseFluidHoverReturn } from "@/hooks/use-fluid-hover";
 import { spring } from "@/lib/springs";
 import { cn } from "@/lib/utils";

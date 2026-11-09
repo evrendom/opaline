@@ -19,6 +19,10 @@ import { Bone, Bones } from "@/app/ui/bones";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { FluidList, useFluidListItem } from "@/components/fluid-list";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
+import {
+	type McpServer,
+	mcpServers,
+} from "@/features/repos/repo-reader/repo-mcp-servers";
 import { keepWhileRangeChanges } from "@/features/repos/repo-reader/repo-page-data";
 import {
 	eventOf,
@@ -28,10 +32,6 @@ import {
 	runKeyOf,
 	usePickedRun,
 } from "@/features/repos/repo-reader/repo-runs-column";
-import {
-	type McpServer,
-	mcpServers,
-} from "@/features/repos/repo-reader/repo-setup-view";
 import {
 	useRepoMcpTools,
 	useRepoSetup,

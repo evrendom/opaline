@@ -14,7 +14,7 @@ import { UsageStateMessage } from "@/components/usage-collection-view";
 import {
 	type McpServer,
 	mcpServers,
-} from "@/features/repos/repo-reader/repo-setup-view";
+} from "@/features/repos/repo-reader/repo-mcp-servers";
 import {
 	useRepoMcpTools,
 	useRepoSetup,
