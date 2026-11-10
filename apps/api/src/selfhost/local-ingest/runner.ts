@@ -37,6 +37,7 @@ const BUSY_REASONS = new Set([
 	"usage_extraction_queue_full",
 ]);
 const BUSY_WAIT_MS = 250;
+const USAGE_INCOMPLETE = "usage_extraction_incomplete";
 const BUSY_WAIT_LIMIT_MS = 10 * 60_000;
 
 function busyReason(error: unknown): boolean {
@@ -48,6 +49,19 @@ function busyReason(error: unknown): boolean {
 
 export function classifyIngestError(error: unknown): SessionOutcome {
 	const message = error instanceof Error ? error.message : String(error);
+	if (
+		error instanceof ORPCError &&
+		error.code === "SERVICE_UNAVAILABLE" &&
+		(error.data as { reason?: unknown } | undefined)?.reason ===
+			USAGE_INCOMPLETE
+	)
+		return {
+			kind: "ingested",
+			sessionId: "",
+			bytes: 0,
+			reason:
+				"Stored without its usage: the transcript's token counts are incomplete. It is imported again when the file changes.",
+		};
 	if (error instanceof ORPCError) {
 		if (error.code === "CONFLICT" && SHRINK.test(message))
 			return {
@@ -94,6 +108,7 @@ export function createSessionRunner(
 					input,
 				});
 			const waitedSince = Date.now();
+			let storedReason: string | undefined;
 			for (;;) {
 				try {
 					await timedIngestPhase("local.ingest_total", ingest);
@@ -107,6 +122,10 @@ export function createSessionRunner(
 						continue;
 					}
 					const outcome = classifyIngestError(error);
+					if (outcome.kind === "ingested") {
+						storedReason = outcome.reason;
+						break;
+					}
 					return outcome.kind === "kept"
 						? { ...outcome, sessionId: input.sessionId }
 						: outcome;
@@ -141,6 +160,7 @@ export function createSessionRunner(
 				kind: "ingested",
 				sessionId: input.sessionId,
 				bytes: prepared.bytes,
+				...(storedReason === undefined ? {} : { reason: storedReason }),
 			};
 		});
 }
