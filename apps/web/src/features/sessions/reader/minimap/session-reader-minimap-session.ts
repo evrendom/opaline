@@ -30,6 +30,7 @@ import {
 export const MAX_SCALE = 0.12;
 
 const SETTLE_MS = 200;
+const SUBAGENT_ENDED = "[data-subagent][data-subagent-end-ms]";
 
 export type SessionMapRefs = {
 	drawnOnce: RefObject<boolean>;
@@ -200,7 +201,9 @@ export function useLaidOutShapes(layout: ReaderLayout | null) {
 	useLayoutEffect(() => {
 		if (!layout) return;
 		const read = (turnId: string, turn: HTMLElement) => {
-			const scroller = readerScrollerOf(turn);
+			const scroller = turn.querySelector(SUBAGENT_ENDED)
+				? readerScrollerOf(turn)
+				: null;
 			const turns = scroller ? turnElementsIn(scroller) : [];
 			laidOut.current.set(
 				turnId,

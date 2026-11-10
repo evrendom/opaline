@@ -15,6 +15,7 @@ export const FrozenSubagentsContext = createContext<HTMLElement | null>(null);
 export const LaunchedSubagentsContext = createContext<HTMLElement | null>(null);
 
 const GAP_PX = 12;
+const STARTED_ROW = "[data-start-ms]";
 
 const LINE_PX = 16;
 
@@ -212,14 +213,21 @@ export function FrozenSubagentsLayer({
 		);
 		const watched = new WeakSet<Element>();
 		const resize = new ResizeObserver(() => collect());
+		const watch = (row: Element) => {
+			if (watched.has(row)) return;
+			watched.add(row);
+			seen.observe(row);
+		};
 		const watchRows = () => {
-			for (const row of scroller.querySelectorAll<HTMLElement>(
-				"[data-start-ms]",
-			)) {
-				if (watched.has(row)) continue;
-				watched.add(row);
-				seen.observe(row);
-			}
+			for (const row of scroller.querySelectorAll(STARTED_ROW)) watch(row);
+		};
+		const watchAdded = (records: MutationRecord[]) => {
+			for (const record of records)
+				for (const node of record.addedNodes) {
+					if (!(node instanceof Element)) continue;
+					if (node.matches(STARTED_ROW)) watch(node);
+					for (const row of node.querySelectorAll(STARTED_ROW)) watch(row);
+				}
 		};
 		const collect = () => {
 			watchRows();
@@ -234,7 +242,7 @@ export function FrozenSubagentsLayer({
 		scroller.addEventListener("scroll", onScroll, { passive: true });
 		const changes = new MutationObserver(refresh);
 		changes.observe(slot, { childList: true });
-		const drawn = new MutationObserver(watchRows);
+		const drawn = new MutationObserver(watchAdded);
 		drawn.observe(scroller, { childList: true, subtree: true });
 		resize.observe(slot);
 		const content = readerContentOf(scroller);

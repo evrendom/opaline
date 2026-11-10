@@ -224,14 +224,18 @@ function useReaderLayoutPass({
 			releasing = true;
 			requestAnimationFrame(() =>
 				requestAnimationFrame(() => {
-					for (const turnId of turnIds) {
+					const released = turnIds.flatMap((turnId) => {
 						const element = turnElementsRef.current.get(turnId);
-						if (!element) continue;
-						if (!layout.wasDeferred(turnId)) {
+						return element
+							? [{ element, laidOut: !layout.wasDeferred(turnId), turnId }]
+							: [];
+					});
+					for (const { element, laidOut, turnId } of released)
+						if (laidOut)
 							for (const listener of layout.laidOutListeners)
 								listener(turnId, element);
-							markLaidOut(element);
-						}
+					for (const { element, laidOut } of released) {
+						if (laidOut) markLaidOut(element);
 						markMeasuring(element, false);
 					}
 					layout.finish(...turnIds);
