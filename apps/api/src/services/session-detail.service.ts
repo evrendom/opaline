@@ -58,6 +58,7 @@ import {
 	writeStoredSessionDetail,
 } from "./session-detail-store.js";
 import { getSessionFamilyCost } from "./session-family-cost.service.js";
+import { sessionFileChangesOf } from "./session-file-changes/derivation-file-changes.js";
 
 const logger = getLogger(["rudel", "api", "session-detail"]);
 const MAX_LATENCY_SAMPLES = 1_024;
@@ -112,9 +113,13 @@ export async function getSessionDetailBodyChunk(
 			// Single-response body getters enforce the old response byte ceiling.
 			// Chunk delivery reads the complete derived body instead; the chunk
 			// serializer, not the whole transcript, defines this response's budget.
-			const value = derivation
-				? getSessionDetailBodyForChunk(derivation, input)
-				: null;
+			const value = !derivation
+				? null
+				: input.kind === "fileChanges"
+					? input.targetId === input.sessionId
+						? sessionFileChangesOf(derivation)
+						: null
+					: getSessionDetailBodyForChunk(derivation, input);
 			if (!value) throw new SessionDetailSnapshotNotFoundError();
 			const serialized = serializeSessionDetailBody(value);
 			return { bytes: serialized.json.length * 2, value: serialized };

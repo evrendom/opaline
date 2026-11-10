@@ -148,7 +148,7 @@ export const SessionDetailSubagentInputSchema =
 
 export const SessionDetailBodyChunkInputSchema =
 	SessionDetailRevisionInputSchema.extend({
-		kind: z.enum(["turn", "subagent", "subagentTrace"]),
+		kind: z.enum(["turn", "subagent", "subagentTrace", "fileChanges"]),
 		targetId: z.string().min(1).max(MAX_DETAIL_ITEM_ID_LENGTH),
 		offset: z.number().int().nonnegative().safe().default(0),
 	}).strict();

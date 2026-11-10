@@ -275,6 +275,7 @@ export {
 	type SessionFile,
 	type SessionFileChange,
 	type SessionFileChanges,
+	SessionFileChangesSchema,
 	type SessionRunCheck,
 	SessionRunCheckSchema,
 	type SessionRunReadRange,

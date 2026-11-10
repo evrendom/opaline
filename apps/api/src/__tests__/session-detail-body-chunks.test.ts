@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { SessionDetailBodyChunkInputSchema } from "@rudel/api-routes";
 import {
+	SessionDetailBodyChunkInputSchema,
+	type SessionFileChanges,
+} from "@rudel/api-routes";
+import { API_RESPONSE_MAX_BYTES } from "../lib/api-response-size.js";
+import {
+	createSessionDetailBodyChunk,
 	getSessionDetailBodyForChunk,
 	serializeSessionDetailBody,
 } from "../services/session-detail-body-chunks.js";
@@ -111,5 +116,47 @@ describe("session detail body chunks", () => {
 				targetId: "missing",
 			}),
 		).toBeNull();
+	});
+});
+
+describe("a session's file changes", () => {
+	const changes: SessionFileChanges = {
+		files: Array.from({ length: 3_000 }, (_, index) => ({
+			changes: [],
+			content: `export const value${index} = "${"x".repeat(1_500)}";\n`,
+			contentCut: false,
+			movedTo: null,
+			path: `/repo/src/file-${index}.ts`,
+			readBy: [{ agentId: "", turnId: "t1" }],
+			readTurns: ["t1"],
+			reads: 1,
+		})),
+		runs: [],
+	};
+
+	test("too big for one response, they arrive whole in chunks that each fit", () => {
+		const body = serializeSessionDetailBody(changes);
+		expect(body.json.length).toBeGreaterThan(API_RESPONSE_MAX_BYTES);
+		const input = {
+			kind: "fileChanges",
+			revision: "7",
+			sessionId: "s",
+			targetId: "s",
+		} as const;
+		expect(
+			SessionDetailBodyChunkInputSchema.parse(input).kind,
+		).toBe("fileChanges");
+		expect(getSessionDetailBodyForChunk(derivation, input)).toBeNull();
+		const parts: string[] = [];
+		for (let offset = 0; offset < body.json.length; ) {
+			const chunk = createSessionDetailBodyChunk(body, { ...input, offset });
+			expect(
+				Buffer.byteLength(JSON.stringify({ json: chunk }), "utf8"),
+			).toBeLessThan(API_RESPONSE_MAX_BYTES);
+			parts.push(chunk.data);
+			offset += chunk.data.length;
+		}
+		expect(parts.length).toBeGreaterThan(1);
+		expect(JSON.parse(parts.join(""))).toEqual(changes);
 	});
 });

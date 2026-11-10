@@ -9,6 +9,7 @@ import {
 	type SessionDetailSubagentTrace,
 	SessionDetailSubagentTraceSchema,
 	type SessionDetailTurn,
+	type SessionFileChanges,
 } from "@rudel/api-routes";
 
 type SessionDetailBody =
@@ -29,6 +30,7 @@ export function getSessionDetailBodyForChunk(
 	},
 	input: Pick<SessionDetailBodyChunkInput, "kind" | "targetId">,
 ): SessionDetailBody | null {
+	if (input.kind === "fileChanges") return null;
 	if (input.kind === "turn")
 		return derivation.turnBodies.get(input.targetId) ?? null;
 	const content = derivation.rawSubagents[input.targetId];
@@ -89,7 +91,7 @@ export function createSessionDetailBodyChunk(
 }
 
 export function serializeSessionDetailBody(
-	body: SessionDetailBody,
+	body: SessionDetailBody | SessionFileChanges,
 ): SerializedSessionDetailBody {
 	const json = JSON.stringify(body);
 	return { json, sha256: createHash("sha256").update(json).digest("hex") };
