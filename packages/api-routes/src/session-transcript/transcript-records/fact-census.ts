@@ -920,6 +920,10 @@ export function pathMatches(
 	return compilePattern(pattern, descendants).test(path);
 }
 
+export function censusPathPattern(pattern: string): RegExp {
+	return compilePattern(pattern, false);
+}
+
 function isObject(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }

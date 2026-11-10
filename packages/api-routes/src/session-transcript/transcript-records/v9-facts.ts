@@ -1,6 +1,7 @@
 import {
 	CENSUS_CONVENTIONS,
 	censusPathParts,
+	censusPathPattern,
 	censusRecordKind,
 	censusRecordPaths,
 	pathMatches,
@@ -22,6 +23,25 @@ interface SourceFact {
 	readonly key: TranscriptRecordFactKey;
 	readonly moreKey: TranscriptRecordFactKey;
 	readonly sources: readonly string[];
+	readonly matchers: readonly ((path: string, value: unknown) => boolean)[];
+}
+
+function sourceMatcher(
+	pattern: string,
+): (path: string, value: unknown) => boolean {
+	const conventionAt = pattern.indexOf("~");
+	if (conventionAt === -1) {
+		const expression = censusPathPattern(pattern.replaceAll("{*}", "*"));
+		return (path) => expression.test(path);
+	}
+	const expression = censusPathPattern(pattern.slice(0, conventionAt));
+	const convention = CENSUS_CONVENTIONS.find(
+		(entry) => entry.id === pattern.slice(conventionAt + 1),
+	);
+	return (path, value) =>
+		typeof value === "string" &&
+		expression.test(path) &&
+		convention?.matches(value.slice(0, 512)) === true;
 }
 
 interface Component {
@@ -82,7 +102,14 @@ function factsForKind(
 				);
 				return sources.length === 0
 					? []
-					: [{ key: mapping.key, moreKey: mapping.moreKey, sources }];
+					: [
+							{
+								key: mapping.key,
+								moreKey: mapping.moreKey,
+								sources,
+								matchers: sources.map(sourceMatcher),
+							},
+						];
 			});
 		candidates.set(cacheKey, facts);
 	}
@@ -143,20 +170,10 @@ export function withV9Facts(
 						: undefined
 				: undefined;
 		for (const fact of selected) {
-			const source = fact.sources.find((pattern) => {
-				const conventionAt = pattern.indexOf("~");
-				if (conventionAt === -1)
-					return pathMatches(pattern.replaceAll("{*}", "*"), path);
-				if (
-					typeof value !== "string" ||
-					!pathMatches(pattern.slice(0, conventionAt), path)
-				)
-					return false;
-				const convention = CENSUS_CONVENTIONS.find(
-					(entry) => entry.id === pattern.slice(conventionAt + 1),
-				);
-				return convention?.matches(value.slice(0, 512)) === true;
-			});
+			const matched = fact.matchers.findIndex((matches) =>
+				matches(path, value),
+			);
+			const source = matched === -1 ? undefined : fact.sources[matched];
 			if (source === undefined || value === undefined) continue;
 			if (
 				agent === "codex" &&
