@@ -1,7 +1,15 @@
 import { execFileSync, spawn } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import {
+	copyFileSync,
+	existsSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	statSync,
+	utimesSync,
+} from "node:fs";
 import { writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import postgres from "postgres";
 
 const USAGE = `bun scripts/selfhost-bench.ts --data-dir <opaline server data dir> [options]
@@ -20,6 +28,9 @@ open latency, and find / patterns / digest latency. Prints one table.
   --sessions <n>           newest transcripts to import with --import cli (default all)
   --idle-seconds <s>       idle CPU window after the import (default 60; the budget is over 600)
   --derived-timeout <s>    how long to wait for the run index after the import (default 1800)
+  --live <transcript>      after the import, copy this Claude Code transcript into the watched
+                           projects folder, notify the server that it ended, and time until
+                           its run index is committed (the < 10 s budget; local import only)
   --label <text>           name of this run in the table
   --json <file>            also write the measurements as JSON`;
 
@@ -33,6 +44,7 @@ interface Options {
 	readonly derivedTimeoutSeconds: number;
 	readonly label: string;
 	readonly json: string | null;
+	readonly live: string | null;
 }
 
 function parseOptions(argv: readonly string[]): Options {
@@ -71,6 +83,7 @@ function parseOptions(argv: readonly string[]): Options {
 		derivedTimeoutSeconds: number("derived-timeout", 1800) ?? 1800,
 		label: values.get("label") ?? importMode,
 		json: values.get("json") ?? null,
+		live: values.has("live") ? resolve(values.get("live") ?? "") : null,
 	};
 }
 
@@ -107,6 +120,8 @@ interface Stack {
 	readonly sql: postgres.Sql;
 	readonly clickhouse: (query: string) => Promise<string>;
 	readonly pids: () => number[];
+	readonly pid: (name: "server" | "clickhouse" | "postgres") => number | null;
+	readonly home: string;
 }
 
 function openStack(dataDir: string): Stack {
@@ -153,7 +168,97 @@ function openStack(dataDir: string): Stack {
 				};
 				return [record.pid];
 			}),
+		pid: (name) => {
+			const file = join(dataDir, "run", `${name}.pid`);
+			if (!existsSync(file)) return null;
+			return (JSON.parse(readFileSync(file, "utf8")) as { pid: number }).pid;
+		},
+		home: process.env.HOME ?? "",
 	};
+}
+
+function rssMiB(pid: number | null): number {
+	if (pid === null) return 0;
+	try {
+		const out = execFileSync("ps", ["-o", "rss=", "-p", String(pid)], {
+			encoding: "utf8",
+		});
+		return Math.round(Number(out.trim()) / 1024);
+	} catch {
+		return 0;
+	}
+}
+
+function startMemoryProbe(stack: Stack, everyMs = 500) {
+	let stopped = false;
+	const peak = { server: 0, clickhouse: 0 };
+	const loop = (async () => {
+		while (!stopped) {
+			peak.server = Math.max(peak.server, rssMiB(stack.pid("server")));
+			peak.clickhouse = Math.max(
+				peak.clickhouse,
+				rssMiB(stack.pid("clickhouse")),
+			);
+			await Bun.sleep(everyMs);
+		}
+	})();
+	return async () => {
+		stopped = true;
+		await loop;
+		return peak;
+	};
+}
+
+async function clickhouseMemoryErrors(stack: Stack): Promise<number> {
+	return Number(
+		(await stack.clickhouse(
+			"SELECT sum(value) FROM system.errors WHERE name = 'MEMORY_LIMIT_EXCEEDED'",
+		)) || "0",
+	);
+}
+
+async function clickhouseMemoryCapMiB(stack: Stack): Promise<number> {
+	const bytes = await stack.clickhouse(
+		"SELECT value FROM system.server_settings WHERE name = 'max_server_memory_usage'",
+	);
+	return Math.round(Number(bytes) / 1024 / 1024);
+}
+
+async function liveSessionLatency(
+	stack: Stack,
+	transcript: string,
+	timeoutMs: number,
+): Promise<{ sessionId: string; runIndexMs: number | null }> {
+	const sessionId = basename(transcript, ".jsonl");
+	const project = basename(dirname(transcript));
+	const target = join(stack.home, ".claude", "projects", project);
+	mkdirSync(target, { recursive: true });
+	const destination = join(target, `${sessionId}.jsonl`);
+	const started = performance.now();
+	copyFileSync(transcript, destination);
+	const now = new Date();
+	utimesSync(destination, now, now);
+	await fetch(`${stack.url}/api/selfhost/ingest/notify`, {
+		method: "POST",
+		headers: {
+			"x-api-key": stack.apiKey,
+			"content-type": "application/json",
+		},
+		body: JSON.stringify({ paths: [destination], final: true }),
+	});
+	const deadline = started + timeoutMs;
+	while (performance.now() < deadline) {
+		const found = await stack.clickhouse(
+			`SELECT count() FROM rudel.run_index WHERE session_id = '${sessionId.replace(/[^0-9a-zA-Z-]/gu, "")}' AND row_kind = 'receipt'`,
+		);
+		if (Number(found) > 0)
+			return {
+				sessionId,
+				runIndexMs: Math.round(performance.now() - started),
+			};
+		await Bun.sleep(100);
+	}
+	return { sessionId, runIndexMs: null };
 }
 
 function transcripts(home: string): { path: string; mtimeMs: number }[] {
@@ -188,6 +293,7 @@ function startHealthProbe(url: string, everyMs = 250) {
 	let samples = 0;
 	let slow = 0;
 	let last = performance.now();
+	const gaps: { endedAt: string; ms: number }[] = [];
 	const loop = (async () => {
 		while (!stopped) {
 			const sent = performance.now();
@@ -200,6 +306,11 @@ function startHealthProbe(url: string, everyMs = 250) {
 			const now = performance.now();
 			if (now - sent > 1_000) slow += 1;
 			maxGapMs = Math.max(maxGapMs, now - last);
+			if (now - last > 500)
+				gaps.push({
+					endedAt: new Date().toISOString(),
+					ms: Math.round(now - last),
+				});
 			last = now;
 			samples += 1;
 			await Bun.sleep(Math.max(0, everyMs - (performance.now() - sent)));
@@ -208,7 +319,12 @@ function startHealthProbe(url: string, everyMs = 250) {
 	return async () => {
 		stopped = true;
 		await loop;
-		return { maxGapMs: Math.round(maxGapMs), samples, over1s: slow };
+		return {
+			maxGapMs: Math.round(maxGapMs),
+			samples,
+			over1s: slow,
+			gaps: gaps.sort((a, b) => b.ms - a.ms).slice(0, 10),
+		};
 	};
 }
 
@@ -455,6 +571,8 @@ async function main(): Promise<void> {
 	});
 	if (options.importMode !== "none") {
 		const stopProbe = startHealthProbe(stack.url);
+		const stopMemory = startMemoryProbe(stack);
+		const memoryErrorsBefore = await clickhouseMemoryErrors(stack);
 		const cpuBefore = await cpuSeconds(stack.pids());
 		const started = performance.now();
 		let imported = 0;
@@ -485,6 +603,10 @@ async function main(): Promise<void> {
 		const totalMs = performance.now() - started;
 		const cpuDuring = (await cpuSeconds(stack.pids())) - cpuBefore;
 		const probe = await stopProbe();
+		const memory = await stopMemory();
+		const memoryErrors =
+			(await clickhouseMemoryErrors(stack)) - memoryErrorsBefore;
+		const clickhouseCap = await clickhouseMemoryCapMiB(stack);
 		const phases = (await (
 			await fetch(`${stack.url}/api/selfhost/ingest/timings`, {
 				headers: { "x-api-key": stack.apiKey },
@@ -500,6 +622,9 @@ async function main(): Promise<void> {
 			derivedComplete: derived,
 			cpuSecondsDuringImport: Math.round(cpuDuring),
 			health: probe,
+			memory,
+			clickhouseMemoryErrors: memoryErrors,
+			clickhouseCapMiB: clickhouseCap,
 			phases: phases.phases,
 			stored,
 		});
@@ -529,6 +654,18 @@ async function main(): Promise<void> {
 				ok: within(probe.maxGapMs, 1_000),
 			},
 			{
+				measure: "server peak RSS during import",
+				value: `${memory.server} MiB`,
+				budget: "< 1536 MiB",
+				ok: within(memory.server, 1536),
+			},
+			{
+				measure: "ClickHouse peak RSS / cap; memory-limit errors",
+				value: `${memory.clickhouse} / ${clickhouseCap} MiB; ${memoryErrors} errors`,
+				budget: "within cap",
+				ok: memory.clickhouse <= clickhouseCap && memoryErrors === 0,
+			},
+			{
 				measure: "CPU used by server + ClickHouse + Postgres",
 				value: `${Math.round(cpuDuring)} s over ${(totalMs / 1000).toFixed(0)} s`,
 				budget: "-",
@@ -542,6 +679,20 @@ async function main(): Promise<void> {
 				budget: "-",
 				ok: null,
 			});
+	}
+
+	if (options.live && options.importMode === "local") {
+		const live = await liveSessionLatency(stack, options.live, 120_000);
+		results.liveSession = live;
+		rows.push({
+			measure: "finished session: hook to its run index",
+			value:
+				live.runIndexMs === null
+					? "not built within 120 s"
+					: `${(live.runIndexMs / 1000).toFixed(1)} s`,
+			budget: "< 10 s",
+			ok: live.runIndexMs !== null && within(live.runIndexMs, 10_000),
+		});
 	}
 
 	if (options.idleSeconds > 0) {
