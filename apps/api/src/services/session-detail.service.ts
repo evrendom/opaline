@@ -43,7 +43,10 @@ import {
 	SESSION_DETAIL_DERIVATION_MAX_CONCURRENCY,
 } from "./session-detail-derivation-limits.js";
 import { createSessionDetailDerivationSemaphore } from "./session-detail-derivation-semaphore.js";
-import { deriveSessionDetailOffThread } from "./session-detail-derivation-thread.js";
+import {
+	deriveSessionDetailOffThread,
+	loadAndDeriveSessionDetailOffThread,
+} from "./session-detail-derivation-thread.js";
 import { buildSessionDetailInitial } from "./session-detail-initial.js";
 import { createSessionDetailInstrumentation } from "./session-detail-instrumentation.js";
 import {
@@ -241,6 +244,39 @@ async function loadDerivation(
 			);
 			if (stored) return { bytes: stored.byteSize, value: stored };
 			return derivationSemaphore.run(async () => {
+				if (isSelfHosted() && !isLiveSessionDetailRevision(key.revision)) {
+					const startedAt = performance.now();
+					const loaded = await timedIngestPhase("detail.derive", () =>
+						loadAndDeriveSessionDetailOffThread(key),
+					);
+					if (!loaded) throw new SessionDetailSnapshotNotFoundError();
+					if (
+						loaded.loaded.revision !== key.revision ||
+						loaded.loaded.source !== key.source
+					)
+						throw new SessionDetailStaleRevisionError(
+							key.revision,
+							loaded.loaded.revision,
+						);
+					const value = loaded.derivation;
+					const durationMs = Math.round(performance.now() - startedAt);
+					instrumentation.recordDerivation({
+						cachedBytes: value.byteSize,
+						durationMs,
+						heapGrowthBytes: 0,
+						rawBytes: loaded.loaded.rawBytes,
+					});
+					logger.info(
+						"Derived session detail snapshot off thread in {durationMs}ms (rawBytes={rawBytes}, cachedBytes={cachedBytes})",
+						{
+							cachedBytes: value.byteSize,
+							durationMs,
+							instanceId,
+							rawBytes: loaded.loaded.rawBytes,
+						},
+					);
+					return { bytes: value.byteSize, value };
+				}
 				const memoryBefore = process.memoryUsage();
 				const startedAt = performance.now();
 				const snapshot = await timedIngestPhase("detail.raw_fetch", () =>
