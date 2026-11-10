@@ -5,6 +5,7 @@ import {
 } from "@rudel/api-routes";
 import {
 	createIncompleteUsageExtractionResult,
+	extractUsageEvents,
 	type UsageExtractionInput,
 	type UsageExtractionResult,
 } from "@rudel/usage-events";
@@ -13,6 +14,9 @@ import {
 	isLargeIngestSession,
 	scaleSessionBudget,
 } from "../lib/ingest-size.js";
+import { ingestWorkRunsInline } from "../lib/inline-work.js";
+import { recyclesWorkerAfter } from "../lib/worker-memory.js";
+import { extractSessionSkills } from "./skill-extraction.js";
 import type {
 	SessionFactsExtractionResult,
 	UsageExtractionTelemetry,
@@ -361,6 +365,7 @@ export class UsageExtractionQueue {
 
 		this.activeRequestId = undefined;
 		this.removeRequest(request);
+		if (recyclesWorkerAfter(request.bytes)) this.stopWorker();
 		if (response.status === "error") {
 			request.reject(
 				new UsageExtractionExecutionError(new Error(response.message)),
@@ -493,7 +498,37 @@ export function extractUsageEventsOffThread(
 export function extractSessionFactsOffThread(
 	request: UsageExtractionRequest,
 ): Promise<SessionFactsExtractionResult> {
+	if (ingestWorkRunsInline())
+		return Promise.resolve().then(() => {
+			try {
+				return extractSessionFactsInline(request);
+			} catch (error) {
+				throw new UsageExtractionExecutionError(
+					new Error(
+						error instanceof Error
+							? error.message
+							: "Usage extraction worker failed",
+					),
+				);
+			}
+		});
 	return usageExtractionQueue.extractSessionFacts(request);
+}
+
+function extractSessionFactsInline(
+	request: UsageExtractionRequest,
+): SessionFactsExtractionResult {
+	return {
+		usage: extractUsageEvents(request.input),
+		skills: request.extractSkills
+			? extractSessionSkills({
+					content: request.input.content,
+					sessionDate: request.skillSessionDate ?? "1970-01-01T00:00:00.000Z",
+					source: request.input.source,
+					subagents: request.input.subagents,
+				})
+			: null,
+	};
 }
 
 export function getUsageExtractionQueueMetrics(): UsageExtractionQueueMetrics {

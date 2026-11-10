@@ -8,6 +8,9 @@ import {
 	isLargeIngestSession,
 	scaleSessionBudget,
 } from "../lib/ingest-size.js";
+import { ingestWorkRunsInline } from "../lib/inline-work.js";
+import { recyclesWorkerAfter } from "../lib/worker-memory.js";
+import { slimAndFilterSecrets } from "./ingest-filter.core.js";
 import { getIngestFilterWorkerError } from "./ingest-filter.error.js";
 import type {
 	IngestFilterFields,
@@ -411,6 +414,7 @@ export class IngestFilterQueue {
 
 		this.activeRequestId = undefined;
 		this.removePendingRequest(pending);
+		if (recyclesWorkerAfter(pending.bytes)) this.stopWorker();
 		if (response.status === "error") {
 			pending.reject(getIngestFilterWorkerError(response));
 		} else {
@@ -574,6 +578,8 @@ function leastLoadedFilterQueue(): IngestFilterQueue {
 export function filterSessionTextFieldsOffThread(
 	request: IngestFilterRequest,
 ): Promise<IngestFilterResult> {
+	if (ingestWorkRunsInline())
+		return Promise.resolve().then(() => slimAndFilterSecrets(request.fields));
 	return ingestFilterQueues.length === 1
 		? ingestFilterQueue.filter(request)
 		: leastLoadedFilterQueue().filter(request);

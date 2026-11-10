@@ -4,6 +4,8 @@ import { filterKnownSecrets } from "@rudel/secret-filter";
 import type { ClickHouseExecutor } from "../clickhouse.js";
 import { ClickHouseWriteFencedError } from "../lib/clickhouse-write-fence.js";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
+import { ReusableWorkers } from "../lib/reusable-workers.js";
+import { isSelfHosted } from "../lib/self-hosted.js";
 import {
 	type GenerationRetirement,
 	type GenerationRetirementOptions,
@@ -63,7 +65,7 @@ export async function persistGitObservationsBestEffort(
 ): Promise<"written" | "skipped" | "failed"> {
 	if (process.env.GIT_OBSERVATION_EXTRACTION_ENABLED === "false")
 		return "skipped";
-	if (activeJobs >= readPositiveSafeIntegerEnv("GIT_OBSERVATION_MAX_JOBS", 2)) {
+	if (activeJobs >= readMaxConcurrentJobs()) {
 		logger.warn(
 			"Git observation extraction admission full; backfill can retry",
 		);
@@ -299,18 +301,40 @@ async function readRawRange(
 	return raw;
 }
 
+function readMaxConcurrentJobs(): number {
+	return readPositiveSafeIntegerEnv("GIT_OBSERVATION_MAX_JOBS", 2);
+}
+
+function createGitObservationWorker(): Worker {
+	return new Worker(
+		new URL("./git-observation-extraction.worker.ts", import.meta.url).href,
+	);
+}
+
+let pooled: ReusableWorkers | undefined;
+
+function reusableWorkers(): ReusableWorkers {
+	pooled ??= new ReusableWorkers(
+		createGitObservationWorker,
+		readMaxConcurrentJobs(),
+	);
+	return pooled;
+}
+
 function parseOffThread(
 	input: GitObservationParseInput,
 	signal: AbortSignal,
 ): Promise<RudelSessionGitObservationsRow[]> {
-	const worker = new Worker(
-		new URL("./git-observation-extraction.worker.ts", import.meta.url).href,
-	);
+	const pool = isSelfHosted() ? reusableWorkers() : null;
+	const worker = pool ? pool.take() : createGitObservationWorker();
 	return new Promise<RudelSessionGitObservationsRow[]>((resolve, reject) => {
-		const cancel = () => finish(() => reject(signal.reason));
-		const finish = (complete: () => void) => {
+		const cancel = () => finish(false, () => reject(signal.reason));
+		const finish = (answered: boolean, complete: () => void) => {
 			signal.removeEventListener("abort", cancel);
-			worker.terminate();
+			worker.onmessage = null;
+			worker.onerror = null;
+			if (pool && answered) pool.give(worker);
+			else worker.terminate();
 			complete();
 		};
 		worker.onmessage = (
@@ -319,20 +343,20 @@ function parseOffThread(
 				| { type: "error"; message: string }
 			>,
 		) =>
-			finish(() =>
+			finish(true, () =>
 				event.data.type === "result"
 					? resolve(event.data.rows)
 					: reject(new Error(event.data.message)),
 			);
 		worker.onerror = () =>
-			finish(() => reject(new Error("Git observation worker failed")));
+			finish(false, () => reject(new Error("Git observation worker failed")));
 		signal.addEventListener("abort", cancel, { once: true });
 		if (signal.aborted) cancel();
 		else {
 			try {
 				worker.postMessage(input);
 			} catch (error) {
-				finish(() => reject(error));
+				finish(false, () => reject(error));
 			}
 		}
 	});

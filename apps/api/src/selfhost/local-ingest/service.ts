@@ -30,6 +30,7 @@ export interface SessionJob {
 	readonly sessionPath: string;
 	readonly source: TranscriptSource;
 	readonly change: string;
+	readonly bytes?: number;
 }
 
 export type SessionOutcome =
@@ -57,6 +58,7 @@ export interface LocalIngestSettings {
 	readonly historyDays: number;
 	readonly concurrency: number;
 	readonly memoryBudgetBytes: number;
+	readonly exclusiveBytes: number;
 	readonly quietMs: number;
 	readonly maxDelayMs: number;
 	readonly liveIntervalMs: number;
@@ -70,8 +72,9 @@ export interface LocalIngestSettings {
 
 export const DEFAULT_LOCAL_INGEST_SETTINGS: LocalIngestSettings = {
 	historyDays: 30,
-	concurrency: 4,
+	concurrency: 3,
 	memoryBudgetBytes: 256 * 1024 * 1024,
+	exclusiveBytes: 48 * 1024 * 1024,
 	quietMs: 1_500,
 	maxDelayMs: 60_000,
 	liveIntervalMs: 8_000,
@@ -432,7 +435,9 @@ export class LocalIngest {
 					(this.files.get(left.sessionPath)?.stat.mtimeMs ?? 0),
 			);
 		let next = Number.POSITIVE_INFINITY;
+		const exclusiveRunning = this.exclusiveRunning;
 		for (const entry of due) {
+			if (exclusiveRunning) break;
 			if (this.running >= this.settings.concurrency) break;
 			const dueAt = entry.dueAt ?? now;
 			if (dueAt > now) {
@@ -440,12 +445,15 @@ export class LocalIngest {
 				continue;
 			}
 			const bytes = this.sessionBytes(entry.sessionPath);
+			const exclusive = bytes >= this.settings.exclusiveBytes;
+			if (exclusive && this.running > 0) break;
 			if (
 				this.running > 0 &&
 				this.runningBytes + bytes > this.settings.memoryBudgetBytes
 			)
 				continue;
 			this.run(entry, bytes);
+			if (exclusive) break;
 		}
 		if (this.running === 0 && due.length === 0) this.finishImportIfIdle();
 		if (Number.isFinite(next)) this.pumpSoon(next - now);
@@ -456,6 +464,16 @@ export class LocalIngest {
 			if (entry.running || entry.dueAt !== null) return;
 		this.importStartedAt = null;
 		this.importBytesDone = 0;
+	}
+
+	private get exclusiveRunning(): boolean {
+		for (const entry of this.sessions.values())
+			if (
+				entry.running &&
+				this.sessionBytes(entry.sessionPath) >= this.settings.exclusiveBytes
+			)
+				return true;
+		return false;
 	}
 
 	private run(entry: SessionEntry, bytes: number): void {
@@ -543,7 +561,12 @@ export class LocalIngest {
 			return null;
 		}
 		const outcome = await this.deps.ingestSession(
-			{ sessionPath: entry.sessionPath, source: entry.source, change },
+			{
+				sessionPath: entry.sessionPath,
+				source: entry.source,
+				change,
+				bytes: this.sessionBytes(entry.sessionPath),
+			},
 			owner,
 		);
 		const at = this.now();

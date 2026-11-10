@@ -8,6 +8,8 @@ import {
 	LocalIngest,
 	type LocalIngestSettings,
 	type Owner,
+	type SessionJob,
+	type SessionOutcome,
 } from "./service.js";
 import { localIngestRoots } from "./sources.js";
 
@@ -91,45 +93,21 @@ export async function startLocalIngest(options: {
 	readonly env?: Environment;
 }): Promise<LocalIngestHandle> {
 	const env = options.env ?? process.env;
-	const [
-		{ sqlClient },
-		router,
-		{ getClickhouse },
-		storage,
-		{ createSessionRunner },
-		{ LocalSessionInputPool },
-	] = await Promise.all([
-		import("../../db.js"),
-		import("../../router.js"),
-		import("../../clickhouse.js"),
-		import("../../services/r2-ingest-storage.service.js"),
-		import("./runner.js"),
-		import("../../services/local-session-input.service.js"),
-	]);
+	const { sqlClient } = await import("../../db.js");
 	const settings = readLocalIngestSettings(env);
-	const pool = new LocalSessionInputPool(
-		settings.concurrency ?? DEFAULT_LOCAL_INGEST_SETTINGS.concurrency,
-	);
+	const runner =
+		env.OPALINE_LOCAL_INGEST_THREAD === "0"
+			? await inProcessRunner(sqlClient, settings, options.log)
+			: await threadRunner(
+					settings.concurrency ?? DEFAULT_LOCAL_INGEST_SETTINGS.concurrency,
+				);
 	let wakeTimer: ReturnType<typeof setTimeout> | undefined;
 	const roots = localIngestRoots(env);
 	const service = new LocalIngest({
 		roots,
 		store: createFileStore(sqlClient),
 		resolveOwner: () => resolveLocalOwner(sqlClient),
-		ingestSession: createSessionRunner({
-			processIngestSession: router.processIngestSession,
-			errorFactories: router.createBackgroundIngestErrorFactories,
-			prepare: (request) => pool.prepare(request),
-			sql: sqlClient,
-			clickhouse: getClickhouse,
-			objectStore: () => {
-				const availability = storage.readR2IngestAvailability();
-				return availability.enabled
-					? storage.createObjectStoreClient(availability.configuration)
-					: null;
-			},
-			log: options.log,
-		}),
+		ingestSession: runner.ingestSession,
 		onIngested: () => {
 			if (wakeTimer) return;
 			wakeTimer = setTimeout(() => {
@@ -156,7 +134,7 @@ export async function startLocalIngest(options: {
 		stop: async () => {
 			clearTimeout(wakeTimer);
 			await service.stop();
-			pool.close();
+			runner.close();
 			registerLocalIngest(null);
 		},
 	};
@@ -165,4 +143,78 @@ export async function startLocalIngest(options: {
 		`local ingest: ${roots.claudeProjects} and ${roots.codexSessions}, last ${settings.historyDays} days, background priority ${backgroundPrioritySupported(env) ? "on" : "off"}`,
 	);
 	return handle;
+}
+
+interface SessionRunner {
+	readonly ingestSession: (
+		job: SessionJob,
+		owner: Owner,
+	) => Promise<SessionOutcome>;
+	readonly close: () => void;
+}
+
+async function threadRunner(threads: number): Promise<SessionRunner> {
+	const [{ LocalIngestThread }, { WORKER_RECYCLE_BYTES }] = await Promise.all([
+		import("../../services/local-ingest-thread.js"),
+		import("../../lib/worker-memory.js"),
+	]);
+	const pool = Array.from(
+		{ length: Math.max(1, threads) },
+		() =>
+			new LocalIngestThread({
+				recycleAfterBytes: WORKER_RECYCLE_BYTES,
+				inline: true,
+			}),
+	);
+	return {
+		ingestSession: (job, owner) =>
+			pool
+				.reduce((idlest, thread) =>
+					thread.inFlight < idlest.inFlight ? thread : idlest,
+				)
+				.ingestSession(job, owner),
+		close: () => {
+			for (const thread of pool) thread.close();
+		},
+	};
+}
+
+async function inProcessRunner(
+	sqlClient: postgres.Sql,
+	settings: Partial<LocalIngestSettings>,
+	log: (line: string) => void,
+): Promise<SessionRunner> {
+	const [
+		router,
+		{ getClickhouse },
+		storage,
+		{ createSessionRunner },
+		{ LocalSessionInputPool },
+	] = await Promise.all([
+		import("../../router.js"),
+		import("../../clickhouse.js"),
+		import("../../services/r2-ingest-storage.service.js"),
+		import("./runner.js"),
+		import("../../services/local-session-input.service.js"),
+	]);
+	const pool = new LocalSessionInputPool(
+		settings.concurrency ?? DEFAULT_LOCAL_INGEST_SETTINGS.concurrency,
+	);
+	return {
+		ingestSession: createSessionRunner({
+			processIngestSession: router.processIngestSession,
+			errorFactories: router.createBackgroundIngestErrorFactories,
+			prepare: (request) => pool.prepare(request),
+			sql: sqlClient,
+			clickhouse: getClickhouse,
+			objectStore: () => {
+				const availability = storage.readR2IngestAvailability();
+				return availability.enabled
+					? storage.createObjectStoreClient(availability.configuration)
+					: null;
+			},
+			log,
+		}),
+		close: () => pool.close(),
+	};
 }

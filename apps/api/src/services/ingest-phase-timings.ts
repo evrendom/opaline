@@ -51,3 +51,18 @@ export function readIngestPhaseTotals(): Record<string, IngestPhaseTotal> {
 export function resetIngestPhaseTotals(): void {
 	totals.clear();
 }
+
+export function mergeIngestPhaseTotals(
+	measured: Readonly<Record<string, IngestPhaseTotal>>,
+): void {
+	if (!isSelfHosted()) return;
+	for (const [phase, total] of Object.entries(measured)) {
+		const current = totals.get(phase);
+		if (!current && totals.size >= MAX_PHASES) continue;
+		totals.set(phase, {
+			count: (current?.count ?? 0) + total.count,
+			totalMs: (current?.totalMs ?? 0) + total.totalMs,
+			maxMs: Math.max(current?.maxMs ?? 0, total.maxMs),
+		});
+	}
+}

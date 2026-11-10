@@ -1,6 +1,9 @@
 import { Buffer } from "node:buffer";
 import { getLogger } from "@logtape/logtape";
 import {
+	createSplitStats,
+	splitSessionTranscript,
+	summarizeSplit,
 	TRANSCRIPT_RECORD_TEXT_MAX_CHARS,
 	TRANSCRIPT_RECORDS_SESSION_TEXT_BUDGET_CHARS,
 	type TranscriptRecordDraft,
@@ -14,6 +17,10 @@ import {
 	isLargeIngestSession,
 	scaleSessionBudget,
 } from "../lib/ingest-size.js";
+import { ingestWorkRunsInline } from "../lib/inline-work.js";
+import { ReusableWorkers } from "../lib/reusable-workers.js";
+import { isSelfHosted } from "../lib/self-hosted.js";
+import { recyclesWorkerAfter } from "../lib/worker-memory.js";
 import {
 	type GitObservationExtractionInput,
 	persistGitObservationsBestEffort,
@@ -232,10 +239,11 @@ export function streamTranscriptRecordDrafts(
 	options: { readonly signal?: AbortSignal; readonly timeoutMs: number },
 ): TranscriptRecordStream {
 	let summary: TranscriptSplitSummary | undefined;
+	if (ingestWorkRunsInline()) return splitInline(request);
 	async function* drafts(): AsyncGenerator<TranscriptRecordDraft> {
-		const worker = new Worker(
-			new URL("./transcript-records.worker.js", import.meta.url).href,
-		);
+		const pool = isSelfHosted() ? reusableWorkers() : null;
+		const worker = pool ? pool.take() : createTranscriptRecordsWorker();
+		let idle = false;
 		const inbox: TranscriptRecordsWorkerMessage[] = [];
 		let failure: Error | undefined;
 		let wake: (() => void) | undefined;
@@ -243,17 +251,22 @@ export function streamTranscriptRecordDrafts(
 			failure ??= error;
 			wake?.();
 		};
-		worker.addEventListener(
-			"message",
-			(event: MessageEvent<TranscriptRecordsWorkerMessage>) => {
-				inbox.push(event.data);
-				wake?.();
-			},
-		);
-		worker.addEventListener("error", (event) => fail(new Error(event.message)));
-		worker.addEventListener("close", () =>
-			fail(new Error("Transcript records worker stopped unexpectedly")),
-		);
+		const onMessage = (event: MessageEvent<TranscriptRecordsWorkerMessage>) => {
+			if (event.data.type !== "batch") idle = true;
+			inbox.push(event.data);
+			wake?.();
+		};
+		const onError = (event: ErrorEvent) => {
+			idle = false;
+			fail(new Error(event.message));
+		};
+		const onClose = () => {
+			idle = false;
+			fail(new Error("Transcript records worker stopped unexpectedly"));
+		};
+		worker.addEventListener("message", onMessage);
+		worker.addEventListener("error", onError);
+		worker.addEventListener("close", onClose);
 		const timer = setTimeout(
 			() => fail(new Error("Transcript records extraction timed out")),
 			options.timeoutMs,
@@ -287,7 +300,12 @@ export function streamTranscriptRecordDrafts(
 		} finally {
 			clearTimeout(timer);
 			options.signal?.removeEventListener("abort", onAbort);
-			worker.terminate();
+			worker.removeEventListener("message", onMessage);
+			worker.removeEventListener("error", onError);
+			worker.removeEventListener("close", onClose);
+			if (pool && idle && !recyclesWorkerAfter(request.content.length))
+				pool.give(worker);
+			else worker.terminate();
 		}
 	}
 	return {
@@ -299,6 +317,63 @@ export function streamTranscriptRecordDrafts(
 			return summary;
 		},
 	};
+}
+
+function splitInline(
+	request: TranscriptRecordsSplitRequest,
+): TranscriptRecordStream {
+	const stats = createSplitStats();
+	let done = false;
+	async function* drafts(): AsyncGenerator<TranscriptRecordDraft> {
+		let rows = 0;
+		for (const draft of splitSessionTranscript(
+			{
+				codexForkParentCalls: request.codexForkParentCalls,
+				content: request.content,
+				sessionDate: request.sessionDate,
+				source: request.source,
+				subagents: request.subagents,
+				textBudgetChars: request.textBudgetChars,
+				textMaxChars: request.textMaxChars,
+			},
+			stats,
+		)) {
+			rows++;
+			if (rows > request.maxRows)
+				throw new Error(
+					`Transcript expands to more than ${request.maxRows} records`,
+				);
+			yield draft;
+		}
+		done = true;
+	}
+	return {
+		drafts: drafts(),
+		summary() {
+			if (!done) throw new Error("Transcript records split did not complete");
+			return summarizeSplit(stats);
+		},
+	};
+}
+
+function createTranscriptRecordsWorker(): Worker {
+	return new Worker(
+		new URL("./transcript-records.worker.js", import.meta.url).href,
+	);
+}
+
+let pooled: ReusableWorkers | undefined;
+
+function reusableWorkers(): ReusableWorkers {
+	pooled ??= new ReusableWorkers(
+		createTranscriptRecordsWorker,
+		readTranscriptRecordsExtractionConfig().queueMaxJobs,
+	);
+	return pooled;
+}
+
+export function closeTranscriptRecordsWorkers(): void {
+	pooled?.close();
 }
 
 export interface PersistTranscriptRecordsInput {

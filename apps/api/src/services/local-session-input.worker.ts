@@ -1,6 +1,5 @@
 import { lowerWorkerThreadPriority } from "../lib/background-work.js";
-import { collectSessionImages } from "../selfhost/local-ingest/image-collection.js";
-import { buildLocalSessionInput } from "../selfhost/local-ingest/session-input.js";
+import { prepareLocalSession } from "../selfhost/local-ingest/prepare.js";
 import type {
 	LocalSessionInputRequest,
 	LocalSessionInputWorkerResponse,
@@ -28,25 +27,12 @@ self.addEventListener("message", (event) => {
 	const { requestId, request } = event.data;
 	void (async () => {
 		try {
-			const built = await buildLocalSessionInput(request);
-			if (built.kind === "skipped") {
-				self.postMessage({ requestId, status: "ok", prepared: built });
-				return;
-			}
-			const images = collectSessionImages([
-				{ agentId: "", content: built.input.content },
-				...(built.input.subagents ?? []).map((subagent) => ({
-					agentId: subagent.agentId,
-					content: subagent.content,
-				})),
-			]);
+			const prepared = await prepareLocalSession(request);
 			self.postMessage(
-				{
-					requestId,
-					status: "ok",
-					prepared: { ...built, images },
-				},
-				images.map((image) => image.bytes.buffer as ArrayBuffer),
+				{ requestId, status: "ok", prepared },
+				prepared.kind === "skipped"
+					? []
+					: prepared.images.map((image) => image.bytes.buffer as ArrayBuffer),
 			);
 		} catch (error) {
 			self.postMessage({
