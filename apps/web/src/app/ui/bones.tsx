@@ -68,6 +68,10 @@ function useSquircleBars() {
 // sample ever uses keeps it drawing the sample: content is never saved there.
 const sampleKey = (label: string) => `sample:${label}`;
 
+// skullet snapshots shown content under its key after every DOM change (a deep
+// clone plus a text measure of each node); an empty key turns that off.
+const NO_SNAPSHOT = "";
+
 export function Bones({
 	children,
 	className,
@@ -116,7 +120,7 @@ export function Reveal({
 		<div ref={host} className="contents">
 			<Skeleton
 				className={cn(fill && "bones-fill", className)}
-				id={loading ? sampleKey(sampleId) : undefined}
+				id={loading ? sampleKey(sampleId) : NO_SNAPSHOT}
 				label={label}
 				loading={loading}
 			>
