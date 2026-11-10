@@ -125,6 +125,19 @@ export function callTuplesSql(): string {
 		})})`;
 }
 
+export function callTuplesBatchSql(): string {
+	return `SELECT session_id, groupArray(tuple(${CALL_FIELDS.map(([, expression]) => expression).join(", ")})) AS calls
+		FROM (${callRowsSql({
+			sessions: pinnedFilter(),
+			fresh: FORK_REPLAY_FILTER,
+			identity: false,
+			programs: false,
+			output: false,
+			commandRows: true,
+		})})
+		GROUP BY session_id`;
+}
+
 const INSTRUCTION_FILE =
 	/(?:^|\/)(?:(?<claude>CLAUDE(?:\.local)?\.md)|(?<agents>AGENTS(?:\.override)?\.md)|(?<skill>SKILL\.md)|(?<rules>\.claude\/rules\/[^/]+\.md))$/u;
 

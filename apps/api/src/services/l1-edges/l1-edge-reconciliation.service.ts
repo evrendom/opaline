@@ -20,6 +20,7 @@ import {
 	enqueueL1EdgeDependents,
 	enqueueL1EdgeScope,
 	failL1EdgeScope,
+	heldL1EdgeLeases,
 	holdsL1EdgeLease,
 	recordL1EdgeDependencies,
 } from "./l1-edge-queue.service.js";
@@ -35,7 +36,11 @@ import {
 	RUN_INDEX_TABLE,
 	RUN_REQUESTS_TABLE,
 } from "./l1-edge-tables.js";
-import { buildRunIndex } from "./run-index.service.js";
+import { buildRunIndex, type RunIndexBuild } from "./run-index.service.js";
+import {
+	buildRunIndexBatch,
+	type RunIndexBatchLimits,
+} from "./run-index-batch.service.js";
 
 const logger = getLogger(["rudel", "api", "l1-edges"]);
 
@@ -71,6 +76,18 @@ export interface L1EdgePassEnv {
 		source: string;
 		sessionId: string;
 	}) => Promise<unknown>;
+	runIndexBatch?: {
+		claimLimit: number;
+		limits?: RunIndexBatchLimits;
+		afterBuilt?: (
+			sessions: readonly {
+				organizationId: string;
+				userId: string;
+				source: string;
+				sessionId: string;
+			}[],
+		) => Promise<unknown>;
+	};
 	now?: () => Date;
 }
 
@@ -82,24 +99,206 @@ export async function runL1EdgePass(env: L1EdgePassEnv): Promise<number> {
 	const started = Date.now();
 	let built = 0;
 	const concurrency = Math.max(1, env.concurrency ?? 1);
+	const batch = env.runIndexBatch;
 	while (Date.now() - started < env.budgetMs) {
-		const claims = await claimL1EdgeScopes(env.sql, {
-			limit: Math.max(CLAIM_BATCH, concurrency),
-			leaseMs: LEASE_MS,
-			organizationId: env.organizationId,
-		});
-		if (claims.length === 0) break;
-		if (concurrency === 1) {
-			for (const claim of claims)
-				if (await processClaim(claim, env)) built += 1;
-			continue;
-		}
-		const results = await Promise.all(
-			claims.map((claim) => processClaim(claim, env)),
-		);
-		built += results.filter(Boolean).length;
+		const [claims, runIndex] = await Promise.all([
+			claimL1EdgeScopes(env.sql, {
+				limit: Math.max(CLAIM_BATCH, concurrency),
+				leaseMs: LEASE_MS,
+				organizationId: env.organizationId,
+				kinds: batch ? ["session", "repository"] : undefined,
+			}),
+			batch
+				? claimL1EdgeScopes(env.sql, {
+						limit: batch.claimLimit,
+						leaseMs: LEASE_MS,
+						organizationId: env.organizationId,
+						kinds: ["run_index"],
+					})
+				: [],
+		]);
+		if (claims.length === 0 && runIndex.length === 0) break;
+		const [others, batched] = await Promise.all([
+			processClaims(
+				runIndex.length === 1 ? [...claims, ...runIndex] : claims,
+				env,
+				concurrency,
+			),
+			runIndex.length > 1 ? processRunIndexBatch(runIndex, env) : 0,
+		]);
+		built += others + batched;
 	}
 	return built;
+}
+
+async function processClaims(
+	claims: readonly ClaimedL1EdgeScope[],
+	env: L1EdgePassEnv,
+	concurrency: number,
+): Promise<number> {
+	let built = 0;
+	if (concurrency === 1) {
+		for (const claim of claims) if (await processClaim(claim, env)) built += 1;
+		return built;
+	}
+	let next = 0;
+	await Promise.all(
+		Array.from({ length: Math.min(concurrency, claims.length) }, async () => {
+			while (next < claims.length) {
+				const claim = claims[next++];
+				if (claim && (await processClaim(claim, env))) built += 1;
+			}
+		}),
+	);
+	return built;
+}
+
+async function processRunIndexBatch(
+	claims: readonly ClaimedL1EdgeScope[],
+	env: L1EdgePassEnv,
+): Promise<number> {
+	const members = new Map<string, ClaimedL1EdgeScope[]>();
+	for (const claim of claims) {
+		const key = `${claim.organizationId}\u0000${claim.userId ?? ""}`;
+		const list = members.get(key);
+		if (list) list.push(claim);
+		else members.set(key, [claim]);
+	}
+	let built = 0;
+	for (const member of members.values())
+		built += await processMemberRunIndexBatch(member, env);
+	return built;
+}
+
+async function processMemberRunIndexBatch(
+	claims: readonly ClaimedL1EdgeScope[],
+	env: L1EdgePassEnv,
+): Promise<number> {
+	const [first] = claims;
+	if (!first) return 0;
+	const target = {
+		organizationId: first.organizationId,
+		userId: first.userId ?? undefined,
+	};
+	const bySession = new Map(
+		claims.map((claim) => [claim.sessionId ?? "", claim]),
+	);
+	let outcomes: Awaited<ReturnType<typeof buildRunIndexBatch>>;
+	try {
+		if (await hasClickHousePurgeTombstone(target, { database: env.sql }))
+			throw new ClickHouseWriteFencedError();
+		outcomes = await buildRunIndexBatch({
+			executor: env.sources.executor,
+			organizationId: first.organizationId,
+			userId: first.userId ?? "",
+			claims: claims.map((claim) => ({
+				session: {
+					userId: claim.userId ?? "",
+					source: claim.source ?? "",
+					sessionId: claim.sessionId ?? "",
+				},
+				buildRevision: claim.revision,
+			})),
+			beforeWrite: async (sessionIds) => {
+				await assertNoClickHousePurgeTombstone(target, { database: env.sql });
+				const writing = sessionIds.flatMap((sessionId) => {
+					const claim = bySession.get(sessionId);
+					return claim ? [claim] : [];
+				});
+				const held = await heldL1EdgeLeases(env.sql, writing);
+				return new Set(
+					writing
+						.filter((claim) => held.has(claim.scopeId))
+						.map((claim) => claim.sessionId ?? ""),
+				);
+			},
+			now: env.now,
+			limits: env.runIndexBatch?.limits,
+		});
+	} catch (error) {
+		if (!(error instanceof ClickHouseWriteFencedError))
+			logger.warn(
+				"Run index batch of {count} sessions failed, building them one at a time: {error}",
+				{
+					count: claims.length,
+					error: error instanceof Error ? error.message : String(error),
+				},
+			);
+		return processClaims(claims, env, 1);
+	}
+	let built = 0;
+	const written: {
+		organizationId: string;
+		userId: string;
+		source: string;
+		sessionId: string;
+	}[] = [];
+	for (const claim of claims) {
+		const outcome = outcomes.get(claim.sessionId ?? "");
+		if (!outcome || outcome.kind === "lease_lost") continue;
+		if (outcome.kind === "failed") {
+			const message =
+				outcome.error instanceof Error
+					? outcome.error.message
+					: String(outcome.error);
+			logger.warn("Edge scope {scope} failed: {error}", {
+				scope: `${claim.scopeKind}:${claim.scopeId}`,
+				error: message,
+			});
+			await failL1EdgeScope(env.sql, claim, message);
+			continue;
+		}
+		await completeRunIndexScope(env, claim, outcome.build);
+		if (outcome.build.written) {
+			built += 1;
+			written.push({
+				organizationId: claim.organizationId,
+				userId: claim.userId ?? "",
+				source: claim.source ?? "",
+				sessionId: claim.sessionId ?? "",
+			});
+		}
+	}
+	if (written.length > 0) await afterRunIndexBatchBuilt(env, written);
+	return built;
+}
+
+function completeRunIndexScope(
+	env: L1EdgePassEnv,
+	claim: ClaimedL1EdgeScope,
+	build: RunIndexBuild,
+): Promise<boolean> {
+	return completeL1EdgeScope(env.sql, claim, {
+		resolverVersion: RUN_INDEX_VERSION,
+		input: build.input,
+		edgeCount: build.runCount,
+		unresolvedCount: 0,
+		frozenReason: build.frozenReason,
+	});
+}
+
+async function afterRunIndexBatchBuilt(
+	env: L1EdgePassEnv,
+	sessions: readonly {
+		organizationId: string;
+		userId: string;
+		source: string;
+		sessionId: string;
+	}[],
+): Promise<void> {
+	const hook = env.runIndexBatch?.afterBuilt;
+	if (!hook) {
+		for (const session of sessions) await afterRunIndexBuilt(env, session);
+		return;
+	}
+	try {
+		await hook(sessions);
+	} catch (error) {
+		logger.warn("After the run index of {count} sessions: {error}", {
+			count: sessions.length,
+			error: error instanceof Error ? error.message : String(error),
+		});
+	}
 }
 
 async function processClaim(
@@ -179,13 +378,7 @@ async function processClaim(
 				beforeWrite,
 				now: env.now,
 			});
-			await completeL1EdgeScope(env.sql, claim, {
-				resolverVersion: RUN_INDEX_VERSION,
-				input: build.input,
-				edgeCount: build.runCount,
-				unresolvedCount: 0,
-				frozenReason: build.frozenReason,
-			});
+			await completeRunIndexScope(env, claim, build);
 			if (build.written)
 				await afterRunIndexBuilt(env, {
 					organizationId: claim.organizationId,

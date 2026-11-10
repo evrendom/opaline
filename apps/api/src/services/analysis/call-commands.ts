@@ -207,14 +207,23 @@ export async function materializeSessionCallCommands(
 		readonly sessionId: string;
 	},
 ): Promise<number> {
-	const scope = {
-		organizationId: session.organizationId,
-		userId: session.userId,
-	};
+	return materializeSessionsCallCommands(
+		executor,
+		{ organizationId: session.organizationId, userId: session.userId },
+		[session.sessionId],
+	);
+}
+
+export async function materializeSessionsCallCommands(
+	executor: ClickHouseExecutor,
+	scope: TranscriptReadScope,
+	sessionIds: readonly string[],
+): Promise<number> {
+	if (sessionIds.length === 0) return 0;
 	const committed = await query(
 		executor,
 		CommittedSchema,
-		buildCommittedGenerationsStatement(scope, [session.sessionId]),
+		buildCommittedGenerationsStatement(scope, sessionIds),
 	);
 	const generations = committed.map((row) => ({
 		sessionId: row.session_id,

@@ -61,11 +61,29 @@ export function buildRunMessagesStatement(
 	scope: TranscriptReadScope,
 	generation: SessionGeneration,
 ): ClickHouseStatement {
-	const at = "tuple(record_idx, block_idx)";
-	const said = "kind = 'assistant_text'";
 	return {
 		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
-		query: `SELECT agent_id, turn_idx,
+		query: runMessagesSql(""),
+		query_params: pinnedParams(scope, [generation]),
+	};
+}
+
+export function buildRunMessagesBatchStatement(
+	scope: TranscriptReadScope,
+	generations: readonly SessionGeneration[],
+	settings: Record<string, string | number> = {},
+): ClickHouseStatement {
+	return {
+		clickhouse_settings: { ...ANALYSIS_QUERY_SETTINGS, ...settings },
+		query: runMessagesSql("session_id, "),
+		query_params: pinnedParams(scope, generations),
+	};
+}
+
+function runMessagesSql(session: string): string {
+	const at = "tuple(record_idx, block_idx)";
+	const said = "kind = 'assistant_text'";
+	return `SELECT ${session}agent_id, turn_idx,
 				if(countIf(${GENUINE_PROMPT_SQL}) = 0, NULL,
 					argMinIf(${textSql(SCAN_TEXT_CHARS)}, ${at}, ${GENUINE_PROMPT_SQL})) AS opening_prompt,
 				countIf(${said}) > 0 AND maxIf(${at}, ${said}) > maxIf(${at}, kind = 'tool_call') AS ended_saying,
@@ -77,9 +95,7 @@ export function buildRunMessagesStatement(
 				(turn_idx >= 1 AND facts['fork_replayed'] != 'true'
 					AND ((${GENUINE_PROMPT_SQL}) OR kind IN ('assistant_text', 'tool_call')))
 				OR (${SYSTEM_PROMPT_SQL}))
-			GROUP BY agent_id, turn_idx`,
-		query_params: pinnedParams(scope, [generation]),
-	};
+			GROUP BY ${session}agent_id, turn_idx`;
 }
 
 /**

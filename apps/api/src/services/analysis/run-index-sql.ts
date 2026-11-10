@@ -646,7 +646,25 @@ export function buildCodexLifecycleStatement(
 ): ClickHouseStatement {
 	return {
 		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
-		query: `SELECT agent_id, record_idx, block_idx, turn_idx, subtype,
+		query: codexLifecycleSql(""),
+		query_params: pinnedParams(scope, [generation]),
+	};
+}
+
+export function buildCodexLifecycleBatchStatement(
+	scope: TranscriptReadScope,
+	generations: readonly SessionGeneration[],
+	settings: Record<string, string | number> = {},
+): ClickHouseStatement {
+	return {
+		clickhouse_settings: { ...ANALYSIS_QUERY_SETTINGS, ...settings },
+		query: codexLifecycleSql("session_id, "),
+		query_params: pinnedParams(scope, generations),
+	};
+}
+
+function codexLifecycleSql(session: string): string {
+	return `SELECT ${session}agent_id, record_idx, block_idx, turn_idx, subtype,
 				any(facts['turn_id']) AS turn_id, any(duration_ms) AS task_duration_ms,
 				${LIFECYCLE_FACT_KEYS.map((key) =>
 					key === "permission_profile"
@@ -656,10 +674,8 @@ export function buildCodexLifecycleStatement(
 			FROM ${records()}
 			WHERE ${pinnedFilter()} AND source = 'codex' AND kind = 'meta' AND subtype IN ${CODEX_LIFECYCLE_SUBTYPES}
 				AND facts['fork_replayed'] != 'true'
-			GROUP BY agent_id, record_idx, block_idx, turn_idx, subtype
-			ORDER BY agent_id, record_idx, block_idx`,
-		query_params: pinnedParams(scope, [generation]),
-	};
+			GROUP BY ${session}agent_id, record_idx, block_idx, turn_idx, subtype
+			ORDER BY ${session}agent_id, record_idx, block_idx`;
 }
 
 /** Where each turn of a Codex stream starts, and its last response record (0 when none). */
@@ -677,15 +693,34 @@ export function buildCodexTurnMarksStatement(
 ): ClickHouseStatement {
 	return {
 		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
-		query: `SELECT agent_id, turn_idx, min(record_idx) AS turn_start,
-				maxIf(record_idx, kind IN ${RESPONSE_KINDS}) AS last_response
-			FROM ${records()}
-			WHERE ${pinnedFilter()} AND source = 'codex' AND facts['fork_replayed'] != 'true'
-			GROUP BY agent_id, turn_idx
-			ORDER BY agent_id, turn_idx`,
+		query: codexTurnMarksSql(""),
 		query_params: pinnedParams(scope, [generation]),
 	};
 }
+
+export function buildCodexTurnMarksBatchStatement(
+	scope: TranscriptReadScope,
+	generations: readonly SessionGeneration[],
+	settings: Record<string, string | number> = {},
+): ClickHouseStatement {
+	return {
+		clickhouse_settings: { ...ANALYSIS_QUERY_SETTINGS, ...settings },
+		query: codexTurnMarksSql("session_id, "),
+		query_params: pinnedParams(scope, generations),
+	};
+}
+
+function codexTurnMarksSql(session: string): string {
+	return `SELECT ${session}agent_id, turn_idx, min(record_idx) AS turn_start,
+				maxIf(record_idx, kind IN ${RESPONSE_KINDS}) AS last_response
+			FROM ${records()}
+			WHERE ${pinnedFilter()} AND source = 'codex' AND facts['fork_replayed'] != 'true'
+			GROUP BY ${session}agent_id, turn_idx
+			ORDER BY ${session}agent_id, turn_idx`;
+}
+
+const USAGE_GENERATIONS_SQL =
+	"SELECT u.1, toUInt64(u.2) FROM (SELECT arrayJoin(arrayZip({sessionIds:Array(String)}, {usageGenerations:Array(String)})) AS u)";
 
 /** The model a usage event is attributed to: resolved, else as recorded. */
 export const USAGE_MODEL_SQL =
@@ -727,11 +762,20 @@ const TOKEN_KINDS = [
  * set of events, never a mix of two extractions. `find` reads every active
  * event.
  */
-export function usageEventCtes(options: { generation?: boolean } = {}): string {
-	const generation = options.generation
-		? " AND event_version = {usageGeneration:UInt64}"
-		: "";
-	return `${buildPricedUsageEventsCte(`e.organization_id = {organizationId:String} AND e.user_id = {userId:String} AND e.session_id IN {sessionIds:Array(String)}${generation.replace("event_version", "e.event_version")}`)},
+export function usageEventCtes(
+	options: { generation?: boolean | "per-session" } = {},
+): string {
+	const generation =
+		options.generation === "per-session"
+			? ` AND (session_id, event_version) IN (${USAGE_GENERATIONS_SQL})`
+			: options.generation
+				? " AND event_version = {usageGeneration:UInt64}"
+				: "";
+	const pricedGeneration =
+		options.generation === "per-session"
+			? ` AND (e.session_id, e.event_version) IN (${USAGE_GENERATIONS_SQL})`
+			: generation.replace("event_version", "e.event_version");
+	return `${buildPricedUsageEventsCte(`e.organization_id = {organizationId:String} AND e.user_id = {userId:String} AND e.session_id IN {sessionIds:Array(String)}${pricedGeneration}`)},
 		claude_single_lineages AS (
 			SELECT DISTINCT session_id, lineage_id FROM ${getSafeClickHouseTable("rudel.usage_events")} FINAL
 			WHERE organization_id = {organizationId:String} AND user_id = {userId:String} AND session_id IN {sessionIds:Array(String)}
@@ -933,15 +977,48 @@ export function buildRunIndexStatement(
 	scope: TranscriptReadScope,
 	generation: UsageBoundGeneration,
 ): ClickHouseStatement {
+	return {
+		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
+		query: runIndexSql(false),
+		query_params: {
+			...pinnedParams(scope, [generation]),
+			usageGeneration: generation.usageGeneration,
+		},
+	};
+}
+
+export function buildRunIndexBatchStatement(
+	scope: TranscriptReadScope,
+	generations: readonly UsageBoundGeneration[],
+	settings: Record<string, string | number> = {},
+): ClickHouseStatement {
+	return {
+		clickhouse_settings: { ...ANALYSIS_QUERY_SETTINGS, ...settings },
+		query: runIndexSql(true),
+		query_params: usageBoundParams(scope, generations),
+	};
+}
+
+function usageBoundParams(
+	scope: TranscriptReadScope,
+	generations: readonly UsageBoundGeneration[],
+) {
+	return {
+		...pinnedParams(scope, generations),
+		usageGenerations: generations.map(
+			(generation) => generation.usageGeneration,
+		),
+	};
+}
+
+function runIndexSql(batch: boolean): string {
 	const usage = (column: string, alias = column) =>
 		`if(c.observations = 0, NULL, c.${column}) AS ${alias}`;
 	const tokenCount = (column: string) =>
 		`if(c.observations = 0, NULL, toString(c.${column})) AS ${column}`;
-	return {
-		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
-		query: `WITH ${runFactsCtes({ literal: true })},
+	return `WITH ${runFactsCtes({ literal: true })},
 			${runContextCtes()},
-			${usageEventCtes({ generation: true })},
+			${usageEventCtes({ generation: batch ? "per-session" : true })},
 			${runUsageCtes()}
 			SELECT r.session_id AS session_id, r.agent_id AS agent_id, r.turn_idx AS turn_idx,
 				r.first_record AS start_record, b.boundary AS end_record,
@@ -962,12 +1039,7 @@ export function buildRunIndexStatement(
 			LEFT ANY JOIN codex_streams st ON r.session_id = st.session_id AND r.agent_id = st.agent_id
 			LEFT ANY JOIN run_delegations d ON r.session_id = d.session_id AND r.agent_id = d.agent_id AND r.turn_idx = d.turn_idx
 			LEFT ANY JOIN run_costs c ON r.session_id = c.session_id AND r.agent_id = c.agent_id AND r.turn_idx = c.turn_idx
-			ORDER BY agent_id, start_record`,
-		query_params: {
-			...pinnedParams(scope, [generation]),
-			usageGeneration: generation.usageGeneration,
-		},
-	};
+			ORDER BY ${batch ? "session_id, " : ""}agent_id, start_record`;
 }
 
 /**
@@ -1027,6 +1099,50 @@ export function buildUnattributedUsageStatement(
 	};
 }
 
+export function buildUnattributedUsageBatchStatement(
+	scope: TranscriptReadScope,
+	generations: readonly UsageBoundGeneration[],
+	settings: Record<string, string | number> = {},
+): ClickHouseStatement {
+	return {
+		clickhouse_settings: { ...ANALYSIS_QUERY_SETTINGS, ...settings },
+		query: `WITH ${forkReplayCtes()}, ${boundedRunsCte(FORK_REPLAY_FILTER)},
+			${usageEventCtes({ generation: "per-session" })},
+			${runUsageCtes()},
+			unattributed_models AS (
+				SELECT e.session_id AS session_id, ${modelUsageColumns()}
+				FROM unassigned_usage e
+				GROUP BY session_id, usage_model
+			),
+			unattributed AS (SELECT session_id, ${usageTotalColumns()} FROM unattributed_models GROUP BY session_id),
+			whole_models AS (
+				SELECT e.session_id AS session_id, ${modelUsageColumns()}
+				FROM resolved_usage e
+				GROUP BY session_id, usage_model
+			),
+			whole AS (SELECT session_id, ${usageTotalColumns()} FROM whole_models GROUP BY session_id),
+			empty AS (SELECT ${usageTotalColumns()} FROM whole_models WHERE 0)
+			SELECT s.session_id AS session_id,
+				if(u.session_id = '', z.observations, u.observations) AS usage_observations,
+				if(u.session_id = '', z.unpriced, u.unpriced) AS usage_unpriced,
+				if(u.session_id = '', z.model, u.model) AS usage_model,
+				if(u.session_id = '' OR u.observations = 0, NULL, u.cost) AS cost_usd,
+				if(u.session_id = '', z.model_costs, u.model_costs) AS model_costs,
+				${TOKEN_KINDS.map((kind) => `if(u.session_id = '' OR u.observations = 0, NULL, toString(u.${kind})) AS ${kind}`).join(", ")},
+				if(u.session_id = '' OR u.observations = 0, NULL, toString(u.context_input_tokens_at_start)) AS context_input_tokens_at_start,
+				if(t.session_id = '', z.observations, t.observations) AS total_observations,
+				if(t.session_id = '', z.unpriced, t.unpriced) AS total_unpriced,
+				if(t.session_id = '', z.cost, t.cost) AS total_cost_usd,
+				${TOKEN_KINDS.map((kind) => `toString(if(t.session_id = '', z.${kind}, t.${kind})) AS total_${kind}`).join(", ")}
+			FROM (SELECT arrayJoin({sessionIds:Array(String)}) AS session_id) s
+			CROSS JOIN empty z
+			LEFT ANY JOIN unattributed u ON s.session_id = u.session_id
+			LEFT ANY JOIN whole t ON s.session_id = t.session_id
+			ORDER BY session_id`,
+		query_params: usageBoundParams(scope, generations),
+	};
+}
+
 /** Characters of a request's last assistant text kept with it. */
 export const REQUEST_TEXT_HEAD_CHARS = 160;
 /** Records a model writes in a response; any other non-meta record is input to the next one. */
@@ -1055,11 +1171,11 @@ const RESPONSE_RECORD_KINDS = "('assistant_text', 'reasoning', 'tool_call')";
  * (RUN_ACTIVITY_SQL): the run's last request does not run on into a
  * compaction a local command added after the answer.
  */
-function runRequestsCtes(): string {
+function runRequestsCtes(batch = false): string {
 	const run = "PARTITION BY session_id, agent_id, turn_idx";
 	const order = "ORDER BY record_idx, block_idx";
 	return `${forkReplayCtes()}, ${boundedRunsCte(FORK_REPLAY_FILTER)},
-			${usageEventCtes({ generation: true })},
+			${usageEventCtes({ generation: batch ? "per-session" : true })},
 			response_lines AS (
 				SELECT session_id, agent_id, record_idx, max(kind IN ${RESPONSE_RECORD_KINDS}) AS response
 				FROM ${records()}
@@ -1180,12 +1296,33 @@ export function buildRunRequestsStatement(
 	scope: TranscriptReadScope,
 	generation: UsageBoundGeneration,
 ): ClickHouseStatement {
-	const tokenCount = (column: string) =>
-		`if(u.observations = 0, NULL, toString(u.${column})) AS ${column}`;
 	return {
 		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
-		query: `WITH ${runRequestsCtes()}
-			SELECT q.agent_id AS agent_id, q.turn_idx AS turn_idx, q.run_start_record AS run_start_record,
+		query: runRequestsSql(false),
+		query_params: {
+			...pinnedParams(scope, [generation]),
+			usageGeneration: generation.usageGeneration,
+		},
+	};
+}
+
+export function buildRunRequestsBatchStatement(
+	scope: TranscriptReadScope,
+	generations: readonly UsageBoundGeneration[],
+	settings: Record<string, string | number> = {},
+): ClickHouseStatement {
+	return {
+		clickhouse_settings: { ...ANALYSIS_QUERY_SETTINGS, ...settings },
+		query: runRequestsSql(true),
+		query_params: usageBoundParams(scope, generations),
+	};
+}
+
+function runRequestsSql(batch: boolean): string {
+	const tokenCount = (column: string) =>
+		`if(u.observations = 0, NULL, toString(u.${column})) AS ${column}`;
+	return `WITH ${runRequestsCtes(batch)}
+			SELECT ${batch ? "q.session_id AS session_id, " : ""}q.agent_id AS agent_id, q.turn_idx AS turn_idx, q.run_start_record AS run_start_record,
 				q.start_record AS start_record, q.end_record AS end_record,
 				q.started_ms AS started_ms, q.ended_ms AS ended_ms, q.calls AS calls,
 				q.texts AS texts, q.text_record AS text_record, q.text_block AS text_block, q.text_head AS text_head,
@@ -1194,12 +1331,7 @@ export function buildRunRequestsStatement(
 				${TOKEN_KINDS.map((kind) => tokenCount(kind)).join(", ")}
 			FROM request_ranges q
 			LEFT ANY JOIN request_usage u ON q.session_id = u.session_id AND q.agent_id = u.agent_id AND q.start_record = u.start_record
-			ORDER BY agent_id, start_record`,
-		query_params: {
-			...pinnedParams(scope, [generation]),
-			usageGeneration: generation.usageGeneration,
-		},
-	};
+			ORDER BY ${batch ? "session_id, " : ""}agent_id, start_record`;
 }
 
 /** Session facts of one generation for its receipt. */
@@ -1223,16 +1355,8 @@ export function buildRunIndexSessionStatement(
 	generation: SessionGeneration,
 	calls?: { readonly ctes: string; readonly sql: string },
 ): ClickHouseStatement {
-	const costState =
-		"agent_id = '' AND kind = 'meta' AND subtype = 'cost-state'";
 	const facts = `SELECT
-				toUnixTimestamp64Milli(anyIf(session_date, record_idx = ${TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX})) AS session_date_ms,
-				argMinIf(facts['thread_source'], record_idx, agent_id = '' AND kind = 'meta' AND subtype = 'session_meta' AND facts['thread_source'] != '') AS thread_source,
-				argMaxIf(facts['title'], tuple(record_idx, block_idx), agent_id = '' AND kind = 'meta' AND subtype = 'ai-title' AND facts['title'] != '') AS title,
-				argMaxIf(mapFilter((k, v) -> k IN (${COST_STATE_KEYS.map((key) => `'${key}'`).join(", ")}), facts), tuple(record_idx, block_idx), ${costState}) AS cost_state,
-				-- In a tuple, so a NULL duration stays the last record's, not an earlier one's.
-				tupleElement(argMaxIf(tuple(duration_ms), tuple(record_idx, block_idx), ${costState}), 1) AS cost_state_duration_ms,
-				countIf(${costState}) AS has_cost_state
+				${sessionFactsColumns()}
 			FROM ${records()}
 			WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
 				AND session_id = {sessionId:String} AND revision = toUInt64({revision:String})
@@ -1258,6 +1382,48 @@ export function buildRunIndexSessionStatement(
 			SELECT f.*, k.calls AS calls
 			FROM (${facts}) AS f CROSS JOIN (${calls.sql}) AS k`,
 		query_params: { ...pinnedParams(scope, [generation]), ...params },
+	};
+}
+
+function sessionFactsColumns(): string {
+	const costState =
+		"agent_id = '' AND kind = 'meta' AND subtype = 'cost-state'";
+	return `toUnixTimestamp64Milli(anyIf(session_date, record_idx = ${TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX})) AS session_date_ms,
+				argMinIf(facts['thread_source'], record_idx, agent_id = '' AND kind = 'meta' AND subtype = 'session_meta' AND facts['thread_source'] != '') AS thread_source,
+				argMaxIf(facts['title'], tuple(record_idx, block_idx), agent_id = '' AND kind = 'meta' AND subtype = 'ai-title' AND facts['title'] != '') AS title,
+				argMaxIf(mapFilter((k, v) -> k IN (${COST_STATE_KEYS.map((key) => `'${key}'`).join(", ")}), facts), tuple(record_idx, block_idx), ${costState}) AS cost_state,
+				-- In a tuple, so a NULL duration stays the last record's, not an earlier one's.
+				tupleElement(argMaxIf(tuple(duration_ms), tuple(record_idx, block_idx), ${costState}), 1) AS cost_state_duration_ms,
+				countIf(${costState}) AS has_cost_state`;
+}
+
+export function buildRunIndexSessionBatchStatement(
+	scope: TranscriptReadScope,
+	generations: readonly SessionGeneration[],
+	calls: { readonly ctes: string; readonly sql: string },
+	settings: Record<string, string | number> = {},
+): ClickHouseStatement {
+	return {
+		clickhouse_settings: {
+			...ANALYSIS_QUERY_SETTINGS,
+			max_result_bytes: SESSION_CALLS_MAX_RESULT_BYTES,
+			...settings,
+		},
+		query: `WITH ${calls.ctes}
+			SELECT f.*, k.calls AS calls
+			FROM (
+				SELECT session_id,
+					${sessionFactsColumns()}
+				FROM ${records()}
+				WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
+					AND session_id IN {sessionIds:Array(String)}
+					AND (session_id, revision, parser_version) IN (
+						SELECT g.1, toUInt64(g.2), g.3 FROM (SELECT arrayJoin(arrayZip({sessionIds:Array(String)}, {revisions:Array(String)}, {parserVersions:Array(UInt16)})) AS g))
+				GROUP BY session_id
+			) AS f
+			LEFT ANY JOIN (${calls.sql}) AS k ON f.session_id = k.session_id
+			ORDER BY session_id`,
+		query_params: pinnedParams(scope, generations),
 	};
 }
 
@@ -1306,12 +1472,25 @@ export function buildMcpStateStatement(
 	};
 }
 
-function mcpStateSql(): string {
-	return `SELECT agent_id, turn_idx, argMax(${MCP_UNAVAILABLE}, tuple(record_idx, block_idx)) AS unavailable
+export function buildMcpStateBatchStatement(
+	scope: TranscriptReadScope,
+	generations: readonly SessionGeneration[],
+	settings: Record<string, string | number> = {},
+): ClickHouseStatement {
+	return {
+		clickhouse_settings: { ...ANALYSIS_QUERY_SETTINGS, ...settings },
+		query: mcpStateSql(true),
+		query_params: pinnedParams(scope, generations),
+	};
+}
+
+function mcpStateSql(batch = false): string {
+	const session = batch ? "session_id, " : "";
+	return `SELECT ${session}agent_id, turn_idx, argMax(${MCP_UNAVAILABLE}, tuple(record_idx, block_idx)) AS unavailable
 			FROM ${records()}
 			WHERE ${pinnedFilter()} AND ${MCP_STATE_RECORD}
-			GROUP BY agent_id, turn_idx
-			ORDER BY agent_id, turn_idx`;
+			GROUP BY ${session}agent_id, turn_idx
+			ORDER BY ${session}agent_id, turn_idx`;
 }
 
 /** How a build's directory statements leave out a forked Codex session's replayed calls, as the run facts do. */

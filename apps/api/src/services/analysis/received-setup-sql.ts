@@ -69,7 +69,25 @@ export function buildReceivedSetupStatement(
 ): ClickHouseStatement {
 	return {
 		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
-		query: `SELECT agent_id, record_idx, block_idx, toUnixTimestamp64Milli(ts) AS at_ms, kind, file_path,
+		query: receivedSetupSql(""),
+		query_params: pinnedParams(scope, [generation]),
+	};
+}
+
+export function buildReceivedSetupBatchStatement(
+	scope: TranscriptReadScope,
+	generations: readonly SessionGeneration[],
+	settings: Record<string, string | number> = {},
+): ClickHouseStatement {
+	return {
+		clickhouse_settings: { ...ANALYSIS_QUERY_SETTINGS, ...settings },
+		query: receivedSetupSql("session_id, "),
+		query_params: pinnedParams(scope, generations),
+	};
+}
+
+function receivedSetupSql(session: string): string {
+	return `SELECT ${session}agent_id, record_idx, block_idx, toUnixTimestamp64Milli(ts) AS at_ms, kind, file_path,
 				facts['received_setup'] AS setup, toUInt8(facts['fork_replayed'] = 'true') AS replayed,
 				if(subtype = 'attachment:session_context', facts['environment_snapshot_components'], '') AS environment,
 				toUInt8(has(splitByChar(',', facts['facts_clipped']), 'environment_snapshot_components')) AS environment_clipped
@@ -79,9 +97,7 @@ export function buildReceivedSetupStatement(
 				OR kind = 'compaction'
 				OR (kind = 'file_change' AND file_op IN ('write', 'edit', 'delete'))
 				OR (agent_id = '' AND kind = 'meta' AND subtype = 'attachment:session_context'))
-			ORDER BY agent_id, record_idx, block_idx`,
-		query_params: pinnedParams(scope, [generation]),
-	};
+			ORDER BY ${session}agent_id, record_idx, block_idx`;
 }
 
 /** The build's records as the pure rows function takes them. */

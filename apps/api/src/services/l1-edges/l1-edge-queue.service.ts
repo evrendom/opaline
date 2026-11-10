@@ -188,6 +188,7 @@ export async function claimL1EdgeScopes(
 		leaseMs: number;
 		/** Only this workspace's scopes (tests building their own fixtures). */
 		organizationId?: string;
+		kinds?: readonly L1EdgeScopeKind[];
 	},
 ): Promise<ClaimedL1EdgeScope[]> {
 	const leaseToken = crypto.randomUUID();
@@ -208,6 +209,7 @@ export async function claimL1EdgeScopes(
 				WHERE request_count > built_request_count AND next_attempt_at <= now()
 					AND (lease_expires_at IS NULL OR lease_expires_at <= now())
 					AND ($4::text IS NULL OR organization_id = $4::text)
+					AND ($5::text[] IS NULL OR scope_kind = ANY($5::text[]))
 				ORDER BY priority, next_attempt_at
 				FOR UPDATE SKIP LOCKED
 				LIMIT $1
@@ -237,6 +239,7 @@ export async function claimL1EdgeScopes(
 					leaseToken,
 					options.leaseMs,
 					options.organizationId ?? null,
+					options.kinds ? [...options.kinds] : null,
 				],
 			),
 		)
@@ -266,6 +269,30 @@ export async function holdsL1EdgeLease(
 		[claim.organizationId, claim.scopeKind, claim.scopeId, claim.leaseToken],
 	);
 	return rows.length === 1;
+}
+
+export async function heldL1EdgeLeases(
+	sql: Sql,
+	claims: readonly Pick<
+		ClaimedL1EdgeScope,
+		"organizationId" | "scopeKind" | "scopeId" | "leaseToken"
+	>[],
+): Promise<Set<string>> {
+	if (claims.length === 0) return new Set();
+	const rows = await sql.unsafe<{ scope_id: string }[]>(
+		`SELECT scope.scope_id FROM l1_edge_scope AS scope
+		 JOIN unnest($1::text[], $2::text[], $3::text[], $4::text[]) AS claim(organization_id, scope_kind, scope_id, lease_token)
+			ON scope.organization_id = claim.organization_id AND scope.scope_kind = claim.scope_kind
+			AND scope.scope_id = claim.scope_id AND scope.lease_token = claim.lease_token
+		 WHERE scope.lease_expires_at > now()`,
+		[
+			claims.map((claim) => claim.organizationId),
+			claims.map((claim) => claim.scopeKind),
+			claims.map((claim) => claim.scopeId),
+			claims.map((claim) => claim.leaseToken),
+		],
+	);
+	return new Set(rows.map((row) => row.scope_id));
 }
 
 /** Records a finished build; returns false when the lease was lost. */

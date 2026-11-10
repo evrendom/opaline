@@ -159,32 +159,47 @@ export function buildRunDirectoriesStatement(
 /** Records that carry the directory they were written in. */
 const CWD_RECORDS = `(kind IN ('user_prompt', 'assistant_text', 'tool_call') OR (kind = 'meta' AND startsWith(subtype, 'item_completed:')))`;
 
-function runDirectoriesSql(replay: ForkReplayRules): string {
+export function buildRunDirectoriesBatchStatement(
+	scope: TranscriptReadScope,
+	generations: readonly SessionGeneration[],
+	replay: ForkReplayRules,
+	settings: Record<string, string | number> = {},
+): ClickHouseStatement {
+	return {
+		clickhouse_settings: { ...ANALYSIS_QUERY_SETTINGS, ...settings },
+		query: runDirectoriesSql(replay, true),
+		query_params: pinnedParams(scope, generations),
+	};
+}
+
+function runDirectoriesSql(replay: ForkReplayRules, batch = false): string {
 	const at = "tuple(record_idx, block_idx)";
+	const session = batch ? "session_id, " : "";
+	const call = batch ? "(session_id, call_id)" : "call_id";
 	return `WITH ${replay.ctes},
 		shell_calls AS (
-			SELECT agent_id, call_id,
+			SELECT ${session}agent_id, call_id,
 				argMinIf(turn_idx, ${at}, kind = 'tool_call') AS turn,
 				minIf(record_idx, kind = 'tool_call') AS first_record,
 				argMinIf(${CD_TARGET_SQL}, ${at}, kind = 'tool_call') AS cd_target,
 				argMinIf(${CALL_CWD}, ${at}, ${HAS_CALL_CWD}) AS recorded_cwd
 			FROM ${records()}
 			WHERE ${pinnedFilter()} AND kind IN ('tool_call', 'tool_result', 'meta') AND call_id != '' AND ${replay.filter}
-				AND call_id IN (SELECT call_id FROM ${records()} WHERE ${pinnedFilter()} AND ${SHELL_CALL})
-			GROUP BY agent_id, call_id
+				AND ${call} IN (SELECT ${session}call_id FROM ${records()} WHERE ${pinnedFilter()} AND ${SHELL_CALL})
+			GROUP BY ${session}agent_id, call_id
 			HAVING countIf(${SHELL_CALL}) > 0 AND turn >= 1
 		)
-		SELECT agent_id, turn AS turn_idx, 1 AS shell, cd_target, recorded_cwd,
+		SELECT ${session}agent_id, turn AS turn_idx, 1 AS shell, cd_target, recorded_cwd,
 			count() AS calls, min(first_record) AS first_record
 		FROM shell_calls
-		GROUP BY agent_id, turn_idx, cd_target, recorded_cwd
+		GROUP BY ${session}agent_id, turn_idx, cd_target, recorded_cwd
 		UNION ALL
-		SELECT agent_id, turn_idx, 0 AS shell, '' AS cd_target,
+		SELECT ${session}agent_id, turn_idx, 0 AS shell, '' AS cd_target,
 			argMin(${FIRST_CWD}, ${at}) AS recorded_cwd, 0 AS calls, min(record_idx) AS first_record
 		FROM ${records()}
 		WHERE ${pinnedFilter()} AND turn_idx >= 1 AND ${CWD_RECORDS}
 			AND facts['fork_replayed'] != 'true' AND ${HAS_FIRST_CWD}
-		GROUP BY agent_id, turn_idx`;
+		GROUP BY ${session}agent_id, turn_idx`;
 }
 
 /**
@@ -216,11 +231,58 @@ export function buildDirectoryEvidenceStatement(
 	};
 }
 
-function directoryEvidenceSql(replay: ForkReplayRules): string {
+export function buildDirectoryEvidenceBatchStatement(
+	scope: TranscriptReadScope,
+	generations: readonly SessionGeneration[],
+	sessions: ReadonlyMap<string, { projectPath: string; gitBranch: string }>,
+	replay: ForkReplayRules,
+	settings: Record<string, string | number> = {},
+): ClickHouseStatement {
+	const branches = generations.map((generation) => {
+		const session = sessions.get(generation.sessionId) ?? {
+			projectPath: "",
+			gitBranch: "",
+		};
+		return session.gitBranch === "HEAD" || session.projectPath === ""
+			? { projectPath: session.projectPath, gitBranch: "" }
+			: session;
+	});
+	return {
+		clickhouse_settings: { ...ANALYSIS_QUERY_SETTINGS, ...settings },
+		query: directoryEvidenceSql(replay, true),
+		query_params: {
+			...pinnedParams(scope, generations),
+			projectPaths: branches.map((branch) => branch.projectPath),
+			gitBranches: branches.map((branch) => branch.gitBranch),
+		},
+	};
+}
+
+function directoryEvidenceSql(replay: ForkReplayRules, batch = false): string {
 	const at = "tuple(record_idx, block_idx)";
 	const output = "if(empty(text), concat(head, '\\n', tail), text)";
+	const session = batch ? "session_id, " : "";
+	const call = batch ? "(session_id, call_id)" : "call_id";
+	const branch = batch
+		? `SELECT 'session_branch' AS evidence, session_id, '' AS agent_id, min(record_idx) AS first_record, '' AS cd_target,
+			any(${RECORDED_CWD}) AS recorded_cwd, '' AS command, '' AS output
+		FROM ${records()}
+		WHERE ${pinnedFilter()} AND source = 'claude_code'
+			AND kind IN ('user_prompt', 'tool_call')
+			AND (session_id, ${RECORDED_CWD}, ${componentValue("git_branch_components")}) IN (
+				SELECT b.1, b.2, b.3 FROM (SELECT arrayJoin(arrayZip({sessionIds:Array(String)}, {projectPaths:Array(String)}, {gitBranches:Array(String)})) AS b)
+				WHERE b.3 != '')
+		GROUP BY session_id`
+		: `SELECT 'session_branch' AS evidence, '' AS agent_id, min(record_idx) AS first_record, '' AS cd_target,
+			{projectPath:String} AS recorded_cwd, '' AS command, '' AS output
+		FROM ${records()}
+		WHERE ${pinnedFilter()} AND source = 'claude_code' AND {gitBranch:String} != ''
+			AND kind IN ('user_prompt', 'tool_call')
+			AND ${RECORDED_CWD} = {projectPath:String}
+			AND ${componentValue("git_branch_components")} = {gitBranch:String}
+		HAVING count() > 0`;
 	return `WITH ${replay.ctes}
-		SELECT 'call' AS evidence, agent_id, minIf(record_idx, kind = 'tool_call') AS first_record,
+		SELECT 'call' AS evidence, ${session}agent_id, minIf(record_idx, kind = 'tool_call') AS first_record,
 			argMinIf(${CD_TARGET_SQL}, ${at}, kind = 'tool_call') AS cd_target,
 			argMinIf(${CALL_CWD}, ${at}, ${HAS_CALL_CWD}) AS recorded_cwd,
 			argMinIf(${COMMAND_TEXT}, ${at}, kind = 'tool_call') AS command,
@@ -230,26 +292,19 @@ function directoryEvidenceSql(replay: ForkReplayRules): string {
 				kind = 'tool_result'))), '\\n') AS output
 		FROM ${records()}
 		WHERE ${pinnedFilter()} AND kind IN ('tool_call', 'tool_result', 'meta') AND call_id != '' AND ${replay.filter}
-			AND call_id IN (SELECT call_id FROM ${records()} WHERE ${pinnedFilter()} AND ${SHELL_CALL}
+			AND ${call} IN (SELECT ${session}call_id FROM ${records()} WHERE ${pinnedFilter()} AND ${SHELL_CALL}
 				AND match(${COMMAND_TEXT}, ${EVIDENCE_COMMAND}))
-		GROUP BY agent_id, call_id
+		GROUP BY ${session}agent_id, call_id
 		HAVING countIf(${SHELL_CALL}) > 0
 		UNION ALL
-		SELECT 'codex_session_meta' AS evidence, agent_id, min(record_idx) AS first_record, '' AS cd_target,
+		SELECT 'codex_session_meta' AS evidence, ${session}agent_id, min(record_idx) AS first_record, '' AS cd_target,
 			argMin(facts['git_remote_cwd'], record_idx) AS recorded_cwd, '' AS command,
 			argMin(facts['git_remote'], record_idx) AS output
 		FROM ${records()}
 		WHERE ${pinnedFilter()} AND source = 'codex' AND kind = 'meta' AND subtype = 'session_meta'
-		GROUP BY agent_id
+		GROUP BY ${session}agent_id
 		UNION ALL
-		SELECT 'session_branch' AS evidence, '' AS agent_id, min(record_idx) AS first_record, '' AS cd_target,
-			{projectPath:String} AS recorded_cwd, '' AS command, '' AS output
-		FROM ${records()}
-		WHERE ${pinnedFilter()} AND source = 'claude_code' AND {gitBranch:String} != ''
-			AND kind IN ('user_prompt', 'tool_call')
-			AND ${RECORDED_CWD} = {projectPath:String}
-			AND ${componentValue("git_branch_components")} = {gitBranch:String}
-		HAVING count() > 0`;
+		${branch}`;
 }
 
 /** The SQL and bases the directory columns are read with, for the build fingerprint. */
