@@ -4,6 +4,10 @@ import { Link } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
+import {
+	pollUnlessPushed,
+	useSessionArrivalsLive,
+} from "@/features/sessions/session-arrivals-live";
 import { getSessionTimestamp } from "@/features/sessions/session-ordering";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { DockedSupportEmailButton } from "@/features/support/SupportEmailButton";
@@ -64,10 +68,11 @@ export function LastSessionUploadBar() {
 	// The demo's static render must match its hydration on any machine, so it
 	// shows UTC until Explore, then the visitor's own time.
 	const fixedFormat = demo !== null && !demo.live;
+	const pushed = useSessionArrivalsLive();
 	const query = useAnalyticsQuery(
 		orpc.analytics.sessions.lastUpload.queryOptions({
 			staleTime: 60_000,
-			refetchInterval: 60_000,
+			refetchInterval: pollUnlessPushed(pushed, 60_000),
 		}),
 	);
 	const latest = query.data;

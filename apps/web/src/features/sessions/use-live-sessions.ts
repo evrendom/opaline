@@ -6,14 +6,15 @@ import { client, orpc } from "@/lib/orpc";
 import { sessionDetailInitialQueryOptions } from "./components/session-detail-fast-query";
 import {
 	LIVE_SESSION_IDLE_POLL_INTERVAL_MS,
-	LIVE_SESSION_LIST_POLL_INTERVAL_MS,
 	LIVE_SESSION_POLL_INTERVAL_MS,
 	type LiveSessionState,
 	type LiveSessionTail,
+	liveSessionListPollInterval,
 	liveSessionPollInterval,
 	mergeLiveSessionTail,
 	readLiveSessionState,
 } from "./live-session-model";
+import { useSessionArrivalsLive } from "./session-arrivals-live";
 
 /** How often a view's "active 12s ago" and running state are re-read. */
 const LIVE_STATE_CLOCK_MS = 30_000;
@@ -33,6 +34,7 @@ export function useLiveSessionList({
 	poll?: boolean | number;
 } = {}) {
 	const available = useLiveSessionsAvailable();
+	const pushed = useSessionArrivalsLive();
 	const { state: organization } = useOrganization();
 	const organizationId = organization.activeOrg?.id;
 	const options = orpc.analytics.sessions.liveList.queryOptions();
@@ -40,7 +42,12 @@ export function useLiveSessionList({
 		...options,
 		queryKey: ["org", organizationId, ...options.queryKey],
 		enabled: enabled && available && !!organizationId,
-		refetchInterval: poll === true ? LIVE_SESSION_LIST_POLL_INTERVAL_MS : poll,
+		refetchInterval: (current) =>
+			liveSessionListPollInterval(
+				poll,
+				current.state.data?.sessions.length ?? 0,
+				pushed,
+			),
 		retry: false,
 	});
 	return {

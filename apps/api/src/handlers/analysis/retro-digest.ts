@@ -5,8 +5,12 @@ import {
 	shardWindows,
 } from "../../services/analysis/patterns-sql.js";
 import {
+	childBudget,
+	inOrder,
+	joinBudgets,
 	LimitRefusal,
 	limitRefusal,
+	partConcurrency,
 	runSplit,
 	type SplitBudget,
 	splitBudget,
@@ -138,6 +142,7 @@ export async function runDigest(
 		name: keyof typeof STATEMENT_NAMES,
 		into: DigestPart,
 		build: (window: MeasureParams, piece: boolean) => readonly string[],
+		own: SplitBudget = budget,
 	): Promise<Row> => {
 		const row: Row = {};
 		for (const [index, stage] of STATEMENT_NAMES[name].entries()) {
@@ -145,7 +150,7 @@ export async function runDigest(
 				`digest ${stage}`,
 				params,
 				(window, piece) => view(build(window, piece)[index] ?? "", window),
-				budget,
+				own,
 			);
 			if (!outcome.ok) {
 				if (name === "sessions" && index === 0)
@@ -179,30 +184,8 @@ export async function runDigest(
 		users: listed.map((t) => String(t[14])),
 	};
 	const empty = scope.sessions.length === 0;
-	const startDirs = empty
-		? []
-		: await reader.trusted(startDirsStatement(scope));
-	const calls = empty
-		? {}
-		: await part("calls", "calls", (window, piece) =>
-				digestCallsSql(window, piece),
-			);
-	const edits = empty
-		? {}
-		: await part("edits", "edits", (window) => [digestEditsSql(window)]);
-	const usage = empty
-		? {}
-		: await part("usage", "usage", (window) => digestUsageSql(window));
-	const contextSizes = empty
-		? []
-		: await reader.trusted(contextSizesStatement(scope));
-	const runs = empty
-		? {}
-		: joinDigestRuns(
-				await part("runs", "runs", (window) => digestRunsSql(window)),
-			);
 	const partial = new Map<DigestPart, string[]>();
-	const severityShards = async (): Promise<Row[]> => {
+	const severityShards = async (own: SplitBudget): Promise<Row[]> => {
 		const rows: Row[] = [];
 		const failed: string[] = [];
 		let read = 0;
@@ -212,7 +195,7 @@ export async function runDigest(
 					`digest severity ${rule} ${shard.from}..${shard.to}`,
 					shard,
 					(window) => view(digestSeveritySql(window)[index] ?? "", window),
-					budget,
+					own,
 				);
 				if (!outcome.ok) {
 					failed.push(outcome.line);
@@ -224,10 +207,8 @@ export async function runDigest(
 		if (failed.length) (read ? partial : unknown).set("severity", failed);
 		return rows;
 	};
-	const severity = empty ? [] : await severityShards();
-	const patterns: Row[] = [];
 	const approximate: string[] = [];
-	if (!empty) {
+	const listPatterns = async (own: SplitBudget): Promise<Row[]> => {
 		const statement = patternStatement(
 			{ action: "list", ...input, minCount: 2, limit: 100 },
 			today,
@@ -235,28 +216,49 @@ export async function runDigest(
 		);
 		const rows: Row[] = [];
 		const merged = new Map<string, string>();
-		for (const query of statement.parts.queries) {
-			const split = query.split;
-			if (!split) {
-				rows.push(
-					...(await reader.view(
-						query.query,
-						query.cohort ?? cohort,
-						query.rows,
-					)),
-				);
+		const outcomes = await inOrder(
+			statement.parts.queries.map((query) => async () => {
+				const piece = childBudget(own);
+				const split = query.split;
+				if (!split)
+					return {
+						query,
+						piece,
+						rows: await reader.view(
+							query.query,
+							query.cohort ?? cohort,
+							query.rows,
+						),
+					};
+				return {
+					query,
+					piece,
+					outcome: await runSplit(
+						`digest ${split.stage}`,
+						split.window,
+						(window, part) => {
+							const built = part ? split.build(window) : query;
+							return reader.view(
+								built.query,
+								built.cohort ?? cohort,
+								built.rows,
+							);
+						},
+						piece,
+						split.approximate ? { approximate: split.approximate } : {},
+					),
+				};
+			}),
+			1,
+		);
+		for (const done of outcomes) {
+			joinBudgets(own, [done.piece]);
+			const split = done.query.split;
+			if (!split || !done.outcome) {
+				rows.push(...(done.rows ?? []));
 				continue;
 			}
-			const outcome = await runSplit(
-				`digest ${split.stage}`,
-				split.window,
-				(window, piece) => {
-					const built = piece ? split.build(window) : query;
-					return reader.view(built.query, built.cohort ?? cohort, built.rows);
-				},
-				budget,
-				split.approximate ? { approximate: split.approximate } : {},
-			);
+			const outcome = done.outcome;
 			if (!outcome.ok) {
 				unknown.set("patterns", [
 					...(unknown.get("patterns") ?? []),
@@ -285,16 +287,58 @@ export async function runDigest(
 				known.add(String(rid));
 			cited.set(id, known);
 		}
-		patterns.push(
-			...statement.parts.merge(rows).map((row) => ({
-				...row,
-				rids: [...(cited.get(String(row.id)) ?? [])],
-				...(merged.has(String(row.kind))
-					? { merged: merged.get(String(row.kind)) }
-					: {}),
-			})),
-		);
-	}
+		return statement.parts.merge(rows).map((row) => ({
+			...row,
+			rids: [...(cited.get(String(row.id)) ?? [])],
+			...(merged.has(String(row.kind))
+				? { merged: merged.get(String(row.kind)) }
+				: {}),
+		}));
+	};
+	const steps = {
+		startDirs: (_own: SplitBudget) => reader.trusted(startDirsStatement(scope)),
+		calls: (own: SplitBudget) =>
+			part(
+				"calls",
+				"calls",
+				(window, piece) => digestCallsSql(window, piece),
+				own,
+			),
+		edits: (own: SplitBudget) =>
+			part("edits", "edits", (window) => [digestEditsSql(window)], own),
+		usage: (own: SplitBudget) =>
+			part("usage", "usage", (window) => digestUsageSql(window), own),
+		contextSizes: (_own: SplitBudget) =>
+			reader.trusted(contextSizesStatement(scope)),
+		runs: async (own: SplitBudget) =>
+			joinDigestRuns(
+				await part("runs", "runs", (window) => digestRunsSql(window), own),
+			),
+		severity: severityShards,
+		patterns: listPatterns,
+	};
+	const read = empty
+		? null
+		: await inOrder(
+				Object.values(steps).map((step) => async () => {
+					const own = childBudget(budget);
+					return { own, value: await step(own) };
+				}),
+				partConcurrency(),
+			);
+	for (const done of read ?? []) joinBudgets(budget, [done.own]);
+	const value = <K extends keyof typeof steps>(name: K) =>
+		read?.[Object.keys(steps).indexOf(name)]?.value as
+			| Awaited<ReturnType<(typeof steps)[K]>>
+			| undefined;
+	const startDirs = value("startDirs") ?? [];
+	const calls = value("calls") ?? {};
+	const edits = value("edits") ?? {};
+	const usage = value("usage") ?? {};
+	const contextSizes = value("contextSizes") ?? [];
+	const runs = value("runs") ?? {};
+	const severity = value("severity") ?? [];
+	const patterns: Row[] = value("patterns") ?? [];
 	const inputs = {
 		sessions,
 		calls,

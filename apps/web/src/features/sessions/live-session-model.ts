@@ -14,6 +14,19 @@ export const LIVE_SESSION_POLL_INTERVAL_MS = 2_000;
 /** A live session that went quiet without ending, or a failed request, is asked again this often. */
 export const LIVE_SESSION_IDLE_POLL_INTERVAL_MS = 30_000;
 export const LIVE_SESSION_LIST_POLL_INTERVAL_MS = 5_000;
+export const LIVE_SESSION_LIST_PUSHED_POLL_INTERVAL_MS = 60_000;
+
+export function liveSessionListPollInterval(
+	poll: boolean | number,
+	running: number,
+	pushed: boolean,
+): number | false {
+	if (poll === false) return false;
+	const every = poll === true ? LIVE_SESSION_LIST_POLL_INTERVAL_MS : poll;
+	return running > 0 || !pushed
+		? every
+		: Math.max(every, LIVE_SESSION_LIST_PUSHED_POLL_INTERVAL_MS);
+}
 
 /**
  * What the page holds of a live session: the session, where each of its

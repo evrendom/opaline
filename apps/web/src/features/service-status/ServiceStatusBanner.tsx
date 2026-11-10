@@ -1,19 +1,25 @@
 import { IconAlertTriangle } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchServiceStatus } from "@/features/service-status/service-status";
+import {
+	pollUnlessPushed,
+	useSessionArrivalsLive,
+} from "@/features/sessions/session-arrivals-live";
 import { getApiBaseUrl } from "@/lib/api-base-url";
 
 const HEALTHY_POLL_MS = 60_000;
+const PUSHED_POLL_MS = 5 * 60_000;
 const DEGRADED_POLL_MS = 15_000;
 
 export function ServiceStatusBanner() {
+	const pushed = useSessionArrivalsLive();
 	const { data: status } = useQuery({
 		queryKey: ["service-status"],
 		queryFn: ({ signal }) => fetchServiceStatus(getApiBaseUrl(), signal),
 		refetchInterval: (query) =>
 			query.state.data === "analytics-unavailable"
 				? DEGRADED_POLL_MS
-				: HEALTHY_POLL_MS,
+				: pollUnlessPushed(pushed, HEALTHY_POLL_MS, PUSHED_POLL_MS),
 		refetchOnWindowFocus: true,
 		retry: false,
 		staleTime: DEGRADED_POLL_MS,

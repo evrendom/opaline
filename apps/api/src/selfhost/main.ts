@@ -95,6 +95,7 @@ async function main(): Promise<void> {
 		jobs: scheduler.selfHostedJobs(),
 		lock: scheduler.leaseJobLock(sqlClient),
 		cronSecret: config.cronSecret,
+		pending: scheduler.postgresPendingWork(sqlClient),
 	});
 	if (jobs.jobs.includes("r2-ingest"))
 		registerR2IngestCleanupWorker({

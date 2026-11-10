@@ -11,8 +11,12 @@ import {
 	runDigest,
 } from "../../handlers/analysis/retro-digest.js";
 import {
+	childBudget,
 	halves,
+	inOrder,
+	joinBudgets,
 	LimitRefusal,
+	partConcurrency,
 	runSplit,
 	SPLIT_STATEMENTS,
 	splitBudget,
@@ -817,5 +821,163 @@ describe("one query of the quota per tool call", () => {
 			),
 		});
 		expect(queries).toEqual([]);
+	});
+});
+
+describe("a self-hosted server runs independent statements two at a time", () => {
+	const selfHosted = async <T>(work: () => Promise<T>): Promise<T> => {
+		const previous = process.env.OPALINE_SELF_HOSTED;
+		process.env.OPALINE_SELF_HOSTED = "1";
+		try {
+			return await work();
+		} finally {
+			if (previous === undefined) delete process.env.OPALINE_SELF_HOSTED;
+			else process.env.OPALINE_SELF_HOSTED = previous;
+		}
+	};
+	const jitter = (query: string) =>
+		new Promise((resolve) =>
+			setTimeout(resolve, query.length % 7 === 0 ? 0 : (query.length % 5) + 1),
+		);
+
+	test("inOrder keeps the order, runs at most the given number at once, and throws the first failure in order", async () => {
+		let running = 0;
+		let most = 0;
+		const task =
+			(value: number, ms: number, fail = false) =>
+			async () => {
+				running++;
+				most = Math.max(most, running);
+				await Bun.sleep(ms);
+				running--;
+				if (fail) throw new Error(`failed ${value}`);
+				return value;
+			};
+		expect(
+			await inOrder([task(1, 15), task(2, 1), task(3, 5), task(4, 1)], 2),
+		).toEqual([1, 2, 3, 4]);
+		expect(most).toBe(2);
+		await expect(
+			inOrder([task(1, 20, true), task(2, 1, true), task(3, 1)], 2),
+		).rejects.toThrow("failed 1");
+		expect(await inOrder([], 2)).toEqual([]);
+		expect(partConcurrency()).toBe(1);
+		expect(await selfHosted(async () => partConcurrency())).toBe(2);
+	});
+
+	test("child budgets keep each stage's notes and join them in stage order", () => {
+		const budget = splitBudget({ now: () => 0 });
+		const first = childBudget(budget);
+		const second = childBudget(budget);
+		second.notes.push("second");
+		first.notes.push("first");
+		first.partial.push("partial first");
+		expect(first.deadline).toBe(budget.deadline);
+		joinBudgets(budget, [first, second]);
+		expect(budget.notes).toEqual(["first", "second"]);
+		expect(budget.partial).toEqual(["partial first"]);
+	});
+
+	test("patterns list: the same rows and notices with refused and split families", async () => {
+		const list = async () => {
+			let running = 0;
+			let most = 0;
+			const { env } = gateway((window, query) => {
+				if (!window) return [];
+				if (windowDays(window) > 20)
+					return refusal(query.includes("th_ev") ? TIME : MEMORY);
+				if (query.includes("in_ev")) return refusal(MEMORY);
+				return [];
+			});
+			const query = env.executor.query;
+			env.executor.query = async <T>(statement: ClickHouseStatement) => {
+				running++;
+				most = Math.max(most, running);
+				await jitter(statement.query);
+				try {
+					return await query<T>(statement);
+				} finally {
+					running--;
+				}
+			};
+			const outcome = await runSql(
+				caller,
+				patternStatement(
+					{ action: "list", ...month, minCount: 2, limit: 20 },
+					today,
+				),
+				env,
+			);
+			if (!outcome.ok) throw new Error(outcome.error.message);
+			const { id: _id, ...result } = outcome.result;
+			return { result, most };
+		};
+		const one = await list();
+		const two = await selfHosted(list);
+		expect(one.most).toBe(1);
+		expect(two.most).toBe(2);
+		expect(two.result).toEqual(one.result);
+		expect(one.result.notices.length).toBeGreaterThan(2);
+	});
+
+	test("digest: the same text with refused, split and partial stages", async () => {
+		const digest = async () => {
+			let running = 0;
+			let most = 0;
+			const result = await runDigest(
+				{
+					workspaceId: "ws-1",
+					view: async (query, cohort) => {
+						running++;
+						most = Math.max(most, running);
+						try {
+							await jitter(query + cohort);
+							if (query.includes("p.uid)) AS sessions"))
+								return [{ sessions: [DIGEST_SESSION] }];
+							if (query.includes("notEmpty(e.changed_files)")) throw memory();
+							if (
+								query.includes("AS ranked") &&
+								windowDays(windowOf(cohort) ?? month) > 1
+							)
+								throw memory();
+							if (query.includes("AS severity")) {
+								if ((windowOf(cohort)?.from ?? "") >= "2026-10-27")
+									throw memory();
+								return [
+									{
+										severity: [
+											[
+												"destructive",
+												"git reset --hard",
+												2,
+												1,
+												[["s1#1", "git reset --hard"]],
+											],
+										],
+									},
+								];
+							}
+							return [];
+						} finally {
+							running--;
+						}
+					},
+					trusted: async () => [],
+				},
+				{ from: "2026-10-20", to: "2026-11-02" },
+				today,
+			);
+			return {
+				text: result.text.replace(/, \d+(\.\d+)? s\n/u, "\n"),
+				most,
+			};
+		};
+		const one = await digest();
+		const two = await selfHosted(digest);
+		expect(one.most).toBe(1);
+		expect(two.most).toBe(2);
+		expect(two.text).toEqual(one.text);
+		expect(one.text).toContain("lower bound, a window is missing");
+		expect(one.text).toContain("unknown, not 0: digest edits refused");
 	});
 });

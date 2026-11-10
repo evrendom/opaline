@@ -1,3 +1,5 @@
+import { isSelfHosted } from "../../lib/self-hosted.js";
+import { AGENT_QUERY_LIMITS } from "./agent-query-slots.js";
 import type { MeasureParams } from "./retro-measure-sql.js";
 import type { SqlFailure } from "./sql-guard.js";
 
@@ -43,6 +45,59 @@ export function splitBudget(
 		notes: [],
 		partial: [],
 	};
+}
+
+export function partConcurrency(): number {
+	return isSelfHosted() ? AGENT_QUERY_LIMITS.perWorkspace : 1;
+}
+
+export function childBudget(budget: SplitBudget): SplitBudget {
+	return { ...budget, notes: [], partial: [] };
+}
+
+export function joinBudgets(
+	budget: SplitBudget,
+	children: readonly SplitBudget[],
+): void {
+	for (const child of children) {
+		budget.notes.push(...child.notes);
+		budget.partial.push(...child.partial);
+	}
+}
+
+export async function inOrder<T>(
+	tasks: readonly (() => Promise<T>)[],
+	concurrency: number,
+): Promise<T[]> {
+	const settled: PromiseSettledResult<T>[] = new Array(tasks.length);
+	let next = 0;
+	let failed = false;
+	const worker = async () => {
+		while (!failed && next < tasks.length) {
+			const index = next++;
+			const task = tasks[index];
+			if (!task) continue;
+			try {
+				settled[index] = { status: "fulfilled", value: await task() };
+			} catch (reason) {
+				settled[index] = { status: "rejected", reason };
+				failed = true;
+			}
+		}
+	};
+	await Promise.all(
+		Array.from(
+			{ length: Math.max(1, Math.min(concurrency, tasks.length)) },
+			worker,
+		),
+	);
+	const values: T[] = [];
+	for (const outcome of settled) {
+		if (!outcome) break;
+		if (outcome.status === "rejected") throw outcome.reason;
+		values.push(outcome.value);
+	}
+	return values;
 }
 
 const dayOf = (value: string) => Date.parse(`${value}T00:00:00Z`);

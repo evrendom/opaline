@@ -1,12 +1,14 @@
 import {
 	type CSSProperties,
 	type ReactNode,
+	useEffect,
 	useLayoutEffect,
 	useRef,
 } from "react";
 import { Skeleton, SkulletProvider } from "skullet/react";
 import { cn } from "@/lib/utils";
 import "./bones.css";
+import { cancelSkulletAnimations } from "./skullet-animations";
 
 const THEME = {
 	light: { base: "var(--bone)", highlight: "var(--bone-shine)" },
@@ -54,6 +56,10 @@ function useSquircleBars() {
 				root.adoptedStyleSheets = [...root.adoptedStyleSheets, squircleBars];
 		}
 	});
+	useEffect(() => {
+		if (!host.current) return;
+		return cancelSkulletAnimations(host.current);
+	}, []);
 	return host;
 }
 

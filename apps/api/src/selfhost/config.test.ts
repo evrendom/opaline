@@ -42,6 +42,24 @@ test("defaults: loopback on port 4100, the public origin is the app origin, and 
 		ALLOWED_ORIGIN: "http://localhost:4100",
 		CRON_SECRET: config.cronSecret,
 		NODE_ENV: "production",
+		USAGE_EVENT_ANALYTICS_CUTOVER_MODE: "all",
+		USAGE_ROLLUP_ORG_IDS: "all",
+		USAGE_ROLLUP_BACKFILL_ENABLED: "1",
+		SKILL_ANALYTICS_CUTOVER_MODE: "all",
+	});
+});
+
+test("the read paths production turns on by environment are on, and the environment still wins", () => {
+	const { env } = readSelfHostConfig({
+		...base,
+		USAGE_ROLLUP_ORG_IDS: "",
+		USAGE_EVENT_ANALYTICS_CUTOVER_MODE: "off",
+	});
+	expect(env).toMatchObject({
+		USAGE_EVENT_ANALYTICS_CUTOVER_MODE: "off",
+		USAGE_ROLLUP_ORG_IDS: "all",
+		USAGE_ROLLUP_BACKFILL_ENABLED: "1",
+		SKILL_ANALYTICS_CUTOVER_MODE: "all",
 	});
 });
 
