@@ -1,6 +1,7 @@
-import { type CSSProperties, useLayoutEffect, useRef } from "react";
+import { type CSSProperties, useEffect, useLayoutEffect, useRef } from "react";
 import { SkeletonBox } from "skullet/react";
 import { cn } from "@/lib/utils";
+import { cancelSkulletAnimations } from "./skullet-animations";
 
 const SIZED_BY_CLASS: CSSProperties = {
 	borderRadius: undefined,
@@ -28,6 +29,10 @@ function Skeleton({
 			if (value === false || value == null) bar.removeAttribute(name);
 			else bar.setAttribute(name, value === true ? "" : String(value));
 	}, [forwarded]);
+	useEffect(() => {
+		if (!host.current) return;
+		return cancelSkulletAnimations(host.current);
+	}, []);
 	return (
 		<span ref={host} className="contents">
 			<SkeletonBox
