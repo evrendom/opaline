@@ -1,6 +1,8 @@
 import { type RefObject, useLayoutEffect, useRef } from "react";
 import type { ReaderLayout } from "../detail/reader-layout";
 import {
+	drawsFromModel,
+	MAP_MODEL_EVENT,
 	readerScrollerOf,
 	sessionModelIn,
 	turnElementsIn,
@@ -14,6 +16,7 @@ import {
 import {
 	continuesDrawn,
 	type PageSpans,
+	prefixMapping,
 	readSpans,
 	spanMapping,
 } from "./session-reader-minimap-hold";
@@ -84,8 +87,11 @@ export function attachSessionMap({
 	let drawnSpans: PageSpans | null = null;
 	let nowSpans: PageSpans | null = null;
 	let mapping: ReturnType<typeof spanMapping> = null;
+	let fromModel = false;
 	const remap = () => {
-		mapping = spanMapping(drawnSpans, nowSpans);
+		mapping = fromModel
+			? prefixMapping(drawnSpans, nowSpans)
+			: spanMapping(drawnSpans, nowSpans);
 		refs.toPage.current = mapping?.toNow ?? null;
 	};
 	const placeView = () => {
@@ -111,6 +117,7 @@ export function attachSessionMap({
 		timer = 0;
 		nowSpans = readSpans(scroller);
 		const model = sessionModelIn(scroller);
+		if (drawsFromModel(scroller) && (!model || model.length === 0)) return;
 		if (model && model.length > 0) {
 			const modelled = modelMap(model);
 			const scale = map.clientHeight / Math.max(modelled.spans.end, 1);
@@ -129,6 +136,7 @@ export function attachSessionMap({
 				if (next.parts.length > 0) refs.drawnOnce.current = true;
 			}
 			refs.session.current = last;
+			fromModel = true;
 			drawnSpans = modelled.spans;
 			remap();
 			placeView();
@@ -213,12 +221,14 @@ export function attachSessionMap({
 	resize.observe(scroller);
 	resize.observe(content);
 	scroller.addEventListener("scroll", onScroll, { passive: true });
+	scroller.addEventListener(MAP_MODEL_EVENT, draw);
 	return {
 		redraw: settle,
 		stop: () => {
 			refs.toPage.current = null;
 			resize.disconnect();
 			scroller.removeEventListener("scroll", onScroll);
+			scroller.removeEventListener(MAP_MODEL_EVENT, draw);
 			window.clearTimeout(timer);
 			box.hold();
 		},

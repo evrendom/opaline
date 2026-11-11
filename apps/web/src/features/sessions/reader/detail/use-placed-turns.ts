@@ -1,7 +1,15 @@
 import type { LegendListRef } from "@legendapp/list/react";
-import type { SessionDetailTurnSummary } from "@rudel/api-routes";
-import { type RefObject, useLayoutEffect, useRef } from "react";
-import { type ModelTurn, setPlacedTurns, setSessionModel } from "../reader-dom";
+import type {
+	SessionDetailTurnShape,
+	SessionDetailTurnSummary,
+} from "@rudel/api-routes";
+import { type RefObject, useLayoutEffect, useMemo, useRef } from "react";
+import {
+	MAP_MODEL_EVENT,
+	type ModelTurn,
+	setPlacedTurns,
+	setSessionModel,
+} from "../reader-dom";
 import { estimateTurnPx, TURN_GAP_PX } from "./reader-turns-pending";
 
 const MEMBER_BASE_PX = 48;
@@ -15,35 +23,84 @@ const timeOf = (value: string | null | undefined) => {
 	return Number.isFinite(ms) ? ms : undefined;
 };
 
-export function modelTurns(
+type ModelInput = {
+	apology: boolean;
+	endedAt: string | null;
+	errorAt: readonly string[];
+	errorCount: number;
+	frustrated: boolean;
+	hidden: boolean;
+	startedAt: string | null;
+	subagents: readonly { at: string; subagentId?: string }[];
+	toolCallCount: number;
+	turnId: string;
+	userCharacterCount: number;
+};
+
+function inputsOf(
+	shapes: readonly SessionDetailTurnShape[] | undefined,
 	turns: readonly SessionDetailTurnSummary[],
 	isFrustrated: (turn: SessionDetailTurnSummary) => boolean,
 	isTurnHidden: (turn: SessionDetailTurnSummary) => boolean,
+): ModelInput[] {
+	const loaded = new Map(turns.map((turn) => [turn.turnId, turn]));
+	if (shapes)
+		return shapes.map((shape) => {
+			const turn = loaded.get(shape.turnId);
+			return {
+				...shape,
+				frustrated: turn ? isFrustrated(turn) : shape.negative,
+				hidden: turn ? isTurnHidden(turn) : false,
+			};
+		});
+	return turns.map((turn) => ({
+		apology: (turn.modelApologyCount ?? turn.modelSignalCount) > 0,
+		endedAt: turn.endedAt,
+		errorAt: turn.errorEvents.map((event) => event.at),
+		errorCount: turn.errorCount,
+		frustrated: isFrustrated(turn),
+		hidden: isTurnHidden(turn),
+		startedAt: turn.startedAt,
+		subagents: turn.subagentEvents ?? [],
+		toolCallCount: turn.toolCallCount,
+		turnId: turn.turnId,
+		userCharacterCount: turn.userCharacterCount ?? 0,
+	}));
+}
+
+export function modelTurns(
+	inputs: readonly ModelInput[],
 	subagentSeconds: ReadonlyMap<string, number>,
 ): ModelTurn[] {
-	return turns.map((turn) => {
+	return inputs.map((turn) => {
 		const member = Math.min(
 			MEMBER_BASE_PX +
-				Math.ceil((turn.userCharacterCount ?? 0) / MEMBER_LINE_CHARS) *
-					MEMBER_LINE_PX,
+				Math.ceil(turn.userCharacterCount / MEMBER_LINE_CHARS) * MEMBER_LINE_PX,
 			MEMBER_MAX_PX,
 		);
 		return {
 			endMs: timeOf(turn.endedAt),
-			errors: turn.errorEvents.flatMap((event) => {
-				const ms = timeOf(event.at);
+			errors: turn.errorAt.flatMap((at) => {
+				const ms = timeOf(at);
 				return ms === undefined ? [] : [ms];
 			}),
-			height: Math.max(estimateTurnPx(turn), member + MIN_AGENT_PX),
-			hidden: isTurnHidden(turn),
+			height: Math.max(
+				estimateTurnPx({
+					subagentEvents: turn.subagents,
+					toolCallCount: turn.toolCallCount,
+					turnId: turn.turnId,
+				}),
+				member + MIN_AGENT_PX,
+			),
+			hidden: turn.hidden,
 			marks: {
-				apology: (turn.modelApologyCount ?? turn.modelSignalCount) > 0,
+				apology: turn.apology,
 				errors: turn.errorCount > 0,
-				frustrated: isFrustrated(turn),
+				frustrated: turn.frustrated,
 			},
 			member,
 			startMs: timeOf(turn.startedAt),
-			subagents: (turn.subagentEvents ?? []).flatMap((event) => {
+			subagents: turn.subagents.flatMap((event) => {
 				const startMs = timeOf(event.at);
 				if (startMs === undefined) return [];
 				const seconds = event.subagentId
@@ -63,19 +120,26 @@ export function modelTurns(
 }
 
 export function usePlacedTurns({
+	complete,
 	isFrustrated,
 	isTurnHidden,
 	listRef,
 	scrollElement,
-	subagentSeconds,
+	shapes,
+	subagents,
 	turnElementsRef,
 	turns,
 }: {
+	complete: boolean;
 	isFrustrated: (turn: SessionDetailTurnSummary) => boolean;
 	isTurnHidden: (turn: SessionDetailTurnSummary) => boolean;
 	listRef: RefObject<LegendListRef | null>;
 	scrollElement: HTMLElement | null;
-	subagentSeconds: ReadonlyMap<string, number>;
+	shapes: readonly SessionDetailTurnShape[] | undefined;
+	subagents: readonly {
+		durationSeconds?: number | null;
+		subagentId: string;
+	}[];
 	turnElementsRef: RefObject<Map<string, HTMLElement>>;
 	turns: readonly SessionDetailTurnSummary[];
 }): void {
@@ -89,15 +153,29 @@ export function usePlacedTurns({
 		isTurnHidden,
 		turns,
 	};
+	const subagentSeconds = useMemo(
+		() =>
+			new Map(
+				subagents.flatMap((each) =>
+					typeof each.durationSeconds === "number"
+						? [[each.subagentId, each.durationSeconds] as const]
+						: [],
+				),
+			),
+		[subagents],
+	);
 	const modelRef = useRef<{ key: unknown[]; model: ModelTurn[] } | null>(null);
-	const modelKey = [turns, isFrustrated, isTurnHidden, subagentSeconds];
+	const modelKey = [shapes, turns, isFrustrated, isTurnHidden, subagentSeconds];
 	if (
 		!modelRef.current ||
 		modelRef.current.key.some((part, index) => part !== modelKey[index])
 	)
 		modelRef.current = {
 			key: modelKey,
-			model: modelTurns(turns, isFrustrated, isTurnHidden, subagentSeconds),
+			model: modelTurns(
+				inputsOf(shapes, turns, isFrustrated, isTurnHidden),
+				subagentSeconds,
+			),
 		};
 	useLayoutEffect(() => {
 		if (!scrollElement) return;
@@ -163,10 +241,20 @@ export function usePlacedTurns({
 			});
 		});
 	}, [listRef, scrollElement, turnElementsRef]);
+	const ready = complete || shapes !== undefined;
+	const readyRef = useRef(ready);
+	readyRef.current = ready;
+	const model = modelRef.current.model;
 	useLayoutEffect(() => {
 		if (!scrollElement) return;
-		return setSessionModel(scrollElement, () => modelRef.current?.model ?? []);
+		return setSessionModel(scrollElement, () =>
+			readyRef.current ? (modelRef.current?.model ?? null) : null,
+		);
 	}, [scrollElement]);
+	useLayoutEffect(() => {
+		if (scrollElement && ready && model.length > 0)
+			scrollElement.dispatchEvent(new Event(MAP_MODEL_EVENT));
+	}, [ready, model, scrollElement]);
 }
 
 export function turnKey(turn: SessionDetailTurnSummary) {

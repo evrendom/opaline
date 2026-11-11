@@ -1,4 +1,6 @@
 export const READER_SCROLL_MARK = { "data-reader-scroll": "" } as const;
+export const MAP_MODEL_MARK = { "data-map-model": "" } as const;
+export const MAP_MODEL_EVENT = "reader-map-model";
 const READER_SCROLL = "[data-reader-scroll]";
 
 export const READER_CONTENT_MARK = { "data-reader-content": "" } as const;
@@ -124,16 +126,21 @@ export type ModelTurn = {
 	turnId: string;
 };
 
-const sessionModels = new WeakMap<Element, () => readonly ModelTurn[]>();
+const sessionModels = new WeakMap<Element, () => readonly ModelTurn[] | null>();
 
 export function setSessionModel(
 	scroller: Element,
-	read: () => readonly ModelTurn[],
+	read: () => readonly ModelTurn[] | null,
 ): () => void {
 	sessionModels.set(scroller, read);
+	scroller.dispatchEvent(new Event(MAP_MODEL_EVENT));
 	return () => {
 		if (sessionModels.get(scroller) === read) sessionModels.delete(scroller);
 	};
+}
+
+export function drawsFromModel(scroller: Element): boolean {
+	return scroller.hasAttribute("data-map-model");
 }
 
 export function sessionModelIn(scroller: Element): readonly ModelTurn[] | null {

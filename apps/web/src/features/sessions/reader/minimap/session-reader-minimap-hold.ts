@@ -70,3 +70,26 @@ export function spanMapping(
 		toNow: (y) => along(to, from, y),
 	};
 }
+
+export function prefixMapping(
+	drawn: PageSpans | null,
+	now: PageSpans | null,
+): { toDrawn: (y: number) => number; toNow: (y: number) => number } | null {
+	if (!drawn || !now) return null;
+	const drawnIds = drawn.ids.split(" ");
+	const nowIds = now.ids.split(" ");
+	let shared = 0;
+	while (
+		shared < drawnIds.length &&
+		shared < nowIds.length &&
+		drawnIds[shared] === nowIds[shared]
+	)
+		shared += 1;
+	if (shared === 0) return null;
+	const from = [0, ...now.edges.slice(0, 2 * shared), now.end];
+	const to = [0, ...drawn.edges.slice(0, 2 * shared), drawn.end];
+	return {
+		toDrawn: (y) => along(from, to, y),
+		toNow: (y) => along(to, from, y),
+	};
+}

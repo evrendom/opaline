@@ -27,7 +27,11 @@ import {
 	createActiveTurnStore,
 	TurnRailList,
 } from "../rail/session-reader-turn-rail";
-import { READER_CONTENT_MARK, READER_SCROLL_MARK } from "../reader-dom";
+import {
+	MAP_MODEL_MARK,
+	READER_CONTENT_MARK,
+	READER_SCROLL_MARK,
+} from "../reader-dom";
 import { AGENT_PARAM, TURN_PARAM, writePick } from "../reader-params";
 import {
 	READER_RAIL_BACKGROUND,
@@ -238,23 +242,14 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 			!railTags.keeps(turn),
 		[flagged, focusTurn, railTags],
 	);
-	const subagentSeconds = useMemo(
-		() =>
-			new Map(
-				overview.subagents.flatMap((each) =>
-					each.durationSeconds === null || each.durationSeconds === undefined
-						? []
-						: [[each.subagentId, each.durationSeconds] as const],
-				),
-			),
-		[overview.subagents],
-	);
 	usePlacedTurns({
 		isFrustrated: flagged.isFrustrated,
 		isTurnHidden,
 		listRef,
 		scrollElement,
-		subagentSeconds,
+		complete: turns.length >= totalTurns,
+		shapes: overview.turnShapes,
+		subagents: overview.subagents,
 		turnElementsRef,
 		turns,
 	});
@@ -372,6 +367,7 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 											<div
 												ref={setScrollContainer}
 												{...READER_SCROLL_MARK}
+												{...MAP_MODEL_MARK}
 												className="scroll-fade min-h-0 flex-1 overflow-y-auto [--reader-pane-top:calc(var(--stage-top,0.5rem)+1rem)] [--reader-top:var(--tabs-band,var(--reader-inset))] [--scroll-fade-bottom-depth:8px] [--scroll-fade-top-depth:8px] [container-type:size]"
 											>
 												<TabsBandFade className="top-(--stage-top) mr-(--reader-gutter) ml-(--reader-main-left)" />

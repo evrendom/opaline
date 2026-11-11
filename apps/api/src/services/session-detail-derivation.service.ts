@@ -42,6 +42,8 @@ import {
 	type TokenUsageEvent,
 	type TraceItem,
 	translateCodexToolCall,
+	SESSION_DETAIL_TURN_SHAPE_POINT_LIMIT,
+	type SessionDetailTurnShape,
 } from "@rudel/api-routes";
 import {
 	SCAN_VERSION,
@@ -1104,7 +1106,39 @@ export function getSessionDetailOverviewPage(input: {
 			"Session detail overview exceeded its serialized byte ceiling",
 		);
 	}
+	if (cursor.offset === 0) {
+		const turnShapes = derivation.turnSummaries.map(turnShapeOf);
+		if (serializedBytes(turnShapes) <= SESSION_DETAIL_TURN_SHAPES_MAX_BYTES)
+			return { ...response, turnShapes };
+	}
 	return response;
+}
+
+const SESSION_DETAIL_TURN_SHAPES_MAX_BYTES = 512 * 1024;
+
+function turnShapeOf(turn: TurnSummary): SessionDetailTurnShape {
+	return {
+		apology: (turn.modelApologyCount ?? turn.modelSignalCount) > 0,
+		endedAt: turn.endedAt,
+		errorAt: turn.errorEvents
+			.slice(0, SESSION_DETAIL_TURN_SHAPE_POINT_LIMIT)
+			.map((event) => event.at),
+		errorCount: turn.errorCount,
+		negative: turn.signalOccurrences.some(
+			(signal) => signal.category === "negative",
+		),
+		startedAt: turn.startedAt,
+		subagents: (turn.subagentEvents ?? [])
+			.slice(0, SESSION_DETAIL_TURN_SHAPE_POINT_LIMIT)
+			.map((event) =>
+				event.subagentId
+					? { at: event.at, subagentId: event.subagentId }
+					: { at: event.at },
+			),
+		toolCallCount: turn.toolCallCount,
+		turnId: turn.turnId,
+		userCharacterCount: turn.userCharacterCount ?? 0,
+	};
 }
 
 export function assembleSessionDetailWindow(input: {

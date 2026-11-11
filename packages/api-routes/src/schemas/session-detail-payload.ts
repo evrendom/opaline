@@ -454,6 +454,39 @@ const SessionDetailContextSchema = z
 	.strict()
 	.default({ errors: [], files: [] });
 
+export const SESSION_DETAIL_TURN_SHAPE_POINT_LIMIT = 24;
+export const SESSION_DETAIL_TURN_SHAPE_LIMIT = 20_000;
+
+export const SessionDetailTurnShapeSchema = z
+	.object({
+		apology: z.boolean(),
+		endedAt: SessionDetailNullableTimestampSchema,
+		errorAt: z
+			.array(SessionDetailTimestampSchema)
+			.max(SESSION_DETAIL_TURN_SHAPE_POINT_LIMIT),
+		errorCount: z.number().int().nonnegative(),
+		negative: z.boolean(),
+		startedAt: SessionDetailNullableTimestampSchema,
+		subagents: z
+			.array(
+				z
+					.object({
+						at: SessionDetailTimestampSchema,
+						subagentId: z
+							.string()
+							.min(1)
+							.max(MAX_DETAIL_ITEM_ID_LENGTH)
+							.optional(),
+					})
+					.strict(),
+			)
+			.max(SESSION_DETAIL_TURN_SHAPE_POINT_LIMIT),
+		toolCallCount: z.number().int().nonnegative(),
+		turnId: z.string().min(1).max(MAX_DETAIL_ITEM_ID_LENGTH),
+		userCharacterCount: z.number().int().nonnegative(),
+	})
+	.strict();
+
 export const SessionDetailOverviewSchema = z
 	.object({
 		activityTotals: SessionDetailActivityTotalsSchema,
@@ -472,6 +505,10 @@ export const SessionDetailOverviewSchema = z
 				total: z.number().int().nonnegative(),
 			})
 			.strict(),
+		turnShapes: z
+			.array(SessionDetailTurnShapeSchema)
+			.max(SESSION_DETAIL_TURN_SHAPE_LIMIT)
+			.optional(),
 	})
 	.strict();
 
@@ -962,6 +999,9 @@ export type SessionDetailWindowRequest = z.infer<
 	typeof SessionDetailWindowRequestSchema
 >;
 export type SessionDetailWindow = z.infer<typeof SessionDetailWindowSchema>;
+export type SessionDetailTurnShape = z.infer<
+	typeof SessionDetailTurnShapeSchema
+>;
 export type SessionDetailTurnSummary = z.infer<
 	typeof SessionDetailTurnSummarySchema
 >;
