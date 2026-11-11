@@ -81,7 +81,7 @@ export async function fetchAaRelease(
 			reasoningSetting: record.effort?.slug ?? null,
 			effortLabel: record.effort?.label ?? null,
 			effortOrder: record.effort?.level ?? null,
-			estimated: record.intelligenceIndexIsEstimated,
+			estimated: record.intelligenceIndexIsEstimated ?? false,
 			intelligence: record.intelligenceIndex,
 			costPerTaskUsd: record.intelligenceIndexCostPerTask?.cost?.total ?? null,
 			totalCostUsd: record.intelligenceIndexCost?.total ?? null,

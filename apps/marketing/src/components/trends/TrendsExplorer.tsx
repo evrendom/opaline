@@ -3188,11 +3188,13 @@ const FRONTIER_LABS: readonly TrendsProvider[] = [
  * Falls back to every model in use if none of them is in the snapshot.
  */
 const RECOMMENDED_FRONTIER = [
+	"claude-fable-5-2",
 	"claude-fable-5-1",
 	"claude-opus-5-5",
 	"claude-sonnet-5-5",
 	"gpt-6-astra",
 	"gpt-6.1-sol",
+	"gpt-6.1-terra",
 	"gpt-6-luna",
 ] as const;
 

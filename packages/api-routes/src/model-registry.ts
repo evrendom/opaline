@@ -85,6 +85,14 @@ const CURATED_FAMILIES: readonly ModelFamily[] = [
 		"max",
 	),
 	family(
+		"claude-fable-5-2",
+		"Claude Fable 5.2",
+		"anthropic",
+		"Anthropic",
+		"2026-11-09",
+		"max",
+	),
+	family(
 		"claude-fable-5-1",
 		"Claude Fable 5.1",
 		"anthropic",
