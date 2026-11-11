@@ -1,4 +1,5 @@
 import {
+	placedTurnsIn,
 	readTurnMarks,
 	TURN_ANSWER,
 	TURN_REPLY,
@@ -28,21 +29,31 @@ export function measure(
 	const origin = scroller.getBoundingClientRect().top - scroller.scrollTop;
 	const parts: Part[] = [];
 	const turns = turnElementsIn(scroller);
-	for (const [index, turn] of turns.entries()) {
-		const box = turn.getBoundingClientRect();
-		const block = turn.firstElementChild as HTMLElement | null;
-		const flags = readTurnMarks(turn);
-		const turnId = flags.turnId ?? "";
-		const top = box.top - origin;
-		const bottom = box.bottom - origin;
-		const shown =
-			block?.checkVisibility?.({ contentVisibilityAuto: true }) ?? true;
+	const placed =
+		placedTurnsIn(scroller) ??
+		turns.map((element) => {
+			const box = element.getBoundingClientRect();
+			const marks = readTurnMarks(element);
+			return {
+				bottom: box.bottom - origin,
+				element,
+				marks,
+				top: box.top - origin,
+				turnId: marks.turnId ?? "",
+			};
+		});
+	for (const { bottom, element: turn, marks: flags, top, turnId } of placed) {
+		const block = (turn?.firstElementChild as HTMLElement | null) ?? null;
+		const shown = block
+			? (block.checkVisibility?.({ contentVisibilityAuto: true }) ?? true)
+			: false;
 		let shape = seen.get(turnId) ?? {
 			member: FALLBACK_MEMBER_PX,
 			subagents: [],
 			talks: [],
 		};
 		if (
+			turn &&
 			block &&
 			(!(seen.has(turnId) && kept(turnId)) || tags.length > 0) &&
 			(shown ||
@@ -50,7 +61,7 @@ export function measure(
 				flags.errors ||
 				turn.querySelector("[data-subagent]"))
 		) {
-			shape = readTurnShape(turn, turns.slice(index + 1), tags);
+			shape = readTurnShape(turn, turns.slice(turns.indexOf(turn) + 1), tags);
 			seen.set(turnId, shape);
 		}
 		const split = Math.min(top + shape.member, bottom);

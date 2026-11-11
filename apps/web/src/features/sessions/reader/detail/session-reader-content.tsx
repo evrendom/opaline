@@ -69,6 +69,7 @@ import { ReaderHiddenContext } from "./session-reader-hidden-steps";
 import { ReaderStepJump } from "./session-reader-step-jump";
 import { READING_MEASURE, TurnBlock } from "./session-reader-turn-block";
 import { ReaderTurnSlot, TurnsPending } from "./session-reader-turn-slot";
+import { turnKey, turnSizeType, usePlacedTurns } from "./use-placed-turns";
 import { useReaderOpenCall } from "./use-reader-open-call";
 import { useSessionReaderBodies } from "./use-session-reader-bodies";
 import { TipLayer } from "./waterfall/session-reader-tips";
@@ -230,6 +231,18 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 		() => flagged.railTurns.filter(railTags.keeps),
 		[flagged.railTurns, railTags.keeps],
 	);
+	const isTurnHidden = (turn: SessionDetailTurnSummary) =>
+		focusTurn !== undefined ||
+		!flagged.isShown(turn.turnId) ||
+		!railTags.keeps(turn);
+	usePlacedTurns({
+		isFrustrated: flagged.isFrustrated,
+		isTurnHidden,
+		listRef,
+		scrollElement,
+		turnElementsRef,
+		turns,
+	});
 	const followRef = useRef(followNewest);
 	followRef.current = followNewest;
 
@@ -443,14 +456,16 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 																		item: SessionDetailTurnSummary;
 																		index: number;
 																	}) => (
-																		<div style={{ paddingBottom: TURN_GAP_PX }}>
+																		<div
+																			style={{
+																				paddingBottom: isTurnHidden(turn)
+																					? 0
+																					: TURN_GAP_PX,
+																			}}
+																		>
 																			<ReaderTurnSlot
 																				frustrated={flagged.isFrustrated(turn)}
-																				hidden={
-																					focusTurn !== undefined ||
-																					!flagged.isShown(turn.turnId) ||
-																					!railTags.keeps(turn)
-																				}
+																				hidden={isTurnHidden(turn)}
 																				holdsEstimate={
 																					getBody(turn.turnId).status ===
 																					"loading"
@@ -530,11 +545,3 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 		</ReaderHiddenContext.Provider>
 	);
 });
-
-function turnKey(turn: SessionDetailTurnSummary) {
-	return turn.turnId;
-}
-
-function turnSizeType(turn: SessionDetailTurnSummary) {
-	return `turn:${Math.round(Math.log2(Math.max(estimateTurnPx(turn), 1)))}`;
-}

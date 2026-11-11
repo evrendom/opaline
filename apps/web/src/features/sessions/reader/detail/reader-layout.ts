@@ -197,6 +197,7 @@ const BATCH_TURNS = 4;
 function useReaderLayoutPass({
 	complete,
 	hasBody,
+	isMounted,
 	layout,
 	paused,
 	startTurnId,
@@ -205,14 +206,29 @@ function useReaderLayoutPass({
 }: {
 	complete: boolean;
 	hasBody: (turnId: string) => boolean;
+	isMounted: (turnId: string) => boolean;
 	layout: ReaderLayout;
 	paused: boolean;
 	startTurnId: string | undefined;
 	turnElementsRef: RefObject<Map<string, HTMLElement>>;
 	turns: readonly { toolCallCount?: number; turnId: string }[];
 }): void {
-	const stateRef = useRef({ complete, hasBody, paused, startTurnId, turns });
-	stateRef.current = { complete, hasBody, paused, startTurnId, turns };
+	const stateRef = useRef({
+		complete,
+		hasBody,
+		isMounted,
+		paused,
+		startTurnId,
+		turns,
+	});
+	stateRef.current = {
+		complete,
+		hasBody,
+		isMounted,
+		paused,
+		startTurnId,
+		turns,
+	};
 	useMountEffect(() => {
 		let handle = 0;
 		let startedAt = 0;
@@ -247,6 +263,7 @@ function useReaderLayoutPass({
 			const {
 				complete: allIn,
 				hasBody: ready,
+				isMounted: mounted,
 				paused: hidden,
 				startTurnId: start,
 				turns: all,
@@ -282,7 +299,8 @@ function useReaderLayoutPass({
 					if (
 						!turn ||
 						layout.isLaidOut(turn.turnId) ||
-						layout.isKept(turn.turnId)
+						layout.isKept(turn.turnId) ||
+						!mounted(turn.turnId)
 					)
 						continue;
 					if (
@@ -361,8 +379,8 @@ export function useReaderLayout({
 	});
 	useReaderLayoutPass({
 		complete,
-		hasBody: (turnId) =>
-			isMounted(turnId) && getBody(turnId).status !== "loading",
+		hasBody: (turnId) => getBody(turnId).status !== "loading",
+		isMounted,
 		layout,
 		paused,
 		startTurnId,

@@ -83,6 +83,30 @@ export function readerContentOf(scroller: Element): HTMLElement | null {
 	return scroller.querySelector<HTMLElement>(":scope > [data-reader-content]");
 }
 
+export type PlacedTurn = {
+	bottom: number;
+	element: HTMLElement | undefined;
+	marks: { apology: boolean; errors: boolean; frustrated: boolean };
+	top: number;
+	turnId: string;
+};
+
+const placedTurns = new WeakMap<Element, () => PlacedTurn[] | null>();
+
+export function setPlacedTurns(
+	scroller: Element,
+	read: () => PlacedTurn[] | null,
+): () => void {
+	placedTurns.set(scroller, read);
+	return () => {
+		if (placedTurns.get(scroller) === read) placedTurns.delete(scroller);
+	};
+}
+
+export function placedTurnsIn(scroller: Element): PlacedTurn[] | null {
+	return placedTurns.get(scroller)?.() ?? null;
+}
+
 export function turnElementsIn(scroller: ParentNode): HTMLElement[] {
 	return [...scroller.querySelectorAll<HTMLElement>(TURN)];
 }
