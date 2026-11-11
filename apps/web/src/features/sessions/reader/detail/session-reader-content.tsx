@@ -1,4 +1,8 @@
-import type { SessionDetailWindow } from "@rudel/api-routes";
+import { LegendList, type LegendListRef } from "@legendapp/list/react";
+import type {
+	SessionDetailTurnSummary,
+	SessionDetailWindow,
+} from "@rudel/api-routes";
 import { memo, useCallback, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
@@ -65,7 +69,6 @@ import { ReaderHiddenContext } from "./session-reader-hidden-steps";
 import { ReaderStepJump } from "./session-reader-step-jump";
 import { READING_MEASURE, TurnBlock } from "./session-reader-turn-block";
 import { ReaderTurnSlot, TurnsPending } from "./session-reader-turn-slot";
-import { useMountedTurns } from "./use-mounted-turns";
 import { useReaderOpenCall } from "./use-reader-open-call";
 import { useSessionReaderBodies } from "./use-session-reader-bodies";
 import { TipLayer } from "./waterfall/session-reader-tips";
@@ -153,6 +156,10 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 	const requestBodyRef = useRef(requestBody);
 	requestBodyRef.current = requestBody;
 	const pendingScrollTurnIdRef = useRef(opening.startTurnId);
+	const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(
+		null,
+	);
+	const listRef = useRef<LegendListRef | null>(null);
 	const turnPin = useTurnPin(turnElementsRef);
 	useReaderOpenCall(runUi, searchParams, turnPin, turnElementsRef);
 	const { focus, focusTurn, laterTurns, pickTurn, setFocus } = useReaderFocus({
@@ -167,11 +174,12 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 	const readFocusRef = useRef(readFocus);
 	readFocusRef.current = readFocus;
 	useMountEffect(() => activeTurn.set(null));
-	const isMountedAt = useMountedTurns(
-		turns,
-		pendingScrollTurnIdRef.current ??
-			(followNewest ? undefined : turns[0]?.turnId),
-	);
+	const [initialTurnIndex] = useState(() => {
+		const index = turns.findIndex(
+			(turn) => turn.turnId === pendingScrollTurnIdRef.current,
+		);
+		return index >= 0 ? index : undefined;
+	});
 	const mapKey = useMemo(
 		() => ({
 			revision: overview.revision,
@@ -203,7 +211,7 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 	const layout = useReaderLayout({
 		complete: turns.length >= totalTurns,
 		getBody,
-		isMounted: (turnId) => isMountedAt(numberOf(turnId) - 1),
+		isMounted: (turnId) => turnElementsRef.current.has(turnId),
 		keptShapes: () => keptOf(kept),
 		paused: readFocus !== null || shaping,
 		startTurnId: opening.startTurnId,
@@ -228,6 +236,7 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 	const setScrollContainer = useCallback(
 		(element: HTMLDivElement | null) => {
 			if (!element) return;
+			setScrollElement(element);
 			const watch = watchReaderScroll(element, {
 				answerOf: (turnId) => {
 					const turn = turnElementsRef.current.get(turnId);
@@ -299,6 +308,10 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 		const turnElement = turnElementsRef.current.get(turnId);
 		if (turnElement)
 			jumpToRead(answerOf(turnElement), turnId, activeTurn, jumpingRef);
+		else {
+			const index = turns.findIndex((turn) => turn.turnId === turnId);
+			if (index >= 0) void listRef.current?.scrollToIndex({ index });
+		}
 		setSearchParams(
 			(params) => {
 				writePick(params, { kind: "run", run: turnId });
@@ -402,47 +415,79 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 																	turn={focusTurn}
 																/>
 															) : null}
-															{turns.map((turn, index) => (
-																<ReaderTurnSlot
-																	key={turn.turnId}
-																	frustrated={flagged.isFrustrated(turn)}
-																	hidden={
-																		focusTurn !== undefined ||
-																		!flagged.isShown(turn.turnId) ||
-																		!railTags.keeps(turn)
-																	}
-																	holdsEstimate={
-																		!isMountedAt(index) ||
-																		getBody(turn.turnId).status === "loading"
-																	}
-																	index={index}
-																	keptHeight={keptHeights?.[turn.turnId]}
-																	slotRef={setTurnElement(turn.turnId)}
-																	turn={turn}
-																>
-																	{isMountedAt(index) ? (
-																		<TurnBlock
-																			bodyState={getBody(turn.turnId)}
-																			costShade={getCostShade(
-																				turn.estimatedCost,
-																				costThresholds,
-																			)}
-																			frustrated={flagged.isFrustrated(turn)}
-																			hidden={railTags.hidden}
-																			model={model}
-																			onRetry={retryBody}
-																			questions={questionsByTurn.get(
-																				turn.turnId,
-																			)}
-																			store={runUi}
-																			subagentDurations={subagents.durations}
-																			turn={turn}
-																			userImageUrl={userImageUrl}
-																			userLabel={userLabel}
-																		/>
-																	) : null}
-																</ReaderTurnSlot>
-															))}
+															{turns.length > 0 ? (
+																<LegendList<SessionDetailTurnSummary>
+																	ref={listRef}
+																	data={turns}
+																	scrollElement={scrollElement}
+																	keyExtractor={turnKey}
+																	getItemType={turnSizeType}
+																	estimatedItemSize={estimateTurnPx(turns[0])}
+																	drawDistance={1600}
+																	recycleItems={false}
+																	initialScrollIndex={initialTurnIndex}
+																	extraData={{
+																		costThresholds,
+																		flagged,
+																		getBody,
+																		keptHeights,
+																		questionsByTurn,
+																		railTags,
+																		subagents,
+																		focusTurn,
+																	}}
+																	renderItem={({
+																		item: turn,
+																		index,
+																	}: {
+																		item: SessionDetailTurnSummary;
+																		index: number;
+																	}) => (
+																		<div style={{ paddingBottom: TURN_GAP_PX }}>
+																			<ReaderTurnSlot
+																				frustrated={flagged.isFrustrated(turn)}
+																				hidden={
+																					focusTurn !== undefined ||
+																					!flagged.isShown(turn.turnId) ||
+																					!railTags.keeps(turn)
+																				}
+																				holdsEstimate={
+																					getBody(turn.turnId).status ===
+																					"loading"
+																				}
+																				index={index}
+																				keptHeight={keptHeights?.[turn.turnId]}
+																				slotRef={setTurnElement(turn.turnId)}
+																				turn={turn}
+																			>
+																				<TurnBlock
+																					bodyState={getBody(turn.turnId)}
+																					costShade={getCostShade(
+																						turn.estimatedCost,
+																						costThresholds,
+																					)}
+																					frustrated={flagged.isFrustrated(
+																						turn,
+																					)}
+																					hidden={railTags.hidden}
+																					model={model}
+																					onRetry={retryBody}
+																					questions={questionsByTurn.get(
+																						turn.turnId,
+																					)}
+																					store={runUi}
+																					subagentDurations={
+																						subagents.durations
+																					}
+																					turn={turn}
+																					userImageUrl={userImageUrl}
+																					userLabel={userLabel}
+																				/>
+																			</ReaderTurnSlot>
+																		</div>
+																	)}
+																/>
+															) : null}
 															{turns.length < totalTurns ? (
 																<TurnsPending
 																	failed={Boolean(pages.error)}
@@ -485,3 +530,11 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 		</ReaderHiddenContext.Provider>
 	);
 });
+
+function turnKey(turn: SessionDetailTurnSummary) {
+	return turn.turnId;
+}
+
+function turnSizeType(turn: SessionDetailTurnSummary) {
+	return `turn:${Math.round(Math.log2(Math.max(estimateTurnPx(turn), 1)))}`;
+}
