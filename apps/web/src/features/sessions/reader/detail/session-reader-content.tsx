@@ -81,6 +81,8 @@ import { WHOLE_TURN_ID } from "./waterfall/session-reader-waterfall";
 
 export { TurnBlock };
 
+const TURN_OVERHANG_PX = 24;
+
 export const SessionReaderContent = memo(function SessionReaderContent({
 	emptyMessage = "No turns in this session.",
 	followNewest = false,
@@ -441,6 +443,7 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 															) : null}
 															{turns.length > 0 ? (
 																<LegendList<SessionDetailTurnSummary>
+																	style={{ marginInline: -TURN_OVERHANG_PX }}
 																	ref={listRef}
 																	data={turns}
 																	scrollElement={scrollElement}
@@ -472,6 +475,7 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 																				paddingBottom: isTurnHidden(turn)
 																					? 0
 																					: TURN_GAP_PX,
+																				paddingInline: TURN_OVERHANG_PX,
 																			}}
 																		>
 																			<ReaderTurnSlot
