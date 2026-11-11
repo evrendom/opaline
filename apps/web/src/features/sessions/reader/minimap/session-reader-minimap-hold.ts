@@ -1,4 +1,4 @@
-import { turnElementsIn } from "../reader-dom";
+import { placedTurnsIn, turnElementsIn } from "../reader-dom";
 
 export type PageSpans = { edges: number[]; end: number; ids: string };
 
@@ -6,6 +6,15 @@ export function readSpans(scroller: HTMLElement): PageSpans {
 	const origin = scroller.getBoundingClientRect().top - scroller.scrollTop;
 	const ids: string[] = [];
 	const edges: number[] = [];
+	const placed = placedTurnsIn(scroller);
+	if (placed) {
+		for (const turn of placed) {
+			if (turn.hidden) continue;
+			ids.push(turn.turnId);
+			edges.push(turn.top, turn.bottom);
+		}
+		return { edges, end: scroller.scrollHeight, ids: ids.join(" ") };
+	}
 	for (const turn of turnElementsIn(scroller)) {
 		if (turn.hidden) continue;
 		const box = turn.getBoundingClientRect();

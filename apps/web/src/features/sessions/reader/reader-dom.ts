@@ -86,6 +86,7 @@ export function readerContentOf(scroller: Element): HTMLElement | null {
 export type PlacedTurn = {
 	bottom: number;
 	element: HTMLElement | undefined;
+	hidden: boolean;
 	marks: { apology: boolean; errors: boolean; frustrated: boolean };
 	top: number;
 	turnId: string;
@@ -105,6 +106,38 @@ export function setPlacedTurns(
 
 export function placedTurnsIn(scroller: Element): PlacedTurn[] | null {
 	return placedTurns.get(scroller)?.() ?? null;
+}
+
+export type ModelTurn = {
+	endMs: number | undefined;
+	errors: readonly number[];
+	height: number;
+	hidden: boolean;
+	marks: { apology: boolean; errors: boolean; frustrated: boolean };
+	member: number;
+	startMs: number | undefined;
+	subagents: readonly {
+		endMs: number | undefined;
+		id: string | undefined;
+		startMs: number;
+	}[];
+	turnId: string;
+};
+
+const sessionModels = new WeakMap<Element, () => readonly ModelTurn[]>();
+
+export function setSessionModel(
+	scroller: Element,
+	read: () => readonly ModelTurn[],
+): () => void {
+	sessionModels.set(scroller, read);
+	return () => {
+		if (sessionModels.get(scroller) === read) sessionModels.delete(scroller);
+	};
+}
+
+export function sessionModelIn(scroller: Element): readonly ModelTurn[] | null {
+	return sessionModels.get(scroller)?.() ?? null;
 }
 
 export function turnElementsIn(scroller: ParentNode): HTMLElement[] {

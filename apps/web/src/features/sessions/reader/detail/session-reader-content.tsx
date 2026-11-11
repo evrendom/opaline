@@ -231,15 +231,30 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 		() => flagged.railTurns.filter(railTags.keeps),
 		[flagged.railTurns, railTags.keeps],
 	);
-	const isTurnHidden = (turn: SessionDetailTurnSummary) =>
-		focusTurn !== undefined ||
-		!flagged.isShown(turn.turnId) ||
-		!railTags.keeps(turn);
+	const isTurnHidden = useCallback(
+		(turn: SessionDetailTurnSummary) =>
+			focusTurn !== undefined ||
+			!flagged.isShown(turn.turnId) ||
+			!railTags.keeps(turn),
+		[flagged, focusTurn, railTags],
+	);
+	const subagentSeconds = useMemo(
+		() =>
+			new Map(
+				overview.subagents.flatMap((each) =>
+					each.durationSeconds === null || each.durationSeconds === undefined
+						? []
+						: [[each.subagentId, each.durationSeconds] as const],
+				),
+			),
+		[overview.subagents],
+	);
 	usePlacedTurns({
 		isFrustrated: flagged.isFrustrated,
 		isTurnHidden,
 		listRef,
 		scrollElement,
+		subagentSeconds,
 		turnElementsRef,
 		turns,
 	});

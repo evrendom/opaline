@@ -1,6 +1,10 @@
 import { type RefObject, useLayoutEffect, useRef } from "react";
 import type { ReaderLayout } from "../detail/reader-layout";
-import { readerScrollerOf, turnElementsIn } from "../reader-dom";
+import {
+	readerScrollerOf,
+	sessionModelIn,
+	turnElementsIn,
+} from "../reader-dom";
 import {
 	type Drawn,
 	markReading,
@@ -20,6 +24,7 @@ import {
 	type TurnShape,
 	turnHeights,
 } from "./session-reader-minimap-measure";
+import { modelMap } from "./session-reader-minimap-model";
 import {
 	packAttempts,
 	type SessionMap,
@@ -105,6 +110,30 @@ export function attachSessionMap({
 	const draw = () => {
 		timer = 0;
 		nowSpans = readSpans(scroller);
+		const model = sessionModelIn(scroller);
+		if (model && model.length > 0) {
+			const modelled = modelMap(model);
+			const scale = map.clientHeight / Math.max(modelled.spans.end, 1);
+			refs.scale.current = scale;
+			const next: Drawn = {
+				easing: refs.drawnOnce.current,
+				height: map.clientHeight,
+				parts: modelled.parts,
+				scale,
+				width: map.clientWidth,
+			};
+			if (!last || movesOnMap(last, next)) {
+				last = next;
+				setDrawn(next);
+				box.ease();
+				if (next.parts.length > 0) refs.drawnOnce.current = true;
+			}
+			refs.session.current = last;
+			drawnSpans = modelled.spans;
+			remap();
+			placeView();
+			return;
+		}
 		if (
 			last &&
 			last.parts.length > 0 &&
