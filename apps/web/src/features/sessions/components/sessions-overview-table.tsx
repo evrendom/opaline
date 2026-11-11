@@ -3,7 +3,6 @@ import type {
 	SessionFilterCatalog,
 	SessionListFilters,
 } from "@rudel/api-routes";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import {
 	type ReactNode,
 	type Ref,
@@ -14,9 +13,7 @@ import {
 } from "react";
 import { useEffectOnceWhen } from "@/app/hooks/useEffectOnceWhen";
 import { useLatestValueRef } from "@/app/hooks/useLatestValueRef";
-import { useLoadMoreIntersectionObserver } from "@/app/hooks/useLoadMoreIntersectionObserver";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
-import { getSessionRenderIndexes } from "@/features/sessions/session-list-virtualization";
 import { useLiveClock } from "@/features/sessions/use-live-sessions";
 import { useLoadSessionPages } from "@/features/sessions/use-load-session-pages";
 import { useSessionRunQuestionTags } from "@/features/sessions/use-run-question-tags";
@@ -28,14 +25,15 @@ import { buildSessionMemberProfileSummaries } from "./session-member-profile-sum
 import { SessionsOverviewControls } from "./sessions-overview-controls";
 import { SessionsOverviewFluidList } from "./sessions-overview-fluid-list";
 import { SessionsOverviewHeader } from "./sessions-overview-header";
-import { SessionsOverviewLoadMoreRow } from "./sessions-overview-load-more-row";
+import {
+	SESSIONS_PER_PAGE,
+	SessionsOverviewPager,
+} from "./sessions-overview-pager";
 import { SessionsOverviewRow } from "./sessions-overview-row";
 import { getContainedWheelScroll } from "./sessions-overview-scroll";
 import { SessionsOverviewSkeleton } from "./sessions-overview-skeleton";
 import {
-	SESSION_OVERVIEW_HEADER_HEIGHT,
 	SESSION_OVERVIEW_MIN_WIDTH_CLASS_NAME,
-	SESSION_OVERVIEW_ROW_HEIGHT,
 	SESSION_OVERVIEW_SURFACE_CLASS_NAME,
 } from "./sessions-overview-table-utils";
 import { useSessionsOverviewTableState } from "./use-sessions-overview-table-state";
@@ -102,6 +100,7 @@ export function SessionsOverviewTable({
 	onFiltersChange,
 }: SessionsOverviewTableProps) {
 	const tableScrollElementRef = useRef<HTMLDivElement | null>(null);
+	const [page, setPage] = useState(0);
 	const { avatarMap, userMap } = useUserMap();
 	const tableState = useSessionsOverviewTableState({
 		sessionCountLabel,
@@ -114,6 +113,7 @@ export function SessionsOverviewTable({
 		onRetryFilterCatalog,
 		onFiltersChange,
 		onQueryChange: () => {
+			setPage(0);
 			if (tableScrollElementRef.current)
 				tableScrollElementRef.current.scrollTop = 0;
 		},
@@ -147,78 +147,45 @@ export function SessionsOverviewTable({
 	);
 	const nowMs = useLiveClock(hasLiveRows ? LIVE_ROW_CLOCK_MS : false);
 	const [focusedKey, setFocusedKey] = useState<string | null>(null);
-	const focusedIndex = tableState.sortedSessions.findIndex(
+	const loaded = tableState.sortedSessions.length;
+	const lastLoadedPage = Math.max(Math.ceil(loaded / SESSIONS_PER_PAGE) - 1, 0);
+	const shownPage = pagination?.hasNextPage
+		? page
+		: Math.min(page, lastLoadedPage);
+	const pageSessions = useMemo(
+		() =>
+			tableState.sortedSessions.slice(
+				shownPage * SESSIONS_PER_PAGE,
+				(shownPage + 1) * SESSIONS_PER_PAGE,
+			),
+		[tableState.sortedSessions, shownPage],
+	);
+	const focusedIndex = pageSessions.findIndex(
 		(session) => `${session.source}:${session.session_id}` === focusedKey,
 	);
-	const rangeExtractor = useCallback(
-		(range: Parameters<typeof getSessionRenderIndexes>[0]) =>
-			getSessionRenderIndexes(range, focusedIndex),
-		[focusedIndex],
+	const reportVisible = useLatestValueRef(() =>
+		onVisibleSessions?.(pageSessions),
 	);
-	const virtualizer = useVirtualizer({
-		count: tableState.sortedSessions.length,
-		rangeExtractor,
-		getScrollElement: () => tableScrollElementRef.current,
-		estimateSize: () => SESSION_OVERVIEW_ROW_HEIGHT,
-		getItemKey: (index) => {
-			const session = tableState.sortedSessions[index];
-			return session ? `${session.source}:${session.session_id}` : index;
-		},
-		scrollMargin: SESSION_OVERVIEW_HEADER_HEIGHT,
-		overscan: 8,
-		enabled: !demo && !isLoading,
-	});
-	const virtualRows = virtualizer.getVirtualItems();
-	const visibleRange = virtualizer.range;
-	const visibleKey = visibleRange
-		? `${visibleRange.startIndex}:${visibleRange.endIndex}:${tableState.sortedSessions.length}`
-		: "";
-	const reportVisible = useLatestValueRef(() => {
-		const range = virtualizer.range;
-		onVisibleSessions?.(
-			range
-				? tableState.sortedSessions.slice(range.startIndex, range.endIndex + 1)
-				: [],
-		);
-	});
 	useEffectOnceWhen({
 		effect: () => reportVisible.current(),
 		isReady: onVisibleSessions !== undefined,
-		key: visibleKey,
+		key: `${shownPage}:${pageSessions.length}:${loaded}`,
 	});
-	const renderedRows =
-		virtualRows.length > 0
-			? virtualRows.flatMap((row) => {
-					const session = tableState.sortedSessions[row.index];
-					return session
-						? [
-								{
-									session,
-									position: row.index,
-									start: row.start - SESSION_OVERVIEW_HEADER_HEIGHT,
-								},
-							]
-						: [];
-				})
-			: tableState.visibleSessions.map((session, position) => ({
-					session,
-					position,
-					start: undefined,
-				}));
-	const loadMore = useCallback(() => {
-		if (pagination?.hasNextPage && !pagination.isFetching)
-			pagination.loadMore();
-		else tableState.loadNextSessionBatch();
-	}, [pagination, tableState.loadNextSessionBatch]);
-	const setLoadMoreElement = useLoadMoreIntersectionObserver({
-		enabled:
-			!pagination?.isFetching &&
-			!pagination?.isError &&
-			(pagination?.hasNextPage === true ||
-				(virtualRows.length === 0 &&
-					tableState.remainingLoadedSessionCount > 0)),
-		onIntersect: loadMore,
-	});
+	const renderedRows = pageSessions.map((session, index) => ({
+		session,
+		position: shownPage * SESSIONS_PER_PAGE + index,
+		start: undefined,
+	}));
+	useLoadSessionPages((shownPage + 2) * SESSIONS_PER_PAGE > loaded, pagination);
+	const knownTotal =
+		pagination?.hasNextPage && !tableState.hasActiveFilters
+			? Math.max(loaded, totalSessionCount ?? 0)
+			: loaded;
+	const showPage = useCallback((next: number) => {
+		setPage(next);
+		if (tableScrollElementRef.current)
+			tableScrollElementRef.current.scrollTop = 0;
+	}, []);
 	// Filtering and sorting must keep searching older pages. Never claim the
 	// loaded subset is the full result while those pages are still outstanding.
 	useLoadSessionPages(
@@ -297,7 +264,6 @@ export function SessionsOverviewTable({
 					}}
 					onKeyDownCapture={(event) => {
 						if (
-							virtualRows.length === 0 ||
 							event.key !== "Tab" ||
 							event.ctrlKey ||
 							event.metaKey ||
@@ -306,21 +272,18 @@ export function SessionsOverviewTable({
 						)
 							return;
 						const nextIndex = focusedIndex + (event.shiftKey ? -1 : 1);
-						const next = tableState.sortedSessions[nextIndex];
+						const next = pageSessions[nextIndex];
 						if (!next) return;
 						event.preventDefault();
 						const key = `${next.source}:${next.session_id}`;
 						setFocusedKey(key);
-						virtualizer.scrollToIndex(nextIndex, { align: "auto" });
 						requestAnimationFrame(() => {
 							const row = Array.from(
 								tableScrollElementRef.current?.querySelectorAll<HTMLElement>(
 									"[data-session-key]",
 								) ?? [],
 							).find((row) => row.dataset.sessionKey === key);
-							row
-								?.querySelector<HTMLElement>("a, button")
-								?.focus({ preventScroll: true });
+							row?.querySelector<HTMLElement>("a, button")?.focus();
 						});
 					}}
 				>
@@ -370,9 +333,6 @@ export function SessionsOverviewTable({
 							<SessionsOverviewFluidList
 								fillHeight={!pagination?.hasNextPage}
 								highlightClassName={highlightClassName}
-								height={
-									virtualRows.length ? virtualizer.getTotalSize() : undefined
-								}
 							>
 								{({ registerItem, setActiveIndex }) => (
 									<>
@@ -411,21 +371,19 @@ export function SessionsOverviewTable({
 								)}
 							</SessionsOverviewFluidList>
 						)}
-						{pagination?.hasNextPage ? (
-							<SessionsOverviewLoadMoreRow
-								showSkillsColumn={showSkillsColumn}
-								rowRef={setLoadMoreElement}
-								isFetching={pagination.isFetching}
-								isError={pagination.isError}
-								loadMore={loadMore}
+						{pageSessions.length > 0 ? (
+							<SessionsOverviewPager
+								isFetching={pagination?.isFetching ?? false}
+								known={knownTotal}
+								more={
+									(pagination?.hasNextPage ?? false) && knownTotal === loaded
+								}
+								onPage={showPage}
+								page={shownPage}
+								shown={pageSessions.length}
 							/>
-						) : !pagination && tableState.remainingLoadedSessionCount > 0 ? (
-							<div
-								ref={setLoadMoreElement}
-								aria-hidden="true"
-								className="h-px w-full"
-							/>
-						) : !pagination && tableState.unloadedSessionCount > 0 ? (
+						) : null}
+						{!pagination && tableState.unloadedSessionCount > 0 ? (
 							<p className="px-3 py-2 text-right text-sm text-(--session-overview-muted)">
 								{formatNumber(tableState.unloadedSessionCount)} more not shown
 								{tableState.hasActiveFilters
