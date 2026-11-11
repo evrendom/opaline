@@ -10,6 +10,7 @@ describe("formatModelDisplayLabel", () => {
 		expect(formatModelDisplayLabel("gpt-6-sol")).toBe("GPT 6 Sol");
 		expect(formatModelDisplayLabel("gpt-6-luna")).toBe("GPT 6 Luna");
 		expect(formatModelDisplayLabel("gpt-6.1-sol")).toBe("GPT 6.1 Sol");
+		expect(formatModelDisplayLabel("gpt-6.1-terra")).toBe("GPT 6.1 Terra");
 		expect(formatModelDisplayLabel("GPT 5.6 Sol")).toBe("GPT 5.6 Sol");
 		expect(formatModelDisplayLabel("gpt-5.6")).toBe("GPT 5.6");
 	});
@@ -20,5 +21,6 @@ describe("formatModelDisplayLabel", () => {
 		expect(formatModelDisplayLabel("Claude Fable 5")).toBe("Fable 5");
 		expect(formatModelDisplayLabel("claude-fable-5-1")).toBe("Fable 5.1");
 		expect(formatModelDisplayLabel("claude-fable-5.1")).toBe("Fable 5.1");
+		expect(formatModelDisplayLabel("claude-fable-5-2")).toBe("Fable 5.2");
 	});
 });

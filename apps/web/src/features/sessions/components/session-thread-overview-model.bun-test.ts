@@ -92,7 +92,12 @@ describe("buildSessionOverviewCallSeries", () => {
 	});
 
 	test("uses the published GPT-6 context window when telemetry omits it", () => {
-		for (const model of ["gpt-6-sol", "gpt-6-luna", "gpt-6.1-sol"]) {
+		for (const model of [
+			"gpt-6-sol",
+			"gpt-6-luna",
+			"gpt-6.1-sol",
+			"gpt-6.1-terra",
+		]) {
 			const rows = [createRow({ index: 0, xEndRatio: 1, xStartRatio: 0 })];
 			const series = buildSessionOverviewCallSeries(rows, () => [
 				createUsageEvent({ inputTokens: 100, model }),
@@ -104,16 +109,21 @@ describe("buildSessionOverviewCallSeries", () => {
 		}
 	});
 
-	test("uses Claude Haiku 5.5's 1M context window, not the legacy 200K", () => {
-		const model = "claude-haiku-5-5";
-		const rows = [createRow({ index: 0, xEndRatio: 1, xStartRatio: 0 })];
-		const series = buildSessionOverviewCallSeries(rows, () => [
-			createUsageEvent({ inputTokens: 100, model }),
-		]);
+	test("uses the 1M context window of Haiku 5.5, Fable 5.2 and Mythos 5.2, not the legacy 200K", () => {
+		for (const model of [
+			"claude-haiku-5-5",
+			"claude-fable-5-2",
+			"claude-mythos-5-2",
+		]) {
+			const rows = [createRow({ index: 0, xEndRatio: 1, xStartRatio: 0 })];
+			const series = buildSessionOverviewCallSeries(rows, () => [
+				createUsageEvent({ inputTokens: 100, model }),
+			]);
 
-		expect(series.aggregates.modelContextLimits).toEqual([
-			{ model, source: "catalog", tokenLimit: 1_000_000 },
-		]);
+			expect(series.aggregates.modelContextLimits).toEqual([
+				{ model, source: "catalog", tokenLimit: 1_000_000 },
+			]);
+		}
 	});
 
 	test("normalizes call composition and session aggregates once", () => {

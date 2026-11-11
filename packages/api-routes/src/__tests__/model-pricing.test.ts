@@ -265,7 +265,7 @@ describe("model rate card", () => {
 		}
 	});
 
-	it("prices GPT-6 Sol, Luna and 6.1 Sol from release in every published tier", () => {
+	it("prices GPT-6 Sol, Luna, 6.1 Sol and 6.1 Terra from release in every published tier", () => {
 		for (const [model, dayBefore, releasedAt, baseRates, longRates] of [
 			[
 				"gpt-6-sol",
@@ -287,6 +287,13 @@ describe("model rate card", () => {
 				"2026-09-29",
 				[2, 0.1, 2.5, 10],
 				[4, 0.2, 5, 15],
+			],
+			[
+				"gpt-6.1-terra",
+				"2026-10-25",
+				"2026-10-26",
+				[1, 0.05, 1.25, 5],
+				[2, 0.1, 2.5, 7.5],
 			],
 		] as const) {
 			expect(resolveCanonicalModelIdentity(model)?.model).toBe(model);
@@ -324,6 +331,82 @@ describe("model rate card", () => {
 				}
 			}
 		}
+	});
+
+	it("prices GPT-6.1 Sol Ultrafast only from October 8", () => {
+		expect(
+			resolveModelPricing("gpt-6.1-sol", {
+				at: "2026-10-07T23:59:59.999Z",
+				serviceTier: "ultrafast",
+			}),
+		).toBeNull();
+		for (const [contextInputTokens, input, cached, write, output] of [
+			[272_000, 12, 0.6, 15, 60],
+			[272_001, 24, 1.2, 30, 90],
+		] as const) {
+			const rates = resolveModelPricing("gpt-6.1-sol", {
+				at: "2026-10-08",
+				contextInputTokens,
+				serviceTier: "ultrafast",
+			});
+			expect(rates?.inputPerMTok).toBeCloseTo(input);
+			expect(rates?.cacheReadPerMTok).toBeCloseTo(cached);
+			expect(rates?.cacheWrite5mPerMTok).toBeCloseTo(write);
+			expect(rates?.outputPerMTok).toBeCloseTo(output);
+		}
+		expect(
+			resolveModelPricing("gpt-6.1-terra", {
+				at: "2026-10-26",
+				serviceTier: "ultrafast",
+			}),
+		).toBeNull();
+	});
+
+	it("prices Claude Fable 5.2 and Mythos 5.2 from release", () => {
+		for (const model of ["claude-fable-5-2", "claude-mythos-5-2"]) {
+			expect(resolveCanonicalModelIdentity(model)?.model).toBe(model);
+			expect(resolveCanonicalModelIdentity(`${model}[1m]`)?.model).toBe(model);
+			expect(
+				resolveModelPricing(model, { at: "2026-11-08T23:59:59.999Z" }),
+			).toBeNull();
+			expect(
+				resolveModelPricing(model, {
+					at: "2026-11-09",
+					contextInputTokens: 900_000,
+				}),
+			).toMatchObject({
+				inputPerMTok: 8,
+				cacheReadPerMTok: 0.2,
+				cacheWrite5mPerMTok: 10,
+				cacheWrite1hPerMTok: 16,
+				outputPerMTok: 40,
+			});
+			expect(
+				resolveModelPricing(model, {
+					at: "2026-11-09",
+					inferenceSpeed: "fast",
+				}),
+			).toMatchObject({
+				inputPerMTok: 16,
+				cacheReadPerMTok: 0.4,
+				cacheWrite5mPerMTok: 20,
+				cacheWrite1hPerMTok: 32,
+				outputPerMTok: 80,
+			});
+			expect(
+				resolveModelPricing(model, { at: "2026-11-09", inferenceGeo: "us" })
+					?.cacheReadPerMTok,
+			).toBeCloseTo(0.22);
+		}
+		expect(resolveCanonicalModelIdentity("claude-fable-5-1")?.model).toBe(
+			"claude-fable-5-1",
+		);
+		expect(
+			resolveModelPricing("claude-fable-5-1", {
+				at: "2026-11-09",
+				inferenceSpeed: "fast",
+			}),
+		).toBeNull();
 	});
 
 	it("keeps Fable 5 and 5.1 identities and cache rates separate", () => {
