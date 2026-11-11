@@ -58,6 +58,14 @@
 	-webkit-app-region: drag;
 }
 
+:root[data-desktop] [data-slot="sidebar-wrapper"] {
+	-webkit-app-region: drag;
+}
+
+:root[data-desktop] [data-slot="sidebar-wrapper"] > * {
+	-webkit-app-region: no-drag;
+}
+
 :root[data-desktop]
 	:is([data-slot="sidebar-header"], [data-slot="dashboard-header"])
 	:is(
