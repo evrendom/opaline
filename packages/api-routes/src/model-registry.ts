@@ -168,6 +168,7 @@ const RATE_CARD_RELEASE_DATES: Readonly<Record<string, string>> = {
 	"claude-3-opus-20240229": "2024-03-04",
 	"claude-3-sonnet-20240229": "2024-03-04",
 	"claude-fable-5": "2026-06-09",
+	"claude-haiku-5-5": "2026-10-07",
 	"claude-opus-4-5-20251101": "2025-11-24",
 	"claude-opus-4-6": "2026-02-05",
 	"claude-opus-4-7": "2026-04-16",

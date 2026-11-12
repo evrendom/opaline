@@ -202,6 +202,26 @@ export function paretoObservations(
 		.sort((first, second) => first.value - second.value);
 }
 
+export function labParetoModelIds(
+	models: readonly TrendsBenchmarkModel[],
+	providers: readonly TrendsBenchmarkModel["provider"][],
+	metric: BenchmarkMetric,
+): readonly string[] {
+	const frontier = paretoObservations(
+		benchmarkObservations(
+			models.filter((model) => providers.includes(model.provider)),
+			metric,
+			new Set(REASONING_EFFORTS),
+			true,
+		).filter((row) => row.value > 0),
+	);
+	return [...new Set(frontier.map((row) => row.model))]
+		.sort((first, second) =>
+			(second.releasedAt ?? "").localeCompare(first.releasedAt ?? ""),
+		)
+		.map((model) => model.id);
+}
+
 export function benchmarkGroups(observations: readonly BenchmarkObservation[]) {
 	const groups = new Map<string, BenchmarkObservation[]>();
 	for (const observation of observations) {

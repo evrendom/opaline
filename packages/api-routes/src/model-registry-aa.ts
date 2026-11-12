@@ -22,6 +22,7 @@ export const FAMILY_LINES: Readonly<Record<string, string>> = {
 	"claude-3-haiku-20240307": "claude-haiku",
 	"claude-3-5-haiku-20241022": "claude-haiku",
 	"claude-haiku-4-5-20251001": "claude-haiku",
+	"claude-haiku-5-5": "claude-haiku",
 	"claude-fable-5": "claude-fable",
 	"claude-fable-5-1": "claude-fable",
 	"claude-fable-5-2": "claude-fable",
