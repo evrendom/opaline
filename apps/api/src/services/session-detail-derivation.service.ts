@@ -472,6 +472,14 @@ function compactionsOf(turn: SessionTurn): { compactions?: number } {
 	return compactions > 0 ? { compactions } : {};
 }
 
+function lastActivitySeconds(turn: SessionTurn, start: string | undefined) {
+	let end: string | undefined;
+	for (const item of turn.responseItems) end = item.timestamp ?? end;
+	if (!start || !end) return null;
+	const seconds = (Date.parse(end) - Date.parse(start)) / 1_000;
+	return Number.isFinite(seconds) && seconds >= 0 ? seconds : null;
+}
+
 function createTurnSummary(
 	turn: SessionTurn,
 	metrics: SessionTurnMetrics,
@@ -508,7 +516,9 @@ function createTurnSummary(
 			activityLimit,
 		),
 		...compactionsOf(turn),
-		durationSeconds: timing.durationSeconds ?? null,
+		durationSeconds:
+			timing.durationSeconds ??
+			lastActivitySeconds(turn, timing.startTimestamp),
 		editedFiles: [...metrics.editedFiles],
 		endedAt: timing.endTimestamp ?? null,
 		errorCount: metrics.errorCount,

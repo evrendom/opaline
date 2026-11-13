@@ -6,9 +6,11 @@ import type { NormalizedSessionDetailOverview } from "../../components/session-d
 import { useSessionDetailOverviewPages } from "../../components/use-session-detail-overview-pages";
 import { useSessionFileChanges } from "../../use-session-file-changes";
 import { useCiAccess, useSessionCiRuns } from "../../use-session-run-ci";
+import { useSessionSetupRuns } from "../../use-session-setup-runs";
 import { useSessionSummaryLinks } from "../../use-session-summary-links";
 import { SummaryContext } from "../context/session-reader-context-card";
 import type { ContextMeasure } from "../context/session-reader-context-measure";
+import { runSetupFiles } from "../context/session-reader-context-runs";
 import { SessionContext } from "../context/session-reader-context-session";
 import { FilesRail, useFilesRailTags } from "../rail/session-reader-files-rail";
 import {
@@ -146,7 +148,35 @@ export function SessionReaderSummary({
 			),
 		[agent, overview.subagents, launches, run, turns],
 	);
-	const setup = links ? groupSetupFiles(links.setup) : undefined;
+	const setupRuns = useSessionSetupRuns(sessionId, !!run);
+	const uncalled =
+		!!pickedTurn &&
+		!pickedSubagent &&
+		pickedTurn.usageCalls.length === 0 &&
+		pickedTurn.estimatedCost === null;
+	const runSetup = useMemo(() => {
+		if (!links || !run) return links?.setup;
+		if (uncalled) return [];
+		if (setupRuns.isError) return links.setup;
+		if (!setupRuns.data || !pickedTurn) return undefined;
+		return runSetupFiles(links.setup, setupRuns.data.runs, {
+			agent: pickedSubagent ? (agent ?? null) : null,
+			startedAt: pickedTurn.startedAt,
+		});
+	}, [
+		agent,
+		links,
+		pickedSubagent,
+		pickedTurn,
+		run,
+		setupRuns.data,
+		setupRuns.isError,
+		uncalled,
+	]);
+	const setupEmpty = uncalled
+		? "It ended before its first model call, so no model received any."
+		: undefined;
+	const setup = runSetup ? groupSetupFiles(runSetup) : undefined;
 	const partial = !run && turns.length < totalTurns;
 	const railTags = useFilesRailTags();
 	const scroll = useScrollFade<HTMLDivElement>();
@@ -168,7 +198,7 @@ export function SessionReaderSummary({
 		pickedSubagent
 			? subagentFigures(pickedSubagent)
 			: pickedTurn
-				? runFigures(pickedTurn)
+				? runFigures(pickedTurn, turns)
 				: sessionFigures(overview.session, turns, totalTurns, subagentCount)
 	).map((figure) => {
 		const kinds = (["expensive_run", "long_run"] as const).filter((kind) =>
@@ -226,7 +256,7 @@ export function SessionReaderSummary({
 					<div
 						ref={scroll.ref}
 						{...scroll.fade}
-						className="-mx-2 -mb-2 flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-2 pt-(--summary-top) pb-8 [--summary-top:var(--panes-top)] [container-type:size] *:shrink-0"
+						className="scroll-fade -mx-2 -mb-2 flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-2 pt-(--summary-top) pb-8 [--scroll-fade-top-depth:0px] [--summary-top:var(--panes-top)] [container-type:size] *:shrink-0"
 					>
 						<TabsBandFade className="-mx-2 -mt-1.5 -mb-4 h-1.5 top-[calc(var(--stage-top)-0.5rem-var(--summary-top))] shrink-0" />
 						<SummaryStrip
@@ -266,9 +296,10 @@ export function SessionReaderSummary({
 								}
 							>
 								<SummarySkillsAndFiles
+									empty={setupEmpty}
 									onOpen={onOpenTurn}
 									onOpenSetup={onOpenSetup}
-									setup={links?.setup}
+									setup={runSetup}
 									skills={skills}
 								/>
 							</SummarySection>
@@ -279,7 +310,11 @@ export function SessionReaderSummary({
 									setup ? setup.mcp.length + setup.harness.length : undefined
 								}
 							>
-								<SummaryMcpAndTools onOpen={onOpenSetup} setup={links?.setup} />
+								<SummaryMcpAndTools
+									empty={setupEmpty}
+									onOpen={onOpenSetup}
+									setup={runSetup}
+								/>
 							</SummarySection>
 						</div>
 

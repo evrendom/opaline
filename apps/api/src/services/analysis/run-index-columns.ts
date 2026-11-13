@@ -297,17 +297,32 @@ export const RUN_INDEX_FACT_COLUMNS = {
 	},
 	fallback_model: gate(7, CLAUDE, ["fallback_model"]),
 	goal: gate(7, CODEX, ["goal"]),
-	// toolUseResult.gitOperation, and the pr-link records of the main stream.
+	// Claude: toolUseResult.gitOperation, and the pr-link records of the main
+	// stream. Codex: the git and gh commands it ran and what they printed.
 	git_operations: {
-		...gate(6, CLAUDE, ["gitOperation"]),
+		...gate(6, BOTH, ["gitOperation"], "run", { codex: ALWAYS }, { codex: [] }),
 		mainStreamOnly: CLAUDE,
 	},
 	pushed_branches: {
-		...gate(6, CLAUDE, ["git.push.branch"]),
+		...gate(
+			6,
+			BOTH,
+			["git.push.branch"],
+			"run",
+			{ codex: ALWAYS },
+			{ codex: [] },
+		),
 		mainStreamOnly: CLAUDE,
 	},
 	commit_shas: {
-		...gate(6, CLAUDE, ["git.commit.sha"]),
+		...gate(
+			6,
+			BOTH,
+			["git.commit.sha"],
+			"run",
+			{ codex: ALWAYS },
+			{ codex: [] },
+		),
 		mainStreamOnly: CLAUDE,
 	},
 	pr_urls: {

@@ -157,15 +157,19 @@ function useSessionFlags({
 }): {
 	byLine: ReadonlyMap<string, readonly MomentKind[]>;
 	byTurn: ReadonlyMap<string, readonly MomentKind[]>;
+	loading: boolean;
 } {
-	const runs = useSessionFlaggedRuns({ from, sessionId, to }).data;
+	const query = useSessionFlaggedRuns({ from, sessionId, to });
+	const runs = query.data;
+	const loading = query.isLoading;
 	return useMemo(() => {
 		const allLoaded = turns.length >= totalTurns;
 		return {
 			byLine: flagsByLine(runs ?? [], turns, allLoaded),
 			byTurn: flagsByTurn(runs ?? [], turns, allLoaded),
+			loading,
 		};
-	}, [runs, turns, totalTurns]);
+	}, [loading, runs, turns, totalTurns]);
 }
 
 function FlagTag({ kinds }: { kinds: readonly MomentKind[] }) {
@@ -252,9 +256,13 @@ export function useTurnFlags(
 	return { enabled, flags, pending: enabled && query.isPending };
 }
 
+const FLAG_TRIGGER =
+	"inline-flex h-7 w-fit min-w-7 shrink-0 items-center justify-center gap-1 rounded-full bg-card px-2 text-xs font-medium shadow-(--custom-shadow) transition-colors hover:bg-muted/60 data-popup-open:bg-muted dark:bg-muted-foreground/10";
+
 function SessionFlagFilter({
 	byKind,
 	className,
+	loading,
 	onChange,
 	picked,
 	shown,
@@ -262,6 +270,7 @@ function SessionFlagFilter({
 }: {
 	byKind: ReadonlyMap<MomentKind, number>;
 	className?: string;
+	loading: boolean;
 	onChange: (kinds: MomentKind[]) => void;
 	picked: ReadonlySet<MomentKind>;
 	shown: number;
@@ -274,7 +283,21 @@ function SessionFlagFilter({
 		setOwn(picked);
 	}
 	const menuPicks = new Set([...own].filter((kind) => byKind.has(kind)));
-	if (byKind.size === 0) return null;
+	if (byKind.size === 0)
+		return loading ? (
+			<button
+				type="button"
+				disabled
+				aria-label="Loading flags"
+				className={cn(
+					FLAG_TRIGGER,
+					"cursor-default text-muted-foreground opacity-40 hover:bg-card dark:hover:bg-muted-foreground/10",
+					className,
+				)}
+			>
+				<IconAlertTriangle aria-hidden="true" className="size-3.5" />
+			</button>
+		) : null;
 	const on = menuPicks.size > 0;
 	const pick = (kinds: MomentKind[]) => {
 		setOwn(new Set(kinds));
@@ -299,7 +322,7 @@ function SessionFlagFilter({
 							: `Filter turns by flag, ${shown} flagged`
 					}
 					className={cn(
-						"inline-flex h-7 w-fit min-w-7 shrink-0 items-center justify-center gap-1 rounded-full bg-card px-2 text-xs font-medium shadow-(--custom-shadow) transition-colors hover:bg-muted/60 data-popup-open:bg-muted dark:bg-muted-foreground/10",
+						FLAG_TRIGGER,
 						on ? "text-foreground" : "text-muted-foreground",
 						className,
 					)}
@@ -348,7 +371,7 @@ export function useFlaggedTurns(session: {
 	isFrustrated: (turn: SessionDetailTurnSummary) => boolean;
 	tags: ReadonlyMap<string, ReactNode>;
 } {
-	const { byLine, byTurn: flagged } = useSessionFlags(session);
+	const { byLine, byTurn: flagged, loading } = useSessionFlags(session);
 	const [picked, setPicked] = useState<ReadonlySet<MomentKind>>(
 		() => new Set(),
 	);
@@ -404,6 +427,7 @@ export function useFlaggedTurns(session: {
 		filter: (
 			<SessionFlagFilter
 				byKind={byKind}
+				loading={loading}
 				onChange={(kinds) => setPicked(new Set(kinds))}
 				picked={activeOf(picked)}
 				shown={reading.kept.length}

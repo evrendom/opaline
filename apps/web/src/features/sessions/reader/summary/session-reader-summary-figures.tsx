@@ -15,6 +15,7 @@ export type SummaryFigure = {
 	badge?: ReactNode;
 	note?: ReactNode;
 	noteBelow?: boolean;
+	valueTip?: ReactNode;
 	measure?: ContextMeasure;
 	tint: string;
 	value: string;
@@ -73,6 +74,7 @@ export function SummaryFigures({
 									badge={stat.badge}
 									note={own ? undefined : stat.note}
 									noteBelow={stat.noteBelow}
+									valueTip={own ? undefined : stat.valueTip}
 									onSelect={picks ? () => onMeasure(picks) : undefined}
 									selected={picks === measure}
 									title={stat.detail || undefined}

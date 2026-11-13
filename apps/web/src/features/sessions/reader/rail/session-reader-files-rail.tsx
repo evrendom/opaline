@@ -106,7 +106,11 @@ export function FilesRail({
 				subagents={subagents}
 				tags={tags}
 				turns={railTurns}
-				whole={{ onPick: () => onPickRun(null), picked: run === null }}
+				whole={{
+					onPick: () => onPickRun(null),
+					picked: run === null,
+					total: overview.turnPage.total,
+				}}
 			/>
 		</OpenSubagentContext.Provider>
 	);

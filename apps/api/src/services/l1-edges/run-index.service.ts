@@ -1012,7 +1012,9 @@ export function runRow(
 		abort_reason: lifecycle.abortReason || run.l_abort_reason,
 		turn_error: lifecycle.turnError,
 		turn_error_kind: lifecycle.turnErrorKind,
-		interrupt_markers: run.l_interrupt_markers,
+		interrupt_markers:
+			run.l_interrupt_markers +
+			(lifecycle.abortReason === "interrupted" ? lifecycle.abortedTrue : 0),
 		stop_reason: run.l_stop_reason,
 		hook_stop_reason: run.l_hook_stop_reason,
 		prevented_continuation: recordedFlag(

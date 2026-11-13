@@ -1126,6 +1126,24 @@ describe("run index rows", () => {
 		).toBe("true");
 	});
 
+	test("a Codex turn the user interrupted is an interrupt, like Claude's marker", () => {
+		const interrupted = (abortReason: string) =>
+			runRow(
+				facts({ l_interrupt_markers: 0 }),
+				{ ...NO_CODEX_LIFECYCLE_FACTS, abortReason, abortedTrue: 1 },
+				context,
+			).interrupt_markers;
+		expect(interrupted("interrupted")).toBe(1);
+		expect(interrupted("replaced")).toBe(0);
+		expect(
+			runRow(
+				facts({ l_interrupt_markers: 2 }),
+				NO_CODEX_LIFECYCLE_FACTS,
+				context,
+			).interrupt_markers,
+		).toBe(2);
+	});
+
 	test("Claude abort reason and Codex turn effort survive row materialization", () => {
 		expect(
 			runRow(
@@ -1441,7 +1459,7 @@ describe("run index statements", () => {
 		const span = (query: string) =>
 			query.slice(
 				query.indexOf("run_facts AS ("),
-				query.indexOf("countIf(kind = 'tool_call') AS tool_calls"),
+				query.indexOf(") AS tool_calls,"),
 			);
 		expect(span(index)).toBe(span(find));
 		expect(find).not.toContain("l_agent_version");

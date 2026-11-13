@@ -424,6 +424,7 @@ const UNBUDGETED_FACTS: ReadonlySet<string> = new Set([
 	"script_call_id",
 	"text_cut",
 	"turn_cwd",
+	"turn_id",
 	"workdir",
 ]);
 

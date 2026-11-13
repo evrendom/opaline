@@ -2,9 +2,11 @@ import type {
 	SessionDetailTurnSummary,
 	SessionSetupFile,
 } from "@rudel/api-routes";
+import { IconAlertTriangle } from "@tabler/icons-react";
 import { type ReactNode, useMemo } from "react";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
 import { Reveal } from "@/app/ui/bones";
+import { EmptyState } from "@/components/dashboard/page-parts";
 import { formatCompactNumber } from "@/lib/format";
 import type { NormalizedSessionDetailOverview } from "../../components/session-detail-fast-response";
 import { useSessionSetupRuns } from "../../use-session-setup-runs";
@@ -288,7 +290,24 @@ function RunContext({
 	]);
 	if (state.status === "failed")
 		return <Unmapped>Its transcript couldn't be read.</Unmapped>;
-	if (body && !map) return <Unknown />;
+	if (body && !map)
+		return !agent && turn.usageCalls.length === 0 ? (
+			<ContextMapFrame>
+				<div className="relative">
+					<div aria-hidden="true" className="invisible">
+						<ContextMapSample />
+					</div>
+					<EmptyState
+						className="absolute inset-0 py-0"
+						icon={IconAlertTriangle}
+						title="No model call"
+						description="It ended before its first model call, so nothing filled its context."
+					/>
+				</div>
+			</ContextMapFrame>
+		) : (
+			<Unknown />
+		);
 	return (
 		<Reveal
 			label="Reading its context"

@@ -8,12 +8,12 @@ import {
 } from "./session-reader-summary-figures-model";
 
 const words = (figures: ReturnType<typeof sessionFigures>) =>
-	figures.map(({ detail, label, measure, note, value }) => ({
+	figures.map(({ detail, label, measure, value, valueTip }) => ({
 		detail: detail?.startsWith("Started ") ? "Started …" : detail,
 		label,
 		measure,
-		note,
 		value,
+		valueTip,
 	}));
 
 const turn = (overrides: Partial<SessionDetailTurnSummary>) =>
@@ -45,29 +45,29 @@ describe("the summary's figures", () => {
 		      "detail": "200K in · 6.8K out",
 		      "label": "Cost",
 		      "measure": "cost",
-		      "note": undefined,
 		      "value": "$13",
+		      "valueTip": undefined,
 		    },
 		    {
 		      "detail": "Started …",
 		      "label": "Duration",
 		      "measure": "time",
-		      "note": undefined,
 		      "value": "42m",
+		      "valueTip": undefined,
 		    },
 		    {
 		      "detail": "Its model's window isn't known · 5M tokens in all",
 		      "label": "Context window",
 		      "measure": "context",
-		      "note": undefined,
 		      "value": "—",
+		      "valueTip": undefined,
 		    },
 		    {
 		      "detail": "1 subagent",
 		      "label": "Turns",
 		      "measure": "runs",
-		      "note": undefined,
 		      "value": "2",
+		      "valueTip": undefined,
 		    },
 		  ]
 		`);
@@ -77,29 +77,29 @@ describe("the summary's figures", () => {
 		      "detail": "1 in · 2 out",
 		      "label": "Cost",
 		      "measure": "cost",
-		      "note": undefined,
 		      "value": "$13",
+		      "valueTip": undefined,
 		    },
 		    {
 		      "detail": "Started …",
 		      "label": "Duration",
 		      "measure": "time",
-		      "note": undefined,
 		      "value": "42m",
+		      "valueTip": undefined,
 		    },
 		    {
 		      "detail": "Its model's window isn't known · 5M tokens in all",
 		      "label": "Context window",
 		      "measure": "context",
-		      "note": undefined,
 		      "value": "—",
+		      "valueTip": undefined,
 		    },
 		    {
 		      "detail": "2 subagents",
 		      "label": "Turns",
 		      "measure": "runs",
-		      "note": undefined,
 		      "value": "3",
+		      "valueTip": undefined,
 		    },
 		  ]
 		`);
@@ -112,22 +112,22 @@ describe("the summary's figures", () => {
 		      "detail": "120K in · 3.4K out",
 		      "label": "Cost",
 		      "measure": "cost",
-		      "note": undefined,
 		      "value": "$1.23",
+		      "valueTip": undefined,
 		    },
 		    {
 		      "detail": "Started …",
 		      "label": "Duration",
 		      "measure": "time",
-		      "note": undefined,
 		      "value": "2m",
+		      "valueTip": undefined,
 		    },
 		    {
 		      "detail": "Its model's window isn't known · 123.4K tokens in all",
 		      "label": "Context window",
 		      "measure": "context",
-		      "note": undefined,
 		      "value": "—",
+		      "valueTip": undefined,
 		    },
 		  ]
 		`);
@@ -139,25 +139,94 @@ describe("the summary's figures", () => {
 		      "detail": "120K in · 3.4K out",
 		      "label": "Cost",
 		      "measure": "cost",
-		      "note": undefined,
 		      "value": "$1.23",
+		      "valueTip": undefined,
 		    },
 		    {
 		      "detail": "",
 		      "label": "Duration",
 		      "measure": "time",
-		      "note": undefined,
 		      "value": "—",
+		      "valueTip": undefined,
 		    },
 		    {
 		      "detail": "Its model's window isn't known · 123.4K tokens in all",
 		      "label": "Context window",
 		      "measure": "context",
-		      "note": undefined,
 		      "value": "—",
+		      "valueTip": undefined,
 		    },
 		  ]
 		`);
+	});
+
+	test("a run's fill, on its percentage", () => {
+		const call = {
+			at: "2026-10-10T10:00:05.000Z",
+			cacheCreationInputTokens: 0,
+			cacheReadInputTokens: 100_000,
+			contextWindow: 258_400,
+			freshInputTokens: 6_000,
+			model: "gpt-6-astra",
+			outputTokens: 500,
+		};
+		const [, , context] = words(runFigures(turn({ usageCalls: [call] })));
+		expect(context).toEqual({
+			detail: "106K of a 258.4K window, at its fullest · 123.4K tokens in all",
+			label: "Context window",
+			measure: "context",
+			value: "41%",
+			valueTip: "106K / 258.4K",
+		});
+	});
+
+	test("a run that ended before its first model call fills none of the window its session's calls had", () => {
+		const aborted = turn({
+			estimatedCost: null,
+			inputTokens: null,
+			outputTokens: null,
+			turnId: "t0",
+		});
+		const next = turn({
+			turnId: "t1",
+			usageCalls: [
+				{
+					at: "2026-10-10T10:00:05.000Z",
+					cacheCreationInputTokens: 0,
+					cacheReadInputTokens: 100_000,
+					contextWindow: 258_400,
+					freshInputTokens: 6_000,
+					model: "gpt-6-astra",
+					outputTokens: 500,
+				},
+			],
+		});
+		const [, , context] = words(runFigures(aborted, [aborted, next]));
+		expect(context?.value).toBe("0%");
+		expect(context?.valueTip).toBe("0 / 258.4K");
+	});
+
+	test("a run that ended before its first model call", () => {
+		expect(
+			words(
+				runFigures(
+					turn({
+						durationSeconds: 2.2,
+						estimatedCost: null,
+						inputTokens: null,
+						outputTokens: null,
+					}),
+				),
+			).map(({ detail, label, value }) => ({ detail, label, value })),
+		).toEqual([
+			{ detail: "No model call", label: "Cost", value: "$0.00" },
+			{ detail: "Started …", label: "Duration", value: "2s" },
+			{
+				detail: "It ended before its first model call",
+				label: "Context window",
+				value: "—",
+			},
+		]);
 	});
 
 	test("a subagent's", () => {
@@ -178,29 +247,29 @@ describe("the summary's figures", () => {
 		      "detail": "9K in · 900 out",
 		      "label": "Cost",
 		      "measure": "cost",
-		      "note": undefined,
 		      "value": "$0.42",
+		      "valueTip": undefined,
 		    },
 		    {
 		      "detail": "From its launch to its answer",
 		      "label": "Duration",
 		      "measure": "time",
-		      "note": undefined,
 		      "value": "5m",
+		      "valueTip": undefined,
 		    },
 		    {
 		      "detail": "Its model's window isn't known · 9.9K tokens in all",
 		      "label": "Context window",
 		      "measure": "context",
-		      "note": undefined,
 		      "value": "—",
+		      "valueTip": undefined,
 		    },
 		    {
 		      "detail": "The model it ran on",
 		      "label": "Model",
 		      "measure": undefined,
-		      "note": undefined,
 		      "value": "Opus 4.5",
+		      "valueTip": undefined,
 		    },
 		  ]
 		`);
@@ -218,29 +287,29 @@ describe("the summary's figures", () => {
 		      "detail": "9K in · 900 out",
 		      "label": "Cost",
 		      "measure": "cost",
-		      "note": undefined,
 		      "value": "$0.42",
+		      "valueTip": undefined,
 		    },
 		    {
 		      "detail": "From its launch to its answer",
 		      "label": "Duration",
 		      "measure": "time",
-		      "note": undefined,
 		      "value": "—",
+		      "valueTip": undefined,
 		    },
 		    {
 		      "detail": "Its model's window isn't known · 9.9K tokens in all",
 		      "label": "Context window",
 		      "measure": "context",
-		      "note": undefined,
 		      "value": "—",
+		      "valueTip": undefined,
 		    },
 		    {
 		      "detail": "The model it ran on",
 		      "label": "Model",
 		      "measure": undefined,
-		      "note": undefined,
 		      "value": "—",
+		      "valueTip": undefined,
 		    },
 		  ]
 		`);

@@ -321,3 +321,52 @@ describe("a completion without a turn id", () => {
 		).toBe(0);
 	});
 });
+
+describe("a turn steered while it works", () => {
+	const steered = [
+		line("session_meta", {
+			id: "steered",
+			cli_version: "0.162.0",
+			originator: "codex_exec",
+			thread_source: "user",
+		}),
+		event({
+			type: "task_started",
+			turn_id: "s1",
+			model_context_window: 258400,
+		}),
+		line("turn_context", { turn_id: "s1", model: "gpt-a", effort: "high" }),
+		prompt("locate the safeguard"),
+		answer("looking"),
+		prompt("dont code, just locate"),
+		answer("found it"),
+		prompt("and the config file?"),
+		answer("there too"),
+		event({ type: "task_complete", turn_id: "s1", duration_ms: 9000 }),
+	].join("\n");
+	const { rows, marks } = lifecycleInputs([
+		...splitSessionTranscript({
+			content: steered,
+			sessionDate: "2026-10-01T10:00:00.000Z",
+			source: "codex",
+		}),
+	]);
+	const byRun = codexLifecycleFactsByRun(rows, marks);
+	const run = (turn: number) => byRun.get(streamTurnKey("", turn));
+
+	test("every run of the turn has its settings; its completion's run alone has how it ended", () => {
+		const settings = {
+			...NO_CODEX_LIFECYCLE_FACTS,
+			model: "gpt-a",
+			models: ["gpt-a"],
+			effort: "high",
+			efforts: ["high"],
+			contextWindow: "258400",
+		};
+		expect([1, 2, 3].map(run)).toEqual([
+			settings,
+			settings,
+			{ ...settings, durationMs: 9000 },
+		]);
+	});
+});

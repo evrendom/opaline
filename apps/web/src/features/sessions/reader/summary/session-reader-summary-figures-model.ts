@@ -41,10 +41,39 @@ const CONTEXT = {
 	tint: "text-[rgba(0,96,226,0.765)] dark:text-[#6aa6ff]",
 } as const;
 
+function nearestWindow(
+	turns: readonly SessionDetailTurnSummary[],
+	turn: SessionDetailTurnSummary,
+): number | null {
+	const at = turns.indexOf(turn);
+	if (at < 0) return null;
+	for (let step = 1; step < turns.length; step++)
+		for (const index of [at - step, at + step]) {
+			for (const call of turns[index]?.usageCalls ?? []) {
+				const fill = getContextUseFill({
+					model: call.model,
+					tokens: 1,
+					window: call.contextWindow,
+				});
+				if (fill) return fill.window;
+			}
+		}
+	return null;
+}
+
 function contextFigure(
 	fill: ReturnType<typeof getContextUseFill>,
 	tokens: number,
+	called = true,
+	window: number | null = null,
 ): Figure {
+	if (!called)
+		return {
+			...CONTEXT,
+			detail: "It ended before its first model call",
+			valueTip: window ? `0 / ${formatCompactNumber(window)}` : undefined,
+			value: window ? "0%" : "—",
+		};
 	return {
 		...CONTEXT,
 		detail: `${
@@ -52,7 +81,7 @@ function contextFigure(
 				? `${formatCompactNumber(fill.tokens)} of a ${formatCompactNumber(fill.window)} window, at its fullest`
 				: "Its model's window isn't known"
 		} · ${formatCompactNumber(tokens)} tokens in all`,
-		note: fill
+		valueTip: fill
 			? `${formatCompactNumber(fill.tokens)} / ${formatCompactNumber(fill.window)}`
 			: undefined,
 		value: fill ? `${Math.round(fill.share * 100)}%` : "—",
@@ -119,14 +148,20 @@ export function sessionFigures(
 	];
 }
 
-export function runFigures(turn: SessionDetailTurnSummary): Figure[] {
+export function runFigures(
+	turn: SessionDetailTurnSummary,
+	turns: readonly SessionDetailTurnSummary[] = [],
+): Figure[] {
 	const tokens = (turn.inputTokens ?? 0) + (turn.outputTokens ?? 0);
+	const called = turn.usageCalls.length > 0 || turn.estimatedCost !== null;
 	return [
 		{
 			...COST,
-			detail: tokensDetail(turn.inputTokens, turn.outputTokens),
+			detail: called
+				? tokensDetail(turn.inputTokens, turn.outputTokens)
+				: "No model call",
 			label: "Cost",
-			value: formatReaderCost(turn.estimatedCost),
+			value: formatReaderCost(called ? turn.estimatedCost : 0),
 		},
 		{
 			...DURATION,
@@ -139,6 +174,8 @@ export function runFigures(turn: SessionDetailTurnSummary): Figure[] {
 		contextFigure(
 			((call) => call && getContextUseFill(call))(fullestCall(turn)),
 			tokens,
+			called,
+			called ? null : nearestWindow(turns, turn),
 		),
 	];
 }

@@ -988,7 +988,7 @@ test("a command that failed inside a Codex code-mode script is a failure of its 
 		}),
 	);
 	assert(runs.source === "runs" && "rows" in runs);
-	expect(runs.rows[0]).toMatchObject({ failedCalls: 1, toolCalls: 2 });
+	expect(runs.rows[0]).toMatchObject({ failedCalls: 1, toolCalls: 1 });
 });
 
 test("find source=calls finds the same command across sessions, next to its text", async () => {

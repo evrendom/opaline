@@ -286,6 +286,6 @@ describe("parser 9 run interpretation", () => {
 			runFactsCtes().match(
 				/\(session_id, agent_id, call_id\) NOT IN opaline_replayed_calls/gu,
 			),
-		).toHaveLength(3);
+		).toHaveLength(4);
 	});
 });
