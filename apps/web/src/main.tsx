@@ -1,6 +1,7 @@
 import { lazy, StrictMode, Suspense, useLayoutEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
+import { takeFirstOpenIntro } from "@/app/first-open";
 import { AppProviders } from "@/app/providers/AppProviders";
 import { BonesProvider } from "@/app/ui/bones";
 import {
@@ -82,6 +83,8 @@ function BootDone() {
 	}, []);
 	return null;
 }
+
+takeFirstOpenIntro();
 
 // biome-ignore lint/style/noNonNullAssertion: root element always exists
 const root = createRoot(document.getElementById("root")!);

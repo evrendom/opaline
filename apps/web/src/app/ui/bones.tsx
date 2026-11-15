@@ -5,7 +5,9 @@ import {
 	useLayoutEffect,
 	useRef,
 } from "react";
+import { smart } from "skullet";
 import { Skeleton, SkulletProvider } from "skullet/react";
+import { useIntroHold } from "@/app/first-open";
 import { cn } from "@/lib/utils";
 import "./bones.css";
 import { cancelSkulletAnimations } from "./skullet-animations";
@@ -16,9 +18,16 @@ const THEME = {
 	radius: "0.25rem",
 };
 
+const INTRO_REVEAL = { ...smart, hold: 0 };
+
 export function BonesProvider({ children }: { children: ReactNode }) {
+	const holding = useIntroHold();
 	return (
-		<SkulletProvider mode="light" reveal="smart" theme={THEME}>
+		<SkulletProvider
+			mode="light"
+			reveal={holding ? INTRO_REVEAL : "smart"}
+			theme={THEME}
+		>
 			{children}
 		</SkulletProvider>
 	);
@@ -116,15 +125,17 @@ export function Reveal({
 	sampleId: string;
 }) {
 	const host = useSquircleBars();
+	const holding = useIntroHold();
+	const skeleton = loading || holding;
 	return (
 		<div ref={host} className="contents">
 			<Skeleton
 				className={cn(fill && "bones-fill", className)}
-				id={loading ? sampleKey(sampleId) : NO_SNAPSHOT}
+				id={skeleton ? sampleKey(sampleId) : NO_SNAPSHOT}
 				label={label}
-				loading={loading}
+				loading={skeleton}
 			>
-				{loading ? sample : children()}
+				{skeleton ? sample : children()}
 			</Skeleton>
 		</div>
 	);

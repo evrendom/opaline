@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { AppToaster } from "@/app/ui/AppToaster";
 import { SessionArrivalNotifications } from "@/features/sessions/session-arrival-notifications";
 import "@/app/app-surface.css";
+import { useFirstOpenReady } from "@/app/first-open";
 import { appRoutes, getCanonicalAppPath, isNewSessionPath } from "@/app/routes";
 import { SidebarInset, SidebarProvider } from "@/app/ui/sidebar";
 import { TooltipProvider } from "@/app/ui/tooltip";
@@ -68,6 +69,7 @@ export function LeftSidebarAppShellLayout() {
 	const isWelcome = canonicalPathname === CLI_SETUP_PATH;
 	useRootMark("data-app-shell");
 	useRootMark("data-welcome-shell", isWelcome);
+	useFirstOpenReady();
 	const [onboardingPanel, setOnboardingPanel] =
 		React.useState<HTMLElement | null>(null);
 	const isSessionOverviewRoute = canonicalPathname === appRoutes.session();
