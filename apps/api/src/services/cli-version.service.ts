@@ -5,6 +5,7 @@ import {
 	parseCliVersion,
 } from "@rudel/api-routes";
 import type postgres from "postgres";
+import { isSelfHosted } from "../lib/self-hosted.js";
 
 const logger = getLogger(["rudel", "api", "cli-version"]);
 const NPM_LATEST_CLI_URL = "https://registry.npmjs.org/opaline/latest";
@@ -37,6 +38,7 @@ export async function readLatestCliVersion(
 	fetchLatest: typeof fetch = fetch,
 	now = Date.now(),
 ): Promise<string | null> {
+	if (isSelfHosted()) return null;
 	if (latest && now - latest.checkedAt < LATEST_CHECK_INTERVAL_MS)
 		return latest.version;
 	let version = latest?.version ?? null;
