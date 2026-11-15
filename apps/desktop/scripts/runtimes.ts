@@ -4,21 +4,21 @@ import { join, relative } from "node:path";
 import {
 	createProgressLine,
 	ensureVerifiedDownload,
-} from "../../cli/src/lib/self-host/download.ts";
+} from "../../../packages/local-server/src/download.ts";
 import {
 	detectHostPlatform,
 	getBunAsset,
 	getClickHouseAsset,
 	getPostgresAsset,
 	type HostPlatform,
-} from "../../cli/src/lib/self-host/pinned-runtimes.ts";
+} from "../../../packages/local-server/src/pinned-runtimes.ts";
 import {
 	createRuntimeContext,
 	getRuntimeInstallDir,
 	resolveBun,
 	resolveClickHouse,
 	resolvePostgres,
-} from "../../cli/src/lib/self-host/runtimes.ts";
+} from "../../../packages/local-server/src/runtimes.ts";
 
 const [mode, cacheDir, outDir, platformArgument] = process.argv.slice(2);
 if ((mode !== "download" && mode !== "unpack") || !cacheDir || !outDir) {

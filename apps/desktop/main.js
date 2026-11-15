@@ -2,7 +2,7 @@ const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { app, BrowserWindow, ipcMain, Menu, nativeImage, nativeTheme, screen, shell } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, screen, shell } = require("electron");
 
 const explicitUrl = process.env.OPALINE_URL;
 const isDev = Boolean(explicitUrl);
@@ -15,7 +15,7 @@ if (isDev) app.setPath("userData", `${app.getPath("userData")} Dev`);
 process.env.OPALINE_SERVER_DATA_DIR ||= path.join(app.getPath("userData"), "server");
 
 const { analyzeSessions, scanSessions } = require("./analyze");
-const { agentStatuses, applyRepositories, connectAgent, installCommandLine, listRepositories, stopAll } = require("./cli");
+const { createAgents } = require("./agents");
 const { createLocalStack, introUrl } = require("./stack/local-stack");
 const { createEnvironmentMenu } = require("./environments");
 
@@ -24,6 +24,20 @@ app.userAgentFallback = `${app.userAgentFallback
 	.replace(/\s(opaline-desktop|Opaline)\/\S+/, "")} OpalineDesktop/${app.getVersion()}`;
 
 const stack = createLocalStack({ app });
+const agents = createAgents({
+	stack,
+	confirmCloudSwitch: async (label) => {
+		const { response } = await dialog.showMessageBox(onboardingWindow ?? mainWindow(), {
+			type: "question",
+			buttons: ["Use This Mac", "Keep Opaline Cloud"],
+			defaultId: 0,
+			cancelId: 1,
+			message: `${label} is connected to Opaline Cloud.`,
+			detail: `Connect ${label} to Opaline on this Mac instead? Its Opaline Cloud plugin is turned off; you can turn it back on in ${label} at any time.`,
+		});
+		return response === 0;
+	},
+});
 
 const NO_SCROLLBARS = `
 * {
@@ -118,34 +132,6 @@ function createWindow({ url, bounds, intro = false } = {}) {
 function fromApp(event) {
 	return isAppUrl(event.senderFrame?.url ?? "");
 }
-
-let applying = false;
-
-ipcMain.handle("repositories:list", (event) => {
-	if (!fromApp(event)) throw new Error("Not allowed.");
-	return listRepositories();
-});
-
-ipcMain.handle("repositories:apply", async (event, id, options) => {
-	if (!fromApp(event)) throw new Error("Not allowed.");
-	if (applying) throw new Error("Opaline is already saving your repositories.");
-	applying = true;
-	const contents = event.sender;
-	const origin = appOrigin();
-	const apiBase = ["localhost", "127.0.0.1"].includes(new URL(origin).hostname) ? origin : undefined;
-	try {
-		return await applyRepositories(options ?? {}, apiBase, (payload) => {
-			if (contents.isDestroyed()) return;
-			contents.send("repositories:event", id, payload);
-			if (payload.type === "authorize") {
-				const link = new URL(payload.url);
-				contents.loadURL(`${origin}${link.pathname}${link.search}`);
-			}
-		});
-	} finally {
-		applying = false;
-	}
-});
 
 let onboardingWindow;
 
@@ -319,8 +305,8 @@ ipcMain.handle("onboarding:icons", (event) =>
 			}
 		: null,
 );
-ipcMain.handle("onboarding:agents", (event) => (fromOnboarding(event) ? agentStatuses() : null));
-ipcMain.handle("onboarding:connect", (event, key) => (fromOnboarding(event) ? connectAgent(key) : null));
+ipcMain.handle("onboarding:agents", (event) => (fromOnboarding(event) ? agents.statuses() : null));
+ipcMain.handle("onboarding:connect", (event, key) => (fromOnboarding(event) ? agents.connect(key) : null));
 ipcMain.on("onboarding:theme", (event, theme) => {
 	if (!fromOnboarding(event) || !["light", "dark", "system"].includes(theme)) return;
 	nativeTheme.themeSource = theme;
@@ -370,6 +356,7 @@ app.whenReady().then(() => {
 				stack,
 				window: mainWindow,
 				openWindow: () => createWindow(),
+				quitCompletely,
 			}),
 		);
 	if (onboarding) {
@@ -378,23 +365,33 @@ app.whenReady().then(() => {
 	} else {
 		nativeTheme.themeSource = savedTheme();
 		createWindow();
-		if (!explicitUrl) stack.afterLaunch();
 	}
-	if (!explicitUrl) stack.supervise({ onRestart: reloadAppWindows });
-	void installCommandLine();
-	listRepositories().catch(() => {});
+	if (!explicitUrl) {
+		stack.supervise({ onRestart: reloadAppWindows });
+		stack.ready().then(() => agents.refresh()).catch(() => {});
+	}
 	app.on("activate", () => {
 		if (BrowserWindow.getAllWindows().length === 0) createWindow();
 	});
 });
 
+let stopServer = false;
 let stopping;
 let stopped = false;
 
+function quitCompletely() {
+	stopServer = true;
+	app.quit();
+}
+
 app.on("before-quit", (event) => {
 	quitting = true;
-	stopAll();
+	if (onboardingWindow && !onboardingWindow.isDestroyed()) onboardingWindow.setClosable(true);
 	if (stopped || explicitUrl) return;
+	if (!stopServer) {
+		stack.detach();
+		return;
+	}
 	event.preventDefault();
 	for (const win of BrowserWindow.getAllWindows()) win.hide();
 	stopping ??= stack

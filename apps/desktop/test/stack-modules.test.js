@@ -10,13 +10,6 @@ const {
 	validateEnvironment,
 } = require("../stack/settings");
 const {
-	describeImport,
-	formatEta,
-	nextPollDelay,
-	parseIngestStatus,
-	statusSummary,
-} = require("../stack/status");
-const {
 	createCliRunner,
 	parseJsonLine,
 	priorityCommand,
@@ -109,99 +102,6 @@ describe("environments", () => {
 	});
 });
 
-describe("status", () => {
-	test("the import endpoint degrades to unavailable on 404 or a bad answer", () => {
-		expect(parseIngestStatus(404)).toEqual({ available: false });
-		expect(parseIngestStatus(500, {})).toEqual({
-			available: false,
-			error: true,
-		});
-		expect(
-			parseIngestStatus(200, {
-				state: "importing",
-				sessionsSeen: 420,
-				sessionsIngested: 120,
-				sessionsQueued: 300,
-				bytesQueued: 1e9,
-				lastIngestAt: "2026-11-09T10:00:00Z",
-				etaSeconds: 95,
-				backgroundPriority: true,
-			}),
-		).toEqual({
-			available: true,
-			state: "importing",
-			sessionsSeen: 420,
-			sessionsIngested: 120,
-			sessionsQueued: 300,
-			bytesQueued: 1e9,
-			lastIngestAt: "2026-11-09T10:00:00Z",
-			etaSeconds: 95,
-			backgroundPriority: true,
-		});
-	});
-
-	test("import progress comes from the server, else from the CLI upload", () => {
-		const ingest = parseIngestStatus(200, {
-			state: "importing",
-			sessionsSeen: 420,
-			sessionsIngested: 120,
-			sessionsQueued: 300,
-			etaSeconds: 95,
-		});
-		expect(describeImport(ingest)).toBe(
-			"Importing history: 120 of 420 sessions, about 2 min left",
-		);
-		expect(
-			describeImport(
-				{ available: false },
-				{ running: true, completed: 3, total: 40 },
-			),
-		).toBe("Importing history: 3 of 40 sessions");
-		expect(
-			describeImport({ available: false }, { running: false }),
-		).toBeUndefined();
-		expect(formatEta(30)).toBe("less than a minute left");
-		expect(formatEta(5400)).toBe("about 1 h 30 min left");
-		expect(formatEta(null)).toBe("");
-	});
-
-	test("polling slows down when nothing happens and the window is hidden", () => {
-		expect(
-			nextPollDelay({
-				ingest: { available: false },
-				cliImport: { running: true },
-			}),
-		).toBe(5_000);
-		expect(
-			nextPollDelay({ ingest: { available: false }, windowVisible: true }),
-		).toBe(60_000);
-		expect(
-			nextPollDelay({ ingest: { available: false }, windowVisible: false }),
-		).toBe(300_000);
-	});
-
-	test("summary lines for a menu bar", () => {
-		expect(
-			statusSummary({
-				environment: "This Mac",
-				running: true,
-				sessionsToday: 1,
-				paused: true,
-				ingest: { available: false },
-				cliImport: { running: true, completed: 2, total: 5 },
-			}),
-		).toEqual([
-			"Opaline is running on this Mac",
-			"1 session today",
-			"Importing history: 2 of 5 sessions",
-			"Uploads are paused",
-		]);
-		expect(
-			statusSummary({ environment: "nas.local:4100", running: false }),
-		).toEqual(["nas.local:4100 is not reachable"]);
-	});
-});
-
 describe("the CLI runner", () => {
 	test("priorities: taskpolicy -b on macOS for background work, nice elsewhere", () => {
 		expect(priorityCommand("background", "/A", ["x"], "darwin")).toEqual({
@@ -264,64 +164,5 @@ describe("the CLI runner", () => {
 		]);
 		expect(lines).toEqual(["plain line"]);
 		expect(result.last).toEqual({ type: "done" });
-	});
-});
-
-describe("history", () => {
-	const {
-		createImportLedger,
-		failedPaths,
-		listRecentSessions,
-	} = require("../stack/history");
-
-	test("lists Claude Code and Codex transcripts of the last 30 days, newest first", () => {
-		const make = (relative, daysAgo, content = "{}\n") => {
-			const file = path.join(root, relative);
-			fs.mkdirSync(path.dirname(file), { recursive: true });
-			fs.writeFileSync(file, content);
-			const at = new Date(Date.now() - daysAgo * 86_400_000);
-			fs.utimesSync(file, at, at);
-			return file;
-		};
-		const recent = make("home/.claude/projects/-w-a/s1.jsonl", 1);
-		make("home/.claude/projects/-w-a/s1/subagents/agent-1.jsonl", 1);
-		make("home/.claude/projects/-w-a/old.jsonl", 31);
-		make("home/.claude/projects/-w-a/empty.jsonl", 1, "");
-		const codex = make("home/.codex/sessions/2026/11/08/rollout-1.jsonl", 2);
-		const archived = make("home/.codex/archived_sessions/rollout-0.jsonl", 3);
-		const sessions = listRecentSessions({
-			env: {},
-			home: path.join(root, "home"),
-		});
-		expect(sessions.map((session) => [session.agent, session.path])).toEqual([
-			["claude_code", recent],
-			["codex", codex],
-			["codex", archived],
-		]);
-		const moved = listRecentSessions({
-			env: {
-				CLAUDE_CONFIG_DIR: path.join(root, "elsewhere"),
-				CODEX_HOME: path.join(root, "none"),
-			},
-			home: path.join(root, "home"),
-		});
-		expect(moved).toEqual([]);
-	});
-
-	test("the ledger remembers imported sessions across restarts", () => {
-		const file = path.join(root, "ledger.json");
-		createImportLedger(file).add(["a:1:2", "b:3:4"]);
-		const again = createImportLedger(file);
-		expect(again.has("a:1:2")).toBe(true);
-		expect(again.has("c:5:6")).toBe(false);
-		expect(fs.statSync(file).mode & 0o777).toBe(0o600);
-	});
-
-	test("failed uploads are read from the CLI's stderr", () => {
-		expect([
-			...failedPaths(
-				"Upload of /a b.jsonl failed: boom\nother\nUpload of /c.jsonl failed: x\n",
-			),
-		]).toEqual(["/a b.jsonl", "/c.jsonl"]);
 	});
 });

@@ -6,27 +6,14 @@ const path = require("node:path");
 const { EventEmitter } = require("node:events");
 const { createCliRunner } = require("./cli-runner");
 const {
-	createImportLedger,
-	failedPaths,
-	IMPORT_BATCH,
-	listRecentSessions,
-} = require("./history");
-const {
 	CLOUD_URL,
 	createSettingsStore,
-	environmentLabel,
 	environmentOrigin,
 	normalizeServerUrl,
 	validateEnvironment,
 } = require("./settings");
-const {
-	describeImport,
-	nextPollDelay,
-	parseIngestStatus,
-	statusSummary,
-} = require("./status");
 
-const SETUP_STEPS = ["runtimes", "databases", "server", "account", "agents"];
+const SETUP_STEPS = ["runtimes", "databases", "server", "account"];
 const DEFAULT_PORT = 4100;
 const LINK_RETRY_MS = 30_000;
 const INTRO_PARAM = "opaline-intro";
@@ -45,6 +32,10 @@ function readJson(file) {
 	}
 }
 
+function firstExisting(candidates) {
+	return candidates.find((candidate) => candidate && fs.existsSync(candidate));
+}
+
 function resolveBundle({ app, resourcesPath }) {
 	const bundled =
 		process.resourcesPath &&
@@ -55,15 +46,23 @@ function resolveBundle({ app, resourcesPath }) {
 		process.env.OPALINE_DESKTOP_RESOURCES ??
 		(app.isPackaged || bundled ? process.resourcesPath : undefined);
 	const appRoot = app.getAppPath();
-	const cliCandidates = [
-		process.env.OPALINE_DESKTOP_CLI,
-		path.join(appRoot, "cli", "cli.js"),
-		resources && path.join(resources, "cli", "cli.js"),
-		path.join(appRoot, "..", "cli", "dist", "cli.js"),
-	];
-	const cliPath = cliCandidates.find(
-		(candidate) => candidate && fs.existsSync(candidate),
-	);
+	const launcherPath = firstExisting([
+		process.env.OPALINE_DESKTOP_LOCAL_SERVER,
+		path.join(appRoot, "local-server", "local-server.js"),
+		path.join(
+			appRoot,
+			"..",
+			"..",
+			"packages",
+			"local-server",
+			"dist",
+			"local-server.js",
+		),
+	]);
+	const pluginDir = firstExisting([
+		path.join(appRoot, "agent-plugin"),
+		path.join(appRoot, "..", "..", "plugins", "opaline"),
+	]);
 	const runtimesDir = resources && path.join(resources, "runtimes");
 	const manifest = runtimesDir
 		? readJson(path.join(runtimesDir, "runtimes.json"))
@@ -93,15 +92,12 @@ function resolveBundle({ app, resourcesPath }) {
 	} catch {}
 	return {
 		resources,
-		cliPath,
+		launcherPath,
+		pluginDir,
 		clickhouse: runtime("clickhouse"),
 		postgres: runtime("postgres"),
 		bun: runtime("bun"),
 		downloads,
-		clickhouseDownload:
-			downloads &&
-			manifest.files?.clickhouse &&
-			path.join(downloads, manifest.files.clickhouse),
 		serverManifest,
 	};
 }
@@ -125,14 +121,6 @@ function serverDataDir(env = process.env) {
 	return explicit
 		? path.resolve(explicit)
 		: path.join(os.homedir(), ".opaline", "server");
-}
-
-function cliConfigDir(env = process.env) {
-	return (
-		env.OPALINE_CONFIG_DIR?.trim() ||
-		env.RUDEL_CONFIG_DIR?.trim() ||
-		path.join(os.homedir(), ".rudel")
-	);
 }
 
 function readLocalServer(dataDir = serverDataDir()) {
@@ -163,22 +151,6 @@ function installedClickHouse(dataDir = serverDataDir()) {
 			.at(-1);
 		const binary = name && path.join(dataDir, "bin", name, "clickhouse");
 		return binary && fs.existsSync(binary) ? binary : undefined;
-	} catch {
-		return undefined;
-	}
-}
-
-function readCliLogin(env = process.env) {
-	const credentials = readJson(
-		path.join(cliConfigDir(env), "credentials.json"),
-	);
-	if (!credentials || typeof credentials.apiBaseUrl !== "string")
-		return undefined;
-	try {
-		return {
-			origin: new URL(credentials.apiBaseUrl).origin,
-			token: credentials.token,
-		};
 	} catch {
 		return undefined;
 	}
@@ -234,7 +206,6 @@ function stepForEvent(event) {
 		};
 	if (event.type === "ready") return { step: "server", state: "done", event };
 	if (event.type === "setup") return { step: "account", state: "done", event };
-	if (event.type === "agents") return { step: "agents", state: "done", event };
 	if (event.type === "error") return { step: undefined, state: "error", event };
 	return undefined;
 }
@@ -253,8 +224,8 @@ function createLocalStack(options) {
 	};
 	const bundle = resolveBundle(options);
 	const settings = createSettingsStore(userData);
-	const cli = createCliRunner({
-		cliPath: bundle.cliPath,
+	const launcher = createCliRunner({
+		cliPath: bundle.launcherPath,
 		environment: () => bundleEnvironment(bundle),
 		log,
 		cacheFile: path.join(userData, "shell-path.json"),
@@ -265,10 +236,8 @@ function createLocalStack(options) {
 	let shuttingDown = false;
 	let stopSupervising;
 	let pendingLogin;
-	const watchedWindows = new WeakSet();
-	const ledger = createImportLedger(path.join(userData, "history-import.json"));
-	let cliImport = { running: false, completed: 0, total: 0 };
 	let lastLink = 0;
+	const watchedWindows = new WeakSet();
 	const setupProgress = Object.fromEntries(
 		SETUP_STEPS.map((step) => [step, "pending"]),
 	);
@@ -283,6 +252,10 @@ function createLocalStack(options) {
 		});
 	}
 
+	function mark(name) {
+		log(`mark ${name} ${Math.round(process.uptime() * 1000)} ms after launch`);
+	}
+
 	function forward(event) {
 		if (event.type === "runtime" && event.phase === "ready") {
 			mark(`runtime-${event.name}`);
@@ -294,12 +267,12 @@ function createLocalStack(options) {
 		if (event.type === "log") log(`server: ${event.message}`);
 	}
 
-	function mark(name) {
-		log(`mark ${name} ${Math.round(process.uptime() * 1000)} ms after launch`);
-	}
-
 	function environment() {
 		return settings.read().environment;
+	}
+
+	function isLocal() {
+		return (environment() ?? { kind: "local" }).kind === "local";
 	}
 
 	function localServer() {
@@ -321,34 +294,29 @@ function createLocalStack(options) {
 		}
 	}
 
-	async function startServer(options) {
+	async function startServer() {
 		starting++;
 		try {
-			return await runServerStart(options);
+			const args = ["start"];
+			if (!localServer()) {
+				const port = await firstServerPort();
+				if (port && port !== DEFAULT_PORT) args.push("--port", String(port));
+			}
+			const result = await launcher.run(args, { onEvent: forward });
+			const error = result.events.find((event) => event.type === "error");
+			if (result.code !== 0 || error)
+				throw new Error(
+					error?.message ??
+						(result.stderr.trim().split("\n").at(-1) ||
+							"The local server did not start."),
+				);
+			const login = result.events.find((event) => event.type === "login")?.url;
+			if (login) pendingLogin = { url: login, at: Date.now() };
+			emitter.emit("server", localServer());
+			return { setup: result.events.find((event) => event.type === "setup") };
 		} finally {
 			starting--;
 		}
-	}
-
-	async function runServerStart({ wireAgents }) {
-		const args = ["server", "start", "--json"];
-		if (wireAgents) args.push("--yes");
-		else args.push("--no-agent-setup");
-		if (!localServer()) {
-			const port = await firstServerPort();
-			if (port && port !== DEFAULT_PORT) args.push("--port", String(port));
-		}
-		const result = await cli.run(args, { onEvent: forward });
-		const error = result.events.find((event) => event.type === "error");
-		if (result.code !== 0 || error)
-			throw new Error(
-				error?.message ??
-					(result.stderr.trim().split("\n").at(-1) ||
-						"The local server did not start."),
-			);
-		const login = result.events.find((event) => event.type === "login")?.url;
-		if (login) pendingLogin = { url: login, at: Date.now() };
-		return { setup: result.events.find((event) => event.type === "setup") };
 	}
 
 	function clickhouseBinary(timeoutMs = 120_000) {
@@ -374,7 +342,7 @@ function createLocalStack(options) {
 		preparing ??= (async () => {
 			for (let attempt = 1; attempt <= attempts; attempt++) {
 				try {
-					return await startServer({ wireAgents: false });
+					return await startServer();
 				} catch (error) {
 					log(`prepare attempt ${attempt} failed: ${error.message}`);
 					if (shuttingDown) break;
@@ -396,21 +364,28 @@ function createLocalStack(options) {
 		);
 	}
 
+	async function ready() {
+		const server = localServer();
+		if (server?.configured && (await isHealthy(server.localUrl))) return server;
+		await (preparing ?? prepare());
+		const next = localServer();
+		if (next?.configured && (await isHealthy(next.localUrl))) return next;
+		await startServer();
+		return localServer();
+	}
+
 	function ensureLocal() {
 		ensuring ??= (async () => {
 			try {
 				progress("runtimes", "active");
-				await preparing;
-				const started = await startServer({ wireAgents: true });
+				const server = await ready();
+				if (!server?.configured)
+					throw new Error("The local server is not set up.");
 				for (const step of SETUP_STEPS)
 					if (setupProgress[step] !== "done") progress(step, "done");
 				if (environment()?.kind !== "local")
 					settings.write({ environment: { kind: "local" } });
-				if (!settings.read().historyImportedAt)
-					importHistory().catch((error) =>
-						log(`history import did not start: ${error.message}`),
-					);
-				return { url: localServer()?.publicUrl, setup: started.setup };
+				return { url: server.publicUrl };
 			} catch (error) {
 				progress(undefined, "error", { message: error.message });
 				throw error;
@@ -428,11 +403,22 @@ function createLocalStack(options) {
 			lastLink = Date.now();
 			return url;
 		}
-		const result = await cli.run(["server", "open", "--json"]);
+		const result = await launcher.run(["open"]);
 		if (result.code !== 0 || !result.last?.url)
 			throw new Error(result.last?.message ?? "No sign-in link.");
 		lastLink = Date.now();
 		return result.last.url;
+	}
+
+	async function hasSessionCookie(webContents, url) {
+		try {
+			const cookies = await webContents.session.cookies.get({ url });
+			return cookies.some((cookie) =>
+				/better-auth\.session_token$/u.test(cookie.name),
+			);
+		} catch {
+			return false;
+		}
 	}
 
 	async function signInSession(webContents, link, url) {
@@ -449,22 +435,11 @@ function createLocalStack(options) {
 		return hasSessionCookie(webContents, url);
 	}
 
-	async function hasSessionCookie(webContents, url) {
-		try {
-			const cookies = await webContents.session.cookies.get({ url });
-			return cookies.some((cookie) =>
-				/better-auth\.session_token$/u.test(cookie.name),
-			);
-		} catch {
-			return false;
-		}
-	}
-
 	function watchLoginRedirects(win) {
 		if (watchedWindows.has(win)) return;
 		watchedWindows.add(win);
 		win.webContents.on("did-navigate", (_event, url) => {
-			if ((environment() ?? { kind: "local" }).kind !== "local") return;
+			if (!isLocal()) return;
 			const parsed = new URL(url);
 			if (parsed.origin !== origin() || parsed.pathname !== "/login") return;
 			if (Date.now() - lastLink < LINK_RETRY_MS) return;
@@ -476,25 +451,8 @@ function createLocalStack(options) {
 		});
 	}
 
-	async function localReady() {
-		const server = localServer();
-		return Boolean(server?.configured) && (await isHealthy(server.localUrl));
-	}
-
 	async function openLocal(win, target, intro) {
-		let healthy = await localReady();
-		if (environment()?.kind !== "local" || !healthy) {
-			const ensured = ensureLocal();
-			if (!healthy && preparing) {
-				await preparing;
-				healthy = await localReady();
-			}
-			if (healthy)
-				ensured.catch((error) =>
-					log(`local setup did not finish: ${error.message}`),
-				);
-			else await ensured;
-		}
+		await ensureLocal();
 		const server = localServer();
 		if (!server) throw new Error("The local server is not set up.");
 		watchLoginRedirects(win);
@@ -510,24 +468,6 @@ function createLocalStack(options) {
 		return win.loadURL(link);
 	}
 
-	async function signInToServer(win, url) {
-		const login = readCliLogin();
-		if (login?.origin === new URL(url).origin) return false;
-		const args = ["login", "--server", url, "--json"];
-		if (normalizeServerUrl(url).plaintext)
-			args.push("--allow-insecure-api-base");
-		const result = await cli.run(args, {
-			onEvent: (event) => {
-				emitter.emit("login", event);
-				if (event.type === "authorize" && !win.isDestroyed())
-					win.loadURL(event.url);
-			},
-		});
-		if (result.code !== 0)
-			throw new Error(result.last?.message ?? `Could not sign in to ${url}.`);
-		return true;
-	}
-
 	async function openDashboard(win, target, { intro = false } = {}) {
 		const current = environment() ?? { kind: "local" };
 		const shape = (url) => (intro ? introUrl(url) : url);
@@ -536,16 +476,7 @@ function createLocalStack(options) {
 			if (current.kind === "local") return await openLocal(win, target, intro);
 			if (current.kind === "cloud")
 				return await win.loadURL(shape(target ?? `${CLOUD_URL}/dashboard`));
-			await win.loadURL(shape(target ?? `${current.url}/`));
-			signInToServer(win, current.url)
-				.then(
-					(signedIn) =>
-						signedIn && !win.isDestroyed() && win.loadURL(`${current.url}/`),
-				)
-				.catch((error) => {
-					log(`server sign-in failed: ${error.message}`);
-					emitter.emit("error", error);
-				});
+			return await win.loadURL(shape(target ?? `${current.url}/`));
 		} catch (error) {
 			log(`openDashboard failed: ${error.message}`);
 			emitter.emit("error", error);
@@ -587,6 +518,14 @@ function createLocalStack(options) {
 		}
 	}
 
+	async function stopLocal(timeoutMs = 30_000) {
+		if (!localServer()) return undefined;
+		const started = Date.now();
+		const result = await launcher.run(["stop"], { timeoutMs });
+		log(`stopped the local server in ${Date.now() - started} ms`);
+		return result;
+	}
+
 	async function useEnvironment(next, win) {
 		const target = validateEnvironment(next);
 		if (!target) throw new Error("Unknown environment.");
@@ -600,189 +539,6 @@ function createLocalStack(options) {
 		emitter.emit("environment", target);
 		if (win && !win.isDestroyed()) await openDashboard(win);
 		return target;
-	}
-
-	async function ingestStatus() {
-		const server = localServer();
-		if (environment()?.kind !== "local" || !server?.apiKey)
-			return { available: false };
-		try {
-			const response = await fetchWithTimeout(
-				`${server.localUrl}/api/selfhost/ingest/status`,
-				{ headers: { "x-api-key": server.apiKey } },
-				2_000,
-			);
-			const body =
-				response.status === 404
-					? undefined
-					: await response.json().catch(() => undefined);
-			if (response.status === 404) await response.body?.cancel();
-			return parseIngestStatus(response.status, body);
-		} catch {
-			return { available: false, error: true };
-		}
-	}
-
-	async function sessionsToday(webContents) {
-		if (
-			!webContents ||
-			webContents.isDestroyed() ||
-			!isAppUrl(webContents.getURL())
-		)
-			return undefined;
-		const day = new Date();
-		const iso = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
-		const script = `fetch("/rpc/analytics/overview/kpis",{method:"POST",credentials:"include",headers:{"content-type":"application/json"},body:JSON.stringify({json:{startDate:"${iso}",endDate:"${iso}"}})}).then(r=>r.ok?r.json():null).then(b=>b&&b.json?b.json.distinct_sessions:null).catch(()=>null)`;
-		try {
-			const value = await webContents.executeJavaScript(script, true);
-			return typeof value === "number" ? value : undefined;
-		} catch {
-			return undefined;
-		}
-	}
-
-	async function status(webContents) {
-		const current = environment() ?? { kind: "local" };
-		const label = environmentLabel(current);
-		const target =
-			current.kind === "local" ? localServer()?.localUrl : origin();
-		const [running, ingest, today] = await Promise.all([
-			target ? isHealthy(target) : Promise.resolve(false),
-			ingestStatus(),
-			sessionsToday(webContents),
-		]);
-		const paused = settings.read().uploadsPaused;
-		const snapshot = {
-			environment: current,
-			label,
-			running,
-			sessionsToday: today,
-			paused,
-			ingest,
-			import: describeImport(ingest, cliImport),
-			cliImport: { ...cliImport },
-		};
-		return {
-			...snapshot,
-			lines: statusSummary({ ...snapshot, environment: label, cliImport }),
-		};
-	}
-
-	function watchStatus(listener, { window } = {}) {
-		let timer;
-		let stopped = false;
-		const tick = async () => {
-			if (stopped) return;
-			const webContents =
-				window && !window.isDestroyed() ? window.webContents : undefined;
-			const snapshot = await status(webContents).catch(() => undefined);
-			if (snapshot) listener(snapshot);
-			if (stopped) return;
-			const delay = nextPollDelay({
-				ingest: snapshot?.ingest,
-				cliImport,
-				windowVisible: Boolean(
-					window && !window.isDestroyed() && window.isVisible(),
-				),
-			});
-			timer = setTimeout(tick, delay);
-			timer.unref?.();
-		};
-		tick();
-		return () => {
-			stopped = true;
-			clearTimeout(timer);
-		};
-	}
-
-	async function importHistory() {
-		if (cliImport.running) return { started: false, reason: "running" };
-		if (!isLocal()) return { started: false, reason: "not-local" };
-		const ingest = await ingestStatus();
-		if (ingest.available) {
-			settings.write({ historyImportedAt: new Date().toISOString() });
-			return { started: false, reason: "server" };
-		}
-		const sessions = listRecentSessions().filter(
-			(session) => !ledger.has(session.key),
-		);
-		if (!sessions.length) {
-			settings.write({ historyImportedAt: new Date().toISOString() });
-			return { started: false, reason: "empty" };
-		}
-		cliImport = {
-			running: true,
-			completed: 0,
-			total: sessions.length,
-			failed: 0,
-			startedAt: Date.now(),
-		};
-		emitter.emit("import", { ...cliImport });
-		(async () => {
-			for (let index = 0; index < sessions.length; index += IMPORT_BATCH) {
-				if (!isLocal()) break;
-				const batch = sessions.slice(index, index + IMPORT_BATCH);
-				const result = await cli.run(
-					["import", ...batch.map((session) => session.path)],
-					{ priority: "background" },
-				);
-				if (result.code === null || result.code < 0) break;
-				const failed = failedPaths(result.stderr);
-				if (result.code !== 0 && failed.size === 0)
-					for (const session of batch) failed.add(session.path);
-				ledger.add(
-					batch
-						.filter((session) => !failed.has(session.path))
-						.map((session) => session.key),
-				);
-				cliImport = {
-					...cliImport,
-					completed: cliImport.completed + batch.length,
-					failed: cliImport.failed + failed.size,
-				};
-				emitter.emit("import", { ...cliImport });
-			}
-			cliImport = { ...cliImport, running: false, finishedAt: Date.now() };
-			if (cliImport.completed >= cliImport.total)
-				settings.write({ historyImportedAt: new Date().toISOString() });
-			log(
-				`history import: ${cliImport.completed - cliImport.failed} of ${cliImport.total} sessions in ${cliImport.finishedAt - cliImport.startedAt} ms, ${cliImport.failed} failed`,
-			);
-			emitter.emit("import", { ...cliImport });
-		})().catch((error) => {
-			cliImport = { ...cliImport, running: false };
-			log(`history import failed: ${error.message}`);
-		});
-		return { started: true, sessions: sessions.length };
-	}
-
-	async function pauseUploads() {
-		const result = await cli.run(["uploads", "pause", "--json"]);
-		if (result.code !== 0)
-			throw new Error(result.last?.message ?? "Could not pause uploads.");
-		settings.write({ uploadsPaused: true });
-		return result.last;
-	}
-
-	async function resumeUploads() {
-		const result = await cli.run(["uploads", "resume", "--json"]);
-		if (result.code !== 0)
-			throw new Error(result.last?.message ?? "Could not resume uploads.");
-		settings.write({ uploadsPaused: false });
-		if (result.last?.queued > 0)
-			cli
-				.run(["import", "--retry", "--yes"], { priority: "background" })
-				.catch(() => {});
-		return result.last;
-	}
-
-	async function stopLocal(timeoutMs = 30_000) {
-		if (!localServer()) return undefined;
-		return cli.run(["server", "stop"], { timeoutMs });
-	}
-
-	function isLocal() {
-		return (environment() ?? { kind: "local" }).kind === "local";
 	}
 
 	function supervise({
@@ -810,7 +566,7 @@ function createLocalStack(options) {
 				misses = 0;
 				mark("server-restart");
 				try {
-					await startServer({ wireAgents: false });
+					await startServer();
 					mark("server-restarted");
 					onRestart?.();
 				} catch (error) {
@@ -827,57 +583,55 @@ function createLocalStack(options) {
 		return stopSupervising;
 	}
 
-	async function shutdown() {
+	function detach() {
 		shuttingDown = true;
 		stopSupervising?.();
-		cli.stopAll();
-		if (!isLocal()) return;
-		const started = Date.now();
-		await stopLocal();
-		log(`stopped the local server in ${Date.now() - started} ms`);
+		launcher.stopAll();
 	}
 
-	function afterLaunch({ delayMs = 10_000 } = {}) {
-		if (!isLocal() || !localServer()?.configured) return;
-		const timer = setTimeout(() => {
-			if (!settings.read().historyImportedAt)
-				importHistory().catch((error) =>
-					log(`history import did not resume: ${error.message}`),
-				);
-		}, delayMs);
-		timer.unref?.();
+	async function shutdown() {
+		detach();
+		if (!isLocal()) return;
+		await stopLocal();
+	}
+
+	function agentServer() {
+		const server = localServer();
+		if (!server?.configured || !server.apiKey) return undefined;
+		return {
+			url: server.publicUrl,
+			mcpUrl: `${server.publicUrl}/api/mcp`,
+			apiKey: server.apiKey,
+			dataDir: serverDataDir(),
+		};
 	}
 
 	return {
 		on: (name, listener) => emitter.on(name, listener),
-		mark,
 		off: (name, listener) => emitter.off(name, listener),
+		mark,
 		bundle,
 		settings,
 		environment,
+		isLocal,
 		origin,
 		isAppUrl,
 		localServer,
+		agentServer,
 		prepare,
+		ready,
 		warmClickHouse,
 		ensureLocal,
 		stopLocal,
-		supervise,
-		shutdown,
-		isLocal,
 		clickhouseBinary,
 		openDashboard,
 		signInLink,
 		checkServer,
 		useEnvironment,
-		status,
-		watchStatus,
-		importHistory,
-		pauseUploads,
-		resumeUploads,
-		afterLaunch,
-		runCli: cli.run,
-		stopAll: cli.stopAll,
+		supervise,
+		detach,
+		shutdown,
+		runLauncher: launcher.run,
 	};
 }
 
@@ -888,7 +642,6 @@ module.exports = {
 	installedClickHouse,
 	bundleEnvironment,
 	createLocalStack,
-	readCliLogin,
 	readLocalServer,
 	resolveBundle,
 	serverDataDir,

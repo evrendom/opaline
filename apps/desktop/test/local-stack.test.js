@@ -18,15 +18,14 @@ const {
 	stepForEvent,
 } = require("../stack/local-stack");
 
-const FAKE_CLI = `
+const FAKE_LAUNCHER = `
 const fs = require("node:fs");
 const path = require("node:path");
 const args = process.argv.slice(2);
 fs.appendFileSync(process.env.FAKE_LOG, JSON.stringify(args) + "\\n");
 const out = (event) => process.stdout.write(JSON.stringify(event) + "\\n");
 const base = process.env.FAKE_BASE;
-const key = args.slice(0, 2).join(" ");
-if (key === "server start") {
+if (args[0] === "start") {
 	const dataDir = process.env.OPALINE_SERVER_DATA_DIR;
 	const fresh = !fs.existsSync(path.join(dataDir, "server.json"));
 	fs.mkdirSync(dataDir, { recursive: true });
@@ -38,30 +37,14 @@ if (key === "server start") {
 		out({ type: "starting", service: "postgres" });
 		out({ type: "starting", service: "server" });
 		out({ type: "ready", url: base, localUrl: base, alreadyRunning: false });
-		out({ type: "setup", created: true, credentials: "write", user: { id: "u", email: "me@x.dev", name: "Me" }, organization: { id: "o", slug: "me", name: "Me" } });
+		out({ type: "setup", created: true, credentials: "keep", user: { id: "u", email: "me@x.dev", name: "Me" }, organization: { id: "o", slug: "me", name: "Me" } });
 		out({ type: "login", url: base + "/api/selfhost/login?token=first" });
 	} else {
 		out({ type: "ready", url: base, localUrl: base, alreadyRunning: true });
-		out({ type: "setup", created: false, credentials: "unchanged", user: { id: "u", email: "me@x.dev", name: "Me" }, organization: { id: "o", slug: "me", name: "Me" } });
-		if (args.includes("--yes")) out({ type: "agents", hooks: [{ agent: "claude_code", status: "installed" }], mcp: ["Claude Code: added"] });
 	}
 	out({ type: "done", url: base });
-} else if (key === "server open") {
+} else if (args[0] === "open") {
 	out({ url: base + "/api/selfhost/login?token=again", signIn: true, dashboardUrl: base });
-} else if (args[0] === "login") {
-	const server = args[args.indexOf("--server") + 1];
-	out({ type: "authorize", url: server + "/welcome?user_code=AB-CD", userCode: "AB-CD" });
-	fs.writeFileSync(path.join(process.env.OPALINE_CONFIG_DIR, "credentials.json"), JSON.stringify({ apiBaseUrl: server, token: "k2" }));
-	out({ type: "signed-in", apiBase: server });
-	out({ type: "done", apiBase: server });
-} else if (args[0] === "import") {
-	const failed = args.slice(1).filter((file) => file.includes("fail"));
-	for (const file of failed) process.stderr.write("Upload of " + file + " failed: boom\\n");
-	process.exit(failed.length ? 1 : 0);
-} else if (key === "uploads pause") {
-	out({ paused: true, pausedAt: "2026-11-09T00:00:00Z" });
-} else if (key === "uploads resume") {
-	out({ paused: false, wasPaused: true, queued: 0 });
 }
 `;
 
@@ -71,11 +54,8 @@ let base;
 let healthy = true;
 const saved = {};
 const ENV = [
-	"CLAUDE_CONFIG_DIR",
-	"CODEX_HOME",
 	"OPALINE_SERVER_DATA_DIR",
-	"OPALINE_CONFIG_DIR",
-	"OPALINE_DESKTOP_CLI",
+	"OPALINE_DESKTOP_LOCAL_SERVER",
 	"OPALINE_DESKTOP_SERVER_PORT",
 	"FAKE_LOG",
 	"FAKE_BASE",
@@ -92,8 +72,6 @@ beforeAll(() => {
 				return Response.json({
 					selfHosted: true,
 					version: "0.18.0",
-					appUrl: url.origin,
-					mcpUrl: `${url.origin}/api/mcp`,
 					setupComplete: true,
 				});
 			return new Response("not found", { status: 404 });
@@ -108,21 +86,12 @@ beforeEach(() => {
 	healthy = true;
 	root = fs.mkdtempSync(path.join(os.tmpdir(), "opaline-desktop-controller-"));
 	for (const key of ENV) saved[key] = process.env[key];
-	fs.mkdirSync(path.join(root, "config"));
-	fs.writeFileSync(path.join(root, "cli.js"), FAKE_CLI);
-	fs.writeFileSync(path.join(root, "userData-shell.json"), "");
+	fs.writeFileSync(path.join(root, "local-server.js"), FAKE_LAUNCHER);
 	process.env.OPALINE_SERVER_DATA_DIR = path.join(root, "server");
-	process.env.OPALINE_CONFIG_DIR = path.join(root, "config");
-	process.env.OPALINE_DESKTOP_CLI = path.join(root, "cli.js");
+	process.env.OPALINE_DESKTOP_LOCAL_SERVER = path.join(root, "local-server.js");
 	process.env.FAKE_LOG = path.join(root, "calls.jsonl");
 	process.env.FAKE_BASE = base;
 	process.env.OPALINE_DESKTOP_SERVER_PORT = "4100";
-	process.env.CLAUDE_CONFIG_DIR = path.join(root, "claude");
-	process.env.CODEX_HOME = path.join(root, "codex");
-	writeSession("claude/projects/-work-app/a.jsonl", 1);
-	writeSession("claude/projects/-work-app/b.jsonl", 2);
-	writeSession("claude/projects/-work-old/old.jsonl", 40 * 24 * 60);
-	writeSession("codex/sessions/2026/11/09/rollout-c.jsonl", 3);
 	fs.mkdirSync(path.join(root, "userData"), { recursive: true });
 	fs.writeFileSync(
 		path.join(root, "userData", "shell-path.json"),
@@ -138,15 +107,6 @@ afterEach(() => {
 	fs.rmSync(root, { recursive: true, force: true });
 });
 
-function writeSession(relative, minutesAgo) {
-	const file = path.join(root, relative);
-	fs.mkdirSync(path.dirname(file), { recursive: true });
-	fs.writeFileSync(file, "{}\n");
-	const at = new Date(Date.now() - minutesAgo * 60_000);
-	fs.utimesSync(file, at, at);
-	return file;
-}
-
 function fakeApp() {
 	return {
 		isPackaged: false,
@@ -157,7 +117,6 @@ function fakeApp() {
 
 function fakeWindow(cookies = [], fetch) {
 	const loaded = [];
-	const handlers = {};
 	return {
 		loaded,
 		isDestroyed: () => false,
@@ -170,18 +129,16 @@ function fakeWindow(cookies = [], fetch) {
 				cookies: { get: async () => cookies },
 				...(fetch ? { fetch: (url) => fetch(url, cookies) } : {}),
 			},
-			on: (name, handler) => {
-				handlers[name] = handler;
-			},
+			on: () => {},
 			once: () => {},
 			isDestroyed: () => false,
 			getURL: () => loaded.at(-1) ?? "",
-			executeJavaScript: async () => 7,
 		},
 	};
 }
 
 function calls() {
+	if (!fs.existsSync(process.env.FAKE_LOG)) return [];
 	return fs
 		.readFileSync(process.env.FAKE_LOG, "utf8")
 		.split("\n")
@@ -199,15 +156,17 @@ async function until(check, timeoutMs = 5_000) {
 }
 
 describe("bundle", () => {
-	test("finds the runtimes, the server package and the CLI in the resources", () => {
+	test("finds the runtimes, the server package and the launcher in the app", () => {
 		const resources = path.join(root, "Resources");
+		const appRoot = path.join(resources, "app");
 		for (const file of [
 			"runtimes/clickhouse-1/clickhouse",
 			"runtimes/postgres-1/bin/postgres",
 			"runtimes/bun-1/bun",
 			"server/opaline-server-0.18.0.json",
 			"server/opaline-server-0.18.0.tgz",
-			"cli/cli.js",
+			"app/local-server/local-server.js",
+			"app/agent-plugin/.mcp.json",
 		]) {
 			fs.mkdirSync(path.dirname(path.join(resources, file)), {
 				recursive: true,
@@ -222,14 +181,15 @@ describe("bundle", () => {
 				bun: { path: "bun-1/bun" },
 			}),
 		);
-		const saved = process.env.OPALINE_DESKTOP_CLI;
-		delete process.env.OPALINE_DESKTOP_CLI;
+		delete process.env.OPALINE_DESKTOP_LOCAL_SERVER;
 		const bundle = resolveBundle({
-			app: { ...fakeApp(), isPackaged: true },
+			app: { ...fakeApp(), isPackaged: true, getAppPath: () => appRoot },
 			resourcesPath: resources,
 		});
-		process.env.OPALINE_DESKTOP_CLI = saved;
-		expect(bundle.cliPath).toBe(path.join(resources, "cli", "cli.js"));
+		expect(bundle.launcherPath).toBe(
+			path.join(appRoot, "local-server", "local-server.js"),
+		);
+		expect(bundle.pluginDir).toBe(path.join(appRoot, "agent-plugin"));
 		expect(bundleEnvironment(bundle)).toEqual({
 			OPALINE_CLICKHOUSE_BIN: path.join(
 				resources,
@@ -244,7 +204,7 @@ describe("bundle", () => {
 		});
 	});
 
-	test("reads the local server URL and key, and maps CLI events to setup steps", () => {
+	test("reads the local server URL and key, and maps launcher events to setup steps", () => {
 		const dataDir = path.join(root, "s");
 		fs.mkdirSync(dataDir);
 		fs.writeFileSync(
@@ -265,11 +225,8 @@ describe("bundle", () => {
 		expect(
 			stepForEvent({ type: "starting", service: "postgres" }),
 		).toMatchObject({ step: "databases", state: "active" });
-		expect(stepForEvent({ type: "starting", service: "server" })).toMatchObject(
-			{ step: "server", state: "active" },
-		);
-		expect(stepForEvent({ type: "agents" })).toMatchObject({
-			step: "agents",
+		expect(stepForEvent({ type: "setup" })).toMatchObject({
+			step: "account",
 			state: "done",
 		});
 		expect(stepForEvent({ type: "log" })).toBeUndefined();
@@ -277,7 +234,7 @@ describe("bundle", () => {
 });
 
 describe("the local stack controller", () => {
-	test("first launch: prepare, hand the login link to the window, then wire agents and import history", async () => {
+	test("first launch: prepare, then hand the first sign-in link to the window", async () => {
 		const stack = createLocalStack({ app: fakeApp() });
 		const steps = [];
 		stack.on("progress", (event) => steps.push([event.step, event.state]));
@@ -285,29 +242,16 @@ describe("the local stack controller", () => {
 		const win = fakeWindow();
 		await stack.openDashboard(win);
 		expect(win.loaded).toEqual([`${base}/api/selfhost/login?token=first`]);
-		await until(() => stack.settings.read().historyImportedAt !== undefined);
 		expect(stack.environment()).toEqual({ kind: "local" });
-		expect(calls()).toEqual([
-			["server", "start", "--json", "--no-agent-setup"],
-			["server", "start", "--json", "--yes"],
-			[
-				"import",
-				path.join(root, "claude/projects/-work-app/a.jsonl"),
-				path.join(root, "claude/projects/-work-app/b.jsonl"),
-				path.join(root, "codex/sessions/2026/11/09/rollout-c.jsonl"),
-			],
-		]);
-		for (const step of ["runtimes", "databases", "server", "account", "agents"])
+		expect(calls()).toEqual([["start"]]);
+		for (const step of ["runtimes", "databases", "server", "account"])
 			expect(steps).toContainEqual([step, "done"]);
-		await until(() => stack.settings.read().historyImportedAt !== undefined);
-		const status = await stack.status(win.webContents);
-		expect(status).toMatchObject({
-			running: true,
-			sessionsToday: 7,
-			ingest: { available: false },
-			label: "This Mac",
+		expect(stack.agentServer()).toEqual({
+			url: base,
+			mcpUrl: `${base}/api/mcp`,
+			apiKey: "key-1",
+			dataDir: path.join(root, "server"),
 		});
-		expect(status.lines[0]).toBe("Opaline is running on this Mac");
 	});
 
 	test("the intro opens signed in: the window's session follows the sign-in link, then loads the dashboard with the intro flag", async () => {
@@ -317,11 +261,25 @@ describe("the local stack controller", () => {
 		const win = fakeWindow([], async (url, cookies) => {
 			fetched.push(url);
 			cookies.push({ name: "better-auth.session_token", value: "x" });
-			return new Response(null, { status: 302 });
+			return new Response(null, { status: 200 });
 		});
 		await stack.openDashboard(win, undefined, { intro: true });
 		expect(fetched).toEqual([`${base}/api/selfhost/login?token=first`]);
 		expect(win.loaded).toEqual([`${base}/dashboard?opaline-intro=1`]);
+	});
+
+	test("a later launch with a session cookie and a running server loads the dashboard without a new start", async () => {
+		const stack = createLocalStack({ app: fakeApp() });
+		await stack.prepare();
+		await stack.ensureLocal();
+		fs.writeFileSync(process.env.FAKE_LOG, "");
+		const again = createLocalStack({ app: fakeApp() });
+		const win = fakeWindow([{ name: "better-auth.session_token", value: "x" }]);
+		await again.openDashboard(win);
+		expect(win.loaded).toEqual([`${base}/`]);
+		expect(calls()).toEqual([]);
+		expect(again.isAppUrl(`${base}/repos`)).toBe(true);
+		expect(again.isAppUrl("https://opaline.so/")).toBe(false);
 	});
 
 	test("the supervisor restarts a local server that stops answering", async () => {
@@ -341,117 +299,42 @@ describe("the local stack controller", () => {
 		});
 		await until(() => restarted === 1);
 		stop();
-		expect(calls().filter((args) => args[0] === "server")).toEqual([
-			["server", "start", "--json", "--no-agent-setup"],
-		]);
+		expect(calls()).toEqual([["start"]]);
 	});
 
-	test("quitting stops the local server, and leaving this Mac stops it too", async () => {
+	test("a plain quit leaves the server running; quitting completely or leaving this Mac stops it", async () => {
 		const stack = createLocalStack({ app: fakeApp() });
 		await stack.prepare();
 		await stack.ensureLocal();
-		await until(() => stack.settings.read().historyImportedAt !== undefined);
 		fs.writeFileSync(process.env.FAKE_LOG, "");
+		stack.detach();
+		expect(calls()).toEqual([]);
 		await stack.shutdown();
-		expect(calls()).toEqual([["server", "stop"]]);
+		expect(calls()).toEqual([["stop"]]);
 		fs.writeFileSync(process.env.FAKE_LOG, "");
 		const other = createLocalStack({ app: fakeApp() });
 		await other.useEnvironment({ kind: "cloud" });
 		await until(() => calls().length === 1);
-		expect(calls()).toEqual([["server", "stop"]]);
+		expect(calls()).toEqual([["stop"]]);
 		fs.writeFileSync(process.env.FAKE_LOG, "");
 		await other.shutdown();
 		expect(calls()).toEqual([]);
 	});
 
-	test("later launch with a session cookie loads the dashboard without the CLI", async () => {
-		const stack = createLocalStack({ app: fakeApp() });
-		await stack.prepare();
-		await stack.ensureLocal();
-		fs.writeFileSync(process.env.FAKE_LOG, "");
-		const again = createLocalStack({ app: fakeApp() });
-		const win = fakeWindow([{ name: "better-auth.session_token", value: "x" }]);
-		await again.openDashboard(win);
-		expect(win.loaded).toEqual([`${base}/`]);
-		expect(fs.readFileSync(process.env.FAKE_LOG, "utf8")).toBe("");
-		expect(again.isAppUrl(`${base}/repos`)).toBe(true);
-		expect(again.isAppUrl("https://opaline.so/")).toBe(false);
-	});
-
-	test("switching to your server signs the CLI in through the window, then back to this Mac", async () => {
+	test("your server: the window opens it and signs in there; then back to this Mac", async () => {
 		const stack = createLocalStack({ app: fakeApp() });
 		await stack.prepare();
 		await stack.ensureLocal();
 		const win = fakeWindow([{ name: "better-auth.session_token", value: "x" }]);
 		const other = base.replace("127.0.0.1", "localhost");
 		await stack.useEnvironment({ kind: "server", url: other }, win);
-		await until(() => win.loaded.length >= 3);
-		expect(win.loaded).toEqual([
-			`${other}/`,
-			`${other}/welcome?user_code=AB-CD`,
-			`${other}/`,
-		]);
+		expect(win.loaded).toEqual([`${other}/`]);
 		expect(stack.isAppUrl(`${other}/x`)).toBe(true);
 		await expect(
 			stack.useEnvironment({ kind: "server", url: "http://127.0.0.1:9" }, win),
 		).rejects.toThrow("Could not reach");
 		await stack.useEnvironment({ kind: "local" }, win);
 		expect(stack.environment()).toEqual({ kind: "local" });
-		expect(
-			calls()
-				.filter((args) => args[0] === "server" && args[1] === "start")
-				.at(-1),
-		).toEqual(["server", "start", "--json", "--yes"]);
 		expect(win.loaded.at(-1)).toBe(`${base}/`);
-	});
-
-	test("a later launch resumes the history import with only what is not imported yet", async () => {
-		const stack = createLocalStack({ app: fakeApp() });
-		await stack.prepare();
-		await stack.ensureLocal();
-		await until(() => stack.settings.read().historyImportedAt !== undefined);
-		stack.settings.write({ historyImportedAt: undefined });
-		const fresh = writeSession("claude/projects/-work-app/new.jsonl", 0);
-		const failing = writeSession("claude/projects/-work-fail/fail.jsonl", 5);
-		fs.writeFileSync(process.env.FAKE_LOG, "");
-		const later = createLocalStack({ app: fakeApp() });
-		later.afterLaunch({ delayMs: 0 });
-		await until(() => later.settings.read().historyImportedAt !== undefined);
-		expect(calls()).toEqual([["import", fresh, failing]]);
-		const status = await later.status();
-		expect(status.cliImport).toMatchObject({
-			running: false,
-			completed: 2,
-			total: 2,
-			failed: 1,
-		});
-		fs.writeFileSync(process.env.FAKE_LOG, "");
-		later.settings.write({ historyImportedAt: undefined });
-		expect(await later.importHistory()).toEqual({ started: true, sessions: 1 });
-		await until(() => calls().length === 1);
-		expect(calls()).toEqual([["import", failing]]);
-	});
-
-	test("the history import never uploads when the app is not on this Mac", async () => {
-		const stack = createLocalStack({ app: fakeApp() });
-		stack.settings.write({ environment: { kind: "cloud" } });
-		expect(await stack.importHistory()).toEqual({
-			started: false,
-			reason: "not-local",
-		});
-		stack.afterLaunch({ delayMs: 0 });
-		await new Promise((resolve) => setTimeout(resolve, 50));
-		expect(fs.existsSync(process.env.FAKE_LOG)).toBe(false);
-	});
-
-	test("pause and resume uploads", async () => {
-		const stack = createLocalStack({ app: fakeApp() });
-		expect(await stack.pauseUploads()).toMatchObject({ paused: true });
-		expect(stack.settings.read().uploadsPaused).toBe(true);
-		expect(await stack.resumeUploads()).toMatchObject({
-			paused: false,
-			queued: 0,
-		});
-		expect(stack.settings.read().uploadsPaused).toBe(false);
 	});
 });

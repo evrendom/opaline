@@ -2,7 +2,7 @@ const path = require("node:path");
 const { BrowserWindow, dialog, ipcMain, Menu } = require("electron");
 const { environmentLabel } = require("./stack/settings");
 
-function createEnvironmentMenu({ stack, window, openWindow }) {
+function createEnvironmentMenu({ stack, window, openWindow, quitCompletely }) {
 	let prompt;
 
 	const current = () => stack.environment() ?? { kind: "local" };
@@ -81,7 +81,25 @@ function createEnvironmentMenu({ stack, window, openWindow }) {
 			{ label: "Connect to Your Server…", click: openPrompt },
 		];
 		return Menu.buildFromTemplate([
-			{ role: "appMenu" },
+			{
+				label: "Opaline",
+				submenu: [
+					{ role: "about" },
+					{ type: "separator" },
+					{ role: "services" },
+					{ type: "separator" },
+					{ role: "hide" },
+					{ role: "hideOthers" },
+					{ role: "unhide" },
+					{ type: "separator" },
+					{ role: "quit", label: "Quit Opaline" },
+					{
+						label: "Quit Opaline Completely",
+						accelerator: "Alt+Command+Q",
+						click: quitCompletely,
+					},
+				],
+			},
 			{ role: "editMenu" },
 			{ label: "Environment", submenu: choices },
 			{ role: "viewMenu" },
