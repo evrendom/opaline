@@ -85,7 +85,7 @@ function metricCard(metric, result) {
 
 let boxes = null;
 let glass = null;
-const BOX_DIALS = { count: [14, 2, 40, 1], gap: [8, 0, 16, 1], morph: [0.8, 0.2, 2, 0.05] };
+const BOX_DIALS = { count: [20, 2, 40, 1], gap: [12, 0, 16, 1], morph: [0.8, 0.2, 2, 0.05] };
 let tuning = { boxes: Object.fromEntries(Object.entries(BOX_DIALS).map(([key, value]) => [key, value[0]])) };
 const AGENT_PREVIEWS = {
 	checking: null,
