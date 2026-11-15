@@ -262,7 +262,7 @@ jobs:
         env:
           RUDEL_OLD_CLI_PATH: ${{ github.workspace }}/.tmp/old-cli/package/dist/cli.js
 
-  deploy-vercel:
+  main-head:
     if: >-
       ${{ !cancelled() &&
       github.event_name == 'push' &&
@@ -271,6 +271,32 @@ jobs:
       (needs.integration.result == 'success' ||
       needs.integration.result == 'skipped') }}
     needs: [verify, integration]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    outputs:
+      current: ${{ steps.head.outputs.current }}
+    steps:
+      # The production deploy lock keeps one pending deploy and cancels any
+      # older pending one, so a superseded commit that finishes CI late would
+      # cancel the deploy of main's HEAD, and then nothing is promoted.
+      - name: Is this commit still main's HEAD
+        id: head
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          head_sha="$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq .sha)"
+          if [[ "${head_sha}" == "${GITHUB_SHA}" ]]; then
+            echo "current=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "current=false" >> "${GITHUB_OUTPUT}"
+            echo "Skipping deploy: main has moved to ${head_sha}, whose run deploys this commit too." >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
+  deploy-vercel:
+    if: >-
+      ${{ !cancelled() &&
+      needs.main-head.outputs.current == 'true' }}
+    needs: [verify, integration, main-head]
     uses: ./.github/workflows/vercel.yml
     with:
       target: production

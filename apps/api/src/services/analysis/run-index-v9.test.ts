@@ -62,6 +62,7 @@ describe("parser 9 run interpretation", () => {
 				revision: "1",
 				sessionId: "session",
 				usageGeneration: "usage",
+				source: "claude_code",
 			},
 		).query;
 		const run = runFactsCtes();
@@ -280,10 +281,11 @@ describe("parser 9 run interpretation", () => {
 		expect(sql).toContain("agent_id = '' AND kind = 'tool_call'");
 		expect(sql).not.toContain("timestamp");
 		expect(runFactsCtes()).toContain("f.parent_session_id = p.session_id");
+		expect(runFactsCtes().match(/FROM replayed_calls\)/gu)).toHaveLength(1);
 		expect(
 			runFactsCtes().match(
-				/NOT IN \(SELECT session_id, agent_id, call_id FROM replayed_calls\)/gu,
+				/\(session_id, agent_id, call_id\) NOT IN opaline_replayed_calls/gu,
 			),
-		).toHaveLength(3);
+		).toHaveLength(4);
 	});
 });

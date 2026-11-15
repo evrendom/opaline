@@ -6,6 +6,8 @@ import {
 	createJournalStore,
 	extractExecutableStatements,
 } from "chkit/dist/bin/lib.js";
+import { resolveClickHouseUsername } from "../src/clickhouse-connection.js";
+import { DROPPED_SESSION_ANALYTICS_COLUMNS } from "../src/session-analytics-mv.js";
 import { countReplicas } from "./cluster-replicas.js";
 import {
 	appendJournalEntryWithReconciliation,
@@ -21,15 +23,28 @@ export const STRING_DEFAULTS = {
 		git_remote: "",
 		package_name: "",
 		package_type: "",
-		error_pattern: "",
 		model_used: "",
-		session_archetype: "standard",
 	},
 	claude_sessions: { git_remote: "", package_name: "", package_type: "" },
 	codex_sessions: { git_remote: "", package_name: "", package_type: "" },
 } as const satisfies Record<string, Record<string, string>>;
 
 type Table = keyof typeof STRING_DEFAULTS;
+
+/**
+ * The migration's statements without the columns that
+ * `20261109150000_session_analytics_drop_retired.sql` drops after it, so a
+ * re-apply never names a dropped column.
+ */
+export function stringDefaultsStatements(migrationSql: string): string[] {
+	const dropped = new RegExp(
+		`,\\s*MODIFY COLUMN (?:${DROPPED_SESSION_ANALYTICS_COLUMNS.join("|")}) DEFAULT '[^']*'`,
+		"gu",
+	);
+	return extractExecutableStatements(migrationSql).map((statement) =>
+		statement.replace(dropped, ""),
+	);
+}
 
 /** How ClickHouse reports a string default in `system.columns`. */
 export function stringDefaultExpression(value: string): string {
@@ -61,8 +76,9 @@ export async function runStringDefaultsMigration(options: {
 	if (applied.some((entry) => entry.checksum !== checksum))
 		throw new Error("String defaults migration checksum mismatch");
 	const replicas = await countReplicas(options.executor, "the string defaults");
+	const statements = stringDefaultsStatements(options.migrationSql);
 	const apply = async () => {
-		for (const statement of extractExecutableStatements(options.migrationSql))
+		for (const statement of statements)
 			await options.executor.execute(statement);
 	};
 	const journaled = applied.length > 0;

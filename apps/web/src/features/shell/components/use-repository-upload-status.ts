@@ -16,7 +16,7 @@ const LIVE_POLL_MS = 30_000;
 
 export function useRepositoryUploadStatus() {
 	const repositories = useAnalyticsQuery(
-		orpc.analytics.repositories.list.queryOptions({}),
+		orpc.analytics.repositories.navigation.queryOptions({}),
 	);
 	const demo = useDemoRuntime();
 	const settings = useAnalyticsQuery({

@@ -3,12 +3,14 @@ import {
 	StandardRPCSerializer,
 } from "@orpc/client/standard";
 import { ORPCError } from "@orpc/server";
+import { RPC_BATCH_PATH } from "@rudel/api-routes/rpc-batch";
 
 export const API_RESPONSE_MAX_BYTES = 3_750_000;
 export const API_RESPONSE_TOO_LARGE_CODE = "RESPONSE_TOO_LARGE";
 
 const HEALTH_PATHS = new Set(["/health", "/rpc/health"]);
 const STREAMED_RPC_PATHS = new Set([
+	RPC_BATCH_PATH,
 	"/rpc/cli/data/sql",
 	"/rpc/cli/data/pullTable",
 ]);

@@ -1,7 +1,7 @@
 import type { SessionSetupFile } from "@rudel/api-routes";
 import { IconListDetails, IconPlug, IconSettings } from "@tabler/icons-react";
 import type { ReactNode } from "react";
-import { Bones } from "@/app/ui/bones";
+import { Reveal } from "@/app/ui/bones";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { FluidList, useFluidListItem } from "@/components/fluid-list";
 import { formatPaddedTimeOfDay } from "@/lib/format";
@@ -101,29 +101,39 @@ export function SetupColumn({
 					{calls ? timeline : null}
 					{calls ? null : uses ? (
 						<FluidList className="flex flex-col gap-0.5">
-							{uses.status === "loading" ? (
-								<UsesSkeleton />
-							) : uses.status === "failed" ? (
+							{uses.status === "failed" ? (
 								<p className="py-1 pl-2 text-[11px] text-muted-foreground">
 									This run could not be read.
 								</p>
-							) : uses.uses.length === 0 ? (
+							) : uses.status !== "loading" && uses.uses.length === 0 ? (
 								<EmptyState
 									icon={IconPlug}
 									title="No skills or MCP"
 									description="This run used no skill or MCP server."
 									className="mt-1 p-6 py-8"
 								/>
-							) : null}
-							{useGroups.map((group) => (
-								<SetupUseGroup
-									key={group.file.setupFile}
-									group={group}
-									indexOf={(use) => useIndex.get(use.step.id)}
-									onPickUse={(use) => onPickUse?.(use)}
-									pickedUse={pickedUse ?? null}
-								/>
-							))}
+							) : (
+								<Reveal
+									label="Reading the run"
+									loading={uses.status === "loading"}
+									sample={<UsesSample />}
+									sampleId="reader-setup-uses"
+								>
+									{() => (
+										<div className="flex flex-col gap-0.5">
+											{useGroups.map((group) => (
+												<SetupUseGroup
+													key={group.file.setupFile}
+													group={group}
+													indexOf={(use) => useIndex.get(use.step.id)}
+													onPickUse={(use) => onPickUse?.(use)}
+													pickedUse={pickedUse ?? null}
+												/>
+											))}
+										</div>
+									)}
+								</Reveal>
+							)}
 						</FluidList>
 					) : null}
 					<FluidList
@@ -239,9 +249,9 @@ const SAMPLE_USE_GROUPS = groupUses([
 	}),
 ]);
 
-function UsesSkeleton() {
+function UsesSample() {
 	return (
-		<Bones label="Reading the run">
+		<div className="flex flex-col gap-0.5">
 			{SAMPLE_USE_GROUPS.map((group) => (
 				<SetupUseGroup
 					key={group.file.setupFile}
@@ -251,7 +261,7 @@ function UsesSkeleton() {
 					pickedUse={null}
 				/>
 			))}
-		</Bones>
+		</div>
 	);
 }
 

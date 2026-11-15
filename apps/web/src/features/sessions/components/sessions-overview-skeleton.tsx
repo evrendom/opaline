@@ -1,5 +1,4 @@
 import type { SessionAnalytics } from "@rudel/api-routes";
-import { Bones } from "@/app/ui/bones";
 import { SessionsOverviewFluidList } from "./sessions-overview-fluid-list";
 import { SessionsOverviewRow } from "./sessions-overview-row";
 
@@ -93,36 +92,34 @@ const SAMPLE_SESSIONS: SessionAnalytics[] = ROWS.map(
 	}),
 );
 
-export function SessionsOverviewSkeleton({
+export function SessionsOverviewSample({
 	showSkillsColumn = true,
 }: {
 	showSkillsColumn?: boolean;
 }) {
 	return (
-		<Bones className="flex-1" label="Loading sessions">
-			<SessionsOverviewFluidList fillHeight height={undefined}>
-				{({ registerItem, setActiveIndex }) =>
-					SAMPLE_SESSIONS.map((session, index) => (
-						<SessionsOverviewRow
-							key={session.session_id}
-							activeSessionId={null}
-							avatarUrl={undefined}
-							canOpenSession={undefined}
-							getSessionHref={undefined}
-							getSessionLinkState={undefined}
-							index={index}
-							maximumSessionCost={30}
-							memberProfile={undefined}
-							onSessionClick={undefined}
-							registerItem={registerItem}
-							session={session}
-							setHoverActiveIndex={setActiveIndex}
-							showSkillsColumn={showSkillsColumn}
-							userLabel="you"
-						/>
-					))
-				}
-			</SessionsOverviewFluidList>
-		</Bones>
+		<SessionsOverviewFluidList fillHeight height={undefined}>
+			{({ registerItem, setActiveIndex }) =>
+				SAMPLE_SESSIONS.map((session, index) => (
+					<SessionsOverviewRow
+						key={session.session_id}
+						activeSessionId={null}
+						avatarUrl={undefined}
+						canOpenSession={undefined}
+						getSessionHref={undefined}
+						getSessionLinkState={undefined}
+						index={index}
+						maximumSessionCost={30}
+						memberProfile={undefined}
+						onSessionClick={undefined}
+						registerItem={registerItem}
+						session={session}
+						setHoverActiveIndex={setActiveIndex}
+						showSkillsColumn={showSkillsColumn}
+						userLabel="you"
+					/>
+				))
+			}
+		</SessionsOverviewFluidList>
 	);
 }

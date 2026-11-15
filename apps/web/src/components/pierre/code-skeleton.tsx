@@ -62,6 +62,10 @@ function sampleHunks(count: number): DiffHunk[] {
 	];
 }
 
+export function CodeSample({ lines = SAMPLE.length }: { lines?: number }) {
+	return <DiffView hunks={sampleHunks(lines)} language={null} />;
+}
+
 export function CodeSkeleton({
 	label = "Loading code",
 	lines = SAMPLE.length,
@@ -71,7 +75,7 @@ export function CodeSkeleton({
 }) {
 	return (
 		<Bones label={label}>
-			<DiffView hunks={sampleHunks(lines)} language={null} />
+			<CodeSample lines={lines} />
 		</Bones>
 	);
 }

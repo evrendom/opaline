@@ -5,11 +5,15 @@ import {
 } from "@rudel/ch-schema/usage-session-rollups";
 import {
 	type ClickHouseExecutor,
+	type ClickHouseStatement,
 	getSafeClickHouseTable,
 } from "../clickhouse.js";
 import { ClickHouseWriteFencedError } from "../lib/clickhouse-write-fence.js";
 import { isUsageRollupWriteEnabled } from "../lib/env.js";
-import { buildUsageEventCandidateCtes } from "./usage-event-analytics.service.js";
+import {
+	buildPricedUsageGroupsCtes,
+	buildUsageEventCandidateCtes,
+} from "./usage-event-analytics.service.js";
 
 export interface UsageRollupSessionKey {
 	readonly organizationId: string;
@@ -28,7 +32,10 @@ const logger = getLogger(["rudel", "api", "usage-session-rollups"]);
 export const USAGE_ROLLUP_INGEST_MAX_EXECUTION_SECONDS = 5;
 export const USAGE_ROLLUP_RETRY_AFTER_MINUTES = 60;
 const BUILD_VERSION_SLOT = "{rollupBuildVersion}";
-const READINESS_TTL_MS = 60_000;
+const READY_TTL_MS = 2 * 60_000;
+const NOT_READY_TTL_MS = 60_000;
+const SESSION_ANALYTICS_TABLE = "rudel.session_analytics";
+const USAGE_EVENTS_TABLE = "rudel.usage_events";
 
 const ROLLUP_KEYS_FILTER =
 	"(organization_id, user_id, source, session_id) IN (SELECT organization_id, user_id, source, session_id FROM usage_rollup_keys)";
@@ -65,6 +72,8 @@ const GROUP_FIELDS = [
 	["cache_write_5m_input_tokens", "group_cache_write_5m_input_tokens"],
 	["cache_write_1h_input_tokens", "group_cache_write_1h_input_tokens"],
 	["output_tokens", "group_output_tokens"],
+	["estimated_costs", "group_estimated_cost"],
+	["pricing_models", "pricing_model"],
 ] as const;
 
 const COLUMN_NAMES = USAGE_SESSION_ROLLUP_COLUMNS.map((column) => column.name);
@@ -79,6 +88,7 @@ function buildInsertSqlTemplate(): string {
 		WITH
 		${ROLLUP_KEYS_CTE},
 		${buildUsageEventCandidateCtes(ROLLUP_KEYS_FILTER)},
+		${buildPricedUsageGroupsCtes("usage_event_pricing_candidates")},
 		usage_rollup_groups AS (
 			SELECT
 				organization_id,
@@ -88,7 +98,7 @@ function buildInsertSqlTemplate(): string {
 				any(latest_main_model) AS latest_main_model,
 				any(latest_event_model) AS latest_event_model,
 				arraySort(groupArray(tuple(${groupTuple}))) AS groups
-			FROM usage_event_pricing_candidates
+			FROM priced_usage_groups
 			GROUP BY organization_id, user_id, source, session_id
 		)
 		SELECT
@@ -250,31 +260,84 @@ export async function refreshUsageSessionRollupAfterWrite(
 	}
 }
 
-const readiness = new Map<string, { checkedAt: number; current: boolean }>();
+interface UsageRollupReadiness {
+	readonly checkedAt: number;
+	readonly ready: Promise<boolean>;
+}
 
-export async function hasOnlyCurrentUsageRollups(
-	executor: ClickHouseExecutor,
+const readiness = new Map<string, UsageRollupReadiness>();
+
+export function buildUsageRollupCoverageStatement(
 	organizationId: string,
-	now: () => number = Date.now,
-): Promise<boolean> {
-	const cached = readiness.get(organizationId);
-	if (cached && now() - cached.checkedAt < READINESS_TTL_MS)
-		return cached.current;
-	let current = false;
-	try {
-		const rows = await executor.query<{ stale: number }>({
-			clickhouse_settings: { max_execution_time: 5 },
-			query: `SELECT 1 AS stale
+): ClickHouseStatement {
+	return {
+		clickhouse_settings: {
+			join_use_nulls: 0,
+			max_execution_time: 5,
+			log_comment: "usage-rollups.coverage",
+		},
+		query: `SELECT
+				countIf(r.session_id != '') AS rolled_up,
+				countIf(
+					r.session_id = ''
+					OR r.build_version != {buildVersion:UInt32}
+					OR r.built_at < sa.ingested_at
+					OR r.receipt_generation != e.receipt_generation
+				) AS uncovered
+			FROM (
+				SELECT user_id, toString(source) AS source, session_id,
+					max(ingested_at) AS ingested_at
+				FROM ${getSafeClickHouseTable(SESSION_ANALYTICS_TABLE)}
+				WHERE organization_id = {organizationId:String}
+				GROUP BY user_id, source, session_id
+			) AS sa
+			LEFT ANY JOIN (
+				SELECT user_id, toString(source) AS source, session_id,
+					build_version, built_at, receipt_generation
 				FROM ${getSafeClickHouseTable(USAGE_SESSION_ROLLUPS_TABLE)} FINAL
 				WHERE organization_id = {organizationId:String}
-					AND build_version != {buildVersion:UInt32}
-				LIMIT 1`,
-			query_params: {
-				buildVersion: USAGE_ROLLUP_BUILD_VERSION,
-				organizationId,
-			},
-		});
-		current = rows.length === 0;
+			) AS r
+				ON r.user_id = sa.user_id
+				AND r.source = sa.source
+				AND r.session_id = sa.session_id
+			LEFT ANY JOIN (
+				SELECT user_id, toString(source) AS source, session_id,
+					max(event_version) AS receipt_generation
+				FROM ${getSafeClickHouseTable(USAGE_EVENTS_TABLE)}
+				WHERE organization_id = {organizationId:String}
+					AND record_kind = 'receipt'
+				GROUP BY user_id, source, session_id
+			) AS e
+				ON e.user_id = sa.user_id
+				AND e.source = sa.source
+				AND e.session_id = sa.session_id`,
+		query_params: {
+			buildVersion: USAGE_ROLLUP_BUILD_VERSION,
+			organizationId,
+		},
+	};
+}
+
+export function isUsageRollupCoverageComplete(
+	row: { rolled_up: number | string; uncovered: number | string } | undefined,
+): boolean {
+	return (
+		row !== undefined &&
+		Number(row.rolled_up) > 0 &&
+		Number(row.uncovered) === 0
+	);
+}
+
+async function readUsageRollupCoverage(
+	executor: ClickHouseExecutor,
+	organizationId: string,
+): Promise<boolean> {
+	try {
+		const [row] = await executor.query<{
+			rolled_up: number | string;
+			uncovered: number | string;
+		}>(buildUsageRollupCoverageStatement(organizationId));
+		return isUsageRollupCoverageComplete(row);
 	} catch (error) {
 		logger.warn(
 			"Usage rollup readiness check failed; pricing from events (organization_id={organizationId} error={error})",
@@ -283,9 +346,26 @@ export async function hasOnlyCurrentUsageRollups(
 				organizationId,
 			},
 		);
+		return false;
 	}
-	readiness.set(organizationId, { checkedAt: now(), current });
-	return current;
+}
+
+export async function hasCompleteUsageRollups(
+	executor: ClickHouseExecutor,
+	organizationId: string,
+	now: () => number = Date.now,
+): Promise<boolean> {
+	const cached = readiness.get(organizationId);
+	if (cached) {
+		const ttl = (await cached.ready) ? READY_TTL_MS : NOT_READY_TTL_MS;
+		if (now() - cached.checkedAt < ttl) return cached.ready;
+	}
+	const entry = {
+		checkedAt: now(),
+		ready: readUsageRollupCoverage(executor, organizationId),
+	};
+	readiness.set(organizationId, entry);
+	return entry.ready;
 }
 
 export function clearUsageRollupReadiness(): void {

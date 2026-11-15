@@ -3,6 +3,13 @@ import { getAllAdapters } from "@rudel/agent-adapters";
 import { USAGE_SESSION_ROLLUPS_TABLE } from "@rudel/ch-schema/usage-session-rollups";
 import { getClickhouse, getSafeClickHouseTable } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
+import {
+	buildKeyedDeleteOperations,
+	isDeleteSettled,
+	type KeyedDeleteColumn,
+	type KeyedDeleteKey,
+	runDeleteOperation,
+} from "./clickhouse-batched-delete.js";
 
 const SESSION_ANALYTICS_TABLE = "rudel.session_analytics";
 const SESSION_LANGUAGE_SIGNALS_TABLE = "rudel.session_language_signals";
@@ -11,7 +18,6 @@ const SKILL_USES_TABLE = "rudel.skill_uses";
 const SKILL_VERSION_CONTENTS_TABLE = "rudel.skill_version_contents";
 const USAGE_EVENTS_TABLE = "rudel.usage_events";
 const OWNERSHIP_OPERATION_LOCK_ID = 941_821_301;
-const DELETE_BATCH_SIZE = 10;
 const CLEANUP_QUERY_SETTINGS = {
 	max_bytes_to_read: "10000000000",
 	max_execution_time: 90,
@@ -21,6 +27,15 @@ const DELETE_QUERY_SETTINGS = {
 	...CLEANUP_QUERY_SETTINGS,
 	lightweight_deletes_sync: "3",
 } satisfies ClickHouseSettings;
+const SESSION_KEY_COLUMNS: readonly KeyedDeleteColumn[] = [
+	{ name: "session_id", type: "String" },
+	{ name: "user_id", type: "String" },
+];
+const SKILL_CONTENT_KEY_COLUMNS: readonly KeyedDeleteColumn[] = [
+	{ name: "user_id", type: "String" },
+	{ name: "skill_name", type: "String" },
+	{ name: "content_sha256", type: "String" },
+];
 
 interface OwnershipRow {
 	organization_id: string;
@@ -303,56 +318,50 @@ async function getSessionRowGroups(
 async function deleteNonCanonicalKeys(
 	tablePlan: CleanupTablePlan,
 ): Promise<void> {
-	for (
-		let startIndex = 0;
-		startIndex < tablePlan.keys.length;
-		startIndex += DELETE_BATCH_SIZE
-	) {
-		const queryParams: Record<string, unknown> = {};
-		let predicates: string[];
-		if (tablePlan.keyKind === "skill_content") {
-			const batch = tablePlan.keys.slice(
-				startIndex,
-				startIndex + DELETE_BATCH_SIZE,
-			);
-			predicates = batch.map((row, batchIndex) => {
-				queryParams[`organizationId${batchIndex}`] = row.organization_id;
-				queryParams[`userId${batchIndex}`] = row.user_id;
-				queryParams[`skillName${batchIndex}`] = row.skill_name;
-				queryParams[`contentSha256${batchIndex}`] = row.content_sha256;
-				return `(
-					organization_id = {organizationId${batchIndex}:String}
-					AND user_id = {userId${batchIndex}:String}
-					AND skill_name = {skillName${batchIndex}:String}
-					AND content_sha256 = {contentSha256${batchIndex}:String}
-				)`;
-			});
-		} else {
-			const batch = tablePlan.keys.slice(
-				startIndex,
-				startIndex + DELETE_BATCH_SIZE,
-			);
-			predicates = batch.map((row, batchIndex) => {
-				queryParams[`organizationId${batchIndex}`] = row.organization_id;
-				queryParams[`sessionId${batchIndex}`] = row.session_id;
-				queryParams[`userId${batchIndex}`] = row.user_id;
-				return `(
-					organization_id = {organizationId${batchIndex}:String}
-					AND session_id = {sessionId${batchIndex}:String}
-					AND user_id = {userId${batchIndex}:String}
-				)`;
-			});
-		}
-
-		await getClickhouse().execute({
-			clickhouse_settings: DELETE_QUERY_SETTINGS,
-			query: `
-				DELETE FROM ${getSafeClickHouseTable(tablePlan.table)}
-				WHERE ${predicates.join(" OR ")}
-			`,
-			query_params: queryParams,
-		});
+	const keysByOrganization = new Map<string, KeyedDeleteKey[]>();
+	for (const { organizationId, key } of getDeleteKeys(tablePlan)) {
+		const keys = keysByOrganization.get(organizationId) ?? [];
+		keys.push(key);
+		keysByOrganization.set(organizationId, keys);
 	}
+
+	for (const [organizationId, keys] of keysByOrganization) {
+		const operations = buildKeyedDeleteOperations({
+			table: tablePlan.table,
+			organizationId,
+			columns:
+				tablePlan.keyKind === "skill_content"
+					? SKILL_CONTENT_KEY_COLUMNS
+					: SESSION_KEY_COLUMNS,
+			keys,
+		});
+		for (const operation of operations) {
+			const outcome = await runDeleteOperation(getClickhouse(), {
+				...operation,
+				settings: { ...operation.settings, ...DELETE_QUERY_SETTINGS },
+			});
+			if (!isDeleteSettled(outcome)) {
+				throw new Error(
+					`Cleanup DELETE outcome is ${outcome.status} for ${outcome.table} (query ids ${outcome.queryIds.join(", ")}). Keep ownership claims in place and retry the same command.`,
+				);
+			}
+		}
+	}
+}
+
+function getDeleteKeys(
+	tablePlan: CleanupTablePlan,
+): { organizationId: string; key: KeyedDeleteKey }[] {
+	if (tablePlan.keyKind === "skill_content") {
+		return tablePlan.keys.map((row) => ({
+			organizationId: row.organization_id,
+			key: [row.user_id, row.skill_name, row.content_sha256],
+		}));
+	}
+	return tablePlan.keys.map((row) => ({
+		organizationId: row.organization_id,
+		key: [row.session_id, row.user_id],
+	}));
 }
 
 function getCleanupTableNames(): string[] {

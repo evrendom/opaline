@@ -162,7 +162,10 @@ export async function getSessionFamilyCost(input: {
 		userIdParam: "familyOwnerId",
 	});
 	const [row] = await queryClickhouse<SessionFamilyCostRow>({
-		clickhouse_settings: SESSION_FAMILY_COST_QUERY_SETTINGS,
+		clickhouse_settings: {
+			...SESSION_FAMILY_COST_QUERY_SETTINGS,
+			...usage.clickhouseSettings,
+		},
 		query: buildFocusedFamilyCostSql(
 			usage.cteDefinitions,
 			usage.sessionsRelation,

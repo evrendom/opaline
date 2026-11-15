@@ -7,6 +7,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import { Card, CardHeader, CardTitle } from "@/components/dashboard/card";
 import {
 	Empty,
@@ -33,7 +34,7 @@ export function EmptyState({
 	iconClassName,
 }: {
 	icon: React.ComponentType<{ className?: string }>;
-	title: string;
+	title?: string;
 	description?: string;
 	children?: React.ReactNode;
 	className?: string;
@@ -42,7 +43,10 @@ export function EmptyState({
 	return (
 		<Empty className={cn("border border-dashed", className)}>
 			<EmptyHeader>
-				<EmptyMedia variant="icon">
+				<EmptyMedia
+					variant="icon"
+					className={title || description || children ? undefined : "mb-0"}
+				>
 					<OpalineShape
 						className={cn(
 							"absolute inset-0",
@@ -52,11 +56,13 @@ export function EmptyState({
 					/>
 					<Icon className={cn("relative", iconClassName)} />
 				</EmptyMedia>
-				<EmptyContent>
-					<EmptyTitle>{title}</EmptyTitle>
-					{description && <EmptyDescription>{description}</EmptyDescription>}
-					{children}
-				</EmptyContent>
+				{title || description || children ? (
+					<EmptyContent>
+						{title ? <EmptyTitle>{title}</EmptyTitle> : null}
+						{description && <EmptyDescription>{description}</EmptyDescription>}
+						{children}
+					</EmptyContent>
+				) : null}
 			</EmptyHeader>
 		</Empty>
 	);
@@ -168,6 +174,7 @@ export function StatCard({
 	badge,
 	note,
 	noteBelow = false,
+	valueTip,
 	onSelect,
 	selected = false,
 	value,
@@ -184,6 +191,7 @@ export function StatCard({
 	badge?: React.ReactNode;
 	note?: React.ReactNode;
 	noteBelow?: boolean;
+	valueTip?: React.ReactNode;
 	onSelect?: () => void;
 	selected?: boolean;
 	value: React.ReactNode;
@@ -262,8 +270,9 @@ export function StatCard({
 								{note}
 							</CardTitle>
 						) : null}
-						<CardTitle
-							className="shrink-0 tracking-tight tabular-nums"
+						<StatValue
+							onSelect={onSelect}
+							tip={loading ? undefined : valueTip}
 							title={title}
 						>
 							{loading ? (
@@ -283,7 +292,7 @@ export function StatCard({
 							) : (
 								value
 							)}
-						</CardTitle>
+						</StatValue>
 					</div>
 				</div>
 				{note && noteBelow && !loading ? (
@@ -293,6 +302,42 @@ export function StatCard({
 				) : null}
 			</CardHeader>
 		</Card>
+	);
+}
+
+function StatValue({
+	children,
+	onSelect,
+	tip,
+	title,
+}: {
+	children: React.ReactNode;
+	onSelect?: () => void;
+	tip?: React.ReactNode;
+	title?: string;
+}) {
+	if (!tip)
+		return (
+			<CardTitle className="shrink-0 tracking-tight tabular-nums" title={title}>
+				{children}
+			</CardTitle>
+		);
+	return (
+		<Tooltip>
+			<TooltipTrigger
+				render={
+					<CardTitle
+						className="relative z-20 shrink-0 cursor-default tracking-tight tabular-nums"
+						onClick={onSelect}
+					/>
+				}
+			>
+				{children}
+			</TooltipTrigger>
+			<TooltipContent side="top" className="tabular-nums">
+				{tip}
+			</TooltipContent>
+		</Tooltip>
 	);
 }
 

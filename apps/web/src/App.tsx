@@ -1,12 +1,12 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { AppLoadingScreen } from "@/app/bootstrap/AppLoadingScreen";
+import { preloadRoute } from "@/app/route-loaders";
 import {
 	getSessionDetailId,
 	getWorkspaceRelativePath,
 	getWorkspaceSlugFromPath,
 } from "@/app/routes";
-import { loadSessionsPage } from "@/app/session-page-loader";
 import { NotFoundPage } from "@/app/system/NotFoundPage";
 import { DesktopOnlyOverlay } from "@/app/ui/DesktopOnlyOverlay";
 import { ProductAnalyticsSessionSync } from "@/features/analytics/tracking/ProductAnalyticsSessionSync";
@@ -73,17 +73,10 @@ function FullscreenRouteLoadingScreen() {
 function SessionAwareApp() {
 	const location = useLocation();
 	useEffect(() => {
-		const path = location.pathname;
-		if (
-			path === "/" ||
-			path === "/session" ||
-			/\/sessions(?:\/|$)/.test(path)
-		) {
-			void loadSessionsPage().catch(() => {
-				/* Navigation retries a failed preload. */
-			});
-		}
-		const sessionId = getSessionDetailId(path);
+		preloadRoute(`${location.pathname}${location.search}`);
+	}, [location.pathname, location.search]);
+	useEffect(() => {
+		const sessionId = getSessionDetailId(location.pathname);
 		if (sessionId)
 			void import("@/features/sessions/session-detail-prefetch")
 				.then((prefetch) => {

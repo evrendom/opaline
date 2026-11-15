@@ -1,6 +1,9 @@
 import type { OverviewKPIs, UserDailyTrendData } from "@rudel/api-routes";
 import { buildAbsoluteDateFilter, queryClickhouse } from "../clickhouse.js";
-import { getUsageAnalyticsQueryContext } from "./usage-event-analytics.service.js";
+import {
+	buildSessionDateWindow,
+	getUsageAnalyticsQueryContext,
+} from "./usage-event-analytics.service.js";
 
 /**
  * Get overview KPI counts: distinct users, sessions, projects, subagents, skills, slash commands
@@ -83,9 +86,14 @@ export async function getUsersDailyTrend(
 	endDate: string,
 ): Promise<UserDailyTrendData[]> {
 	const dateFilter = buildAbsoluteDateFilter("startDate", "endDate");
-	const usage = await getUsageAnalyticsQueryContext(orgId);
+	const usage = await getUsageAnalyticsQueryContext(orgId, {
+		window: buildSessionDateWindow(
+			buildAbsoluteDateFilter("startDate", "endDate", "sa.session_date"),
+		),
+	});
 
 	return queryClickhouse<UserDailyTrendData>({
+		clickhouse_settings: usage.clickhouseSettings,
 		query: `
 	WITH ${usage.cteDefinitions}
     SELECT

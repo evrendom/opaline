@@ -20,6 +20,9 @@ test("unknown public and workspace paths cannot become successful app pages", ()
 		"/welcome/missing",
 		"/acme/unknown",
 		"/acme/settings/unknown",
+		"/acme/reports",
+		"/acme/reports/a/b",
+		"/admin/unknown",
 		"/%FF",
 		"/acme%5Cevil",
 	]) {
@@ -40,6 +43,15 @@ test("workspace routes require an existence check", () => {
 		"/acme/skills",
 		"/acme/repos",
 		"/acme/newsesh/session-id",
+		"/acme/compass",
+		"/acme/mcp",
+		"/acme/reports/analysis-id",
+		"/acme/settings/reports",
+		"/acme/settings/team",
+		"/acme/settings/invitations",
+		"/acme/settings/account",
+		"/acme/settings/create-workspace",
+		"/acme/settings/workspace",
 	]) {
 		expect(getSitePageRoute(path)).toEqual({ kind: "workspace", slug: "acme" });
 	}
@@ -66,6 +78,15 @@ test("login, pairing, onboarding, and existing app aliases remain available", ()
 		"/skills",
 		"/repos",
 		"/admin",
+		"/admin/run-questions",
+		"/admin/features",
+		"/announcement",
+		"/compass",
+		"/mcp",
+		"/settings/reports",
+		"/settings/team",
+		"/newsesh",
+		"/dashboardy",
 	]) {
 		expect(getSitePageRoute(path)).toEqual({ kind: "app" });
 	}

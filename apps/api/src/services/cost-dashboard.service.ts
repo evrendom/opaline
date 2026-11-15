@@ -15,6 +15,7 @@ import {
 } from "./analytics-tenant.js";
 import {
 	buildCostDashboard,
+	buildLanguageSplit,
 	type CostAggregateRow,
 	type DashboardMetricAvailabilityOptions,
 	listAvailableDashboardMetrics,
@@ -29,6 +30,7 @@ import {
 	getAllOrganizationsUsageAnalyticsQueryContext,
 	getUsageAnalyticsQueryContext,
 	resolveCanonicalPricingModel,
+	USAGE_ANALYTICS_CLICKHOUSE_SETTINGS,
 } from "./usage-event-analytics.service.js";
 
 export { buildDurationPeriods } from "./dashboard-duration-periods.js";
@@ -100,7 +102,8 @@ export async function getCostDashboard(
 	// card leaves them out: the session cards read the charted answer.
 	const tenantKey = scope.tenant === "organization" ? scope.orgId : "*";
 	const sessionRowsPromise =
-		isGitHubMetric && input.sessionMetrics === false
+		input.sessionMetrics === false &&
+		(isGitHubMetric || isGitHubRequest(requestedInput.requestedMetric))
 			? Promise.resolve(undefined)
 			: sessionMetricRequests.run(
 					tenantKey,
@@ -155,15 +158,16 @@ export async function getCostDashboard(
 					'SELECT id, name, email, image FROM "user" WHERE id = ANY($1::text[])',
 					[memberIds],
 				);
+	const memberLabels = new Map(
+		members.map((member) => [
+			member.id,
+			{ label: member.name?.trim() || member.email, image: member.image },
+		]),
+	);
 	const dashboard = buildCostDashboard(
 		rows,
 		input,
-		new Map(
-			members.map((member) => [
-				member.id,
-				{ label: member.name?.trim() || member.email, image: member.image },
-			]),
-		),
+		memberLabels,
 		durationStats,
 		{
 			availableMetrics,
@@ -175,7 +179,19 @@ export async function getCostDashboard(
 		for (const metric of Object.values(dashboard.metrics))
 			if (metric) metric.breakdowns.members = [];
 	}
-	return dashboard;
+	if (sessionRows === undefined) return dashboard;
+	return {
+		...dashboard,
+		languageSplit: buildLanguageSplit(rows, input, memberLabels),
+	};
+}
+
+function isGitHubRequest(metric: DetailedMetric | undefined): boolean {
+	return (
+		metric === "mergedPullRequests" ||
+		metric === "ciFailuresPerPullRequest" ||
+		metric === "ciRuns"
+	);
 }
 
 /**
@@ -317,18 +333,19 @@ async function querySessionMetricRows(
 	  SELECT 'signals' AS metric, toString(toDate(sa.session_date)) AS date,
 	   ${memberSql("sa")} AS member, ${repositorySql("sa")} AS repository,
 	   if(${canonicalModel} != '', ${canonicalModel}, sa.model_used) AS model,
-	   toFloat64(
-	    ${filteredSignalCount("signal_summary.model_apology_counts", "modelApologies")}
-	     + ${filteredSignalCount("signal_summary.member_negative_counts", "userNegative")}
-	   ) AS value,
+	   toFloat64(signal_value.2) AS value,
 	   toUInt8(signal_summary.scan_version < 5) AS incomplete,
-	   '' AS signal_type, '' AS phrase, '' AS run_signal, '' AS duration, '' AS skills_used,
+	   signal_value.1 AS signal_type, '' AS phrase, '' AS run_signal, '' AS duration, '' AS skills_used,
 	   '' AS coverage_status, toUInt8(0) AS prefiltered
 	  FROM dashboard_sessions AS sa
 	  ANY LEFT JOIN dashboard_signals AS signal_summary
 	   ON sa.organization_id = signal_summary.organization_id AND sa.user_id = signal_summary.user_id
 	    AND sa.source = signal_summary.source AND sa.session_id = signal_summary.session_id
 	    AND sa.session_date = signal_summary.session_date
+	  ARRAY JOIN [
+	   tuple('modelApologies', ${filteredSignalCount("signal_summary.model_apology_counts", "modelApologies")}),
+	   tuple('userNegative', ${filteredSignalCount("signal_summary.member_negative_counts", "userNegative")})
+	  ] AS signal_value
 	 `;
 	// Run facts are indexed with each raw revision. Start dates belong to runs,
 	// so a long-lived session can contribute on days after it was first opened.
@@ -419,9 +436,8 @@ async function querySessionMetricRows(
 		"(s.prefiltered = 1 OR empty({models:Array(String)}) OR has({models:Array(String)}, model) OR (metric = 'agentRuns' AND s.incomplete))";
 	// Each signal row is one exact phrase frequency, not a copy of the category
 	// total. Blank zero rows preserve known-zero categories and indexing state.
-	const typeMatch = detailedSignals
-		? "(s.prefiltered = 1 OR metric != 'signals' OR empty({signalTypes:Array(String)}) OR has({signalTypes:Array(String)}, signal_type))"
-		: "1";
+	const typeMatch =
+		"(s.prefiltered = 1 OR metric != 'signals' OR empty({signalTypes:Array(String)}) OR has({signalTypes:Array(String)}, signal_type))";
 	const phraseMatch = detailedSignals
 		? "(s.prefiltered = 1 OR metric != 'signals' OR empty({phrases:Array(String)}) OR s.incomplete OR has({phrases:Array(String)}, phrase))"
 		: "1";
@@ -439,7 +455,7 @@ async function querySessionMetricRows(
 	const dimensionsSql =
 		input.requestedMetric === undefined
 			? `arrayConcat(['headline'], multiIf(metric = 'agentRuns', ${dimensionListSql("agentRuns")}, metric = 'signals', ${dimensionListSql("signals")}, ${dimensionListSql("cost")}))`
-			: `multiIf(metric = 'agentRunCoverage', ['coverage'], metric = '${input.requestedMetric}', arrayConcat(['headline'], ${dimensionListSql(input.requestedMetric)}), ['headline'])`;
+			: `multiIf(metric = 'agentRunCoverage', ['coverage'], metric = '${input.requestedMetric}', arrayConcat(['headline'], ${dimensionListSql(input.requestedMetric)}), metric = 'signals', ['headline', 'signalTypes'], ['headline'])`;
 	const retainedRawCte =
 		input.requestedMetric === "agentRuns"
 			? `,
@@ -540,6 +556,7 @@ async function querySessionMetricRows(
 			skillsUsed: input.skillsUsed,
 		},
 		clickhouse_settings: {
+			...usage.clickhouseSettings,
 			max_execution_time: 20,
 			max_rows_to_read: "100000000",
 			max_bytes_to_read: "10000000000",
@@ -661,6 +678,7 @@ async function queryAgentRunDurationStats(
 			skillsUsed: input.skillsUsed,
 		},
 		clickhouse_settings: {
+			...USAGE_ANALYTICS_CLICKHOUSE_SETTINGS,
 			max_execution_time: 20,
 			max_rows_to_read: "100000000",
 			max_bytes_to_read: "10000000000",

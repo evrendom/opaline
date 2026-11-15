@@ -15,7 +15,7 @@ import {
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { useIntroHold, useIntroSettled } from "@/app/first-open";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
-import { Bones } from "@/app/ui/bones";
+import { Reveal } from "@/app/ui/bones";
 import {
 	Dialog,
 	DialogContent,
@@ -123,9 +123,7 @@ export function CostBreakdown({
 					className="cost-breakdown-list"
 					data-many={entries.length > 4 || undefined}
 				>
-					{pending ? (
-						<BreakdownSample dimension={dimension} metric={metric} />
-					) : onLoadDeferred ? (
+					{!pending && onLoadDeferred ? (
 						<p className="cost-breakdown-empty">
 							<button
 								type="button"
@@ -135,46 +133,7 @@ export function CostBreakdown({
 								Show {label.toLowerCase()}
 							</button>
 						</p>
-					) : entries.length ? (
-						// Inside the scroll area, so the highlight scrolls with the rows.
-						<div data-fluid-menu-root="">
-							<FluidMenuHover items=".cost-breakdown-row" />
-							{entries.map((entry) => (
-								<BreakdownRow
-									key={entry.id}
-									dimension={dimension}
-									metric={metric}
-									entry={entry}
-									maximum={maximum}
-									color={colorOf.get(entry.id) ?? SERIES_COLORS[0]}
-									selected={selected.includes(entry.id)}
-									onToggle={onToggle}
-								/>
-							))}
-							{holding
-								? INTRO_ROW_SCALES.slice(entries.length).map((scale, at) => {
-										const source = entries[at % entries.length];
-										if (!source) return null;
-										return (
-											<BreakdownRow
-												key={`intro-${scale}`}
-												dimension={dimension}
-												metric={metric}
-												entry={{
-													...source,
-													id: `intro-${scale}`,
-													value: source.value * scale,
-												}}
-												maximum={maximum}
-												color={SERIES_COLORS[0]}
-												selected={false}
-												onToggle={() => {}}
-											/>
-										);
-									})
-								: null}
-						</div>
-					) : (
+					) : !pending && !entries.length ? (
 						<p className="cost-breakdown-empty">
 							{unavailable
 								? metric === "mergedPullRequests" ||
@@ -183,6 +142,55 @@ export function CostBreakdown({
 									: "Still being indexed…"
 								: `No matching ${label.toLowerCase()}.`}
 						</p>
+					) : (
+						<Reveal
+							label={`Loading ${label.toLowerCase()}`}
+							loading={pending}
+							sample={<BreakdownSample dimension={dimension} metric={metric} />}
+							sampleId={`cost-breakdown-${dimension}`}
+						>
+							{() => (
+								<div data-fluid-menu-root="">
+									<FluidMenuHover items=".cost-breakdown-row" />
+									{entries.map((entry) => (
+										<BreakdownRow
+											key={entry.id}
+											dimension={dimension}
+											metric={metric}
+											entry={entry}
+											maximum={maximum}
+											color={colorOf.get(entry.id) ?? SERIES_COLORS[0]}
+											selected={selected.includes(entry.id)}
+											onToggle={onToggle}
+										/>
+									))}
+									{holding
+										? INTRO_ROW_SCALES.slice(entries.length).map(
+												(scale, at) => {
+													const source = entries[at % entries.length];
+													if (!source) return null;
+													return (
+														<BreakdownRow
+															key={`intro-${scale}`}
+															dimension={dimension}
+															metric={metric}
+															entry={{
+																...source,
+																id: `intro-${scale}`,
+																value: source.value * scale,
+															}}
+															maximum={maximum}
+															color={SERIES_COLORS[0]}
+															selected={false}
+															onToggle={() => {}}
+														/>
+													);
+												},
+											)
+										: null}
+								</div>
+							)}
+						</Reveal>
 					)}
 				</ScrollFade>
 				<div className="cost-tools" data-open={split}>
@@ -238,22 +246,27 @@ export function CostBreakdown({
 						data-fluid-menu-root=""
 					>
 						<FluidMenuHover items=".cost-breakdown-row" />
-						{pending ? (
-							<BreakdownSample dimension={dimension} metric={metric} />
-						) : (
-							filtered.map((entry) => (
-								<BreakdownRow
-									key={entry.id}
-									dimension={dimension}
-									metric={metric}
-									entry={entry}
-									maximum={maximum}
-									color={colorOf.get(entry.id) ?? SERIES_COLORS[0]}
-									selected={selected.includes(entry.id)}
-									onToggle={onToggle}
-								/>
-							))
-						)}
+						<Reveal
+							label={`Loading ${label.toLowerCase()}`}
+							loading={pending}
+							sample={<BreakdownSample dimension={dimension} metric={metric} />}
+							sampleId={`cost-breakdown-${dimension}-all`}
+						>
+							{() =>
+								filtered.map((entry) => (
+									<BreakdownRow
+										key={entry.id}
+										dimension={dimension}
+										metric={metric}
+										entry={entry}
+										maximum={maximum}
+										color={colorOf.get(entry.id) ?? SERIES_COLORS[0]}
+										selected={selected.includes(entry.id)}
+										onToggle={onToggle}
+									/>
+								))
+							}
+						</Reveal>
 						{!pending && filtered.length === 0 ? (
 							<p className="cost-breakdown-empty">No results.</p>
 						) : null}
@@ -486,28 +499,24 @@ function BreakdownSample({
 	metric: DashboardMetric;
 }) {
 	const labels = SAMPLE_LABELS[dimension] ?? ["Sample", "Sample row", "Other"];
-	return (
-		<Bones label={`Loading ${COST_LABELS[dimension].toLowerCase()}`}>
-			{labels.map((label, index) => (
-				<BreakdownRow
-					key={label}
-					dimension={dimension}
-					metric={metric}
-					entry={{
-						id: label,
-						image: null,
-						incomplete: false,
-						label,
-						value: SAMPLE_VALUES[index] ?? 0,
-					}}
-					maximum={SAMPLE_VALUES[0] ?? 1}
-					color={SERIES_COLORS[index] ?? SERIES_COLORS[0]}
-					selected={false}
-					onToggle={NO_TOGGLE}
-				/>
-			))}
-		</Bones>
-	);
+	return labels.map((label, index) => (
+		<BreakdownRow
+			key={label}
+			dimension={dimension}
+			metric={metric}
+			entry={{
+				id: label,
+				image: null,
+				incomplete: false,
+				label,
+				value: SAMPLE_VALUES[index] ?? 0,
+			}}
+			maximum={SAMPLE_VALUES[0] ?? 1}
+			color={SERIES_COLORS[index] ?? SERIES_COLORS[0]}
+			selected={false}
+			onToggle={NO_TOGGLE}
+		/>
+	));
 }
 
 /**

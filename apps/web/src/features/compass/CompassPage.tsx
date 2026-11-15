@@ -12,7 +12,7 @@ import {
 } from "@tanstack/react-query";
 import { type KeyboardEvent, type ReactNode, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { Bones } from "@/app/ui/bones";
+import { Reveal } from "@/app/ui/bones";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { UsageStateMessage } from "@/components/usage-collection-view";
 import { useDateRange } from "@/features/analytics/date-range/useDateRange";
@@ -23,13 +23,13 @@ import { orpc } from "@/lib/orpc";
 import {
 	COMPASS_SAMPLE_RUN,
 	KindsMenu,
-	RowsSkeleton,
+	RowsSample,
 	RunRow,
 } from "./compass-moments";
 import { PatternPane, PatternRow } from "./compass-patterns";
 import { RunPane, RunPaneSample } from "./compass-run-detail";
 import { CompassSettingsButton } from "./compass-settings";
-import { useCompassAccess } from "./use-compass-access";
+import { useCompassAccess, useCompassEnabled } from "./use-compass-access";
 import "@/features/costs/cost-dashboard.css";
 import "./compass.css";
 
@@ -62,6 +62,7 @@ function CompassView({ observable }: { observable: boolean }) {
 	const queryClient = useQueryClient();
 	const { state: organization } = useOrganization();
 	const organizationId = organization.activeOrg?.id;
+	const allowed = useCompassEnabled();
 	const { state: range } = useDateRange();
 	const [view, setView] = useState<View>("runs");
 	const [kinds, setKinds] = useState<MomentKind[]>([]);
@@ -88,7 +89,7 @@ function CompassView({ observable }: { observable: boolean }) {
 	const list = useInfiniteQuery({
 		...listOptions,
 		queryKey: ["org", organizationId, ...listOptions.queryKey],
-		enabled: !!organizationId,
+		enabled: allowed && !!organizationId,
 		placeholderData: (previous, previousQuery) =>
 			previousQuery?.queryKey[1] === organizationId ? previous : undefined,
 		staleTime: 60_000,
@@ -99,7 +100,7 @@ function CompassView({ observable }: { observable: boolean }) {
 	const patterns = useQuery({
 		...patternOptions,
 		queryKey: ["org", organizationId, ...patternOptions.queryKey],
-		enabled: !!organizationId,
+		enabled: allowed && !!organizationId,
 		staleTime: 60_000,
 	});
 	const firstPage = list.data?.pages[0];
@@ -224,77 +225,100 @@ function CompassView({ observable }: { observable: boolean }) {
 							<CompassSettingsButton />
 						</div>
 					</div>
-					{view === "runs" && list.isPending ? (
-						<Bones className="shrink-0" label="Counting noticed runs">
-							<p className="compass-list-summary">82 of 493 runs noticed</p>
-						</Bones>
-					) : null}
-					{view === "runs" && firstPage ? (
-						<p className="compass-list-summary">
-							{noticeable?.toLocaleString("en-US")} of{" "}
-							{firstPage.runs.toLocaleString("en-US")} runs noticed
-						</p>
+					{view === "runs" && (list.isPending || firstPage) ? (
+						<Reveal
+							className="shrink-0"
+							label="Counting noticed runs"
+							loading={list.isPending}
+							sample={
+								<p className="compass-list-summary">82 of 493 runs noticed</p>
+							}
+							sampleId="compass-summary"
+						>
+							{() => (
+								<p className="compass-list-summary">
+									{noticeable?.toLocaleString("en-US")} of{" "}
+									{firstPage?.runs.toLocaleString("en-US")} runs noticed
+								</p>
+							)}
+						</Reveal>
 					) : null}
 					<ListBody>
 						{view === "runs" ? (
-							list.isPending ? (
-								<RowsSkeleton />
-							) : list.isError ? (
+							!list.isPending && list.isError ? (
 								<p className="compass-empty">{list.error.message}</p>
-							) : runs.length === 0 ? (
+							) : !list.isPending && runs.length === 0 ? (
 								<p className="compass-empty">
 									{kinds.length > 0 || mine
 										? "No matching runs."
 										: "Nothing noticed in this range. A run shows up here when one of the flags under the settings button marks it."}
 								</p>
 							) : (
-								<>
-									{runs.map((run) => (
-										<RunRow
-											key={run.id}
-											run={run}
-											selected={run.id === selectedRun?.id}
-											onSelect={() => selectRun(run)}
-											onKeyDown={onRowKey}
-										/>
-									))}
-									{list.hasNextPage ? (
-										<div className="compass-more">
-											<button
-												type="button"
-												className="cost-text-button"
-												disabled={list.isFetchingNextPage}
-												onClick={() => {
-													void list.fetchNextPage();
-												}}
-											>
-												{list.isFetchingNextPage
-													? "Loading…"
-													: "Show more runs"}
-											</button>
-										</div>
-									) : null}
-								</>
+								<Reveal
+									label="Loading runs"
+									loading={list.isPending}
+									sample={<RowsSample />}
+									sampleId="compass-runs"
+									key="compass-runs"
+								>
+									{() => (
+										<>
+											{runs.map((run) => (
+												<RunRow
+													key={run.id}
+													run={run}
+													selected={run.id === selectedRun?.id}
+													onSelect={() => selectRun(run)}
+													onKeyDown={onRowKey}
+												/>
+											))}
+											{list.hasNextPage ? (
+												<div className="compass-more">
+													<button
+														type="button"
+														className="cost-text-button"
+														disabled={list.isFetchingNextPage}
+														onClick={() => {
+															void list.fetchNextPage();
+														}}
+													>
+														{list.isFetchingNextPage
+															? "Loading…"
+															: "Show more runs"}
+													</button>
+												</div>
+											) : null}
+										</>
+									)}
+								</Reveal>
 							)
-						) : patterns.isPending ? (
-							<RowsSkeleton />
-						) : patterns.isError ? (
+						) : !patterns.isPending && patterns.isError ? (
 							<p className="compass-empty">{patterns.error.message}</p>
-						) : patternList.length === 0 ? (
+						) : !patterns.isPending && patternList.length === 0 ? (
 							<p className="compass-empty">
 								Patterns form from observed runs. Observe a few noticeable runs,
 								then come back.
 							</p>
 						) : (
-							patternList.map((pattern) => (
-								<PatternRow
-									key={pattern.id}
-									pattern={pattern}
-									selected={pattern.id === selectedPattern?.id}
-									onSelect={() => selectPattern(pattern)}
-									onKeyDown={onRowKey}
-								/>
-							))
+							<Reveal
+								label="Loading patterns"
+								loading={patterns.isPending}
+								sample={<RowsSample />}
+								sampleId="compass-patterns"
+								key="compass-patterns"
+							>
+								{() =>
+									patternList.map((pattern) => (
+										<PatternRow
+											key={pattern.id}
+											pattern={pattern}
+											selected={pattern.id === selectedPattern?.id}
+											onSelect={() => selectPattern(pattern)}
+											onKeyDown={onRowKey}
+										/>
+									))
+								}
+							</Reveal>
 						)}
 					</ListBody>
 				</section>
@@ -308,20 +332,27 @@ function CompassView({ observable }: { observable: boolean }) {
 						Back to the list
 					</button>
 					{view === "runs" ? (
-						selectedRun ? (
-							<RunPane
-								key={selectedRun.id}
-								run={selectedRun}
-								range={range}
-								observable={observable && (firstPage?.observable ?? true)}
-								onObserved={() => {
-									void refresh();
-								}}
-							/>
-						) : list.isPending ? (
-							<Bones label="Loading the run">
-								<RunPaneSample run={COMPASS_SAMPLE_RUN} />
-							</Bones>
+						selectedRun || list.isPending ? (
+							<Reveal
+								label="Loading the run"
+								loading={!selectedRun}
+								sample={<RunPaneSample run={COMPASS_SAMPLE_RUN} />}
+								sampleId="compass-run"
+							>
+								{() =>
+									selectedRun ? (
+										<RunPane
+											key={selectedRun.id}
+											run={selectedRun}
+											range={range}
+											observable={observable && (firstPage?.observable ?? true)}
+											onObserved={() => {
+												void refresh();
+											}}
+										/>
+									) : null
+								}
+							</Reveal>
 						) : (
 							<DetailEmpty
 								text={list.isPending ? "" : "Pick a run to see what went on."}

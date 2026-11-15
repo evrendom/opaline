@@ -56,7 +56,6 @@ import {
 } from "./session-reader-context-place";
 import {
 	type BoxProblems,
-	offBoxHeadlines,
 	ProblemMark,
 	problemsOf,
 	useOwnProblems,
@@ -182,7 +181,7 @@ export function ContextTiles({
 	const [hidden] = useState<ReadonlySet<ContextKind | "free">>(() => new Set());
 	const shown = useMemo(() => filtered(measured, hidden), [hidden, measured]);
 	const shownBase = useMemo(() => filtered(base, hidden), [base, hidden]);
-	const { keep, own: ownProblems } = useOwnProblems(problems, measure);
+	const { keep } = useOwnProblems(problems, measure);
 	const areaHeight = useContext(ContextAreaHeight) ?? AREA_HEIGHT;
 	const preview = useContext(ContextPreview);
 	const withFree = !preview && !hidden.has("free");
@@ -252,7 +251,6 @@ export function ContextTiles({
 		skillSetupFile: places?.skillSetupFile,
 	};
 	const pickedProblems = problemsOf(problems, pickedTile?.part);
-	const offBoxes = offBoxHeadlines(ownProblems, drawn);
 	const keepPick = useCallback(
 		(element: HTMLDivElement | null) => {
 			if (!element) return;
@@ -515,11 +513,6 @@ export function ContextTiles({
 						</div>
 					</ContextMapFrame>
 				</PickedBoxContext.Provider>
-				{offBoxes.length > 0 && measure !== "runs" && !preview ? (
-					<p className="-mt-1 text-xs text-muted-foreground">
-						Not on a box: {offBoxes.join(" · ")}
-					</p>
-				) : null}
 			</div>
 		</MeasureContext.Provider>
 	);

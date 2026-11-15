@@ -54,11 +54,18 @@ export type DashboardVariant =
 	| "compact"
 	| "one-card";
 
+const GITHUB_CARDS: readonly DashboardMetric[] = [
+	"mergedPullRequests",
+	"ciRuns",
+];
+
 export function CostDashboardPage() {
 	const dashboard = useCostDashboard();
 	const previews = useMetricPreviews(
 		dashboard.inputFor,
-		dashboard.metrics,
+		dashboard.metricsPending
+			? [...dashboard.metrics, ...GITHUB_CARDS]
+			: dashboard.metrics,
 		dashboard.input,
 	);
 	const prefetchMetric = usePrefetchDashboardMetric(dashboard.inputFor);

@@ -2562,6 +2562,64 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 		},
 	},
 	{
+		id: "git_output",
+		view: "runs",
+		meaning:
+			"The commits, pushes and pull-request actions a run's git and gh commands ran and printed.",
+		runIndex: ["git_operations", "pushed_branches", "commit_shas"],
+		agents: {
+			claude_code: pending(
+				["assistant.message.content[tool_use:Bash].input.command"],
+				"Claude Code records gitOperation (calls/git_operation); its Bash output is not read for the git columns.",
+				{
+					justification:
+						"Opaline computation, not an agent-written value: the git columns read Claude Code's own gitOperation record, so its command output is not read for them.",
+					relation: {
+						kind: "derived",
+						from: ["calls/input_text", "calls/tool_result_text"],
+					},
+					sourceMappings: [
+						contextOnly(
+							"assistant.message.content[tool_use:Bash].input.command",
+						),
+					],
+				},
+			),
+			codex: stored(
+				[
+					"response_item/function_call:exec_command.arguments.cmd",
+					"event_msg/item_completed:CommandExecution.command[]",
+					"response_item/function_call_output.output",
+				],
+				{
+					since: 1,
+					record: ["text"],
+					elsewhere:
+						"session_git_observations (git extractor, from call outputs)",
+				},
+				{
+					relation: {
+						kind: "derived",
+						from: ["calls/input_text", "calls/tool_result_text"],
+					},
+					sourceMappings: [
+						contextOnly(
+							"response_item/function_call:exec_command.arguments.cmd",
+						),
+						contextOnly("event_msg/item_completed:CommandExecution.command[]"),
+						contextOnly("response_item/function_call_output.output"),
+					],
+					justification:
+						"Opaline computation, not an agent-written value: Codex writes no git operation (calls/git_operation). A git commit, git push or gh pr create/merge/close/ready/reopen command that ran, and the `[branch sha]`, `a..b src -> dst` and `[new branch] src -> dst` lines it printed, as the git extractor reads them.",
+					notes:
+						"Traps: a branch name the stored text cap cut is not read; a push with -q prints no ref lines and reads as none; a dry run is no push.",
+					testedIn:
+						"apps/api/src/services/analysis/run-index-components.test.ts",
+				},
+			),
+		},
+	},
+	{
 		id: "mcp_server",
 		view: "calls",
 		meaning: "The MCP server a call went to.",

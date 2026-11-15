@@ -27,7 +27,7 @@ const postgresClientOptions = {
 		lock_timeout: readLockTimeoutMs(),
 		statement_timeout: 120_000,
 	},
-	idle_timeout: 20,
+	idle_timeout: 120,
 	max: 5,
 	max_lifetime: 60 * 30,
 	prepare: false,

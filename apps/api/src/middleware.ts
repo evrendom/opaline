@@ -2,8 +2,15 @@ import { type Implementer, implement, ORPCError } from "@orpc/server";
 import { contract } from "@rudel/api-routes";
 import type { Session } from "./auth.js";
 import { sqlClient } from "./db.js";
+import {
+	type RequestWorkspaceLookups,
+	resolveRequestWorkspace,
+} from "./lib/request-workspace.js";
 import { isSelfHosted, isSelfHostedAdmin } from "./lib/self-hosted.js";
-import { readWorkspaceMember } from "./services/session-reader.service.js";
+import {
+	readWorkspaceMember,
+	readWorkspaceMemberBySlug,
+} from "./services/session-reader.service.js";
 
 export interface AppContext {
 	user: Session["user"] | null;
@@ -13,6 +20,8 @@ export interface AppContext {
 	ingestOperatorAuthorized: boolean;
 	requestId: string;
 	publicLookupSource: string;
+	requestedWorkspace?: string | null;
+	workspaceLookups?: RequestWorkspaceLookups;
 }
 
 export interface ApiKeyAuthFailure {
@@ -55,26 +64,27 @@ export const settingsMutationMiddleware = os.middleware(
 	},
 );
 
+const requestWorkspaceLookup = {
+	readMember: (organizationId: string, userId: string) =>
+		readWorkspaceMember(organizationId, userId),
+	readMemberBySlug: (slug: string, userId: string) =>
+		readWorkspaceMemberBySlug(slug, userId),
+};
+
 export const orgMiddleware = os.middleware(async ({ context, next }) => {
 	if (!context.user || !context.session) {
 		throw new ORPCError("UNAUTHORIZED");
 	}
 
-	const organizationId =
-		(context.session as Record<string, unknown>).activeOrganizationId ??
-		context.user.id;
-	if (!organizationId || typeof organizationId !== "string") {
-		throw new ORPCError("BAD_REQUEST", {
-			message: "No active organization",
-		});
-	}
-
-	const member = await readWorkspaceMember(organizationId, context.user.id);
-	if (!member) {
-		throw new ORPCError("FORBIDDEN", {
-			message: "Not a member of the active organization",
-		});
-	}
+	const { organizationId, member } = await resolveRequestWorkspace(
+		{
+			requestedWorkspace: context.requestedWorkspace,
+			session: context.session,
+			userId: context.user.id,
+			lookups: context.workspaceLookups,
+		},
+		requestWorkspaceLookup,
+	);
 
 	const sessionReader = member.reader;
 	const userRole =

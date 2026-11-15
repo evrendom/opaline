@@ -19,9 +19,9 @@ import { getLiveSessionR2Client } from "./live-session/live-session-r2.js";
 import { readR2IngestAvailability } from "./r2-ingest-storage.service.js";
 import {
 	createSessionDetailBodyChunk,
-	getSessionDetailBodyForChunk,
 	type SerializedSessionDetailBody,
 	serializeSessionDetailBody,
+	serializeSessionDetailBodyForChunk,
 } from "./session-detail-body-chunks.js";
 import {
 	assembleSessionDetailWindow,
@@ -113,15 +113,18 @@ export async function getSessionDetailBodyChunk(
 			// Single-response body getters enforce the old response byte ceiling.
 			// Chunk delivery reads the complete derived body instead; the chunk
 			// serializer, not the whole transcript, defines this response's budget.
-			const value = !derivation
+			const fileChanges =
+				derivation &&
+				input.kind === "fileChanges" &&
+				input.targetId === input.sessionId
+					? sessionFileChangesOf(derivation)
+					: null;
+			const serialized = !derivation
 				? null
-				: input.kind === "fileChanges"
-					? input.targetId === input.sessionId
-						? sessionFileChangesOf(derivation)
-						: null
-					: getSessionDetailBodyForChunk(derivation, input);
-			if (!value) throw new SessionDetailSnapshotNotFoundError();
-			const serialized = serializeSessionDetailBody(value);
+				: fileChanges
+					? serializeSessionDetailBody(fileChanges)
+					: serializeSessionDetailBodyForChunk(derivation, input);
+			if (!serialized) throw new SessionDetailSnapshotNotFoundError();
 			return { bytes: serialized.json.length * 2, value: serialized };
 		});
 		return createSessionDetailBodyChunk(body, {
@@ -433,6 +436,7 @@ export function getCurrentSessionDetailDerivation(input: {
 }
 
 export async function getSessionDetailInitial(input: {
+	bodyChunks?: boolean;
 	organizationId: string;
 	ownerId: string;
 	sessionId: string;
@@ -442,7 +446,9 @@ export async function getSessionDetailInitial(input: {
 		const derivation = await getCurrentDerivation(input);
 		if (!derivation) return null;
 		const assemblyStartedAt = performance.now();
-		const response = buildSessionDetailInitial(derivation);
+		const response = buildSessionDetailInitial(derivation, {
+			bodyChunks: input.bodyChunks,
+		});
 		response.overview = await withSessionFamilyCost(response.overview, input);
 		logger.info("Assembled initial session detail", {
 			instanceId,

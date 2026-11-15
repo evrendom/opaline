@@ -13,6 +13,7 @@ import {
 } from "react";
 import { useEffectOnceWhen } from "@/app/hooks/useEffectOnceWhen";
 import { useLatestValueRef } from "@/app/hooks/useLatestValueRef";
+import { Reveal } from "@/app/ui/bones";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { useLiveClock } from "@/features/sessions/use-live-sessions";
 import { useLoadSessionPages } from "@/features/sessions/use-load-session-pages";
@@ -31,7 +32,7 @@ import {
 } from "./sessions-overview-pager";
 import { SessionsOverviewRow } from "./sessions-overview-row";
 import { getContainedWheelScroll } from "./sessions-overview-scroll";
-import { SessionsOverviewSkeleton } from "./sessions-overview-skeleton";
+import { SessionsOverviewSample } from "./sessions-overview-skeleton";
 import {
 	SESSION_OVERVIEW_MIN_WIDTH_CLASS_NAME,
 	SESSION_OVERVIEW_SURFACE_CLASS_NAME,
@@ -308,13 +309,11 @@ export function SessionsOverviewTable({
 						)}
 						data-slot="sessions-overview-canvas"
 					>
-						{isLoading ? (
-							<SessionsOverviewSkeleton showSkillsColumn={showSkillsColumn} />
-						) : tableState.recentSessions.length === 0 ? (
+						{!isLoading && tableState.recentSessions.length === 0 ? (
 							<div className="flex min-h-64 flex-1 items-center justify-center border-b border-(--session-overview-border) px-6 text-center text-base text-(--session-overview-muted) sm:text-sm">
 								No recent sessions in the selected range.
 							</div>
-						) : tableState.filteredSessions.length === 0 ? (
+						) : !isLoading && tableState.filteredSessions.length === 0 ? (
 							<div className="flex min-h-64 flex-1 flex-col items-center justify-center gap-2 border-b border-(--session-overview-border) px-6 text-center text-base text-(--session-overview-muted) sm:text-sm">
 								<p>
 									{pagination?.hasNextPage
@@ -330,46 +329,59 @@ export function SessionsOverviewTable({
 								</button>
 							</div>
 						) : (
-							<SessionsOverviewFluidList
-								fillHeight={!pagination?.hasNextPage}
-								highlightClassName={highlightClassName}
+							<Reveal
+								fill
+								className="flex-1"
+								label="Loading sessions"
+								loading={isLoading}
+								sample={
+									<SessionsOverviewSample showSkillsColumn={showSkillsColumn} />
+								}
+								sampleId="sessions"
 							>
-								{({ registerItem, setActiveIndex }) => (
-									<>
-										{renderedRows.map(({ session, position, start }, index) => (
-											<SessionsOverviewRow
-												showPlace={showPlace}
-												showSkillsColumn={showSkillsColumn}
-												key={`${session.source}:${session.session_id}`}
-												virtualTop={start}
-												index={index}
-												position={position}
-												setSize={
-													pagination?.hasNextPage
-														? -1
-														: tableState.sortedSessions.length
-												}
-												registerItem={registerItem}
-												setHoverActiveIndex={setActiveIndex}
-												activeSessionId={activeSessionId}
-												avatarUrl={avatarMap?.[session.user_id]}
-												canOpenSession={canOpenSession}
-												getSessionHref={getSessionHref}
-												getSessionLinkState={getSessionLinkState}
-												liveNowMs={session.live_session ? nowMs : undefined}
-												maximumSessionCost={tableState.maximumSessionCost}
-												memberProfile={memberProfileSummaries.get(
-													session.user_id,
-												)}
-												onSessionClick={onSessionClick}
-												questionTags={questionTags.get(session.session_id)}
-												session={session}
-												userLabel={formatUsername(session.user_id, userMap)}
-											/>
-										))}
-									</>
+								{() => (
+									<SessionsOverviewFluidList
+										fillHeight={!pagination?.hasNextPage}
+										highlightClassName={highlightClassName}
+									>
+										{({ registerItem, setActiveIndex }) => (
+											<>
+												{renderedRows.map(({ session, position, start }, index) => (
+													<SessionsOverviewRow
+														showPlace={showPlace}
+														showSkillsColumn={showSkillsColumn}
+														key={`${session.source}:${session.session_id}`}
+														virtualTop={start}
+														index={index}
+														position={position}
+														setSize={
+															pagination?.hasNextPage
+																? -1
+																: tableState.sortedSessions.length
+														}
+														registerItem={registerItem}
+														setHoverActiveIndex={setActiveIndex}
+														activeSessionId={activeSessionId}
+														avatarUrl={avatarMap?.[session.user_id]}
+														canOpenSession={canOpenSession}
+														getSessionHref={getSessionHref}
+														getSessionLinkState={getSessionLinkState}
+														liveNowMs={session.live_session ? nowMs : undefined}
+														maximumSessionCost={tableState.maximumSessionCost}
+														memberProfile={memberProfileSummaries.get(
+															session.user_id,
+														)}
+														onSessionClick={onSessionClick}
+														questionTags={questionTags.get(session.session_id)}
+														session={session}
+														userLabel={formatUsername(session.user_id, userMap)}
+													/>
+												))}
+											</>
+										)}
+									</SessionsOverviewFluidList>
 								)}
-							</SessionsOverviewFluidList>
+							</Reveal>
 						)}
 						{pageSessions.length > 0 ? (
 							<SessionsOverviewPager

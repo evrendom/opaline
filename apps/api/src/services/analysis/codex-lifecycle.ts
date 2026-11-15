@@ -21,6 +21,12 @@ import type { CodexLifecycleRow, CodexTurnMark } from "./run-index-sql.js";
  * 4. else no run: the row's turn has not started a run, and its facts are
  *    not attributed.
  *
+ * A message sent while a turn works (a steer) starts a run inside the same
+ * turn, so one turn can span several runs: from the run its opening row
+ * starts to its completion's. The turn's settings (model, effort, context
+ * window, policies) hold for every run it spans; how it ended (duration,
+ * abort, error) belongs to its completion's run alone.
+ *
  * This never moves a record between runs: run starts, spans and counts stay
  * by `turn_idx`, so run ids stay the edges' ids.
  */
@@ -97,6 +103,13 @@ export function codexLifecycleRun(
 	// Only an opening row precedes its turn's prompt; a completion never
 	// belongs to a later run.
 	if (COMPLETIONS.has(row.subtype)) return row.turn_idx;
+	return openingRun(row, marks);
+}
+
+function openingRun(
+	row: CodexLifecycleRow,
+	marks: ReadonlyMap<string, CodexTurnMark>,
+): number {
 	const own = marks.get(streamTurnKey(row.agent_id, row.turn_idx));
 	const next = marks.get(streamTurnKey(row.agent_id, row.turn_idx + 1));
 	const lastResponse = own?.last_response ?? 0;
@@ -104,6 +117,23 @@ export function codexLifecycleRun(
 		return row.turn_idx + 1;
 	if (lastResponse > row.record_idx) return row.turn_idx;
 	return 0;
+}
+
+function turnStarts(
+	rows: readonly CodexLifecycleRow[],
+	completions: ReadonlyMap<string, number>,
+	marks: ReadonlyMap<string, CodexTurnMark>,
+): Map<string, number> {
+	const starts = new Map<string, number>();
+	for (const row of rows) {
+		if (COMPLETIONS.has(row.subtype) || row.turn_id === "") continue;
+		const key = `${row.agent_id}\u0000${row.turn_id}`;
+		const end = completions.get(key);
+		const start = openingRun(row, marks);
+		if (end === undefined || start < 1 || start > end) continue;
+		starts.set(key, Math.min(starts.get(key) ?? start, start));
+	}
+	return starts;
 }
 
 /**
@@ -132,41 +162,59 @@ export function codexLifecycleFactsByRun(
 			a.record_idx - b.record_idx ||
 			a.block_idx - b.block_idx,
 	);
+	const starts = turnStarts(rows, completions, marksByTurn);
 	const byRun = new Map<string, CodexLifecycleFacts>();
-	for (const row of ordered) {
-		const run = codexLifecycleRun(row, completions, marksByTurn);
-		if (run < 1) continue;
-		const key = streamTurnKey(row.agent_id, run);
+	const factsOf = (agentId: string, run: number) => {
+		const key = streamTurnKey(agentId, run);
 		const facts = byRun.get(key) ?? {
 			...NO_CODEX_LIFECYCLE_FACTS,
 			models: [],
 			efforts: [],
 		};
-		facts.approvalPolicy ||= row.approval_policy;
-		facts.approvalsReviewer ||= row.approvals_reviewer;
-		facts.sandboxPolicy ||= row.sandbox_policy;
-		facts.sandboxNetworkAccess ||= row.sandbox_network_access;
-		facts.permissionProfile ||= row.permission_profile;
-		facts.collaborationMode ||= row.collaboration_mode;
-		facts.model ||= row.model;
-		if (row.model !== "" && !facts.models.includes(row.model))
-			facts.models = [...facts.models, row.model].sort();
-		facts.effort ||= row.effort;
-		if (row.effort !== "" && !facts.efforts.includes(row.effort))
-			facts.efforts = [...facts.efforts, row.effort].sort();
-		facts.contextWindow ||= row.context_window;
-		facts.turnError ||= row.turn_error;
-		facts.turnErrorKind ||= row.turn_error_kind;
-		if (row.turn_error_kind === "usage_limit_exceeded")
-			facts.usageLimited = true;
-		facts.abortReason ||= row.abort_reason;
-		if (row.subtype === "task_complete")
-			facts.timeToFirstTokenMs ||= row.time_to_first_token_ms;
-		if (COMPLETIONS.has(row.subtype) && row.task_duration_ms !== null)
-			facts.durationMs = (facts.durationMs ?? 0) + row.task_duration_ms;
-		if (row.aborted === "true") facts.abortedTrue++;
-		if (row.aborted === "false") facts.abortedFalse++;
 		byRun.set(key, facts);
+		return facts;
+	};
+	for (const row of ordered) {
+		const run = codexLifecycleRun(row, completions, marksByTurn);
+		if (run < 1) continue;
+		const start =
+			row.turn_id === ""
+				? run
+				: (starts.get(`${row.agent_id}\u0000${row.turn_id}`) ?? run);
+		for (let spanned = start; spanned < run; spanned++)
+			addSettings(factsOf(row.agent_id, spanned), row);
+		const facts = factsOf(row.agent_id, run);
+		addSettings(facts, row);
+		addEnding(facts, row);
 	}
 	return byRun;
+}
+
+function addSettings(facts: CodexLifecycleFacts, row: CodexLifecycleRow) {
+	facts.approvalPolicy ||= row.approval_policy;
+	facts.approvalsReviewer ||= row.approvals_reviewer;
+	facts.sandboxPolicy ||= row.sandbox_policy;
+	facts.sandboxNetworkAccess ||= row.sandbox_network_access;
+	facts.permissionProfile ||= row.permission_profile;
+	facts.collaborationMode ||= row.collaboration_mode;
+	facts.model ||= row.model;
+	if (row.model !== "" && !facts.models.includes(row.model))
+		facts.models = [...facts.models, row.model].sort();
+	facts.effort ||= row.effort;
+	if (row.effort !== "" && !facts.efforts.includes(row.effort))
+		facts.efforts = [...facts.efforts, row.effort].sort();
+	facts.contextWindow ||= row.context_window;
+}
+
+function addEnding(facts: CodexLifecycleFacts, row: CodexLifecycleRow) {
+	facts.turnError ||= row.turn_error;
+	facts.turnErrorKind ||= row.turn_error_kind;
+	if (row.turn_error_kind === "usage_limit_exceeded") facts.usageLimited = true;
+	facts.abortReason ||= row.abort_reason;
+	if (row.subtype === "task_complete")
+		facts.timeToFirstTokenMs ||= row.time_to_first_token_ms;
+	if (COMPLETIONS.has(row.subtype) && row.task_duration_ms !== null)
+		facts.durationMs = (facts.durationMs ?? 0) + row.task_duration_ms;
+	if (row.aborted === "true") facts.abortedTrue++;
+	if (row.aborted === "false") facts.abortedFalse++;
 }

@@ -1,8 +1,11 @@
 import { expect, test } from "bun:test";
 import {
 	assembleTrendsUsage,
+	buildFrictionWindowStatement,
+	frictionRows,
 	readExcludedUserIds,
 	type TrendsUsageRows,
+	trendsQueryParams,
 	trendsWindow,
 } from "./trends-usage.service.js";
 
@@ -395,4 +398,94 @@ test("tool calls per month list complete months that clear the thresholds", () =
 			p99Calls: 110,
 		},
 	]);
+});
+
+test("a friction window bounds every input on the primary key and carries its budget", () => {
+	const statement = buildFrictionWindowStatement(
+		{
+			from: { organizationId: "org-a", userId: "user-a", sessionId: "s-1" },
+			to: { organizationId: "org-b", userId: "user-b", sessionId: "s-2" },
+		},
+		trendsQueryParams(window),
+	);
+	const reads = [
+		...statement.query.matchAll(
+			/FROM rudel\.(usage_events|session_language_signals|transcript_records)\b[\s\S]*?(?=\bFROM\b|$)/g,
+		),
+	];
+	expect(reads.map((read) => read[1]).sort()).toEqual([
+		"session_language_signals",
+		"transcript_records",
+		"transcript_records",
+		"usage_events",
+	]);
+	for (const [read] of reads) {
+		expect(read).toContain("session_id >= {fromSessionId:String}");
+		expect(read).toContain("session_id < {toSessionId:String}");
+		expect(read).not.toContain("<= {toSessionId:String}");
+	}
+	expect(statement.query).toContain(
+		"r.organization_id > {fromOrganizationId:String}",
+	);
+	expect(statement.query).not.toContain("dev_totals");
+	expect(statement.query_params).toMatchObject({
+		fromOrganizationId: "org-a",
+		toSessionId: "s-2",
+	});
+	expect(statement.clickhouse_settings).toMatchObject({
+		max_memory_usage: String(1024 ** 3),
+		max_rows_to_read: "24000000",
+		max_bytes_to_read: String(4 * 1024 ** 3),
+	});
+	expect(
+		buildFrictionWindowStatement({}, trendsQueryParams(window)).query,
+	).not.toContain("OrganizationId:String}");
+});
+
+test("friction rows merge each developer's windows before choosing populations", () => {
+	const developer = (
+		organization: string,
+		user: string,
+		model: string,
+		figures: Partial<
+			Record<"tokens" | "swears" | "apologies" | "errors" | "prompts", number>
+		>,
+	) => ({
+		model,
+		organization_id: organization,
+		user_id: user,
+		output_tokens: String(figures.tokens ?? 0),
+		swears: String(figures.swears ?? 0),
+		apologies: String(figures.apologies ?? 0),
+		tool_errors: String(figures.errors ?? 0),
+		prompts: String(figures.prompts ?? 0),
+	});
+	const rows = frictionRows([
+		developer("org-a", "ann", "gpt-5.5", { tokens: 100, prompts: 4 }),
+		developer("org-a", "ann", "gpt-5.5", { swears: 2, errors: 1, prompts: 1 }),
+		developer("org-a", "ann", "claude-opus-5-5", { tokens: 50, apologies: 3 }),
+		developer("org-b", "ann", "gpt-5.5", { tokens: 10, errors: 2 }),
+		developer("org-b", "bob", "claude-opus-5-5", { prompts: 2 }),
+	]);
+	expect(rows.map((row) => row.model)).toEqual(["claude-opus-5-5", "gpt-5.5"]);
+	expect(rows[1]).toMatchObject({
+		all_developers: "2",
+		all_swearers: "1",
+		all_swears: "2",
+		all_tool_errors: "3",
+		all_tokens: "110",
+		all_prompts: "5",
+		swearers_developers: "1",
+		swearers_tokens: "100",
+		cohort_developers: "1",
+		cohort_tool_errors: "1",
+	});
+	expect(rows[0]).toMatchObject({
+		all_developers: "2",
+		all_apologies: "3",
+		swearers_developers: "1",
+		swearers_apologies: "3",
+		cohort_developers: "1",
+		cohort_prompts: "0",
+	});
 });

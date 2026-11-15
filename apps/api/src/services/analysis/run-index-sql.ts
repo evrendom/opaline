@@ -15,6 +15,13 @@ import { buildPricedUsageEventsCte } from "../usage-event-analytics.service.js";
 import { type ForkReplayRules, runDirectoryRules } from "./run-directories.js";
 import { RUN_INDEX_FACT_COLUMNS } from "./run-index-columns.js";
 import {
+	CODEX_COMMIT_LINE,
+	CODEX_GH_PR_CALL,
+	CODEX_GIT_COMMIT_CALL,
+	CODEX_GIT_DRY_RUN,
+	CODEX_GIT_PUSH_CALL,
+	CODEX_PUSH_NEW_BRANCH_LINE,
+	CODEX_PUSH_RANGE_LINE,
 	componentStringsSql,
 	httpStatusesSql,
 	providerErrorKindSql,
@@ -52,8 +59,11 @@ import {
  * compaction or context a local command added after the answer. 8: a Codex
  * run's directory from its turn and workdir. 9: each build is followed by
  * the session's context snapshot (`rudel.session_context_snapshots`).
+ * 11: a Codex turn's settings hold for every run it spans; a Codex script
+ * whose commands ran is counted as those commands; Codex commits, pushes, PR
+ * actions, spawned agents and interrupted turns are recorded.
  */
-export const RUN_INDEX_VERSION = 10;
+export const RUN_INDEX_VERSION = 11;
 
 export const CALL_FACTS_SINCE_INDEX_VERSION = 10;
 
@@ -247,6 +257,18 @@ const USER_DECIDED =
  * A failed call's record: an error or non-zero exit on its result, or on the
  * Codex completion row (parser 9) that carries the call's outcome.
  */
+const sqlRegex = (pattern: string) =>
+	`'${pattern.replaceAll("\\", "\\\\").replaceAll("'", "\\'")}'`;
+
+const WHOLE_LINES_SQL =
+	"concat(text, if(text_chars > lengthUTF8(text), '', char(10)))";
+
+const CODEX_RAN_RESULT_SQL =
+	"source = 'codex' AND kind = 'tool_result' AND subtype != 'running' AND (exit_code IS NOT NULL OR NOT is_error)";
+
+const SCRIPT_RAN_NESTED_SQL =
+	"(w.call_id != '' AND c.ran_nested AND NOT (c.failed AND NOT c.nested_failed))";
+
 export function runToolErrorSql(): string {
 	return `(${toolErrorSql()} OR (source = 'codex' AND parser_version >= 9 AND kind = 'meta' AND call_id != ''
 		AND (subtype IN ('exec_command_end', 'patch_apply_end') OR startsWith(subtype, 'item_completed:'))
@@ -290,6 +312,10 @@ export function runFactsCtes(options: { literal?: boolean } = {}): string {
 				timed_out_after_ms, ifNull(interrupted, false) AS interrupted_call,
 				${CODEX_PROVIDER_ERROR_KIND_SQL} AS provider_error_kind,
 				if(source = 'codex' AND kind = 'tool_result', extractAll(text, '${RUN_INDEX_PR_URL_PATTERN.replaceAll("\\", "\\\\")}'), []) AS result_pr_urls,
+				if(${CODEX_RAN_RESULT_SQL}, arrayMap(sha -> lower(sha), extractAll(text, ${sqlRegex(CODEX_COMMIT_LINE)})), []) AS result_commit_shas,
+				if(${CODEX_RAN_RESULT_SQL}, arrayConcat(extractAll(${WHOLE_LINES_SQL}, ${sqlRegex(CODEX_PUSH_RANGE_LINE)}),
+					extractAll(${WHOLE_LINES_SQL}, ${sqlRegex(CODEX_PUSH_NEW_BRANCH_LINE)})), []) AS result_push_branches,
+				toUInt8(source = 'codex' AND kind = 'tool_result' AND subtype != 'running' AND NOT is_error) AS clean_result,
 				toUInt8(source = 'codex' AND kind = 'meta' AND subtype IN ${CODEX_LIFECYCLE_SUBTYPES}) AS lifecycle,
 				${permissionField("decision")} AS permission_decision, ${permissionField("source")} AS permission_source,
 				${permissionField("reasonType")} AS permission_reason,
@@ -318,10 +344,31 @@ export function runFactsCtes(options: { literal?: boolean } = {}): string {
 				max(denial_kind != '' AND denial_kind != 'interrupted') AS refused,
 				max(denial_kind IN ('cancelled', 'interrupted') OR ifNull(interrupted, false)) AS stopped,
 				max(kind = 'tool_result') AS has_result,
+				max(source = 'codex' AND kind = 'tool_call' AND match(head, ${sqlRegex(CODEX_GIT_COMMIT_CALL)})) AS git_commit_call,
+				max(source = 'codex' AND kind = 'tool_call' AND match(head, ${sqlRegex(CODEX_GIT_PUSH_CALL)})
+					AND NOT match(head, ${sqlRegex(CODEX_GIT_DRY_RUN)})) AS git_push_call,
+				max(source = 'codex' AND kind = 'tool_call' AND match(head, ${sqlRegex(CODEX_GH_PR_CALL)})) AS gh_pr_call,
 				${foundNothingSql()}
 			FROM ${records()}
 			WHERE ${pinnedFilter()} AND kind IN ('tool_call', 'tool_result', 'meta') AND call_id != '' AND ${FORK_REPLAY_FILTER}
 			GROUP BY session_id, agent_id, call_id
+		),
+		scripts AS (
+			SELECT n.session_id AS script_session, n.agent_id AS script_agent, n.parent AS script_call,
+				max(nc.failed) AS nested_failed
+			FROM (
+				SELECT session_id, agent_id, call_id, facts['script_call_id'] AS parent
+				FROM ${records()}
+				WHERE ${pinnedFilter()} AND source = 'codex' AND kind = 'tool_call' AND subtype = 'nested'
+					AND facts['script_call_id'] != '' AND ${FORK_REPLAY_FILTER}
+			) AS n
+			LEFT ANY JOIN calls nc ON n.session_id = nc.session_id AND n.agent_id = nc.agent_id AND n.call_id = nc.call_id
+			GROUP BY n.session_id, n.agent_id, n.parent
+		),
+		call_outcomes AS (
+			SELECT c.*, s.script_call != '' AS ran_nested, s.nested_failed AS nested_failed
+			FROM calls c
+			LEFT ANY JOIN scripts s ON c.session_id = s.script_session AND c.agent_id = s.script_agent AND c.call_id = s.script_call
 		),
 		work_records AS (
 			SELECT session_id, agent_id, record_idx, block_idx, turn_idx, ts, kind, subtype,
@@ -348,8 +395,8 @@ export function runFactsCtes(options: { literal?: boolean } = {}): string {
 					uniqExactIf(file_path, kind = 'file_change' AND file_op IN ('write', 'edit', 'delete') AND file_path != '' AND (w.call_id = '' OR NOT c.failed))) AS edits,
 				uniqExactIf(w.call_id, ${editRequestSql} AND w.call_id != '' AND NOT c.stopped AND c.failed AND NOT c.refused) AS failed_edits,
 				uniqExactIf(w.call_id, ${editRequestSql} AND w.call_id != '' AND c.refused) AS refused_edits,
-				countIf(kind = 'tool_call') AS tool_calls,
-				uniqExactIf(if(w.call_id != '', w.call_id, concat(toString(record_idx), ':', toString(block_idx))), ${runToolErrorSql()}) AS failed_calls,
+				countIf(kind = 'tool_call' AND NOT ${SCRIPT_RAN_NESTED_SQL}) AS tool_calls,
+				uniqExactIf(if(w.call_id != '', w.call_id, concat(toString(record_idx), ':', toString(block_idx))), ${runToolErrorSql()} AND NOT ${SCRIPT_RAN_NESTED_SQL}) AS failed_calls,
 				countIf(kind = 'tool_call' AND ${toolActivitySql("read", callGroup)}) AS read_calls,
 				countIf(kind = 'tool_call' AND ${toolActivitySql("search", callGroup)}) AS search_calls,
 				countIf(kind = 'tool_call' AND (
@@ -357,7 +404,7 @@ export function runFactsCtes(options: { literal?: boolean } = {}): string {
 					OR (${toolActivitySql("search", callGroup)} AND c.printed_nothing AND NOT c.silenced))) AS not_found,
 				any(w.source) AS run_source, any(w.parser_version) AS run_parser_version${literalFacts}
 			FROM work_records w
-			LEFT ANY JOIN calls c ON w.session_id = c.session_id AND w.agent_id = c.agent_id AND w.call_id = c.call_id
+			LEFT ANY JOIN call_outcomes c ON w.session_id = c.session_id AND w.agent_id = c.agent_id AND w.call_id = c.call_id
 			GROUP BY w.session_id, w.agent_id, w.turn_idx
 		),
 		${boundedRunsCte(FORK_REPLAY_FILTER)}`;
@@ -408,7 +455,9 @@ function foundNothingSql(): string {
 				maxIf(match(substringUTF8(head, 1, ${FACT_TEXT_CHARS}), '${SILENCED_COMMAND.replaceAll("\\", "\\\\")}'), kind = 'tool_call') AS silenced`;
 }
 
-export const FORK_REPLAY_FILTER = `facts['fork_replayed'] != 'true' AND (session_id, agent_id, call_id) NOT IN (SELECT session_id, agent_id, call_id FROM replayed_calls)`;
+const REPLAYED_CALLS = "opaline_replayed_calls";
+
+export const FORK_REPLAY_FILTER = `facts['fork_replayed'] != 'true' AND (session_id, agent_id, call_id) NOT IN ${REPLAYED_CALLS}`;
 
 /**
  * The calls a forked Codex stream replays from its parent (`replayed_calls`):
@@ -429,7 +478,8 @@ export function forkReplayCtes(
 		replayed_calls AS (
 			SELECT f.user_id AS user_id, f.session_id AS session_id, f.agent_id AS agent_id, p.call_id AS call_id
 			FROM fork_links f INNER JOIN parent_calls p ON f.user_id = p.user_id AND f.parent_session_id = p.session_id
-		)`;
+		),
+		(SELECT groupUniqArray((session_id, agent_id, call_id)) FROM replayed_calls) AS ${REPLAYED_CALLS}`;
 }
 
 export function forkReplayOnceCtes(children: string, owner?: string): string {
@@ -571,20 +621,32 @@ function literalRunFacts(): string {
 		`toUInt8(max(${f("api_error")} = 'rate_limit' OR quota_rejected = 1 OR provider_error_kind = 'usage_limit_exceeded')) AS l_rate_limited`,
 		`uniqExactIf(record_idx, ${RUN_EVENT_RECORDS.isRefusal(f, "w.agent_id")}) AS l_refusals`,
 		`argMaxIf(${f("goal")}, tuple(record_idx, block_idx), ${f("goal")} != '') AS l_goal`,
-		`arraySort(arrayDistinct(arrayFlatten(groupArrayIf(git_operation, notEmpty(git_operation))))) AS l_git_operations`,
-		`${sortedSet(f("git.push.branch"))} AS l_pushed_branches`,
-		`${sortedSet(f("git.commit.sha"))} AS l_commit_shas`,
+		`arraySort(arrayDistinct(arrayConcat(
+					CAST(arrayFlatten(groupArrayIf(git_operation, notEmpty(git_operation))), 'Array(String)'),
+					if(countIf(c.git_commit_call AND notEmpty(result_commit_shas)) > 0, ['commit'], []),
+					if(countIf(c.git_push_call AND notEmpty(result_push_branches)) > 0, ['push'], []),
+					if(countIf(c.gh_pr_call AND clean_result = 1) > 0, ['pr'], [])))) AS l_git_operations`,
+		`arraySort(arrayDistinct(arrayConcat(${sortedSet(f("git.push.branch"))},
+					arrayFlatten(groupArrayIf(result_push_branches, c.git_push_call))))) AS l_pushed_branches`,
+		`arraySort(arrayDistinct(arrayConcat(${sortedSet(f("git.commit.sha"))},
+					arrayFlatten(groupArrayIf(result_commit_shas, c.git_commit_call))))) AS l_commit_shas`,
 		`arraySort(arrayDistinct(arrayConcat(groupUniqArrayIf(${f("git.pr.url")}, ${f("git.pr.url")} != ''),
 					groupUniqArrayIf(${f("pr_url")}, ${f("pr_url")} != ''), arrayFlatten(groupArray(result_pr_urls))))) AS l_pr_urls`,
 		`countIf(${f("facts_truncated")} = 'true' OR ${f("facts_clipped")} != '') AS l_facts_truncated`,
 	].join(",\n\t\t\t\t");
 }
 
+const CODEX_AGENT_TYPES_SQL = componentStringsSql(
+	"facts['subagent_type_components']",
+	"[.]arguments[.]agent_type$",
+);
+
 /**
  * Per run, the stream's Codex `thread_source` (from its `session_meta`) and
  * the requested types of Claude Task/Agent and Codex spawn_agent calls.
  * Claude inputs are read from stored text; Codex reads only the named
- * agent_type component, never its requested model or reasoning effort.
+ * agent_type component, never its requested model or reasoning effort, and a
+ * spawn that names none is its built-in "default" agent.
  */
 function runContextCtes(): string {
 	return `codex_streams AS (
@@ -598,12 +660,14 @@ function runContextCtes(): string {
 			SELECT session_id, agent_id, turn_idx, arraySort(groupUniqArrayIf(subagent_type, subagent_type != '')) AS subagent_types
 			FROM (
 				SELECT session_id, agent_id, turn_idx, arrayJoin(if(source = 'codex' AND parser_version >= 9,
-					${componentStringsSql("facts['subagent_type_components']", "[.]arguments[.]agent_type$")},
+					if(kind = 'tool_call' AND tool_name = 'spawn_agent' AND empty(${CODEX_AGENT_TYPES_SQL}),
+						['default'], ${CODEX_AGENT_TYPES_SQL}),
 					[${jsonStringField("text", "subagent_type")}])) AS subagent_type
 				FROM ${records()}
 				WHERE ${pinnedFilter()} AND turn_idx >= 1 AND ${FORK_REPLAY_FILTER}
 					AND (kind = 'tool_call' AND tool_name IN ('Task', 'Agent')
-						OR source = 'codex' AND parser_version >= 9 AND facts['subagent_type_components'] != '')
+						OR source = 'codex' AND parser_version >= 9 AND facts['subagent_type_components'] != ''
+						OR source = 'codex' AND parser_version >= 9 AND kind = 'tool_call' AND tool_name = 'spawn_agent')
 			)
 			GROUP BY session_id, agent_id, turn_idx
 		)`;
@@ -757,10 +821,10 @@ const TOKEN_KINDS = [
  * stored line that may belong to another stream. Unverified cost is reported
  * per session, never guessed onto a run.
  *
- * With `generation`, every usage read is bound to one usage extraction
- * (`{usageGeneration:UInt64}`): the run index prices a complete, consistent
- * set of events, never a mix of two extractions. `find` reads every active
- * event.
+ * With `generation`, every usage read is bound to one usage extraction of
+ * one session stream (`{usageGeneration:UInt64}`, `{source:String}`): the
+ * run index prices a complete, consistent set of events, never a mix of two
+ * extractions. `find` reads every active event.
  */
 export function usageEventCtes(
 	options: { generation?: boolean | "per-session" } = {},
@@ -775,7 +839,9 @@ export function usageEventCtes(
 		options.generation === "per-session"
 			? ` AND (e.session_id, e.event_version) IN (${USAGE_GENERATIONS_SQL})`
 			: generation.replace("event_version", "e.event_version");
-	return `${buildPricedUsageEventsCte(`e.organization_id = {organizationId:String} AND e.user_id = {userId:String} AND e.session_id IN {sessionIds:Array(String)}${pricedGeneration}`)},
+	const source =
+		options.generation === true ? " AND e.source = {source:String}" : "";
+	return `${buildPricedUsageEventsCte(`e.organization_id = {organizationId:String} AND e.user_id = {userId:String}${source} AND e.session_id IN {sessionIds:Array(String)}${pricedGeneration}`)},
 		claude_single_lineages AS (
 			SELECT DISTINCT session_id, lineage_id FROM ${getSafeClickHouseTable("rudel.usage_events")} FINAL
 			WHERE organization_id = {organizationId:String} AND user_id = {userId:String} AND session_id IN {sessionIds:Array(String)}
@@ -874,6 +940,7 @@ const usageShape = {
  */
 export interface UsageBoundGeneration extends SessionGeneration {
 	readonly usageGeneration: string;
+	readonly source: string;
 }
 
 /** One run of a generation with its stored facts, before gating (`run-index-columns.ts`). */
@@ -983,6 +1050,7 @@ export function buildRunIndexStatement(
 		query_params: {
 			...pinnedParams(scope, [generation]),
 			usageGeneration: generation.usageGeneration,
+			source: generation.source,
 		},
 	};
 }
@@ -1095,6 +1163,7 @@ export function buildUnattributedUsageStatement(
 		query_params: {
 			...pinnedParams(scope, [generation]),
 			usageGeneration: generation.usageGeneration,
+			source: generation.source,
 		},
 	};
 }
@@ -1148,6 +1217,21 @@ export const REQUEST_TEXT_HEAD_CHARS = 160;
 /** Records a model writes in a response; any other non-meta record is input to the next one. */
 const RESPONSE_RECORD_KINDS = "('assistant_text', 'reasoning', 'tool_call')";
 
+const PLACED_USAGE = "opaline_placed_usage";
+const PLACED_USAGE_COLUMNS = [
+	"session_id",
+	"stream",
+	"line",
+	"verified",
+	"estimated_cost",
+	"resolved_model",
+	"raw_model",
+	"first_observed_line",
+	"event_version",
+	"event_id",
+	...TOKEN_KINDS,
+] as const;
+
 /**
  * The requests of each run (docs/l1-literal-schema.md, "Scale"): one model
  * response and the calls it made. A request starts at a response record
@@ -1182,14 +1266,16 @@ function runRequestsCtes(batch = false): string {
 				WHERE ${pinnedFilter()} AND kind != 'meta' AND ${FORK_REPLAY_FILTER}
 				GROUP BY session_id, agent_id, record_idx
 			),
+			(SELECT groupArray((${PLACED_USAGE_COLUMNS.join(", ")}))
+				FROM (
+					SELECT e.*, if(e.source = 'claude_code' AND l.response = 1, l.record_idx, e.first_observed_line) AS line
+					FROM resolved_usage e
+					ASOF LEFT JOIN response_lines l
+						ON e.session_id = l.session_id AND e.stream = l.agent_id AND e.first_observed_line <= l.record_idx
+				)) AS ${PLACED_USAGE},
 			placed_usage AS (
-				SELECT e.*, if(e.source = 'claude_code' AND l.response = 1, l.record_idx, e.first_observed_line) AS line
-				FROM resolved_usage e
-				ASOF LEFT JOIN response_lines l
-					ON e.session_id = l.session_id AND e.stream = l.agent_id AND e.first_observed_line <= l.record_idx
-			),
-			event_lines AS (
-				SELECT DISTINCT session_id, stream AS agent_id, line FROM placed_usage
+				SELECT ${PLACED_USAGE_COLUMNS.map((column, index) => `u.${index + 1} AS ${column}`).join(", ")}
+				FROM (SELECT arrayJoin(${PLACED_USAGE}) AS u)
 			),
 			call_outcomes AS (
 				SELECT session_id, agent_id, call_id, max(${runToolErrorSql()}) AS failed
@@ -1211,8 +1297,8 @@ function runRequestsCtes(batch = false): string {
 			request_candidates AS (
 				SELECT *, toUInt8(response = 1 AND ifNull(previous_class, 0) = 0) AS candidate,
 					sum(candidate) OVER (${run} ${order} ROWS UNBOUNDED PRECEDING) AS candidate_number,
-					toUInt8((session_id, agent_id, record_idx) IN (SELECT session_id, agent_id, line FROM event_lines)) AS event_line,
-					toUInt8((session_id, agent_id) IN (SELECT session_id, agent_id FROM event_lines)) AS stream_has_usage
+					toUInt8((session_id, agent_id, record_idx) IN arrayMap(p -> (p.1, p.2, p.3), ${PLACED_USAGE})) AS event_line,
+					toUInt8((session_id, agent_id) IN arrayMap(p -> (p.1, p.2), ${PLACED_USAGE})) AS stream_has_usage
 				FROM request_work
 			),
 			request_marks AS (
@@ -1302,6 +1388,7 @@ export function buildRunRequestsStatement(
 		query_params: {
 			...pinnedParams(scope, [generation]),
 			usageGeneration: generation.usageGeneration,
+			source: generation.source,
 		},
 	};
 }

@@ -1,21 +1,21 @@
 import {
 	isLiveSessionActive,
 	type LiveSessionSummary,
+	type RepositoryNavigationItem,
 	type RepositorySettings,
-	type RepositorySummary,
 	resolveRepoIdentity,
 } from "@rudel/api-routes";
 
 export const SIDEBAR_REPOSITORIES_SHOWN = 10;
 const RECENT_DAYS = 60;
 
-function isRecent(repo: RepositorySummary, now: number) {
+function isRecent(repo: RepositoryNavigationItem, now: number) {
 	if (!repo.lastActiveAt) return true;
 	return now - Date.parse(repo.lastActiveAt) <= RECENT_DAYS * 86_400_000;
 }
 
 export function topRepositories(
-	repos: readonly RepositorySummary[],
+	repos: readonly RepositoryNavigationItem[],
 	now = Date.now(),
 ) {
 	const top = [...repos]
@@ -42,7 +42,7 @@ export const REPOSITORY_HUES = [
 ] as const;
 
 export function repositoryHue(
-	repos: readonly RepositorySummary[],
+	repos: readonly RepositoryNavigationItem[],
 	repoKey: string,
 	now = Date.now(),
 ) {
@@ -53,7 +53,7 @@ export function repositoryHue(
 }
 
 export function hasMoreRepositories(
-	repos: readonly RepositorySummary[],
+	repos: readonly RepositoryNavigationItem[],
 	shown: number,
 ) {
 	return repos.filter((repo) => repo.sessionCount > 0).length > shown;
@@ -73,7 +73,7 @@ export function autoUploadRepositoryKeys(
 
 export function liveRepositoryKeys(
 	sessions: readonly LiveSessionSummary[],
-	repos: readonly RepositorySummary[],
+	repos: readonly RepositoryNavigationItem[],
 	now: number,
 ) {
 	const remotesByName = new Map<string, string>();

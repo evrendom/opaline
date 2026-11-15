@@ -1,5 +1,5 @@
 import type { SessionTurnStepKind } from "@rudel/api-routes";
-import { type Icon, IconSparkles } from "@tabler/icons-react";
+import { type Icon, IconFileCode, IconSparkles } from "@tabler/icons-react";
 import {
 	type ReactNode,
 	useLayoutEffect,
@@ -9,6 +9,7 @@ import {
 } from "react";
 import { Link } from "react-router-dom";
 import { ConversationSkillLink } from "@/components/conversation/conversation-skill-link";
+import { EmptyState } from "@/components/dashboard/page-parts";
 import { FileTree } from "@/components/pierre/file-tree";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
 import { shortRunId, shortSubagentId } from "@/features/sessions/run-id";
@@ -322,7 +323,15 @@ export function SummaryFiles({
 	);
 	const shown = changed.length > 0 ? changed : files;
 	const items = useMemo(() => getSummaryTreeItems(shown), [shown]);
-	if (files.length === 0) return <Empty>No files touched.</Empty>;
+	if (files.length === 0)
+		return (
+			<div className="relative mt-2 min-h-26 flex-1">
+				<EmptyState
+					className="absolute inset-0 gap-2 p-4 py-0"
+					icon={IconFileCode}
+				/>
+			</div>
+		);
 	return (
 		<FitRows
 			floor="17.5rem"

@@ -4,6 +4,13 @@ import { splitSessionTranscript } from "@rudel/api-routes/transcript-records";
 import { MODEL_RATE_CARD_VERSION } from "../pricing.service.js";
 import { buildPricedUsageEventsCte } from "../usage-event-analytics.service.js";
 import {
+	CODEX_COMMIT_LINE,
+	CODEX_GH_PR_CALL,
+	CODEX_GIT_COMMIT_CALL,
+	CODEX_GIT_DRY_RUN,
+	CODEX_GIT_PUSH_CALL,
+	CODEX_PUSH_NEW_BRANCH_LINE,
+	CODEX_PUSH_RANGE_LINE,
 	RUN_INDEX_PR_URL_PATTERN,
 	readRunIndexComponentValues,
 } from "./run-index-components.js";
@@ -100,6 +107,7 @@ describe("semantic run-index component projections", () => {
 				revision: "1",
 				parserVersion: 9,
 				usageGeneration: "1",
+				source: "codex",
 			},
 		);
 		expect(statement.query).toContain("facts['subagent_type_components']");
@@ -163,10 +171,63 @@ describe("semantic run-index component projections", () => {
 		expect(sql).not.toContain("session_git_observations");
 	});
 
-	test("index 10 (each build writes its call facts, ADR 0008; 9 each session's context snapshot after its build; 8 a Codex run's directory from its turn and workdir; 7 runs end at their last activity record, 6 is received setup, OPL-391, 5 requests, 4 the measure facts) with a SQL-and-gates fingerprint", () => {
+	test("index 11 (Codex turns span their steered runs, scripts count as their commands, Codex git, agents and interrupts; 10 each build writes its call facts, ADR 0008; 9 each session's context snapshot after its build; 8 a Codex run's directory from its turn and workdir; 7 runs end at their last activity record, 6 is received setup, OPL-391, 5 requests, 4 the measure facts) with a SQL-and-gates fingerprint", () => {
 		const pricingOnly = `${MODEL_RATE_CARD_VERSION}+${createHash("sha256").update(buildPricedUsageEventsCte("")).digest("hex").slice(0, 12)}`;
-		expect(RUN_INDEX_VERSION).toBe(10);
+		expect(RUN_INDEX_VERSION).toBe(11);
 		expect(RUN_INDEX_PRICING_VERSION).toMatch(/\+[a-f0-9]{12}$/u);
 		expect(RUN_INDEX_PRICING_VERSION).not.toBe(pricingOnly);
+	});
+});
+
+const regex = (pattern: string) =>
+	pattern.startsWith("(?m)")
+		? new RegExp(pattern.slice(4), "gm")
+		: new RegExp(pattern);
+const all = (pattern: string, text: string) =>
+	[...text.matchAll(regex(pattern))].map((match) => match[1]);
+
+describe("Codex git commands and what they printed", () => {
+	test("a commit is its git commit command and its [branch sha] line", () => {
+		const command = 'git add -A && git commit -m "fix: hover" && git push';
+		expect(regex(CODEX_GIT_COMMIT_CALL).test(command)).toBe(true);
+		expect(
+			all(
+				CODEX_COMMIT_LINE,
+				"Process exited with code 0\nOutput:\n[fix/session-list-hover 9000aa46] fix: hover\n 2 files changed\n",
+			),
+		).toEqual(["9000aa46"]);
+		expect(
+			all(CODEX_COMMIT_LINE, "[main (root-commit) 04a5049b] init\n"),
+		).toEqual(["04a5049b"]);
+		expect(all(CODEX_COMMIT_LINE, "[fix/session-list-hover 9000a")).toEqual([]);
+		expect(regex(CODEX_GIT_COMMIT_CALL).test("git log --oneline")).toBe(false);
+	});
+
+	test("a push is its git push command and its ref update lines, whole", () => {
+		expect(regex(CODEX_GIT_PUSH_CALL).test("git push -u origin HEAD")).toBe(
+			true,
+		);
+		expect(
+			regex(CODEX_GIT_DRY_RUN).test("git push --dry-run origin HEAD"),
+		).toBe(true);
+		expect(regex(CODEX_GIT_DRY_RUN).test("git push -u origin HEAD")).toBe(
+			false,
+		);
+		const output =
+			"To https://github.com/opalinehq/athena.git\n * [new branch]        fix/a -> fix/a\n   1fd65fbb..d98df19a  main -> main\n + 1fd65fbb...d98df19a fix/b -> fix/b (forced update)\n";
+		expect(all(CODEX_PUSH_NEW_BRANCH_LINE, output)).toEqual(["fix/a"]);
+		expect(all(CODEX_PUSH_RANGE_LINE, output)).toEqual(["main", "fix/b"]);
+		expect(
+			all(
+				CODEX_PUSH_NEW_BRANCH_LINE,
+				" * [new branch]        fix/opaline-hostname-r2-",
+			),
+		).toEqual([]);
+	});
+
+	test("a PR action is a gh pr command that changes the PR", () => {
+		expect(regex(CODEX_GH_PR_CALL).test("gh pr create --fill")).toBe(true);
+		expect(regex(CODEX_GH_PR_CALL).test("gh pr merge 412 --squash")).toBe(true);
+		expect(regex(CODEX_GH_PR_CALL).test("gh pr view 412")).toBe(false);
 	});
 });

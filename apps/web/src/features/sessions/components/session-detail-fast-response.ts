@@ -582,6 +582,11 @@ function normalizeWindowTurn(raw: Record<string, unknown>) {
 					userItems: normalizeTraceItems(rawBody.userItems),
 				}
 			: null,
+		bodyChunks: optionalField(
+			windowTurnShape.bodyChunks,
+			raw.bodyChunks,
+			undefined,
+		),
 		bodyOmitted: optionalField(
 			windowTurnShape.bodyOmitted,
 			raw.bodyOmitted,

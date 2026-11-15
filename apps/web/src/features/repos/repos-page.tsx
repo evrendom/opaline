@@ -1,10 +1,17 @@
+import { lazy } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { routeLoaders } from "@/app/route-loaders";
 import { appRoutes } from "@/app/routes";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { orpc } from "@/lib/orpc";
-import { RepoDetailPage } from "./repo-detail-page";
 import { ReposOverview } from "./repos-overview";
+
+const RepoDetailPage = lazy(() =>
+	routeLoaders.repoDetail().then((module) => ({
+		default: module.RepoDetailPage,
+	})),
+);
 
 export function ReposPage() {
 	const [searchParams] = useSearchParams();

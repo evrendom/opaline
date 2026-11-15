@@ -215,7 +215,7 @@ describe("clickhouse helpers", () => {
 			"ledger-1:rudel.codex_sessions:session-analytics-repair",
 		);
 
-		// The retired columns keep their defaults until they are dropped.
+		// Retired columns that are not dropped yet keep their defaults.
 		const retired: readonly string[] = RETIRED_SESSION_ANALYTICS_COLUMNS;
 		expect(
 			Object.keys(RudelSessionAnalyticsRowSchema.shape).filter(
@@ -411,6 +411,7 @@ describe("analytics service guardrails", () => {
 		expect(cleanupSource).toContain("max_bytes_to_read");
 		expect(cleanupSource).toContain("max_execution_time");
 		expect(cleanupSource).toContain('lightweight_deletes_sync: "3"');
+		expect(cleanupSource).toContain("buildKeyedDeleteOperations(");
 		expect(cleanupSource).not.toContain("ALTER TABLE");
 	});
 });

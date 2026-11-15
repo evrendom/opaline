@@ -4,7 +4,7 @@ import type {
 } from "@rudel/api-routes";
 import { useCallback, useMemo, useState } from "react";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
-import { Bone, Bones } from "@/app/ui/bones";
+import { Bone, Reveal } from "@/app/ui/bones";
 import { TraceAttempts } from "@/features/compass/compass-trace-attempts";
 import { useSessionReaderBodies } from "../detail/use-session-reader-bodies";
 import { mcpTool } from "../model/session-reader-mcp-tool";
@@ -159,9 +159,11 @@ export function SetupRunTrace({
 				This run could not be read.
 			</p>
 		);
-	if (status === "loading" || !waterfall)
-		return (
-			<Bones label="Reading this run">
+	return (
+		<Reveal
+			label="Reading this run"
+			loading={status === "loading" || !waterfall}
+			sample={
 				<div className="flex flex-col gap-2 py-2">
 					{[80, 64, 72].map((width) => (
 						<Bone
@@ -171,25 +173,30 @@ export function SetupRunTrace({
 						/>
 					))}
 				</div>
-			</Bones>
-		);
-	return (
-		<div ref={attachPane} className="pb-8 pl-[calc(2.25rem+9px)]">
-			<TraceAttempts
-				lanesSlot={null}
-				model={waterfall.model}
-				run={{
-					filter: NO_FILTER,
-					filterOptions: [],
-					marks: getReaderTurnMarks(turn, body),
-					onToggleFilter: NOOP,
-					turn,
-				}}
-				store={store}
-				turnId={turn.turnId}
-				usage={turn.usageCalls}
-				waterfall={waterfall}
-			/>
-		</div>
+			}
+			sampleId="reader-setup-run"
+		>
+			{() =>
+				waterfall ? (
+					<div ref={attachPane} className="pb-8 pl-[calc(2.25rem+9px)]">
+						<TraceAttempts
+							lanesSlot={null}
+							model={waterfall.model}
+							run={{
+								filter: NO_FILTER,
+								filterOptions: [],
+								marks: getReaderTurnMarks(turn, body),
+								onToggleFilter: NOOP,
+								turn,
+							}}
+							store={store}
+							turnId={turn.turnId}
+							usage={turn.usageCalls}
+							waterfall={waterfall}
+						/>
+					</div>
+				) : null
+			}
+		</Reveal>
 	);
 }

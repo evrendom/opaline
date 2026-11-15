@@ -2,6 +2,7 @@ import type { LastSessionUpload } from "@rudel/api-routes";
 import { buildDateFilter, queryClickhouse } from "../clickhouse.js";
 import { createAnalyticsRequestGate } from "./analytics-request-gate.js";
 import {
+	buildScalarWindowSql,
 	buildSessionAnalyticsWindowSql,
 	getUsageAnalyticsQueryContext,
 	type UsageAnalyticsWindow,
@@ -14,12 +15,18 @@ const LAST_UPLOAD_DAYS = 365;
  * is complete, which the newest one nearly always is.
  */
 const LAST_UPLOAD_CANDIDATES = 20;
+const LAST_UPLOAD_REUSE_SECONDS = 30;
 const lastUploadRequests = createAnalyticsRequestGate({
 	perScope: 1,
 	total: 4,
-	reuseMs: 30_000,
+	reuseMs: LAST_UPLOAD_REUSE_SECONDS * 1000,
 	maxEntries: 256,
 });
+export const LAST_UPLOAD_QUERY_CACHE_SETTINGS = {
+	use_query_cache: 1,
+	query_cache_ttl: LAST_UPLOAD_REUSE_SECONDS,
+	query_cache_nondeterministic_function_handling: "save",
+} as const;
 const PERIOD_FILTER = buildDateFilter("days", "sa.session_date");
 const SESSION_ORDER = "sa.session_date DESC, sa.source ASC, sa.session_id ASC";
 // A native Codex child is not top-level (`buildLineageEnrichedMetadataCte`).
@@ -48,15 +55,18 @@ async function readLastSessionUpload(
 ): Promise<LastSessionUpload | null> {
 	const newest = await readLastUpload(organizationId, {
 		includeNativeDescendants: false,
-		sessionsSql: `${buildSessionAnalyticsWindowSql(`${PERIOD_FILTER} AND ${TOP_LEVEL_FILTER}`)}
+		sessionsSql:
+			buildScalarWindowSql(`${buildSessionAnalyticsWindowSql(`${PERIOD_FILTER} AND ${TOP_LEVEL_FILTER}`)}
 				ORDER BY ${SESSION_ORDER}
-				LIMIT ${LAST_UPLOAD_CANDIDATES}`,
+				LIMIT ${LAST_UPLOAD_CANDIDATES}`),
 	});
 	if (newest) return newest;
 	return (
 		(await readLastUpload(organizationId, {
 			includeNativeDescendants: false,
-			sessionsSql: buildSessionAnalyticsWindowSql(PERIOD_FILTER),
+			sessionsSql: buildScalarWindowSql(
+				buildSessionAnalyticsWindowSql(PERIOD_FILTER),
+			),
 		})) ?? null
 	);
 }
@@ -70,6 +80,8 @@ async function readLastUpload(
 	});
 	const [row] = await queryClickhouse<LastSessionUpload>({
 		clickhouse_settings: {
+			...usage.clickhouseSettings,
+			...LAST_UPLOAD_QUERY_CACHE_SETTINGS,
 			join_use_nulls: 0,
 			log_comment: "analytics.sessions.lastUpload",
 		},

@@ -83,3 +83,16 @@ test("no-input reads have closed workspace arguments; input cannot override the 
 		pluginToolCall(["analytics", "sessions", "list"], [], "team"),
 	).toThrow();
 });
+
+test("leaves the app-only chunk totals flag out of plugin tool calls", () => {
+	expect(
+		pluginToolCall(
+			["analytics", "sessions", "detailInitial"],
+			{ bodyChunks: true, sessionId: "session-1" },
+			"team",
+		),
+	).toEqual({
+		name: "app_session_overview",
+		arguments: { sessionId: "session-1", workspace: "team" },
+	});
+});

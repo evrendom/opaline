@@ -636,7 +636,7 @@ export function renderModelPricingTable() {
 		"",
 		`Rate card version: ${MODEL_RATE_CARD_VERSION}. Standard first-party API rates in USD per million tokens.`,
 		"Cache-write columns show 5-minute / 1-hour rates; an em dash means the provider does not publish that tier.",
-		"OpenAI publishes a duration-agnostic cache-write rate, shown in the 5-minute column for a consistent schema.",
+		"OpenAI's 30-minute cache-write rate is shown in the 5-minute column. Its 12-hour writes (from October 20, 2026, at twice the 30-minute rate) have no column yet.",
 		"",
 		"Request-level callers price each token class from the event model, UTC usage date, context, and supported modifiers. Unknown models, unsupported modifier combinations, and known identities without a comparable public API rate return no estimate rather than inheriting a family or session price.",
 		"",

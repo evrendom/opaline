@@ -16,12 +16,14 @@ const INITIAL_SPINE_MAX_BYTES = 500_000;
 // All three views come from one already-authorized, revision-bound derivation.
 export function buildSessionDetailInitial(
 	derivation: SessionDetailDerivation,
+	options: { bodyChunks?: boolean } = {},
 ): SessionDetailInitial {
 	const spine = getSessionDetailSpine(derivation);
 	const assembly = assembleSessionDetailWindow({
 		budget: INITIAL_WINDOW_BUDGET,
 		derivation,
 		request: {
+			...(options.bodyChunks ? { bodyChunks: true } : {}),
 			includeBodies: true,
 			mode: "initial",
 			sessionId: derivation.overviewBase.session.sessionId,

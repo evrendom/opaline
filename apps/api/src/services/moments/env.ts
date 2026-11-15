@@ -3,6 +3,7 @@ import { sqlClient } from "../../db.js";
 import { workspaceFeatureEnabled } from "../workspace-features.js";
 import { type MomentsEnv, observationsDailyLimit } from "./moments.service.js";
 import { observationModelFromEnv } from "./observer.js";
+import { runEvidencePages } from "./run-evidence-pages.js";
 
 /** Moments as the API runs them, configured from the environment. */
 export function momentsEnv(): MomentsEnv {
@@ -14,5 +15,6 @@ export function momentsEnv(): MomentsEnv {
 		model: observationModelFromEnv(),
 		dailyLimit: observationsDailyLimit(),
 		now: () => new Date(),
+		evidencePages: runEvidencePages,
 	};
 }

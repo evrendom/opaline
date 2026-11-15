@@ -232,6 +232,28 @@ describe("session detail fast-path query boundaries", () => {
 		expect(parsed.shapeIssueFields).toContain("turns.0.responsePreview");
 	});
 
+	it("keeps an oversized turn's chunk totals through a recovered window", () => {
+		const summary = overviewFixture().turnPage.items[0];
+		const bodyChunks = { sha256: "b".repeat(64), totalCodeUnits: 700_000 };
+		const parsed = parseSessionDetailWindowResponse({
+			newerCursor: null,
+			olderCursor: null,
+			revision,
+			total: 1,
+			turns: [
+				{
+					...summary,
+					body: null,
+					bodyChunks,
+					bodyOmitted: "oversized",
+					responsePreview: 42,
+				},
+			],
+		});
+		expect(parsed.window.turns[0]?.bodyChunks).toEqual(bodyChunks);
+		expect(parsed.window.turns[0]?.bodyOmitted).toBe("oversized");
+	});
+
 	it("recovers safe overview fields without retaining invalid drifted values", () => {
 		const fixture = overviewFixture();
 		const parsed = parseSessionDetailOverviewResponse(

@@ -3,9 +3,20 @@ import type {
 	TrendsUsage,
 	TrendsUsageMetrics,
 } from "@rudel/api-routes/trends-usage";
-import { queryClickhouse } from "../clickhouse.js";
+import {
+	type ClickHouseExecutor,
+	type ClickHouseStatement,
+	getClickhouse,
+	queryClickhouse,
+} from "../clickhouse.js";
 import { readNonNegativeSafeIntegerEnv } from "../lib/env.js";
 import { SESSION_AGENT_RUN_SCAN_VERSION } from "./session-agent-runs.js";
+import { TRANSCRIPT_RECORDS_TABLE } from "./transcript-records-ingest.service.js";
+import {
+	censusWindowFilter,
+	scanCensusWindows,
+	type TranscriptRecordsCensusWindow,
+} from "./transcript-records-retirement.service.js";
 import {
 	buildCanonicalPricingModelSql,
 	buildRunPricedUsageCte,
@@ -44,6 +55,13 @@ const QUERY_SETTINGS = {
 	timeout_before_checking_execution_speed: 0,
 	max_result_rows: "200000",
 	result_overflow_mode: "throw",
+} as const;
+const FRICTION_WINDOW_ROWS = 4_000_000;
+const FRICTION_WINDOW_SETTINGS = {
+	...QUERY_SETTINGS,
+	max_memory_usage: String(1024 * 1024 * 1024),
+	max_rows_to_read: String(6 * FRICTION_WINDOW_ROWS),
+	max_bytes_to_read: String(4 * 1024 * 1024 * 1024),
 } as const;
 
 type Period = "current" | "previous";
@@ -118,6 +136,40 @@ interface RunTimeMonthRow {
 	readonly mean_seconds: number;
 	readonly seconds_q: readonly number[];
 }
+
+interface FrictionDeveloperRow {
+	readonly model: string;
+	readonly organization_id: string;
+	readonly user_id: string;
+	readonly output_tokens: string;
+	readonly swears: string;
+	readonly apologies: string;
+	readonly tool_errors: string;
+	readonly prompts: string;
+}
+
+interface FrictionFigures {
+	readonly model: string;
+	readonly developer: string;
+	outputTokens: number;
+	swears: number;
+	apologies: number;
+	toolErrors: number;
+	prompts: number;
+}
+
+const FRICTION_FIELDS = (["all", "swearers", "cohort"] as const).flatMap(
+	(population) =>
+		[
+			"developers",
+			"swearers",
+			"swears",
+			"apologies",
+			"tool_errors",
+			"tokens",
+			"prompts",
+		].map((field) => `${population}_${field}`),
+);
 
 /** One model's friction figures for each population, flattened. */
 interface FrictionRow {
@@ -230,11 +282,10 @@ export function readTrendsThresholds(): TrendsUsage["thresholds"] {
 	};
 }
 
-async function computeTrendsUsage(
-	window: TrendsWindow,
-	now: Date,
-): Promise<TrendsUsage> {
-	const params = {
+export type TrendsQueryParams = ReturnType<typeof trendsQueryParams>;
+
+export function trendsQueryParams(window: TrendsWindow) {
+	return {
 		periodStart: window.periodStart,
 		periodEnd: window.periodEndExclusive,
 		previousStart: window.previousPeriodStart,
@@ -243,9 +294,15 @@ async function computeTrendsUsage(
 		shareEnd: window.shareEndExclusive,
 		scanVersion: SESSION_AGENT_RUN_SCAN_VERSION,
 		receiptRecordIdx: TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
-		cohortModel: COHORT_MODEL,
 		excludedUsers: readExcludedUserIds(),
 	};
+}
+
+async function computeTrendsUsage(
+	window: TrendsWindow,
+	now: Date,
+): Promise<TrendsUsage> {
+	const params = trendsQueryParams(window);
 	const query = <T>(sql: string) =>
 		queryClickhouse<T>({
 			query: sql,
@@ -271,7 +328,7 @@ async function computeTrendsUsage(
 		query<ToolRow>(TOOL_FAILURES_SQL),
 		query<RunTimeMonthRow>(RUN_TIME_MONTHS_SQL),
 		query<ToolCallMonthRow>(toolCallMonthsSql()),
-		query<FrictionRow>(frictionSql()),
+		queryFriction(getClickhouse(), params),
 	]);
 	return assembleTrendsUsage(
 		{
@@ -618,7 +675,8 @@ function assembleFriction(
 const RUN_MODEL_SQL = buildCanonicalPricingModelSql("run.4");
 
 /** Indexed sessions whose run facts are current. */
-const SIGNALS_CTE = `
+function signalsCte(keyFilterSql = ""): string {
+	return `
 	signals AS (
 		SELECT organization_id, user_id, source, session_id, session_date,
 			agent_runs, model_apologies, model_apology_counts, member_swears
@@ -626,7 +684,11 @@ const SIGNALS_CTE = `
 		WHERE scan_version >= {scanVersion:UInt16}
 			AND session_date < toDateTime64({periodEnd:String}, 3, 'UTC')
 			AND user_id NOT IN {excludedUsers:Array(String)}
+			${keyFilterSql}
 	)`;
+}
+
+const SIGNALS_CTE = signalsCte();
 
 const RUNS_CTE = `${SIGNALS_CTE},
 	runs AS (
@@ -681,65 +743,64 @@ const RUN_METRICS_SQL = `
 `;
 
 /**
- * Per model and developer: swears, apologies and prompts over sessions
- * attributed to the model (each session to its most-used run model, as
- * everywhere), failed tool calls against the run that made them (as for
- * the tool failure rate) and output tokens per request against its model;
- * then summed per model for every developer, for developers who have sworn
- * at any model, and for developers who used the cohort model.
+ * Per model and developer, over one primary-key window of sessions: swears,
+ * apologies and prompts over sessions attributed to the model (each session
+ * to its most-used run model, as everywhere), failed tool calls against the
+ * run that made them (as for the tool failure rate) and output tokens per
+ * request against its model. Every figure belongs to one session, so the
+ * windows' rows add up to the whole; one pass over the window's transcript
+ * records yields both the prompts and the failed tool results.
  */
-function frictionSql(): string {
-	const population = (name: string, condition: string) => `
-		uniqExactIf(r.organization_id, r.user_id, ${condition}) AS ${name}_developers,
-		uniqExactIf(r.organization_id, r.user_id, r.swears > 0 AND ${condition}) AS ${name}_swearers,
-		sumIf(r.swears, ${condition}) AS ${name}_swears,
-		sumIf(r.apologies, ${condition}) AS ${name}_apologies,
-		sumIf(r.tool_errors, ${condition}) AS ${name}_tool_errors,
-		sumIf(r.output_tokens, ${condition}) AS ${name}_tokens,
-		sumIf(r.prompts, ${condition}) AS ${name}_prompts`;
-	return `
-	WITH ${buildUsageEventAnalyticsCte({ tenant: "allOrganizations" })},
-	${SIGNALS_CTE},
+export function buildFrictionWindowStatement(
+	window: TranscriptRecordsCensusWindow,
+	params: TrendsQueryParams,
+): ClickHouseStatement {
+	const keys = censusWindowFilter(window);
+	const records = censusWindowFilter(window, "r");
+	return {
+		clickhouse_settings: FRICTION_WINDOW_SETTINGS,
+		query_params: { ...params, ...keys.params },
+		query: `
+	WITH ${buildUsageEventAnalyticsCte({
+		tenant: "allOrganizations",
+		sessionKeyFilterSql: keys.sql,
+	})},
+	${signalsCte(keys.sql)},
 	${SESSION_WINDOWS_CTE},
-	${TRANSCRIPT_CTE},
-	session_prompts AS (
+	${transcriptCte({ keys: keys.sql, records: records.sql })},
+	session_transcripts AS (
 		SELECT organization_id, user_id, session_id,
-			countIf(kind = 'user_prompt' AND agent_id = '' AND subtype != 'delegation') AS prompts
+			countIf(kind = 'user_prompt' AND agent_id = '' AND subtype != 'delegation') AS prompts,
+			groupArrayIf(ts, kind = 'tool_result' AND is_error AND ${IN_PERIODS_SQL("ts")}) AS error_times
 		FROM transcript_events
 		GROUP BY organization_id, user_id, session_id
 	),
-	tool_errors AS (
-		SELECT t.organization_id AS organization_id, t.user_id AS user_id,
-			t.session_id AS session_id,
-			arrayLastIndex(start -> start <= t.ts, w.run_starts) AS run_idx,
-			if(run_idx > 0 AND w.run_models[run_idx] != '', w.run_models[run_idx], w.session_model) AS model
-		FROM transcript_events AS t
-		INNER JOIN session_windows AS w
-			ON t.organization_id = w.organization_id AND t.user_id = w.user_id
-			AND t.session_id = w.session_id
-		WHERE t.kind = 'tool_result' AND t.is_error
-			AND ${IN_PERIODS_SQL("t.ts")}
-	),
-	dev_records AS (
-		SELECT w.session_model AS model, w.organization_id AS organization_id,
-			w.user_id AS user_id, w.session_id AS session_id,
-			toUInt64(0) AS output_tokens,
-			toUInt64(if(p.prompts > 0, w.member_swears, 0)) AS swears,
-			toUInt64(w.model_apologies) AS apologies,
-			toUInt64(0) AS tool_errors,
-			toUInt64(ifNull(p.prompts, 0)) AS prompts
+	session_figures AS (
+		SELECT w.organization_id AS organization_id, w.user_id AS user_id,
+			arrayMap(ts -> arrayLastIndex(start -> start <= ts, w.run_starts), p.error_times) AS error_runs,
+			arrayConcat(
+				if(w.session_model != '' AND ${IN_PERIODS_SQL("w.session_date")},
+					[(w.session_model, toUInt64(if(p.prompts > 0, w.member_swears, 0)),
+						toUInt64(w.model_apologies), toUInt64(0), toUInt64(ifNull(p.prompts, 0)))],
+					[]),
+				arrayMap(run_idx -> (
+					if(run_idx > 0 AND w.run_models[run_idx] != '', w.run_models[run_idx], w.session_model),
+					toUInt64(0), toUInt64(0), toUInt64(1), toUInt64(0)), error_runs)
+			) AS figures
 		FROM session_windows AS w
-		LEFT JOIN session_prompts AS p
+		LEFT JOIN session_transcripts AS p
 			ON w.organization_id = p.organization_id AND w.user_id = p.user_id
 			AND w.session_id = p.session_id
-		WHERE w.session_model != '' AND ${IN_PERIODS_SQL("w.session_date")}
+	),
+	dev_records AS (
+		SELECT figure.1 AS model, organization_id, user_id,
+			toUInt64(0) AS output_tokens, figure.2 AS swears, figure.3 AS apologies,
+			figure.4 AS tool_errors, figure.5 AS prompts
+		FROM session_figures
+		ARRAY JOIN figures AS figure
+		WHERE figure.1 != ''
 		UNION ALL
-		SELECT model, organization_id, user_id, session_id, toUInt64(0),
-			toUInt64(0), toUInt64(0), toUInt64(1), toUInt64(0)
-		FROM tool_errors
-		WHERE model != ''
-		UNION ALL
-		SELECT pricing_model AS model, organization_id, user_id, session_id,
+		SELECT pricing_model AS model, organization_id, user_id,
 			toUInt64(group_output_tokens), toUInt64(0), toUInt64(0),
 			toUInt64(0), toUInt64(0)
 		FROM priced_usage_groups
@@ -747,30 +808,101 @@ function frictionSql(): string {
 			AND usage_date >= toDate({previousStart:String})
 			AND usage_date < toDate({periodEnd:String})
 			AND user_id NOT IN {excludedUsers:Array(String)}
-	),
-	dev_rows AS (
-		SELECT model, organization_id, user_id,
-			sum(output_tokens) AS output_tokens, sum(swears) AS swears,
-			sum(apologies) AS apologies, sum(tool_errors) AS tool_errors,
-			sum(prompts) AS prompts
-		FROM dev_records
-		GROUP BY model, organization_id, user_id
-	),
-	dev_totals AS (
-		SELECT organization_id, user_id, sum(swears) AS swears_anywhere,
-			sumIf(output_tokens, model = {cohortModel:String}) AS cohort_tokens
-		FROM dev_rows
-		GROUP BY organization_id, user_id
 	)
-	SELECT r.model AS model,
-		${population("all", "1")},
-		${population("swearers", "d.swears_anywhere > 0")},
-		${population("cohort", "d.cohort_tokens > 0")}
-	FROM dev_rows AS r
-	INNER JOIN dev_totals AS d
-		ON r.organization_id = d.organization_id AND r.user_id = d.user_id
-	GROUP BY model
-`;
+	SELECT model, organization_id, user_id,
+		sum(output_tokens) AS output_tokens, sum(swears) AS swears,
+		sum(apologies) AS apologies, sum(tool_errors) AS tool_errors,
+		sum(prompts) AS prompts
+	FROM dev_records
+	GROUP BY model, organization_id, user_id
+`,
+	};
+}
+
+export async function queryFriction(
+	executor: ClickHouseExecutor,
+	params: TrendsQueryParams,
+	windowRows = FRICTION_WINDOW_ROWS,
+): Promise<FrictionRow[]> {
+	const scan = await scanCensusWindows<FrictionDeveloperRow>(executor, {
+		table: TRANSCRIPT_RECORDS_TABLE,
+		windowRows,
+		limit: Number.POSITIVE_INFINITY,
+		statement: (window) => buildFrictionWindowStatement(window, params),
+		wait: (operation) => operation(),
+	});
+	return frictionRows(scan.rows);
+}
+
+export function frictionRows(
+	developers: readonly FrictionDeveloperRow[],
+): FrictionRow[] {
+	const perModel = new Map<string, FrictionFigures>();
+	const perDeveloper = new Map<
+		string,
+		{ swears: number; cohortTokens: number }
+	>();
+	for (const row of developers) {
+		const developer = `${row.organization_id}\u0000${row.user_id}`;
+		const key = `${row.model}\u0000${developer}`;
+		const figures = {
+			model: row.model,
+			developer,
+			outputTokens: Number(row.output_tokens),
+			swears: Number(row.swears),
+			apologies: Number(row.apologies),
+			toolErrors: Number(row.tool_errors),
+			prompts: Number(row.prompts),
+		};
+		const entry = perModel.get(key);
+		if (entry) {
+			entry.outputTokens += figures.outputTokens;
+			entry.swears += figures.swears;
+			entry.apologies += figures.apologies;
+			entry.toolErrors += figures.toolErrors;
+			entry.prompts += figures.prompts;
+		} else perModel.set(key, figures);
+		const totals = perDeveloper.get(developer) ?? {
+			swears: 0,
+			cohortTokens: 0,
+		};
+		totals.swears += figures.swears;
+		if (row.model === COHORT_MODEL) totals.cohortTokens += figures.outputTokens;
+		perDeveloper.set(developer, totals);
+	}
+	const populations = {
+		all: () => true,
+		swearers: (developer: string) =>
+			(perDeveloper.get(developer)?.swears ?? 0) > 0,
+		cohort: (developer: string) =>
+			(perDeveloper.get(developer)?.cohortTokens ?? 0) > 0,
+	} as const;
+	const rows = new Map<string, Record<string, number>>();
+	for (const entry of perModel.values()) {
+		const row = rows.get(entry.model) ?? {};
+		for (const [name, includes] of Object.entries(populations)) {
+			if (!includes(entry.developer)) continue;
+			const add = (field: string, value: number) => {
+				row[`${name}_${field}`] = (row[`${name}_${field}`] ?? 0) + value;
+			};
+			add("developers", 1);
+			add("swearers", entry.swears > 0 ? 1 : 0);
+			add("swears", entry.swears);
+			add("apologies", entry.apologies);
+			add("tool_errors", entry.toolErrors);
+			add("tokens", entry.outputTokens);
+			add("prompts", entry.prompts);
+		}
+		rows.set(entry.model, row);
+	}
+	return [...rows.entries()]
+		.sort(([first], [second]) => first.localeCompare(second))
+		.map(([model, row]) => ({
+			model,
+			...Object.fromEntries(
+				FRICTION_FIELDS.map((field) => [field, String(row[field] ?? 0)]),
+			),
+		})) as FrictionRow[];
 }
 
 /**
@@ -928,7 +1060,13 @@ function usageTotalsSql(): string {
 }
 
 /** The newest committed transcript-records generation of each session. */
-const TRANSCRIPT_CTE = `
+function transcriptCte(
+	window: { readonly keys: string; readonly records: string } = {
+		keys: "",
+		records: "",
+	},
+): string {
+	return `
 	transcript_generations AS (
 		SELECT organization_id, user_id, session_id,
 			argMax(tuple(revision, parser_version), tuple(revision, parser_version)) AS generation
@@ -936,6 +1074,7 @@ const TRANSCRIPT_CTE = `
 		WHERE agent_id = '' AND record_idx = {receiptRecordIdx:UInt32} AND block_idx = 0
 			AND session_date < toDateTime64({periodEnd:String}, 3, 'UTC')
 			AND user_id NOT IN {excludedUsers:Array(String)}
+			${window.keys}
 		GROUP BY organization_id, user_id, session_id
 	),
 	transcript_events AS (
@@ -950,7 +1089,11 @@ const TRANSCRIPT_CTE = `
 			AND r.record_idx < {receiptRecordIdx:UInt32}
 			AND r.kind IN ('user_prompt', 'tool_call', 'tool_result')
 			AND r.session_date < toDateTime64({periodEnd:String}, 3, 'UTC')
+			${window.records}
 	)`;
+}
+
+const TRANSCRIPT_CTE = transcriptCte();
 
 /**
  * Apologies and swears are counted per session; each session counts toward

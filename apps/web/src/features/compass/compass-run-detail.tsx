@@ -22,7 +22,7 @@ import { useQuery } from "@tanstack/react-query";
 import { type CSSProperties, type ReactNode, useState } from "react";
 import { Link } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
-import { Skeleton } from "@/app/ui/skeleton";
+import { Bone, Reveal } from "@/app/ui/bones";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { formatReaderCost } from "@/features/sessions/reader/model/session-reader-model";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
@@ -147,12 +147,22 @@ export function RunPane({
 						</span>
 					) : null}
 				</h3>
-				{detail.isPending ? (
-					<TimelineSkeleton />
-				) : detail.isError ? (
+				{!detail.isPending && detail.isError ? (
 					<p className="compass-hint">{detail.error.message}</p>
 				) : (
-					<Timeline records={detail.data.records} flags={run.flags} />
+					<Reveal
+						label="Reading what went on"
+						loading={detail.isPending}
+						sample={<TimelineSkeleton />}
+						sampleId="compass-timeline"
+					>
+						{() => (
+							<Timeline
+								records={detail.data?.records ?? []}
+								flags={run.flags}
+							/>
+						)}
+					</Reveal>
 				)}
 				{detail.data?.truncated ? (
 					<p className="compass-hint">
@@ -607,8 +617,8 @@ function TimelineSkeleton() {
 		<div className="flex flex-col gap-3" aria-hidden="true">
 			{[0, 1, 2, 3, 4, 5].map((index) => (
 				<div key={index} className="flex flex-col gap-1.5">
-					<Skeleton className="h-3.5 w-40 rounded-[4px]" />
-					<Skeleton className="h-3 w-full max-w-120 rounded-[4px]" />
+					<Bone className="h-3.5 w-40 rounded-[4px]" />
+					<Bone className="h-3 w-full max-w-120 rounded-[4px]" />
 				</div>
 			))}
 		</div>

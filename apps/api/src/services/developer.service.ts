@@ -5,6 +5,7 @@ import type {
 import { buildDateFilter, queryClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
 import {
+	buildSessionDateWindow,
 	buildUsageCostSubtotalSql,
 	getUsageAnalyticsQueryContext,
 } from "./usage-event-analytics.service.js";
@@ -21,8 +22,11 @@ interface FavoriteModelRow {
 }
 
 async function getFavoriteModelByUser(orgId: string, days: number) {
-	const usage = await getUsageAnalyticsQueryContext(orgId);
+	const usage = await getUsageAnalyticsQueryContext(orgId, {
+		window: buildSessionDateWindow(buildDateFilter("days", "sa.session_date")),
+	});
 	const rows = await queryClickhouse<FavoriteModelRow>({
+		clickhouse_settings: usage.clickhouseSettings,
 		query: `
 	WITH ${usage.cteDefinitions}
     SELECT
@@ -65,7 +69,11 @@ export async function getDeveloperList(
 		currentDays: d,
 		orgId,
 	};
-	const usage = await getUsageAnalyticsQueryContext(orgId);
+	const usage = await getUsageAnalyticsQueryContext(orgId, {
+		window: buildSessionDateWindow(
+			buildDateFilter("currentDays", "sa.session_date"),
+		),
+	});
 
 	const query = `
 	WITH ${usage.cteDefinitions},
@@ -103,6 +111,7 @@ export async function getDeveloperList(
 
 	const [summaryRows, favoriteModelByUser] = await Promise.all([
 		queryClickhouse<Omit<DeveloperSummary, "favorite_model" | "username">>({
+			clickhouse_settings: usage.clickhouseSettings,
 			query,
 			query_params,
 		}),
@@ -127,7 +136,9 @@ export async function getDeveloperTeamCards(
 		days: d,
 		orgId,
 	};
-	const usage = await getUsageAnalyticsQueryContext(orgId);
+	const usage = await getUsageAnalyticsQueryContext(orgId, {
+		window: buildSessionDateWindow(buildDateFilter("days", "sa.session_date")),
+	});
 
 	const summaryQuery = `
 	WITH ${usage.cteDefinitions}
@@ -181,6 +192,7 @@ export async function getDeveloperTeamCards(
 
 	const [summaryRows, favoriteModelByUser, skillRows] = await Promise.all([
 		queryClickhouse<SummaryRow>({
+			clickhouse_settings: usage.clickhouseSettings,
 			query: summaryQuery,
 			query_params,
 		}),

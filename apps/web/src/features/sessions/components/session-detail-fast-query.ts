@@ -1,5 +1,6 @@
 import {
 	SESSION_DETAIL_STALE_REVISION_CODE,
+	type SessionDetailBodyChunks,
 	SessionDetailInitialSchema,
 	type SessionDetailSpine,
 	SessionDetailSpineSchema,
@@ -64,7 +65,7 @@ export async function fetchSessionDetailInitial(
 	const response = await runSessionDetailRequest(
 		(requestSignal) =>
 			orpc.analytics.sessions.detailInitial.call(
-				{ sessionId },
+				{ bodyChunks: true, sessionId },
 				{ signal: requestSignal },
 			),
 		signal,
@@ -240,9 +241,10 @@ export async function fetchSessionDetailWindow(
 	try {
 		const response = await runSessionDetailRequest(
 			(requestSignal) =>
-				orpc.analytics.sessions.detailWindow.call(input, {
-					signal: requestSignal,
-				}),
+				orpc.analytics.sessions.detailWindow.call(
+					{ ...input, bodyChunks: true },
+					{ signal: requestSignal },
+				),
 			querySignal,
 		);
 		const parsed = parseSessionDetailWindowResponse(response);
@@ -282,6 +284,7 @@ export async function fetchSessionDetailSpine(
 export async function fetchSessionDetailTurn(
 	input: { revision: string; sessionId: string; turnId: string },
 	querySignal: AbortSignal,
+	bodyChunks?: SessionDetailBodyChunks,
 ): Promise<SessionDetailTurn> {
 	const response = await readSessionDetailBodyChunks(
 		{
@@ -292,6 +295,7 @@ export async function fetchSessionDetailTurn(
 		},
 		querySignal,
 		{ request: requestSessionDetailBodyChunk },
+		bodyChunks,
 	);
 	const result = SessionDetailTurnSchema.safeParse(response);
 	if (!result.success || result.data.turnId !== input.turnId) {

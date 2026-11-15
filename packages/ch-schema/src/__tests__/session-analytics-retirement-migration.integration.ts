@@ -44,6 +44,10 @@ test("both views stop writing retired interpretations in place: live columns are
 			created.statement.replace(`rudel.${table}`, `${database}.${table}`),
 		);
 	}
+	// The table as the retirement found it, before the retired columns were dropped.
+	await executor.execute(
+		`ALTER TABLE ${database}.session_analytics ADD COLUMN error_pattern LowCardinality(String) DEFAULT '', ADD COLUMN session_archetype String DEFAULT 'standard'`,
+	);
 	// The deployed view: the product launch query, which still writes them.
 	const deployed = extractExecutableStatements(
 		await migrations("20260913190000_product_launch.sql"),

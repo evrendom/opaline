@@ -189,7 +189,9 @@ function contractInputSchema(path: PluginProcedure) {
 function withWorkspace(schema: z.core.$ZodType): z.ZodType {
 	if (schema instanceof z.ZodPipe) return withWorkspace(schema.in);
 	if (schema instanceof z.ZodObject) {
-		return schema.safeExtend({ workspace: z.string().min(1) }).strict();
+		const listed =
+			"bodyChunks" in schema.shape ? schema.omit({ bodyChunks: true }) : schema;
+		return listed.safeExtend({ workspace: z.string().min(1) }).strict();
 	}
 	if (
 		schema instanceof z.ZodUnion ||

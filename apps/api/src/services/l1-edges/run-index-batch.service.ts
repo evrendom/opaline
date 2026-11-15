@@ -155,6 +155,7 @@ export async function buildRunIndexBatch(
 			marker,
 			usage,
 			input.maxSessionRecords ?? RUN_INDEX_MAX_SESSION_RECORDS,
+			claim.session.source,
 		);
 		if (plan.kind === "done")
 			outcomes.set(sessionId, { kind: "built", build: plan.build });

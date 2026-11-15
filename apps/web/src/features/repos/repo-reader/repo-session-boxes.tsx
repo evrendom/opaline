@@ -10,7 +10,7 @@ import {
 	useState,
 } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Bones } from "@/app/ui/bones";
+import { Reveal } from "@/app/ui/bones";
 import { getModelIconComponent } from "@/components/conversation/conversation-trace-model-icon";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { useElementWidth } from "@/components/ui/horizontal-resize-handle";
@@ -239,13 +239,9 @@ export function RepoSessionBoxes({ fill = false }: { fill?: boolean }) {
 					ref={area}
 					className={cn("min-w-0", fill && "relative min-h-0 flex-1")}
 				>
-					{boxes.data === undefined ? (
-						<div style={{ height: height - 2 * GAP }}>
-							<Bones fill label="Loading sessions">
-								<ContextMapSample fill />
-							</Bones>
-						</div>
-					) : tiles.length === 0 && ghosts.length === 0 ? (
+					{boxes.data !== undefined &&
+					tiles.length === 0 &&
+					ghosts.length === 0 ? (
 						<div
 							className={fill ? "absolute inset-0" : undefined}
 							style={fill ? undefined : { height }}
@@ -258,32 +254,45 @@ export function RepoSessionBoxes({ fill = false }: { fill?: boolean }) {
 							/>
 						</div>
 					) : (
-						<ul
-							ref={list}
-							className="relative"
-							style={
-								{
-									height,
-									"--tint": METRIC_APPEARANCE[metric].color,
-								} as CSSProperties
+						<Reveal
+							label="Loading sessions"
+							loading={boxes.data === undefined}
+							sample={
+								<div style={{ height: height - 2 * GAP }}>
+									<ContextMapSample fill />
+								</div>
 							}
+							sampleId="repo-session-boxes"
 						>
-							{tiles.map((tile) => (
-								<SessionTile
-									key={tile.key}
-									metric={metric}
-									tile={tile}
-									picked={tile.key === pickedKey}
-									dimmed={pickedSession !== null && tile.key !== pickedKey}
-									onPick={() =>
-										setPickedKey((current) =>
-											current === tile.key ? null : tile.key,
-										)
+							{() => (
+								<ul
+									ref={list}
+									className="relative"
+									style={
+										{
+											height,
+											"--tint": METRIC_APPEARANCE[metric].color,
+										} as CSSProperties
 									}
-								/>
-							))}
-							<GhostTiles ghosts={ghosts} look={GHOST_LOOK} />
-						</ul>
+								>
+									{tiles.map((tile) => (
+										<SessionTile
+											key={tile.key}
+											metric={metric}
+											tile={tile}
+											picked={tile.key === pickedKey}
+											dimmed={pickedSession !== null && tile.key !== pickedKey}
+											onPick={() =>
+												setPickedKey((current) =>
+													current === tile.key ? null : tile.key,
+												)
+											}
+										/>
+									))}
+									<GhostTiles ghosts={ghosts} look={GHOST_LOOK} />
+								</ul>
+							)}
+						</Reveal>
 					)}
 				</div>
 				{boxes.data === undefined || tiles.length > 0 || ghosts.length > 0 ? (

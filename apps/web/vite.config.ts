@@ -107,6 +107,24 @@ function buildApiProxy(target: string, bearerToken?: string) {
 	};
 }
 
+const VENDOR_CHUNKS: readonly (readonly [string, RegExp])[] = [
+	[
+		"vendor-react",
+		/^(?:react|react-dom|scheduler|react-router|react-router-dom)$/u,
+	],
+	["vendor-ui", /^(?:@base-ui|@radix-ui|radix-ui|@floating-ui)(?:\/|$)/u],
+	["vendor-motion", /^(?:motion|framer-motion|motion-dom|motion-utils)$/u],
+	["vendor-zod", /^zod$/u],
+	["vendor-orpc", /^@orpc\//u],
+	["vendor-query", /^@tanstack\/(?:react-query|query-core)$/u],
+];
+
+function vendorChunk(id: string) {
+	const name = /.*\/node_modules\/((?:@[^/]+\/)?[^/]+)/u.exec(id)?.[1];
+	if (!name) return undefined;
+	return VENDOR_CHUNKS.find(([, pattern]) => pattern.test(name))?.[0];
+}
+
 export default defineConfig(async ({ mode }) => {
 	const appVersion = await resolveAppVersion();
 	const env = loadEnv(mode, __dirname, "");
@@ -122,6 +140,10 @@ export default defineConfig(async ({ mode }) => {
 			__APP_VERSION__: JSON.stringify(appVersion),
 		},
 		plugins: [react(), tailwindcss()],
+		build:
+			mode === "plugin"
+				? undefined
+				: { rollupOptions: { output: { manualChunks: vendorChunk } } },
 		server: {
 			port: 4011,
 			proxy: buildApiProxy(apiTarget, apiBearerToken),

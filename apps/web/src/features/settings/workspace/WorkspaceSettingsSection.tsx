@@ -2,7 +2,7 @@ import { CardContent } from "@/app/ui/card";
 import { useTrackProductPageView } from "@/features/analytics/tracking/useTrackProductPageView";
 import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import { showsBilling } from "@/features/self-hosted/surfaces";
-import { SettingsPageSkeleton } from "@/features/settings/components/settings-page-skeleton";
+import { SettingsPageReveal } from "@/features/settings/components/settings-page-skeleton";
 import { SettingsSectionCard } from "@/features/settings/components/settings-section";
 import { buildWorkspaceSettingsTracking } from "@/features/settings/settings-page-tracking";
 import { BillingManagementCard } from "@/features/settings/workspace/components/BillingManagementCard";
@@ -29,9 +29,7 @@ export function WorkspaceSettingsSection() {
 		}),
 	);
 
-	if (data.state.isPending) return <SettingsPageSkeleton routeId="workspace" />;
-
-	if (!data.state.hasOrganization) {
+	if (!data.state.isPending && !data.state.hasOrganization) {
 		return (
 			<div className="workspace-settings-page">
 				<WorkspaceEmptyStateCard />
@@ -46,37 +44,41 @@ export function WorkspaceSettingsSection() {
 	}
 
 	return (
-		<div className="workspace-settings-page">
-			{!data.state.isPending && data.state.isError ? (
-				<SettingsSectionCard>
-					<CardContent className="text-sm text-muted-foreground">
-						Organization data couldn&apos;t be loaded right now.
-					</CardContent>
-				</SettingsSectionCard>
-			) : null}
+		<SettingsPageReveal routeId="workspace" loading={data.state.isPending}>
+			{() => (
+				<div className="workspace-settings-page">
+					{!data.state.isPending && data.state.isError ? (
+						<SettingsSectionCard>
+							<CardContent className="text-sm text-muted-foreground">
+								Organization data couldn&apos;t be loaded right now.
+							</CardContent>
+						</SettingsSectionCard>
+					) : null}
 
-			{!data.state.isPending && !data.state.isError && data.activeOrg ? (
-				<>
-					<WorkspaceIdentityCard
-						organization={data.activeOrg}
-						canManage={data.canManage}
-						onInvalidate={data.invalidate}
-					/>
-					{data.currentUserRole === "owner" && showsBilling(selfHost) ? (
+					{!data.state.isPending && !data.state.isError && data.activeOrg ? (
 						<>
-							<BillingManagementCard
-								organizationId={data.activeOrg.id}
-								workspaceSlug={data.activeOrg.slug}
+							<WorkspaceIdentityCard
+								organization={data.activeOrg}
+								canManage={data.canManage}
+								onInvalidate={data.invalidate}
 							/>
-							<BillingSandboxCard organizationId={data.activeOrg.id} />
+							{data.currentUserRole === "owner" && showsBilling(selfHost) ? (
+								<>
+									<BillingManagementCard
+										organizationId={data.activeOrg.id}
+										workspaceSlug={data.activeOrg.slug}
+									/>
+									<BillingSandboxCard organizationId={data.activeOrg.id} />
+								</>
+							) : null}
+							<WorkspaceDangerZoneCard
+								organization={data.activeOrg}
+								canManage={data.canManage}
+							/>
 						</>
 					) : null}
-					<WorkspaceDangerZoneCard
-						organization={data.activeOrg}
-						canManage={data.canManage}
-					/>
-				</>
-			) : null}
-		</div>
+				</div>
+			)}
+		</SettingsPageReveal>
 	);
 }

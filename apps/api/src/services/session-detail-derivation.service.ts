@@ -474,6 +474,14 @@ function compactionsOf(turn: SessionTurn): { compactions?: number } {
 	return compactions > 0 ? { compactions } : {};
 }
 
+function lastActivitySeconds(turn: SessionTurn, start: string | undefined) {
+	let end: string | undefined;
+	for (const item of turn.responseItems) end = item.timestamp ?? end;
+	if (!start || !end) return null;
+	const seconds = (Date.parse(end) - Date.parse(start)) / 1_000;
+	return Number.isFinite(seconds) && seconds >= 0 ? seconds : null;
+}
+
 function createTurnSummary(
 	turn: SessionTurn,
 	metrics: SessionTurnMetrics,
@@ -510,7 +518,9 @@ function createTurnSummary(
 			activityLimit,
 		),
 		...compactionsOf(turn),
-		durationSeconds: timing.durationSeconds ?? null,
+		durationSeconds:
+			timing.durationSeconds ??
+			lastActivitySeconds(turn, timing.startTimestamp),
 		editedFiles: [...metrics.editedFiles],
 		endedAt: timing.endTimestamp ?? null,
 		errorCount: metrics.errorCount,
@@ -1158,6 +1168,7 @@ export function assembleSessionDetailWindow(input: {
 			derivation,
 			index,
 			input.budget?.maxTurnBytes,
+			request.bodyChunks === true,
 		);
 		if (!turn) {
 			continue;
@@ -1314,6 +1325,7 @@ function createSessionDetailWindowTurn(
 	derivation: SessionDetailDerivation,
 	index: number,
 	maxTurnBytes = SESSION_DETAIL_WINDOW_MAX_TURN_BYTES,
+	withBodyChunks = false,
 ) {
 	const summary = derivation.turnSummaries[index];
 	if (!summary) {
@@ -1321,12 +1333,17 @@ function createSessionDetailWindowTurn(
 	}
 	// The spine already measures response items. Don't inflate a multi-megabyte
 	// response just to discover again that it needs the chunk endpoint.
+	const bodyChunks = withBodyChunks
+		? derivation.turnBodies.chunks?.(summary.turnId)
+		: undefined;
+	const chunked = bodyChunks ? { bodyChunks } : {};
 	if ((derivation.spine[index]?.responseBytes ?? 0) > maxTurnBytes) {
 		return {
 			oversized: true,
 			value: {
 				...summary,
 				body: null,
+				...chunked,
 				bodyOmitted: "oversized",
 			} satisfies SessionDetailWindowTurn,
 		};
@@ -1344,6 +1361,7 @@ function createSessionDetailWindowTurn(
 		value: {
 			...summary,
 			body: oversized ? null : body,
+			...(oversized ? chunked : {}),
 			bodyOmitted: oversized ? "oversized" : null,
 		} satisfies SessionDetailWindowTurn,
 	};

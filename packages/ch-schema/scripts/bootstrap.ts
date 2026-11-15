@@ -111,6 +111,14 @@ export const FORWARD_SCRIPTS = new Map([
 		"migrate-usage-session-rollups.ts",
 	],
 	[
+		"20261109120000_usage_session_rollup_costs.sql",
+		"migrate-usage-session-rollups.ts",
+	],
+	[
+		"20261109150000_session_analytics_drop_retired.sql",
+		"migrate-session-analytics-drop-retired.ts",
+	],
+	[
 		"20261109200000_transcript_record_commands.sql",
 		"migrate-transcript-record-commands.ts",
 	],

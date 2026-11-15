@@ -192,3 +192,167 @@ test("cancellation stops delivery without returning a partial transcript", async
 	).rejects.toThrow("Navigation cancelled");
 	expect(requests).toBe(1);
 });
+
+function gatedRequests(body: { json: string; sha256: string }) {
+	const started: number[] = [];
+	const gates: (() => void)[] = [];
+	const request = (input: SessionDetailBodyChunkInput) => {
+		started.push(input.offset);
+		return new Promise<unknown>((resolve) => {
+			gates.push(() => resolve(createSessionDetailBodyChunk(body, input)));
+		});
+	};
+	const releaseAll = async () => {
+		while (gates.length > 0) {
+			for (const gate of gates.splice(0)) gate();
+			await tick();
+		}
+	};
+	return { releaseAll, request, started };
+}
+
+const tick = () => new Promise((done) => setTimeout(done, 0));
+
+function largeBody(chunks: number) {
+	return serializeSessionDetailBody({
+		content: "x".repeat(SESSION_DETAIL_BODY_CHUNK_CODE_UNITS * chunks - 256),
+		revision: identity.revision,
+		subagentId: "a",
+	});
+}
+
+test("known totals request every chunk at once, up to four per body", async () => {
+	const body = largeBody(6);
+	const known = { sha256: body.sha256, totalCodeUnits: body.json.length };
+	const chunkCount = Math.ceil(
+		body.json.length / SESSION_DETAIL_BODY_CHUNK_CODE_UNITS,
+	);
+	expect(chunkCount).toBe(6);
+	const gated = gatedRequests(body);
+	const result = readSessionDetailBodyChunks(
+		identity,
+		new AbortController().signal,
+		{ request: gated.request },
+		known,
+	);
+	await tick();
+	expect(gated.started).toEqual([
+		0,
+		SESSION_DETAIL_BODY_CHUNK_CODE_UNITS,
+		SESSION_DETAIL_BODY_CHUNK_CODE_UNITS * 2,
+		SESSION_DETAIL_BODY_CHUNK_CODE_UNITS * 3,
+	]);
+	await gated.releaseAll();
+	expect(await result).toEqual(JSON.parse(body.json));
+	expect(gated.started).toHaveLength(chunkCount);
+	expect(new Set(gated.started).size).toBe(chunkCount);
+});
+
+test("a short known body is one request", async () => {
+	const body = serializeSessionDetailBody({
+		content: "short",
+		revision: identity.revision,
+		subagentId: "a",
+	});
+	const gated = gatedRequests(body);
+	const result = readSessionDetailBodyChunks(
+		identity,
+		new AbortController().signal,
+		{ request: gated.request },
+		{ sha256: body.sha256, totalCodeUnits: body.json.length },
+	);
+	await gated.releaseAll();
+	expect(await result).toEqual(JSON.parse(body.json));
+	expect(gated.started).toEqual([0]);
+});
+
+test("unknown totals still learn them from the first chunk before the rest", async () => {
+	const body = largeBody(3);
+	const gated = gatedRequests(body);
+	const result = readSessionDetailBodyChunks(
+		identity,
+		new AbortController().signal,
+		{ request: gated.request },
+	);
+	await tick();
+	expect(gated.started).toEqual([0]);
+	await gated.releaseAll();
+	expect(await result).toEqual(JSON.parse(body.json));
+	expect(gated.started).toEqual([
+		0,
+		SESSION_DETAIL_BODY_CHUNK_CODE_UNITS,
+		SESSION_DETAIL_BODY_CHUNK_CODE_UNITS * 2,
+	]);
+});
+
+test("known totals that disagree with the delivered chunks are an integrity failure", async () => {
+	const body = largeBody(2);
+	const read = (known: { sha256: string; totalCodeUnits: number }) =>
+		readSessionDetailBodyChunks(
+			identity,
+			new AbortController().signal,
+			{
+				request: async (input) => createSessionDetailBodyChunk(body, input),
+			},
+			known,
+		);
+	await expect(
+		read({ sha256: "0".repeat(64), totalCodeUnits: body.json.length }),
+	).rejects.toBeInstanceOf(SessionDetailBodyIntegrityError);
+	await expect(
+		read({ sha256: body.sha256, totalCodeUnits: body.json.length + 1 }),
+	).rejects.toBeInstanceOf(SessionDetailBodyIntegrityError);
+	await expect(
+		read({
+			sha256: body.sha256,
+			totalCodeUnits: body.json.length - SESSION_DETAIL_BODY_CHUNK_CODE_UNITS,
+		}),
+	).rejects.toBeInstanceOf(SessionDetailBodyIntegrityError);
+	for (const corruption of [
+		{ revision: "1" },
+		{ sessionId: "another-session" },
+		{ data: "short" },
+	]) {
+		await expect(
+			readSessionDetailBodyChunks(
+				identity,
+				new AbortController().signal,
+				{
+					request: async (input) => ({
+						...createSessionDetailBodyChunk(body, input),
+						...(input.offset > 0 ? corruption : {}),
+					}),
+				},
+				{ sha256: body.sha256, totalCodeUnits: body.json.length },
+			),
+		).rejects.toBeInstanceOf(SessionDetailBodyIntegrityError);
+	}
+});
+
+test("a failed chunk cancels its siblings when totals are known", async () => {
+	const body = largeBody(3);
+	const aborted: number[] = [];
+	await expect(
+		readSessionDetailBodyChunks(
+			identity,
+			new AbortController().signal,
+			{
+				request: (input, signal) => {
+					if (input.offset === SESSION_DETAIL_BODY_CHUNK_CODE_UNITS)
+						return Promise.reject(new Error("Chunk failed"));
+					return new Promise((_, reject) => {
+						signal.addEventListener("abort", () => {
+							aborted.push(input.offset);
+							reject(signal.reason);
+						});
+					});
+				},
+			},
+			{ sha256: body.sha256, totalCodeUnits: body.json.length },
+		),
+	).rejects.toThrow("Chunk failed");
+	expect(aborted.sort((left, right) => left - right)).toEqual([
+		0,
+		SESSION_DETAIL_BODY_CHUNK_CODE_UNITS * 2,
+	]);
+});

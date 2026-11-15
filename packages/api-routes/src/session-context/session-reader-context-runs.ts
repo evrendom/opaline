@@ -103,25 +103,37 @@ export function sessionBaseline(
 	return Math.max(0, least - tokensOf(turns[0]?.userPreview));
 }
 
-export function runSetupTexts(
+export function runSetupFiles(
 	files: readonly SessionSetupFile[],
 	runs: readonly SessionSetupRun[],
 	run: { agent: string | null; startedAt: string | null },
-): { chars: number; key: string; label: string }[] {
+): SessionSetupFile[] {
 	const start = run.startedAt ? Date.parse(run.startedAt) : Number.NaN;
+	let latest = Number.NEGATIVE_INFINITY;
+	if (!run.agent)
+		for (const each of runs) {
+			const at = Date.parse(each.startedAt);
+			if (each.agentId === "" && at <= start && at > latest) latest = at;
+		}
 	const received = new Set(
 		runs
 			.filter((each) =>
 				run.agent
 					? each.agentId === run.agent
-					: each.agentId === "" && Date.parse(each.startedAt) === start,
+					: each.agentId === "" && Date.parse(each.startedAt) === latest,
 			)
 			.map((each) => each.setupFile),
 	);
-	return files
-		.filter(
-			(file) => file.kind !== "skill_body" && received.has(file.setupFile),
-		)
+	return files.filter((file) => received.has(file.setupFile));
+}
+
+export function runSetupTexts(
+	files: readonly SessionSetupFile[],
+	runs: readonly SessionSetupRun[],
+	run: { agent: string | null; startedAt: string | null },
+): { chars: number; key: string; label: string }[] {
+	return runSetupFiles(files, runs, run)
+		.filter((file) => file.kind !== "skill_body")
 		.map((file) => ({
 			chars: file.chars,
 			key: file.setupFile,

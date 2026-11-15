@@ -19,6 +19,7 @@ import {
 } from "../lib/env.js";
 import {
 	buildDateRangeWindowSql,
+	buildPricedUsageGroupsCtes,
 	buildUsageEventAnalyticsCte,
 	buildUsageEventCandidateCtes,
 } from "./usage-event-analytics.service.js";
@@ -36,6 +37,7 @@ import {
 import {
 	backfillUsageSessionRollups,
 	buildUsageRollupCandidatesStatement,
+	isUsageRollupReceiptSweepDue,
 } from "./usage-session-rollup-backfill.service.js";
 
 const previousWrites = process.env.USAGE_ROLLUP_WRITES_ENABLED;
@@ -46,11 +48,25 @@ afterEach(() => {
 });
 
 describe("usage rollup switches", () => {
-	test("reads rollups only for listed workspaces, or every one with all, never a skipped one", () => {
+	test("reads rollups for every workspace unless listed, switched off with none, or skipped", () => {
 		const listed = { USAGE_ROLLUP_ORG_IDS: " org-a , org-b " };
 		expect(shouldReadUsageRollups("org-a", listed)).toBe(true);
 		expect(shouldReadUsageRollups("org-c", listed)).toBe(false);
-		expect(shouldReadUsageRollups("org-a", {})).toBe(false);
+		expect(shouldReadUsageRollups("org-a", {})).toBe(true);
+		expect(shouldReadUsageRollups("org-a", { USAGE_ROLLUP_ORG_IDS: " " })).toBe(
+			true,
+		);
+		expect(
+			shouldReadUsageRollups("org-a", { USAGE_ROLLUP_ORG_IDS: "none" }),
+		).toBe(false);
+		expect(
+			shouldReadUsageRollups("org-a", { USAGE_ROLLUP_ORG_IDS: "org-a,none" }),
+		).toBe(false);
+		expect(
+			shouldReadUsageRollups("internal-1", {
+				USAGE_ROLLUP_BACKFILL_SKIP_ORG_IDS: "internal-1",
+			}),
+		).toBe(false);
 		const all = {
 			USAGE_ROLLUP_BACKFILL_SKIP_ORG_IDS: "internal-1,internal-2",
 			USAGE_ROLLUP_ORG_IDS: "all",
@@ -98,20 +114,24 @@ describe("usage rollup read path", () => {
 			"SELECT 'o' AS organization_id, 'u' AS user_id, 's' AS source, 'x' AS session_id",
 	};
 
-	test("prices the stored groups with the events path's SQL from the candidates on", () => {
+	test("reads the stored prices and sums them with the events path's SQL from the priced groups on", () => {
 		const events = buildUsageEventAnalyticsCte({ window }, false, "events");
 		const rollups = buildUsageEventAnalyticsCte({ window }, false, "rollups");
 		expect(rollups).toContain("FROM rudel.usage_session_rollups FINAL");
 		expect(rollups).toContain("AND is_consistent = 1");
+		expect(rollups).toContain("estimated_costs AS group_estimated_cost");
+		expect(rollups).toContain("pricing_models AS pricing_model");
 		expect(rollups).not.toContain("rudel.usage_events");
 		expect(events).not.toContain("rudel.usage_session_rollups");
 		const tail = (sql: string) =>
-			sql.slice(sql.indexOf("usage_event_pricing_groups AS ("));
+			sql.slice(sql.indexOf("usage_event_session_rollups AS ("));
 		expect(tail(rollups)).toBe(tail(events));
 		const head = (sql: string) =>
-			sql.slice(0, sql.indexOf("usage_event_pricing_candidates AS ("));
+			sql.slice(0, sql.indexOf("priced_usage_groups AS ("));
 		expect(head(events)).toContain("latest_usage_records AS (");
+		expect(head(events)).toContain("usage_event_pricing_rate_card AS (");
 		expect(head(rollups)).not.toContain("latest_usage_records AS (");
+		expect(head(rollups)).not.toContain("usage_event_pricing_rate_card AS (");
 		expect(head(rollups)).toContain("usage_window_sessions AS (");
 	});
 
@@ -128,7 +148,7 @@ describe("usage rollup read path", () => {
 });
 
 describe("usage rollup build", () => {
-	test("inserts every column from the events path's own pricing groups", () => {
+	test("inserts every column from the events path's own priced groups", () => {
 		const sql = buildUsageSessionRollupInsertSql();
 		expect(sql).toStartWith(
 			`INSERT INTO rudel.usage_session_rollups (${USAGE_SESSION_ROLLUP_COLUMNS.map((column) => column.name).join(", ")})`,
@@ -137,6 +157,16 @@ describe("usage rollup build", () => {
 			buildUsageEventCandidateCtes(
 				"(organization_id, user_id, source, session_id) IN (SELECT organization_id, user_id, source, session_id FROM usage_rollup_keys)",
 			),
+		);
+		expect(sql).toContain(
+			buildPricedUsageGroupsCtes("usage_event_pricing_candidates"),
+		);
+		expect(sql).toContain("FROM priced_usage_groups");
+		expect(sql).toContain(
+			"arrayMap(group -> group.16, g.groups) AS estimated_costs",
+		);
+		expect(sql).toContain(
+			"arrayMap(group -> group.17, g.groups) AS pricing_models",
 		);
 		expect(sql).toContain(`${USAGE_ROLLUP_BUILD_VERSION} AS build_version`);
 		expect(sql).toContain("FROM usage_rollup_keys AS k");
@@ -247,7 +277,7 @@ describe("usage rollup build", () => {
 });
 
 describe("usage rollup backfill", () => {
-	test("selects missing, stale, unsettled, inconsistent and older-build rows outside skipped workspaces and back-offs", () => {
+	test("selects missing, stale, unsettled, inconsistent, older-build and older-receipt rows outside skipped workspaces and back-offs", () => {
 		const statement = buildUsageRollupCandidatesStatement({
 			limit: 300,
 			skippedOrganizationIds: ["internal-1"],
@@ -266,6 +296,22 @@ describe("usage rollup backfill", () => {
 			"r.build_version != {buildVersion:UInt32}",
 		);
 		expect(statement.query).toContain("OR r.built_at < sa.ingested_at");
+		expect(statement.query).not.toContain("rudel.usage_events");
+		const sweep = buildUsageRollupCandidatesStatement({
+			checkReceipts: true,
+			limit: 300,
+			skippedOrganizationIds: ["internal-1"],
+		}).query;
+		expect(sweep).toContain(
+			"OR (r.built_at < sa.ingested_at OR r.receipt_generation != e.receipt_generation)",
+		);
+		expect(sweep).toContain("AND record_kind = 'receipt'");
+		expect(isUsageRollupReceiptSweepDue(Date.UTC(2026, 10, 8, 12, 30))).toBe(
+			true,
+		);
+		expect(isUsageRollupReceiptSweepDue(Date.UTC(2026, 10, 8, 12, 31))).toBe(
+			false,
+		);
 		expect(statement.query).toContain(
 			"r.built_at < sa.ingested_at + INTERVAL 10 MINUTE",
 		);

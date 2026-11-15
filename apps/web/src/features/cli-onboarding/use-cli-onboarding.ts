@@ -318,7 +318,9 @@ export function useCliOnboarding(
 			} catch {
 				/* The destination carries the dates too. */
 			}
-			const organizations = await authClient.organization.list();
+			const organizations = await authClient.organization.list({
+				fetchOptions: { disableSignal: true },
+			});
 			const organization = organizations.data?.find(
 				(item) => item.id === snapshot.organizationId,
 			);

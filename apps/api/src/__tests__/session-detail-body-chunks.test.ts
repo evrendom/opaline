@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
+import { createHash } from "node:crypto";
 import {
+	SESSION_DETAIL_BODY_CHUNK_CODE_UNITS,
+	SESSION_DETAIL_WINDOW_MAX_TURN_BYTES,
 	SessionDetailBodyChunkInputSchema,
+	SessionDetailInitialSchema,
+	SessionDetailTurnSchema,
+	SessionDetailWindowSchema,
 	type SessionFileChanges,
 } from "@rudel/api-routes";
 import { API_RESPONSE_MAX_BYTES } from "../lib/api-response-size.js";
@@ -8,7 +14,14 @@ import {
 	createSessionDetailBodyChunk,
 	getSessionDetailBodyForChunk,
 	serializeSessionDetailBody,
+	serializeSessionDetailBodyForChunk,
 } from "../services/session-detail-body-chunks.js";
+import {
+	assembleSessionDetailWindow,
+	deriveSessionDetail,
+	type SessionDetailRawSnapshot,
+} from "../services/session-detail-derivation.service.js";
+import { buildSessionDetailInitial } from "../services/session-detail-initial.js";
 
 const line = (value: unknown) => JSON.stringify(value);
 const base = { parentUuid: null, sessionId: "subagent-session" };
@@ -158,5 +171,174 @@ describe("a session's file changes", () => {
 		}
 		expect(parts.length).toBeGreaterThan(1);
 		expect(JSON.parse(parts.join(""))).toEqual(changes);
+	});
+});
+
+function oversizedSnapshot(): SessionDetailRawSnapshot {
+	const turn = (id: string, second: number, user: string, reply: string) => [
+		line({
+			message: { content: user, role: "user" },
+			sessionId: "session-1",
+			timestamp: at(second),
+			type: "user",
+			uuid: id,
+		}),
+		line({
+			message: {
+				content: [{ text: reply, type: "text" }],
+				id: `message-${id}`,
+				model: "claude-opus-5",
+				role: "assistant",
+			},
+			sessionId: "session-1",
+			timestamp: at(second + 1),
+			type: "assistant",
+			uuid: `reply-${id}`,
+		}),
+	];
+	return {
+		content: [
+			...turn("small", 0, "Hello", "Hi"),
+			...turn(
+				"large-reply",
+				10,
+				"Dump the log",
+				"🙂 log line\n".repeat(SESSION_DETAIL_WINDOW_MAX_TURN_BYTES / 8),
+			),
+			...turn(
+				"large-prompt",
+				20,
+				"x".repeat(SESSION_DETAIL_WINDOW_MAX_TURN_BYTES + 1),
+				"Read it",
+			),
+		].join("\n"),
+		durationMinutes: 1,
+		gitBranch: "main",
+		gitRemote: "github.com/rudel/rudel",
+		gitSha: "abc",
+		inputTokens: 0,
+		lastInteractionDate: at(30),
+		modelUsed: "claude-opus-5",
+		organizationId: "org-1",
+		outputTokens: 0,
+		ownerId: "owner-1",
+		packageName: "rudel",
+		projectPath: "/src/rudel",
+		revision: "11",
+		sessionDate: at(0),
+		sessionId: "session-1",
+		skills: [],
+		slashCommands: [],
+		source: "claude_code",
+		subagents: {},
+		totalTokens: 0,
+	};
+}
+
+describe("oversized bodies in a window", () => {
+	const derivation = deriveSessionDetail(oversizedSnapshot());
+
+	test("carry the chunk total and checksum the chunk endpoint serves", () => {
+		const window = SessionDetailWindowSchema.parse(
+			assembleSessionDetailWindow({
+				derivation,
+				request: {
+					anchorTurnId: "small",
+					bodyChunks: true,
+					includeBodies: true,
+					mode: "anchor",
+					revision: "11",
+					sessionId: "session-1",
+				},
+			}).window,
+		);
+		const byId = new Map(window.turns.map((turn) => [turn.turnId, turn]));
+		expect(byId.get("small")?.bodyOmitted).toBeNull();
+		expect(byId.get("small")?.bodyChunks).toBeUndefined();
+		for (const turnId of ["large-reply", "large-prompt"]) {
+			const turn = byId.get(turnId);
+			expect(turn?.bodyOmitted).toBe("oversized");
+			const serialized = serializeSessionDetailBodyForChunk(derivation, {
+				kind: "turn",
+				targetId: turnId,
+			});
+			if (!serialized || !turn?.bodyChunks)
+				throw new Error(`Expected ${turnId} to be chunked`);
+			expect(serialized.json.length).toBeGreaterThan(
+				SESSION_DETAIL_BODY_CHUNK_CODE_UNITS,
+			);
+			expect(turn.bodyChunks).toEqual({
+				sha256: createHash("sha256").update(serialized.json).digest("hex"),
+				totalCodeUnits: serialized.json.length,
+			});
+			const last = createSessionDetailBodyChunk(serialized, {
+				kind: "turn",
+				offset:
+					Math.floor(
+						(serialized.json.length - 1) / SESSION_DETAIL_BODY_CHUNK_CODE_UNITS,
+					) * SESSION_DETAIL_BODY_CHUNK_CODE_UNITS,
+				revision: "11",
+				sessionId: "session-1",
+				targetId: turnId,
+			});
+			expect(last.sha256).toBe(turn.bodyChunks.sha256);
+			expect(last.totalCodeUnits).toBe(turn.bodyChunks.totalCodeUnits);
+			expect(
+				SessionDetailTurnSchema.parse(JSON.parse(serialized.json)),
+			).toEqual(
+				SessionDetailTurnSchema.parse(derivation.turnBodies.get(turnId)),
+			);
+		}
+	});
+
+	test("carry it in the initial window too", () => {
+		const initial = SessionDetailInitialSchema.parse(
+			buildSessionDetailInitial(derivation, { bodyChunks: true }),
+		);
+		const large = initial.window.turns.find(
+			(turn) => turn.turnId === "large-reply",
+		);
+		expect(large?.bodyOmitted).toBe("oversized");
+		expect(large?.bodyChunks?.totalCodeUnits).toBeGreaterThan(
+			SESSION_DETAIL_BODY_CHUNK_CODE_UNITS,
+		);
+	});
+
+	test("stay out of windows and initial views that did not ask for them", () => {
+		const window = assembleSessionDetailWindow({
+			derivation,
+			request: {
+				anchorTurnId: "small",
+				includeBodies: true,
+				mode: "anchor",
+				revision: "11",
+				sessionId: "session-1",
+			},
+		}).window;
+		const initial = buildSessionDetailInitial(derivation);
+		for (const turns of [window.turns, initial.window.turns]) {
+			const oversized = turns.filter(
+				(turn) => turn.bodyOmitted === "oversized",
+			);
+			expect(oversized.map((turn) => turn.turnId)).toContain("large-reply");
+			for (const turn of oversized) expect("bodyChunks" in turn).toBe(false);
+		}
+	});
+
+	test("a body store without chunk totals still omits the body", () => {
+		const window = assembleSessionDetailWindow({
+			derivation: { ...derivation, turnBodies: new Map(derivation.turnBodies) },
+			request: {
+				anchorTurnId: "large-reply",
+				bodyChunks: true,
+				includeBodies: true,
+				mode: "anchor",
+				revision: "11",
+				sessionId: "session-1",
+			},
+		}).window;
+		const large = window.turns.find((turn) => turn.turnId === "large-reply");
+		expect(large?.bodyOmitted).toBe("oversized");
+		expect(large && "bodyChunks" in large).toBe(false);
 	});
 });

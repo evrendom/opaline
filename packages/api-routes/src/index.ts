@@ -85,6 +85,7 @@ export {
 import {
 	RepositoryDetailSchema,
 	RepositoryInputSchema,
+	RepositoryNavigationItemSchema,
 	RepositoryOverviewInputSchema,
 	RepositoryOverviewSchema,
 	RepositorySummarySchema,
@@ -93,6 +94,7 @@ import {
 export type {
 	RepositoryFile,
 	RepositoryFiles,
+	RepositoryNavigationItem,
 	RepositoryOverview,
 	RepositorySummary,
 	RepositoryTreeEntry,
@@ -535,6 +537,8 @@ export {
 	type SessionDetailBodyChunkInput,
 	SessionDetailBodyChunkInputSchema,
 	SessionDetailBodyChunkSchema,
+	type SessionDetailBodyChunks,
+	SessionDetailBodyChunksSchema,
 	SessionDetailChunkedSubagentSchema,
 	type SessionDetailContextUse,
 	type SessionDetailInitial,
@@ -1451,6 +1455,7 @@ export const contract = {
 		},
 		repositories: {
 			list: oc.output(z.array(RepositorySummarySchema)),
+			navigation: oc.output(z.array(RepositoryNavigationItemSchema)),
 			detail: oc.input(RepositoryInputSchema).output(RepositoryDetailSchema),
 			overview: oc
 				.input(RepositoryOverviewInputSchema)

@@ -2,24 +2,14 @@ import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import type { ClickHouseExecutor } from "@chkit/clickhouse";
 import type { ColumnDefinition } from "@chkit/core";
-import {
-	checksumSQL,
-	extractExecutableStatements,
-} from "chkit/dist/bin/lib.js";
+import { checksumSQL } from "chkit/dist/bin/lib.js";
 import {
 	runStringDefaultsMigration,
 	STRING_DEFAULTS,
 	STRING_DEFAULTS_MIGRATION,
 	stringDefaultExpression,
+	stringDefaultsStatements,
 } from "../../scripts/migrate-string-defaults.js";
-import {
-	AFFECTED_ROWS,
-	affectedRowsSql,
-	dryRunSql,
-	insertSql,
-	parseRepairArgs,
-	stripDefaultQuotes,
-} from "../../scripts/repair-string-defaults.js";
 
 const sql = readFileSync(
 	new URL(`../../chx/migrations/${STRING_DEFAULTS_MIGRATION}`, import.meta.url),
@@ -64,10 +54,10 @@ describe("string defaults", () => {
 		expect(quoted).toEqual([]);
 	});
 
-	test("the migration sets each column to its source default and nothing else", async () => {
+	test("the migration sets each live column to its source default and nothing else", async () => {
 		expect(sql).not.toMatch(/\bDROP\b|\bDELETE\b|\bTRUNCATE\b|\bUPDATE\b/u);
 		const migrated = Object.fromEntries(
-			extractExecutableStatements(sql).map((statement) => {
+			stringDefaultsStatements(sql).map((statement) => {
 				const table = /^ALTER TABLE rudel\.(\w+)\s/u.exec(statement)?.[1];
 				const clauses = statement
 					.replace(/^ALTER TABLE rudel\.\w+\s+/u, "")
@@ -145,7 +135,7 @@ describe("string defaults", () => {
 	});
 });
 
-const QUOTED = "'\\'standard\\''";
+const QUOTED = "'\\'\\''";
 const JOURNALED = {
 	name: STRING_DEFAULTS_MIGRATION,
 	checksum: checksumSQL(sql),
@@ -174,7 +164,7 @@ function cluster(
 						default_kind: "DEFAULT",
 						default_expression:
 							host === "clickhouse-1" &&
-							name === "session_archetype" &&
+							name === "model_used" &&
 							reads <= revertedReads
 								? QUOTED
 								: stringDefaultExpression(value),
@@ -206,7 +196,7 @@ const run = (
 	});
 
 describe("string defaults runner", () => {
-	const statements = extractExecutableStatements(sql).length;
+	const statements = stringDefaultsStatements(sql).length;
 
 	test("applies once and journals only after every replica serves the defaults", async () => {
 		const state = cluster(2);
@@ -219,7 +209,7 @@ describe("string defaults runner", () => {
 	test("fails without journaling when a replica keeps the quoted default", async () => {
 		const state = cluster(Number.POSITIVE_INFINITY);
 		await expect(run(state, 4)).rejects.toThrow(
-			"String defaults mismatch: session_analytics.session_archetype on replica clickhouse-1",
+			"String defaults mismatch: session_analytics.model_used on replica clickhouse-1",
 		);
 		expect(state.journal).toHaveLength(0);
 		expect(state.executed).toHaveLength(statements * 2);
@@ -255,69 +245,5 @@ describe("string defaults runner", () => {
 		await expect(run(state)).rejects.toThrow("checksum mismatch");
 		expect(state.executed).toHaveLength(0);
 		expect(state.reads()).toBe(0);
-	});
-});
-
-describe("string defaults repair", () => {
-	test("targets only rows holding both quoted defaults", () => {
-		expect(AFFECTED_ROWS).toBe(
-			"session_archetype = '\\'standard\\'' AND error_pattern = '\\'\\''",
-		);
-		expect(dryRunSql(["org_1"])).toContain(
-			"WHERE session_archetype = '\\'standard\\'' AND error_pattern = '\\'\\'' AND organization_id IN ('org_1')",
-		);
-		expect(affectedRowsSql("org_1", 10)).toContain("LIMIT 11");
-		expect(() => affectedRowsSql("x' OR 1", 10)).toThrow(
-			"Invalid organization",
-		);
-	});
-
-	test("rewrites only the two columns, at the same revision", () => {
-		const row = {
-			session_id: "s",
-			revision: "115807295561596928",
-			session_archetype: "'standard'",
-			error_pattern: "''",
-			model_used: "claude",
-		};
-		expect(stripDefaultQuotes(row)).toEqual({
-			...row,
-			session_archetype: "standard",
-			error_pattern: "",
-		});
-		expect(() =>
-			stripDefaultQuotes({ ...row, session_archetype: "deep_work" }),
-		).toThrow("not affected");
-		expect(insertSql([stripDefaultQuotes(row)])).toBe(
-			`INSERT INTO rudel.session_analytics SETTINGS async_insert = 0 FORMAT JSONEachRow\n${JSON.stringify(stripDefaultQuotes(row))}`,
-		);
-	});
-
-	test("dry-runs unless told which organizations to apply to", () => {
-		expect(parseRepairArgs([])).toEqual({
-			apply: false,
-			organizations: "all",
-			maxRowsPerOrganization: 2_000,
-		});
-		expect(
-			parseRepairArgs([
-				"--apply",
-				"--organization",
-				"a",
-				"--organization",
-				"b",
-			]),
-		).toEqual({
-			apply: true,
-			organizations: ["a", "b"],
-			maxRowsPerOrganization: 2_000,
-		});
-		expect(() => parseRepairArgs(["--apply"])).toThrow("--organization");
-		expect(() => parseRepairArgs(["--all", "--organization", "a"])).toThrow(
-			"not both",
-		);
-		expect(() => parseRepairArgs(["--organization", "a'b"])).toThrow(
-			"Invalid --organization",
-		);
 	});
 });

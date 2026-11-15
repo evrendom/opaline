@@ -3,6 +3,7 @@ import type {
 	CostDashboardInput,
 	CostDashboardRequestedMetric,
 	DashboardMetric,
+	DashboardMetricData,
 } from "@rudel/api-routes";
 import {
 	type QueryClient,
@@ -20,7 +21,7 @@ import { costsQueryScope, dashboardPlaceholder } from "./use-cost-dashboard";
  */
 export type MetricPreviews = Partial<Record<DashboardMetric, CostDashboard>> & {
 	/** Language signals split by type, for the per-run language rates. */
-	languageSplit?: CostDashboard;
+	languageSplit?: DashboardMetricData | null;
 	pending?: boolean;
 };
 
@@ -47,13 +48,21 @@ export function useMetricPreviews(
 			metric === "mergedPullRequests" || metric === "ciRuns",
 	);
 	const language = metrics.includes("signals");
+	const charted = queryClient.getQueryData<CostDashboard>([
+		"org",
+		state.activeOrg?.id,
+		...orpc.analytics.overview.costs.queryOptions({ input: chartInput })
+			.queryKey,
+	]);
+	const separateLanguage =
+		language && charted !== undefined && charted.languageSplit === undefined;
 	const requests = [
 		{ input: chartInput, placeholder: sessionCardsPlaceholder },
 		...githubCards.map((metric) => ({
 			input: { ...inputFor(metric), sessionMetrics: false },
 			placeholder: dashboardPlaceholder,
 		})),
-		...(language
+		...(separateLanguage
 			? [
 					{
 						input: { ...inputFor("signals"), splitBy: "signalTypes" as const },
@@ -86,7 +95,11 @@ export function useMetricPreviews(
 				return [metric, index === -1 ? chart?.data : github[index]?.data];
 			}),
 		),
-		languageSplit: language ? rest[githubCards.length]?.data : undefined,
+		languageSplit: !language
+			? undefined
+			: separateLanguage
+				? rest[githubCards.length]?.data?.metrics.signals
+				: chart?.data?.languageSplit,
 		pending: answers.some((answer) => answer.isPending),
 	};
 }

@@ -454,6 +454,7 @@ const detailInitial = os.analytics.sessions.detailInitial
 		);
 		try {
 			const result = await getSessionDetailInitial({
+				bodyChunks: input.bodyChunks,
 				organizationId: context.organizationId,
 				ownerId,
 				sessionId: input.sessionId,

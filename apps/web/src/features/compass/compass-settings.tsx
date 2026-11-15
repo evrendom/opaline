@@ -12,6 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/app/ui/popover";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
 import { client, orpc } from "@/lib/orpc";
 import { MOMENT_KINDS_APPEARANCE } from "./moment-labels";
+import { useCompassEnabled } from "./use-compass-access";
 
 type FlagSetting = CompassSettings["flags"][MomentKind];
 
@@ -24,12 +25,13 @@ export function CompassSettingsButton() {
 	const queryClient = useQueryClient();
 	const { state: organization } = useOrganization();
 	const organizationId = organization.activeOrg?.id;
+	const allowed = useCompassEnabled();
 	const options = orpc.analytics.moments.settings.queryOptions();
 	const queryKey = ["org", organizationId, ...options.queryKey];
 	const query = useQuery({
 		...options,
 		queryKey,
-		enabled: !!organizationId,
+		enabled: allowed && !!organizationId,
 	});
 	const canEdit = query.data?.canEdit === true;
 

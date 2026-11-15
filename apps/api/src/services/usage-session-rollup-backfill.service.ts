@@ -30,6 +30,8 @@ const RECENT_DAYS = 30;
 const SETTLE_MINUTES = 10;
 const INCONSISTENT_RECHECK_MINUTES = 60;
 const SESSION_ANALYTICS_TABLE = "rudel.session_analytics";
+const USAGE_EVENTS_TABLE = "rudel.usage_events";
+const RECEIPT_SWEEP_EVERY_MINUTES = 30;
 const logger = getLogger(["rudel", "api", "usage-session-rollups"]);
 
 const CandidateSchema = z.object({
@@ -39,12 +41,36 @@ const CandidateSchema = z.object({
 	session_id: z.string(),
 });
 
+export function isUsageRollupReceiptSweepDue(now: number): boolean {
+	return Math.floor(now / 60_000) % RECEIPT_SWEEP_EVERY_MINUTES === 0;
+}
+
+function buildReceiptJoinSql(): string {
+	return `
+			LEFT ANY JOIN (
+				SELECT organization_id, user_id, toString(source) AS source, session_id,
+					max(event_version) AS receipt_generation
+				FROM ${getSafeClickHouseTable(USAGE_EVENTS_TABLE)}
+				WHERE organization_id NOT IN {skipped:Array(String)}
+					AND record_kind = 'receipt'
+				GROUP BY organization_id, user_id, source, session_id
+			) AS e
+				ON e.organization_id = sa.organization_id
+				AND e.user_id = sa.user_id
+				AND e.source = sa.source
+				AND e.session_id = sa.session_id`;
+}
+
 export function buildUsageRollupCandidatesStatement(input: {
+	readonly checkReceipts?: boolean;
 	readonly limit: number;
 	readonly skippedOrganizationIds: readonly string[];
 }): ClickHouseStatement {
 	const sessions = getSafeClickHouseTable(SESSION_ANALYTICS_TABLE);
 	const rollups = getSafeClickHouseTable(USAGE_SESSION_ROLLUPS_TABLE);
+	const behind = input.checkReceipts
+		? "(r.built_at < sa.ingested_at OR r.receipt_generation != e.receipt_generation)"
+		: "r.built_at < sa.ingested_at";
 	return {
 		clickhouse_settings: {
 			join_use_nulls: 0,
@@ -61,24 +87,24 @@ export function buildUsageRollupCandidatesStatement(input: {
 			) AS sa
 			LEFT ANY JOIN (
 				SELECT organization_id, user_id, toString(source) AS source, session_id,
-					is_consistent, build_version, built_at, retry_after
+					is_consistent, build_version, built_at, retry_after, receipt_generation
 				FROM ${rollups} FINAL
 				WHERE organization_id NOT IN {skipped:Array(String)}
 			) AS r
 				ON r.organization_id = sa.organization_id
 				AND r.user_id = sa.user_id
 				AND r.source = sa.source
-				AND r.session_id = sa.session_id
+				AND r.session_id = sa.session_id${input.checkReceipts ? buildReceiptJoinSql() : ""}
 			WHERE r.retry_after <= now64(3)
 				AND (
 					r.build_version != {buildVersion:UInt32}
-					OR r.built_at < sa.ingested_at
+					OR ${behind}
 					OR (r.built_at < sa.ingested_at + INTERVAL ${SETTLE_MINUTES} MINUTE
 						AND r.built_at < now64(3) - INTERVAL ${SETTLE_MINUTES} MINUTE)
 					OR (r.is_consistent = 0
 						AND r.built_at < now64(3) - INTERVAL ${INCONSISTENT_RECHECK_MINUTES} MINUTE)
 				)
-			ORDER BY (r.session_id != '' AND r.built_at < sa.ingested_at) DESC,
+			ORDER BY (r.session_id != '' AND ${behind}) DESC,
 				sa.session_date >= now() - INTERVAL ${RECENT_DAYS} DAY DESC,
 				cityHash64(sa.organization_id, sa.user_id, toStartOfHour(now())),
 				sa.source, sa.session_id
@@ -102,6 +128,7 @@ export async function backfillUsageSessionRollups(input: {
 	readonly backOff?: typeof backOffUsageSessionRollups;
 	readonly batchSize?: number;
 	readonly budgetMs?: number;
+	readonly checkReceipts?: boolean;
 	readonly executor: ClickHouseExecutor;
 	readonly limit?: number;
 	readonly now?: () => number;
@@ -120,6 +147,8 @@ export async function backfillUsageSessionRollups(input: {
 			input.executor,
 			CandidateSchema,
 			buildUsageRollupCandidatesStatement({
+				checkReceipts:
+					input.checkReceipts ?? isUsageRollupReceiptSweepDue(now()),
 				limit: input.limit ?? USAGE_ROLLUP_BACKFILL_LIMIT,
 				skippedOrganizationIds:
 					input.skippedOrganizationIds ??

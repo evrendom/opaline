@@ -12,7 +12,7 @@ import {
 	useState,
 } from "react";
 import "./cost-dot-chart.css";
-import { Bones } from "@/app/ui/bones";
+import { Reveal } from "@/app/ui/bones";
 import { OPALINE_OUTLINE } from "@/features/shell/components/shell-nav-icon";
 import type { ChartInterval, groupChartTrend } from "./chart-interval";
 import {
@@ -689,10 +689,16 @@ function FrameBones({
 				root.adoptedStyleSheets = [...root.adoptedStyleSheets, pebbleBars];
 		}
 	});
-	if (!loading) return children;
 	return (
 		<div ref={host} className="contents">
-			<Bones label="Loading the calendar">{children}</Bones>
+			<Reveal
+				label="Loading the calendar"
+				loading={loading}
+				sample={children}
+				sampleId="cost-calendar"
+			>
+				{() => children}
+			</Reveal>
 		</div>
 	);
 }

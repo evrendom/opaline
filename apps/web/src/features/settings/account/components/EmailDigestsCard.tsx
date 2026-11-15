@@ -2,7 +2,7 @@ import type { UsageDigestPreferences } from "@rudel/api-routes";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useId } from "react";
 import { toast } from "sonner";
-import { Bones } from "@/app/ui/bones";
+import { Reveal } from "@/app/ui/bones";
 import { Checkbox } from "@/app/ui/checkbox";
 import {
 	WorkspaceSettingsGroup,
@@ -49,34 +49,36 @@ export function EmailDigestsCard() {
 		}
 	}
 
-	if (query.isPending)
-		return (
-			<Bones label="Loading your email choices">
-				<EmailDigestsSample />
-			</Bones>
-		);
-
 	return (
-		<EmailDigestsGroup>
-			{query.isError ? (
-				<WorkspaceSettingsRow label="Could not load your email choices.">
-					<button
-						type="button"
-						className="text-sm underline"
-						onClick={() => void query.refetch()}
-					>
-						Try again
-					</button>
-				</WorkspaceSettingsRow>
-			) : (
-				<DigestRows
-					workspaces={query.data.workspaces}
-					onChange={(organizationId, kind, enabled) =>
-						void setPreference(organizationId, kind, enabled)
-					}
-				/>
+		<Reveal
+			label="Loading your email choices"
+			loading={query.isPending}
+			sample={<EmailDigestsSample />}
+			sampleId="email-digests"
+		>
+			{() => (
+				<EmailDigestsGroup>
+					{query.isError ? (
+						<WorkspaceSettingsRow label="Could not load your email choices.">
+							<button
+								type="button"
+								className="text-sm underline"
+								onClick={() => void query.refetch()}
+							>
+								Try again
+							</button>
+						</WorkspaceSettingsRow>
+					) : (
+						<DigestRows
+							workspaces={query.data?.workspaces ?? []}
+							onChange={(organizationId, kind, enabled) =>
+								void setPreference(organizationId, kind, enabled)
+							}
+						/>
+					)}
+				</EmailDigestsGroup>
 			)}
-		</EmailDigestsGroup>
+		</Reveal>
 	);
 }
 

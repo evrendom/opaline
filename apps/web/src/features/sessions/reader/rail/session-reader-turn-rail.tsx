@@ -119,7 +119,12 @@ export const TurnRailList = memo(function TurnRailList({
 	onSelect: (turnId: string) => void;
 	subagents?: readonly RailSubagent[];
 	turns: readonly SessionDetailTurnSummary[];
-	whole?: { disabled?: boolean; onPick: () => void; picked: boolean };
+	whole?: {
+		disabled?: boolean;
+		onPick: () => void;
+		picked: boolean;
+		total: number;
+	};
 }) {
 	const [figure, setFigure] = useState<RailFigure>("context");
 	const turnInView = useSyncExternalStore(
@@ -333,7 +338,7 @@ export const TurnRailList = memo(function TurnRailList({
 								Entire session
 							</span>
 							<span className="text-muted-foreground">
-								{turns.length} {turns.length === 1 ? "turn" : "turns"}
+								{whole.total} {whole.total === 1 ? "turn" : "turns"}
 							</span>
 							<span
 								data-rail-line={whole.disabled ? undefined : ""}

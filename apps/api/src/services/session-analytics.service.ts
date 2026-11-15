@@ -25,6 +25,7 @@ import { appendSessionListSqlFilters } from "./session-list-filters.js";
 import { buildActiveSkillUsesCte } from "./skill-extraction-ingest.service.js";
 import {
 	buildSessionAnalyticsWindowSql,
+	buildSessionDateWindow,
 	getUsageAnalyticsQueryContext,
 } from "./usage-event-analytics.service.js";
 
@@ -385,6 +386,7 @@ async function getSessionAnalyticsBaseRows(
 
 	const rows = await queryClickhouse<SessionAnalyticsListRow>({
 		clickhouse_settings: {
+			...usage.clickhouseSettings,
 			join_use_nulls: 0,
 			log_comment: "analytics.sessions.list",
 		},
@@ -583,6 +585,7 @@ export async function getSessionAnalyticsSummaryComparison(
 		Record<string, number | null | undefined>
 	>({
 		clickhouse_settings: {
+			...usage.clickhouseSettings,
 			log_comment: "analytics.sessions.summaryComparison",
 		},
 		query: `
@@ -746,10 +749,10 @@ export async function getSessionDimensionAnalysis(
 	);
 
 	let query: string;
-	const usage = await getUsageAnalyticsQueryContext(
-		orgId,
-		user_id ? { userIdParam: "userId" } : {},
-	);
+	const usage = await getUsageAnalyticsQueryContext(orgId, {
+		userIdParam: user_id ? "userId" : undefined,
+		window: buildSessionDateWindow(buildDateFilter("days", "sa.session_date")),
+	});
 
 	if (split_by) {
 		query = `
@@ -790,6 +793,7 @@ export async function getSessionDimensionAnalysis(
 	}
 
 	const results = await queryClickhouse<DimensionRow>({
+		clickhouse_settings: usage.clickhouseSettings,
 		query,
 		query_params,
 	});

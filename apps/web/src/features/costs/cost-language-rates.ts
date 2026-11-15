@@ -1,4 +1,4 @@
-import type { CostDashboard, DashboardMetricData } from "@rudel/api-routes";
+import type { DashboardMetricData } from "@rudel/api-routes";
 import { type ChartInterval, groupChartTrend } from "./chart-interval";
 
 const SWEARS = "Negative user";
@@ -32,11 +32,10 @@ function seriesOf(data: DashboardMetricData, label: string) {
 }
 
 export function languageRates(
-	split: CostDashboard | undefined,
+	signals: DashboardMetricData | null | undefined,
 	runs: DashboardMetricData | null | undefined,
 	interval: ChartInterval,
 ): LanguageRates | undefined {
-	const signals = split?.metrics.signals;
 	if (!signals || !runs) return undefined;
 	const swearsId = seriesOf(signals, SWEARS);
 	const apologiesId = seriesOf(signals, APOLOGIES);

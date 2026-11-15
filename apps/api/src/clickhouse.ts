@@ -13,6 +13,7 @@ import {
 	SESSION_ANALYTICS_INSERT_COLUMNS,
 } from "@rudel/ch-schema/session-analytics-mv";
 import { withBackgroundClickHouseSettings } from "./lib/background-work.js";
+import { withClickHouseWorkloadSettings } from "./clickhouse-workload.js";
 
 const logger = getLogger(["rudel", "api", "clickhouse"]);
 
@@ -337,7 +338,7 @@ export function createClickHouseExecutor(config: {
 						? undefined
 						: AbortSignal.any([statement.abortSignal]),
 				clickhouse_settings: withBackgroundClickHouseSettings(
-					statement.clickhouse_settings,
+					withClickHouseWorkloadSettings(statement.clickhouse_settings),
 				),
 				query: statement.query,
 				query_params: statement.query_params,
@@ -353,7 +354,7 @@ export function createClickHouseExecutor(config: {
 						? undefined
 						: AbortSignal.any([statement.abortSignal]),
 				clickhouse_settings: withBackgroundClickHouseSettings(
-					statement.clickhouse_settings,
+					withClickHouseWorkloadSettings(statement.clickhouse_settings),
 				),
 				query: statement.query,
 				query_params: statement.query_params,

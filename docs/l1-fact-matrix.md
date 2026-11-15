@@ -20,8 +20,8 @@ Under each status is where the agent records the fact, shortened: `toolUseResult
 
 | | Claude Code | Codex |
 |---|---:|---:|
-| ✅ stored | 165 (1 with a gap) | 184 (1 with a gap) |
-| 🟡 pending | 51 | 37 |
+| ✅ stored | 165 (1 with a gap) | 185 (1 with a gap) |
+| 🟡 pending | 52 | 37 |
 | ⚪ not recorded | 40 | 35 |
 | 🔴 wrong | 0 | 0 |
 
@@ -40,10 +40,10 @@ Mapping quality (tier denominator: literal agent mappings including searched abs
 | narrower | 11 | 3 |
 | not_emitted | 0 | 3 |
 | not_found | 70 | 39 |
-| derived | 22 | 22 |
+| derived | 23 | 23 |
 | provenance | 6 | 4 |
-| N/A (derived/provenance) | 28 | 26 |
-| Context paths (excluded as sources) | 35 | 76 |
+| N/A (derived/provenance) | 29 | 27 |
+| Context paths (excluded as sources) | 36 | 79 |
 | Judged (excludes searched absences) | 138 | 161 |
 | Semantic conflicts | 3 | 3 |
 | Paired runs | 0 | 0 |
@@ -570,6 +570,7 @@ Local Codex census: 1516 paths: 1262 declared, 50 open-JSON descendants, 164 too
 
 | Fact | What it is | Claude Code | Codex | Comparability |
 |---|---|---|---|---|
+| `git_output` | The commits, pushes and pull-request actions a run's git and gh commands ran and printed. | 🟡 pending derived · not_applicable | ✅ v1 derived · not_applicable | Opaline-derived/provenance; N/A per agent |
 | `turn_cwd` | On a Codex prompt, the working directory the turn's context named when it arrived (turn_context cwd, else the session's). | ⚪ not recorded not_found · asserted | ✅ v14 derived · not_applicable | Opaline-derived/provenance; N/A per agent |
 | `compaction_of` | On a compaction record that repeats one the stream already recorded with nothing but bookkeeping in between (Claude Code's summary after its compact boundary), the line of that compaction: compactions count records without it, once per compaction. | ✅ v15 derived · not_applicable | ✅ v15 derived · not_applicable | Opaline-derived/provenance; N/A per agent |
 | `started_at`, `ended_at`, `minutes`, `active_minutes` | When a run started and ended, and how long it took. | ✅ elsewhere close · observed<br>`every record timestamp` | ✅ v9 close · observed<br>`every record @timestamp`, `task_started.started_at` +4 | Comparable with caveat |
@@ -665,6 +666,10 @@ Local Codex census: 1516 paths: 1262 declared, 50 open-JSON descendants, 164 too
 
 ### Details
 
+- `git_output`
+  - Claude Code 🟡: Relation: derived from calls/input_text, calls/tool_result_text. Confidence: not_applicable. Evidence: llm_audit (1). Judgement: Opaline computation, not an agent-written value: the git columns read Claude Code's own gitOperation record, so its command output is not read for them. Path: `assistant.message.content[tool_use:Bash].input.command` — context · unreviewed. Plan: Claude Code records gitOperation (calls/git_operation); its Bash output is not read for the git columns.
+  - Codex ✅: Relation: derived from calls/input_text, calls/tool_result_text. Confidence: not_applicable. Evidence: llm_audit (1), fixture_test (1). Judgement: Opaline computation, not an agent-written value: Codex writes no git operation (calls/git_operation). A git commit, git push or gh pr create/merge/close/ready/reopen command that ran, and the `[branch sha]`, `a..b src -> dst` and `[new branch] src -> dst` lines it printed, as the git extractor reads them. Path: `response_item/function_call:exec_command.arguments.cmd` — context · unreviewed. Path: `event_msg/item_completed:CommandExecution.command[]` — context · unreviewed. Path: `response_item/function_call_output.output` — context · unreviewed. Stored in session_git_observations (git extractor, from call outputs). Note: Traps: a branch name the stored text cap cut is not read; a push with -q prints no ref lines and reads as none; a dry run is no push.
+  - Run index columns: `git_operations`, `pushed_branches`, `commit_shas`.
 - `turn_cwd`
   - Claude Code ⚪: Relation: not_found. Confidence: asserted. Evidence: llm_audit (1), census (1). Judgement: Census of the local transcripts, 2026-10-09: 275 Claude Code files (2.1.220–2.1.293, 163,945 records) and 2,694 Codex files (0.100–0.162, 3,055,210 records): Claude Code writes cwd on every line; it is cwd_components. How we checked: local census: Claude Code writes cwd on every line; it is cwd_components.
   - Codex ✅: Relation: derived from calls/cwd. Confidence: not_applicable. Evidence: fixture_test (2), llm_audit (1). Judgement: turn_context precedes its turn's prompt in the file, so its cwd would sit on the previous run's rows; the prompt that opens the turn carries it instead, so every run names the directory it started in. Path: `turn_context/.cwd` — context · unreviewed. Path: `session_meta/.cwd` — context · unreviewed.

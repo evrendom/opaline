@@ -1,9 +1,20 @@
+import { lazy } from "react";
 import { useSearchParams } from "react-router-dom";
+import { routeLoaders } from "@/app/route-loaders";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
-import { WorkspaceSetupPage } from "@/features/setup/workspace-setup-page";
 import { SkillsPageView } from "@/features/skills/components/SkillsPageView";
-import { SkillDetailPage } from "@/features/skills/skill-detail-page";
 import { orpc } from "@/lib/orpc";
+
+const WorkspaceSetupPage = lazy(() =>
+	routeLoaders.workspaceSetup().then((module) => ({
+		default: module.WorkspaceSetupPage,
+	})),
+);
+const SkillDetailPage = lazy(() =>
+	routeLoaders.skillDetail().then((module) => ({
+		default: module.SkillDetailPage,
+	})),
+);
 
 const PICK_PARAMS = [
 	"session",

@@ -35,7 +35,7 @@ export const aaPublicPayloadSchema = zod.object({
 					.nullable()
 					.optional(),
 				intelligenceIndex: observation,
-				intelligenceIndexIsEstimated: zod.boolean(),
+				intelligenceIndexIsEstimated: zod.boolean().optional(),
 				intelligenceIndexCost: total,
 				intelligenceIndexCostPerTask: zod
 					.object({ cost: total })

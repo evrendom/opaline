@@ -16,6 +16,7 @@ import {
 	WorkspaceSettingsField,
 	WorkspaceSettingsFields,
 } from "@/features/settings/workspace/components/workspace-settings-group";
+import { useOptionalOrganization } from "@/features/workspace/organization/OrganizationProvider";
 import { authClient } from "@/lib/auth-client";
 
 // Invite row: email, role and Invite at the top of the
@@ -27,6 +28,7 @@ export function WorkspaceInviteMemberForm({
 	canManage: boolean;
 	onInvalidate: () => void;
 }) {
+	const organizationId = useOptionalOrganization()?.state.activeOrg?.id;
 	const { trackOrganizationAction } = useAnalyticsTracking({
 		pageName: "organization",
 	});
@@ -56,6 +58,7 @@ export function WorkspaceInviteMemberForm({
 		const response = await authClient.organization.inviteMember({
 			email,
 			role: inviteRole,
+			organizationId,
 		});
 		setIsInviting(false);
 

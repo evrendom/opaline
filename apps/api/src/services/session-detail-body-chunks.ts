@@ -11,6 +11,7 @@ import {
 	type SessionDetailTurn,
 	type SessionFileChanges,
 } from "@rudel/api-routes";
+import type { SessionDetailBodyStore } from "./session-detail-body-store.js";
 
 type SessionDetailBody =
 	| SessionDetailTurn
@@ -65,6 +66,18 @@ function getSubagentTrace(
 		revision,
 		subagentId,
 	});
+}
+
+export function serializeSessionDetailBodyForChunk(
+	derivation: Parameters<typeof getSessionDetailBodyForChunk>[0] & {
+		turnBodies: Pick<SessionDetailBodyStore<SessionDetailTurn>, "serialized">;
+	},
+	input: Pick<SessionDetailBodyChunkInput, "kind" | "targetId">,
+): SerializedSessionDetailBody | null {
+	if (input.kind === "turn" && derivation.turnBodies.serialized)
+		return derivation.turnBodies.serialized(input.targetId) ?? null;
+	const value = getSessionDetailBodyForChunk(derivation, input);
+	return value ? serializeSessionDetailBody(value) : null;
 }
 
 export function createSessionDetailBodyChunk(

@@ -8,6 +8,7 @@ import {
 } from "@/features/self-hosted/account-recovery";
 import { WorkspaceMembersTable } from "@/features/settings/workspace/components/WorkspaceMembersTable";
 import type { TeamPageMemberRow } from "@/features/team/use-team-page-data";
+import { useOptionalOrganization } from "@/features/workspace/organization/OrganizationProvider";
 import { authClient } from "@/lib/auth-client";
 import { copyTextToClipboardWithResult } from "@/lib/clipboard";
 
@@ -37,6 +38,7 @@ export function WorkspaceMembersList({
 		pageName: "organization",
 	});
 	const [pendingMemberKey, setPendingMemberKey] = useState<string | null>(null);
+	const organizationId = useOptionalOrganization()?.state.activeOrg?.id;
 
 	const removeMember = async (memberId: string) => {
 		setPendingMemberKey(`remove:${memberId}`);
@@ -48,7 +50,10 @@ export function WorkspaceMembersList({
 		});
 
 		try {
-			await authClient.organization.removeMember({ memberIdOrEmail: memberId });
+			await authClient.organization.removeMember({
+				memberIdOrEmail: memberId,
+				organizationId,
+			});
 			onInvalidate();
 		} catch (cause) {
 			toast.error(
@@ -70,7 +75,11 @@ export function WorkspaceMembersList({
 		});
 
 		try {
-			await authClient.organization.updateMemberRole({ memberId, role });
+			await authClient.organization.updateMemberRole({
+				memberId,
+				role,
+				organizationId,
+			});
 			onInvalidate();
 		} catch (cause) {
 			toast.error(

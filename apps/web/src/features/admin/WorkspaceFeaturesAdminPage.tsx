@@ -4,8 +4,13 @@ import type {
 	WorkspaceFeatureKey,
 	WorkspaceFeatureState,
 } from "@rudel/api-routes";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+	keepPreviousData,
+	useQuery,
+	useQueryClient,
+} from "@tanstack/react-query";
 import { useState } from "react";
+import { useDebouncedValue } from "@/components/dashboard/hooks";
 import { client } from "@/lib/orpc";
 import { cn } from "@/lib/utils";
 
@@ -22,13 +27,15 @@ export function WorkspaceFeaturesAdminPage() {
 	const queryClient = useQueryClient();
 	const [search, setSearch] = useState("");
 	const [error, setError] = useState<string | null>(null);
+	const query = useDebouncedValue(search.trim());
 	const listing = useQuery({
-		queryKey: [...FEATURES_KEY, search.trim()],
+		queryKey: [...FEATURES_KEY, query],
 		queryFn: () =>
 			client.admin.workspaceFeatures.list({
-				...(search.trim() ? { search: search.trim() } : {}),
+				...(query ? { search: query } : {}),
 				limit: 50,
 			}),
+		placeholderData: keepPreviousData,
 	});
 
 	const set = async (

@@ -3,7 +3,7 @@ import { absolutePath } from "@rudel/api-routes/call-paths";
 import { IconAlertTriangle, IconFile, IconFileCode } from "@tabler/icons-react";
 import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Bones } from "@/app/ui/bones";
+import { Reveal } from "@/app/ui/bones";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { cn } from "@/lib/utils";
 import type { NormalizedSessionDetailOverview } from "../../components/session-detail-fast-response";
@@ -227,104 +227,109 @@ export function SessionReaderFilesView({
 								description="This session wrote, edited or read no files."
 							/>
 						</RailEmptyPane>
-					) : query.isLoading ? (
-						<Bones
+					) : (
+						<Reveal
 							fill
 							className="min-w-0 flex-1"
 							label="Reading the files this session touched"
+							loading={query.isLoading}
+							sample={
+								<div className="flex h-full min-h-0 gap-6">
+									<FilesColumnsSample
+										agent={agent}
+										model={model ?? null}
+										run={run}
+									/>
+								</div>
+							}
+							sampleId="reader-files"
 						>
-							<div className="flex h-full min-h-0 gap-6">
-								<FilesColumnsSample
-									agent={agent}
-									model={model ?? null}
-									run={run}
-								/>
-							</div>
-						</Bones>
-					) : (
-						<>
-							{run ? (
-								<TouchedFiles
-									agent={agent}
-									edits={edits}
-									extents={extents}
-									hidden={railTags.hidden}
-									file={selected?.path ?? null}
-									files={files}
-									model={model ?? null}
-									onPickFile={pickFile}
-									onPickStep={pickStep}
-									read={readStep?.step.eventId ?? null}
-									roots={roots}
-									run={run}
-									steps={traces.get(run) ?? []}
-								/>
-							) : (
-								<SessionFiles
-									edits={edits}
-									extents={extents}
-									file={selected?.path ?? null}
-									files={files}
-									hidden={railTags.hidden}
-									model={model ?? null}
-									onPickFile={pickFile}
-									onPickStep={pickStep}
-									read={readStep?.step.eventId ?? null}
-									roots={roots}
-									steps={allSteps}
-								/>
-							)}
-							<div
-								className={cn(
-									"mt-(--panes-top) flex min-h-0 min-w-0 flex-1 overflow-hidden",
-									CARD,
-								)}
-							>
-								{readStep ? (
-									<SeenFile
-										key={readStep.step.eventId}
-										agent={agent}
-										onClearAgent={() => setPicks({ agent: null })}
-										onClearRead={() => setPicks({ read: null })}
-										onClearRun={() => setPicks({ run: null })}
-										path={
-											readStep.step.paths.find(
-												(each) => each === selected?.path,
-											) ??
-											readStep.step.paths[0] ??
-											""
-										}
-										run={run}
-										seen={readStep.seen}
-										step={readStep.step}
-									/>
-								) : selected ? (
-									<FileDetail
-										key={`${selected.path}:${run ?? ""}:${agent ?? ""}`}
-										agent={agent}
-										file={selected}
-										onClearAgent={() => setPicks({ agent: null })}
-										onClearFile={() => setPicks({ file: null })}
-										onClearRun={() => setPicks({ run: null })}
-										onOpenTurn={onOpenTurn}
-										run={run}
-									/>
-								) : filePath ? (
-									<p className="px-5 py-4 text-[13px] text-muted-foreground">
-										<span className="font-mono">{filePath}</span> isn't among
-										the files this session changed or read.
-									</p>
-								) : (
-									<div className="flex min-w-0 flex-1 flex-col p-4">
-										<EmptyState
-											icon={IconFile}
-											title="Pick a file"
-											description="Pick a file on the left to see what the session did to it and what it read of it."
+							{() => (
+								<div className="flex h-full min-h-0 gap-6">
+									{run ? (
+										<TouchedFiles
+											agent={agent}
+											edits={edits}
+											extents={extents}
+											hidden={railTags.hidden}
+											file={selected?.path ?? null}
+											files={files}
+											model={model ?? null}
+											onPickFile={pickFile}
+											onPickStep={pickStep}
+											read={readStep?.step.eventId ?? null}
+											roots={roots}
+											run={run}
+											steps={traces.get(run) ?? []}
 										/>
+									) : (
+										<SessionFiles
+											edits={edits}
+											extents={extents}
+											file={selected?.path ?? null}
+											files={files}
+											hidden={railTags.hidden}
+											model={model ?? null}
+											onPickFile={pickFile}
+											onPickStep={pickStep}
+											read={readStep?.step.eventId ?? null}
+											roots={roots}
+											steps={allSteps}
+										/>
+									)}
+									<div
+										className={cn(
+											"mt-(--panes-top) flex min-h-0 min-w-0 flex-1 overflow-hidden",
+											CARD,
+										)}
+									>
+										{readStep ? (
+											<SeenFile
+												key={readStep.step.eventId}
+												agent={agent}
+												onClearAgent={() => setPicks({ agent: null })}
+												onClearRead={() => setPicks({ read: null })}
+												onClearRun={() => setPicks({ run: null })}
+												path={
+													readStep.step.paths.find(
+														(each) => each === selected?.path,
+													) ??
+													readStep.step.paths[0] ??
+													""
+												}
+												run={run}
+												seen={readStep.seen}
+												step={readStep.step}
+											/>
+										) : selected ? (
+											<FileDetail
+												key={`${selected.path}:${run ?? ""}:${agent ?? ""}`}
+												agent={agent}
+												file={selected}
+												onClearAgent={() => setPicks({ agent: null })}
+												onClearFile={() => setPicks({ file: null })}
+												onClearRun={() => setPicks({ run: null })}
+												onOpenTurn={onOpenTurn}
+												run={run}
+											/>
+										) : filePath ? (
+											<p className="px-5 py-4 text-[13px] text-muted-foreground">
+												<span className="font-mono">{filePath}</span> isn't
+												among the files this session changed or read.
+											</p>
+										) : (
+											<div className="flex min-w-0 flex-1 flex-col p-4">
+												<EmptyState
+													icon={IconFile}
+													title="Pick a file"
+													description="Pick a file on the left to see what the session did to it and what it read of it."
+												/>
+											</div>
+										)}
 									</div>
-								)}
-							</div>
-						</>
+								</div>
+							)}
+						</Reveal>
 					)}
 				</div>
 			</SessionSubagents>

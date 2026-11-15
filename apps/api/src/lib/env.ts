@@ -218,7 +218,10 @@ export function shouldReadUsageRollups(
 	)
 		return false;
 	const enabled = readOrganizationIdList(environment.USAGE_ROLLUP_ORG_IDS);
-	return enabled.has(organizationId) || enabled.has("all");
+	if (enabled.has("none")) return false;
+	return (
+		enabled.size === 0 || enabled.has("all") || enabled.has(organizationId)
+	);
 }
 
 const SWITCH_ON = new Set(["1", "on", "true", "yes"]);

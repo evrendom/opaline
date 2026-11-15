@@ -255,20 +255,6 @@ export function useOwnProblems(
 	}, [byRun, problems]);
 }
 
-export function offBoxHeadlines(
-	own: readonly [string, BoxProblems][],
-	drawn: readonly { part: ContextPart | null }[],
-): string[] {
-	const on = new Set(
-		drawn.flatMap((tile) =>
-			(tile.part?.folded ?? (tile.part ? [tile.part.key] : [])).map((key) =>
-				key.replace(/^(?:compacted|earlier):/u, ""),
-			),
-		),
-	);
-	return own.filter(([key]) => !on.has(key)).map(([, each]) => each.headline);
-}
-
 const BADGE: Record<Tone, string> = {
 	later: "bg-opal-4 text-white",
 	minor: "bg-opal-3 text-white",

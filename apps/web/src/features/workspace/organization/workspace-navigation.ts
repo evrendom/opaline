@@ -7,7 +7,9 @@ export async function resolveWorkspaceAppPath(
 	organizationId: string,
 	path: string,
 ): Promise<string> {
-	const result = await authClient.organization.list();
+	const result = await authClient.organization.list({
+		fetchOptions: { disableSignal: true },
+	});
 	if (result.error) throw new Error("Could not load your workspaces.");
 	const organization = result.data?.find((item) => item.id === organizationId);
 	if (!organization) throw new Error("This workspace is no longer available.");

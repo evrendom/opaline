@@ -143,14 +143,17 @@ export function transcriptRecordsCensusWindows(
 	];
 }
 
-export function censusWindowFilter(window: TranscriptRecordsCensusWindow): {
+export function censusWindowFilter(
+	window: TranscriptRecordsCensusWindow,
+	alias?: string,
+): {
 	sql: string;
 	params: Record<string, string>;
 } {
 	return {
 		sql: [
-			window.from === undefined ? "" : `AND ${keyBound("from", ">")}`,
-			window.to === undefined ? "" : `AND ${keyBound("to", "<")}`,
+			window.from === undefined ? "" : `AND ${keyBound("from", ">", alias)}`,
+			window.to === undefined ? "" : `AND ${keyBound("to", "<", alias)}`,
 		].join(" "),
 		params: {
 			...keyParams("from", window.from),
@@ -159,12 +162,18 @@ export function censusWindowFilter(window: TranscriptRecordsCensusWindow): {
 	};
 }
 
-function keyBound(side: "from" | "to", direction: ">" | "<"): string {
+function keyBound(
+	side: "from" | "to",
+	direction: ">" | "<",
+	alias?: string,
+): string {
+	const column = (name: string) =>
+		alias === undefined ? name : `${alias}.${name}`;
 	const organization = `{${side}OrganizationId:String}`;
 	const user = `{${side}UserId:String}`;
 	const session = `{${side}SessionId:String}`;
 	const last = direction === ">" ? ">=" : "<";
-	return `(organization_id ${direction} ${organization} OR (organization_id = ${organization} AND (user_id ${direction} ${user} OR (user_id = ${user} AND session_id ${last} ${session}))))`;
+	return `(${column("organization_id")} ${direction} ${organization} OR (${column("organization_id")} = ${organization} AND (${column("user_id")} ${direction} ${user} OR (${column("user_id")} = ${user} AND ${column("session_id")} ${last} ${session}))))`;
 }
 
 function keyParams(

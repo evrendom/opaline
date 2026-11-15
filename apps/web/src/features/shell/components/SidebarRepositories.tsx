@@ -1,6 +1,7 @@
 import { IconFolders, IconFoldersFilled } from "@tabler/icons-react";
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { routePreloadHandlers } from "@/app/route-loaders";
 import { appRoutes } from "@/app/routes";
 import {
 	SidebarGroup,
@@ -32,7 +33,7 @@ export function SidebarRepositories({ reposActive }: { reposActive: boolean }) {
 	const getShellRoutePath = useShellRoutePath();
 	const [params] = useSearchParams();
 	const query = useAnalyticsQuery(
-		orpc.analytics.repositories.list.queryOptions({}),
+		orpc.analytics.repositories.navigation.queryOptions({}),
 	);
 	const now = useRepositoryClock();
 	const welcome = useWelcomeSelection();
@@ -74,6 +75,9 @@ export function SidebarRepositories({ reposActive }: { reposActive: boolean }) {
 											<Link
 												to={getShellRoutePath(appRoutes.repoDetail(repo.key))}
 												aria-current={active ? "page" : undefined}
+												{...routePreloadHandlers(
+													getShellRoutePath(appRoutes.repoDetail(repo.key)),
+												)}
 											/>
 										}
 									>
@@ -96,6 +100,9 @@ export function SidebarRepositories({ reposActive }: { reposActive: boolean }) {
 										<Link
 											to={getShellRoutePath(appRoutes.repos())}
 											aria-current={allActive ? "page" : undefined}
+											{...routePreloadHandlers(
+												getShellRoutePath(appRoutes.repos()),
+											)}
 										/>
 									}
 								>

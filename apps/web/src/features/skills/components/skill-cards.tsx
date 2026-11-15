@@ -141,7 +141,7 @@ export function OverviewCard({
 						skullet-ignore=""
 						className="absolute -right-3 -bottom-7 rotate-[-14deg] text-[88px] leading-none opacity-15"
 					>
-						{emoji}
+						<span>{emoji}</span>
 					</span>
 					<div className="absolute inset-x-3 top-3 flex items-center gap-1">
 						{pills}
@@ -187,7 +187,9 @@ export function StripPill({
 			title={title}
 			className="inline-flex items-center gap-1 rounded-full bg-black/30 px-2 py-0.5 text-[11px] font-medium text-white tabular-nums"
 		>
-			<Icon aria-hidden className="size-3 opacity-80" />
+			<span className="inline-flex opacity-80">
+				<Icon aria-hidden className="size-3" />
+			</span>
 			{label}
 		</span>
 	);

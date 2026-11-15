@@ -15,10 +15,11 @@ const JOURNALED = {
 	checksum: checksumSQL(SQL),
 };
 
-/** A replica that serves `stale` reads of the Codex view before the new query. */
+/** Replica clickhouse-1 serves `stale` reads of the Codex view before the new query. */
 function cluster(
 	staleReads: number,
 	journal: { name: string; checksum: string }[] = [],
+	hosts = ["clickhouse-0", "clickhouse-1"],
 ) {
 	let reads = 0;
 	const executed: string[] = [];
@@ -26,15 +27,18 @@ function cluster(
 		execute: async (statement: string) => {
 			executed.push(statement);
 		},
-		query: async () => {
+		query: async (query: string) => {
+			if (query.includes("system.clusters")) return [{ replicas: 2 }];
 			reads++;
-			return [
-				{ name: "session_analytics_mv", as_select: FRESH },
+			return hosts.flatMap((host) => [
+				{ host, name: "session_analytics_mv", as_select: FRESH },
 				{
+					host,
 					name: "codex_session_analytics_mv",
-					as_select: reads <= staleReads ? STALE : FRESH,
+					as_select:
+						host === "clickhouse-1" && reads <= staleReads ? STALE : FRESH,
 				},
-			];
+			]);
 		},
 	} as unknown as ClickHouseExecutor;
 	const journalStore = {
@@ -70,9 +74,25 @@ describe("session analytics retirement runner", () => {
 				targetDatabase: "rudel",
 				readBack: { attempts: 4, delayMs: 0 },
 			}),
-		).rejects.toThrow("codex_session_analytics_mv: session_archetype");
+		).rejects.toThrow(
+			"codex_session_analytics_mv on replica clickhouse-1: session_archetype",
+		);
 		expect(state.journal).toHaveLength(0);
 		expect(state.executed).toHaveLength(4);
+	});
+
+	test("fails without journaling when a replica does not answer", async () => {
+		const state = cluster(0, [], ["clickhouse-0"]);
+		await expect(
+			runSessionAnalyticsRetirementMigration({
+				executor: state.executor,
+				journalStore: state.journalStore,
+				migrationSql: SQL,
+				targetDatabase: "rudel",
+				readBack: { attempts: 1, delayMs: 0 },
+			}),
+		).rejects.toThrow("session analytics views visible on 1 of 2 replicas");
+		expect(state.journal).toHaveLength(0);
 	});
 
 	test("re-applies a journaled migration whose views reverted, without journaling it again", async () => {
@@ -99,7 +119,9 @@ describe("session analytics retirement runner", () => {
 				targetDatabase: "rudel",
 				readBack: { attempts: 4, delayMs: 0 },
 			}),
-		).rejects.toThrow("codex_session_analytics_mv: session_archetype");
+		).rejects.toThrow(
+			"codex_session_analytics_mv on replica clickhouse-1: session_archetype",
+		);
 		expect(state.executed).toHaveLength(4);
 		expect(state.journal).toHaveLength(1);
 	});

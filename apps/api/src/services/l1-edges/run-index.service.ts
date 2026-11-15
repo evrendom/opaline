@@ -221,6 +221,7 @@ export async function buildRunIndex(input: {
 		marker,
 		await readRunIndexUsage(executor, organizationId, session),
 		input.maxSessionRecords ?? RUN_INDEX_MAX_SESSION_RECORDS,
+		session.source,
 	);
 	if (plan.kind === "done") return plan.build;
 	const { generation, usage, key, bound } = plan;
@@ -628,6 +629,7 @@ export function planRunIndexBuild(
 	marker: RudelRunIndexRow | undefined,
 	usage: RunIndexUsage,
 	maxRecords: number,
+	source: string,
 ): RunIndexPlan {
 	const generation: RunIndexGeneration = {
 		revision: committed.revision,
@@ -673,6 +675,7 @@ export function planRunIndexBuild(
 			revision: committed.revision,
 			parserVersion: committed.parserVersion,
 			usageGeneration: usage.generation,
+			source,
 		},
 		records: committed.records,
 	};
@@ -712,7 +715,7 @@ function markerGeneration(marker: RudelRunIndexRow): RunIndexGeneration {
 export async function readRunIndexUsage(
 	executor: ClickHouseExecutor,
 	organizationId: string,
-	session: Pick<SessionIdentity, "userId" | "sessionId">,
+	session: SessionIdentity,
 ): Promise<RunIndexUsage> {
 	const [state] = await query(executor, UsageStateSchema, {
 		query: `SELECT toString(any(receipt_generation)) AS generation, any(receipt_count) AS receipts,
@@ -730,11 +733,12 @@ export async function readRunIndexUsage(
 					argMaxIf(receipt_checksum, event_version, record_kind = 'receipt') OVER () AS receipt_checksum_latest
 				FROM ${getSafeClickHouseTable("rudel.usage_events")} FINAL
 				WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
-					AND session_id = {sessionId:String}
+					AND source = {source:String} AND session_id = {sessionId:String}
 			)`,
 		query_params: {
 			organizationId,
 			userId: session.userId,
+			source: session.source,
 			sessionId: session.sessionId,
 		},
 		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
@@ -1213,7 +1217,9 @@ export function runRow(
 		abort_reason: lifecycle.abortReason || run.l_abort_reason,
 		turn_error: lifecycle.turnError,
 		turn_error_kind: lifecycle.turnErrorKind,
-		interrupt_markers: run.l_interrupt_markers,
+		interrupt_markers:
+			run.l_interrupt_markers +
+			(lifecycle.abortReason === "interrupted" ? lifecycle.abortedTrue : 0),
 		stop_reason: run.l_stop_reason,
 		hook_stop_reason: run.l_hook_stop_reason,
 		prevented_continuation: recordedFlag(

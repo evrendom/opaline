@@ -55,7 +55,7 @@ export type UnpricedModelIdentity = {
 	notes: string;
 };
 
-export const MODEL_RATE_CARD_VERSION = "2026-10-08";
+export const MODEL_RATE_CARD_VERSION = "2026-11-11";
 
 // Standard first-party API rates in USD per million tokens. Keep rows grouped
 // by provider and model family, with the newest effective period first.
@@ -125,6 +125,39 @@ export const MODEL_RATE_CARD: readonly ModelRateCardEntry[] = [
 		outputPerMTok: 15,
 		source: "https://developers.openai.com/api/docs/pricing",
 		verifiedAt: "2026-09-30",
+		notes: "Full-request rates above 272k input tokens.",
+	},
+	{
+		provider: "openai",
+		model: "gpt-6.1-terra",
+		displayName: "GPT-6.1 Terra",
+		match: ["^gpt-6\\.1-terra$"],
+		effectiveFrom: "2026-10-26",
+		contextBand: "base",
+		inputPerMTok: 1,
+		cacheReadPerMTok: 0.05,
+		cacheWrite5mPerMTok: 1.25,
+		cacheWrite1hPerMTok: null,
+		outputPerMTok: 5,
+		source: "https://developers.openai.com/api/docs/models/gpt-6.1-terra",
+		verifiedAt: "2026-11-11",
+		notes:
+			"Standard first-party API rates from release; half GPT-6.1 Sol on every token class.",
+	},
+	{
+		provider: "openai",
+		model: "gpt-6.1-terra",
+		displayName: "GPT-6.1 Terra",
+		match: ["^gpt-6\\.1-terra$"],
+		effectiveFrom: "2026-10-26",
+		contextBand: "long",
+		inputPerMTok: 2,
+		cacheReadPerMTok: 0.1,
+		cacheWrite5mPerMTok: 2.5,
+		cacheWrite1hPerMTok: null,
+		outputPerMTok: 7.5,
+		source: "https://developers.openai.com/api/docs/pricing",
+		verifiedAt: "2026-11-11",
 		notes: "Full-request rates above 272k input tokens.",
 	},
 	{
@@ -834,6 +867,40 @@ export const MODEL_RATE_CARD: readonly ModelRateCardEntry[] = [
 	// Anthropic: Claude 5 and Claude Opus 4.x
 	{
 		provider: "anthropic",
+		model: "claude-fable-5-2",
+		displayName: "Claude Fable 5.2",
+		match: ["^claude-fable-5-2(?:-\\d{8})?$"],
+		effectiveFrom: "2026-11-09",
+		contextBand: "base",
+		inputPerMTok: 8,
+		cacheReadPerMTok: 0.2,
+		cacheWrite5mPerMTok: 10,
+		cacheWrite1hPerMTok: 16,
+		outputPerMTok: 40,
+		source: "https://platform.claude.com/docs/en/models/fable-5-2/overview",
+		verifiedAt: "2026-11-11",
+		notes:
+			"Standard first-party API rates from release; cache reads are 0.025x input; the full 1M context uses the base rate.",
+	},
+	{
+		provider: "anthropic",
+		model: "claude-mythos-5-2",
+		displayName: "Claude Mythos 5.2",
+		match: ["^claude-mythos-5-2(?:-\\d{8})?$"],
+		effectiveFrom: "2026-11-09",
+		contextBand: "base",
+		inputPerMTok: 8,
+		cacheReadPerMTok: 0.2,
+		cacheWrite5mPerMTok: 10,
+		cacheWrite1hPerMTok: 16,
+		outputPerMTok: 40,
+		source: "https://platform.claude.com/docs/en/about-claude/pricing",
+		verifiedAt: "2026-11-11",
+		notes:
+			"Limited availability; shares Fable 5.2 rates, including $0.20 cache reads.",
+	},
+	{
+		provider: "anthropic",
 		model: "claude-fable-5-1",
 		displayName: "Claude Fable 5.1",
 		match: ["^claude-fable-5-1(?:-\\d{8})?$"],
@@ -1362,6 +1429,28 @@ export const MODEL_RATE_MODIFIERS: readonly ModelRateModifierEntry[] = [
 	},
 	{
 		provider: "openai",
+		model: "gpt-6.1-sol",
+		dimension: "service_tier",
+		values: ["ultrafast"],
+		effectiveFrom: "2026-10-08",
+		multiplier: 6,
+		source: "https://developers.openai.com/api/docs/pricing",
+		verifiedAt: "2026-11-11",
+		notes: "Ultrafast is 6x every token class in both context bands.",
+	},
+	{
+		provider: "openai",
+		model: "gpt-6.1-terra",
+		dimension: "service_tier",
+		values: ["fast", "priority"],
+		effectiveFrom: "2026-10-26",
+		multiplier: 2,
+		source: "https://developers.openai.com/api/docs/models/gpt-6.1-terra",
+		verifiedAt: "2026-11-11",
+		notes: "Fast/Priority doubles every token class in both context bands.",
+	},
+	{
+		provider: "openai",
 		model: "gpt-6-astra",
 		dimension: "service_tier",
 		values: ["fast", "priority"],
@@ -1478,6 +1567,38 @@ export const MODEL_RATE_MODIFIERS: readonly ModelRateModifierEntry[] = [
 		verifiedAt: "2026-09-29",
 		notes: "Published $8/$40 Fast mode; cache multipliers stack.",
 	},
+	...[
+		["claude-fable-5-2", "2026-11-09"],
+		["claude-mythos-5-2", "2026-11-09"],
+	].map(
+		([model, effectiveFrom]): ModelRateModifierEntry => ({
+			provider: "anthropic",
+			model: String(model),
+			dimension: "inference_speed",
+			values: ["fast"],
+			effectiveFrom: String(effectiveFrom),
+			multiplier: 2,
+			source: "https://platform.claude.com/docs/en/build-with-claude/fast-mode",
+			verifiedAt: "2026-11-11",
+			notes: "Published $16/$80 Fast mode; cache multipliers stack.",
+		}),
+	),
+	...[
+		["claude-fable-5-2", "2026-11-09"],
+		["claude-mythos-5-2", "2026-11-09"],
+	].map(
+		([model, effectiveFrom]): ModelRateModifierEntry => ({
+			provider: "anthropic",
+			model: String(model),
+			dimension: "inference_geo",
+			values: ["us"],
+			effectiveFrom: String(effectiveFrom),
+			multiplier: 1.1,
+			source: "https://platform.claude.com/docs/en/about-claude/pricing",
+			verifiedAt: "2026-11-11",
+			notes: "Anthropic US-only inference premium; all token classes stack.",
+		}),
+	),
 	...[
 		["claude-mythos-5-1", "2026-09-01"],
 		["claude-opus-5-5", "2026-09-22"],

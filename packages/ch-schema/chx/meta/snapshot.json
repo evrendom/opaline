@@ -1288,11 +1288,6 @@
 					"default": "fn:0"
 				},
 				{
-					"name": "error_pattern",
-					"type": "LowCardinality(String)",
-					"default": ""
-				},
-				{
 					"name": "model_used",
 					"type": "String",
 					"default": ""
@@ -1301,11 +1296,6 @@
 					"name": "has_commit",
 					"type": "UInt8",
 					"default": "fn:0"
-				},
-				{
-					"name": "session_archetype",
-					"type": "String",
-					"default": "standard"
 				},
 				{
 					"name": "success_score",
@@ -6446,9 +6436,21 @@
 					"comment": "Per pricing group: output tokens."
 				},
 				{
+					"name": "estimated_costs",
+					"type": "Array(Nullable(Float64))",
+					"default": "fn:arrayMap(kind -> CAST(NULL, 'Nullable(Float64)'), record_kinds)",
+					"comment": "Per pricing group: estimated cost in USD against the rate card the row was built with; NULL when the group cannot be priced, and on rows written before the column existed."
+				},
+				{
+					"name": "pricing_models",
+					"type": "Array(LowCardinality(String))",
+					"default": "fn:arrayMap(kind -> '', record_kinds)",
+					"comment": "Per pricing group: the rate card model its pricing identity resolves to; empty when none does, and on rows written before the column existed."
+				},
+				{
 					"name": "build_version",
 					"type": "UInt32",
-					"comment": "Fingerprint of the grouping rules that built the row; rows of another fingerprint are rebuilt."
+					"comment": "Fingerprint of the grouping and pricing rules that built the row, rate card included; rows of another fingerprint are rebuilt."
 				},
 				{
 					"name": "built_at",
@@ -6468,7 +6470,7 @@
 				"non_replicated_deduplication_window": "1000",
 				"storage_policy": "'s3'"
 			},
-			"comment": "Request usage of a session summed per pricing group (date, model identity, provider, tier, speed, geography, context band), one row per session from its latest usage-event generation; priced against the rate card at read time.",
+			"comment": "Request usage of a session summed per pricing group (date, model identity, provider, tier, speed, geography, context band), one row per session from its latest usage-event generation; each group priced against the rate card when the row is built.",
 			"kind": "table"
 		},
 		{

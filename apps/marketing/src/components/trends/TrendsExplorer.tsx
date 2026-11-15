@@ -18,6 +18,7 @@ import {
 	type BenchmarkObservation,
 	type BenchmarkSection,
 	benchmarkObservations,
+	labParetoModelIds,
 	paretoObservations,
 	REASONING_EFFORTS,
 	usageBenchmark,
@@ -484,6 +485,14 @@ function Explorer({
 	// own name below.
 	const newestOfLine = newestOfLines(benchmarks);
 	const frontierLabIds = new Set(newestOfLine.map((model) => model.id));
+	const openAiAnthropicFrontier = labParetoModelIds(
+		benchmarks,
+		OPENAI_ANTHROPIC,
+		(lab && benchmarkSection.kind === "connected"
+			? benchmarkSection
+			: DEFAULT_BENCHMARK_SECTION
+		).metric,
+	).flatMap((modelId) => benchmarks.filter(({ id }) => id === modelId));
 	// The models on the Pareto frontier of every model available (for this
 	// chart, its reasoning levels and scale), tagged in "All models" whether
 	// the frontier is shown or not. Usage has no frontier of its own: it
@@ -511,7 +520,7 @@ function Explorer({
 	);
 	// Quick picks above "All models", each capped like any selection.
 	const capped = (ids: Iterable<string>) =>
-		new Set([...ids].slice(0, MAX_SHOWN));
+		new Set([...new Set(ids)].slice(0, MAX_SHOWN));
 	const presets: readonly PickerPreset[] = [
 		{
 			id: "openai-anthropic",
@@ -523,13 +532,14 @@ function Explorer({
 					<ProviderMark provider="anthropic" />
 				</>
 			),
-			// Benchmarks: each line's newest model. Usage charts: every
+			// Benchmarks: the models on their shared Pareto frontier, then each
+			// line's newest model. Usage charts: every
 			// OpenAI and Anthropic model with data on the chart, the most used
 			// first so the cap keeps them.
 			ids: capped(
 				(
 					(lab
-						? newestOfLine
+						? [...openAiAnthropicFrontier, ...newestOfLine]
 						: wildSection?.kind === "share"
 							? shareRanked(snapshot, benchmarks)
 							: wildSection?.id === "friction-model"
@@ -3188,11 +3198,13 @@ const FRONTIER_LABS: readonly TrendsProvider[] = [
  * Falls back to every model in use if none of them is in the snapshot.
  */
 const RECOMMENDED_FRONTIER = [
+	"claude-fable-5-2",
 	"claude-fable-5-1",
 	"claude-opus-5-5",
 	"claude-sonnet-5-5",
 	"gpt-6-astra",
 	"gpt-6.1-sol",
+	"gpt-6.1-terra",
 	"gpt-6-luna",
 ] as const;
 
@@ -3222,13 +3234,30 @@ function newestOfLines(
 	return [...newestOfLine.values()];
 }
 
+const OPENAI_ANTHROPIC: readonly TrendsProvider[] = ["openai", "anthropic"];
+
+const DEFAULT_BENCHMARK_SECTION =
+	BENCHMARK_SECTIONS.find((section) => section.id === "cost-intelligence") ??
+	BENCHMARK_SECTIONS[0];
+
 /**
- * The page opens on "Frontier": the newest model of each line, so it
- * follows releases, with the Pareto line drawn through them and the models
- * off it hidden. Falls back to the recommended frontier without benchmarks.
+ * The page opens on every OpenAI and Anthropic model on their shared Pareto
+ * frontier, newest first, then the newest model of each line, so it follows
+ * releases, with the Pareto line drawn through them and the models off it
+ * hidden. Falls back to the recommended frontier without benchmarks.
  */
 function defaultShownIds(snapshot: TrendsSnapshot): ReadonlySet<string> {
-	const ids = newestOfLines(snapshot.benchmarks ?? []).map((model) => model.id);
+	const benchmarks = snapshot.benchmarks ?? [];
+	const ids = [
+		...new Set([
+			...labParetoModelIds(
+				benchmarks,
+				OPENAI_ANTHROPIC,
+				DEFAULT_BENCHMARK_SECTION.metric,
+			),
+			...newestOfLines(benchmarks).map((model) => model.id),
+		]),
+	];
 	return ids.length > 0
 		? new Set(ids.slice(0, MAX_SHOWN))
 		: recommendedIds(snapshot);
@@ -3239,7 +3268,7 @@ function defaultState(snapshot: TrendsSnapshot): ExplorerState {
 	const shown = defaultShownIds(snapshot);
 	return {
 		mode: benchmarks.length > 0 ? "benchmarks" : "wild",
-		benchmarkId: "cost-intelligence",
+		benchmarkId: DEFAULT_BENCHMARK_SECTION.id,
 		wildId: "run-time-months",
 		view: "chart",
 		log: true,

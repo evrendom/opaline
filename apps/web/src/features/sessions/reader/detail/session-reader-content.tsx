@@ -112,7 +112,10 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 	);
 	const totalTurns = overview.turnPage.total;
 	const wholeLine = useWholeSessionLine();
-	const whole = useMemo(() => ({ ...wholeLine, disabled: true }), [wholeLine]);
+	const whole = useMemo(
+		() => ({ ...wholeLine, disabled: true, total: totalTurns }),
+		[totalTurns, wholeLine],
+	);
 	const subagents = useSessionSubagents(turns, overview.subagents);
 	const costThresholds = useMemo(
 		() => getCostQuintiles(turns.map((turn) => turn.estimatedCost ?? 0)),

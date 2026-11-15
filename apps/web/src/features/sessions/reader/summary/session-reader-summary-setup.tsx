@@ -15,11 +15,13 @@ import {
 import { groupSetupFiles, type SummarySkill } from "./session-summary-model";
 
 export function SummarySkillsAndFiles({
+	empty = "No skills or context files.",
 	onOpen,
 	onOpenSetup,
 	setup,
 	skills,
 }: {
+	empty?: string;
 	onOpen: OpenPlace;
 	onOpenSetup: (setupFile: string) => void;
 	setup: readonly SessionSetupFile[] | undefined;
@@ -34,8 +36,7 @@ export function SummarySkillsAndFiles({
 		...skills.map((skill) => ({ skill })),
 		...files.map((file) => ({ file })),
 	];
-	if (rows.length === 0)
-		return setup ? <Empty>No skills or context files.</Empty> : <Pending />;
+	if (rows.length === 0) return setup ? <Empty>{empty}</Empty> : <Pending />;
 	return (
 		<ShortList
 			items={rows}
@@ -61,9 +62,11 @@ export function SummarySkillsAndFiles({
 }
 
 export function SummaryMcpAndTools({
+	empty = "No MCP servers or harness text recorded.",
 	onOpen,
 	setup,
 }: {
+	empty?: string;
 	onOpen: (setupFile: string) => void;
 	setup: readonly SessionSetupFile[] | undefined;
 }) {
@@ -71,8 +74,7 @@ export function SummaryMcpAndTools({
 	if (!setup) return <Pending />;
 	const { harness, mcp } = groupSetupFiles(setup);
 	const files = [...mcp, ...harness];
-	if (files.length === 0)
-		return <Empty>No MCP servers or harness text recorded.</Empty>;
+	if (files.length === 0) return <Empty>{empty}</Empty>;
 	return (
 		<ShortList
 			items={files}

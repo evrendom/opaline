@@ -44,6 +44,7 @@ import {
 	type ObservationModel,
 	readSpanText,
 } from "./observer.js";
+import type { RunEvidencePages } from "./run-evidence-pages.js";
 
 /**
  * Noticeable runs for the Compass page (CONTEXT.md "Moment"): every run of
@@ -65,6 +66,7 @@ export interface MomentsEnv {
 	/** Observations a workspace may write per UTC day. */
 	readonly dailyLimit: number;
 	now(): Date;
+	readonly evidencePages?: RunEvidencePages;
 }
 
 export interface MomentsCaller extends MomentScope {
@@ -117,8 +119,20 @@ export async function listMoments(
 	};
 	if (input.mine && caller.member !== null && caller.member !== caller.viewerId)
 		throw new MomentNotFoundError("Not your runs.");
+	const load = () => readRunEvidence(env.executor, scope, input);
 	const [runs, observable, settings, frustrationCheck] = await Promise.all([
-		readRunEvidence(env.executor, scope, input),
+		env.evidencePages
+			? env.evidencePages.read(
+					JSON.stringify([
+						scope.workspaceId,
+						scope.member,
+						input.startDate,
+						input.endDate,
+					]),
+					input.offset,
+					load,
+				)
+			: load(),
 		mayObserve(env, caller.workspaceId),
 		readCompassSettings(env.sql, caller.workspaceId),
 		env.featureEnabled("frustration_check", caller.workspaceId),

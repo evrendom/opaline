@@ -4,6 +4,7 @@ import {
 	useContext,
 	useEffect,
 	useMemo,
+	useRef,
 } from "react";
 import { useSearchParams } from "react-router-dom";
 import type {
@@ -144,47 +145,56 @@ export function DateRangeProvider({
 }) {
 	const [searchParams, setSearchParams] = useSearchParams();
 	const { dateRange, source } = resolveDateRange(searchParams, storageKey);
+	const metric = searchParams.get("metric");
+	const urlStart = searchParams.get("from");
+	const urlEnd = searchParams.get("to");
+	const setSearchParamsRef = useRef(setSearchParams);
+	useEffect(() => {
+		setSearchParamsRef.current = setSearchParams;
+	}, [setSearchParams]);
 
 	// Remember URL ranges before a session link navigates without query parameters.
 	useEffect(() => {
-		const urlRange = readDateRangeFromSearchParams(searchParams);
+		const urlRange =
+			urlStart && urlEnd
+				? normalizeAnalyticsDateRange(
+						urlStart,
+						urlEnd,
+						getAnalyticsMaxDays(metric),
+					)
+				: null;
 		if (urlRange) writeStoredDateRange(urlRange, storageKey);
-	}, [searchParams, storageKey]);
+	}, [metric, storageKey, urlEnd, urlStart]);
 
-	const updateDateRange = (
-		updater: (currentDateRange: StoredDateRange) => StoredDateRange,
-	) => {
-		setSearchParams(
-			(prev) => {
-				const { dateRange: currentDateRange } = resolveDateRange(
-					prev,
-					storageKey,
-				);
-				const nextDateRange = updater(currentDateRange);
-				const normalizedDateRange =
-					normalizeAnalyticsDateRange(
-						nextDateRange.start,
-						nextDateRange.end,
-						getAnalyticsMaxDays(prev.get("metric")),
-					) ?? currentDateRange;
-				const nextSearchParams = new URLSearchParams(prev);
+	const actions = useMemo<DateRangeContextValue["actions"]>(() => {
+		const updateDateRange = (
+			updater: (currentDateRange: StoredDateRange) => StoredDateRange,
+		) => {
+			setSearchParamsRef.current(
+				(prev) => {
+					const { dateRange: currentDateRange } = resolveDateRange(
+						prev,
+						storageKey,
+					);
+					const nextDateRange = updater(currentDateRange);
+					const normalizedDateRange =
+						normalizeAnalyticsDateRange(
+							nextDateRange.start,
+							nextDateRange.end,
+							getAnalyticsMaxDays(prev.get("metric")),
+						) ?? currentDateRange;
+					const nextSearchParams = new URLSearchParams(prev);
 
-				nextSearchParams.set("from", normalizedDateRange.start);
-				nextSearchParams.set("to", normalizedDateRange.end);
-				writeStoredDateRange(normalizedDateRange, storageKey);
+					nextSearchParams.set("from", normalizedDateRange.start);
+					nextSearchParams.set("to", normalizedDateRange.end);
+					writeStoredDateRange(normalizedDateRange, storageKey);
 
-				return nextSearchParams;
-			},
-			{ replace: true },
-		);
-	};
-
-	const contextValue: DateRangeContextValue = {
-		state: {
-			startDate: dateRange.start,
-			endDate: dateRange.end,
-		},
-		actions: {
+					return nextSearchParams;
+				},
+				{ replace: true },
+			);
+		};
+		return {
 			setStartDate: (date: string) => {
 				updateDateRange((currentDateRange) => ({
 					...currentDateRange,
@@ -203,13 +213,23 @@ export function DateRangeProvider({
 					end: endDate,
 				}));
 			},
-		},
-		meta: {
-			maxDays: getAnalyticsMaxDays(searchParams.get("metric")),
-			dayCount: getInclusiveDateRangeDays(dateRange.start, dateRange.end),
-			source,
-		},
-	};
+		};
+	}, [storageKey]);
+
+	const startDate = dateRange.start;
+	const endDate = dateRange.end;
+	const contextValue = useMemo<DateRangeContextValue>(
+		() => ({
+			state: { startDate, endDate },
+			actions,
+			meta: {
+				maxDays: getAnalyticsMaxDays(metric),
+				dayCount: getInclusiveDateRangeDays(startDate, endDate),
+				source,
+			},
+		}),
+		[actions, endDate, metric, source, startDate],
+	);
 
 	return (
 		<DateRangeContext.Provider value={contextValue}>

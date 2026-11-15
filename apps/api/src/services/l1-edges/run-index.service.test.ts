@@ -20,6 +20,7 @@ import { NO_CODEX_LIFECYCLE_FACTS } from "../analysis/codex-lifecycle.js";
 import { gateRunIndexRow } from "../analysis/run-index-columns.js";
 import {
 	buildRunIndexStatement,
+	buildRunRequestsStatement,
 	buildUnattributedUsageStatement,
 	RUN_INDEX_PRICING_VERSION,
 	RUN_INDEX_VERSION,
@@ -38,6 +39,7 @@ import {
 	buildRunIndex,
 	carriedMcpUnavailable,
 	RunIndexUsageChangedError,
+	readRunIndexUsage,
 	runIndexUsage,
 	runRow,
 	runUnknownColumns,
@@ -1124,6 +1126,24 @@ describe("run index rows", () => {
 		).toBe("true");
 	});
 
+	test("a Codex turn the user interrupted is an interrupt, like Claude's marker", () => {
+		const interrupted = (abortReason: string) =>
+			runRow(
+				facts({ l_interrupt_markers: 0 }),
+				{ ...NO_CODEX_LIFECYCLE_FACTS, abortReason, abortedTrue: 1 },
+				context,
+			).interrupt_markers;
+		expect(interrupted("interrupted")).toBe(1);
+		expect(interrupted("replaced")).toBe(0);
+		expect(
+			runRow(
+				facts({ l_interrupt_markers: 2 }),
+				NO_CODEX_LIFECYCLE_FACTS,
+				context,
+			).interrupt_markers,
+		).toBe(2);
+	});
+
 	test("Claude abort reason and Codex turn effort survive row materialization", () => {
 		expect(
 			runRow(
@@ -1325,6 +1345,7 @@ describe("run index statements", () => {
 		revision: "7",
 		parserVersion: 8,
 		usageGeneration: "12",
+		source: "claude_code",
 	};
 	const finalScans = (query: string) =>
 		query.match(/rudel\.transcript_records FINAL/gu)?.length ?? 0;
@@ -1358,6 +1379,69 @@ describe("run index statements", () => {
 		);
 	});
 
+	test("every usage read of a build seeks the session's source in the usage key", async () => {
+		const usageReads = (query: string) =>
+			query
+				.split("rudel.usage_events")
+				.slice(1)
+				.map((tail) => tail.slice(0, tail.search(/\n\s*\)/u)));
+		for (const build of [
+			buildRunIndexStatement,
+			buildRunRequestsStatement,
+			buildUnattributedUsageStatement,
+		]) {
+			const statement = build(scope, generation);
+			const reads = usageReads(statement.query);
+			expect(reads.length).toBeGreaterThan(0);
+			for (const read of reads) expect(read).toMatch(/source = /u);
+			expect(statement.query).toContain("e.source = {source:String}");
+			expect(statement.query_params).toMatchObject({ source: "claude_code" });
+		}
+		expect(buildRunFactsStatement(scope, [generation]).query).not.toContain(
+			"{source:String}",
+		);
+
+		const statements: ClickHouseStatement[] = [];
+		await readRunIndexUsage(
+			{
+				async close() {},
+				async execute() {},
+				async insert() {},
+				async query<T>(statement: ClickHouseStatement) {
+					statements.push(statement);
+					return [] as T[];
+				},
+			},
+			"org",
+			{ ...session, source: "codex" },
+		);
+		expect(statements[0]?.query).toContain(
+			"AND source = {source:String} AND session_id = {sessionId:String}",
+		);
+		expect(statements[0]?.query_params).toMatchObject({
+			source: "codex",
+			sessionId: "s 1",
+		});
+	});
+
+	test("a build reads the pinned generation by its key and resolves shared sets once", () => {
+		const requests = buildRunRequestsStatement(scope, generation).query;
+		for (const query of [
+			requests,
+			buildRunIndexStatement(scope, generation).query,
+			buildUnattributedUsageStatement(scope, generation).query,
+		]) {
+			expect(query).toContain(
+				"(session_id, revision, parser_version) IN arrayZip({sessionIds:Array(String)}",
+			);
+			expect(query).not.toContain("arrayJoin(arrayZip(");
+			expect(query.match(/FROM replayed_calls\)/gu)).toHaveLength(1);
+		}
+		expect(requests.match(/AS opaline_placed_usage/gu)).toHaveLength(1);
+		expect(requests.match(/FROM resolved_usage e/gu)).toHaveLength(1);
+		expect(requests).not.toContain("event_lines");
+	});
+
 	test("unattributed usage is every event no run claims, verified or not", () => {
 		const statement = buildUnattributedUsageStatement(scope, generation);
 		expect(statement.query).toContain("FROM unassigned_usage e");
@@ -1375,7 +1459,7 @@ describe("run index statements", () => {
 		const span = (query: string) =>
 			query.slice(
 				query.indexOf("run_facts AS ("),
-				query.indexOf("countIf(kind = 'tool_call') AS tool_calls"),
+				query.indexOf(") AS tool_calls,"),
 			);
 		expect(span(index)).toBe(span(find));
 		expect(find).not.toContain("l_agent_version");

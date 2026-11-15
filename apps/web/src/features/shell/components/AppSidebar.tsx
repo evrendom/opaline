@@ -3,6 +3,7 @@ import { IntroReveal } from "@/app/ui/bones";
 ("use client");
 
 import { Link } from "react-router-dom";
+import { routePreloadHandlers } from "@/app/route-loaders";
 import {
 	Sidebar,
 	SidebarContent,
@@ -59,6 +60,7 @@ function SidebarNavItem({
 					<Link
 						to={getShellRoutePath(route.path)}
 						aria-current={active ? "page" : undefined}
+						{...routePreloadHandlers(getShellRoutePath(route.path))}
 					/>
 				}
 			>
@@ -88,6 +90,7 @@ function SidebarNavTile({
 			<Link
 				to={getShellRoutePath(route.path)}
 				aria-current={active ? "page" : undefined}
+				{...routePreloadHandlers(getShellRoutePath(route.path))}
 				data-active={active || undefined}
 				title={route.navLabel}
 				className={cn(

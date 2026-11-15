@@ -1,5 +1,9 @@
 import type { RunIndexColumn } from "./run-index.js";
 
+export interface UsageRollupColumn extends RunIndexColumn {
+	readonly default?: string;
+}
+
 export const USAGE_SESSION_ROLLUPS_TABLE = "rudel.usage_session_rollups";
 
 export const USAGE_SESSION_ROLLUPS_KEY = [
@@ -10,9 +14,9 @@ export const USAGE_SESSION_ROLLUPS_KEY = [
 ];
 export const USAGE_SESSION_ROLLUPS_VERSION = "receipt_generation";
 export const USAGE_SESSION_ROLLUPS_COMMENT =
-	"Request usage of a session summed per pricing group (date, model identity, provider, tier, speed, geography, context band), one row per session from its latest usage-event generation; priced against the rate card at read time.";
+	"Request usage of a session summed per pricing group (date, model identity, provider, tier, speed, geography, context band), one row per session from its latest usage-event generation; each group priced against the rate card when the row is built.";
 
-export const USAGE_SESSION_ROLLUP_COLUMNS: readonly RunIndexColumn[] = [
+export const USAGE_SESSION_ROLLUP_COLUMNS: readonly UsageRollupColumn[] = [
 	{
 		name: "organization_id",
 		type: "String",
@@ -133,10 +137,24 @@ export const USAGE_SESSION_ROLLUP_COLUMNS: readonly RunIndexColumn[] = [
 		comment: "Per pricing group: output tokens.",
 	},
 	{
+		name: "estimated_costs",
+		type: "Array(Nullable(Float64))",
+		default: "arrayMap(kind -> CAST(NULL, 'Nullable(Float64)'), record_kinds)",
+		comment:
+			"Per pricing group: estimated cost in USD against the rate card the row was built with; NULL when the group cannot be priced, and on rows written before the column existed.",
+	},
+	{
+		name: "pricing_models",
+		type: "Array(LowCardinality(String))",
+		default: "arrayMap(kind -> '', record_kinds)",
+		comment:
+			"Per pricing group: the rate card model its pricing identity resolves to; empty when none does, and on rows written before the column existed.",
+	},
+	{
 		name: "build_version",
 		type: "UInt32",
 		comment:
-			"Fingerprint of the grouping rules that built the row; rows of another fingerprint are rebuilt.",
+			"Fingerprint of the grouping and pricing rules that built the row, rate card included; rows of another fingerprint are rebuilt.",
 	},
 	{
 		name: "built_at",

@@ -10,7 +10,7 @@ export type SitePageRoute =
 // Unlike a blanket SPA fallback, this cannot turn arbitrary public URLs into
 // successful login pages. Workspace existence is checked at the HTTP boundary.
 const SETTINGS_PATH =
-	/^\/settings(?:\/(?:account|workspace|github|sessions|members|invitations|create-workspace))?$/u;
+	/^\/settings(?:\/(?:account|workspace|github|sessions|reports|members|team|invitations|create-workspace))?$/u;
 const SESSION_PATH = /^\/(?:session|sessions|newsesh)(?:\/[^/]+(?:\/v2)?)?$/u;
 const LEGACY_PATH =
 	/^\/(?:dashboard(?:\/(?:sessions(?:\/[^/]+)?|developers(?:\/[^/]+)?|projects|errors|roi|analytics))?|dashboardy|developers(?:\/[^/]+)?|projects|errors|roi|analytics|session\/full\/[^/]+)$/u;
@@ -33,7 +33,9 @@ export function getSitePageRoute(pathname: string): SitePageRoute {
 		SETTINGS_PATH.test(path) ||
 		SESSION_PATH.test(path) ||
 		LEGACY_PATH.test(path) ||
-		/^\/(?:admin|skills|repos|team|invitation\/[^/]+)$/u.test(path)
+		/^\/(?:admin(?:\/(?:run-questions|features))?|announcement|home|compass|skills|repos|mcp|team|invitation\/[^/]+)$/u.test(
+			path,
+		)
 	)
 		return { kind: "app" };
 
@@ -43,7 +45,8 @@ export function getSitePageRoute(pathname: string): SitePageRoute {
 	if (!slug || !validateOrgSlug(slug)) return { kind: "not-found" };
 	if (
 		suffix === "" ||
-		/^\/(?:home|dashboard|skills|repos|team)$/u.test(suffix) ||
+		/^\/(?:home|dashboard|compass|skills|repos|mcp|team)$/u.test(suffix) ||
+		/^\/reports\/[^/]+$/u.test(suffix) ||
 		/^\/(?:sessions|newsesh)(?:\/[^/]+(?:\/v2)?)?$/u.test(suffix) ||
 		SETTINGS_PATH.test(suffix)
 	)

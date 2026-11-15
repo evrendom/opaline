@@ -1,5 +1,5 @@
 import { IconChevronRight, IconTextWrap } from "@tabler/icons-react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { type ReactNode, useState } from "react";
 import { CopyButton } from "@/features/shell/components/copy-button";
 import { cn } from "@/lib/utils";

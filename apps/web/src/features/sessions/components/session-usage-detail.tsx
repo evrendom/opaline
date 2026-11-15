@@ -2,8 +2,11 @@ import type { SessionListInput } from "@rudel/api-routes";
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import {
+	type ComponentProps,
 	type CSSProperties,
+	lazy,
 	type ReactNode,
+	Suspense,
 	useMemo,
 	useRef,
 	useState,
@@ -27,7 +30,11 @@ import {
 import { SessionDetailErrorBoundary } from "@/features/sessions/components/session-detail-view-parts";
 import { SessionsOverviewTable } from "@/features/sessions/components/sessions-overview-table";
 import { SESSION_OVERVIEW_SURFACE_CLASS_NAME } from "@/features/sessions/components/sessions-overview-table-utils";
-import { SessionReaderView } from "@/features/sessions/reader/SessionReaderView";
+import { SessionReaderFallback } from "@/features/sessions/reader/session-reader-light-samples";
+import {
+	getLoadedSessionReaderView,
+	loadSessionReaderView,
+} from "@/features/sessions/session-detail-prefetch";
 import {
 	getSessionNeighbours,
 	type SessionNavigation,
@@ -409,6 +416,23 @@ export function UsageSessionsPane({
 	);
 }
 
+const LazySessionReaderView = lazy(() =>
+	loadSessionReaderView().then((module) => ({
+		default: module.SessionReaderView,
+	})),
+);
+
+function SessionReader(props: ComponentProps<typeof LazySessionReaderView>) {
+	const [Reader] = useState(
+		() => getLoadedSessionReaderView() ?? LazySessionReaderView,
+	);
+	return (
+		<Suspense fallback={<SessionReaderFallback />}>
+			<Reader {...props} />
+		</Suspense>
+	);
+}
+
 /**
  * One session opened in place of a sessions list: a back button with the
  * session's own header controls beside it, then the session.
@@ -457,7 +481,7 @@ export function UsageSessionDetail({
 				</div>
 			) : null}
 			<SessionDetailErrorBoundary key={sessionId} fallbackHref={fallbackHref}>
-				<SessionReaderView
+				<SessionReader
 					navigation={navigation}
 					position={position}
 					sessionId={sessionId}

@@ -47,9 +47,9 @@ export const GENUINE_PROMPT_SQL =
 export function pinnedFilter(): string {
 	return `organization_id = {organizationId:String} AND user_id = {userId:String}
 		AND session_id IN {sessionIds:Array(String)}
-		AND (session_id, revision, parser_version) IN (
-			SELECT g.1, toUInt64(g.2), g.3 FROM (SELECT arrayJoin(arrayZip({sessionIds:Array(String)}, {revisions:Array(String)}, {parserVersions:Array(UInt16)})) AS g)
-		) AND record_idx < ${TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX}`;
+		AND (session_id, revision, parser_version) IN arrayZip({sessionIds:Array(String)},
+			arrayMap(r -> toUInt64(r), {revisions:Array(String)}), {parserVersions:Array(UInt16)})
+		AND record_idx < ${TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX}`;
 }
 
 export function pinnedParams(

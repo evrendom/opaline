@@ -3,6 +3,7 @@
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",
+	"sideEffects": false,
 	"exports": {
 		".": "./src/index.ts",
 		"./billing": "./src/billing.ts",
@@ -21,6 +22,7 @@
 		"./trends-usage": "./src/trends-usage.ts",
 		"./organization-paths": "./src/organization-paths.ts",
 		"./reserved-slugs": "./src/reserved-slugs.ts",
+		"./rpc-batch": "./src/rpc-batch.ts",
 		"./skill-icon": "./src/skill-icon.ts",
 		"./usage-digest-email": "./src/usage-digest-email.ts",
 		"./transcript-records": "./src/session-transcript/transcript-records/index.ts",

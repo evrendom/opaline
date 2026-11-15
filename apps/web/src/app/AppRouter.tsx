@@ -8,8 +8,8 @@ import {
 	useLocation,
 	useParams,
 } from "react-router-dom";
+import { routeLoaders } from "@/app/route-loaders";
 import { appRoutes } from "@/app/routes";
-import { loadSessionsPage } from "@/app/session-page-loader";
 import { NotFoundPage } from "@/app/system/NotFoundPage";
 import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
 import { AcceptInvitationPage } from "@/features/invitations/AcceptInvitationPage";
@@ -37,16 +37,13 @@ function lazyNamed<TModule extends Record<string, unknown>>(
 	});
 }
 
-const AdminDashboardPage = lazyNamed(
-	() => import("@/features/admin/AdminDashboardPage"),
-	"AdminDashboardPage",
-);
+const AdminDashboardPage = lazyNamed(routeLoaders.admin, "AdminDashboardPage");
 const RunQuestionsAdminPage = lazyNamed(
-	() => import("@/features/admin/RunQuestionsAdminPage"),
+	routeLoaders.adminRunQuestions,
 	"RunQuestionsAdminPage",
 );
 const WorkspaceFeaturesAdminPage = lazyNamed(
-	() => import("@/features/admin/WorkspaceFeaturesAdminPage"),
+	routeLoaders.adminFeatures,
 	"WorkspaceFeaturesAdminPage",
 );
 const AnnouncementPage = lazyNamed(
@@ -54,32 +51,17 @@ const AnnouncementPage = lazyNamed(
 	"AnnouncementPage",
 );
 const CliOnboardingPage = lazyNamed(
-	() => import("@/features/cli-onboarding/cli-onboarding-page"),
+	routeLoaders.cliOnboarding,
 	"CliOnboardingPage",
 );
 
-const DashboardPage = lazyNamed(
-	() => import("@/features/dashboard/DashboardPage"),
-	"DashboardPage",
-);
-const SessionsPage = lazyNamed(loadSessionsPage, "SessionsPage");
-const NewSessionPage = lazyNamed(
-	() => import("@/features/sessions/new-session-page"),
-	"NewSessionPage",
-);
-const ReposPage = lazyNamed(
-	() => import("@/features/repos/repos-page"),
-	"ReposPage",
-);
-const CompassPage = lazyNamed(
-	() => import("@/features/compass/CompassPage"),
-	"CompassPage",
-);
-const SkillsPage = lazyNamed(
-	() => import("@/features/skills/SkillsPage"),
-	"SkillsPage",
-);
-const McpPage = lazyNamed(() => import("@/features/mcp/McpPage"), "McpPage");
+const DashboardPage = lazyNamed(routeLoaders.dashboard, "DashboardPage");
+const SessionsPage = lazyNamed(routeLoaders.sessions, "SessionsPage");
+const NewSessionPage = lazyNamed(routeLoaders.newSession, "NewSessionPage");
+const ReposPage = lazyNamed(routeLoaders.repos, "ReposPage");
+const CompassPage = lazyNamed(routeLoaders.compass, "CompassPage");
+const SkillsPage = lazyNamed(routeLoaders.skills, "SkillsPage");
+const McpPage = lazyNamed(routeLoaders.mcp, "McpPage");
 const WorkspaceSettingsPage = lazyNamed(
 	() => import("@/features/settings/workspace/WorkspaceSettingsPage"),
 	"WorkspaceSettingsPage",
@@ -108,10 +90,7 @@ const McpSettingsPage = lazyNamed(
 	() => import("@/features/self-hosted/McpSettingsPage"),
 	"McpSettingsPage",
 );
-const ReportPage = lazyNamed(
-	() => import("@/features/reports/ReportPage"),
-	"ReportPage",
-);
+const ReportPage = lazyNamed(routeLoaders.report, "ReportPage");
 const TeamInviteAcceptPage = lazyNamed(
 	() => import("@/features/team/TeamInviteAcceptPage"),
 	"TeamInviteAcceptPage",

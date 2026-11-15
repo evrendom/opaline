@@ -50,6 +50,7 @@ export async function getRepositoryOverview(
 	const rows = await queryClickhouse<RepositoryOverviewRow>({
 		clickhouse_settings: {
 			...REPOSITORY_QUERY_SETTINGS,
+			...usage.clickhouseSettings,
 			log_comment: "analytics.repositories.overview",
 		},
 		query: `WITH RECURSIVE ${usage.cteDefinitions},

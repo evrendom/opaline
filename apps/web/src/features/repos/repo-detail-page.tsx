@@ -318,12 +318,7 @@ export function RepoDetailPage({
 					<div className={SESSION_OVERVIEW_SURFACE_CLASS_NAME}>{sessions}</div>
 				</SessionInRepo.Provider>
 			) : (
-				<RepoDataProvider
-					name={name}
-					pullRequests={pullRequests}
-					repoKey={repoKey}
-					summary={repo}
-				>
+				<RepoDataProvider repoKey={repoKey}>
 					<DotPickContext.Provider value={dotPick}>
 						<RailHighlightProvider tab={shownTab}>
 							<div className="relative isolate min-h-0 min-w-0 flex-1 overflow-hidden [--dashboard-01-content-background:var(--dashboard-01-stage-background)] [--panes-top:calc(var(--stage-top)-0.125rem)] [--stage-top:--spacing(2)] [--tabs-band:--spacing(19)]">

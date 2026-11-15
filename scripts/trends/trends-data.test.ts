@@ -15,6 +15,7 @@ import {
 import { PREVIEW_TRENDS_SNAPSHOT } from "../../apps/marketing/src/trends/preview-snapshot";
 import {
 	benchmarkObservations,
+	labParetoModelIds,
 	REASONING_EFFORTS,
 	reasoningLinePoints,
 	reasoningLineSegments,
@@ -896,4 +897,38 @@ test("unspecified default stays in tables but never doubles back in connected li
 			).length,
 		).toBe(1);
 	}
+});
+
+test("the OpenAI and Anthropic Pareto frontier keeps every lab model on it, newest first", () => {
+	const model = (
+		id: string,
+		provider: TrendsBenchmarkModel["provider"],
+		releasedAt: string | null,
+		points: readonly (readonly [number, number])[],
+	): TrendsBenchmarkModel => ({
+		...benchmarkFixture(id, 0),
+		provider,
+		releasedAt,
+		line: null,
+		points: points.map(([intelligenceIndex, costPerTaskUsd], index) => ({
+			...benchmarkFixture(id, intelligenceIndex).points[0],
+			effort: (["low", "high"] as const)[index] ?? "high",
+			effortOrder: 20 + index * 20,
+			costPerTaskUsd,
+		})),
+	});
+	const models = [
+		model("gpt-cheap", "openai", "2026-09-22", [[10, 0.01]]),
+		model("claude-small", "anthropic", "2026-10-07", [
+			[18, 0.04],
+			[30, 0.16],
+		]),
+		model("claude-old-big", "anthropic", "2026-02-05", [[40, 9]]),
+		model("gpt-mid", "openai", "2026-09-29", [[50, 0.6]]),
+		model("claude-newest", "anthropic", "2026-11-09", [[64, 26]]),
+		model("gemini-cheaper", "google", "2026-10-28", [[60, 0.02]]),
+	];
+	expect(
+		labParetoModelIds(models, ["openai", "anthropic"], "costPerTaskUsd"),
+	).toEqual(["claude-newest", "claude-small", "gpt-mid", "gpt-cheap"]);
 });

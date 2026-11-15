@@ -2,7 +2,7 @@ import type { SessionRunCiRun } from "@rudel/api-routes";
 import { IconAlertTriangle, IconGitPullRequest } from "@tabler/icons-react";
 import { type ReactNode, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Bones } from "@/app/ui/bones";
+import { Reveal } from "@/app/ui/bones";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { cn } from "@/lib/utils";
 import type { NormalizedSessionDetailOverview } from "../../components/session-detail-fast-response";
@@ -249,61 +249,66 @@ export function SessionReaderCiView({
 			<SessionSubagents onOpen={openSubagent} subagents={subagents}>
 				<div className="flex h-full min-h-0 gap-6">
 					{railColumn}
-					{pending ? (
-						<Bones
-							fill
-							className="min-w-0 flex-1"
-							label="Reading the pull requests and CI this session reached"
-						>
+					<Reveal
+						fill
+						className="min-w-0 flex-1"
+						label="Reading the pull requests and CI this session reached"
+						loading={pending}
+						sample={
 							<div className="flex h-full min-h-0 gap-6">
 								<CiColumnsSample agent={agent} model={model} run={run} />
 							</div>
-						</Bones>
-					) : (
-						<>
-							<CiPullColumn
-								agent={agent}
-								model={model}
-								onPick={(key) => setPicks({ ci: null, pr: key })}
-								onPickRun={(ciRunId, key) => setPicks({ ci: ciRunId, pr: key })}
-								picked={shown?.entry.key ?? null}
-								pickedRun={pickedRun?.ciRunId ?? null}
-								rows={rows}
-								run={run}
-								unplaced={reach.unplaced}
-							/>
-							<div
-								className={cn(
-									"mt-(--panes-top) flex min-h-0 min-w-0 flex-1 overflow-hidden",
-									CARD,
-								)}
-							>
-								{shown ? (
-									<CiPullCard
-										onPickRun={(ciRunId) =>
-											setPicks({ ci: ciRunId, pr: shown.entry.key })
-										}
-										pickedRun={pickedRun?.ciRunId ?? null}
-										reachedBy={
-											shown.entry.pull && !run ? (
-												<PullTouchers
-													onOpenTurn={onOpenTurn}
-													touchers={pullTouchers(
-														shown.entry.key,
-														shown.entry.runs,
-														reach,
-													)}
-												/>
-											) : null
-										}
-										row={shown}
-									/>
-								) : unknown ? (
-									<UnknownPullCard pickKey={unknown} />
-								) : null}
+						}
+						sampleId="reader-ci"
+					>
+						{() => (
+							<div className="flex h-full min-h-0 gap-6">
+								<CiPullColumn
+									agent={agent}
+									model={model}
+									onPick={(key) => setPicks({ ci: null, pr: key })}
+									onPickRun={(ciRunId, key) =>
+										setPicks({ ci: ciRunId, pr: key })
+									}
+									picked={shown?.entry.key ?? null}
+									pickedRun={pickedRun?.ciRunId ?? null}
+									rows={rows}
+									run={run}
+									unplaced={reach.unplaced}
+								/>
+								<div
+									className={cn(
+										"mt-(--panes-top) flex min-h-0 min-w-0 flex-1 overflow-hidden",
+										CARD,
+									)}
+								>
+									{shown ? (
+										<CiPullCard
+											onPickRun={(ciRunId) =>
+												setPicks({ ci: ciRunId, pr: shown.entry.key })
+											}
+											pickedRun={pickedRun?.ciRunId ?? null}
+											reachedBy={
+												shown.entry.pull && !run ? (
+													<PullTouchers
+														onOpenTurn={onOpenTurn}
+														touchers={pullTouchers(
+															shown.entry.key,
+															shown.entry.runs,
+															reach,
+														)}
+													/>
+												) : null
+											}
+											row={shown}
+										/>
+									) : unknown ? (
+										<UnknownPullCard pickKey={unknown} />
+									) : null}
+								</div>
 							</div>
-						</>
-					)}
+						)}
+					</Reveal>
 				</div>
 			</SessionSubagents>
 		</Frame>

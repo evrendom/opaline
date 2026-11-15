@@ -39,6 +39,14 @@ export const RepositoryDetailSchema = z.object({
 	skills: z.array(HistoricalSkillSummarySchema),
 });
 export type RepositorySummary = z.infer<typeof RepositorySummarySchema>;
+export const RepositoryNavigationItemSchema = RepositorySummarySchema.pick({
+	identity: true,
+	sessionCount: true,
+	lastActiveAt: true,
+});
+export type RepositoryNavigationItem = z.infer<
+	typeof RepositoryNavigationItemSchema
+>;
 
 export const RepositoryOverviewInputSchema = DateRangeInputSchema.merge(
 	RepositoryInputSchema,

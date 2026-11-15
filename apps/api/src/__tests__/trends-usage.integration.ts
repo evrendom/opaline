@@ -3,7 +3,13 @@ import { trendsUsageSchema } from "@rudel/api-routes/trends-usage";
 import { z } from "zod";
 import { getClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
-import { trendsWindow } from "../services/trends-usage.service.js";
+import {
+	buildFrictionWindowStatement,
+	frictionRows,
+	queryFriction,
+	trendsQueryParams,
+	trendsWindow,
+} from "../services/trends-usage.service.js";
 import {
 	type ApiTestServer,
 	startApiTestServer,
@@ -25,6 +31,7 @@ const ch = getClickhouse();
 const users: { id: string; token: string }[] = [];
 const sessions: { userId: string; sessionId: string }[] = [];
 let server: ApiTestServer;
+let frictionBefore: ReturnType<typeof frictionRows>;
 
 beforeAll(async () => {
 	server = await startApiTestServer({
@@ -50,6 +57,7 @@ beforeAll(async () => {
 	}
 	const [first, second] = users;
 	if (!first || !second) throw new Error("Expected two users");
+	frictionBefore = await queryFriction(ch, trendsQueryParams(window));
 	await ingest(first, `trends-${run}-current-1`, currentDay);
 	await ingest(second, `trends-${run}-current-2`, currentDay + 3_600_000);
 	await ingest(first, `trends-${run}-earlier`, earlierDay);
@@ -244,4 +252,63 @@ test("publishes every source aggregated per model, without identities", async ()
 			"claude-code"
 		],
 	).toBeGreaterThanOrEqual(4);
+});
+
+test("friction is the same whole and split into key windows that cut a developer", async () => {
+	const [first, second] = users;
+	if (!first || !second) throw new Error("Expected two users");
+	const params = trendsQueryParams(window);
+	const cuts = [
+		{
+			organizationId: first.id,
+			userId: first.id,
+			sessionId: `trends-${run}-earlier`,
+		},
+		{ organizationId: second.id, userId: second.id, sessionId: "" },
+	].sort((a, b) => (a.organizationId < b.organizationId ? -1 : 1));
+	const windows = [
+		{ to: cuts[0] },
+		{ from: cuts[0], to: cuts[1] },
+		{ from: cuts[1] },
+	];
+	const split = [];
+	for (const keyWindow of windows)
+		split.push(
+			...(await ch.query<Parameters<typeof frictionRows>[0][number]>(
+				buildFrictionWindowStatement(keyWindow, params),
+			)),
+		);
+	const whole = frictionRows(
+		await ch.query<Parameters<typeof frictionRows>[0][number]>(
+			buildFrictionWindowStatement({}, params),
+		),
+	);
+	const planned = await queryFriction(ch, params);
+	expect(frictionRows(split)).toEqual(whole);
+	expect(planned).toEqual(whole);
+	const fixture = planned.find((row) => row.model === MODEL);
+	const before = frictionBefore.find((row) => row.model === MODEL);
+	const added = (field: keyof NonNullable<typeof fixture>) =>
+		Number(fixture?.[field] ?? 0) - Number(before?.[field] ?? 0);
+	expect({
+		developers: added("all_developers"),
+		swearers: added("all_swearers"),
+		swears: added("all_swears"),
+		apologies: added("all_apologies"),
+		toolErrors: added("all_tool_errors"),
+		tokens: added("all_tokens"),
+		prompts: added("all_prompts"),
+		swearersDevelopers: added("swearers_developers"),
+		cohortDevelopers: added("cohort_developers"),
+	}).toEqual({
+		developers: 2,
+		swearers: 2,
+		swears: 3,
+		apologies: 3,
+		toolErrors: 3,
+		tokens: 330,
+		prompts: 6,
+		swearersDevelopers: 2,
+		cohortDevelopers: 0,
+	});
 });

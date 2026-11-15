@@ -7,6 +7,27 @@ export const RUN_INDEX_PROVIDER_ERROR_KINDS = [
 	"response_too_many_failed_attempts",
 ] as const;
 
+/**
+ * Codex records no git operation of its own (Claude Code writes
+ * `toolUseResult.gitOperation`), so a Codex run's commits, pushes and PR
+ * actions are read from the commands it ran and what they printed, as
+ * `session_git_observations` reads them: a commit is its `[branch sha]` line,
+ * a push its `a..b src -> dst` or `[new branch] src -> dst` lines, whole:
+ * a stored output cut inside a branch name gives no branch.
+ */
+export const CODEX_GIT_COMMIT_CALL = "\\bgit\\b[^\\n;&|]*\\bcommit\\b";
+export const CODEX_GIT_PUSH_CALL = "\\bgit\\b[^\\n;&|]*\\bpush\\b";
+export const CODEX_GIT_DRY_RUN =
+	"\\bgit\\b[^\\n;&|]*\\bpush\\b[^\\n;&|]*\\s(?:--dry-run|-[A-Za-z]*n[A-Za-z]*)(?:\\s|[\"']|$)";
+export const CODEX_GH_PR_CALL =
+	"\\bgh\\s+pr\\s+(?:create|merge|close|ready|reopen)\\b";
+export const CODEX_COMMIT_LINE =
+	"(?m)^\\s*\\[[^\\n]+?\\s+([a-fA-F0-9]{4,40})\\]\\s";
+export const CODEX_PUSH_RANGE_LINE =
+	"(?m)^\\s*(?:\\+\\s+)?[a-fA-F0-9]{4,40}[.]{2,3}[a-fA-F0-9]{4,40}\\s+\\S+\\s+->\\s+(\\S+)\\s";
+export const CODEX_PUSH_NEW_BRANCH_LINE =
+	"(?m)^\\s*[*]\\s+\\[new branch\\]\\s+\\S+\\s+->\\s+(\\S+)\\s";
+
 export const RUN_INDEX_PR_URL_PATTERN =
 	"https://github[.]com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/[1-9][0-9]*\\b";
 

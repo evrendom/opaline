@@ -4,7 +4,6 @@ import { useMountEffect } from "@/app/hooks/useMountEffect";
 declare global {
 	interface OpalineDesktop {
 		introReady?: () => void;
-		replayOpen?: () => void;
 	}
 	interface Window {
 		opalineDesktop?: OpalineDesktop;

@@ -55,9 +55,19 @@ type DesktopBridge = {
 };
 
 declare global {
-	interface Window {
-		opalineDesktop?: DesktopBridge;
+	interface OpalineDesktop {
+		listRepositories?: DesktopBridge["listRepositories"];
+		applyRepositories?: DesktopBridge["applyRepositories"];
 	}
+}
+
+function isBridge(
+	value: OpalineDesktop | undefined,
+): value is OpalineDesktop & DesktopBridge {
+	return (
+		typeof value?.listRepositories === "function" &&
+		typeof value.applyRepositories === "function"
+	);
 }
 
 const subscribe = () => () => {};
@@ -65,7 +75,7 @@ const subscribe = () => () => {};
 export function useDesktop(): DesktopBridge | null {
 	return useSyncExternalStore(
 		subscribe,
-		() => window.opalineDesktop ?? null,
+		() => (isBridge(window.opalineDesktop) ? window.opalineDesktop : null),
 		() => null,
 	);
 }

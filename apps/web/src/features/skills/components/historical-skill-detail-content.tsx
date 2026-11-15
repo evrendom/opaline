@@ -5,8 +5,8 @@ import type {
 } from "@rudel/api-routes";
 import { IconCheck, IconChevronDown, IconStack2 } from "@tabler/icons-react";
 import { useMemo, useRef, useState } from "react";
+import { Bone, Reveal } from "@/app/ui/bones";
 import { Button } from "@/app/ui/button";
-import { Skeleton } from "@/app/ui/skeleton";
 import { getToolPresentation } from "@/components/conversation/conversation-tools";
 import { ConversationTraceTag } from "@/components/conversation/conversation-trace-tag";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
@@ -65,17 +65,26 @@ export function HistoricalSkillDetailContent({
 				)}
 				data-slot="skill-version-toolbar"
 			>
-				{detail && selectedVersion ? (
-					<SkillVersionMenu
-						versions={versions}
-						selectedVersion={selectedVersion}
-						onSelect={(key) => {
-							setSelectedVersionKey(key);
-							if (scrollRef.current) scrollRef.current.scrollTop = 0;
-						}}
-					/>
-				) : isPending ? (
-					<Skeleton className="h-7 w-28 rounded-md" />
+				{isPending || (detail && selectedVersion) ? (
+					<Reveal
+						label="Loading skill versions"
+						loading={isPending}
+						sample={<Bone className="h-7 w-28 rounded-md" />}
+						sampleId="skill-versions"
+					>
+						{() =>
+							selectedVersion ? (
+								<SkillVersionMenu
+									versions={versions}
+									selectedVersion={selectedVersion}
+									onSelect={(key) => {
+										setSelectedVersionKey(key);
+										if (scrollRef.current) scrollRef.current.scrollTop = 0;
+									}}
+								/>
+							) : null
+						}
+					</Reveal>
 				) : null}
 				{/* Rendered is the readable document; Raw is the file as written. */}
 				{selectedVersion ? (
@@ -107,9 +116,9 @@ export function HistoricalSkillDetailContent({
 					variant === "card" ? "p-5" : "p-5 sm:p-7",
 				)}
 			>
-				{isPending ? (
-					<SkillDetailSkeleton previewContent={previewContent} />
-				) : isError || !detail ? (
+				{isPending && previewContent ? (
+					<SkillDetailPreview previewContent={previewContent} />
+				) : !isPending && (isError || !detail) ? (
 					<div className="flex min-h-56 flex-col items-center justify-center gap-3 text-center">
 						<h3 className="text-base font-medium">
 							Skill details couldn’t load
@@ -118,48 +127,60 @@ export function HistoricalSkillDetailContent({
 							Try again
 						</Button>
 					</div>
-				) : selectedVersion && raw ? (
-					// No scroll box of its own: the pane is the one scroll area.
-					<pre className="rounded-md bg-muted p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">
-						{selectedVersion.content}
-					</pre>
-				) : selectedVersion ? (
-					<>
-						{allowedTools.length > 0 ? (
-							<div className="mb-6 flex flex-wrap items-center gap-2">
-								<span className="text-[0.8125rem] font-medium text-(--session-overview-muted)">
-									Allowed tools
-								</span>
-								<ul
-									aria-label="Allowed tools"
-									className="m-0 flex min-w-0 flex-wrap list-none items-center gap-1 p-0"
-								>
-									{allowedTools.map((tool) => (
-										<li key={tool} className="flex shrink-0">
-											<ConversationTraceTag
-												toolIcon={
-													getToolPresentation(tool.split("(")[0] ?? tool).icon
-												}
-												value={tool}
-												title={`Allowed tool: ${tool}`}
-												className="shrink-0"
-											>
-												<span className="font-sans">{tool}</span>
-											</ConversationTraceTag>
-										</li>
-									))}
-								</ul>
-							</div>
-						) : null}
-						<RichSkillDocument
-							content={selectedVersion.content}
-							className="min-w-0"
-						/>
-					</>
 				) : (
-					<div className="py-10 text-center text-sm text-(--session-overview-muted)">
-						No complete content was recovered
-					</div>
+					<Reveal
+						label="Loading skill details"
+						loading={isPending}
+						sample={<SkillDetailSample />}
+						sampleId="skill-detail"
+					>
+						{() =>
+							selectedVersion && raw ? (
+								// No scroll box of its own: the pane is the one scroll area.
+								<pre className="rounded-md bg-muted p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">
+									{selectedVersion.content}
+								</pre>
+							) : selectedVersion ? (
+								<>
+									{allowedTools.length > 0 ? (
+										<div className="mb-6 flex flex-wrap items-center gap-2">
+											<span className="text-[0.8125rem] font-medium text-(--session-overview-muted)">
+												Allowed tools
+											</span>
+											<ul
+												aria-label="Allowed tools"
+												className="m-0 flex min-w-0 flex-wrap list-none items-center gap-1 p-0"
+											>
+												{allowedTools.map((tool) => (
+													<li key={tool} className="flex shrink-0">
+														<ConversationTraceTag
+															toolIcon={
+																getToolPresentation(tool.split("(")[0] ?? tool)
+																	.icon
+															}
+															value={tool}
+															title={`Allowed tool: ${tool}`}
+															className="shrink-0"
+														>
+															<span className="font-sans">{tool}</span>
+														</ConversationTraceTag>
+													</li>
+												))}
+											</ul>
+										</div>
+									) : null}
+									<RichSkillDocument
+										content={selectedVersion.content}
+										className="min-w-0"
+									/>
+								</>
+							) : (
+								<div className="py-10 text-center text-sm text-(--session-overview-muted)">
+									No complete content was recovered
+								</div>
+							)
+						}
+					</Reveal>
 				)}
 			</div>
 		</>
@@ -230,24 +251,22 @@ function SkillVersionMenu({
 	);
 }
 
-function SkillDetailSkeleton({
-	previewContent,
-}: {
-	previewContent: string | null;
-}) {
+function SkillDetailPreview({ previewContent }: { previewContent: string }) {
 	return (
 		<div aria-busy="true" className="space-y-3">
 			<output className="sr-only">Loading skill details</output>
-			{previewContent ? (
-				<RichSkillDocument content={previewContent} />
-			) : (
-				<>
-					<Skeleton className="h-6 w-52" />
-					<Skeleton className="h-4 w-full" />
-					<Skeleton className="h-4 w-[88%]" />
-					<Skeleton className="h-4 w-[72%]" />
-				</>
-			)}
+			<RichSkillDocument content={previewContent} />
+		</div>
+	);
+}
+
+function SkillDetailSample() {
+	return (
+		<div className="space-y-3">
+			<Bone className="h-6 w-52 rounded-2xl" />
+			<Bone className="h-4 w-full rounded-2xl" />
+			<Bone className="h-4 w-[88%] rounded-2xl" />
+			<Bone className="h-4 w-[72%] rounded-2xl" />
 		</div>
 	);
 }

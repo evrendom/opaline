@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { CostDashboardInputSchema } from "@rudel/api-routes";
 import {
 	buildCostDashboard,
+	buildLanguageSplit,
 	type CostAggregateRow,
 	listAvailableDashboardMetrics,
 	listDashboardDates,
@@ -683,4 +684,67 @@ test("an answer without session rows leaves the session metrics null rather than
 	expect(result.metrics.sessions).toBeNull();
 	expect(result.metrics.signals).toBeNull();
 	expect(result.metrics.agentRuns).toBeNull();
+});
+
+test("the charted answer's language split matches a separate signals request split by type", () => {
+	const rows = [
+		row({ metric: "cost" }),
+		...[
+			["modelApologies", 4, "2026-09-01"],
+			["userNegative", 2, "2026-09-01"],
+			["userNegative", 3, "2026-09-02"],
+		].flatMap(([id, value, date]) => [
+			row({
+				metric: "signals",
+				dimension: "headline",
+				id: "",
+				date: String(date),
+				value: Number(value),
+				matched_value: Number(value),
+			}),
+			row({
+				metric: "signals",
+				dimension: "signalTypes",
+				id: String(id),
+				date: String(date),
+				value: Number(value),
+				matched_value: Number(value),
+			}),
+		]),
+	];
+	const separate = buildCostDashboard(
+		rows,
+		{ ...input, requestedMetric: "signals", splitBy: "signalTypes" },
+		members,
+	).metrics.signals;
+	const split = buildLanguageSplit(
+		rows,
+		{ ...input, requestedMetric: "cost" },
+		members,
+	);
+	expect(split?.trend).toEqual(separate?.trend);
+	expect(split?.series).toEqual(separate?.series);
+	expect(split?.total).toBe(9);
+	expect(split?.breakdowns.signalTypes).toEqual(
+		separate?.breakdowns.signalTypes,
+	);
+	expect(split?.breakdowns.members).toEqual([]);
+});
+
+test("the language split is unknown while a session's signals are indexing", () => {
+	expect(
+		buildLanguageSplit(
+			[
+				row({
+					metric: "signals",
+					dimension: "headline",
+					id: "",
+					incomplete: 1,
+					matched_incomplete: 1,
+				}),
+			],
+			input,
+			members,
+		),
+	).toBeNull();
 });
