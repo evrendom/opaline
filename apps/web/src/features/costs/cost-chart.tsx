@@ -45,6 +45,7 @@ import {
 	XAxis,
 	YAxis,
 } from "recharts";
+import { introRequested } from "@/app/first-open";
 import { Skeleton } from "@/app/ui/skeleton";
 import {
 	Tooltip as InfoTooltip,
@@ -944,6 +945,7 @@ export function CostChart({
 					</div>
 					<div
 						ref={canvasRef}
+						skullet-ignore=""
 						className="cost-chart-canvas"
 						data-phase={phase}
 						data-kind={showDots ? "dots" : undefined}
@@ -1497,6 +1499,9 @@ function Metric({
 			data-revealing={revealing || undefined}
 			style={{ "--metric-color": color } as CSSProperties}
 		>
+			{introRequested() ? (
+				<span aria-hidden="true" className="cost-metric-intro-anchor" />
+			) : null}
 			{/* StatCard: glyph + label on the left, value on the right,
 			    the sparkline flush with the card's bottom edge. */}
 			<div className="cost-metric-header">
@@ -1629,6 +1634,7 @@ export function MetricSparkline({
 	return (
 		<svg
 			aria-hidden="true"
+			skullet-own=""
 			className="cost-metric-sparkline cost-metric-trend"
 			data-placeholder={placeholder || undefined}
 			viewBox="0 0 100 32"

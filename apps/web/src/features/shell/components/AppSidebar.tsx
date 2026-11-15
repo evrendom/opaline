@@ -1,4 +1,6 @@
-"use client";
+import { IntroReveal } from "@/app/ui/bones";
+
+("use client");
 
 import { Link } from "react-router-dom";
 import {
@@ -125,7 +127,9 @@ export function AppSidebar() {
 				{import.meta.env.MODE === "plugin" ? null : (
 					<SidebarHeader>
 						<DesktopWindowBar />
-						<SidebarWorkspaceSwitcher />
+						<IntroReveal label="Workspace">
+							<SidebarWorkspaceSwitcher />
+						</IntroReveal>
 					</SidebarHeader>
 				)}
 
@@ -146,9 +150,11 @@ export function AppSidebar() {
 						</SidebarGroupContent>
 					</SidebarGroup>
 					{import.meta.env.MODE === "plugin" ? null : (
-						<SidebarRepositories
-							reposActive={currentShellRoute.id === "repos"}
-						/>
+						<IntroReveal label="Repositories">
+							<SidebarRepositories
+								reposActive={currentShellRoute.id === "repos"}
+							/>
+						</IntroReveal>
 					)}
 				</SidebarContent>
 

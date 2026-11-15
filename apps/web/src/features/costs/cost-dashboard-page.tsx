@@ -13,6 +13,7 @@ import {
 	useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { IntroReveal } from "@/app/ui/bones";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import { Button } from "@/components/dashboard/button";
 import { EmptyState } from "@/components/dashboard/page-parts";
@@ -263,155 +264,162 @@ export function CostDashboardView({
 	const breakdownsRef = useRef<HTMLDivElement>(null);
 	const breakdownRowHeight = useBreakdownRowHeight(breakdownsRef);
 	return (
-		<div
-			className="cost-page isolate antialiased"
-			data-variant={variant}
-			aria-busy={query.isFetching}
-			data-updating={(query.isFetching && !isPending) || showSettled}
+		<IntroReveal
+			page
+			label="Dashboard"
+			className="intro-fill"
+			contentReady={isError || (!isPending && !metricsPending)}
 		>
-			{headerPortal && rangeControls
-				? createPortal(rangeControls, headerPortal)
-				: null}
-			{showToolbar ? (
-				<section
-					className="cost-page-toolbar"
-					aria-label="Dashboard controls"
-					data-fluid-menu-root=""
-				>
-					<FluidMenuHover items="button" />
-					{toolbarStart}
-					{headerPortal ? null : rangeControls}
-				</section>
-			) : null}
-			{/* Focusable only for the demo, which focuses it on entry so the
+			<div
+				className="cost-page isolate antialiased"
+				data-variant={variant}
+				aria-busy={query.isFetching}
+				data-updating={(query.isFetching && !isPending) || showSettled}
+			>
+				{headerPortal && rangeControls
+					? createPortal(rangeControls, headerPortal)
+					: null}
+				{showToolbar ? (
+					<section
+						className="cost-page-toolbar"
+						aria-label="Dashboard controls"
+						data-fluid-menu-root=""
+					>
+						<FluidMenuHover items="button" />
+						{toolbarStart}
+						{headerPortal ? null : rangeControls}
+					</section>
+				) : null}
+				{/* Focusable only for the demo, which focuses it on entry so the
 			    keyboard scrolls it; in the app a click must not focus it. */}
-			<div className="cost-page-scroll" tabIndex={demo ? -1 : undefined}>
-				<div className="cost-page-content">
-					{rangeInContent ? (
-						lead ? (
-							<div className="cost-range-controls cost-range-lead">
-								{rangeControls}
-								{lead}
+				<div className="cost-page-scroll" tabIndex={demo ? -1 : undefined}>
+					<div className="cost-page-content">
+						{rangeInContent ? (
+							lead ? (
+								<div className="cost-range-controls cost-range-lead">
+									{rangeControls}
+									{lead}
+								</div>
+							) : (
+								rangeControls
+							)
+						) : null}
+						{isError ? (
+							<div className="cost-error-state" role="alert">
+								<EmptyState
+									icon={IconAlertTriangle}
+									title="The dashboard couldn’t load"
+									description={dashboardErrorText(query.error)}
+								>
+									<Button
+										variant="outline"
+										className="mx-auto mt-2"
+										onClick={() => {
+											void query.refetch();
+										}}
+									>
+										<IconRefresh />
+										Try again
+									</Button>
+								</EmptyState>
 							</div>
 						) : (
-							rangeControls
-						)
-					) : null}
-					{isError ? (
-						<div className="cost-error-state" role="alert">
-							<EmptyState
-								icon={IconAlertTriangle}
-								title="The dashboard couldn’t load"
-								description={dashboardErrorText(query.error)}
-							>
-								<Button
-									variant="outline"
-									className="mx-auto mt-2"
-									onClick={() => {
-										void query.refetch();
-									}}
-								>
-									<IconRefresh />
-									Try again
-								</Button>
-							</EmptyState>
-						</div>
-					) : (
-						<CostChart
-							dots={
-								variant === "rail-card"
-									? "switch"
-									: variant === "dot-rail" || variant === "rail-chat"
-										? "only"
+							<CostChart
+								dots={
+									variant === "rail-card"
+										? "switch"
+										: variant === "dot-rail" || variant === "rail-chat"
+											? "only"
+											: undefined
+								}
+								data={showSettled ? settled.data : data}
+								metric={showSettled ? settled.metric : metric}
+								selectedMetric={metric}
+								metrics={metrics}
+								metricsPending={metricsPending}
+								filters={activeFilters}
+								previews={previews}
+								inputFor={dashboard.inputFor}
+								runSignals={input.runSignals}
+								signalTypes={input.signalTypes}
+								interval={interval}
+								onMetricChange={setMetric}
+								onMetricIntent={onMetricIntent}
+								onRefresh={() => query.refetch()}
+								refreshing={query.isFetching && !isPending}
+								pending={isPending && !showSettled}
+								splitBy={
+									showSettled
+										? settled.data.splitBy
+										: (data?.splitBy ?? input.splitBy)
+								}
+								onResetSplit={() => setSplit("none")}
+							/>
+						)}
+						<div className="cost-breakdowns-container" hidden={isError}>
+							{tabbed ? (
+								<div className="cost-breakdown-tabs" role="tablist">
+									{dimensions.map((dimension) => (
+										<button
+											key={dimension}
+											type="button"
+											role="tab"
+											aria-selected={dimension === activeTab}
+											onClick={() => setBreakdownTab(dimension)}
+										>
+											{COST_LABELS[dimension]}
+										</button>
+									))}
+								</div>
+							) : null}
+							<div
+								ref={breakdownsRef}
+								className="cost-breakdowns"
+								// Every row is as tall as the space left under the chart: one row
+								// fits the page exactly, more rows keep that height and scroll.
+								data-sized={breakdownRowHeight ? "" : undefined}
+								style={
+									breakdownRowHeight
+										? ({
+												"--breakdown-row-height": `${breakdownRowHeight}px`,
+											} as CSSProperties)
 										: undefined
-							}
-							data={showSettled ? settled.data : data}
-							metric={showSettled ? settled.metric : metric}
-							selectedMetric={metric}
-							metrics={metrics}
-							metricsPending={metricsPending}
-							filters={activeFilters}
-							previews={previews}
-							inputFor={dashboard.inputFor}
-							runSignals={input.runSignals}
-							signalTypes={input.signalTypes}
-							interval={interval}
-							onMetricChange={setMetric}
-							onMetricIntent={onMetricIntent}
-							onRefresh={() => query.refetch()}
-							refreshing={query.isFetching && !isPending}
-							pending={isPending && !showSettled}
-							splitBy={
-								showSettled
-									? settled.data.splitBy
-									: (data?.splitBy ?? input.splitBy)
-							}
-							onResetSplit={() => setSplit("none")}
-						/>
-					)}
-					<div className="cost-breakdowns-container" hidden={isError}>
-						{tabbed ? (
-							<div className="cost-breakdown-tabs" role="tablist">
-								{dimensions.map((dimension) => (
-									<button
+								}
+								data-scope={scope}
+								data-layout={breakdownLayout}
+								data-signals={metric === "signals"}
+								data-pull-requests={isPullRequestMetric}
+								data-ci-runs={metric === "ciRuns"}
+							>
+								{shownDimensions.map((dimension) => (
+									<CostBreakdown
 										key={dimension}
-										type="button"
-										role="tab"
-										aria-selected={dimension === activeTab}
-										onClick={() => setBreakdownTab(dimension)}
-									>
-										{COST_LABELS[dimension]}
-									</button>
+										dimension={dimension}
+										entries={selectedData?.breakdowns[dimension] ?? []}
+										metric={metric}
+										valueLabel={METRIC_LABELS[metric]}
+										unavailable={selectedData === null}
+										onLoadDeferred={
+											PERSON_DIMENSIONS.has(dimension)
+												? (loadPersonRows ?? undefined)
+												: undefined
+										}
+										selected={input[dimension]}
+										pending={isPending}
+										split={input.splitBy === dimension}
+										onToggle={(id) => toggle(dimension, id)}
+										onClear={() => clear(dimension)}
+										onSplit={() =>
+											setSplit(input.splitBy === dimension ? "none" : dimension)
+										}
+									/>
 								))}
 							</div>
-						) : null}
-						<div
-							ref={breakdownsRef}
-							className="cost-breakdowns"
-							// Every row is as tall as the space left under the chart: one row
-							// fits the page exactly, more rows keep that height and scroll.
-							data-sized={breakdownRowHeight ? "" : undefined}
-							style={
-								breakdownRowHeight
-									? ({
-											"--breakdown-row-height": `${breakdownRowHeight}px`,
-										} as CSSProperties)
-									: undefined
-							}
-							data-scope={scope}
-							data-layout={breakdownLayout}
-							data-signals={metric === "signals"}
-							data-pull-requests={isPullRequestMetric}
-							data-ci-runs={metric === "ciRuns"}
-						>
-							{shownDimensions.map((dimension) => (
-								<CostBreakdown
-									key={dimension}
-									dimension={dimension}
-									entries={selectedData?.breakdowns[dimension] ?? []}
-									metric={metric}
-									valueLabel={METRIC_LABELS[metric]}
-									unavailable={selectedData === null}
-									onLoadDeferred={
-										PERSON_DIMENSIONS.has(dimension)
-											? (loadPersonRows ?? undefined)
-											: undefined
-									}
-									selected={input[dimension]}
-									pending={isPending}
-									split={input.splitBy === dimension}
-									onToggle={(id) => toggle(dimension, id)}
-									onClear={() => clear(dimension)}
-									onSplit={() =>
-										setSplit(input.splitBy === dimension ? "none" : dimension)
-									}
-								/>
-							))}
 						</div>
 					</div>
 				</div>
 			</div>
-		</div>
+		</IntroReveal>
 	);
 }
 

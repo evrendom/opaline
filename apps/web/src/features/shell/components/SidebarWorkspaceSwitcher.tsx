@@ -62,7 +62,11 @@ function WorkspaceMark({ logo }: { logo: string | null | undefined }) {
 			aria-hidden="true"
 			className={cn("flex size-5 shrink-0", WORKSPACE_MARK_SHADOW_CLASS_NAME)}
 		>
-			<Avatar className="size-5 rounded-none after:hidden [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]">
+			<Avatar
+				skullet-own=""
+				data-workspace-mark=""
+				className="size-5 rounded-none after:hidden [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]"
+			>
 				{logo ? (
 					<AvatarImage src={logo} alt="" className="rounded-none" />
 				) : null}

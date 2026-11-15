@@ -7,7 +7,14 @@ import {
 } from "react";
 import { smart } from "skullet";
 import { Skeleton, SkulletProvider } from "skullet/react";
-import { useIntroHold } from "@/app/first-open";
+import {
+	introRequested,
+	markIntroContentReady,
+	useIntroHold,
+	useIntroPageReady,
+	useIntroSettled,
+} from "@/app/first-open";
+import { useMountEffect } from "@/app/hooks/useMountEffect";
 import { cn } from "@/lib/utils";
 import "./bones.css";
 import { cancelSkulletAnimations } from "./skullet-animations";
@@ -125,8 +132,7 @@ export function Reveal({
 	sampleId: string;
 }) {
 	const host = useSquircleBars();
-	const holding = useIntroHold();
-	const skeleton = loading || holding;
+	const skeleton = loading;
 	return (
 		<div ref={host} className="contents">
 			<Skeleton
@@ -138,5 +144,85 @@ export function Reveal({
 				{skeleton ? sample : children()}
 			</Skeleton>
 		</div>
+	);
+}
+
+function IntroSkeleton({
+	children,
+	className,
+	label,
+}: {
+	children: ReactNode;
+	className?: string;
+	label: string;
+}) {
+	const host = useSquircleBars();
+	const holding = useIntroHold();
+	const settled = useIntroSettled();
+	return (
+		<div ref={host} className="contents">
+			<Skeleton
+				className={cn("intro-region", className)}
+				label={label}
+				loading={holding && settled}
+			>
+				<span skullet-own="" hidden />
+				{children}
+			</Skeleton>
+		</div>
+	);
+}
+
+function IntroContentReady() {
+	useMountEffect(markIntroContentReady);
+	return null;
+}
+
+function IntroPage({
+	contentReady,
+	...props
+}: {
+	children: ReactNode;
+	className?: string;
+	contentReady: boolean;
+	label: string;
+}) {
+	useIntroPageReady();
+	return (
+		<>
+			<IntroSkeleton {...props} />
+			{contentReady ? <IntroContentReady /> : null}
+		</>
+	);
+}
+
+export function IntroReveal({
+	children,
+	className,
+	contentReady = true,
+	label,
+	page = false,
+}: {
+	children: ReactNode;
+	className?: string;
+	contentReady?: boolean;
+	label: string;
+	page?: boolean;
+}) {
+	if (!introRequested()) return children;
+	if (page)
+		return (
+			<IntroPage
+				className={className}
+				contentReady={contentReady}
+				label={label}
+			>
+				{children}
+			</IntroPage>
+		);
+	return (
+		<IntroSkeleton className={className} label={label}>
+			{children}
+		</IntroSkeleton>
 	);
 }
