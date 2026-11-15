@@ -1,0 +1,111 @@
+#!/bin/sh
+set -eu
+here=$(cd "$(dirname "$0")" && pwd)
+repo=$(cd "$here/../.." && pwd)
+cache_root="$HOME/.cache/opaline-desktop"
+athena="${ATHENA:-$HOME/coding-projects/athena-selfhost-intro}"
+out="${OPALINE_DIST:-$cache_root/package}"
+cache="${OPALINE_RUNTIME_CACHE:-$cache_root/runtimes}"
+server_dir="${OPALINE_SERVER_PACKAGE_DIR:-$cache_root/server-package}"
+server_version="${OPALINE_SERVER_VERSION:-0.18.0-desktop.$(git -C "$athena" rev-parse --short=8 HEAD)}"
+layout="${OPALINE_RUNTIMES_LAYOUT:-unpacked}"
+identity="${OPALINE_SIGN_IDENTITY:--}"
+notary="${OPALINE_NOTARY_PROFILE:-}"
+electron_app="${ELECTRON_APP:-$here/node_modules/electron/dist/Electron.app}"
+version=$(sed -n 's/^[[:space:]]*"version": "\(.*\)",$/\1/p' "$here/package.json" | head -n 1)
+app="$out/Opaline.app"
+work="$out/.work"
+
+step() { printf '%s %s\n' "$(date +%H:%M:%S)" "$*"; }
+
+[ -d "$electron_app" ] || { echo "No Electron.app at $electron_app (symlink node_modules/electron)." >&2; exit 1; }
+[ -d "$athena/apps/web" ] || { echo "ATHENA=$athena is not an athena checkout." >&2; exit 1; }
+for file in onboarding-window/vendor/glass3d.js onboarding-window/dots/dots.js onboarding-window/dots/dots.css onboarding-window/previews/dark.png onboarding-window/previews/light.png; do
+	[ -f "$here/$file" ] || { echo "Missing $file (see build-glass3d.sh, build-dots.sh, scripts/grab-previews.mjs)." >&2; exit 1; }
+done
+
+rm -rf "$app" "$work"
+mkdir -p "$out" "$work"
+
+step "CLI: bun run build"
+(cd "$repo/apps/cli" && bun run build >/dev/null)
+
+server_manifest="$server_dir/opaline-server-$server_version.json"
+if [ ! -f "$server_manifest" ]; then
+	step "server: bun run build:selfhost --version $server_version"
+	(cd "$athena" && bun run build:selfhost --version "$server_version" --out "$server_dir" >/dev/null)
+fi
+[ -f "$server_manifest" ] || server_manifest=$(ls "$server_dir"/opaline-server-"$server_version"*.json | sort | tail -n 1)
+server_tarball="$server_dir/$(sed -n 's/^[[:space:]]*"file": "\(.*\)",*$/\1/p' "$server_manifest" | head -n 1)"
+[ -f "$server_tarball" ] || { echo "No tarball for $server_manifest" >&2; exit 1; }
+
+step "runtimes: verified downloads in $cache ($layout)"
+if [ "$layout" = unpacked ]; then
+	bun "$here/scripts/runtimes.ts" unpack "$cache" "$work/unpacked" >/dev/null
+else
+	bun "$here/scripts/runtimes.ts" download "$cache" "$work/runtimes" >/dev/null
+fi
+
+step "pricing.js from $athena/packages/api-routes/src/model-pricing.ts"
+bun build "$athena/packages/api-routes/src/model-pricing.ts" --format=cjs --target=node --outfile "$here/pricing.js" >/dev/null
+
+step "assemble $app"
+cp -R "$electron_app" "$app"
+rm -f "$app/Contents/Resources/default_app.asar"
+resources="$app/Contents/Resources"
+dest="$resources/app"
+mkdir -p "$dest/cli" "$resources/server" "$resources/runtimes"
+cp "$here/package.json" "$here/main.js" "$here/cli.js" "$here/analyze.js" "$here/pricing.js" \
+	"$here/preload.js" "$here/onboarding-preload.js" "$here/environments.js" "$here/environment-preload.js" "$dest/"
+cp -R "$here/stack" "$here/analysis" "$here/onboarding" "$here/onboarding-window" "$here/environment-window" "$dest/"
+cp "$repo/apps/cli/dist/"*.js "$dest/cli/"
+printf '{"type":"module"}\n' > "$dest/cli/package.json"
+cp "$server_manifest" "$server_tarball" "$resources/server/"
+if [ "$layout" = unpacked ]; then
+	cp -R "$work/unpacked/bin/." "$resources/runtimes/"
+else
+	mkdir -p "$resources/runtimes/downloads"
+	for file in $(bun -e "console.log(Object.values(require('$work/runtimes/runtimes.json').files).join(' '))"); do
+		cp -c "$cache/$file" "$resources/runtimes/downloads/$file" 2>/dev/null || cp "$cache/$file" "$resources/runtimes/downloads/$file"
+		chmod 0644 "$resources/runtimes/downloads/$file"
+	done
+	cp "$work/runtimes/runtimes.json" "$resources/runtimes/runtimes.json"
+fi
+cp "$here/build/Opaline.icns" "$resources/Opaline.icns"
+plist="$app/Contents/Info.plist"
+plutil -replace CFBundleName -string Opaline "$plist"
+plutil -replace CFBundleDisplayName -string Opaline "$plist"
+plutil -replace CFBundleIdentifier -string so.opaline.desktop "$plist"
+plutil -replace CFBundleIconFile -string Opaline.icns "$plist"
+mv "$app/Contents/MacOS/Electron" "$app/Contents/MacOS/Opaline"
+plutil -replace CFBundleExecutable -string Opaline "$plist"
+plutil -replace CFBundleShortVersionString -string "$version" "$plist"
+plutil -replace CFBundleVersion -string "$version" "$plist"
+xattr -cr "$app"
+
+if [ "$identity" = "-" ]; then
+	step "sign: ad-hoc"
+	codesign --force --deep --sign - "$app"
+else
+	step "sign: $identity (hardened runtime)"
+	entitlements="$here/build/entitlements.plist"
+	find "$resources/runtimes" -type f -perm -u+x | while read -r binary; do
+		if file "$binary" | grep -q Mach-O; then
+			codesign --force --timestamp --options runtime --entitlements "$entitlements" --sign "$identity" "$binary"
+		fi
+	done
+	find "$app/Contents/Frameworks" -depth \( -name '*.dylib' -o -name '*.framework' -o -name '*.app' \) | while read -r item; do
+		codesign --force --timestamp --options runtime --entitlements "$entitlements" --sign "$identity" "$item"
+	done
+	codesign --force --timestamp --options runtime --entitlements "$entitlements" --sign "$identity" "$app"
+	if [ -n "$notary" ]; then
+		step "notarize: notarytool profile $notary"
+		ditto -c -k --keepParent "$app" "$out/Opaline-notarize.zip"
+		xcrun notarytool submit "$out/Opaline-notarize.zip" --keychain-profile "$notary" --wait
+		xcrun stapler staple "$app"
+		rm -f "$out/Opaline-notarize.zip"
+	fi
+fi
+codesign --verify --deep --strict "$app"
+rm -rf "$work"
+step "done: $app ($(du -sh "$app" | cut -f1)), server $(basename "$server_tarball"), runtimes $layout"

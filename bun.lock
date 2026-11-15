@@ -79,6 +79,10 @@
         "typescript": "5.9.2",
       },
     },
+    "apps/desktop": {
+      "name": "@rudel/desktop",
+      "version": "0.1.0",
+    },
     "apps/marketing": {
       "name": "@rudel/marketing",
       "version": "0.0.1",
@@ -1051,6 +1055,8 @@
     "@rudel/api-routes": ["@rudel/api-routes@workspace:packages/api-routes"],
 
     "@rudel/ch-schema": ["@rudel/ch-schema@workspace:packages/ch-schema"],
+
+    "@rudel/desktop": ["@rudel/desktop@workspace:apps/desktop"],
 
     "@rudel/language-signals": ["@rudel/language-signals@workspace:packages/language-signals"],
 

@@ -16,7 +16,16 @@
 			"!**/generated",
 			"!design-archive",
 			"!apps/marketing/public/vendor",
-			"!apps/marketing/src/styles/vendor"
+			"!apps/marketing/src/styles/vendor",
+			"!apps/desktop/main.js",
+			"!apps/desktop/cli.js",
+			"!apps/desktop/analyze.js",
+			"!apps/desktop/preload.js",
+			"!apps/desktop/onboarding-preload.js",
+			"!apps/desktop/onboarding-window",
+			"!apps/desktop/dots",
+			"!apps/desktop/glass3d",
+			"!apps/desktop/onboarding"
 		]
 	},
 	"formatter": {

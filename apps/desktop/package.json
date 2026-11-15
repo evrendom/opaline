@@ -1,0 +1,15 @@
+{
+	"name": "@rudel/desktop",
+	"productName": "Opaline",
+	"version": "0.1.0",
+	"private": true,
+	"main": "main.js",
+	"scripts": {
+		"start": "env -u ELECTRON_RUN_AS_NODE electron .",
+		"package": "./package.sh",
+		"build:glass3d": "./build-glass3d.sh",
+		"build:dots": "./build-dots.sh",
+		"previews": "node scripts/grab-previews.mjs",
+		"test": "bun test test"
+	}
+}

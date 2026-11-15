@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en" data-theme="dark" class="dark">
+	<head>
+		<meta charset="utf-8" />
+		<meta
+			http-equiv="Content-Security-Policy"
+			content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'"
+		/>
+		<title>Opaline</title>
+		<link rel="stylesheet" href="dots/dots.css" />
+		<link rel="stylesheet" href="vendor/dialkit/dialkit.css" />
+		<link rel="stylesheet" href="style.css" />
+	</head>
+	<body>
+		<div class="frame">
+		<div class="card">
+			<main class="content" aria-live="polite"></main>
+		</div>
+		<svg class="defs" aria-hidden="true" width="0" height="0"><filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="6.29" numOctaves="2" stitchTiles="stitch" /><feColorMatrix type="saturate" values="0" /></filter></svg>
+		<footer class="footer">
+			<nav class="dots" aria-label="Steps"></nav>
+			<div class="footer-pill">
+				<div class="pill-light" aria-hidden="true"></div>
+				<p class="footer-note"><span class="note-chip"><svg class="note-pebble" viewBox="0 0 1049 1042" aria-hidden="true"><clipPath id="note-pebble-clip"><path d="M524.532 0C661.725 4.52425 793.956 20.3892 890.19 103.494C986.746 183.313 1047.24 330.329 1049 520.65C1047.24 710.913 986.746 857.99 890.19 937.817C793.956 1020.92 661.79 1036.79 524.532 1041.3C387.274 1036.79 255.1 1020.92 158.866 937.817C62.3182 857.99 1.76716 711.006 0 520.684C1.75876 330.245 62.3185 183.245 158.866 103.494C255.1 20.3892 387.274 4.52426 524.532 0Z"/></clipPath><path class="note-pebble-fill" d="M524.532 0C661.725 4.52425 793.956 20.3892 890.19 103.494C986.746 183.313 1047.24 330.329 1049 520.65C1047.24 710.913 986.746 857.99 890.19 937.817C793.956 1020.92 661.79 1036.79 524.532 1041.3C387.274 1036.79 255.1 1020.92 158.866 937.817C62.3182 857.99 1.76716 711.006 0 520.684C1.75876 330.245 62.3185 183.245 158.866 103.494C255.1 20.3892 387.274 4.52426 524.532 0Z"/><path class="note-pebble-ring" d="M524.532 0C661.725 4.52425 793.956 20.3892 890.19 103.494C986.746 183.313 1047.24 330.329 1049 520.65C1047.24 710.913 986.746 857.99 890.19 937.817C793.956 1020.92 661.79 1036.79 524.532 1041.3C387.274 1036.79 255.1 1020.92 158.866 937.817C62.3182 857.99 1.76716 711.006 0 520.684C1.75876 330.245 62.3185 183.245 158.866 103.494C255.1 20.3892 387.274 4.52426 524.532 0Z" clip-path="url(#note-pebble-clip)" fill="none" stroke-width="2" vector-effect="non-scaling-stroke"/></svg><svg class="note-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6"/><path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0"/><path d="M8 11v-4a4 4 0 1 1 8 0v4"/></svg></span><span>Nothing leaves this <span data-device>Mac</span>.</span></p>
+				<button class="primary" type="button">Get Started</button>
+			</div>
+		</footer>
+		</div>
+		<div class="tooltip" role="tooltip" hidden></div>
+		<script src="dots/dots.js"></script>
+		<script src="charts.js"></script>
+		<script src="vendor/dialkit/dialkit.js"></script>
+		<script src="vendor/glass3d.js"></script>
+		<script src="boxes.js"></script>
+		<script src="app.js"></script>
+	</body>
+</html>
