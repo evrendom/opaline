@@ -1,4 +1,6 @@
-"use client";
+import { IntroReveal } from "@/app/ui/bones";
+
+("use client");
 
 import { Link } from "react-router-dom";
 import { routePreloadHandlers } from "@/app/route-loaders";
@@ -14,6 +16,7 @@ import {
 	SidebarMenuItem,
 } from "@/app/ui/sidebar";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
+import { DesktopWindowBar } from "@/features/shell/components/desktop-window-bar";
 import { SidebarInstallCommand } from "@/features/shell/components/SidebarInstallCommand";
 import { SidebarRepositories } from "@/features/shell/components/SidebarRepositories";
 import { SidebarUserMenu } from "@/features/shell/components/SidebarUserMenu";
@@ -126,7 +129,10 @@ export function AppSidebar() {
 				{/* The plugin's host already titles it "Opaline". */}
 				{import.meta.env.MODE === "plugin" ? null : (
 					<SidebarHeader>
-						<SidebarWorkspaceSwitcher />
+						<DesktopWindowBar />
+						<IntroReveal label="Workspace">
+							<SidebarWorkspaceSwitcher />
+						</IntroReveal>
 					</SidebarHeader>
 				)}
 
@@ -147,9 +153,11 @@ export function AppSidebar() {
 						</SidebarGroupContent>
 					</SidebarGroup>
 					{import.meta.env.MODE === "plugin" ? null : (
-						<SidebarRepositories
-							reposActive={currentShellRoute.id === "repos"}
-						/>
+						<IntroReveal label="Repositories">
+							<SidebarRepositories
+								reposActive={currentShellRoute.id === "repos"}
+							/>
+						</IntroReveal>
 					)}
 				</SidebarContent>
 

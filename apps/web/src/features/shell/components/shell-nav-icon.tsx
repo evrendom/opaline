@@ -81,6 +81,8 @@ export function ShellNavIcon({
 
 	return (
 		<span
+			skullet-own=""
+			data-nav-icon=""
 			className={cn(
 				"relative grid size-4.5 shrink-0 place-items-center transition-colors duration-100 ease-in-out",
 				active && tone ? tone.glyph : restingGlyphClassName,

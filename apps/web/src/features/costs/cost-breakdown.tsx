@@ -13,6 +13,7 @@ import {
 	IconMessage2,
 } from "@tabler/icons-react";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { useIntroHold, useIntroSettled } from "@/app/first-open";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
 import { Reveal } from "@/app/ui/bones";
 import {
@@ -54,6 +55,8 @@ type Props = {
 	onLoadDeferred?: () => void;
 };
 
+const INTRO_ROW_SCALES = [1, 0.62, 0.41, 0.27, 0.18, 0.11];
+
 export function CostBreakdown({
 	dimension,
 	metric,
@@ -69,6 +72,9 @@ export function CostBreakdown({
 	onLoadDeferred,
 }: Props) {
 	const [expanded, setExpanded] = useState(false);
+	const introHold = useIntroHold();
+	const introSettled = useIntroSettled();
+	const holding = introHold && introSettled;
 	const [search, setSearch] = useState("");
 	const label = COST_LABELS[dimension];
 	const maximum = Math.max(0, ...entries.map((entry) => entry.value));
@@ -158,6 +164,30 @@ export function CostBreakdown({
 											onToggle={onToggle}
 										/>
 									))}
+									{holding
+										? INTRO_ROW_SCALES.slice(entries.length).map(
+												(scale, at) => {
+													const source = entries[at % entries.length];
+													if (!source) return null;
+													return (
+														<BreakdownRow
+															key={`intro-${scale}`}
+															dimension={dimension}
+															metric={metric}
+															entry={{
+																...source,
+																id: `intro-${scale}`,
+																value: source.value * scale,
+															}}
+															maximum={maximum}
+															color={SERIES_COLORS[0]}
+															selected={false}
+															onToggle={() => {}}
+														/>
+													);
+												},
+											)
+										: null}
 								</div>
 							)}
 						</Reveal>
@@ -527,11 +557,13 @@ export function ScrollFade({
 				<div ref={content}>{children}</div>
 			</div>
 			<div
+				skullet-ignore=""
 				className="cost-scroll-fade-edge"
 				data-edge="top"
 				data-visible={edges.top || undefined}
 			/>
 			<div
+				skullet-ignore=""
 				className="cost-scroll-fade-edge"
 				data-edge="bottom"
 				data-visible={edges.bottom || undefined}

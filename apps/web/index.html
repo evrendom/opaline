@@ -19,6 +19,9 @@
         document.documentElement.classList.toggle("dark", dark);
         document.documentElement.style.colorScheme = dark ? "dark" : "light";
       } catch {}
+      if (navigator.userAgent.includes("OpalineDesktop/")) {
+        document.documentElement.dataset.desktop = "";
+      }
     </script>
     <meta name="description" content="Ingest, store, and analyze Claude Code / Codex session transcripts" />
     <link rel="icon" href="/favicon.ico" sizes="any" media="(prefers-color-scheme: light)" />
