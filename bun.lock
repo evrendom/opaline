@@ -232,6 +232,18 @@
         "typescript": "5.9.2",
       },
     },
+    "packages/local-server": {
+      "name": "@rudel/local-server",
+      "version": "0.18.0",
+      "dependencies": {
+        "zod": "^4.6.5",
+      },
+      "devDependencies": {
+        "@rudel/typescript-config": "workspace:*",
+        "bun-types": "latest",
+        "typescript": "5.9.2",
+      },
+    },
     "packages/repo-intelligence-source-github": {
       "name": "@rudel/repo-intelligence-source-github",
       "version": "0.0.0",
@@ -1061,6 +1073,8 @@
     "@rudel/language-signals": ["@rudel/language-signals@workspace:packages/language-signals"],
 
     "@rudel/local-context-source": ["@rudel/local-context-source@workspace:packages/local-context-source"],
+
+    "@rudel/local-server": ["@rudel/local-server@workspace:packages/local-server"],
 
     "@rudel/marketing": ["@rudel/marketing@workspace:apps/marketing"],
 
