@@ -373,6 +373,27 @@ describe("install", () => {
 		expect(quits).toEqual(["quit"]);
 	});
 
+	test("a prompt that closes because the install already started changes nothing", async () => {
+		let answer;
+		const ui = fakeUi();
+		ui.askToRestart = () =>
+			new Promise((resolve) => {
+				answer = resolve;
+			});
+		const { updater, autoUpdater, order, lines } = setup({
+			ui,
+			fetch: async () => jsonResponse(feedFor("0.2.0")),
+		});
+		await updater.check();
+		autoUpdater.emit("update-downloaded");
+		await updater.menuItem().click();
+		answer(false);
+		await Bun.sleep(0);
+		expect(order).toEqual(["beforeInstall", "quitAndInstall"]);
+		expect(lines.join("\n")).not.toContain("postponed");
+		expect(updater.state().kind).toBe("installing");
+	});
+
 	test("install does nothing without a downloaded update", async () => {
 		const { updater, order } = setup({ fetch: async () => jsonResponse({}) });
 		expect(await updater.install()).toBe(false);
