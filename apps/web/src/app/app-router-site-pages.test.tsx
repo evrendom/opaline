@@ -2,7 +2,7 @@ import type { ReactElement, ReactNode } from "react";
 import { createRoutesFromChildren, type RouteObject } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { getSitePageRoute } from "../../../api/src/lib/site-page-route";
-import { AppRouter } from "./AppRouter";
+import { AppRouterRoutes } from "./AppRouter";
 
 const WORKSPACE_SLUG = "acme";
 const SERVED_BY_OTHER_REWRITES = new Set([
@@ -42,7 +42,10 @@ function expandParams(path: string): string[] {
 }
 
 function appRouterPaths() {
-	const element = AppRouter({ rootRedirectTarget: null }) as ReactElement<{
+	const element = AppRouterRoutes({
+		rootRedirectTarget: null,
+		selfHosted: false,
+	}) as ReactElement<{
 		children: ReactNode;
 	}>;
 	const routes = createRoutesFromChildren(element.props.children);

@@ -349,17 +349,23 @@ function getShellRouteElements(
 	);
 }
 
-export function AppRouter({
-	rootRedirectTarget,
-	sessionComponent,
-	dashboardComponent,
-}: {
+type AppRouterProps = {
 	rootRedirectTarget: string | null;
 	sessionComponent?: ComponentType;
 	dashboardComponent?: ComponentType;
-}) {
+};
+
+export function AppRouter(props: AppRouterProps) {
+	return <AppRouterRoutes {...props} selfHosted={useSelfHost() !== null} />;
+}
+
+export function AppRouterRoutes({
+	rootRedirectTarget,
+	sessionComponent,
+	dashboardComponent,
+	selfHosted,
+}: AppRouterProps & { selfHosted: boolean }) {
 	const rootRedirect = rootRedirectTarget || shellRouteMap.dashboard.path;
-	const selfHosted = useSelfHost() !== null;
 	return (
 		<Routes>
 			<Route path="/" element={<Navigate to={rootRedirect} replace />} />
