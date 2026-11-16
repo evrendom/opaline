@@ -13,9 +13,9 @@ import { storeSessionImages } from "./images.js";
 import type { Owner, SessionJob, SessionOutcome } from "./service.js";
 
 type ProcessIngestSession =
-	typeof import("../../router.js").processIngestSession;
+	typeof import("../../services/session-import/index.js").processIngestSession;
 type BackgroundErrors =
-	typeof import("../../router.js").createBackgroundIngestErrorFactories;
+	typeof import("../../services/session-import/index.js").createBackgroundIngestErrorFactories;
 
 export interface SessionRunnerDependencies {
 	readonly processIngestSession: ProcessIngestSession;
@@ -83,7 +83,7 @@ export async function loadSessionRunner(options: {
 	readonly log: (line: string) => void;
 }): Promise<(job: SessionJob, owner: Owner) => Promise<SessionOutcome>> {
 	const [router, { getClickhouse }, storage] = await Promise.all([
-		import("../../router.js"),
+		import("../../services/session-import/index.js"),
 		import("../../clickhouse.js"),
 		import("../../services/r2-ingest-storage.service.js"),
 	]);

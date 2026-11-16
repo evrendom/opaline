@@ -1,7 +1,7 @@
 import postgres from "postgres";
 import { fetchHandler, MAX_REQUEST_BODY_BYTES } from "../../handler.js";
-import { setIngestRateLimitEnvironmentForTests } from "../../router.js";
 import { createPostgresIngestRateLimitEnvironment } from "../../services/ingest-rate-limit.service.js";
+import { setIngestRateLimitEnvironmentForTests } from "../../services/ingest-rate-limit-environment.js";
 
 const unavailableDatabase = postgres(
 	"postgres://postgres:postgres@127.0.0.1:1/rudel",

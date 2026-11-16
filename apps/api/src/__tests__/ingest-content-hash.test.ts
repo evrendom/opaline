@@ -114,7 +114,7 @@ describe("computeIngestContentHash", () => {
 
 	test("the handler computes one hash and reuses it for compare and record", async () => {
 		const routerSource = await Bun.file(
-			new URL("../router.ts", import.meta.url),
+			new URL("../services/session-import/import-session.ts", import.meta.url),
 		).text();
 		expect(
 			routerSource.match(/computeIngestContentHash\(filteredInput\)/gu),

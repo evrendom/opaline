@@ -25,11 +25,7 @@ import {
 import { ingestProcessingSqlClient, sqlClient } from "../db.js";
 import { handleR2IngestMaintenanceRequest } from "../handlers/api-maintenance.js";
 import { handleLargeR2IngestWorkerRequest } from "../handlers/large-r2-ingest-worker.js";
-import {
-	type IngestErrorFactories,
-	processIngestSession,
-	router,
-} from "../router.js";
+import { router } from "../router.js";
 import { requeueFailedIngestJobs } from "../scripts/requeue-failed-ingest-jobs.js";
 import { setAnalysisLogForTests } from "../services/analysis-log/config.js";
 import { createLocalEmbedder } from "../services/analysis-log/embedder.js";
@@ -79,6 +75,10 @@ import {
 	type R2MultipartUploadInitClient,
 	type R2ObjectMetadata,
 } from "../services/r2-ingest-storage.service.js";
+import {
+	type IngestErrorFactories,
+	processIngestSession,
+} from "../services/session-import/index.js";
 import { UsageExtractionQueueTimeoutError } from "../services/usage-extraction.service.js";
 import {
 	type ApiTestServer,
