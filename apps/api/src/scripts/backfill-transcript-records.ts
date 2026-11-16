@@ -14,6 +14,7 @@ import {
 	type TranscriptRecordsBackfillOptions,
 } from "../services/transcript-records-backfill.service.js";
 
+const GIT_OBSERVATION_RETIREMENT_BUDGET_MS = 15 * 60_000;
 const DEFAULT_MAX_SESSIONS = readPositiveSafeIntegerEnv(
 	"TRANSCRIPT_RECORDS_BACKFILL_MAX_SESSIONS",
 	10_000,
@@ -113,17 +114,28 @@ try {
 	console.log(JSON.stringify(result, null, 2));
 	if (result.failedCount > 0) process.exitCode = 2;
 	if (values.execute) {
-		// The run kept older git observation generations; retire them in one pass.
-		const retirement = await retireGenerations(executor, gitObservationsStore, {
-			organizationId: values["organization-id"],
-		});
-		console.error(
-			`Retired ${retirement.retired} of ${retirement.generations} older git observation generations${retirement.hasMore ? "; more remain for the hourly retirement" : ""}.`,
-		);
+		try {
+			const retirement = await retireGenerations(
+				executor,
+				gitObservationsStore,
+				{
+					organizationId: values["organization-id"],
+					deadline: {
+						deadlineAt: Date.now() + GIT_OBSERVATION_RETIREMENT_BUDGET_MS,
+						now: Date.now,
+					},
+				},
+			);
+			console.error(
+				`Retired ${retirement.retired} of ${retirement.generations} older git observation generations${retirement.hasMore ? "; more remain for the hourly retirement" : ""}.`,
+			);
+		} catch (error) {
+			console.error(
+				`Older git observation generations were not retired (${error instanceof Error ? error.message : String(error)}); the hourly retirement retires them.`,
+			);
+		}
 	}
 	if (values.execute && result.completedCount > 0) {
-		// The generations this run superseded stay readable for the grace,
-		// then only the daily pass (ten sessions a day) would delete them.
 		const scope = values["organization-id"]
 			? `--organization-id ${values["organization-id"]}`
 			: "--all-organizations";
