@@ -18,6 +18,7 @@ const { analyzeSessions, scanSessions } = require("./analyze");
 const { createAgents } = require("./agents");
 const { createLocalStack, introUrl } = require("./stack/local-stack");
 const { createEnvironmentMenu } = require("./environments");
+const { keepClaudeTranscripts } = require("./stack/transcripts");
 
 app.userAgentFallback = `${app.userAgentFallback
 	.replace(/\sElectron\/\S+/, "")
@@ -353,6 +354,13 @@ function restoreServerPriority() {
 	if (!serverQuiet) return;
 	serverQuiet = false;
 	stack.setServerPriority(false);
+}
+
+try {
+	const kept = keepClaudeTranscripts();
+	stack.mark(`claude-transcripts ${kept.changed ? `kept for ${kept.days} days` : kept.reason}`);
+} catch (error) {
+	stack.mark(`claude-transcripts not changed: ${error.message}`);
 }
 
 if (!explicitUrl && stack.isLocal()) {
