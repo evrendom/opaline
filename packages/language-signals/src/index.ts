@@ -25,5 +25,7 @@ export type {
 	ModelLanguageSignalMatch,
 } from "./types.js";
 
-// Version 5 persists exact phrase frequencies for dashboard signal filters.
-export const SCAN_VERSION = 5;
+// Version 7 changes the member frustration rules. It skips 6, which persisted
+// rows already carry for run-level facts (SESSION_AGENT_RUN_SCAN_VERSION), so
+// every session re-scans.
+export const SCAN_VERSION = 7;

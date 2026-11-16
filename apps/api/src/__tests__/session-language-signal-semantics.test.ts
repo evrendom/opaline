@@ -20,6 +20,8 @@ const fingerprintsByVersion: Readonly<Record<number, string>> = {
 	// Negative member counts, followed by exact per-phrase frequency maps.
 	4: "083a0b78ac8523eff65f0e2f667cf0116241abd1a0c1569e054f0df484da2686",
 	5: "39adbbfba8621f3129931bb7849bc9df7aaeec6bfa55d81ea41ec8eb7624b29a",
+	6: "39adbbfba8621f3129931bb7849bc9df7aaeec6bfa55d81ea41ec8eb7624b29a",
+	7: "e119b29c251eb10484a70ef0a39c00903e040d638e501951212384e31a451dd7",
 };
 
 describe("persisted language-signal semantics", () => {

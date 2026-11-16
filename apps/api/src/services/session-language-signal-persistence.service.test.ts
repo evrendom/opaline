@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import type {
-	LanguageSignalCounts,
-	LanguageSignalSummary,
+import {
+	type LanguageSignalCounts,
+	type LanguageSignalSummary,
+	SCAN_VERSION,
 } from "@rudel/language-signals";
 import type { ClickHouseExecutor } from "../clickhouse.js";
 import { SessionLanguageSignalScannerOperationalError } from "./ingest-worker-operational.error.js";
@@ -77,14 +78,14 @@ describe("session language-signal ingest persistence", () => {
 			organization_id: "org-1",
 			raw_ingested_at: "2026-08-19 12:00:01.123",
 			raw_revision: "115807295561596928",
-			scan_version: 5,
+			scan_version: SCAN_VERSION,
 			model_apology_counts: {},
 			member_negative_counts: {},
 			member_positive_counts: {},
 			scanned_at: "2026-08-19 12:00:02.456",
 			signal_version: buildSessionLanguageSignalVersion(
 				"115807295561596928",
-				5,
+				SCAN_VERSION,
 				"2026-08-19T12:00:02.456Z",
 			),
 			session_date: "2026-08-19 12:00:00.000",
