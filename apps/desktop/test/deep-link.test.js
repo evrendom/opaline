@@ -3,6 +3,7 @@ const {
 	deepLinkFromArgv,
 	deepLinkTarget,
 	isDeepLink,
+	openedUrl,
 } = require("../deep-link");
 
 const ORIGIN = "http://localhost:4100";
@@ -97,5 +98,40 @@ describe("deepLinkFromArgv", () => {
 		expect(deepLinkFromArgv(undefined)).toBeUndefined();
 		expect(isDeepLink(" opaline://x")).toBe(true);
 		expect(isDeepLink("https://x")).toBe(false);
+	});
+});
+
+describe("openedUrl", () => {
+	test("pages on the local server stay in the app", () => {
+		expect(openedUrl(`${ORIGIN}/acme/reports/a1?x=1`, ORIGIN)).toEqual({
+			kind: "app",
+			url: "http://localhost:4100/acme/reports/a1?x=1",
+		});
+		expect(openedUrl("http://127.0.0.1:4100/acme", ORIGIN).kind).toBe(
+			"external",
+		);
+	});
+
+	test("app links open through the app's own link handling", () => {
+		expect(openedUrl(" opaline://acme/dashboard ", ORIGIN)).toEqual({
+			kind: "link",
+			url: "opaline://acme/dashboard",
+		});
+	});
+
+	test("only web and mail links leave the app", () => {
+		expect(openedUrl("https://github.com/a/b/pull/1", ORIGIN)).toEqual({
+			kind: "external",
+			url: "https://github.com/a/b/pull/1",
+		});
+		expect(openedUrl("mailto:a@example.com", ORIGIN).kind).toBe("external");
+		for (const raw of [
+			"file:///etc/passwd",
+			"javascript:alert(1)",
+			"smb://host/share",
+			"not a url",
+		])
+			expect(openedUrl(raw, ORIGIN)).toEqual({ kind: "none" });
+		expect(openedUrl(`${ORIGIN}/acme`, undefined).kind).toBe("external");
 	});
 });

@@ -35,9 +35,29 @@ function deepLinkTarget(raw, origin) {
 	return target.toString();
 }
 
+const EXTERNAL_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
+
+function openedUrl(raw, origin) {
+	if (isDeepLink(raw)) return { kind: "link", url: raw.trim() };
+	let url;
+	try {
+		url = new URL(raw);
+	} catch {
+		return { kind: "none" };
+	}
+	try {
+		if (origin && url.origin === new URL(origin).origin)
+			return { kind: "app", url: url.toString() };
+	} catch {}
+	return EXTERNAL_PROTOCOLS.has(url.protocol)
+		? { kind: "external", url: url.toString() }
+		: { kind: "none" };
+}
+
 module.exports = {
 	OPALINE_SCHEME,
 	deepLinkFromArgv,
 	deepLinkTarget,
 	isDeepLink,
+	openedUrl,
 };

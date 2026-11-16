@@ -19,7 +19,7 @@ if (!app.requestSingleInstanceLock()) {
 	return;
 }
 
-const { OPALINE_SCHEME, deepLinkFromArgv, deepLinkTarget } = require("./deep-link");
+const { OPALINE_SCHEME, deepLinkFromArgv, deepLinkTarget, isDeepLink, openedUrl } = require("./deep-link");
 
 let pendingLink = deepLinkFromArgv(process.argv);
 
@@ -130,9 +130,16 @@ function createWindow({ url, link, bounds, intro = false } = {}) {
 	win.webContents.on("dom-ready", () => win.webContents.insertCSS(NO_SCROLLBARS).catch(() => {}));
 	if (isDev) win.webContents.on("did-finish-load", () => win.webContents.executeJavaScript(REPLAY_BUTTON).catch(() => {}));
 	win.webContents.setWindowOpenHandler(({ url: next }) => {
-		if (isAppUrl(next)) createWindow({ url: next });
-		else shell.openExternal(next);
+		const opened = openedUrl(next, appOrigin());
+		if (opened.kind === "app") createWindow({ url: opened.url });
+		else if (opened.kind === "link") openLink(opened.url);
+		else if (opened.kind === "external") shell.openExternal(opened.url);
 		return { action: "deny" };
+	});
+	win.webContents.on("will-navigate", (event, next) => {
+		if (!isDeepLink(next)) return;
+		event.preventDefault();
+		openLink(next);
 	});
 	appWindows.add(win);
 	win.on("closed", () => appWindows.delete(win));
