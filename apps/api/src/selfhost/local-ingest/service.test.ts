@@ -384,14 +384,16 @@ test("a session that keeps failing is given up until its transcript changes, and
 	await service.stop();
 });
 
-test("a restart gives a session it gave up on one more round", async () => {
+test("a restart gives a session it gave up on or skipped one more round", async () => {
 	const broken = await session("broken", 1);
+	const oversized = await session("oversized", 1);
 	const store = memoryStore();
 	const outcomes = new Map<string, SessionOutcome>([
 		[
 			broken,
 			{ kind: "retry", reason: 'could not access file "$libdir/plpgsql"' },
 		],
+		[oversized, { kind: "skipped", reason: "content Too big" }],
 	]);
 	const settings = {
 		concurrency: 1,
@@ -404,12 +406,17 @@ test("a restart gives a session it gave up on one more round", async () => {
 	await service.start();
 	await waitFor(() => store.rows.get(broken)?.state === "skipped");
 	await settle(service);
+	expect(store.rows.get(oversized)?.state).toBe("skipped");
 	await service.stop();
 	const second = ingestor();
 	const restarted = create(store, second, { settings });
 	await restarted.start();
-	await waitFor(() => store.rows.get(broken)?.state === "ingested");
-	expect(second.calls).toHaveLength(1);
+	await waitFor(
+		() =>
+			store.rows.get(broken)?.state === "ingested" &&
+			store.rows.get(oversized)?.state === "ingested",
+	);
+	expect(second.calls).toHaveLength(2);
 	await restarted.stop();
 });
 

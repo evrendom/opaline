@@ -299,8 +299,7 @@ export class LocalIngest {
 		});
 		if (row.role !== "session") return;
 		const entry = this.entry(row.sessionPath, row.source);
-		const retry =
-			row.state === "skipped" && Boolean(row.reason?.startsWith(GAVE_UP));
+		const retry = row.state === "skipped";
 		entry.state = retry ? "pending" : row.state;
 		entry.reason = row.reason;
 		entry.attempts = row.attempts;
