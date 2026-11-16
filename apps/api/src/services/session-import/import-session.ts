@@ -1,6 +1,6 @@
 import { type IngestSessionInput, R2_INGEST_PROTOCOL } from "@rudel/api-routes";
 import { readBooleanEnv } from "../../lib/env.js";
-import { computeIngestContentHash } from "../../lib/ingest-content-hash.js";
+import { computeIngestContentHashes } from "../../lib/ingest-content-hash.js";
 import type { AppContext } from "../../middleware.js";
 import {
 	type AnalysisUploadEnv,
@@ -59,9 +59,16 @@ export async function processIngestSession(
 	// Hash the exact bytes and filter version stored by the server. This makes
 	// an old unfiltered CLI upload and a current pre-filtered CLI upload
 	// converge after server filtering instead of creating duplicate rows.
+	const subagents: Record<string, string> = {};
+	for (const subagent of claimed.filteredInput.subagents ?? []) {
+		subagents[subagent.agentId] = subagent.content;
+	}
+	const hashes = computeIngestContentHashes(claimed.filteredInput, subagents);
 	const prepared: PreparedSession = {
 		...claimed,
-		contentHash: computeIngestContentHash(claimed.filteredInput),
+		contentHash: hashes.contentSha256,
+		subagents,
+		transcriptHash: hashes.transcriptSha256,
 	};
 	const processed = request.durableProcessing
 		? await processInLedger(
@@ -118,11 +125,7 @@ function openRun(
 	request: SessionImportRequest,
 	claimedLedger: ClaimedIngestProcessingLedger | undefined,
 ): ImportRun {
-	const { contentHash, filteredInput, filteredText, ownership } = prepared;
-	const subagents: Record<string, string> = {};
-	for (const subagent of filteredInput.subagents ?? []) {
-		subagents[subagent.agentId] = subagent.content;
-	}
+	const { contentHash, filteredText, ownership } = prepared;
 	return {
 		claimedLedger,
 		clickhouse: claimedLedger
@@ -152,6 +155,5 @@ function openRun(
 				? (ownership.lastUsageChecksum ?? undefined)
 				: undefined,
 		},
-		subagents,
 	};
 }

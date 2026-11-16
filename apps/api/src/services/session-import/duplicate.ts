@@ -1,9 +1,6 @@
 import { getLogger } from "@logtape/logtape";
 import type { R2IngestProcessorResult } from "../r2-ingest-commit.service.js";
-import {
-	hashSkillSourceContent,
-	SKILL_PARSER_VERSION,
-} from "../skill-extraction.js";
+import { SKILL_PARSER_VERSION } from "../skill-extraction.js";
 import { hasMatchingSkillExtractionReceipt } from "../skill-extraction-ingest.service.js";
 import { hasMatchingUsageExtractionReceipt } from "../usage-event-ingest.service.js";
 import { type ImportRun, importedSession, storedResult } from "./scope.js";
@@ -13,8 +10,9 @@ const logger = getLogger(["rudel", "api", "router"]);
 export async function duplicateExit(
 	run: ImportRun,
 ): Promise<R2IngestProcessorResult | null> {
-	const { deps, enabled, prepared, request, subagents } = run;
-	const { contentHash, filteredInput, orgId, ownership } = prepared;
+	const { deps, enabled, prepared, request } = run;
+	const { contentHash, filteredInput, orgId, ownership, transcriptHash } =
+		prepared;
 	const { context, input, signal } = request;
 	// This is a best-effort cost optimization, not a cross-instance
 	// security control. Concurrent identical requests can both reach the
@@ -43,10 +41,7 @@ export async function duplicateExit(
 			}),
 			{
 				parserVersion: SKILL_PARSER_VERSION,
-				sourceContentSha256: hashSkillSourceContent(
-					filteredInput.content,
-					subagents,
-				),
+				sourceContentSha256: transcriptHash,
 			},
 		);
 	const transcriptRecordsCurrent = await deps.stores.recordsCurrent(
@@ -54,9 +49,10 @@ export async function duplicateExit(
 		{
 			config: enabled.records,
 			content: filteredInput.content,
+			contentSha256: transcriptHash,
 			organizationId: orgId,
 			sessionId: input.sessionId,
-			subagents,
+			subagents: prepared.subagents,
 			userId: context.user.id,
 		},
 	);

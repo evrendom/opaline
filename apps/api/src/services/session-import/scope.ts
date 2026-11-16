@@ -28,6 +28,8 @@ export interface ClaimedSession extends AdmittedSession {
 
 export interface PreparedSession extends ClaimedSession {
 	readonly contentHash: string;
+	readonly subagents: Readonly<Record<string, string>>;
+	readonly transcriptHash: string;
 }
 
 export type ImportResponse = R2IngestProcessorResult["result"];
@@ -44,7 +46,6 @@ export interface ImportRun {
 	readonly prepared: PreparedSession;
 	readonly request: SessionImportRequest;
 	readonly response: ImportResponse;
-	readonly subagents: Readonly<Record<string, string>>;
 }
 
 export interface StoredRevision {

@@ -43,7 +43,7 @@ export async function storeDerivedFacts(
 	run: ImportRun,
 	stored: StoredRevision,
 ): Promise<R2IngestProcessorResult> {
-	const { deps, enabled, prepared, request, subagents } = run;
+	const { deps, enabled, prepared, request } = run;
 	const { filteredInput, orgId, timestamps } = prepared;
 	const { context, input, signal } = request;
 	const languageSignalInput: SessionLanguageSignalScanInput = {
@@ -65,13 +65,14 @@ export async function storeDerivedFacts(
 		.persistRecords(deps.stores.executor(), {
 			config: enabled.records,
 			content: filteredInput.content,
+			contentSha256: prepared.transcriptHash,
 			organizationId: orgId,
 			revision: stored.revision,
 			sessionDate: timestamps.sessionDate,
 			sessionId: input.sessionId,
 			signal,
 			source: filteredInput.source,
-			subagents,
+			subagents: prepared.subagents,
 			userId: context.user.id,
 		})
 		.then(async (records) => {
@@ -228,7 +229,7 @@ async function extractAndStoreFacts(
 						sessionId: input.sessionId,
 						source: filteredInput.source,
 						content: filteredInput.content,
-						subagents: run.subagents,
+						subagents: prepared.subagents,
 					},
 					signal,
 					skillSessionDate: timestamps.sessionDate,

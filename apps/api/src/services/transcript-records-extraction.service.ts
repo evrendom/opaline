@@ -381,6 +381,7 @@ export interface PersistTranscriptRecordsInput {
 	readonly assertWritable: () => Promise<void>;
 	readonly config: TranscriptRecordsExtractionConfig;
 	readonly content: string;
+	readonly contentSha256?: string;
 	readonly gate?: TranscriptRecordsJobGate;
 	readonly onWritten?: GitObservationExtractionInput["onWritten"];
 	readonly organizationId: string;
@@ -455,7 +456,9 @@ export async function persistTranscriptRecordsBestEffort(
 			await timedIngestPhase("server.transcript_records", () =>
 				writeTranscriptRecords(executor, {
 					assertWritable: input.assertWritable,
-					contentSha256: hashTranscriptContent(input.content, input.subagents),
+					contentSha256:
+						input.contentSha256 ??
+						hashTranscriptContent(input.content, input.subagents),
 					drafts: stream.drafts,
 					organizationId: input.organizationId,
 					revision: input.revision,
@@ -504,6 +507,7 @@ export async function isTranscriptRecordsCurrent(
 	input: {
 		readonly config: TranscriptRecordsExtractionConfig;
 		readonly content: string;
+		readonly contentSha256?: string;
 		readonly organizationId: string;
 		readonly sessionId: string;
 		readonly subagents: Readonly<Record<string, string>>;
@@ -514,7 +518,9 @@ export async function isTranscriptRecordsCurrent(
 	try {
 		const state = await readTranscriptRecordsReceipt(executor, input);
 		return hasMatchingTranscriptRecordsReceipt(state, {
-			contentSha256: hashTranscriptContent(input.content, input.subagents),
+			contentSha256:
+				input.contentSha256 ??
+				hashTranscriptContent(input.content, input.subagents),
 		});
 	} catch (error) {
 		logger.warn(

@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import type { IngestSessionInput } from "@rudel/api-routes";
-import { computeIngestContentHash } from "../lib/ingest-content-hash.js";
+import {
+	computeIngestContentHash,
+	computeIngestContentHashes,
+} from "../lib/ingest-content-hash.js";
+import { hashTranscriptContent } from "../lib/transcript-content-hash.js";
 
 const baseInput: IngestSessionInput = {
 	content: "main transcript",
@@ -110,5 +114,28 @@ describe("computeIngestContentHash", () => {
 				subagents: [...subagents].reverse(),
 			}),
 		);
+	});
+});
+
+describe("computeIngestContentHashes", () => {
+	test("one walk gives the content hash and the transcript hash, across chunk boundaries and surrogates", () => {
+		const straddling = `${"a".repeat((1 << 20) - 1)}\u{1F600}b\ud800x\udc00${"\u00e9".repeat(1 << 20)}`;
+		for (const input of [
+			baseInput,
+			{ ...baseInput, source: "codex" as const },
+			{ ...baseInput, content: straddling },
+			{ ...baseInput, content: "" },
+		]) {
+			const subagents = Object.fromEntries(
+				(input.subagents ?? []).map((subagent) => [
+					subagent.agentId,
+					subagent.content,
+				]),
+			);
+			expect(computeIngestContentHashes(input, subagents)).toEqual({
+				contentSha256: computeIngestContentHash(input),
+				transcriptSha256: hashTranscriptContent(input.content, subagents),
+			});
+		}
 	});
 });
