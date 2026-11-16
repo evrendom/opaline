@@ -489,7 +489,14 @@ async function ingestStatus(
 	if (!ingest) return Response.json({ error: "not_found" }, { status: 404 });
 	const actor = await loginLinkActor(request, deps);
 	if (actor instanceof Response) return actor;
-	return Response.json(ingest.status());
+	const [derived] = await deps.sql<{ queued: number }[]>`
+		SELECT count(*)::int AS queued FROM l1_edge_scope
+		WHERE request_count > built_request_count AND last_error IS NULL
+	`;
+	return Response.json({
+		...ingest.status(),
+		derivedQueued: derived?.queued ?? 0,
+	});
 }
 
 async function ingestNotify(

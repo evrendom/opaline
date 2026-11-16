@@ -1,9 +1,14 @@
 import type { LastSessionUpload, SessionAnalytics } from "@rudel/api-routes";
-import { IconArrowUpRight, IconCloudUpload } from "@tabler/icons-react";
+import {
+	IconArrowUpRight,
+	IconCloudUpload,
+	IconLoader2,
+} from "@tabler/icons-react";
 import { Link } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
+import { useLocalProcessing } from "@/features/self-hosted/local-processing";
 import {
 	pollUnlessPushed,
 	useSessionArrivalsLive,
@@ -75,12 +80,21 @@ export function LastSessionUploadBar() {
 			refetchInterval: pollUnlessPushed(pushed, 60_000),
 		}),
 	);
+	const processing = useLocalProcessing();
 	const latest = query.data;
 	const uploadedAt = latest ? getSessionEnd(latest) : null;
 
 	return (
 		<div className="flex h-8 shrink-0 items-center gap-4 px-1 text-xs text-muted-foreground tabular-nums">
-			{latest && uploadedAt && !Number.isNaN(uploadedAt.getTime()) ? (
+			{processing ? (
+				<output className="flex items-center gap-1.25">
+					<IconLoader2
+						aria-hidden="true"
+						className="size-3.25 animate-spin opacity-80"
+					/>
+					Processing sessions and repos
+				</output>
+			) : latest && uploadedAt && !Number.isNaN(uploadedAt.getTime()) ? (
 				<Link
 					to={getShellRoutePath(appRoutes.sessionDetail(latest.session_id))}
 					className="group/last-upload flex items-center gap-1.25 rounded-sm outline-none transition-colors hover:text-foreground"
