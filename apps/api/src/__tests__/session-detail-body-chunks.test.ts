@@ -156,9 +156,9 @@ describe("a session's file changes", () => {
 			sessionId: "s",
 			targetId: "s",
 		} as const;
-		expect(
-			SessionDetailBodyChunkInputSchema.parse(input).kind,
-		).toBe("fileChanges");
+		expect(SessionDetailBodyChunkInputSchema.parse(input).kind).toBe(
+			"fileChanges",
+		);
 		expect(getSessionDetailBodyForChunk(derivation, input)).toBeNull();
 		const parts: string[] = [];
 		for (let offset = 0; offset < body.json.length; ) {

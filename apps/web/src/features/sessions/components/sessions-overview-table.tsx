@@ -346,37 +346,46 @@ export function SessionsOverviewTable({
 									>
 										{({ registerItem, setActiveIndex }) => (
 											<>
-												{renderedRows.map(({ session, position, start }, index) => (
-													<SessionsOverviewRow
-														showPlace={showPlace}
-														showSkillsColumn={showSkillsColumn}
-														key={`${session.source}:${session.session_id}`}
-														virtualTop={start}
-														index={index}
-														position={position}
-														setSize={
-															pagination?.hasNextPage
-																? -1
-																: tableState.sortedSessions.length
-														}
-														registerItem={registerItem}
-														setHoverActiveIndex={setActiveIndex}
-														activeSessionId={activeSessionId}
-														avatarUrl={avatarMap?.[session.user_id]}
-														canOpenSession={canOpenSession}
-														getSessionHref={getSessionHref}
-														getSessionLinkState={getSessionLinkState}
-														liveNowMs={session.live_session ? nowMs : undefined}
-														maximumSessionCost={tableState.maximumSessionCost}
-														memberProfile={memberProfileSummaries.get(
-															session.user_id,
-														)}
-														onSessionClick={onSessionClick}
-														questionTags={questionTags.get(session.session_id)}
-														session={session}
-														userLabel={formatUsername(session.user_id, userMap)}
-													/>
-												))}
+												{renderedRows.map(
+													({ session, position, start }, index) => (
+														<SessionsOverviewRow
+															showPlace={showPlace}
+															showSkillsColumn={showSkillsColumn}
+															key={`${session.source}:${session.session_id}`}
+															virtualTop={start}
+															index={index}
+															position={position}
+															setSize={
+																pagination?.hasNextPage
+																	? -1
+																	: tableState.sortedSessions.length
+															}
+															registerItem={registerItem}
+															setHoverActiveIndex={setActiveIndex}
+															activeSessionId={activeSessionId}
+															avatarUrl={avatarMap?.[session.user_id]}
+															canOpenSession={canOpenSession}
+															getSessionHref={getSessionHref}
+															getSessionLinkState={getSessionLinkState}
+															liveNowMs={
+																session.live_session ? nowMs : undefined
+															}
+															maximumSessionCost={tableState.maximumSessionCost}
+															memberProfile={memberProfileSummaries.get(
+																session.user_id,
+															)}
+															onSessionClick={onSessionClick}
+															questionTags={questionTags.get(
+																session.session_id,
+															)}
+															session={session}
+															userLabel={formatUsername(
+																session.user_id,
+																userMap,
+															)}
+														/>
+													),
+												)}
 											</>
 										)}
 									</SessionsOverviewFluidList>

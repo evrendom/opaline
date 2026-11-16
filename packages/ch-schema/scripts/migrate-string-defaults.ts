@@ -6,7 +6,6 @@ import {
 	createJournalStore,
 	extractExecutableStatements,
 } from "chkit/dist/bin/lib.js";
-import { resolveClickHouseUsername } from "../src/clickhouse-connection.js";
 import { DROPPED_SESSION_ANALYTICS_COLUMNS } from "../src/session-analytics-mv.js";
 import { countReplicas } from "./cluster-replicas.js";
 import {

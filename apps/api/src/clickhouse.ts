@@ -12,8 +12,8 @@ import {
 	CODEX_SESSION_ANALYTICS_MV_SQL,
 	SESSION_ANALYTICS_INSERT_COLUMNS,
 } from "@rudel/ch-schema/session-analytics-mv";
-import { withBackgroundClickHouseSettings } from "./lib/background-work.js";
 import { withClickHouseWorkloadSettings } from "./clickhouse-workload.js";
+import { withBackgroundClickHouseSettings } from "./lib/background-work.js";
 
 const logger = getLogger(["rudel", "api", "clickhouse"]);
 

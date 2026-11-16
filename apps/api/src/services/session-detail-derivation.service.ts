@@ -21,6 +21,7 @@ import {
 	SESSION_DETAIL_CONTEXT_FILE_LIMIT,
 	SESSION_DETAIL_PREVIEW_CODE_POINT_LIMIT,
 	SESSION_DETAIL_SIGNAL_OCCURRENCE_LIMIT,
+	SESSION_DETAIL_TURN_SHAPE_POINT_LIMIT,
 	SESSION_DETAIL_WINDOW_INITIAL_TURNS,
 	SESSION_DETAIL_WINDOW_MAX_RAW_BYTES,
 	SESSION_DETAIL_WINDOW_MAX_TURN_BYTES,
@@ -31,6 +32,7 @@ import {
 	type SessionDetailTurn,
 	type SessionDetailTurnBody,
 	SessionDetailTurnSchema,
+	type SessionDetailTurnShape,
 	type SessionDetailWindow,
 	type SessionDetailWindowRequest,
 	type SessionDetailWindowTurn,
@@ -42,8 +44,6 @@ import {
 	type TokenUsageEvent,
 	type TraceItem,
 	translateCodexToolCall,
-	SESSION_DETAIL_TURN_SHAPE_POINT_LIMIT,
-	type SessionDetailTurnShape,
 } from "@rudel/api-routes";
 import {
 	SCAN_VERSION,
