@@ -213,6 +213,7 @@ function agentTile(agent, settled = false) {
 		connected: `<span class="agent-action" data-done>${CHECK_FILLED}Connected</span>`,
 		error: `<button type="button" class="agent-action" data-connect="${agent.key}">Try again</button>`,
 		ready: `<button type="button" class="agent-action" data-connect="${agent.key}">Connect</button>`,
+		checking: `<button type="button" class="agent-action" data-connect="${agent.key}">Connect</button>`,
 	}[phase] ?? '<button type="button" class="agent-action" disabled>Connect</button>';
 	return `<article class="agent" data-agent="${agent.key}" data-phase="${phase}"${settled ? " data-settled" : ""} style="--agent-color:${agent.color}">
 		${icon(agent.key, "agent-icon") || `<span class="agent-icon" data-blank>${agent.label[0]}</span>`}
@@ -1021,9 +1022,27 @@ async function buildUp(view) {
 }
 
 const AGENT_TINTS = {
-	claude: ["#E8957A", "#D97757", "#B85A3C"],
-	codex: ["#B6A2F9", "#6F85FF", "#332DF5"],
+	claude: ["oklch(0.76 0.11 39.2)", "oklch(0.659 0.146 39.2)", "oklch(0.6 0.14 39.2)"],
+	codex: ["oklch(0.774 0.128 295.5)", "oklch(0.679 0.167 268.4)", "oklch(0.498 0.283 271.2)"],
 };
+
+function oklchToHex(value) {
+	const [l, c, h] = value.match(/[\d.]+/g).map(Number);
+	const a = c * Math.cos((h * Math.PI) / 180);
+	const b = c * Math.sin((h * Math.PI) / 180);
+	const lms = [l + 0.3963377774 * a + 0.2158037573 * b, l - 0.1055613458 * a - 0.0638541728 * b, l - 0.0894841775 * a - 1.291485548 * b].map((x) => x ** 3);
+	const linear = [
+		4.0767416621 * lms[0] - 3.3077115913 * lms[1] + 0.2309699292 * lms[2],
+		-1.2684380046 * lms[0] + 2.6097574011 * lms[1] - 0.3413193965 * lms[2],
+		-0.0041960863 * lms[0] - 0.7034186147 * lms[1] + 1.707614701 * lms[2],
+	];
+	return `#${linear
+		.map((x) => {
+			const v = Math.min(1, Math.max(0, x <= 0.0031308 ? 12.92 * x : 1.055 * x ** (1 / 2.4) - 0.055));
+			return Math.round(v * 255).toString(16).padStart(2, "0");
+		})
+		.join("")}`;
+}
 const LEAVE_MS = 520;
 const LEAVE_GAP_MS = 70;
 
@@ -1118,7 +1137,7 @@ function rewind(reading, overlays, name) {
 
 content.addEventListener("pointerover", (event) => {
 	const tile = event.target.closest("[data-agent]");
-	if (tile && !tile.contains(event.relatedTarget)) glass?.tint(AGENT_TINTS[tile.dataset.agent]);
+	if (tile && !tile.contains(event.relatedTarget)) glass?.tint(AGENT_TINTS[tile.dataset.agent]?.map(oklchToHex));
 });
 
 content.addEventListener("pointerout", (event) => {
@@ -1260,7 +1279,7 @@ untitle(document.body);
 document.querySelector("[data-device]").textContent = DEVICE;
 
 api.agents().then((list) => {
-	for (const status of list) liveAgents[status.key] = status;
+	for (const status of list) if (!liveAgents[status.key]) liveAgents[status.key] = status;
 	previewAgents();
 });
 
