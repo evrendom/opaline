@@ -92,11 +92,10 @@ export async function buildSetupRequest(
 		email?.trim() ||
 		(await readGitConfig("user.email")) ||
 		`${username}@opaline.local`;
-	const firstName = name.split(/\s+/u)[0] || name;
 	return {
 		email: resolvedEmail,
 		name,
-		workspaceName: `${firstName}'s workspace`,
+		workspaceName: "Your workspace",
 	};
 }
 

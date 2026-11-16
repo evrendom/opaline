@@ -228,7 +228,7 @@ describe("first admin", () => {
 	test("an explicit email is used for the first admin", async () => {
 		const request = await buildSetupRequest("admin@acme.test");
 		expect(request.email).toBe("admin@acme.test");
-		expect(request.workspaceName).toEndWith("'s workspace");
+		expect(request.workspaceName).toBe("Your workspace");
 	});
 });
 
