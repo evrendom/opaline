@@ -218,3 +218,21 @@ function readCommandLine(pid: number): Promise<string | undefined> {
 		);
 	});
 }
+
+export function readProcessStart(pid: number): Promise<number | undefined> {
+	return new Promise((resolve) => {
+		execFile(
+			"ps",
+			["-o", "lstart=", "-p", String(pid)],
+			{
+				encoding: "utf8",
+				timeout: 5_000,
+				env: { ...process.env, LC_ALL: "C", TZ: "UTC" },
+			},
+			(error, stdout) => {
+				const started = error ? Number.NaN : Date.parse(`${stdout.trim()} UTC`);
+				resolve(Number.isNaN(started) ? undefined : started);
+			},
+		);
+	});
+}

@@ -94,6 +94,7 @@ import {
 	type ServerState,
 	saveServerState,
 } from "./server-state.js";
+import { withStartLock } from "./start-lock.js";
 import { getLauncherVersion } from "./version.js";
 
 export interface ServerStartFlags {
@@ -168,12 +169,29 @@ export async function startServer(
 	flags: ServerStartFlags,
 	context: ServerRunnerContext,
 ): Promise<undefined | Error> {
-	const { reporter } = context;
 	const dataDir = resolveServerDataDir(
 		flags.dataDir,
 		context.env,
 		context.home,
 	);
+	return withStartLock(
+		dataDir,
+		() => startServerAlone(dataDir, flags, context),
+		{
+			onWait: (holder) =>
+				context.reporter.info(
+					`Another start of this server is running (pid ${holder.pid}); waiting for it to finish.`,
+				),
+		},
+	);
+}
+
+async function startServerAlone(
+	dataDir: string,
+	flags: ServerStartFlags,
+	context: ServerRunnerContext,
+): Promise<undefined | Error> {
+	const { reporter } = context;
 	const platform = detectHostPlatform();
 	if (platform instanceof Error) return platform;
 	let existing: ServerState | undefined;
@@ -1144,7 +1162,7 @@ async function reassignBusyInternalPorts(
 	return next;
 }
 
-async function startServices(options: {
+export async function startServices(options: {
 	readonly dataDir: string;
 	readonly state: ServerState;
 	readonly runtimes: Runtimes;
@@ -1156,6 +1174,23 @@ async function startServices(options: {
 	const { dataDir, state, runtimes, running, startedHere, context } = options;
 	const baseEnv = pickEnvironment(context.env);
 	const clickhouse = getClickHouseConnection(state);
+	const clickhouseReady = async () =>
+		(await probeClickHouse(clickhouse, { timeoutMs: 2_000 })).ok;
+	const postgresReady = async () =>
+		(await probePostgres(state.postgres.port)) === "ready";
+	const localUrl = getLocalServerUrl(state);
+	const joinRunning = async (
+		name: ServiceName,
+		timeoutMs: number,
+		check: () => Promise<boolean>,
+	): Promise<Error | undefined> => {
+		const record = running[name];
+		if (!record || (await check().catch(() => false))) return undefined;
+		context.reporter.info(
+			`${SERVICE_LABELS[name]} is already starting (pid ${record.pid}); waiting until it is ready ...`,
+		);
+		return waitUntilReady({ dataDir, name, pid: record.pid, timeoutMs, check });
+	};
 
 	const startClickHouse = async (): Promise<Error | undefined> => {
 		if (state.clickhouse.mode === "local" && runtimes.clickhouse) {
@@ -1192,11 +1227,15 @@ async function startServices(options: {
 					name: "clickhouse",
 					pid: record.pid,
 					timeoutMs: CLICKHOUSE_READY_TIMEOUT_MS,
-					check: async () =>
-						(await probeClickHouse(clickhouse, { timeoutMs: 2_000 })).ok,
+					check: clickhouseReady,
 				});
 				if (ready) return ready;
 			}
+			return joinRunning(
+				"clickhouse",
+				CLICKHOUSE_READY_TIMEOUT_MS,
+				clickhouseReady,
+			);
 		}
 		return undefined;
 	};
@@ -1243,12 +1282,11 @@ async function startServices(options: {
 				name: "postgres",
 				pid: record.pid,
 				timeoutMs: POSTGRES_READY_TIMEOUT_MS,
-				check: async () =>
-					(await probePostgres(state.postgres.port)) === "ready",
+				check: postgresReady,
 			});
 			if (ready) return ready;
 		}
-		return undefined;
+		return joinRunning("postgres", POSTGRES_READY_TIMEOUT_MS, postgresReady);
 	};
 	const [clickhouseFailed, postgresFailed] = await Promise.all([
 		startClickHouse(),
@@ -1299,17 +1337,17 @@ async function startServices(options: {
 			marker: options.distribution.entry,
 		});
 		startedHere.push("server");
-		const localUrl = getLocalServerUrl(state);
-		const ready = await waitUntilReady({
+		return waitUntilReady({
 			dataDir,
 			name: "server",
 			pid: record.pid,
 			timeoutMs: readServerTimeout(context.env),
 			check: () => isServerReady(localUrl),
 		});
-		if (ready) return ready;
 	}
-	return undefined;
+	return joinRunning("server", readServerTimeout(context.env), () =>
+		isServerReady(localUrl),
+	);
 }
 
 export function getServerEnvironment(
