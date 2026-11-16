@@ -27,7 +27,7 @@ export function ProfileOverviewCard({
 	image: string | null;
 	isSigningOut: boolean;
 	name: string;
-	onSignOut: () => void;
+	onSignOut?: () => void;
 }) {
 	return (
 		<WorkspaceSettingsGroup title="Profile">
@@ -43,20 +43,22 @@ export function ProfileOverviewCard({
 			<WorkspaceSettingsRow label="Email" controlId="account-email">
 				<Input id="account-email" type="email" value={email} readOnly />
 			</WorkspaceSettingsRow>
-			<WorkspaceSettingsRow
-				label="Session"
-				description="Sign out from this device without affecting other sessions."
-			>
-				<Button
-					type="button"
-					variant="outline"
-					size="sm"
-					onClick={onSignOut}
-					disabled={isSigningOut}
+			{onSignOut ? (
+				<WorkspaceSettingsRow
+					label="Session"
+					description="Sign out from this device without affecting other sessions."
 				>
-					{isSigningOut ? "Signing out…" : "Sign out"}
-				</Button>
-			</WorkspaceSettingsRow>
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						onClick={onSignOut}
+						disabled={isSigningOut}
+					>
+						{isSigningOut ? "Signing out…" : "Sign out"}
+					</Button>
+				</WorkspaceSettingsRow>
+			) : null}
 		</WorkspaceSettingsGroup>
 	);
 }

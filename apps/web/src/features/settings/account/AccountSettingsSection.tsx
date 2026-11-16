@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { appRoutes } from "@/app/routes";
 import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
 import { useTrackProductPageView } from "@/features/analytics/tracking/useTrackProductPageView";
+import { useLocalDesktopApp } from "@/features/desktop/local-app";
 import { PasswordCard } from "@/features/self-hosted/PasswordCard";
 import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import { sendsEmail } from "@/features/self-hosted/surfaces";
@@ -24,6 +25,7 @@ import { authClient, signOut } from "@/lib/auth-client";
 export function AccountSettingsSection() {
 	const navigate = useNavigate();
 	const selfHost = useSelfHost();
+	const localApp = useLocalDesktopApp();
 	const getShellRoutePath = useShellRoutePath();
 	const data = useAccountSettingsData();
 	const invitationsData = useInvitationsSettingsData();
@@ -155,44 +157,48 @@ export function AccountSettingsSection() {
 						email={data.user.email}
 						image={data.user.image}
 						isSigningOut={isSigningOut}
-						onSignOut={() => void handleSignOut()}
+						onSignOut={localApp ? undefined : () => void handleSignOut()}
 					/>
-					{selfHost ? <PasswordCard /> : null}
+					{selfHost && !localApp ? <PasswordCard /> : null}
 					<AppearanceCard />
 					{sendsEmail(selfHost) ? (
 						<div id="email-digests" className="scroll-mt-24">
 							<EmailDigestsCard />
 						</div>
 					) : null}
-					<ProfileLinkedAccountsCard
-						isPending={data.state.isPending}
-						linkedProviders={data.linkedProviders}
-						linkingProvider={linkingProvider}
-						onLinkProvider={handleLinkProvider}
-					/>
-					<div id="workspace-invitations" className="scroll-mt-24">
-						<WorkspaceIncomingInvitationsCard
-							title="Workspace invitations"
-							description="Accept or decline workspace invites sent to your account."
-							invitations={invitationsData.invitations}
-							isPending={invitationsData.state.isPending}
-							processingId={processingInvitationId}
-							onAccept={(invitationId) =>
-								void handleAcceptInvitation(invitationId)
-							}
-							onDecline={(invitationId) =>
-								void handleDeclineInvitation(invitationId)
-							}
-						/>
-					</div>
-					{data.state.hasData ? (
-						<div id="delete-account" className="scroll-mt-24">
-							<AccountDangerZoneCard
-								user={{ email: data.user.email, name: data.user.name }}
-								onDeleted={handleAccountDeleted}
+					{localApp ? null : (
+						<>
+							<ProfileLinkedAccountsCard
+								isPending={data.state.isPending}
+								linkedProviders={data.linkedProviders}
+								linkingProvider={linkingProvider}
+								onLinkProvider={handleLinkProvider}
 							/>
-						</div>
-					) : null}
+							<div id="workspace-invitations" className="scroll-mt-24">
+								<WorkspaceIncomingInvitationsCard
+									title="Workspace invitations"
+									description="Accept or decline workspace invites sent to your account."
+									invitations={invitationsData.invitations}
+									isPending={invitationsData.state.isPending}
+									processingId={processingInvitationId}
+									onAccept={(invitationId) =>
+										void handleAcceptInvitation(invitationId)
+									}
+									onDecline={(invitationId) =>
+										void handleDeclineInvitation(invitationId)
+									}
+								/>
+							</div>
+							{data.state.hasData ? (
+								<div id="delete-account" className="scroll-mt-24">
+									<AccountDangerZoneCard
+										user={{ email: data.user.email, name: data.user.name }}
+										onDeleted={handleAccountDeleted}
+									/>
+								</div>
+							) : null}
+						</>
+					)}
 				</div>
 			)}
 		</SettingsPageReveal>

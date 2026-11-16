@@ -1,5 +1,6 @@
 import { CardContent } from "@/app/ui/card";
 import { useTrackProductPageView } from "@/features/analytics/tracking/useTrackProductPageView";
+import { useLocalDesktopApp } from "@/features/desktop/local-app";
 import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import { showsBilling } from "@/features/self-hosted/surfaces";
 import { SettingsPageReveal } from "@/features/settings/components/settings-page-skeleton";
@@ -16,6 +17,7 @@ import { useWorkspaceSettingsData } from "@/features/settings/workspace/use-work
 export function WorkspaceSettingsSection() {
 	const data = useWorkspaceSettingsData();
 	const selfHost = useSelfHost();
+	const localApp = useLocalDesktopApp();
 	const memberCount = data.fullOrg?.members.length ?? 0;
 	const pendingOutgoingInvitationCount = data.pendingInvitations.length;
 
@@ -71,10 +73,12 @@ export function WorkspaceSettingsSection() {
 									<BillingSandboxCard organizationId={data.activeOrg.id} />
 								</>
 							) : null}
-							<WorkspaceDangerZoneCard
-								organization={data.activeOrg}
-								canManage={data.canManage}
-							/>
+							{localApp ? null : (
+								<WorkspaceDangerZoneCard
+									organization={data.activeOrg}
+									canManage={data.canManage}
+								/>
+							)}
 						</>
 					) : null}
 				</div>

@@ -16,7 +16,10 @@ export function GitHubSettingsPage() {
 	const selfHost = useSelfHost();
 
 	const loading = state.isLoading || Boolean(organizationId && query.isPending);
-	if (!loading && (!organizationId || !showsGitHubSettings(selfHost, query.data))) {
+	if (
+		!loading &&
+		(!organizationId || !showsGitHubSettings(selfHost, query.data))
+	) {
 		return (
 			<Navigate
 				replace

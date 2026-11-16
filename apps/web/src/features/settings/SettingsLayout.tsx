@@ -21,7 +21,14 @@ import {
 	IconUserFilled,
 } from "@tabler/icons-react";
 import { motion } from "motion/react";
-import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import {
+	Link,
+	Navigate,
+	Outlet,
+	useLocation,
+	useNavigate,
+} from "react-router-dom";
+import { appRoutes } from "@/app/routes";
 import {
 	Select,
 	SelectContent,
@@ -30,6 +37,10 @@ import {
 	SelectValue,
 } from "@/app/ui/select";
 import { IconPlugFilled } from "@/components/ui/icon-plug-filled";
+import {
+	LOCAL_APP_HIDDEN_SETTINGS,
+	useLocalDesktopApp,
+} from "@/features/desktop/local-app";
 import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import { showsGitHubSettings } from "@/features/self-hosted/surfaces";
 import {
@@ -62,16 +73,24 @@ export function SettingsLayout() {
 	const { state } = useOrganization();
 	const { query } = useGitHubConnection(state.activeOrg?.id ?? null);
 	const selfHost = useSelfHost();
+	const localApp = useLocalDesktopApp();
 	const routes = primarySettingsRoutes.filter((route) =>
-		route.id === "github"
-			? showsGitHubSettings(selfHost, query.data)
-			: route.id !== "mcp" || selfHost !== null,
+		localApp && LOCAL_APP_HIDDEN_SETTINGS.has(route.id)
+			? false
+			: route.id === "github"
+				? showsGitHubSettings(selfHost, query.data)
+				: route.id !== "mcp" || selfHost !== null,
 	);
 	const getShellRoutePath = useShellRoutePath();
 	const location = useLocation();
 	const navigate = useNavigate();
 	const activeRouteId = getActiveSettingsRouteId(location.pathname);
 	const { fade, ref: fadeRef } = useScrollFade<HTMLDivElement>();
+
+	if (localApp && LOCAL_APP_HIDDEN_SETTINGS.has(activeRouteId))
+		return (
+			<Navigate replace to={getShellRoutePath(appRoutes.settingsWorkspace())} />
+		);
 
 	return (
 		<div

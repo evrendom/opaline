@@ -1,4 +1,13 @@
 import { useSelfHost } from "@/features/self-hosted/self-host-info";
+import type { SettingsRouteId } from "@/features/settings/config/settings-routes";
+
+export const LOCAL_APP_HIDDEN_SETTINGS: ReadonlySet<SettingsRouteId> = new Set([
+	"members",
+	"team",
+	"invitations",
+	"sessions",
+	"mcp",
+]);
 
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
