@@ -117,6 +117,7 @@ const STATEMENT_NAMES = {
 		"streams and models",
 		"unrecorded facts",
 		"links",
+		"rules",
 	],
 	calls: ["calls ranked", "calls share", "pushes"],
 	edits: ["edits"],

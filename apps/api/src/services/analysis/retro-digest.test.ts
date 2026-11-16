@@ -29,6 +29,7 @@ import {
 	digestUsageSql,
 	focusPattern,
 	INLINE_SCRIPT_RE,
+	RULE_RE,
 	SCRIPT_FUNCTION_RE,
 	SECRET_RE,
 	SEVERITY_RULES,
@@ -383,6 +384,27 @@ function inputs(): DigestInputs {
 			sessions: [session("s1"), session("s2"), session("s3", "codex")],
 			repeats: [["fix the tests", 2, "s1", 3]],
 			repeat_totals: [1, 1],
+			rule_totals: [3, 2],
+			rules: [
+				[
+					"dont use a mono",
+					2,
+					2,
+					"s1",
+					4,
+					"dont use a mono font",
+					"2026-10-07 10:00:00.000",
+				],
+				[
+					"always dark mode first",
+					1,
+					1,
+					"s2",
+					2,
+					"always dark mode first",
+					"2026-10-08 10:00:00.000",
+				],
+			],
 			streams: [
 				["s1", "a1", 1],
 				["s1", "a2", 1],
@@ -814,6 +836,23 @@ describe("digest", () => {
 			"(session_id, agent_id, turn_idx) IN (('s-1', '', 4), ('s\\'1', 'a9f', 2))",
 		);
 		expect(sql).toContain("(user_id, session_id) IN (SELECT arrayJoin(");
+	});
+
+	test("rules the person states in later prompts are listed, those said in 2+ sessions first", () => {
+		const row = buildDigest(inputs(), scope)
+			.sections.flatMap((section) => section.rows)
+			.find((candidate) => candidate.metric === "rules said in prompts");
+		expect(row?.value).toBe(
+			'3 prompts in 2 sessions; said in 2+ sessions: 1; "dont use a mono" 2 sess 2 texts: s1#4 "dont use a mono font" · "always dark mode first" 1 sess 1 texts: s2#2 "always dark mode first"',
+		);
+		expect(row?.example).toBe("s1#4");
+		const rule = new RegExp(RULE_RE, "gu");
+		expect(
+			"ok but dont use a mono font. and from now on test in dia, not chrome".match(
+				rule,
+			),
+		).toEqual(["dont use a mono", "from now on test in dia"]);
+		expect("i dont know".match(rule)).toEqual(["dont know"]);
 	});
 
 	test("thresholds come from the cohort: context size p90 and long runs", () => {

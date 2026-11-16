@@ -224,6 +224,24 @@ export const DIGEST_MERGES: Readonly<Record<string, Merge>> = {
 		DIGEST_LIMITS.repeats,
 	),
 	repeat_totals: summed,
+	rule_totals: summed,
+	rules: grouped(
+		1,
+		[1, 2],
+		(left, right) =>
+			Math.min(num(right[1]), num(right[2])) -
+				Math.min(num(left[1]), num(left[2])) ||
+			num(right[2]) - num(left[2]) ||
+			order(str(right[6]), str(left[6])) ||
+			order(str(left[0]), str(right[0])),
+		DIGEST_LIMITS.rules,
+		{
+			3: (left) => left,
+			4: (left) => left,
+			5: (left) => left,
+			6: (left, right) => (order(str(left), str(right)) < 0 ? right : left),
+		},
+	),
 	streams: sorted(by(byText(0), byText(1)), DIGEST_LIMITS.streams),
 	streams_total: total,
 	models: grouped(

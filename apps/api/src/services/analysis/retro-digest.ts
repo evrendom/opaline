@@ -1053,6 +1053,33 @@ function personSection(
 		sessions: [...new Set(repeats.map((t) => str(t[2])))].slice(0, DIGEST_IDS),
 		example: repeats[0] ? ex(str(repeats[0][2]), repeats[0][3]) : "",
 	});
+	const rules = tuples(sessionsRow.rules);
+	const ruleTotals = arr(sessionsRow.rule_totals).map(num);
+	if (rules.length > 0) {
+		const repeated = rules.filter(
+			(rule) => Math.min(num(rule[1]), num(rule[2])) >= 2,
+		);
+		const shown = [
+			...repeated,
+			...rules.filter((rule) => !repeated.includes(rule)),
+		].slice(0, 6);
+		rows.push({
+			metric: "rules said in prompts",
+			value: `${fmt(ruleTotals[0] ?? 0)} prompts in ${ruleTotals[1] ?? 0} sessions; ${repeated.length ? `said in 2+ sessions: ${repeated.length}` : "none said in 2+ sessions"}; ${shown
+				.map(
+					(rule) =>
+						`"${str(rule[0])}" ${num(rule[1])} sess ${num(rule[2])} texts: ${ex(str(rule[3]), rule[4])} "${short(str(rule[5]), 40)}"`,
+				)
+				.join(" · ")}`,
+			definition:
+				"genuine main-stream prompts after a session's first, up to 600 chars (typed corrections, not briefs or pastes) with never, always, don't, do not, from now on, every time, not our, use our or instead of, grouped by those words and the next three; texts = distinct prompt texts, so a scripted prompt sent to many sessions counts once; a rule the person keeps saying belongs in an instruction file: open the run's setup (s<n>) to check whether one already says it",
+			sessions: [...new Set(shown.map((rule) => str(rule[3])))].slice(
+				0,
+				DIGEST_IDS,
+			),
+			example: shown[0] ? ex(str(shown[0][3]), shown[0][4]) : "",
+		});
+	}
 	return { id: "g", title: "The person", rows, missing };
 }
 

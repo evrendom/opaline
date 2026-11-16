@@ -13,6 +13,7 @@ export const DIGEST_IDS = 3;
 
 export const DIGEST_LIMITS = {
 	repeats: 40,
+	rules: 40,
 	streams: 5000,
 	models: 12,
 	links: 2000,
@@ -39,6 +40,24 @@ export const CI_POLL_RE = String.raw`\bgh\s+(pr\s+checks|run\s+(watch|view|list)
 export const INLINE_SCRIPT_RE = String.raw`(^|[;&|(]\s*|\s)(python3?|node|bun|deno|ruby|perl|tsx)\s+(-c\s|-e\s|-p\s|--eval\s|-\s*<<|<<)`;
 
 export const SCRIPT_FUNCTION_RE = String.raw`((?:def|function)\s+[A-Za-z_][A-Za-z0-9_]*\s*\([^)\n]{0,40}\))`;
+
+export const RULE_TRIGGERS = [
+	"never",
+	"always",
+	"dont",
+	"do not",
+	"from now on",
+	"every time",
+	"not our",
+	"use our",
+	"instead of",
+] as const;
+
+export const RULE_RE = String.raw`\b(?:${RULE_TRIGGERS.join("|")})(?: [a-z0-9][a-z0-9-]*){1,3}`;
+
+const NOT_A_RULE = String.raw`\b(?:i|we|it|that|they|he|she) (?:dont|do not|never|always)\b`;
+
+const NOT_A_RULE_VERB = String.raw`^(?:dont|do not|never|always) (?:get|know|understand|like|see|think|care|want|need|mind|have|remember|worry|mean|believe|feel)\b`;
 
 export const INTERPRETER_RE = String.raw`\b(python3?|node|bun|deno|ruby|perl|tsx)\b`;
 
@@ -86,6 +105,20 @@ export function digestSessionsSql(params: MeasureParams): string[] {
 		)
 		GROUP BY uid, sid, said
 		HAVING times >= 2
+	),
+	rules AS (
+		SELECT uid, sid, turn, at, said, cityHash64(text) AS text_hash,
+			substring(replaceRegexpAll(text, '\\s+', ' '), 1, 90) AS quote
+		FROM (
+			SELECT user_id AS uid, session_id AS sid, turn_idx AS turn, at, text,
+				arrayFilter(phrase -> NOT match(phrase, ${sqlString(NOT_A_RULE_VERB)}),
+					arrayDistinct(extractAll(replaceRegexpAll(
+						replaceRegexpAll(replaceRegexpAll(lowerUTF8(substring(text, 1, 4000)), '[\\x27’]', ''), '[^a-z0-9-]+', ' '),
+						${sqlString(NOT_A_RULE)}, ' '), ${sqlString(RULE_RE)}))) AS said
+			FROM prompts
+			WHERE at >= ${start} AND genuine = 1 AND agent_id = '' AND turn_idx > 1 AND text_chars <= 600 AND ${inPickedSet()}
+		)
+		WHERE notEmpty(said)
 	),
 	streams AS (
 		SELECT session_id AS sid, agent_id AS aid, min(turn_idx) AS turn
@@ -136,6 +169,14 @@ export function digestSessionsSql(params: MeasureParams): string[] {
 		FROM session_links
 		WHERE ${inPickedSet("", "from_session_id")} OR ${inPickedSet("", "to_session_id")}
 		ORDER BY kind, from_session_id, to_session_id LIMIT ${DIGEST_LIMITS.links})`,
+		`${ctes}
+	SELECT (SELECT (count(), uniqExact(sid)) FROM rules) AS rule_totals,
+		(SELECT groupArray((phrase, sessions, texts, first_sid, first_turn, first_quote, toString(last_at))) FROM (
+			SELECT phrase, uniqExact(sid) AS sessions, uniqExact(text_hash) AS texts,
+				argMin(sid, at) AS first_sid, argMin(turn, at) AS first_turn, argMin(quote, at) AS first_quote, max(at) AS last_at
+			FROM (SELECT sid, turn, at, quote, text_hash, arrayJoin(said) AS phrase FROM rules)
+			GROUP BY phrase
+			ORDER BY least(sessions, texts) DESC, texts DESC, last_at DESC, phrase LIMIT ${DIGEST_LIMITS.rules})) AS rules`,
 	];
 }
 
