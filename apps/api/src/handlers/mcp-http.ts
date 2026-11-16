@@ -11,6 +11,7 @@ import { sqlClient } from "../db.js";
 import { getFrontendOrigin } from "../frontend-origin.js";
 import { isSelfHosted, isSelfHostedAdmin } from "../lib/self-hosted.js";
 import { splitAnalyticsInputs } from "../mcp/analytics-inputs.js";
+import { workspacePageUrl } from "../mcp/app-links.js";
 import {
 	DASHBOARD_WIDGET_URI,
 	MCP_APP_MIME_TYPE,
@@ -524,7 +525,7 @@ async function runTool(
 			? [
 					{
 						type: "text",
-						text: `Open in Opaline: ${getFrontendOrigin()}/${encodeURIComponent(workspace.slug)}${tool.link(args)}`,
+						text: `Open in Opaline: ${workspacePageUrl(workspace.slug, tool.link(args))}`,
 					},
 				]
 			: [];

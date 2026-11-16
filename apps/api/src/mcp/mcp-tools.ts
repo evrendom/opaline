@@ -36,6 +36,7 @@ import { sqlClient } from "../db.js";
 import { isSelfHostedAdmin } from "../lib/self-hosted.js";
 import type { AppContext } from "../middleware.js";
 import type { router } from "../router.js";
+import { desktopApp } from "../selfhost/desktop-app.js";
 import { retroToolsEnabled } from "../services/analysis/retro-tools.js";
 import { SQL_RESULT_ID_PREFIX } from "../services/analysis/sql-results.js";
 import { countVisibleSessions } from "../services/analysis/visible-sessions.js";
@@ -55,7 +56,12 @@ import {
 	renderStoredSqlResult,
 } from "./analysis-renderers.js";
 import { withAnalyticsInputs } from "./analytics-inputs.js";
-import { sessionsUrl, sessionUrl, withUrlLine } from "./app-links.js";
+import {
+	sessionsUrl,
+	sessionUrl,
+	withUrlLine,
+	workspacePageUrl,
+} from "./app-links.js";
 import {
 	cliHint,
 	pullCommand,
@@ -87,7 +93,7 @@ import {
 	renderMeasureRun,
 	renderPatterns,
 } from "./measure-renderers.js";
-import { withReportLink } from "./report-link.js";
+import { analysisReportUrl, withReportLink } from "./report-link.js";
 import {
 	findPeek,
 	measuresPeek,
@@ -189,6 +195,10 @@ function input(properties: JsonSchema = {}, required: string[] = []) {
 		required,
 		additionalProperties: false,
 	};
+}
+
+function dashboardLink(args: Args) {
+	return `/dashboard${query(args, { startDate: "from", endDate: "to", metric: "metric", splitBy: "split", members: "member", repositories: "repo", models: "model" })}`;
 }
 
 function query(args: Args, keys: Record<string, string>) {
@@ -1425,21 +1435,20 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			const input = parseMcpInput(AnalysisHistorySaveInputSchema, args);
 			const coverage = startCoverage(client);
 			return withLogOffMessage(
-				client.analysis.history
-					.save(input)
-					.then((saved) =>
-						withCoverage(
-							withReportLink(
-								[
-									`saved analysis=${saved.analysis} status=${saved.status}`,
-									...(saved.warnings ?? []),
-								].join("\n"),
-								workspace.slug,
-								saved.analysis,
-							),
-							coverage,
+				client.analysis.history.save(input).then((saved) => {
+					desktopApp.show(analysisReportUrl(workspace.slug, saved.analysis));
+					return withCoverage(
+						withReportLink(
+							[
+								`saved analysis=${saved.analysis} status=${saved.status}`,
+								...(saved.warnings ?? []),
+							].join("\n"),
+							workspace.slug,
+							saved.analysis,
 						),
-					),
+						coverage,
+					);
+				}),
 			);
 		},
 	},
@@ -1644,6 +1653,9 @@ export const MCP_TOOLS: readonly McpTool[] = [
 				readPluginBootstrap(client, context),
 			]);
 			const view = { ...query, workspace: context.workspace.slug };
+			desktopApp.show(
+				workspacePageUrl(context.workspace.slug, dashboardLink(args)),
+			);
 			return {
 				...summarizeDashboard(dashboard, query.metric),
 				query: view,
@@ -1656,8 +1668,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 				},
 			};
 		},
-		link: (args) =>
-			`/dashboard${query(args, { startDate: "from", endDate: "to", metric: "metric", splitBy: "split", members: "member", repositories: "repo", models: "model" })}`,
+		link: dashboardLink,
 	},
 	{
 		name: "get_session",

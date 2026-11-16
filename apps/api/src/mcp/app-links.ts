@@ -51,6 +51,10 @@ export function appUrl(
 	return `${getFrontendOrigin()}${path}${suffix ? `?${suffix}` : ""}`;
 }
 
+export function workspacePageUrl(workspaceSlug: string, path: string): string {
+	return `${getFrontendOrigin()}/${encodeURIComponent(workspaceSlug)}${path}`;
+}
+
 export function sessionUrl(workspace: string, sessionId: string): string {
 	return appUrl("session", { workspaceSlug: workspace, sessionId });
 }

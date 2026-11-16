@@ -11,6 +11,7 @@ import {
 	apiKeyFromHeaders,
 	apiKeyUserId,
 } from "../selfhost/api-key-auth.js";
+import { hasDesktopApp } from "../selfhost/desktop-app.js";
 import { SELF_HOSTED_LOGIN_PATH } from "../selfhost/login-plugin.js";
 import {
 	issueLoginToken,
@@ -126,6 +127,7 @@ async function info(deps: SelfHostDependencies): Promise<Response> {
 		appUrl,
 		mcpUrl: `${appUrl}/api/mcp`,
 		setupComplete: row?.users === true,
+		desktopApp: hasDesktopApp(deps.env),
 		auth: {
 			password: true,
 			emailCodes: Boolean(deps.env.RESEND_API_KEY?.trim()),

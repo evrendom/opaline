@@ -1,4 +1,6 @@
 import { ORPCError } from "@orpc/server";
+import { getFrontendOrigin } from "../frontend-origin.js";
+import { isSelfHosted } from "../lib/self-hosted.js";
 import { splitL1NodeId } from "../services/l1-edges/l1-edge-ids.js";
 import { classifyOpalineUrl, pastedUrlHint } from "./app-links.js";
 
@@ -25,11 +27,15 @@ export function runFromUrl(
 	const pasted = classifyOpalineUrl(url);
 	if (!pasted)
 		throw new ORPCError("BAD_REQUEST", {
-			message: `url is not an Opaline link (https://opaline.so/…): ${url.slice(0, 200)}`,
+			message: `url is not an Opaline link (${linkExample()}): ${url.slice(0, 200)}`,
 		});
 	if (pasted.kind === "session" && pasted.record)
 		return { hint: null, args: { ...args, id: pasted.record } };
 	return { hint: pastedUrlHint(pasted), args };
+}
+
+function linkExample(): string {
+	return isSelfHosted() ? `${getFrontendOrigin()}/…` : "https://opaline.so/…";
 }
 
 export function sessionOfRunId(id: string): string | null {

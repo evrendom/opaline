@@ -125,6 +125,7 @@ describe("self-hosted HTTP routes", () => {
 			appUrl: "http://localhost:4100",
 			mcpUrl: "http://localhost:4100/api/mcp",
 			setupComplete: false,
+			desktopApp: false,
 			auth: {
 				password: true,
 				emailCodes: true,
@@ -155,6 +156,16 @@ describe("self-hosted HTTP routes", () => {
 				)
 			)?.json()) as object,
 		).toMatchObject({ auth: { openSignup: true } });
+		expect(
+			(await (
+				await call(
+					deps(() => [{ users: true }], { ...ENV, OPALINE_DESKTOP_APP: "1" })
+						.deps,
+					"GET",
+					"/api/selfhost/info",
+				)
+			)?.json()) as object,
+		).toMatchObject({ desktopApp: true });
 		expect((await call(d.deps, "GET", "/api/selfhost/nope"))?.status).toBe(404);
 	});
 
