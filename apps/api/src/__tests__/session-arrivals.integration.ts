@@ -55,7 +55,6 @@ afterAll(async () => {
 		await sqlClient`DELETE FROM organization WHERE id = ${user.id}`;
 		await sqlClient`DELETE FROM "user" WHERE id = ${user.id}`;
 	}
-	await sqlClient.end();
 });
 
 function request(organizationId: string, token?: string, since?: string) {
