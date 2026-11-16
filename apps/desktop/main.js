@@ -166,14 +166,14 @@ function savedTheme() {
 
 const SWAP_FALLBACK_MS = 5000;
 
-function appBounds(area) {
-	const width = Math.min(1440, area.width);
-	const height = Math.min(900, area.height);
+function centeredBounds(area, width, height, center = { x: area.x + area.width / 2, y: area.y + area.height / 2 }) {
+	const w = Math.min(width, area.width);
+	const h = Math.min(height, area.height);
 	return {
-		x: Math.round(area.x + (area.width - width) / 2),
-		y: Math.round(area.y + (area.height - height) / 2),
-		width,
-		height,
+		x: Math.round(Math.min(Math.max(center.x - w / 2, area.x), area.x + area.width - w)),
+		y: Math.round(Math.min(Math.max(center.y - h / 2, area.y), area.y + area.height - h)),
+		width: w,
+		height: h,
 	};
 }
 
@@ -215,7 +215,7 @@ let onboardingDone = false;
 function createOnboardingWindow(page = "") {
 	const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
 	onboardingWindow = new BrowserWindow({
-		...appBounds(area),
+		...centeredBounds(area, 1120, 800),
 		frame: false,
 		hasShadow: false,
 		resizable: false,
@@ -331,6 +331,15 @@ ipcMain.on("onboarding:finish", (event, duration) => {
 	onboardingDone = true;
 	if (!replaced && BrowserWindow.getAllWindows().length > 1) return onboardingWindow.destroy();
 	revealApp(onboardingWindow, Number(duration) || 750);
+});
+
+ipcMain.handle("onboarding:expand", (event) => {
+	if (!fromOnboarding(event)) return null;
+	const current = onboardingWindow.getBounds();
+	const area = screen.getDisplayMatching(current).workArea;
+	const next = centeredBounds(area, 1440, 900, { x: current.x + current.width / 2, y: current.y + current.height / 2 });
+	onboardingWindow.setBounds(next);
+	return { width: next.width, height: next.height };
 });
 
 ipcMain.on("onboarding:pass-through", (event, through) => {

@@ -1152,7 +1152,7 @@ function closeOut() {
 	const reading = content.querySelector(".view.reading");
 	if (reading) reading.animate([{ opacity: 1, filter: "blur(0px)" }, { opacity: 0, filter: "blur(10px)" }], { duration: LEAVE_MS, easing: APPEAR_EASE, fill: "forwards" });
 	wait = Math.max(wait, fadeOut([dots, document.querySelector(".footer-pill")]));
-	setTimeout(() => {
+	setTimeout(async () => {
 		glass?.destroy();
 		glass = null;
 		boxes?.destroy();
@@ -1161,9 +1161,18 @@ function closeOut() {
 		dotChart = null;
 		trendChart = null;
 		content.replaceChildren();
+		await growWindow();
 		document.body.dataset.morph = "";
 		api.finish(SHELL_MS);
 	}, wait);
+}
+
+async function growWindow() {
+	const target = await api.expand?.();
+	if (!target) return;
+	const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+	for (let tries = 0; tries < 30 && (innerWidth !== target.width || innerHeight !== target.height); tries++) await frame();
+	await frame();
 }
 
 function handoff(reading) {

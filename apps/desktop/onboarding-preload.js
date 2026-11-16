@@ -9,5 +9,6 @@ contextBridge.exposeInMainWorld("opalineOnboarding", {
 	connect: (key) => ipcRenderer.invoke("onboarding:connect", key),
 	theme: (theme) => ipcRenderer.send("onboarding:theme", theme),
 	finish: (duration) => ipcRenderer.send("onboarding:finish", duration),
+	expand: () => ipcRenderer.invoke("onboarding:expand"),
 	passThrough: (through) => ipcRenderer.send("onboarding:pass-through", through),
 });
