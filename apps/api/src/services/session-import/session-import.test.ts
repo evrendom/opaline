@@ -7,8 +7,14 @@ import {
 } from "../../__tests__/helpers/session-import-memory-stores.js";
 
 process.env.PG_CONNECTION_STRING ??= "postgres://unused@127.0.0.1:1/unused";
-const { createBackgroundIngestErrorFactories, processIngestSession } =
-	await import("./index.js");
+const {
+	createBackgroundIngestErrorFactories,
+	importSession,
+	processIngestSession,
+} = await import("./index.js");
+const { IngestFilterQueueFullError } = await import(
+	"../ingest-filter.service.js"
+);
 
 function upload(content: string): IngestSessionInput {
 	return {
@@ -139,4 +145,81 @@ test("an identical re-import queues the run index only when it writes missing gi
 		await importInto(stores, upload(content));
 		expect(stores.runIndex).toHaveLength(gitObservations === "written" ? 1 : 0);
 	}
+});
+
+function outcomeOf(stores: MemoryStores, input: IngestSessionInput) {
+	return importSession(
+		{
+			awaitLanguageSignals: true,
+			context: { apiKeyId: null, session: null, user: { id: "user" } },
+			enforceRateLimits: false,
+			input,
+		},
+		stores.dependencies,
+	);
+}
+
+test("an import reports stored, kept, skipped or retry with a typed reason", async () => {
+	const stores = memoryStores();
+	expect(await outcomeOf(stores, upload(claudeTranscript(3)))).toEqual({
+		kind: "stored",
+		usage: "complete",
+	});
+	expect(await outcomeOf(stores, upload(claudeTranscript(1)))).toEqual({
+		kind: "kept",
+		reason: "shorter_than_stored",
+		message: "Replacement transcript is unexpectedly smaller",
+	});
+	stores.owner = "someone else";
+	expect(await outcomeOf(stores, upload(claudeTranscript(4)))).toEqual({
+		kind: "skipped",
+		reason: "ownership_conflict",
+		message: "Session belongs to another organization member",
+	});
+	expect(
+		await outcomeOf(memoryStores(), upload('{"type":"user"}\n')),
+	).toMatchObject({ kind: "skipped", reason: "invalid" });
+});
+
+test("a full queue and an unexpected failure are retries; incomplete usage is stored", async () => {
+	expect(
+		await outcomeOf(
+			memoryStores({
+				filterText: async () => {
+					throw new IngestFilterQueueFullError("global-jobs");
+				},
+			}),
+			upload(claudeTranscript(2)),
+		),
+	).toMatchObject({ kind: "retry", reason: "queue_full" });
+	expect(
+		await outcomeOf(
+			memoryStores({
+				allocateRevision: async () => {
+					throw new Error("Postgres went away");
+				},
+			}),
+			upload(claudeTranscript(2)),
+		),
+	).toEqual({
+		kind: "retry",
+		reason: "failed",
+		message: "Postgres went away",
+	});
+	const incomplete = memoryStores();
+	const extract = incomplete.dependencies.extractSessionFacts;
+	expect(
+		await outcomeOf(
+			memoryStores({
+				extractSessionFacts: async (request) => {
+					const facts = await extract(request);
+					return {
+						...facts,
+						usage: { ...facts.usage, status: "incomplete", events: [] },
+					};
+				},
+			}),
+			upload(claudeTranscript(2)),
+		),
+	).toEqual({ kind: "stored", usage: "incomplete" });
 });

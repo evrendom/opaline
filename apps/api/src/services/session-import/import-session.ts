@@ -213,6 +213,28 @@ export function createBackgroundIngestErrorFactories(): IngestErrorFactories {
 	};
 }
 
+export interface SessionImportRequest {
+	readonly aggregateContentMaxBytes?: number;
+	readonly allowQuiescedIngest?: boolean;
+	/** Where `input.analysisId` links are recorded; the configured log by default. */
+	readonly analysisUploads?: AnalysisUploadEnv;
+	readonly awaitBestEffortLanguageSignals?: boolean;
+	readonly awaitLanguageSignals: boolean;
+	readonly context: {
+		readonly apiKeyId: string | null;
+		readonly session: AppContext["session"];
+		readonly user: { readonly id: string };
+	};
+	readonly durableProcessing?: {
+		readonly failpoint: IngestProcessingFailpoint | undefined;
+		readonly operationId: string;
+	};
+	readonly enforceRateLimits: boolean;
+	readonly errorFactories: IngestErrorFactories;
+	readonly input: IngestSessionInput;
+	readonly signal?: AbortSignal;
+}
+
 export async function processIngestSession(
 	{
 		aggregateContentMaxBytes,
@@ -226,27 +248,7 @@ export async function processIngestSession(
 		errorFactories,
 		input,
 		signal,
-	}: {
-		aggregateContentMaxBytes?: number;
-		allowQuiescedIngest?: boolean;
-		/** Where `input.analysisId` links are recorded; the configured log by default. */
-		analysisUploads?: AnalysisUploadEnv;
-		awaitBestEffortLanguageSignals?: boolean;
-		awaitLanguageSignals: boolean;
-		context: {
-			apiKeyId: string | null;
-			session: AppContext["session"];
-			user: { id: string };
-		};
-		durableProcessing?: {
-			failpoint: IngestProcessingFailpoint | undefined;
-			operationId: string;
-		};
-		enforceRateLimits: boolean;
-		errorFactories: IngestErrorFactories;
-		input: IngestSessionInput;
-		signal?: AbortSignal;
-	},
+	}: SessionImportRequest,
 	overrides: Partial<SessionImportDependencies> = {},
 ): Promise<R2IngestProcessorResult> {
 	const deps: SessionImportDependencies = {
