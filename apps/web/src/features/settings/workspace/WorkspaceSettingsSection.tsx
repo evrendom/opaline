@@ -3,6 +3,8 @@ import { useTrackProductPageView } from "@/features/analytics/tracking/useTrackP
 import { useLocalDesktopApp } from "@/features/desktop/local-app";
 import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import { showsBilling } from "@/features/self-hosted/surfaces";
+import { AppearanceCard } from "@/features/settings/account/components/AppearanceCard";
+import { ProfileOverviewCard } from "@/features/settings/account/components/ProfileOverviewCard";
 import { SettingsPageReveal } from "@/features/settings/components/settings-page-skeleton";
 import { SettingsSectionCard } from "@/features/settings/components/settings-section";
 import { buildWorkspaceSettingsTracking } from "@/features/settings/settings-page-tracking";
@@ -13,6 +15,24 @@ import { WorkspaceDangerZoneCard } from "@/features/settings/workspace/component
 import { WorkspaceEmptyStateCard } from "@/features/settings/workspace/components/WorkspaceEmptyStateCard";
 import { WorkspaceIdentityCard } from "@/features/settings/workspace/components/WorkspaceIdentityCard";
 import { useWorkspaceSettingsData } from "@/features/settings/workspace/use-workspace-settings-data";
+import { authClient } from "@/lib/auth-client";
+
+function LocalProfileSettings() {
+	const { data: session } = authClient.useSession();
+	const user = session?.user;
+	return (
+		<>
+			<ProfileOverviewCard
+				name={typeof user?.name === "string" ? user.name : ""}
+				email={typeof user?.email === "string" ? user.email : ""}
+				image={typeof user?.image === "string" ? user.image : null}
+				isSigningOut={false}
+				showEmail={false}
+			/>
+			<AppearanceCard />
+		</>
+	);
+}
 
 export function WorkspaceSettingsSection() {
 	const data = useWorkspaceSettingsData();
@@ -64,6 +84,7 @@ export function WorkspaceSettingsSection() {
 								canManage={data.canManage}
 								onInvalidate={data.invalidate}
 							/>
+							{localApp ? <LocalProfileSettings /> : null}
 							{data.currentUserRole === "owner" && showsBilling(selfHost) ? (
 								<>
 									<BillingManagementCard

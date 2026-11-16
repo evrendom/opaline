@@ -2,6 +2,7 @@ import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import type { SettingsRouteId } from "@/features/settings/config/settings-routes";
 
 export const LOCAL_APP_HIDDEN_SETTINGS: ReadonlySet<SettingsRouteId> = new Set([
+	"account",
 	"members",
 	"team",
 	"invitations",

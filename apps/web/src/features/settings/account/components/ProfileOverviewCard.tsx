@@ -22,12 +22,14 @@ export function ProfileOverviewCard({
 	isSigningOut,
 	name,
 	onSignOut,
+	showEmail = true,
 }: {
 	email: string;
 	image: string | null;
 	isSigningOut: boolean;
 	name: string;
 	onSignOut?: () => void;
+	showEmail?: boolean;
 }) {
 	return (
 		<WorkspaceSettingsGroup title="Profile">
@@ -40,9 +42,11 @@ export function ProfileOverviewCard({
 			<WorkspaceSettingsRow label="Name" controlId="account-name">
 				<Input id="account-name" value={name} readOnly />
 			</WorkspaceSettingsRow>
-			<WorkspaceSettingsRow label="Email" controlId="account-email">
-				<Input id="account-email" type="email" value={email} readOnly />
-			</WorkspaceSettingsRow>
+			{showEmail ? (
+				<WorkspaceSettingsRow label="Email" controlId="account-email">
+					<Input id="account-email" type="email" value={email} readOnly />
+				</WorkspaceSettingsRow>
+			) : null}
 			{onSignOut ? (
 				<WorkspaceSettingsRow
 					label="Session"
