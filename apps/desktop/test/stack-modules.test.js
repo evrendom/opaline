@@ -9,6 +9,7 @@ const {
 	normalizeServerUrl,
 	validateEnvironment,
 } = require("../stack/settings");
+const { firstServerPort } = require("../stack/local-stack");
 const {
 	createCliRunner,
 	parseJsonLine,
@@ -164,5 +165,21 @@ describe("the CLI runner", () => {
 		]);
 		expect(lines).toEqual(["plain line"]);
 		expect(result.last).toEqual({ type: "done" });
+	});
+});
+
+describe("the server port", () => {
+	test("skips ports browsers and fetch refuse, like 4190", async () => {
+		const taken = new Set([4100]);
+		for (let port = 4101; port < 4190; port++) taken.add(port);
+		expect(await firstServerPort({}, async (port) => !taken.has(port))).toBe(
+			4191,
+		);
+		expect(
+			await firstServerPort(
+				{ OPALINE_DESKTOP_SERVER_PORT: "4190" },
+				async () => true,
+			),
+		).toBe(4191);
 	});
 });

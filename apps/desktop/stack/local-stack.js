@@ -17,6 +17,14 @@ const SETUP_STEPS = ["runtimes", "databases", "server", "account"];
 const DEFAULT_PORT = 4100;
 const LINK_RETRY_MS = 30_000;
 const INTRO_PARAM = "opaline-intro";
+const BLOCKED_PORTS = new Set([
+	1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 42, 43, 53, 69, 77, 79,
+	87, 95, 101, 102, 103, 104, 109, 110, 111, 113, 115, 117, 119, 123, 135, 137,
+	139, 143, 161, 179, 389, 427, 465, 512, 513, 514, 515, 526, 530, 531, 532,
+	540, 548, 554, 556, 563, 587, 601, 636, 989, 990, 993, 995, 1719, 1720, 1723,
+	2049, 3659, 4045, 4190, 5060, 5061, 6000, 6566, 6665, 6666, 6667, 6668, 6669,
+	6679, 6697, 10080,
+]);
 
 function introUrl(url) {
 	const next = new URL(url);
@@ -164,12 +172,14 @@ function isPortFree(port) {
 	});
 }
 
-async function firstServerPort(env = process.env) {
+async function firstServerPort(env = process.env, isFree = isPortFree) {
 	const requested = Number.parseInt(env.OPALINE_DESKTOP_SERVER_PORT ?? "", 10);
-	if (Number.isInteger(requested) && requested > 0 && requested < 65_536)
-		return requested;
-	for (let port = DEFAULT_PORT; port < DEFAULT_PORT + 100; port++)
-		if (await isPortFree(port)) return port;
+	const valid =
+		Number.isInteger(requested) && requested > 0 && requested < 65_536;
+	if (valid && !BLOCKED_PORTS.has(requested)) return requested;
+	const start = valid ? requested : DEFAULT_PORT;
+	for (let port = start; port < start + 100 && port < 65_536; port++)
+		if (!BLOCKED_PORTS.has(port) && (await isFree(port))) return port;
 	return undefined;
 }
 
