@@ -296,7 +296,7 @@ function layout(output: AnalysisFindOutput, verbosity: Verbosity): Layout {
 							list(
 								group.examples.map(
 									(example) =>
-										`${refText(example.ref)}@${example.record}.${example.block}${subagentOf(example.parentSessionId)} ${example.commandFrom}: ${example.command}`,
+										`${refText(example.ref)}@${example.record}.${example.block}${example.at ? ` at ${example.at}` : ""}${subagentOf(example.parentSessionId)} ${example.commandFrom}: ${example.command}`,
 								),
 							),
 						free: true,
@@ -359,7 +359,7 @@ function layout(output: AnalysisFindOutput, verbosity: Verbosity): Layout {
 				{
 					name: "eventRef",
 					value: (event) =>
-						`${refText(event.eventRef)}@${event.eventRef.record}`,
+						`${refText(event.eventRef)}@${event.eventRef.record}${event.at ? ` at ${event.at}` : ""}`,
 				},
 				{
 					name: "originRef",
@@ -499,7 +499,7 @@ type FailureExample = Extract<
 function failureExamples(examples: readonly FailureExample[]): string[] {
 	const byLine = new Map<string, string[]>();
 	for (const example of examples) {
-		const at = `${refText(example.ref)}@${example.record}${subagentOf(example.parentSessionId)}`;
+		const at = `${refText(example.ref)}@${example.record}${example.at ? ` at ${example.at}` : ""}${subagentOf(example.parentSessionId)}`;
 		const refs = byLine.get(example.errorLine);
 		if (refs) refs.push(at);
 		else byLine.set(example.errorLine, [at]);

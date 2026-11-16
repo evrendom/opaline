@@ -524,6 +524,7 @@ const ToolGroupSchema = z.object({
 			z.object({
 				ref: RunRefSchema,
 				record: z.number(),
+				at: z.string().optional(),
 				errorLine: z.string(),
 				parentSessionId: ParentSessionIdSchema,
 			}),
@@ -585,6 +586,7 @@ const CallGroupSchema = z.object({
 				ref: RunRefSchema,
 				record: z.number().int(),
 				block: z.number().int(),
+				at: z.string().optional(),
 				commandFrom: z.enum(COMMAND_FROM),
 				command: z.string(),
 				parentSessionId: ParentSessionIdSchema,
@@ -596,6 +598,7 @@ export const AnalysisEventSchema = z.object({
 	type: ReactionSchema,
 	terms: z.array(z.string()),
 	eventRef: RunRefSchema.extend({ record: z.number() }),
+	at: z.string().optional(),
 	quote: z.string().max(200),
 	partial: z.boolean(),
 	originRef: RunRefSchema.nullable(),

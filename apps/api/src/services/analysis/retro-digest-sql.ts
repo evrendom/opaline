@@ -353,6 +353,31 @@ export function digestUsageSql(params: MeasureParams): string[] {
 	];
 }
 
+export interface ExampleRef {
+	readonly sessionId: string;
+	readonly agentId: string;
+	readonly turn: number;
+}
+
+export function digestExampleTimesSql(
+	params: MeasureParams,
+	refs: readonly ExampleRef[],
+): string {
+	const tuples = refs
+		.map(
+			(ref) =>
+				`(${sqlString(ref.sessionId)}, ${sqlString(ref.agentId)}, ${Math.trunc(ref.turn)})`,
+		)
+		.join(", ");
+	return `WITH ${pickedSetCte(params)}
+	SELECT session_id, agent_id, turn_idx, min(started_at) AS at
+	FROM runs
+	WHERE session_id IN (${[...new Set(refs.map((ref) => sqlString(ref.sessionId)))].join(", ")})
+		AND (session_id, agent_id, turn_idx) IN (${tuples})
+		AND ${inPickedSet()}
+	GROUP BY session_id, agent_id, turn_idx`;
+}
+
 export interface CohortScope {
 	readonly workspaceId: string;
 	readonly users: readonly string[];

@@ -3,7 +3,9 @@ import {
 	buildDigest,
 	coverageOf,
 	type DigestInputs,
+	digestExampleRefs,
 	editFacts,
+	exampleRef,
 	joinDigestRuns,
 	maskSecrets,
 	mergeSeverity,
@@ -20,6 +22,7 @@ import {
 	DB_CLIENT_RE,
 	digestCallsSql,
 	digestEditsSql,
+	digestExampleTimesSql,
 	digestRunsSql,
 	digestSessionsSql,
 	digestSeveritySql,
@@ -766,6 +769,51 @@ describe("digest", () => {
 		expect(text).toContain("- skipped: call timeouts: not recorded for codex");
 		expect(text).toContain("codex main trigger not recorded 1");
 		expect(text).toContain("(queued: not recorded for codex)");
+	});
+
+	test("examples carry their run's start, the prompt's timestamp in the transcript, so a reader can find them there", () => {
+		const digest = buildDigest(inputs(), scope);
+		const refs = digestExampleRefs(digest);
+		expect(refs.length).toBeGreaterThan(0);
+		const times = new Map(
+			refs.map((ref, index) => [
+				`${ref.sessionId}${ref.agentId ? `:${ref.agentId}` : ""}#${ref.turn}`,
+				new Date(Date.UTC(2026, 10, 3, 9, index)).toISOString(),
+			]),
+		);
+		const lines = renderDigest(digest, undefined, [], times)
+			.split("\n")
+			.filter((line) => line.includes(" e.g. "));
+		expect(lines.some((line) => line.includes(" at 2026-11-03T09:"))).toBe(
+			true,
+		);
+		for (const line of lines.filter((line) =>
+			/ e\.g\. [^\s"]+#\d+$/u.test(line.replace(/ at \S+$/u, "")),
+		))
+			expect(line).toMatch(/ e\.g\. \S+#\d+ at 2026-11-03T09:\d{2}:00\.000Z$/u);
+		expect(renderDigest(digest)).not.toMatch(/#\d+ at 20/u);
+	});
+
+	test("an example id reads as session, stream and turn, and its time is looked up in the picked runs only", () => {
+		expect(exampleRef("s-1#4")).toEqual({
+			sessionId: "s-1",
+			agentId: "",
+			turn: 4,
+		});
+		expect(exampleRef("s-1:a9f#2")).toEqual({
+			sessionId: "s-1",
+			agentId: "a9f",
+			turn: 2,
+		});
+		expect(exampleRef("ids s-1 s-2")).toBeNull();
+		const sql = digestExampleTimesSql(params, [
+			{ sessionId: "s-1", agentId: "", turn: 4 },
+			{ sessionId: "s'1", agentId: "a9f", turn: 2 },
+		]);
+		expect(sql).toContain(
+			"(session_id, agent_id, turn_idx) IN (('s-1', '', 4), ('s\\'1', 'a9f', 2))",
+		);
+		expect(sql).toContain("(user_id, session_id) IN (SELECT arrayJoin(");
 	});
 
 	test("thresholds come from the cohort: context size p90 and long runs", () => {

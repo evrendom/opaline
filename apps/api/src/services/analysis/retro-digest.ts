@@ -3,6 +3,7 @@ import {
 	CALL_METRICS,
 	type CallMetric,
 	DIGEST_IDS,
+	type ExampleRef,
 } from "./retro-digest-sql.js";
 
 export type Row = Record<string, unknown>;
@@ -1507,7 +1508,7 @@ function maskSection(section: DigestSection): DigestSection {
 }
 
 export const DIGEST_UNITS =
-	"Rows: metric: value [definition, quote it with the number] e.g. session#turn (or session:agent#turn) to read. Terms: session = main session started in the window; streams = main + subagents unless said; shell = shell commands matched on their first 300 chars; min = sum of call_minutes (call to result); failed = error, non-zero exit or refusal.";
+	"Rows: metric: value [definition, quote it with the number] e.g. session#turn (or session:agent#turn) to read, at its start: the prompt's timestamp in the transcript (UTC); cite both. Terms: session = main session started in the window; streams = main + subagents unless said; shell = shell commands matched on their first 300 chars; min = sum of call_minutes (call to result); failed = error, non-zero exit or refusal.";
 
 export type DigestPart =
 	| "calls"
@@ -1597,10 +1598,52 @@ export function noteMerged(digest: Digest, notes: readonly string[]): Digest {
 	};
 }
 
+const EXAMPLE_REF = /^([^:#\s]+)(?::([^#\s]+))?#(\d+)$/u;
+
+export function exampleRef(example: string): ExampleRef | null {
+	const match = EXAMPLE_REF.exec(example);
+	if (!match?.[1] || !match[3]) return null;
+	return {
+		sessionId: match[1],
+		agentId: match[2] ?? "",
+		turn: Number(match[3]),
+	};
+}
+
+export function exampleKey(ref: ExampleRef): string {
+	return `${ref.sessionId}${ref.agentId ? `:${ref.agentId}` : ""}#${ref.turn}`;
+}
+
+const QUOTED_REF =
+	/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?::[\w-]+)?#\d+/gu;
+
+export function digestExampleRefs(digest: Digest): ExampleRef[] {
+	const refs = new Map<string, ExampleRef>();
+	const add = (text: string) => {
+		const ref = exampleRef(text);
+		if (ref) refs.set(exampleKey(ref), ref);
+	};
+	for (const section of digest.sections)
+		for (const row of section.rows) {
+			if (row.example) add(row.example);
+			for (const quoted of row.value.match(QUOTED_REF) ?? []) add(quoted);
+		}
+	return [...refs.values()];
+}
+
+function timed(text: string, times: ReadonlyMap<string, string>): string {
+	if (times.size === 0) return text;
+	return text.replace(QUOTED_REF, (ref) => {
+		const at = times.get(ref);
+		return at ? `${ref} at ${at}` : ref;
+	});
+}
+
 export function renderDigest(
 	digest: Digest,
 	ms?: number,
 	footer: readonly string[] = [],
+	times: ReadonlyMap<string, string> = new Map(),
 ): string {
 	const scope = digest.scope;
 	const head = `retro digest ${scope.repository ?? "all repositories"} ${scope.from}..${scope.to}${scope.latest ? ` latest ${scope.latest}` : ""}${scope.listed ? ` (${scope.listed} listed sessions)` : ""}: ${digest.sessions} sessions (${Object.entries(
@@ -1623,15 +1666,18 @@ export function renderDigest(
 		lines.push(`## ${section.id}. ${section.title}`);
 		let previous = "";
 		for (const row of section.rows) {
+			const at = row.example ? times.get(row.example) : undefined;
 			const example = row.example
-				? ` e.g. ${row.example}`
+				? ` e.g. ${row.example}${at ? ` at ${at}` : ""}`
 				: row.sessions.length
 					? ` ids ${row.sessions.map((sid) => sid.slice(0, 8)).join(" ")}`
 					: "";
 			const definition =
 				row.definition === previous ? "as above" : row.definition;
 			previous = row.definition;
-			lines.push(`- ${row.metric}: ${row.value} [${definition}]${example}`);
+			lines.push(
+				`- ${row.metric}: ${timed(row.value, times)} [${definition}]${example}`,
+			);
 		}
 		for (const note of section.missing) lines.push(`- skipped: ${note}`);
 		for (const cut of section.cuts ?? []) lines.push(`- cut: ${cut}`);

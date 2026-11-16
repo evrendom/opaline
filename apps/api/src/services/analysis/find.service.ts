@@ -767,9 +767,11 @@ async function findCallGroups(
 		header,
 		groups: page.map(({ group, examples, runs }) => {
 			const shown = examples.flatMap(
-				([, , session, agent, turn, record, block]) => {
+				([atMs, , session, agent, turn, record, block]) => {
 					const text = texts.get(exampleKey(session, agent, record, block));
-					return text ? [{ session, agent, turn, record, block, text }] : [];
+					return text
+						? [{ atMs, session, agent, turn, record, block, text }]
+						: [];
 				},
 			);
 			return {
@@ -786,10 +788,11 @@ async function findCallGroups(
 						? (shown[0]?.text.normalized ?? null)
 						: null,
 				examples: shown.map(
-					({ session, agent, turn, record, block, text }) => ({
+					({ atMs, session, agent, turn, record, block, text }) => ({
 						ref: { sessionId: session, agentId: agent, turn },
 						record,
 						block,
+						at: new Date(atMs).toISOString(),
 						commandFrom: text.command_from,
 						command: text.command,
 						parentSessionId:
@@ -1522,6 +1525,7 @@ async function findFailures(context: FindContext): Promise<FoundPage> {
 					bucket.group.examples.push({
 						ref,
 						record: row.record_idx,
+						at,
 						errorLine: errorLine(row.head, row.tail),
 						parentSessionId:
 							context.sessions.get(row.session_id)?.parentSessionId ?? null,
@@ -1618,7 +1622,7 @@ async function findReactions(context: FindContext): Promise<FoundPage> {
 	return paged(context, events.map(eventSortKey), following > events.length, {
 		source: "user",
 		header: context.header,
-		events: events.map(({ at: _at, block: _block, ...event }) => {
+		events: events.map(({ block: _block, ...event }) => {
 			const origin = event.originRef
 				? origins.get(runKey(event.originRef))
 				: undefined;

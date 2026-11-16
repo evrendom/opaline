@@ -19,6 +19,8 @@ import {
 	buildDigest,
 	type Digest,
 	type DigestPart,
+	digestExampleRefs,
+	exampleKey,
 	joinDigestRuns,
 	markPartial,
 	markUnknown,
@@ -35,6 +37,7 @@ import {
 	contextSizesStatement,
 	digestCallsSql,
 	digestEditsSql,
+	digestExampleTimesSql,
 	digestRunsSql,
 	digestSessionsSql,
 	digestSeveritySql,
@@ -369,12 +372,50 @@ export async function runDigest(
 		),
 		partial,
 	);
+	const { times, note } = await exampleTimes(digest, (refs) =>
+		reader.view(digestExampleTimesSql(params, refs), cohort),
+	);
 	const ms = Math.round(performance.now() - started);
 	return {
 		digest,
-		text: renderDigest(digest, ms, [...budget.notes, ...budget.partial]),
+		text: renderDigest(
+			digest,
+			ms,
+			[...budget.notes, ...budget.partial, ...(note ? [note] : [])],
+			times,
+		),
 		ms,
 		from: params.from,
 		to: params.to,
 	};
+}
+
+async function exampleTimes(
+	digest: Digest,
+	read: (refs: ReturnType<typeof digestExampleRefs>) => Promise<Row[]>,
+): Promise<{ times: Map<string, string>; note: string | null }> {
+	const refs = digestExampleRefs(digest);
+	if (refs.length === 0) return { times: new Map(), note: null };
+	let rows: Row[];
+	try {
+		rows = await read(refs);
+	} catch (error) {
+		return {
+			times: new Map(),
+			note: `example times unknown: ${error instanceof Error ? error.message : String(error)}`,
+		};
+	}
+	const times = new Map(
+		rows.flatMap((row) => {
+			const at = Date.parse(`${String(row.at).replace(" ", "T")}Z`);
+			if (Number.isNaN(at)) return [];
+			const key = exampleKey({
+				sessionId: String(row.session_id),
+				agentId: String(row.agent_id ?? ""),
+				turn: Number(row.turn_idx),
+			});
+			return [[key, new Date(at).toISOString()] as const];
+		}),
+	);
+	return { times, note: null };
 }

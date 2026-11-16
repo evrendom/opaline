@@ -383,6 +383,7 @@ async function loadRun(
 			id: neighbour(row),
 			agent: row.source,
 			prompt: row.prompt_head || null,
+			startedMs: clickHouseMs(row.started_at),
 			task: row.prompt_head
 				? null
 				: await delegatedTask(executor, address, row),
@@ -394,6 +395,7 @@ async function loadRun(
 				? {
 						id: neighbour(previous),
 						prompt: previous.prompt_head || null,
+						startedMs: clickHouseMs(previous.started_at),
 						end: lastText(of(previous.start_record))?.head ?? null,
 						queuedBoundary: row.prompt_subtype === "queued",
 					}
@@ -402,6 +404,7 @@ async function loadRun(
 				? {
 						id: neighbour(next),
 						prompt: next.prompt_head || null,
+						startedMs: clickHouseMs(next.started_at),
 						queuedBoundary: next.prompt_subtype === "queued",
 					}
 				: null,
@@ -409,6 +412,10 @@ async function loadRun(
 			setup,
 		},
 	};
+}
+
+function clickHouseMs(time: string): number {
+	return Date.parse(`${time.replace(" ", "T")}Z`);
 }
 
 const SetupRowSchema = z.object({
