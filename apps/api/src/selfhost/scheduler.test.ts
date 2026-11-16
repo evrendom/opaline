@@ -63,7 +63,7 @@ test("without providers only the jobs that need none run, and billing, trends an
 	expect(every).toMatchObject({
 		"l1-edges": 60_000,
 		"run-index-heal": 300_000,
-		"session-retirement": 3_600_000,
+		"session-retirement": 300_000,
 		repair: 86_400_000,
 		"native-lineage": 86_400_000,
 		"analysis-log-retention": 86_400_000,

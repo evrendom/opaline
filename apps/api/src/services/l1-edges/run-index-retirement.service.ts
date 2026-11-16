@@ -89,11 +89,22 @@ export async function runRunIndexRetirementPass(
 					clickhouse_settings: CENSUS_WINDOW_SETTINGS,
 					query: `
 				SELECT organization_id, user_id, session_id
-				FROM ${getSafeClickHouseTable(RUN_INDEX_TABLE)}
-				WHERE 1 = 1 ${options.organizationId === undefined ? "" : "AND organization_id = {organizationId:String}"} ${bounds.sql}
+				FROM (
+					SELECT organization_id, user_id, session_id,
+						(revision, parser_version, index_version, build_revision) AS generation,
+						countIf(row_kind = 'receipt') AS receipts,
+						maxIf(toUnixTimestamp64Milli(built_at), row_kind = 'receipt') AS receipt_ms,
+						max(toUnixTimestamp64Milli(built_at)) AS written_ms
+					FROM ${getSafeClickHouseTable(RUN_INDEX_TABLE)}
+					WHERE 1 = 1 ${options.organizationId === undefined ? "" : "AND organization_id = {organizationId:String}"} ${bounds.sql}
+					GROUP BY organization_id, user_id, session_id, generation
+				)
 				GROUP BY organization_id, user_id, session_id
-				HAVING uniqExact((revision, parser_version, index_version, build_revision)) > 1
-					AND max(toUnixTimestamp64Milli(built_at)) <= {retireBefore:Int64}
+				HAVING count() > 1
+					AND (max(written_ms) <= {retireBefore:Int64}
+						OR arrayExists(
+							snapshot -> snapshot.2 > 0 AND snapshot.3 <= {retireBefore:Int64},
+							arraySlice(arraySort(groupArray((generation, receipts, receipt_ms))), 2)))
 				ORDER BY organization_id, user_id, session_id
 				LIMIT {maxSessions:UInt32}
 			`,

@@ -1,8 +1,10 @@
+import { TRANSCRIPT_RECORD_COMMANDS_TABLE } from "@rudel/ch-schema/transcript-record-commands";
 import type { ClickHouseExecutor } from "../clickhouse.js";
 import {
 	createMaintenanceQueueDeadline,
 	type MaintenanceDeadline,
 } from "../lib/bounded-maintenance.js";
+import { storedCallCommandsEnabled } from "./analysis/call-commands.js";
 import {
 	buildKeyedDeleteOperations,
 	isDeleteSettled,
@@ -230,16 +232,38 @@ export async function retireTranscriptRecordsGenerations(
 		windowsScanned: census.windowsScanned,
 	};
 	for (const [organizationId, retirements] of byOrganization) {
+		const keys = retirements.map((retirement) => [
+			retirement.userId,
+			retirement.sessionId,
+			retirement.generation.revision,
+			retirement.generation.parserVersion,
+		]);
+		if (storedCallCommandsEnabled()) {
+			const commandOperations = buildKeyedDeleteOperations({
+				table: TRANSCRIPT_RECORD_COMMANDS_TABLE,
+				organizationId,
+				columns: TRANSCRIPT_RECORDS_GENERATION_COLUMNS,
+				keys,
+			});
+			const commandOutcomes = await runRetirementDeletes(
+				executor,
+				commandOperations,
+				{ deadline: options.deadline },
+			);
+			result.deleteStatements += submittedStatements(commandOutcomes);
+			if (
+				commandOutcomes.length < commandOperations.length ||
+				!commandOutcomes.every(isDeleteSettled)
+			) {
+				result.hasMore = true;
+				break;
+			}
+		}
 		const operations = buildKeyedDeleteOperations({
 			table: TRANSCRIPT_RECORDS_TABLE,
 			organizationId,
 			columns: TRANSCRIPT_RECORDS_GENERATION_COLUMNS,
-			keys: retirements.map((retirement) => [
-				retirement.userId,
-				retirement.sessionId,
-				retirement.generation.revision,
-				retirement.generation.parserVersion,
-			]),
+			keys,
 		});
 		const outcomes = await runRetirementDeletes(executor, operations, {
 			deadline: options.deadline,

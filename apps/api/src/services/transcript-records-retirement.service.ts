@@ -68,7 +68,9 @@ export function buildTranscriptRecordsRetirementCensusStatement(input: {
 				FROM (
 				SELECT organization_id, user_id, session_id,
 					max((revision, parser_version)) AS newest_generation,
-					argMax(head, (revision, parser_version, JSONExtractString(head, 'publishedAt'))) AS receipt_head
+					argMax(head, (revision, parser_version, JSONExtractString(head, 'publishedAt'))) AS receipt_head,
+					arraySort(groupUniqArray(((revision, parser_version),
+						parseDateTime64BestEffortOrNull(JSONExtractString(head, 'publishedAt'), 3, 'UTC')))) AS receipts
 				FROM ${getSafeClickHouseTable(TRANSCRIPT_RECORDS_TABLE)}
 				WHERE agent_id = ''
 					AND record_idx = {receiptRecordIdx:UInt32}
@@ -78,8 +80,9 @@ export function buildTranscriptRecordsRetirementCensusStatement(input: {
 					${input.window?.to === undefined ? "" : `AND ${keyBound("to", "<")}`}
 				GROUP BY organization_id, user_id, session_id
 				HAVING uniqExact((revision, parser_version)) > 1
-					AND parseDateTime64BestEffortOrNull(JSONExtractString(receipt_head, 'publishedAt'), 3, 'UTC')
-						<= fromUnixTimestamp64Milli({retireBefore:Int64}, 'UTC')
+					AND arrayExists(
+						receipt -> receipt.2 <= fromUnixTimestamp64Milli({retireBefore:Int64}, 'UTC'),
+						arraySlice(receipts, 2))
 				)
 				ORDER BY organization_id, user_id, session_id
 				LIMIT {maxSessions:UInt32}

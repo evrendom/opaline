@@ -189,7 +189,7 @@ export function selfHostedJobs(env: Environment = process.env): SchedulerJob[] {
 		},
 		{
 			name: "session-retirement",
-			everyMs: HOUR,
+			everyMs: 5 * MINUTE,
 			firstAfterMs: 5 * MINUTE,
 			when: true,
 			handler: async () =>
