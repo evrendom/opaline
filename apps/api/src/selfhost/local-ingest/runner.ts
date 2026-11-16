@@ -28,7 +28,7 @@ export interface SessionRunnerDependencies {
 }
 
 const BUSY_WAIT_MS = 250;
-const BUSY_WAIT_LIMIT_MS = 10 * 60_000;
+export const BUSY_WAIT_LIMIT_MS = 10 * 60_000;
 const KEPT_REASON =
 	"The transcript on disk is shorter than the copy Opaline stored; the longer copy is kept.";
 const USAGE_INCOMPLETE_REASON =
@@ -66,15 +66,23 @@ export function createSessionRunner(
 	const sleep = deps.sleep ?? ((ms: number) => Bun.sleep(ms));
 	return (job, owner) =>
 		runAsBackgroundWork(async () => {
-			const prepared = await timedIngestPhase("local.prepare", () =>
-				deps.prepare({
-					sessionPath: job.sessionPath,
-					source: job.source,
-					change: job.change,
-					organizationId: owner.organizationId,
-					now: now().getTime(),
-				}),
-			);
+			let prepared: PreparedLocalSession;
+			try {
+				prepared = await timedIngestPhase("local.prepare", () =>
+					deps.prepare({
+						sessionPath: job.sessionPath,
+						source: job.source,
+						change: job.change,
+						organizationId: owner.organizationId,
+						now: now().getTime(),
+					}),
+				);
+			} catch (error) {
+				return {
+					kind: "retry",
+					reason: `${job.sessionPath} could not be read: ${error instanceof Error ? error.message : String(error)}`,
+				};
+			}
 			if (prepared.kind === "skipped") return prepared;
 			const { input, files } = prepared;
 			const request = {
@@ -88,14 +96,14 @@ export function createSessionRunner(
 				enforceRateLimits: false,
 				input,
 			};
-			const waitedSince = Date.now();
+			const waitedSince = now().getTime();
 			let imported = await timedIngestPhase("local.ingest_total", () =>
 				deps.importSession(request),
 			);
 			while (
 				imported.kind === "retry" &&
 				imported.reason === "queue_full" &&
-				Date.now() - waitedSince < BUSY_WAIT_LIMIT_MS
+				now().getTime() - waitedSince < BUSY_WAIT_LIMIT_MS
 			) {
 				await sleep(BUSY_WAIT_MS);
 				imported = await timedIngestPhase("local.ingest_total", () =>
