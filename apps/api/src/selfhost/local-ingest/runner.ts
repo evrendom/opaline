@@ -77,6 +77,32 @@ export function classifyIngestError(error: unknown): SessionOutcome {
 	return { kind: "retry", reason: message.slice(0, 500) };
 }
 
+export async function loadSessionRunner(options: {
+	readonly sql: postgres.Sql;
+	readonly prepare: SessionRunnerDependencies["prepare"];
+	readonly log: (line: string) => void;
+}): Promise<(job: SessionJob, owner: Owner) => Promise<SessionOutcome>> {
+	const [router, { getClickhouse }, storage] = await Promise.all([
+		import("../../router.js"),
+		import("../../clickhouse.js"),
+		import("../../services/r2-ingest-storage.service.js"),
+	]);
+	return createSessionRunner({
+		processIngestSession: router.processIngestSession,
+		errorFactories: router.createBackgroundIngestErrorFactories,
+		prepare: options.prepare,
+		sql: options.sql,
+		clickhouse: getClickhouse,
+		objectStore: () => {
+			const availability = storage.readR2IngestAvailability();
+			return availability.enabled
+				? storage.createObjectStoreClient(availability.configuration)
+				: null;
+		},
+		log: options.log,
+	});
+}
+
 export function createSessionRunner(
 	deps: SessionRunnerDependencies,
 ): (job: SessionJob, owner: Owner) => Promise<SessionOutcome> {
