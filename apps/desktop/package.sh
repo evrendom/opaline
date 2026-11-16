@@ -101,8 +101,13 @@ if [ "$identity" = "-" ]; then
 	codesign --force --deep --sign - "$app"
 else
 	step "sign: $identity (hardened runtime)"
-	entitlements="$here/build/entitlements.plist"
+	entitlements="$here/signing/entitlements.plist"
 	find "$resources/runtimes" -type f -perm -u+x | while read -r binary; do
+		if file "$binary" | grep -q Mach-O; then
+			codesign --force --timestamp --options runtime --entitlements "$entitlements" --sign "$identity" "$binary"
+		fi
+	done
+	find "$app/Contents/Frameworks" -type f -perm -u+x ! -name '*.dylib' | while read -r binary; do
 		if file "$binary" | grep -q Mach-O; then
 			codesign --force --timestamp --options runtime --entitlements "$entitlements" --sign "$identity" "$binary"
 		fi
