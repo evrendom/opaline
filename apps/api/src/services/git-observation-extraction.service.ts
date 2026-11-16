@@ -7,11 +7,6 @@ import { readPositiveSafeIntegerEnv } from "../lib/env.js";
 import { ReusableWorkers } from "../lib/reusable-workers.js";
 import { isSelfHosted } from "../lib/self-hosted.js";
 import {
-	type GenerationRetirement,
-	type GenerationRetirementOptions,
-	retireGenerationsBelowNewestReceipt,
-} from "./generation-retirement.js";
-import {
 	baseRow,
 	GIT_OBSERVATION_MAX_RAW_BYTES,
 	GIT_TOOL_PATTERN,
@@ -22,6 +17,7 @@ import {
 	gitObservationGenerationVersion,
 } from "./git-observation-parser.js";
 import { enqueueSessionEdgesBestEffort } from "./l1-edges/l1-edge-enqueue.js";
+import { receiptRow } from "./transcript-generations/generations.js";
 import { readRawTranscriptLine } from "./transcript-raw-line.service.js";
 import { createTranscriptRecordsDeadline } from "./transcript-records-deadline.js";
 import type { TranscriptRecordsIdentity } from "./transcript-records-ingest.service.js";
@@ -53,7 +49,7 @@ export interface GitObservationExtractionInput
 	onWritten?: (session: TranscriptRecordsIdentity) => Promise<void>;
 }
 
-interface Generation {
+interface ReceiptRow {
 	revision: string;
 	parser_version: number;
 	ts: string;
@@ -106,10 +102,10 @@ export async function extractGitObservations(
 	const params = identityParams(input);
 	try {
 		const receipts = await deadline.wait(() =>
-			executor.query<Generation>({
+			executor.query<ReceiptRow>({
 				abortSignal: deadline.signal,
 				clickhouse_settings: SCAN_SETTINGS,
-				query: `SELECT toString(revision) AS revision, parser_version, ts FROM rudel.transcript_records WHERE ${identityFilter()} AND kind = 'receipt' ORDER BY toUInt64(revision) DESC, parser_version DESC LIMIT 1`,
+				query: `SELECT toString(revision) AS revision, parser_version, ts FROM rudel.transcript_records WHERE ${identityFilter()} AND ${receiptRow()} ORDER BY toUInt64(revision) DESC, parser_version DESC LIMIT 1`,
 				query_params: params,
 			}),
 		);
@@ -139,10 +135,10 @@ export async function extractGitObservations(
 			parserVersion,
 		};
 		const committed = await deadline.wait(() =>
-			executor.query<Generation>({
+			executor.query<ReceiptRow>({
 				abortSignal: deadline.signal,
 				clickhouse_settings: SCAN_SETTINGS,
-				query: `SELECT toString(revision) AS revision, parser_version, ts FROM ${SESSION_GIT_OBSERVATIONS_TABLE} WHERE ${identityFilter()} AND kind = 'receipt' ORDER BY toUInt64(revision) DESC, parser_version DESC LIMIT 1`,
+				query: `SELECT toString(revision) AS revision, parser_version, ts FROM ${SESSION_GIT_OBSERVATIONS_TABLE} WHERE ${identityFilter()} AND ${receiptRow()} ORDER BY toUInt64(revision) DESC, parser_version DESC LIMIT 1`,
 				query_params: params,
 			}),
 		);
@@ -362,20 +358,9 @@ function parseOffThread(
 	});
 }
 
-export function retireOlderGitObservations(
-	executor: ClickHouseExecutor,
-	options: GenerationRetirementOptions = {},
-): Promise<GenerationRetirement> {
-	return retireGenerationsBelowNewestReceipt(
-		executor,
-		SESSION_GIT_OBSERVATIONS_TABLE,
-		options,
-	);
-}
-
 function compareGeneration(
-	left: Pick<Generation, "revision" | "parser_version">,
-	right: Pick<Generation, "revision" | "parser_version">,
+	left: Pick<ReceiptRow, "revision" | "parser_version">,
+	right: Pick<ReceiptRow, "revision" | "parser_version">,
 ): number {
 	return BigInt(left.revision) === BigInt(right.revision)
 		? left.parser_version - right.parser_version

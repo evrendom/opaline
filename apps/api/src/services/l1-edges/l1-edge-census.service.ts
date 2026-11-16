@@ -8,6 +8,7 @@ import {
 	getSafeClickHouseTable,
 } from "../../clickhouse.js";
 import type { MaintenanceDeadline } from "../../lib/bounded-maintenance.js";
+import { receiptRow } from "../transcript-generations/generations.js";
 import { L1_EDGE_RESOLVER_VERSION } from "./l1-edge-derivation.js";
 import { sessionScopeId } from "./l1-edge-ids.js";
 import {
@@ -157,7 +158,7 @@ export function buildObservedSessionsStatement(
 				SELECT organization_id, user_id, source, session_id,
 					max(tuple(revision, parser_version, transcript_parser_version)) AS newest
 				FROM ${getSafeClickHouseTable("rudel.session_git_observations")}
-				WHERE kind = 'receipt' AND ts >= fromUnixTimestamp64Milli({since:Int64}, 'UTC')
+				WHERE ${receiptRow()} AND ts >= fromUnixTimestamp64Milli({since:Int64}, 'UTC')
 					${organizationId === undefined ? "" : "AND organization_id = {organizationId:String}"}
 				GROUP BY organization_id, user_id, source, session_id
 			)

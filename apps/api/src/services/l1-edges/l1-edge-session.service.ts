@@ -21,6 +21,10 @@ import {
 import { queryCountedGenerations, type ScopeBatch } from "../analysis/scope.js";
 import { ANALYSIS_QUERY_SETTINGS, query } from "../analysis/sql.js";
 import {
+	pinnedParams,
+	pinnedRows,
+} from "../transcript-generations/generations.js";
+import {
 	type DerivedEdge,
 	type DerivedResolution,
 	deriveSessionEdges,
@@ -200,16 +204,15 @@ export async function buildSessionEdges(input: {
 		for (const row of await query(executor, RunStartSchema, {
 			query: `SELECT agent_id, turn_idx, min(record_idx) AS start_record
 				FROM ${getSafeClickHouseTable("rudel.transcript_records")} FINAL
-				WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
-					AND session_id = {sessionId:String} AND revision = toUInt64({revision:String})
-					AND parser_version = {parserVersion:UInt16} AND turn_idx >= 1
+				WHERE ${pinnedRows()} AND turn_idx >= 1
 				GROUP BY agent_id, turn_idx`,
-			query_params: {
-				...scope,
-				sessionId: session.sessionId,
-				revision: generation.revision,
-				parserVersion: generation.transcriptParserVersion,
-			},
+			query_params: pinnedParams(scope, [
+				{
+					sessionId: session.sessionId,
+					revision: generation.revision,
+					parserVersion: generation.transcriptParserVersion,
+				},
+			]),
 			clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
 		}))
 			runStarts.set(`${row.agent_id}|${row.turn_idx}`, row.start_record);

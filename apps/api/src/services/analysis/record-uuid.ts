@@ -1,10 +1,13 @@
 import { ORPCError } from "@orpc/server";
-import { TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX } from "@rudel/api-routes/transcript-records";
 import { z } from "zod";
 import type {
 	ClickHouseExecutor,
 	ClickHouseStatement,
 } from "../../clickhouse.js";
+import {
+	contentRow,
+	receiptRow,
+} from "../transcript-generations/generations.js";
 import { ANALYSIS_QUERY_SETTINGS, query, records } from "./sql.js";
 
 /**
@@ -81,7 +84,7 @@ export function buildRecordUuidLookupStatement(
 					AND (user_id, session_id) IN (
 						SELECT user_id, session_id FROM ${records()}
 						WHERE organization_id = {organizationId:String} AND record_uuid IN {uuids:Array(String)})
-					AND agent_id = '' AND record_idx = {receipt:UInt32} AND block_idx = 0
+					AND ${receiptRow()}
 				ORDER BY user_id, session_id, revision DESC, parser_version DESC
 				LIMIT 1 BY user_id, session_id
 			)
@@ -90,7 +93,7 @@ export function buildRecordUuidLookupStatement(
 			FROM ${records()}
 			WHERE organization_id = {organizationId:String} AND record_uuid IN {uuids:Array(String)}
 				AND (user_id, session_id, revision, parser_version) IN (SELECT user_id, session_id, revision, parser_version FROM committed)
-				AND record_idx < {receipt:UInt32}
+				AND ${contentRow()}
 			GROUP BY user_id, source, session_id, agent_id, record_idx
 			ORDER BY min(session_date), min(ts), session_id, agent_id, record_idx
 			LIMIT {limit:UInt32}`,
@@ -98,7 +101,6 @@ export function buildRecordUuidLookupStatement(
 			organizationId: workspaceId,
 			// Claude Code writes lowercase; an id copied in upper case still matches.
 			uuids: [...new Set([uuid, uuid.toLowerCase()])],
-			receipt: TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
 			limit: RECORD_UUID_MAX_HITS,
 		},
 	};

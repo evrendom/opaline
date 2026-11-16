@@ -3,6 +3,13 @@ import { z } from "zod";
 import type { ClickHouseExecutor } from "../../clickhouse.js";
 import { parseObservationEvidenceId } from "../l1-edges/l1-edge-ids.js";
 import {
+	contentRow,
+	pinnedParams,
+	pinnedRows,
+	receiptRow,
+	type SessionGeneration,
+} from "../transcript-generations/generations.js";
+import {
 	type CursorKey,
 	type CursorOrder,
 	compareKeys,
@@ -263,6 +270,16 @@ export interface ObservationGeneration {
 	transcriptParserVersion: number;
 	/** The generation was extracted from the session's indexed transcript generation. */
 	current: boolean;
+}
+
+function pinnedGenerations(
+	pinned: readonly (readonly [string, ObservationGeneration])[],
+): SessionGeneration[] {
+	return pinned.map(([sessionId, generation]) => ({
+		sessionId,
+		revision: generation.revision,
+		parserVersion: generation.parserVersion,
+	}));
 }
 
 /** An event before GitHub facts are added. */
@@ -703,7 +720,7 @@ export async function loadObservationGenerations(
 			query: `SELECT session_id, toString(revision) AS revision_text, parser_version, transcript_parser_version
 				FROM rudel.session_git_observations FINAL
 				WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
-					AND session_id IN {sessionIds:Array(String)} AND kind = 'receipt'`,
+					AND session_id IN {sessionIds:Array(String)} AND ${receiptRow()}`,
 			query_params: {
 				organizationId: batch.scope.organizationId,
 				userId: batch.scope.userId,
@@ -824,11 +841,7 @@ async function queryObservationRows(
 				push_from_sha, push_to_sha, push_source_branch, pr_repo, pr_number, commit_hash,
 				repository_url, run_id, toUnixTimestamp64Milli(ts) AS ts_ms
 			FROM rudel.session_git_observations FINAL
-			WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
-				AND session_id IN {sessionIds:Array(String)} AND kind != 'receipt'
-				AND (session_id, toString(revision), parser_version) IN (
-					SELECT g.1, g.2, g.3 FROM (SELECT arrayJoin(arrayZip(
-						{genSessions:Array(String)}, {genRevisions:Array(String)}, {genParsers:Array(UInt16)})) AS g))
+			WHERE ${pinnedRows()} AND ${contentRow()}
 				${
 					wanted
 						? `AND (session_id, agent_id, record_idx, block_idx, kind) IN (
@@ -847,12 +860,7 @@ async function queryObservationRows(
 			ORDER BY ts_ms DESC, session_id, agent_id, record_idx, block_idx
 			LIMIT {limit:UInt32}`,
 		query_params: {
-			organizationId: batch.scope.organizationId,
-			userId: batch.scope.userId,
-			sessionIds: pinned.map(([sessionId]) => sessionId),
-			genSessions: pinned.map(([sessionId]) => sessionId),
-			genRevisions: pinned.map(([, generation]) => generation.revision),
-			genParsers: pinned.map(([, generation]) => generation.parserVersion),
+			...pinnedParams(batch.scope, pinnedGenerations(pinned)),
 			limit: options.limit,
 			...(wanted
 				? {
@@ -1001,21 +1009,12 @@ async function loadChecksAfter(
 					SELECT session_id, agent_id, record_idx, call_id,
 						max(label != 'unconfirmed') AS confirmed, min(ts) AS ts
 					FROM rudel.session_git_observations FINAL
-					WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
-						AND session_id IN {sessionIds:Array(String)} AND kind = 'ci_check'
-						AND (session_id, toString(revision), parser_version) IN (
-							SELECT g.1, g.2, g.3 FROM (SELECT arrayJoin(arrayZip(
-								{genSessions:Array(String)}, {genRevisions:Array(String)}, {genParsers:Array(UInt16)})) AS g))
+					WHERE ${pinnedRows()} AND kind = 'ci_check'
 					GROUP BY session_id, agent_id, record_idx, call_id
 				) AS c ON c.session_id = pushes.push_session AND c.agent_id = pushes.push_agent
 				GROUP BY pushes.push_session, pushes.push_agent, pushes.push_record`,
 			query_params: {
-				organizationId: batch.scope.organizationId,
-				userId: batch.scope.userId,
-				sessionIds: pinned.map(([sessionId]) => sessionId),
-				genSessions: pinned.map(([sessionId]) => sessionId),
-				genRevisions: pinned.map(([, generation]) => generation.revision),
-				genParsers: pinned.map(([, generation]) => generation.parserVersion),
+				...pinnedParams(batch.scope, pinnedGenerations(pinned)),
 				pushSessions: targets.map((seed) => seed.sessionId),
 				pushAgents: targets.map((seed) => seed.agentId),
 				pushRecords: targets.map((seed) => seed.record),
@@ -1066,19 +1065,10 @@ async function loadSessionCommits(
 		const rows = await query(executor, SessionCommitSchema, {
 			query: `SELECT session_id, short_sha, min(toUnixTimestamp64Milli(ts)) AS first_ms
 				FROM rudel.session_git_observations FINAL
-				WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
-					AND session_id IN {sessionIds:Array(String)} AND kind = 'commit_created' AND short_sha != ''
-					AND (session_id, toString(revision), parser_version) IN (
-						SELECT g.1, g.2, g.3 FROM (SELECT arrayJoin(arrayZip(
-							{genSessions:Array(String)}, {genRevisions:Array(String)}, {genParsers:Array(UInt16)})) AS g))
+				WHERE ${pinnedRows()} AND kind = 'commit_created' AND short_sha != ''
 				GROUP BY session_id, short_sha`,
 			query_params: {
-				organizationId: batch.scope.organizationId,
-				userId: batch.scope.userId,
-				sessionIds: pinned.map(([sessionId]) => sessionId),
-				genSessions: pinned.map(([sessionId]) => sessionId),
-				genRevisions: pinned.map(([, generation]) => generation.revision),
-				genParsers: pinned.map(([, generation]) => generation.parserVersion),
+				...pinnedParams(batch.scope, pinnedGenerations(pinned)),
 			},
 			clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
 		});

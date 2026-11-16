@@ -1,4 +1,3 @@
-import { TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX } from "@rudel/api-routes/transcript-records";
 import type {
 	TrendsUsage,
 	TrendsUsageMetrics,
@@ -10,13 +9,17 @@ import {
 	queryClickhouse,
 } from "../clickhouse.js";
 import { readNonNegativeSafeIntegerEnv } from "../lib/env.js";
-import { SESSION_AGENT_RUN_SCAN_VERSION } from "./session-agent-runs.js";
-import { TRANSCRIPT_RECORDS_TABLE } from "./transcript-records-ingest.service.js";
 import {
+	type CensusWindow,
 	censusWindowFilter,
 	scanCensusWindows,
-	type TranscriptRecordsCensusWindow,
-} from "./transcript-records-retirement.service.js";
+} from "./census-windows.js";
+import { SESSION_AGENT_RUN_SCAN_VERSION } from "./session-agent-runs.js";
+import {
+	contentRow,
+	newestGenerations,
+} from "./transcript-generations/generations.js";
+import { TRANSCRIPT_RECORDS_TABLE } from "./transcript-records-ingest.service.js";
 import {
 	buildCanonicalPricingModelSql,
 	buildRunPricedUsageCte,
@@ -293,7 +296,6 @@ export function trendsQueryParams(window: TrendsWindow) {
 		shareStart: window.shareStart,
 		shareEnd: window.shareEndExclusive,
 		scanVersion: SESSION_AGENT_RUN_SCAN_VERSION,
-		receiptRecordIdx: TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
 		excludedUsers: readExcludedUserIds(),
 	};
 }
@@ -752,7 +754,7 @@ const RUN_METRICS_SQL = `
  * records yields both the prompts and the failed tool results.
  */
 export function buildFrictionWindowStatement(
-	window: TranscriptRecordsCensusWindow,
+	window: CensusWindow,
 	params: TrendsQueryParams,
 ): ClickHouseStatement {
 	const keys = censusWindowFilter(window);
@@ -828,7 +830,11 @@ export async function queryFriction(
 		table: TRANSCRIPT_RECORDS_TABLE,
 		windowRows,
 		limit: Number.POSITIVE_INFINITY,
-		statement: (window) => buildFrictionWindowStatement(window, params),
+		read: (window, _remaining, abortSignal) =>
+			executor.query<FrictionDeveloperRow>({
+				...buildFrictionWindowStatement(window, params),
+				abortSignal,
+			}),
 		wait: (operation) => operation(),
 	});
 	return frictionRows(scan.rows);
@@ -1068,14 +1074,11 @@ function transcriptCte(
 ): string {
 	return `
 	transcript_generations AS (
-		SELECT organization_id, user_id, session_id,
-			argMax(tuple(revision, parser_version), tuple(revision, parser_version)) AS generation
-		FROM rudel.transcript_records
-		WHERE agent_id = '' AND record_idx = {receiptRecordIdx:UInt32} AND block_idx = 0
-			AND session_date < toDateTime64({periodEnd:String}, 3, 'UTC')
+		${newestGenerations({
+			and: `AND session_date < toDateTime64({periodEnd:String}, 3, 'UTC')
 			AND user_id NOT IN {excludedUsers:Array(String)}
-			${window.keys}
-		GROUP BY organization_id, user_id, session_id
+			${window.keys}`,
+		})}
 	),
 	transcript_events AS (
 		SELECT r.organization_id AS organization_id, r.user_id AS user_id,
@@ -1086,7 +1089,7 @@ function transcriptCte(
 			ON r.organization_id = g.organization_id AND r.user_id = g.user_id
 			AND r.session_id = g.session_id
 		WHERE r.revision = g.generation.1 AND r.parser_version = g.generation.2
-			AND r.record_idx < {receiptRecordIdx:UInt32}
+			AND ${contentRow("r")}
 			AND r.kind IN ('user_prompt', 'tool_call', 'tool_result')
 			AND r.session_date < toDateTime64({periodEnd:String}, 3, 'UTC')
 			${window.records}

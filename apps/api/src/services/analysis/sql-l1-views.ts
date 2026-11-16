@@ -1,4 +1,3 @@
-import { TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX } from "@rudel/api-routes/transcript-records";
 import { CALL_FACTS_TABLE } from "@rudel/ch-schema/call-facts";
 import {
 	RUN_SETUP_COLUMNS,
@@ -10,6 +9,10 @@ import {
 	RUN_INDEX_TABLE,
 	RUN_REQUESTS_TABLE,
 } from "../l1-edges/l1-edge-tables.js";
+import {
+	contentRow,
+	receiptRow,
+} from "../transcript-generations/generations.js";
 import { committedBuildSql } from "./run-index-reader.js";
 import { GENUINE_PROMPT_SQL, records } from "./sql.js";
 import { cohortOwner, windowSessionsSql } from "./sql-measures.js";
@@ -433,7 +436,7 @@ function gitEventsView(owner: Owner): SqlView {
 						FROM (
 							SELECT DISTINCT user_id, session_id, revision, parser_version, transcript_parser_version
 							FROM ${observations}
-							WHERE ${scope} AND kind = 'receipt'
+							WHERE ${scope} AND ${receiptRow()}
 						) AS o
 						INNER JOIN opaline_view_generations AS g ON o.user_id = g.user_id AND o.session_id = g.session_id
 						GROUP BY o.user_id, o.session_id
@@ -445,7 +448,7 @@ function gitEventsView(owner: Owner): SqlView {
 							call_id, kind, label, short_sha, branch, push_from_sha, push_to_sha, push_source_branch,
 							pr_repo, pr_number, commit_hash, repository_url, run_id, ts
 						FROM ${observations} FINAL
-						WHERE ${scope} AND kind != 'receipt'
+						WHERE ${scope} AND ${contentRow()}
 					) AS o
 					INNER JOIN opaline_view_picks AS p ON o.user_id = p.user_id AND o.session_id = p.session_id
 						AND o.revision = p.revision AND o.parser_version = p.parser_version
@@ -907,7 +910,7 @@ function indexedReceiptsSql(scope: string, columns: string): string {
 function indexedGenerationSql(scope: string): string {
 	const generation = "user_id, source, session_id, revision, parser_version";
 	return `(${generation}) IN (${indexedReceiptsSql(scope, generation)})
-			AND record_idx < ${TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX}`;
+			AND ${contentRow()}`;
 }
 
 /**

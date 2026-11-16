@@ -11,13 +11,13 @@ import {
 import postgres from "postgres";
 import { getClickhouse } from "../clickhouse.js";
 import { assertNoClickHousePurgeTombstone } from "../services/clickhouse-purge-tombstone.service.js";
+import { RETIREMENT_GRACE_MS } from "../services/generation-retirement/retirement.js";
 import { auditL1, compareL1Audits } from "../services/l1-audit.service.js";
 import { backfillTranscriptRecords } from "../services/transcript-records-backfill.service.js";
 import {
 	buildTranscriptRecordRow,
 	buildTranscriptRecordsReceiptRow,
 	hashTranscriptContent,
-	TRANSCRIPT_RECORDS_RETIRE_GRACE_MS,
 } from "../services/transcript-records-ingest.service.js";
 import { readSessionFacts } from "../services/transcript-records-reader.service.js";
 import { drainTranscriptRecordsRetirement } from "../services/transcript-records-retirement-drain.service.js";
@@ -177,7 +177,7 @@ test("a backfill's superseded generations are retired by the drain after the gra
 		deleteStatements: 0,
 	});
 
-	const later = Date.now() + TRANSCRIPT_RECORDS_RETIRE_GRACE_MS + 60_000;
+	const later = Date.now() + RETIREMENT_GRACE_MS + 60_000;
 	const preview = await drain(false, later);
 	expect(preview).toMatchObject({
 		status: "preview",

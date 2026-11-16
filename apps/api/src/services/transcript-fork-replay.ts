@@ -1,11 +1,12 @@
-import {
-	codexForkParentIds,
-	TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
-} from "@rudel/api-routes/transcript-records";
+import { codexForkParentIds } from "@rudel/api-routes/transcript-records";
 import { z } from "zod";
 import type { ClickHouseExecutor } from "../clickhouse.js";
 import { ANALYSIS_QUERY_SETTINGS, records } from "./analysis/sql.js";
-import type { TranscriptReadScope } from "./transcript-records-queries.js";
+import {
+	contentRow,
+	newestGenerations,
+	type TranscriptReadScope,
+} from "./transcript-generations/generations.js";
 
 /**
  * The committed generation of each parent session `parents` selects, and its
@@ -17,19 +18,14 @@ export function forkParentCallsSql(
 	owner = "organization_id = {organizationId:String} AND user_id = {userId:String}",
 ): string {
 	return `parent_receipts AS (
-		SELECT user_id, session_id, argMax(tuple(revision, parser_version), tuple(revision, parser_version)) AS generation
-		FROM ${records()}
-		WHERE ${owner}
-			AND ${parents} AND source = 'codex'
-			AND agent_id = '' AND record_idx = ${TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX} AND block_idx = 0
-		GROUP BY user_id, session_id
+		${newestGenerations({ by: ["user_id", "session_id"], and: `AND ${owner} AND ${parents} AND source = 'codex'` })}
 	), parent_calls AS (
 		SELECT DISTINCT user_id, session_id, call_id FROM ${records()}
 		WHERE ${owner}
 			AND ${parents} AND source = 'codex'
 			AND (user_id, session_id, revision, parser_version) IN (SELECT user_id, session_id, generation.1, generation.2 FROM parent_receipts)
 			AND agent_id = '' AND kind = 'tool_call' AND call_id != ''
-			AND record_idx < ${TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX}
+			AND ${contentRow()}
 	)`;
 }
 

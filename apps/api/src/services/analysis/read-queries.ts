@@ -1,14 +1,14 @@
 import type { RunRef } from "@rudel/api-routes";
 import type { ClickHouseStatement } from "../../clickhouse.js";
-import type {
-	SessionGeneration,
-	TranscriptReadScope,
-} from "../transcript-records-queries.js";
+import {
+	pinnedParams,
+	pinnedRecords,
+	type SessionGeneration,
+	type TranscriptReadScope,
+} from "../transcript-generations/generations.js";
 import {
 	ANALYSIS_QUERY_SETTINGS,
 	GENUINE_PROMPT_SQL,
-	pinnedFilter,
-	pinnedParams,
 	records,
 	toolErrorSql,
 } from "./sql.js";
@@ -33,7 +33,7 @@ export function buildLastEditStatement(run: RunAddress): ClickHouseStatement {
 		WHERE ${runFilter()} AND kind = 'file_change' AND file_op IN ('write', 'edit', 'delete')
 			AND (call_id = '' OR (session_id, agent_id, call_id) NOT IN (
 				SELECT session_id, agent_id, call_id FROM ${records()}
-				WHERE ${pinnedFilter()} AND ${toolErrorSql()} AND call_id != ''))`,
+				WHERE ${pinnedRecords()} AND ${toolErrorSql()} AND call_id != ''))`,
 	);
 }
 
@@ -79,7 +79,7 @@ export function buildLastAssistantRecordStatement(
 }
 
 function runFilter(): string {
-	return `${pinnedFilter()} AND agent_id = {agentId:String} AND turn_idx = {turn:UInt32}`;
+	return `${pinnedRecords()} AND agent_id = {agentId:String} AND turn_idx = {turn:UInt32}`;
 }
 
 function runStatement(

@@ -4,10 +4,12 @@ import type {
 	ClickHouseExecutor,
 	ClickHouseStatement,
 } from "../../clickhouse.js";
-import type {
-	SessionGeneration,
-	TranscriptReadScope,
-} from "../transcript-records-queries.js";
+import {
+	pinnedParams,
+	pinnedRecords,
+	type SessionGeneration,
+	type TranscriptReadScope,
+} from "../transcript-generations/generations.js";
 import {
 	childSessions,
 	type FamilyPosition,
@@ -15,13 +17,7 @@ import {
 	loadFamiliesAround,
 } from "./lineage.js";
 import { queryCountedGenerations } from "./scope.js";
-import {
-	ANALYSIS_QUERY_SETTINGS,
-	pinnedFilter,
-	pinnedParams,
-	query,
-	records,
-} from "./sql.js";
+import { ANALYSIS_QUERY_SETTINGS, query, records } from "./sql.js";
 
 /**
  * Where a Codex subagent thread meets the session that spawned it. The parent
@@ -352,7 +348,7 @@ function buildDelegationCallsStatement(
 				SELECT agent_id, turn_idx, record_idx, block_idx, call_id, tool_name, ts,
 					substringUTF8(head, 1, 1024) AS args
 				FROM ${records()}
-				WHERE ${pinnedFilter()} AND kind = 'tool_call' AND tool_name IN {tools:Array(String)}
+				WHERE ${pinnedRecords()} AND kind = 'tool_call' AND tool_name IN {tools:Array(String)}
 				ORDER BY agent_id, record_idx, block_idx
 				LIMIT 1 BY agent_id, record_idx, block_idx
 			) c
@@ -360,10 +356,10 @@ function buildDelegationCallsStatement(
 				SELECT agent_id, call_id, max(spawned_agent_id) AS spawned,
 					max(toUInt8(is_error)) AS failed
 				FROM ${records()}
-				WHERE ${pinnedFilter()} AND kind = 'tool_result' AND call_id != ''
+				WHERE ${pinnedRecords()} AND kind = 'tool_result' AND call_id != ''
 					AND (agent_id, call_id) IN (
 						SELECT agent_id, call_id FROM ${records()}
-						WHERE ${pinnedFilter()} AND kind = 'tool_call' AND tool_name IN {tools:Array(String)})
+						WHERE ${pinnedRecords()} AND kind = 'tool_call' AND tool_name IN {tools:Array(String)})
 				GROUP BY agent_id, call_id
 			) r ON c.agent_id = r.agent_id AND c.call_id = r.call_id AND c.call_id != ''
 			ORDER BY c.agent_id, c.record_idx, c.block_idx
@@ -389,7 +385,7 @@ function buildChildTasksStatement(
 					toUInt8(subtype = 'delegation') AS delegation,
 					substringUTF8(head, 1, {chars:UInt32}) AS text
 				FROM ${records()}
-				WHERE ${pinnedFilter()} AND agent_id = '' AND kind = 'user_prompt'
+				WHERE ${pinnedRecords()} AND agent_id = '' AND kind = 'user_prompt'
 				ORDER BY session_id, record_idx, block_idx
 				LIMIT 1 BY session_id, record_idx, block_idx
 			)

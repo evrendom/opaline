@@ -1,22 +1,19 @@
 import type { ReceivedSetupEntry } from "@rudel/api-routes/transcript-records";
 import { z } from "zod";
 import type { ClickHouseStatement } from "../../clickhouse.js";
-import type {
-	SessionGeneration,
-	TranscriptReadScope,
-} from "../transcript-records-queries.js";
+import {
+	pinnedParams,
+	pinnedRecords,
+	type SessionGeneration,
+	type TranscriptReadScope,
+} from "../transcript-generations/generations.js";
 import {
 	type GitStatus,
 	parseGitStatus,
 	type ReceivedSetupInput,
 	type SetupReception,
 } from "./received-setup.js";
-import {
-	ANALYSIS_QUERY_SETTINGS,
-	pinnedFilter,
-	pinnedParams,
-	records,
-} from "./sql.js";
+import { ANALYSIS_QUERY_SETTINGS, records } from "./sql.js";
 
 /**
  * What a run index build reads for received setup (`received-setup.ts`)
@@ -92,7 +89,7 @@ function receivedSetupSql(session: string): string {
 				if(subtype = 'attachment:session_context', facts['environment_snapshot_components'], '') AS environment,
 				toUInt8(has(splitByChar(',', facts['facts_clipped']), 'environment_snapshot_components')) AS environment_clipped
 			FROM ${records()}
-			WHERE ${pinnedFilter()} AND (
+			WHERE ${pinnedRecords()} AND (
 				facts['received_setup'] != ''
 				OR kind = 'compaction'
 				OR (kind = 'file_change' AND file_op IN ('write', 'edit', 'delete'))

@@ -3,13 +3,16 @@ import { getClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
 import { assertNoClickHousePurgeTombstone } from "../services/clickhouse-purge-tombstone.service.js";
-import { retireOlderGitObservations } from "../services/git-observation-extraction.service.js";
+import {
+	RETIREMENT_GRACE_MS,
+	retireGenerations,
+} from "../services/generation-retirement/retirement.js";
+import { gitObservationsStore } from "../services/generation-retirement/stores.js";
 import {
 	backfillTranscriptRecords,
 	previewTranscriptRecordsBackfill,
 	type TranscriptRecordsBackfillOptions,
 } from "../services/transcript-records-backfill.service.js";
-import { TRANSCRIPT_RECORDS_RETIRE_GRACE_MS } from "../services/transcript-records-ingest.service.js";
 
 const DEFAULT_MAX_SESSIONS = readPositiveSafeIntegerEnv(
 	"TRANSCRIPT_RECORDS_BACKFILL_MAX_SESSIONS",
@@ -111,7 +114,7 @@ try {
 	if (result.failedCount > 0) process.exitCode = 2;
 	if (values.execute) {
 		// The run kept older git observation generations; retire them in one pass.
-		const retirement = await retireOlderGitObservations(executor, {
+		const retirement = await retireGenerations(executor, gitObservationsStore, {
 			organizationId: values["organization-id"],
 		});
 		console.error(
@@ -125,7 +128,7 @@ try {
 			? `--organization-id ${values["organization-id"]}`
 			: "--all-organizations";
 		console.error(
-			`Superseded generations are retirable after ${new Date(Date.now() + TRANSCRIPT_RECORDS_RETIRE_GRACE_MS).toISOString()}: bun run retire:transcript-records ${scope} (preview), then add --execute.`,
+			`Superseded generations are retirable after ${new Date(Date.now() + RETIREMENT_GRACE_MS).toISOString()}: bun run retire:transcript-records ${scope} (preview), then add --execute.`,
 		);
 	}
 } finally {

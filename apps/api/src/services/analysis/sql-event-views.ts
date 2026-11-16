@@ -1,7 +1,5 @@
-import {
-	TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
-	type TranscriptSource,
-} from "@rudel/api-routes/transcript-records";
+import type { TranscriptSource } from "@rudel/api-routes/transcript-records";
+import { contentRow } from "../transcript-generations/generations.js";
 import {
 	RUN_INDEX_FACT_COLUMNS,
 	type RunIndexColumnGate,
@@ -311,7 +309,7 @@ export function eventsSql(runs: CommittedRuns, window: SqlWindow = {}): string {
 					FROM ${records()} FINAL
 					PREWHERE ${EVENT_RECORDS}
 					WHERE ${runs.owner} AND ${generation}${inWindow}
-						AND record_idx < ${TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX} AND turn_idx >= 1
+						AND ${contentRow()} AND turn_idx >= 1
 						AND facts['fork_replayed'] != 'true'
 				)
 			) AS e

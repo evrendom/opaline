@@ -5,6 +5,7 @@ import {
 	type ClickHouseExecutor,
 	getSafeClickHouseTable,
 } from "../../clickhouse.js";
+import { receiptRow } from "../transcript-generations/generations.js";
 import {
 	enqueueL1EdgeScope,
 	enqueueL1EdgeSessionScopes,
@@ -102,7 +103,7 @@ export async function backfillL1Edges(
 			},
 			query: `SELECT organization_id, user_id, source, session_id
 				FROM ${getSafeClickHouseTable("rudel.session_git_observations")}
-				WHERE kind = 'receipt'
+				WHERE ${receiptRow()}
 					${options.organizationId ? "AND organization_id = {organizationId:String}" : ""}
 					${after ? "AND (organization_id, user_id, source, session_id) > ({afterOrganizationId:String}, {afterUserId:String}, {afterSource:String}, {afterSessionId:String})" : ""}
 				GROUP BY organization_id, user_id, source, session_id

@@ -1,18 +1,14 @@
 import { scanMemberLanguageSignals } from "@rudel/language-signals";
 import { z } from "zod";
 import type { ClickHouseStatement } from "../../clickhouse.js";
-import type {
-	SessionGeneration,
-	TranscriptReadScope,
-} from "../transcript-records-queries.js";
-import { SCAN_TEXT_CHARS } from "./scan-queries.js";
 import {
-	ANALYSIS_QUERY_SETTINGS,
-	GENUINE_PROMPT_SQL,
-	pinnedFilter,
 	pinnedParams,
-	records,
-} from "./sql.js";
+	pinnedRecords,
+	type SessionGeneration,
+	type TranscriptReadScope,
+} from "../transcript-generations/generations.js";
+import { SCAN_TEXT_CHARS } from "./scan-queries.js";
+import { ANALYSIS_QUERY_SETTINGS, GENUINE_PROMPT_SQL, records } from "./sql.js";
 
 /**
  * What a run's messages literally say, for the run index (index 4): the
@@ -91,7 +87,7 @@ function runMessagesSql(session: string): string {
 				toUInt8(ended_saying AND argMaxIf(text_chars > ${FINAL_MESSAGE_CHARS} OR lengthUTF8(text) < text_chars, ${at}, ${said})) AS final_message_cut,
 				toUInt8(countIf(${SYSTEM_PROMPT_SQL}) > 0) AS system_prompt
 			FROM ${records()}
-			WHERE ${pinnedFilter()} AND (
+			WHERE ${pinnedRecords()} AND (
 				(turn_idx >= 1 AND facts['fork_replayed'] != 'true'
 					AND ((${GENUINE_PROMPT_SQL}) OR kind IN ('assistant_text', 'tool_call')))
 				OR (${SYSTEM_PROMPT_SQL}))

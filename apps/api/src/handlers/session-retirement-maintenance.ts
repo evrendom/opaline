@@ -13,14 +13,20 @@ export async function handleSessionRetirementMaintenanceRequest(
 	const idle = await import("../services/idle-activity.js");
 	const skipped = idle.idleCronResponse(await idle.cronGate());
 	if (skipped) return skipped;
-	const [{ getClickhouse }, { runSessionRetirementPass }] = await Promise.all([
+	const [
+		{ getClickhouse },
+		{ runRetirementPass },
+		{ SESSION_RETIREMENT_STORES },
+	] = await Promise.all([
 		import("../clickhouse.js"),
-		import("../services/session-retirement.service.js"),
+		import("../services/generation-retirement/retirement.js"),
+		import("../services/generation-retirement/stores.js"),
 	]);
 	const startedAt = Date.now();
-	const retirement = await runSessionRetirementPass({
+	const retirement = await runRetirementPass({
 		executor: getClickhouse(),
 		deadline: { deadlineAt: startedAt + INVOCATION_BUDGET_MS, now: Date.now },
+		stores: SESSION_RETIREMENT_STORES,
 	});
 	const ok = Object.values(retirement).every((step) => step.status === "ok");
 	if (!ok)

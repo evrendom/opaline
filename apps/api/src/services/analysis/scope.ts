@@ -11,10 +11,10 @@ import {
 	type SessionReader,
 } from "../session-visibility.js";
 import {
-	buildCommittedGenerationsStatement,
+	readCommittedGenerations,
 	type SessionGeneration,
 	type TranscriptReadScope,
-} from "../transcript-records-queries.js";
+} from "../transcript-generations/generations.js";
 import { compareKeys } from "./find-cursor.js";
 import {
 	descendantSessions,
@@ -223,37 +223,21 @@ export interface CountedGeneration extends SessionGeneration {
 	readonly records: number;
 }
 
-const CountedGenerationRowSchema = z
-	.object({
-		session_id: z.string(),
-		revision_text: z.string(),
-		parser_version: z.number(),
-		receipt: z.string(),
-	})
-	.transform(
-		(row): CountedGeneration => ({
-			sessionId: row.session_id,
-			revision: row.revision_text,
-			parserVersion: row.parser_version,
-			// An unreadable receipt counts as a full batch, so its session is read alone.
-			records:
-				decodeTranscriptRecordsReceipt(row.receipt)?.rowCount ?? BATCH_RECORDS,
-		}),
-	);
-
 /** Committed generations of the given sessions (at most `BATCH_SESSIONS`), in session order. */
 export async function queryCountedGenerations(
 	executor: ClickHouseExecutor,
 	scope: TranscriptReadScope,
 	sessionIds: readonly string[],
 ): Promise<CountedGeneration[]> {
-	return z
-		.array(CountedGenerationRowSchema)
-		.parse(
-			await executor.query<unknown>(
-				buildCommittedGenerationsStatement(scope, sessionIds),
-			),
-		);
+	const committed = await readCommittedGenerations(executor, scope, sessionIds);
+	return committed.map((generation) => ({
+		sessionId: generation.sessionId,
+		revision: generation.revision,
+		parserVersion: generation.parserVersion,
+		records:
+			decodeTranscriptRecordsReceipt(generation.receipt)?.rowCount ??
+			BATCH_RECORDS,
+	}));
 }
 
 /**

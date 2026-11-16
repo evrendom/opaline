@@ -30,7 +30,6 @@ import {
 	type UnattributedUsageRow,
 } from "../analysis/run-index-sql.js";
 import { buildRunFactsStatement } from "../analysis/run-queries.js";
-import { selectRetiredGenerations } from "../transcript-records-ingest.service.js";
 import { callTuple } from "./call-facts.fixtures.js";
 import { runNodeId } from "./l1-edge-ids.js";
 import { RUN_REQUESTS_TABLE } from "./l1-edge-tables.js";
@@ -43,7 +42,6 @@ import {
 	runIndexUsage,
 	runRow,
 	runUnknownColumns,
-	selectRetiredSnapshots,
 } from "./run-index.service.js";
 
 const NOW = new Date("2026-10-08T12:00:00.000Z");
@@ -243,6 +241,7 @@ function fakeClickHouse(state: {
 										session_id: session.sessionId,
 										revision_text: "7",
 										parser_version: state.parserVersion ?? 8,
+										source: session.source,
 										receipt: encodeTranscriptRecordsReceipt({
 											contentSha256: "a",
 											lineCount: 1,
@@ -1014,59 +1013,6 @@ describe("usage of a build", () => {
 	});
 });
 
-describe("retiring snapshots", () => {
-	const minutesAgo = (minutes: number) => NOW.getTime() - minutes * 60_000;
-	const snapshot = (
-		revision: string,
-		build: string,
-		receiptMinutesAgo: number | null,
-		writtenMinutesAgo = receiptMinutesAgo ?? 0,
-	) => ({
-		revision_text: revision,
-		parser_version: 8,
-		index_version: 1,
-		build_text: build,
-		receipts: receiptMinutesAgo === null ? 0 : 1,
-		receipt_built_ms:
-			receiptMinutesAgo === null ? 0 : minutesAgo(receiptMinutesAgo),
-		written_ms: minutesAgo(writtenMinutesAgo),
-	});
-	const retire = (rows: ReturnType<typeof snapshot>[]) =>
-		selectRetiredSnapshots(rows, { graceMs: 10 * 60_000, now: NOW }).map(
-			(row) => `${row.revision}/${row.buildRevision}`,
-		);
-
-	test("generation 1 crashed after its runs, generation 2 committed, cleanup failed: the sweep finds it", () => {
-		expect(
-			retire([snapshot("2", "50", 30), snapshot("1", "49", null, 40)]),
-		).toEqual(["1/49"]);
-	});
-
-	test("a superseded build of the same generation goes after the grace, never the committed one", () => {
-		expect(retire([snapshot("2", "51", 5), snapshot("2", "50", 30)])).toEqual(
-			[],
-		);
-		expect(retire([snapshot("2", "51", 20), snapshot("2", "50", 30)])).toEqual([
-			"2/50",
-		]);
-	});
-
-	test("a newer build in flight stays; one abandoned past the grace goes", () => {
-		expect(
-			retire([snapshot("2", "52", null, 1), snapshot("2", "51", 30)]),
-		).toEqual([]);
-		expect(
-			retire([snapshot("2", "52", null, 30), snapshot("2", "51", 30)]),
-		).toEqual(["2/52"]);
-	});
-
-	test("without any committed snapshot only abandoned builds go", () => {
-		expect(
-			retire([snapshot("2", "52", null, 30), snapshot("1", "40", null, 1)]),
-		).toEqual(["2/52"]);
-	});
-});
-
 describe("run index rows", () => {
 	const context = {
 		organizationId: "org",
@@ -1424,17 +1370,13 @@ describe("run index statements", () => {
 		});
 	});
 
-	test("a build reads the pinned generation by its key and resolves shared sets once", () => {
+	test("a build resolves shared sets once", () => {
 		const requests = buildRunRequestsStatement(scope, generation).query;
 		for (const query of [
 			requests,
 			buildRunIndexStatement(scope, generation).query,
 			buildUnattributedUsageStatement(scope, generation).query,
 		]) {
-			expect(query).toContain(
-				"(session_id, revision, parser_version) IN arrayZip({sessionIds:Array(String)}",
-			);
-			expect(query).not.toContain("arrayJoin(arrayZip(");
 			expect(query.match(/FROM replayed_calls\)/gu)).toHaveLength(1);
 		}
 		expect(requests.match(/AS opaline_placed_usage/gu)).toHaveLength(1);
@@ -1464,34 +1406,5 @@ describe("run index statements", () => {
 		expect(span(index)).toBe(span(find));
 		expect(find).not.toContain("l_agent_version");
 		expect(index).toContain("l_agent_version");
-	});
-});
-
-describe("generic generation retirement", () => {
-	const minutesAgo = (minutes: number) => NOW.getTime() - minutes * 60_000;
-
-	test("uncommitted generations go at once; committed ones after the grace since they were superseded", () => {
-		expect(
-			selectRetiredGenerations(
-				[
-					{ generation: "b", publishedAtMs: minutesAgo(30) },
-					{ generation: "a", publishedAtMs: null },
-					{ generation: "z", publishedAtMs: minutesAgo(60) },
-				],
-				{ graceMs: 10 * 60_000, now: NOW, publishedAtMs: minutesAgo(1) },
-			),
-		).toEqual(["a", "z"]);
-	});
-
-	test("an unreadable publication time keeps everything below it", () => {
-		expect(
-			selectRetiredGenerations(
-				[
-					{ generation: "b", publishedAtMs: Number.NaN },
-					{ generation: "a", publishedAtMs: minutesAgo(60) },
-				],
-				{ graceMs: 10 * 60_000, now: NOW, publishedAtMs: minutesAgo(30) },
-			),
-		).toEqual(["b"]);
 	});
 });

@@ -24,6 +24,7 @@ import {
 	getSafeClickHouseTable,
 } from "../clickhouse.js";
 import { ClickHouseWriteFencedError } from "../lib/clickhouse-write-fence.js";
+import type { Generation } from "./transcript-generations/generations.js";
 import { createTranscriptRecordsDeadline } from "./transcript-records-deadline.js";
 
 export const TRANSCRIPT_RECORDS_TABLE = "rudel.transcript_records";
@@ -39,15 +40,6 @@ const RECEIPT_SCAN_SETTINGS = {
 	max_rows_to_read: "5000000",
 } as const;
 
-/**
- * How long a superseded committed generation stays readable, measured from the
- * publication that superseded it. It must exceed the readers' enforced
- * whole-read deadline (`TRANSCRIPT_READ_DEADLINE_MS`), so a read that pinned a
- * generation can never have its rows deleted before it finishes or times out.
- */
-export const TRANSCRIPT_RECORDS_RETIRE_GRACE_MS = 10 * 60_000;
-export const MAX_RETIRED_GENERATIONS_PER_PASS = 100;
-
 const logger = getLogger(["rudel", "api", "transcript-records-ingest"]);
 
 export interface TranscriptRecordsIdentity {
@@ -55,19 +47,6 @@ export interface TranscriptRecordsIdentity {
 	readonly sessionId: string;
 	readonly source: TranscriptSource;
 	readonly userId: string;
-}
-
-/**
- * One extraction generation of a session: the raw revision the rows came from
- * and the splitter version that produced them. Generations are the unit of
- * publication. The generation is part of the row identity, so rows of different
- * generations never collapse into each other, and a generation that never
- * received its receipt cannot disturb the committed one.
- */
-export interface TranscriptRecordsGeneration {
-	readonly parserVersion: number;
-	/** Raw-session revision as an unsigned decimal string. */
-	readonly revision: string;
 }
 
 export interface TranscriptRecordsWriteInput extends TranscriptRecordsIdentity {
@@ -108,8 +87,7 @@ export interface TranscriptRecordsWriteResult {
 	readonly rowCount: number;
 }
 
-export interface TranscriptRecordsReceiptState
-	extends TranscriptRecordsGeneration {
+export interface TranscriptRecordsReceiptState extends Generation {
 	readonly receipt: TranscriptRecordsReceipt;
 }
 
@@ -155,7 +133,7 @@ async function writeGeneration(
 ): Promise<TranscriptRecordsWriteResult> {
 	deadline.assertActive();
 	assertRevision(input.revision);
-	const generation: TranscriptRecordsGeneration = {
+	const generation: Generation = {
 		parserVersion: TRANSCRIPT_RECORDS_PARSER_VERSION,
 		revision: input.revision,
 	};
@@ -516,7 +494,7 @@ export async function deleteTranscriptRecordsGeneration(
 		TranscriptRecordsIdentity,
 		"organizationId" | "sessionId" | "userId"
 	>,
-	generation: TranscriptRecordsGeneration,
+	generation: Generation,
 ): Promise<void> {
 	await executor.execute({
 		clickhouse_settings: { lightweight_deletes_sync: "1" },
@@ -536,50 +514,6 @@ export async function deleteTranscriptRecordsGeneration(
 			userId: identity.userId,
 		},
 	});
-}
-
-/**
- * A generation older than the published one, with when its receipt was
- * published: null when it never committed, NaN when the time is unreadable.
- */
-export interface OlderGeneration<Generation> {
-	readonly generation: Generation;
-	readonly publishedAtMs: number | null;
-}
-
-/**
- * Older generations (given newest first) that are garbage or past their
- * grace. Shared by every store whose generations commit with a receipt
- * (transcript records; the run index, whose generation also has an index
- * version).
- */
-export function selectRetiredGenerations<Generation>(
-	older: readonly OlderGeneration<Generation>[],
-	retirement: {
-		readonly graceMs: number;
-		readonly now: Date;
-		readonly publishedAtMs: number;
-	},
-): Generation[] {
-	const retired: Generation[] = [];
-	// Publication time of the next newer committed generation: the moment the
-	// generation below it stopped being the committed one.
-	let supersededAtMs = retirement.publishedAtMs;
-	for (const { generation, publishedAtMs } of older) {
-		if (publishedAtMs === null) {
-			retired.push(generation);
-			continue;
-		}
-		if (supersededAtMs <= retirement.now.getTime() - retirement.graceMs) {
-			retired.push(generation);
-		}
-		// An unreadable timestamp keeps this generation and everything below it
-		// for another pass rather than guessing.
-		supersededAtMs = Number.isFinite(publishedAtMs)
-			? publishedAtMs
-			: Number.POSITIVE_INFINITY;
-	}
-	return retired.slice(0, MAX_RETIRED_GENERATIONS_PER_PASS);
 }
 
 async function insertBatch(

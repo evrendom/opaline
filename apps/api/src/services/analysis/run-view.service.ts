@@ -12,10 +12,12 @@ import {
 } from "../../clickhouse.js";
 import { runNodeId, splitL1NodeId } from "../l1-edges/l1-edge-ids.js";
 import { RUN_REQUESTS_TABLE } from "../l1-edges/l1-edge-tables.js";
-import type {
-	SessionGeneration,
-	TranscriptReadScope,
-} from "../transcript-records-queries.js";
+import {
+	pinnedParams,
+	pinnedRecords,
+	type SessionGeneration,
+	type TranscriptReadScope,
+} from "../transcript-generations/generations.js";
 import { readRecord } from "../transcript-records-reader.service.js";
 import { CURRENT_PHASE_RULE } from "./phases.js";
 import {
@@ -46,13 +48,7 @@ import {
 	renderRunView,
 } from "./run-view.js";
 import { queryCountedGenerations } from "./scope.js";
-import {
-	ANALYSIS_QUERY_SETTINGS,
-	pinnedFilter,
-	pinnedParams,
-	query,
-	records,
-} from "./sql.js";
+import { ANALYSIS_QUERY_SETTINGS, query, records } from "./sql.js";
 import {
 	describeSqlFailure,
 	quotaExceeded,
@@ -554,7 +550,7 @@ async function delegatedTask(
 	const [task] = await query(executor, z.object({ text: z.string() }), {
 		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
 		query: `SELECT substringUTF8(head, 1, ${TASK_CHARS}) AS text FROM ${records()}
-			WHERE ${pinnedFilter()} AND agent_id = {agentId:String} AND kind = 'user_prompt'
+			WHERE ${pinnedRecords()} AND agent_id = {agentId:String} AND kind = 'user_prompt'
 				AND record_idx >= {from:UInt32} AND record_idx < {to:UInt32}
 			ORDER BY record_idx, block_idx LIMIT 1`,
 		query_params: {
@@ -750,10 +746,10 @@ async function readCalls(
 					max(${runToolErrorSql()}) AS failed, anyIf(spawned_agent_id, spawned_agent_id != '') AS spawned,
 					arraySort(groupUniqArrayIf(tuple(record_idx, block_idx), kind = 'tool_result')) AS result_records
 				FROM ${records()}
-				WHERE ${pinnedFilter()} AND agent_id = {agentId:String} AND kind IN ('tool_result', 'meta')
+				WHERE ${pinnedRecords()} AND agent_id = {agentId:String} AND kind IN ('tool_result', 'meta')
 					AND call_id IN (
 						SELECT call_id FROM ${records()}
-						WHERE ${pinnedFilter()} AND agent_id = {agentId:String} AND kind = 'tool_call'
+						WHERE ${pinnedRecords()} AND agent_id = {agentId:String} AND kind = 'tool_call'
 							AND record_idx >= {from:UInt32} AND record_idx < {to:UInt32} AND call_id != '')
 				GROUP BY call_id
 			)
@@ -763,7 +759,7 @@ async function readCalls(
 				r.failed AS failed, r.spawned AS spawned, r.result_records AS result_records
 			FROM (
 				SELECT DISTINCT record_idx, block_idx, tool_name, command_class, head, call_id, ts FROM ${records()}
-				WHERE ${pinnedFilter()} AND agent_id = {agentId:String} AND kind = 'tool_call'
+				WHERE ${pinnedRecords()} AND agent_id = {agentId:String} AND kind = 'tool_call'
 					AND record_idx >= {from:UInt32} AND record_idx < {to:UInt32}
 			) c
 			LEFT ANY JOIN results r ON c.call_id = r.call_id AND c.call_id != ''

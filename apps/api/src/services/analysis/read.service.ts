@@ -7,10 +7,10 @@ import type {
 import { countCodePoints } from "@rudel/api-routes/transcript-records";
 import { z } from "zod";
 import { type ClickHouseExecutor, getClickhouse } from "../../clickhouse.js";
+import type { SessionGeneration } from "../transcript-generations/generations.js";
 import {
 	buildRecordBlocksStatement,
 	buildTurnActionsStatement,
-	type SessionGeneration,
 } from "../transcript-records-queries.js";
 import {
 	readRecord,

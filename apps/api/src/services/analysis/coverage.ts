@@ -4,10 +4,7 @@ import {
 	type AnalysisCoverageOutput,
 	COVERAGE_LIVE_MINUTES,
 } from "@rudel/api-routes";
-import {
-	TRANSCRIPT_RECORDS_PARSER_VERSION,
-	TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
-} from "@rudel/api-routes/transcript-records";
+import { TRANSCRIPT_RECORDS_PARSER_VERSION } from "@rudel/api-routes/transcript-records";
 import { SESSION_INVENTORY_TABLE } from "@rudel/ch-schema/session-inventory";
 import { z } from "zod";
 import {
@@ -15,6 +12,7 @@ import {
 	type ClickHouseStatement,
 	getSafeClickHouseTable,
 } from "../../clickhouse.js";
+import { receiptRow } from "../transcript-generations/generations.js";
 import { measureParams } from "./retro-measures.js";
 import { RUN_INDEX_VERSION } from "./run-index-sql.js";
 
@@ -172,7 +170,7 @@ export function buildInventoryCoverageStatement(
 				FROM ${records}
 				WHERE organization_id = {organizationId:String} ${member}
 					AND (user_id, session_id) IN (SELECT user_id, session_id FROM listed)
-					AND agent_id = '' AND record_idx = {receiptRecordIdx:UInt32} AND block_idx = 0
+					AND ${receiptRow()}
 				GROUP BY user_id, session_id
 			)
 			SELECT
@@ -190,7 +188,6 @@ export function buildInventoryCoverageStatement(
 		query_params: {
 			...params(owner, scope),
 			liveMinutes: COVERAGE_LIVE_MINUTES,
-			receiptRecordIdx: TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
 		},
 	};
 }

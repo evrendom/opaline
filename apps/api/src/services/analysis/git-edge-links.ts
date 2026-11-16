@@ -21,6 +21,7 @@ import {
 	L1_EDGES_BY_TARGET_TABLE,
 	L1_EDGES_TABLE,
 } from "../l1-edges/l1-edge-tables.js";
+import type { Generation } from "../transcript-generations/generations.js";
 import {
 	assembleGitEvents,
 	BRANCH_RUNS_CAP,
@@ -1597,18 +1598,12 @@ async function readCiRuns(
 	return found;
 }
 
-/** The generation an evidence row was read in. */
-export interface EvidenceGeneration {
-	revision: string;
-	parserVersion: number;
-}
-
 /** A retained edge from a session's evidence to a pull request or one of its commits. */
 export interface PullRequestTouch {
 	session: SessionIdentity;
 	relation: string;
 	evidenceId: string;
-	generation: EvidenceGeneration;
+	generation: Generation;
 	agentId: string;
 	/** The run's number; null for evidence that belongs to no run. */
 	turn: number | null;
@@ -1867,8 +1862,8 @@ export async function loadPullRequestTouches(
  */
 export function touchEvidence(
 	touches: readonly PullRequestTouch[],
-): Map<string, Map<string, EvidenceGeneration>> {
-	const evidence = new Map<string, Map<string, EvidenceGeneration>>();
+): Map<string, Map<string, Generation>> {
+	const evidence = new Map<string, Map<string, Generation>>();
 	for (const touch of touches) {
 		const ids = evidence.get(touch.session.sessionId) ?? new Map();
 		ids.set(touch.evidenceId, touch.generation);
@@ -1889,7 +1884,7 @@ export const WITNESSES_PER_ANSWER = 200;
 export function touchWitnesses(
 	touches: readonly PullRequestTouch[],
 	visible: ReadonlySet<string>,
-	generations: ReadonlyMap<string, EvidenceGeneration>,
+	generations: ReadonlyMap<string, Generation>,
 ): Witness[] {
 	return touches.flatMap((touch): Witness[] => {
 		if (

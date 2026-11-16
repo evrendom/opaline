@@ -1,4 +1,3 @@
-import { TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX } from "@rudel/api-routes/transcript-records";
 import { SETUP_TEXTS_TABLE } from "@rudel/ch-schema/received-setup";
 import { redactReturnedValue } from "@rudel/secret-filter";
 import {
@@ -8,6 +7,7 @@ import {
 import { committedBuildSql } from "../analysis/run-index-reader.js";
 import { chunkByParamBytes, records as recordsTable } from "../analysis/sql.js";
 import { RUN_INDEX_TABLE } from "../l1-edges/l1-edge-tables.js";
+import { contentRow } from "../transcript-generations/generations.js";
 import {
 	type CliDataContext,
 	ExportRefused,
@@ -70,7 +70,7 @@ function committedGeneration(): string {
 			WHERE ${OWNER} AND row_kind = 'receipt'
 				AND ${committedBuildSql(runIndex, OWNER, ["user_id", "session_id"])}
 		)
-		AND record_idx < ${TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX}`;
+		AND ${contentRow()}`;
 }
 
 export function recordSizesStatement(

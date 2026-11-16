@@ -117,8 +117,12 @@ function fakeExecutor(
 				return runs
 					.filter(
 						(run) =>
-							run.session_id === statement.query_params?.sessionId &&
-							run.revision === statement.query_params?.revision &&
+							(statement.query_params?.sessionIds as string[]).includes(
+								run.session_id,
+							) &&
+							(statement.query_params?.revisions as string[]).includes(
+								run.revision,
+							) &&
 							run.turn_idx === statement.query_params?.turn,
 					)
 					.flatMap(() => [

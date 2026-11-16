@@ -1,11 +1,14 @@
-import {
-	FILE_MUTATION_OPERATIONS,
-	TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
-} from "@rudel/api-routes/transcript-records";
+import { FILE_MUTATION_OPERATIONS } from "@rudel/api-routes/transcript-records";
 import {
 	type ClickHouseStatement,
 	getSafeClickHouseTable,
 } from "../clickhouse.js";
+import {
+	pinnedParams,
+	pinnedRecords,
+	type SessionGeneration,
+	type TranscriptReadScope,
+} from "./transcript-generations/generations.js";
 
 /**
  * SQL for the transcript record readers. Every statement:
@@ -31,64 +34,7 @@ const QUERY_SETTINGS = {
 	result_overflow_mode: "throw",
 } as const;
 
-export interface TranscriptReadScope {
-	readonly organizationId: string;
-	readonly userId: string;
-}
-
 const table = () => getSafeClickHouseTable("rudel.transcript_records");
-
-/**
- * The committed extraction generation of one session, resolved once per read
- * operation and bound into every later query of it, so one response can never
- * mix rows of two generations.
- */
-export interface SessionGeneration {
-	readonly parserVersion: number;
-	readonly revision: string;
-	readonly sessionId: string;
-}
-
-function baseParams(scope: TranscriptReadScope) {
-	return {
-		organizationId: scope.organizationId,
-		receiptRecordIdx: TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
-		userId: scope.userId,
-	};
-}
-
-function generationParams(generations: readonly SessionGeneration[]) {
-	return {
-		parserVersions: generations.map((generation) => generation.parserVersion),
-		revisions: generations.map((generation) => generation.revision),
-		sessionIds: generations.map((generation) => generation.sessionId),
-	};
-}
-
-/** CTE holding the pinned generations as rows of (session, revision, parser). */
-function pinnedGenerationsCte(): string {
-	return `
-		pinned AS (
-			SELECT g.1 AS session_id, g.2 AS revision, g.3 AS parser_version
-			FROM (
-				SELECT arrayJoin(arrayZip(
-					{sessionIds:Array(String)},
-					arrayMap(value -> toUInt64(value), {revisions:Array(String)}),
-					{parserVersions:Array(UInt16)}
-				)) AS g
-			)
-		)`;
-}
-
-/** Row filter for records of the pinned generations, excluding receipts. */
-function recordsFilter(alias = ""): string {
-	const column = (name: string) => (alias ? `${alias}.${name}` : name);
-	return `${column("organization_id")} = {organizationId:String}
-				AND ${column("user_id")} = {userId:String}
-				AND ${column("session_id")} IN {sessionIds:Array(String)}
-				AND (${column("session_id")}, ${column("revision")}, ${column("parser_version")}) IN (SELECT session_id, revision, parser_version FROM pinned)
-				AND ${column("record_idx")} < {receiptRecordIdx:UInt32}`;
-}
 
 /** Mutation rows whose tool call did not fail. */
 function unfailedFileChangeFilter(): string {
@@ -97,39 +43,11 @@ function unfailedFileChangeFilter(): string {
 				AND (session_id, agent_id, call_id) NOT IN (
 					SELECT session_id, agent_id, call_id
 					FROM ${table()} FINAL
-					WHERE ${recordsFilter()}
+					WHERE ${pinnedRecords()}
 						AND kind = 'tool_result'
 						AND (is_error OR (exit_code IS NOT NULL AND exit_code != 0))
 						AND call_id != ''
 				)`;
-}
-
-/** Newest committed generation of each session: its newest receipt. */
-export function buildCommittedGenerationsStatement(
-	scope: TranscriptReadScope,
-	sessionIds: readonly string[],
-): ClickHouseStatement {
-	return {
-		clickhouse_settings: QUERY_SETTINGS,
-		query: `
-			SELECT
-				session_id,
-				toString(revision) AS revision_text,
-				parser_version,
-				source,
-				head AS receipt
-			FROM ${table()}
-			WHERE organization_id = {organizationId:String}
-				AND user_id = {userId:String}
-				AND session_id IN {sessionIds:Array(String)}
-				AND agent_id = ''
-				AND record_idx = {receiptRecordIdx:UInt32}
-				AND block_idx = 0
-			ORDER BY session_id, revision DESC, parser_version DESC
-			LIMIT 1 BY session_id
-		`,
-		query_params: { ...baseParams(scope), sessionIds: [...sessionIds] },
-	};
 }
 
 export function buildSessionTotalsStatement(
@@ -139,7 +57,6 @@ export function buildSessionTotalsStatement(
 	return {
 		clickhouse_settings: QUERY_SETTINGS,
 		query: `
-			WITH ${pinnedGenerationsCte()}
 			SELECT
 				session_id,
 				count() AS records,
@@ -152,10 +69,10 @@ export function buildSessionTotalsStatement(
 				groupUniqArrayIf(agent_id, agent_id != '') AS stream_agent_ids,
 				groupUniqArrayIf(spawned_agent_id, spawned_agent_id != '') AS spawned_agent_ids
 			FROM ${table()} FINAL
-			WHERE ${recordsFilter()}
+			WHERE ${pinnedRecords()}
 			GROUP BY session_id
 		`,
-		query_params: { ...baseParams(scope), ...generationParams(generations) },
+		query_params: pinnedParams(scope, generations),
 	};
 }
 
@@ -166,19 +83,18 @@ export function buildSessionCommandsStatement(
 	return {
 		clickhouse_settings: QUERY_SETTINGS,
 		query: `
-			WITH ${pinnedGenerationsCte()}
 			SELECT
 				session_id,
 				command_class,
 				countIf(kind = 'tool_call') AS calls,
 				countIf(kind = 'tool_result' AND is_error) AS failed
 			FROM ${table()} FINAL
-			WHERE ${recordsFilter()}
+			WHERE ${pinnedRecords()}
 				AND command_class != ''
 				AND kind IN ('tool_call', 'tool_result')
 			GROUP BY session_id, command_class
 		`,
-		query_params: { ...baseParams(scope), ...generationParams(generations) },
+		query_params: pinnedParams(scope, generations),
 	};
 }
 
@@ -190,19 +106,17 @@ export function buildSessionFilesStatement(
 	return {
 		clickhouse_settings: QUERY_SETTINGS,
 		query: `
-			WITH ${pinnedGenerationsCte()}
 			SELECT
 				session_id,
 				uniqExact(file_path) AS file_count,
 				arraySlice(arraySort(groupUniqArray(file_path)), 1, {maxFiles:UInt32}) AS files
 			FROM ${table()} FINAL
-			WHERE ${recordsFilter()}
+			WHERE ${pinnedRecords()}
 				AND ${unfailedFileChangeFilter()}
 			GROUP BY session_id
 		`,
 		query_params: {
-			...baseParams(scope),
-			...generationParams(generations),
+			...pinnedParams(scope, generations),
 			maxFiles,
 		},
 	};
@@ -210,7 +124,7 @@ export function buildSessionFilesStatement(
 
 /** Filters shared by the per-session, per-agent map and turn statements. */
 function streamFilter(alias = ""): string {
-	return `${recordsFilter(alias)}
+	return `${pinnedRecords(alias)}
 				AND ${alias ? `${alias}.` : ""}agent_id = {agentId:String}`;
 }
 
@@ -219,7 +133,7 @@ function streamParams(
 	generation: SessionGeneration,
 	agentId: string,
 ) {
-	return { ...baseParams(scope), ...generationParams([generation]), agentId };
+	return { ...pinnedParams(scope, [generation]), agentId };
 }
 
 export function buildMapTurnsStatement(
@@ -230,7 +144,6 @@ export function buildMapTurnsStatement(
 	return {
 		clickhouse_settings: QUERY_SETTINGS,
 		query: `
-			WITH ${pinnedGenerationsCte()}
 			SELECT
 				records.turn_idx,
 				toUnixTimestamp64Milli(min(records.ts)) AS started_ms,
@@ -262,7 +175,6 @@ export function buildMapPromptsStatement(
 	return {
 		clickhouse_settings: QUERY_SETTINGS,
 		query: `
-			WITH ${pinnedGenerationsCte()}
 			SELECT turn_idx, argMin(head, record_idx) AS prompt_head
 			FROM ${table()} FINAL
 			WHERE ${streamFilter()}
@@ -282,7 +194,6 @@ export function buildMapFilesStatement(
 	return {
 		clickhouse_settings: QUERY_SETTINGS,
 		query: `
-			WITH ${pinnedGenerationsCte()}
 			SELECT
 				turn_idx,
 				uniqExact(file_path) AS file_count,
@@ -307,7 +218,6 @@ export function buildMapCommandsStatement(
 	return {
 		clickhouse_settings: QUERY_SETTINGS,
 		query: `
-			WITH ${pinnedGenerationsCte()}
 			SELECT
 				turn_idx,
 				command_class,
@@ -348,7 +258,6 @@ export function buildTurnPromptStatement(
 	return {
 		clickhouse_settings: QUERY_SETTINGS,
 		query: `
-			WITH ${pinnedGenerationsCte()}
 			SELECT
 				record_idx,
 				text_chars,
@@ -378,7 +287,6 @@ export function buildTurnActionsStatement(
 	return {
 		clickhouse_settings: { ...QUERY_SETTINGS, join_use_nulls: 1 },
 		query: `
-			WITH ${pinnedGenerationsCte()}
 			SELECT
 				c.record_idx,
 				c.block_idx,
@@ -440,7 +348,6 @@ export function buildTurnFileChangesStatement(
 	return {
 		clickhouse_settings: QUERY_SETTINGS,
 		query: `
-			WITH ${pinnedGenerationsCte()}
 			SELECT record_idx, block_idx, file_op, file_path, subtype, call_id, tool_name
 			FROM ${table()} FINAL
 			WHERE ${turnFilter()}
@@ -466,7 +373,6 @@ export function buildTurnFailuresStatement(
 	return {
 		clickhouse_settings: QUERY_SETTINGS,
 		query: `
-			WITH ${pinnedGenerationsCte()}
 			SELECT
 				record_idx,
 				block_idx,
@@ -503,7 +409,6 @@ export function buildTurnDiffStatement(
 	return {
 		clickhouse_settings: QUERY_SETTINGS,
 		query: `
-			WITH ${pinnedGenerationsCte()}
 			SELECT
 				record_idx,
 				block_idx,
@@ -540,7 +445,6 @@ export function buildTurnParentCommandsStatement(
 	return {
 		clickhouse_settings: QUERY_SETTINGS,
 		query: `
-			WITH ${pinnedGenerationsCte()}
 			SELECT call_id, text_chars, substringUTF8(text, 1, {itemChars:UInt32}) AS input
 			FROM ${table()} FINAL
 			WHERE ${turnFilter()}
@@ -567,7 +471,6 @@ export function buildTurnRawStatement(
 	return {
 		clickhouse_settings: QUERY_SETTINGS,
 		query: `
-			WITH ${pinnedGenerationsCte()}
 			SELECT
 				record_idx,
 				block_idx,
@@ -607,7 +510,6 @@ export function buildRecordBlocksStatement(
 	return {
 		clickhouse_settings: QUERY_SETTINGS,
 		query: `
-			WITH ${pinnedGenerationsCte()}
 			SELECT
 				block_idx,
 				kind,
@@ -646,7 +548,6 @@ export function buildRecordSliceStatement(
 	return {
 		clickhouse_settings: QUERY_SETTINGS,
 		query: `
-			WITH ${pinnedGenerationsCte()}
 			SELECT
 				lengthUTF8(text) AS stored_chars,
 				substringUTF8(text, {fromChar:UInt32} + 1, {charCount:UInt32}) AS slice

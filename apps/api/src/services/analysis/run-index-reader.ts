@@ -5,7 +5,7 @@ import {
 	getSafeClickHouseTable,
 } from "../../clickhouse.js";
 import { RUN_INDEX_TABLE } from "../l1-edges/l1-edge-tables.js";
-import type { TranscriptReadScope } from "../transcript-records-queries.js";
+import type { TranscriptReadScope } from "../transcript-generations/generations.js";
 import { ANALYSIS_QUERY_SETTINGS } from "./sql.js";
 
 /**

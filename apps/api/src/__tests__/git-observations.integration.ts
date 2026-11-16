@@ -13,11 +13,12 @@ import { sqlClient } from "../db.js";
 import { ClickHouseWriteFencedError } from "../lib/clickhouse-write-fence.js";
 import { enqueueClickHousePurge } from "../services/clickhouse-purge.service.js";
 import { assertNoClickHousePurgeTombstone } from "../services/clickhouse-purge-tombstone.service.js";
+import { retireGenerations } from "../services/generation-retirement/retirement.js";
+import { gitObservationsStore } from "../services/generation-retirement/stores.js";
 import { backfillGitObservations } from "../services/git-observation-backfill.service.js";
 import {
 	extractGitObservations,
 	persistGitObservationsBestEffort,
-	retireOlderGitObservations,
 } from "../services/git-observation-extraction.service.js";
 import { gitObservationGenerationVersion } from "../services/git-observation-parser.js";
 import {
@@ -213,7 +214,7 @@ test("revision and parser advancement replace old generations; retries are resum
 	expect(new Set(rows.map((row) => row.revision))).toEqual(
 		new Set(["100", "200"]),
 	);
-	await retireOlderGitObservations(executor, { organizationId });
+	await retireGenerations(executor, gitObservationsStore, { organizationId });
 	rows = await readRows(input.sessionId);
 	expect(rows.every((row) => row.revision === "200")).toBe(true);
 	expect(rows.some((row) => row.short_sha === "f00ba12")).toBe(true);
@@ -238,7 +239,7 @@ test("revision and parser advancement replace old generations; retries are resum
 			assertWritable: () => fence(input),
 		}),
 	).toBe("written");
-	await retireOlderGitObservations(executor, { organizationId });
+	await retireGenerations(executor, gitObservationsStore, { organizationId });
 	rows = await readRows(input.sessionId);
 	expect(
 		rows.every(
@@ -279,7 +280,7 @@ test("publication keeps older generations until one batched retirement removes t
 		new Set(["100", "200"]),
 	);
 
-	const retirement = await retireOlderGitObservations(executor, {
+	const retirement = await retireGenerations(executor, gitObservationsStore, {
 		organizationId,
 	});
 	expect(retirement.retired).toBeGreaterThanOrEqual(1);
@@ -298,8 +299,11 @@ test("publication keeps older generations until one batched retirement removes t
 	expect(rows.length).toBeGreaterThan(0);
 	expect(rows.every((row) => row.revision === "200")).toBe(true);
 	expect(
-		(await retireOlderGitObservations(executor, { organizationId }))
-			.generations,
+		(
+			await retireGenerations(executor, gitObservationsStore, {
+				organizationId,
+			})
+		).generations,
 	).toBe(0);
 });
 
@@ -331,7 +335,7 @@ test("a retirement whose DELETE outcome is unknown settles on the data and never
 			}
 		},
 	};
-	const retirement = await retireOlderGitObservations(timingOut, {
+	const retirement = await retireGenerations(timingOut, gitObservationsStore, {
 		organizationId,
 	});
 	expect(retirement.outcomes.map((outcome) => outcome.status)).toEqual(

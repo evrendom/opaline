@@ -11,6 +11,10 @@ import {
 	getSafeClickHouseTable,
 } from "../../clickhouse.js";
 import { ANALYSIS_QUERY_SETTINGS, query } from "../analysis/sql.js";
+import {
+	pinnedParams,
+	pinnedRecords,
+} from "../transcript-generations/generations.js";
 
 /**
  * A run's observation: Claude reads only the run's flagged records
@@ -219,15 +223,16 @@ export async function readSpanText(
 				toUInt8(is_error OR coalesce(exit_code, 0) != 0) AS failed,
 				if(text_chars <= ${RECORD_TEXT_MAX_CHARS}, text, concat(head, ' […] ', tail)) AS text
 			FROM ${getSafeClickHouseTable("rudel.transcript_records")} FINAL
-			WHERE organization_id = {workspaceId:String} AND user_id = {userId:String}
-				AND session_id = {sessionId:String} AND agent_id = {agentId:String}
-				AND revision = toUInt64({revision:String}) AND parser_version = {parserVersion:UInt16}
+			WHERE ${pinnedRecords()} AND agent_id = {agentId:String}
 				AND record_idx BETWEEN {from:UInt32} AND {to:UInt32}
-				AND kind NOT IN ('receipt', 'meta', 'oversized')
+				AND kind NOT IN ('meta', 'oversized')
 			ORDER BY record_idx, block_idx
 			LIMIT 2000`,
 		query_params: {
-			...run,
+			...pinnedParams({ organizationId: run.workspaceId, userId: run.userId }, [
+				run,
+			]),
+			agentId: run.agentId,
 			from: Math.max(1, span.start - SPAN_CONTEXT_RECORDS),
 			to: span.end + SPAN_CONTEXT_RECORDS,
 		},

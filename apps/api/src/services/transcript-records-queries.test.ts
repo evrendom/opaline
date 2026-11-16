@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import type { ClickHouseStatement } from "../clickhouse.js";
+import type {
+	SessionGeneration,
+	TranscriptReadScope,
+} from "./transcript-generations/generations.js";
 import {
-	buildCommittedGenerationsStatement,
 	buildMapCommandsStatement,
 	buildMapFilesStatement,
 	buildMapPromptsStatement,
@@ -18,8 +21,6 @@ import {
 	buildTurnParentCommandsStatement,
 	buildTurnPromptStatement,
 	buildTurnRawStatement,
-	type SessionGeneration,
-	type TranscriptReadScope,
 } from "./transcript-records-queries.js";
 
 const scope: TranscriptReadScope = {
@@ -80,18 +81,7 @@ const lightStatements: readonly [string, ClickHouseStatement][] = [
 	["record blocks", buildRecordBlocksStatement(scope, generation, hostile, 3)],
 ];
 
-const committedGenerations = buildCommittedGenerationsStatement(scope, [
-	hostile,
-]);
-
 const allStatements = [
-	["committed generations", committedGenerations] as const,
-	...factsAndMapStatements,
-	...textReadingStatements,
-	...lightStatements,
-];
-
-const pinnedStatements = [
 	...factsAndMapStatements,
 	...textReadingStatements,
 	...lightStatements,
@@ -118,43 +108,6 @@ describe("transcript record statements", () => {
 			expect(JSON.stringify(statement.query_params)).toContain("DROP TABLE");
 		});
 	}
-
-	for (const [name, statement] of pinnedStatements) {
-		test(`${name} never returns receipt rows`, () => {
-			expect(statement.query).toContain(
-				"record_idx < {receiptRecordIdx:UInt32}",
-			);
-			expect(statement.query_params?.receiptRecordIdx).toBe(4_294_967_295);
-		});
-
-		test(`${name} reads only the pinned generation`, () => {
-			expect(statement.query).toMatch(
-				/\((?:\w+\.)?session_id, (?:\w+\.)?revision, (?:\w+\.)?parser_version\) IN \(SELECT session_id, revision, parser_version FROM pinned\)/u,
-			);
-			expect(statement.query).toContain("{revisions:Array(String)}");
-			expect(statement.query).toContain("{parserVersions:Array(UInt16)}");
-			expect(statement.query_params?.sessionIds).toEqual([hostile]);
-			expect(statement.query_params?.revisions).toEqual([generation.revision]);
-			expect(statement.query_params?.parserVersions).toEqual([2]);
-		});
-
-		test(`${name} never resolves the newest receipt itself`, () => {
-			expect(statement.query).not.toMatch(/max\(revision\)/u);
-			expect(statement.query).not.toContain("FROM latest");
-		});
-	}
-
-	test("the committed generation is the newest receipt by revision then parser version", () => {
-		expect(committedGenerations.query).toContain(
-			"ORDER BY session_id, revision DESC, parser_version DESC",
-		);
-		expect(committedGenerations.query).toContain("LIMIT 1 BY session_id");
-		expect(committedGenerations.query).toContain(
-			"record_idx = {receiptRecordIdx:UInt32}",
-		);
-		expect(committedGenerations.query).toContain("agent_id = ''");
-		expect(committedGenerations.query).toContain("block_idx = 0");
-	});
 
 	for (const [name, statement] of [
 		...factsAndMapStatements,
@@ -192,7 +145,6 @@ describe("transcript record statements", () => {
 		expect(withHead.map(([name]) => name)).toEqual(["map prompts"]);
 		const prompts = buildMapPromptsStatement(scope, generation, "");
 		expect(prompts.query).toContain("kind = 'user_prompt'");
-		expect(committedGenerations.query).toContain("head AS receipt");
 	});
 
 	test("failed calls are excluded from file changes by call id", () => {
@@ -224,19 +176,5 @@ describe("transcript record statements", () => {
 		expect(actions.query).toContain(
 			"results.is_error OR (results.exit_code IS NOT NULL AND results.exit_code != 0)",
 		);
-	});
-
-	test("several sessions bind their own generation each", () => {
-		const statement = buildSessionTotalsStatement(scope, [
-			{ parserVersion: 1, revision: "10", sessionId: "a" },
-			{ parserVersion: 2, revision: "20", sessionId: "b" },
-		]);
-
-		expect(statement.query).toContain(
-			"session_id IN {sessionIds:Array(String)}",
-		);
-		expect(statement.query_params?.sessionIds).toEqual(["a", "b"]);
-		expect(statement.query_params?.revisions).toEqual(["10", "20"]);
-		expect(statement.query_params?.parserVersions).toEqual([1, 2]);
 	});
 });

@@ -7,18 +7,18 @@ import {
 } from "@rudel/api-routes";
 import { z } from "zod";
 import type { ClickHouseStatement } from "../../clickhouse.js";
-import type {
-	SessionGeneration,
-	TranscriptReadScope,
-} from "../transcript-records-queries.js";
+import {
+	pinnedParams,
+	pinnedRecords,
+	type SessionGeneration,
+	type TranscriptReadScope,
+} from "../transcript-generations/generations.js";
 import { commandsTable } from "./call-commands.js";
 import { commandColumnsSql } from "./command-identity.js";
 import type { CompiledFilters } from "./find-filters.js";
 import { runToolErrorSql } from "./run-index-sql.js";
 import {
 	ANALYSIS_QUERY_SETTINGS,
-	pinnedFilter,
-	pinnedParams,
 	REF_RUNS_SQL,
 	records,
 	refParams,
@@ -157,7 +157,7 @@ function callsSql({ input, refs, filters, stored }: CallQuery): string {
 	const ended = CALL_TASK_END_SQL;
 	return `calls AS (
 			${commandRecordsSql(stored)}
-			WHERE ${pinnedFilter()} AND command_from != ''
+			WHERE ${pinnedRecords()} AND command_from != ''
 				${refs ? `AND (session_id, agent_id, turn_idx) IN (SELECT r.1, r.2, r.3 FROM (${REF_RUNS_SQL}))` : ""}
 				${conditions.map((condition) => `AND ${condition}`).join(" ")}
 		), results AS (
@@ -170,7 +170,7 @@ function callsSql({ input, refs, filters, stored }: CallQuery): string {
 				anyIf(file_path, (${CALL_HAND_OFF_SQL} OR ${CALL_TASK_NOTIFICATION_SQL}) AND file_path != '') AS task_file,
 				countIf(${ended}) > 0 AS task_ended
 			FROM ${records()}
-			WHERE ${pinnedFilter()} AND call_id != ''
+			WHERE ${pinnedRecords()} AND call_id != ''
 				AND (${result} OR (${CALL_TASK_NOTIFICATION_SQL} AND subtype = 'task_notification') OR (${CALL_COMPLETION_SQL}))
 			GROUP BY session_id, agent_id, call_id
 		), matched AS (
@@ -306,7 +306,7 @@ export function buildCallExamplesStatement(
 			FROM (
 				SELECT session_id, agent_id, record_idx, block_idx, head, ${stored ? "command_from, command_text, command_normalized" : commandColumnsSql()}
 				FROM ${stored ? commandsTable() : records()}
-				WHERE ${pinnedFilter()}
+				WHERE ${pinnedRecords()}
 					AND (session_id, agent_id, record_idx, block_idx) IN (
 						SELECT e.1, e.2, e.3, e.4 FROM (SELECT arrayJoin(arrayZip({exampleSessions:Array(String)}, {exampleAgents:Array(String)}, {exampleRecords:Array(UInt32)}, {exampleBlocks:Array(UInt16)})) AS e)
 					)

@@ -7,7 +7,6 @@ import {
 	SEARCH_REGEX_MAX_CHARS,
 	SEARCH_TEXT_MAX_CHARS,
 } from "@rudel/api-routes";
-import { TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX } from "@rudel/api-routes/transcript-records";
 import { filterKnownSecrets, redactReturnedValue } from "@rudel/secret-filter";
 import { z } from "zod";
 import {
@@ -34,6 +33,10 @@ import type { SqlQuota } from "../analysis/sql-results.js";
 import { SQL_SCOPE_PARAMS } from "../analysis/sql-views.js";
 import { RUN_INDEX_TABLE } from "../l1-edges/l1-edge-tables.js";
 import { readableSessionOwner } from "../session-visibility.js";
+import {
+	contentRow,
+	receiptRow,
+} from "../transcript-generations/generations.js";
 import type { SearchAccess } from "./access.js";
 import {
 	estimateEmbeddingTokens,
@@ -439,7 +442,7 @@ export function searchStatement(
 			FROM ${TRANSCRIPT_RECORDS_TABLE}
 			WHERE ${scope} AND ${p("exact", "UInt8")} = 1
 				AND (user_id, session_id, revision, parser_version) IN (SELECT user_id, session_id, revision, parser_version FROM ${name("sessions")})
-				AND record_idx < ${TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX} AND turn_idx >= 1 AND ts >= ${since} AND ts < ${until}
+				AND ${contentRow()} AND turn_idx >= 1 AND ts >= ${since} AND ts < ${until}
 				AND kind IN ${p("record_kinds", "Array(String)")}
 				AND (${record.matched}${options.totals ? ` OR ${partial}` : ""})
 		),
@@ -479,7 +482,7 @@ export function searchStatement(
 			FROM (
 				SELECT user_id, session_id, agent_id, turn_idx, chunk_hash, kind, tool_name, revision, parser_version
 				FROM ${TRANSCRIPT_CHUNK_HITS_TABLE}
-				WHERE ${scope} AND ${p("meaning", "UInt8")} = 1 AND record_idx < ${TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX}
+				WHERE ${scope} AND ${p("meaning", "UInt8")} = 1 AND ${contentRow()}
 					AND ts >= ${since} AND ts < ${until} AND ${user} AND ${source}
 					AND (empty(${p("kinds", "Array(String)")}) OR has(${p("kinds", "Array(String)")}, kind))
 			) AS h
@@ -569,7 +572,7 @@ function coverageStatement(memberOnly: boolean): string {
 		SELECT user_id, session_id, revision, parser_version, 1 AS indexed,
 			argMax(pending_chunks, written_at) AS pending, argMax(truncated_records, written_at) AS truncated
 		FROM ${TRANSCRIPT_CHUNK_HITS_TABLE}
-		WHERE ${scopeSql(memberOnly)} AND record_idx = ${TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX}
+		WHERE ${scopeSql(memberOnly)} AND ${receiptRow()}
 		GROUP BY user_id, session_id, revision, parser_version
 	) AS c ON s.user_id = c.user_id AND s.session_id = c.session_id
 		AND s.revision = c.revision AND s.parser_version = c.parser_version`;

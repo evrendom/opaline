@@ -1,7 +1,4 @@
-import {
-	TRANSCRIPT_RECORDS_PARSER_VERSION,
-	TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
-} from "@rudel/api-routes/transcript-records";
+import { TRANSCRIPT_RECORDS_PARSER_VERSION } from "@rudel/api-routes/transcript-records";
 import type postgres from "postgres";
 import {
 	type ClickHouseExecutor,
@@ -20,6 +17,11 @@ import {
 	L1_EDGES_TABLE,
 	RUN_INDEX_TABLE,
 } from "./l1-edges/l1-edge-tables.js";
+import {
+	contentRow,
+	newestGenerations,
+	receiptRow,
+} from "./transcript-generations/generations.js";
 import { TRANSCRIPT_RECORDS_TABLE } from "./transcript-records-ingest.service.js";
 
 /**
@@ -242,15 +244,12 @@ function organizationFilter(
 		: `AND ${alias ? `${alias}.` : ""}organization_id = {organizationId:String}`;
 }
 
-const RECEIPT_FILTER = `kind = 'receipt' AND agent_id = '' AND record_idx = {receiptRecordIdx:UInt32} AND block_idx = 0`;
-
 /** The committed transcript generation of every session, as a CTE body. */
 function committedTranscriptsSql(organizationId: string | undefined): string {
-	return `SELECT organization_id, user_id, session_id, any(source) AS session_source,
-			max((revision, parser_version)) AS generation
-		FROM ${getSafeClickHouseTable(TRANSCRIPT_RECORDS_TABLE)}
-		WHERE ${RECEIPT_FILTER} ${organizationFilter(organizationId)}
-		GROUP BY organization_id, user_id, session_id`;
+	return newestGenerations({
+		columns: "any(source) AS session_source",
+		and: organizationFilter(organizationId),
+	});
 }
 
 const n = (value: unknown) => Number(value ?? 0);
@@ -282,7 +281,7 @@ async function readTranscripts(
 					SELECT organization_id, user_id, session_id, (revision, parser_version) AS generation,
 						any(source) AS generation_source, any(JSONExtractUInt(head, 'rowCount')) AS row_count
 					FROM ${getSafeClickHouseTable(TRANSCRIPT_RECORDS_TABLE)}
-					WHERE ${RECEIPT_FILTER} ${organizationFilter(organizationId)}
+					WHERE ${receiptRow()} ${organizationFilter(organizationId)}
 					GROUP BY organization_id, user_id, session_id, revision, parser_version
 				)
 				GROUP BY organization_id, user_id, session_id
@@ -291,7 +290,6 @@ async function readTranscripts(
 			ORDER BY session_source, committed_parser`,
 		query_params: {
 			organizationId: organizationId ?? "",
-			receiptRecordIdx: TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
 		},
 	});
 	const committedByParser: TranscriptsSection["committedByParser"] = {};
@@ -338,7 +336,6 @@ async function readTranscriptFacts(
 ): Promise<TranscriptFactsSection> {
 	const params = {
 		organizationId: organizationId ?? "",
-		receiptRecordIdx: TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
 	};
 	const [rows, receipts] = await Promise.all([
 		executor.query<{
@@ -357,7 +354,7 @@ async function readTranscriptFacts(
 					countIf(entrypoint != '') AS with_entrypoint,
 					countIf(notEmpty(facts)) AS with_facts
 				FROM ${getSafeClickHouseTable(TRANSCRIPT_RECORDS_TABLE)}
-				WHERE record_idx < {receiptRecordIdx:UInt32} ${organizationFilter(organizationId)}
+				WHERE ${contentRow()} ${organizationFilter(organizationId)}
 				GROUP BY source, parser_version
 				ORDER BY source, parser_version`,
 			query_params: params,
@@ -371,7 +368,7 @@ async function readTranscriptFacts(
 			query: `SELECT source, parser_version,
 						uniqExact(organization_id, user_id, session_id, revision) AS receipts
 					FROM ${getSafeClickHouseTable(TRANSCRIPT_RECORDS_TABLE)}
-					WHERE ${RECEIPT_FILTER} ${organizationFilter(organizationId)}
+					WHERE ${receiptRow()} ${organizationFilter(organizationId)}
 					GROUP BY source, parser_version`,
 			query_params: params,
 		}),
@@ -415,7 +412,7 @@ async function readGitObservations(
 				SELECT organization_id, user_id, session_id,
 					groupUniqArray(tuple(revision, transcript_parser_version, parser_version)) AS generations
 				FROM ${getSafeClickHouseTable("rudel.session_git_observations")}
-				WHERE kind = 'receipt' ${organizationFilter(organizationId)}
+				WHERE ${receiptRow()} ${organizationFilter(organizationId)}
 				GROUP BY organization_id, user_id, session_id
 			)
 			SELECT records.session_source AS source,
@@ -433,7 +430,6 @@ async function readGitObservations(
 		query_params: {
 			gitExtractor: GIT_OBSERVATION_PARSER_VERSION,
 			organizationId: organizationId ?? "",
-			receiptRecordIdx: TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
 		},
 	});
 	const bySource: GitObservationsSection["bySource"] = {};
@@ -578,7 +574,6 @@ async function readRunIndex(
 		indexVersion: RUN_INDEX_VERSION,
 		organizationId: organizationId ?? "",
 		pricingVersion: RUN_INDEX_PRICING_VERSION,
-		receiptRecordIdx: TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
 	};
 	const [joined, indexedOnly] = await Promise.all([
 		executor.query<Record<string, number>>({

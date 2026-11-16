@@ -1,8 +1,8 @@
 import { SESSION_LINEAGE_DERIVATION_VERSION } from "@rudel/api-routes";
-import { TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX } from "@rudel/api-routes/transcript-records";
 import { getSafeClickHouseTable } from "../../clickhouse.js";
 import { shouldReadSessionLineage } from "../../lib/env.js";
 import { NATIVE_PARENT_EDGE_SQL } from "../session-lineage-analytics.service.js";
+import { contentRow } from "../transcript-generations/generations.js";
 import { records } from "./sql.js";
 import type { CommittedRuns } from "./sql-measures.js";
 import type { SqlView, SqlViewColumn } from "./sql-views.js";
@@ -44,7 +44,7 @@ export const FORK_ORDINAL_PATH = "session_meta/.subagent_history_start_ordinal";
 const DELEGATION_CONFIDENCES = ["id_echo", "prompt_echo", "attested_temporal"];
 
 /** A thread's own Codex session_meta records: in its main stream, never the receipt. */
-const SESSION_META = `source = 'codex' AND kind = 'meta' AND subtype = 'session_meta' AND agent_id = '' AND record_idx < ${TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX}`;
+const SESSION_META = `source = 'codex' AND kind = 'meta' AND subtype = 'session_meta' AND agent_id = '' AND ${contentRow()}`;
 
 const quoted = (values: readonly string[]) =>
 	values.map((value) => `'${value}'`).join(", ");

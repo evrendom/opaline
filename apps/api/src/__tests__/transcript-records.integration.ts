@@ -20,7 +20,11 @@ import { ClickHouseWriteFencedError } from "../lib/clickhouse-write-fence.js";
 import { enqueueClickHousePurge } from "../services/clickhouse-purge.service.js";
 import { assertNoClickHousePurgeTombstone } from "../services/clickhouse-purge-tombstone.service.js";
 import { reconcileDerivedTranscriptRecords } from "../services/derived-records-reconciliation.service.js";
-import { retireTranscriptRecordsGenerations } from "../services/session-retirement.service.js";
+import {
+	RETIREMENT_GRACE_MS,
+	retireGenerations,
+} from "../services/generation-retirement/retirement.js";
+import { transcriptRecordsStore } from "../services/generation-retirement/stores.js";
 import {
 	backfillTranscriptRecords,
 	previewTranscriptRecordsBackfill,
@@ -30,7 +34,6 @@ import {
 	buildTranscriptRecordsReceiptRow,
 	hashTranscriptContent,
 	readTranscriptRecordsReceipt,
-	TRANSCRIPT_RECORDS_RETIRE_GRACE_MS,
 	writeTranscriptRecords,
 } from "../services/transcript-records-ingest.service.js";
 import {
@@ -953,9 +956,9 @@ describe("transcript record readers", () => {
 			await readStoredRevisions(generationSessionId, generationOrganizationId),
 		).toEqual(["100", "200", "300", "400"]);
 
-		const later = Date.now() + 2 * TRANSCRIPT_RECORDS_RETIRE_GRACE_MS;
+		const later = Date.now() + 2 * RETIREMENT_GRACE_MS;
 		expect(
-			await retireTranscriptRecordsGenerations(clickhouse, {
+			await retireGenerations(clickhouse, transcriptRecordsStore, {
 				deadline: { deadlineAt: later + 600_000, now: () => later },
 				organizationId: generationOrganizationId,
 			}),
@@ -1613,15 +1616,15 @@ describe("durable transcript record retirement", () => {
 			table: "rudel.transcript_records",
 			values: rows,
 		});
-		const clock = BASE_TIME_MS + TRANSCRIPT_RECORDS_RETIRE_GRACE_MS;
+		const clock = BASE_TIME_MS + RETIREMENT_GRACE_MS;
 		const sweep = () =>
-			retireTranscriptRecordsGenerations(clickhouse, {
+			retireGenerations(clickhouse, transcriptRecordsStore, {
 				organizationId: retirementOrganizationId,
 				deadline: { deadlineAt: clock + 600_000, now: () => clock },
 			});
 		expect(await sweep()).toMatchObject({
 			retired: 100,
-			sessionsProcessed: 1,
+			sessions: 1,
 			hasMore: true,
 		});
 		expect(
@@ -1629,7 +1632,7 @@ describe("durable transcript record retirement", () => {
 		).toEqual(["1", "103", "2"]);
 		expect(await sweep()).toMatchObject({
 			retired: 2,
-			sessionsProcessed: 1,
+			sessions: 1,
 			hasMore: false,
 		});
 		expect(
@@ -1637,7 +1640,7 @@ describe("durable transcript record retirement", () => {
 		).toEqual(["103"]);
 		expect(await sweep()).toMatchObject({
 			retired: 0,
-			sessionsProcessed: 0,
+			sessions: 0,
 			hasMore: false,
 		});
 	});
@@ -1710,11 +1713,11 @@ describe("durable transcript record retirement", () => {
 			},
 		};
 		const retire = () =>
-			retireTranscriptRecordsGenerations(recording, {
+			retireGenerations(recording, transcriptRecordsStore, {
 				deadline: { deadlineAt: clock + 600_000, now: () => clock },
 				organizationId: retirementOrganizationId,
 			});
-		clock += TRANSCRIPT_RECORDS_RETIRE_GRACE_MS - 1;
+		clock += RETIREMENT_GRACE_MS - 1;
 		expect(await retire()).toMatchObject({ retired: 0, deleteStatements: 0 });
 		clock++;
 		expect(await retire()).toMatchObject({
@@ -1760,15 +1763,15 @@ describe("durable transcript record retirement", () => {
 			}
 		}
 		const sweep = () =>
-			retireTranscriptRecordsGenerations(clickhouse, {
+			retireGenerations(clickhouse, transcriptRecordsStore, {
 				deadline: { deadlineAt: clock + 600_000, now: () => clock },
 				maxSessions: 1,
 				organizationId: retirementOrganizationId,
 			});
-		clock += TRANSCRIPT_RECORDS_RETIRE_GRACE_MS - 1;
+		clock += RETIREMENT_GRACE_MS - 1;
 		expect(await sweep()).toMatchObject({
 			retired: 0,
-			sessionsProcessed: 0,
+			sessions: 0,
 			hasMore: false,
 		});
 		for (const sessionId of sessionIds) {
@@ -1779,7 +1782,7 @@ describe("durable transcript record retirement", () => {
 		clock++;
 		expect(await sweep()).toMatchObject({
 			retired: 1,
-			sessionsProcessed: 1,
+			sessions: 1,
 			hasMore: true,
 		});
 		expect(
@@ -1790,11 +1793,11 @@ describe("durable transcript record retirement", () => {
 		).toEqual(["100", "200"]);
 		expect(await sweep()).toMatchObject({
 			retired: 1,
-			sessionsProcessed: 1,
+			sessions: 1,
 		});
 		expect(await sweep()).toMatchObject({
 			retired: 0,
-			sessionsProcessed: 0,
+			sessions: 0,
 			hasMore: false,
 		});
 		for (const sessionId of sessionIds) {

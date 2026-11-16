@@ -380,6 +380,8 @@ describe("scope and storage", () => {
 							session_id: "0b9d5f0e-5f35-4c43-9a8e-9cf2e3d6d0a1",
 							revision_text: "1",
 							parser_version: 9,
+							source: "claude_code",
+							receipt: "",
 						},
 					];
 				return [];
@@ -456,6 +458,8 @@ describe("scope and storage", () => {
 						: "",
 					revision_text: "7",
 					parser_version: 9,
+					source: "claude_code",
+					receipt: "",
 				},
 			];
 		});
@@ -516,6 +520,8 @@ describe("scope and storage", () => {
 							session_id,
 							revision_text: "1",
 							parser_version: 9,
+							source: "claude_code",
+							receipt: "",
 						}),
 					);
 				return [];
@@ -554,7 +560,15 @@ describe("scope and storage", () => {
 			if (statement.query.includes("any(user_id)"))
 				return [{ session_id: "s1", user_id: "member-1" }];
 			if (statement.query_params?.sessionIds)
-				return [{ session_id: "s1", revision_text: "1", parser_version: 9 }];
+				return [
+					{
+						session_id: "s1",
+						revision_text: "1",
+						parser_version: 9,
+						source: "claude_code",
+						receipt: "",
+					},
+				];
 			return [];
 		});
 		const result = ok(

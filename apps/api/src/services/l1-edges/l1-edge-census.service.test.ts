@@ -4,6 +4,7 @@ import type {
 	ClickHouseExecutor,
 	ClickHouseStatement,
 } from "../../clickhouse.js";
+import { receiptRow } from "../transcript-generations/generations.js";
 import {
 	buildObservedSessionsStatement,
 	classifySessionScope,
@@ -233,7 +234,7 @@ describe("requeueStaleL1EdgeScopes", () => {
 	test("reads recent observation receipts in a daily-rotating order", () => {
 		const now = Date.parse("2026-10-09T03:00:00.000Z");
 		const { query, query_params } = buildObservedSessionsStatement(now, "org");
-		expect(query).toContain("kind = 'receipt'");
+		expect(query).toContain(receiptRow());
 		expect(query).toContain("AND organization_id = {organizationId:String}");
 		expect(query_params).toMatchObject({
 			seed: "2026-10-09",

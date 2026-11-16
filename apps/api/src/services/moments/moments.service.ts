@@ -18,6 +18,10 @@ import {
 	getSafeClickHouseTable,
 } from "../../clickhouse.js";
 import { ANALYSIS_QUERY_SETTINGS, query } from "../analysis/sql.js";
+import {
+	pinnedParams,
+	pinnedRecords,
+} from "../transcript-generations/generations.js";
 import { readCompassSettings } from "./compass-settings.js";
 import { readFrustration } from "./frustration.js";
 import {
@@ -214,20 +218,23 @@ export async function readRunDetail(
 					file_path, file_op, text_chars,
 					substringUTF8(if(text_chars <= {maxChars:UInt32}, text, head), 1, {maxChars:UInt32}) AS text
 				FROM ${getSafeClickHouseTable("rudel.transcript_records")} FINAL
-				WHERE organization_id = {workspaceId:String} AND user_id = {userId:String}
-					AND session_id = {sessionId:String} AND agent_id = {agentId:String}
-					AND revision = toUInt64({revision:String}) AND parser_version = {parserVersion:UInt16}
+				WHERE ${pinnedRecords()} AND agent_id = {agentId:String}
 					AND turn_idx = {turn:UInt32}
-					AND kind NOT IN ('receipt', 'meta')
+					AND kind != 'meta'
 				ORDER BY record_idx, block_idx
 				LIMIT {limit:UInt32}`,
 			query_params: {
-				workspaceId: caller.workspaceId,
-				userId: run.user_id,
-				sessionId: run.session_id,
+				...pinnedParams(
+					{ organizationId: caller.workspaceId, userId: run.user_id },
+					[
+						{
+							sessionId: run.session_id,
+							revision: run.revision,
+							parserVersion: run.parser_version,
+						},
+					],
+				),
 				agentId: run.agent_id,
-				revision: run.revision,
-				parserVersion: run.parser_version,
 				turn: run.turn_idx,
 				maxChars: RUN_RECORD_TEXT_MAX_CHARS,
 				limit: RUN_RECORDS_MAX + 1,

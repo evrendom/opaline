@@ -1,9 +1,6 @@
 import { Buffer } from "node:buffer";
 import { SEARCH_KINDS, SEARCH_RECORD_TEXT_MAX_CHARS } from "@rudel/api-routes";
-import {
-	TRANSCRIPT_RECORD_EXCERPT_CHARS,
-	TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
-} from "@rudel/api-routes/transcript-records";
+import { TRANSCRIPT_RECORD_EXCERPT_CHARS } from "@rudel/api-routes/transcript-records";
 import { filterKnownSecrets } from "@rudel/secret-filter";
 import { z } from "zod";
 import type {
@@ -16,6 +13,11 @@ import {
 	REAL_BACKFILL_CLOCK,
 	readClickHouseLoadAverage,
 } from "../backfill-pacing.js";
+import {
+	contentRow,
+	newestGenerations,
+	receiptRow,
+} from "../transcript-generations/generations.js";
 import { TRANSCRIPT_RECORDS_TABLE } from "../transcript-records-ingest.service.js";
 import type { SearchAccess } from "./access.js";
 import { CHUNK_MAX_CHARS, CHUNK_OVERLAP_CHARS } from "./chunks.js";
@@ -237,21 +239,18 @@ export function buildTranscriptSearchBackfillStatement(input: {
 			max_result_rows: String(input.limit),
 		},
 		query: `WITH records AS (
-				SELECT organization_id, user_id, session_id,
-					argMax(source, (revision, parser_version)) AS session_source,
-					argMax(session_date, (revision, parser_version)) AS started,
-					max((revision, parser_version)) AS generation
-				FROM ${TRANSCRIPT_RECORDS_TABLE}
-				WHERE kind = 'receipt' AND agent_id = '' AND record_idx = {receiptRecordIdx:UInt32} AND block_idx = 0
-					${organizationFilter}
-				GROUP BY organization_id, user_id, session_id
+				${newestGenerations({
+					columns: `argMax(source, (revision, parser_version)) AS session_source,
+					argMax(session_date, (revision, parser_version)) AS started`,
+					and: organizationFilter,
+				})}
 			),
 			indexed AS (
 				SELECT organization_id, user_id, session_id, toUInt8(1) AS present,
 					argMax(tuple(revision, parser_version, pending_chunks),
 						tuple(revision, parser_version, written_at)) AS committed
 				FROM ${TRANSCRIPT_CHUNK_HITS_TABLE}
-				WHERE agent_id = '' AND record_idx = {receiptRecordIdx:UInt32} AND kind = 'receipt'
+				WHERE ${receiptRow()}
 					${organizationFilter}
 				GROUP BY organization_id, user_id, session_id
 			)
@@ -279,7 +278,6 @@ export function buildTranscriptSearchBackfillStatement(input: {
 			afterUserId: input.after?.userId ?? "",
 			limit: input.limit,
 			organizationIds: input.organizationIds ?? [],
-			receiptRecordIdx: TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
 			shardCount: input.shard?.count ?? 1,
 			shardIndex: input.shard?.index ?? 0,
 		},
@@ -620,23 +618,18 @@ async function estimateChars(
 					AND session_id IN {sessionIds:Array(String)}
 					AND (organization_id, user_id, session_id, revision, parser_version) IN (
 						SELECT organization_id, user_id, session_id, generation.1, generation.2
-						FROM (
-							SELECT organization_id, user_id, session_id, max((revision, parser_version)) AS generation
-							FROM ${TRANSCRIPT_RECORDS_TABLE}
-							WHERE organization_id IN {organizationIds:Array(String)}
+						FROM (${newestGenerations({
+							and: `AND organization_id IN {organizationIds:Array(String)}
 								AND user_id IN {userIds:Array(String)}
-								AND session_id IN {sessionIds:Array(String)}
-								AND kind = 'receipt' AND agent_id = '' AND record_idx = {receiptRecordIdx:UInt32}
-							GROUP BY organization_id, user_id, session_id
-						)
+								AND session_id IN {sessionIds:Array(String)}`,
+						})})
 					)
-					AND record_idx < {receiptRecordIdx:UInt32} AND turn_idx >= 1
+					AND ${contentRow()} AND turn_idx >= 1
 					AND kind IN {kinds:Array(String)} AND text_chars > 0
 				GROUP BY organization_id, user_id, session_id`,
 				query_params: {
 					kinds: [...SEARCH_KINDS],
 					organizationIds: unique(batch.map((row) => row.organization_id)),
-					receiptRecordIdx: TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
 					recordMaxChars: RECORD_SEARCH_MAX_CHARS,
 					sessionIds: unique(batch.map((row) => row.session_id)),
 					userIds: unique(batch.map((row) => row.user_id)),
