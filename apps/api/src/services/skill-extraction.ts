@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { hashTranscriptContent } from "../lib/transcript-content-hash.js";
 import { extractHistoricalClaudeSkills } from "./historical-claude-skill-parser.js";
 import { extractHistoricalCodexSkills } from "./historical-codex-skill-parser.js";
 import type {
@@ -75,11 +75,5 @@ export function hashSkillSourceContent(
 	content: string,
 	subagents: Readonly<Record<string, string>> = {},
 ): string {
-	const hash = createHash("sha256");
-	hash.update(content, "utf8");
-	for (const agentId of Object.keys(subagents).sort()) {
-		hash.update(`\u0000${agentId}\u0000`, "utf8");
-		hash.update(subagents[agentId] ?? "", "utf8");
-	}
-	return hash.digest("hex");
+	return hashTranscriptContent(content, subagents);
 }

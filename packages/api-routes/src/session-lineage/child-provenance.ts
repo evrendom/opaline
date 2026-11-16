@@ -12,7 +12,7 @@ export function extractNativeCodexLineageEvidence(
 	>,
 ): NativeCodexLineageEvidence | undefined {
 	if (session.source !== "codex") return undefined;
-	const lines = parseJsonLines(session.content);
+	const lines = new LazyJsonLines(session.content);
 	const sessionMeta = lines.find((line) => line.type === "session_meta");
 	const metadata = readRecord(sessionMeta?.payload);
 	if (metadata?.thread_source !== "subagent") return undefined;
@@ -30,10 +30,8 @@ export function extractNativeCodexLineageEvidence(
 	].filter((value): value is string => value !== undefined);
 	if (parentIds.some((value) => value !== nestedParentId)) return undefined;
 
-	const model = lines
-		.map((line) => readRecord(line.payload))
-		.map((payload) => readString(payload?.model))
-		.find(Boolean);
+	const modelLine = lines.find(readPayloadModel);
+	const model = modelLine && readPayloadModel(modelLine);
 	const depth = threadSpawn?.depth;
 	return {
 		agentNickname: readString(threadSpawn?.agent_nickname),
@@ -191,15 +189,58 @@ function parseJsonLines(
 	content: string,
 ): readonly Readonly<Record<string, unknown>>[] {
 	return content.split("\n").flatMap((line) => {
-		if (!line.trim()) return [];
-		try {
-			const parsed: unknown = JSON.parse(line);
-			const record = readRecord(parsed);
-			return record ? [record] : [];
-		} catch {
-			return [];
-		}
+		const record = parseJsonLine(line);
+		return record ? [record] : [];
 	});
+}
+
+function parseJsonLine(
+	line: string,
+): Readonly<Record<string, unknown>> | undefined {
+	if (!line.trim()) return undefined;
+	try {
+		return readRecord(JSON.parse(line));
+	} catch {
+		return undefined;
+	}
+}
+
+function readPayloadModel(
+	line: Readonly<Record<string, unknown>>,
+): string | undefined {
+	return readString(readRecord(line.payload)?.model);
+}
+
+class LazyJsonLines {
+	private readonly parsed: Readonly<Record<string, unknown>>[] = [];
+	private next = 0;
+
+	constructor(private readonly content: string) {}
+
+	find(
+		matches: (line: Readonly<Record<string, unknown>>) => unknown,
+	): Readonly<Record<string, unknown>> | undefined {
+		const found = this.parsed.find(matches);
+		if (found) return found;
+		for (let line = this.read(); line; line = this.read()) {
+			if (matches(line)) return line;
+		}
+		return undefined;
+	}
+
+	private read(): Readonly<Record<string, unknown>> | undefined {
+		while (this.next <= this.content.length) {
+			const newline = this.content.indexOf("\n", this.next);
+			const end = newline === -1 ? this.content.length : newline;
+			const record = parseJsonLine(this.content.slice(this.next, end));
+			this.next = newline === -1 ? this.content.length + 1 : newline + 1;
+			if (record) {
+				this.parsed.push(record);
+				return record;
+			}
+		}
+		return undefined;
+	}
 }
 
 function readRecord(

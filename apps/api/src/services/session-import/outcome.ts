@@ -1,7 +1,7 @@
 import { ORPCError } from "@orpc/server";
-import type { SessionImportDependencies } from "./dependencies.js";
+import type { SessionImportOverrides } from "./dependencies.js";
+import type { IngestErrorFactories } from "./errors.js";
 import {
-	type IngestErrorFactories,
 	processIngestSession,
 	type SessionImportRequest,
 } from "./import-session.js";
@@ -105,7 +105,7 @@ export function outcomeOfError(error: unknown): SessionImportOutcome {
 
 export async function importSession(
 	request: Omit<SessionImportRequest, "errorFactories">,
-	overrides: Partial<SessionImportDependencies> = {},
+	overrides: SessionImportOverrides = {},
 ): Promise<SessionImportOutcome> {
 	try {
 		await processIngestSession(

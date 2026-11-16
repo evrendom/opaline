@@ -470,18 +470,7 @@ export function hasMatchingTranscriptRecordsReceipt(
 	);
 }
 
-export function hashTranscriptContent(
-	content: string,
-	subagents: Readonly<Record<string, string>> = {},
-): string {
-	const hash = createHash("sha256");
-	hash.update(content, "utf8");
-	for (const agentId of Object.keys(subagents).sort()) {
-		hash.update(`\u0000${agentId}\u0000`, "utf8");
-		hash.update(subagents[agentId] ?? "", "utf8");
-	}
-	return hash.digest("hex");
-}
+export { hashTranscriptContent } from "../lib/transcript-content-hash.js";
 
 /**
  * Delete every row of one generation only while deletion is under way for the

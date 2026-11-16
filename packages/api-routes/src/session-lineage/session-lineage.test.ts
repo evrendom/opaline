@@ -96,6 +96,37 @@ describe("native Codex lineage extraction", () => {
 		).toBeUndefined();
 		expect(create({ thread_source: "cli" })).toBeUndefined();
 	});
+
+	test("takes the first model of any line, before or after the session metadata", () => {
+		const meta = codexLine("2026-09-18T09:25:51.697Z", "session_meta", {
+			id: "child",
+			source: {
+				subagent: { thread_spawn: { parent_thread_id: "parent" } },
+			},
+			thread_source: "subagent",
+		});
+		const model = (lines: readonly string[]) =>
+			extractNativeCodexLineageEvidence(
+				createRawSession({
+					content: lines.join("\n"),
+					sessionId: "child",
+					source: "codex",
+				}),
+			)?.model;
+		const early = codexLine("2026-09-18T09:25:50.000Z", "turn_context", {
+			model: "gpt-early",
+		});
+		const late = codexLine("2026-09-18T09:25:52.000Z", "turn_context", {
+			model: "gpt-late",
+		});
+		const empty = codexLine("2026-09-18T09:25:50.000Z", "turn_context", {
+			model: "",
+		});
+		expect(model(["not json", empty, early, meta, late])).toBe("gpt-early");
+		expect(model([empty, meta, "{", late, ""])).toBe("gpt-late");
+		expect(model([meta])).toBe("codex");
+		expect(model([early, late])).toBeUndefined();
+	});
 });
 
 describe("shell-carried launch classification", () => {

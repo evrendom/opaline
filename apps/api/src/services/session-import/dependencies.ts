@@ -1,18 +1,20 @@
 import { type ClickHouseExecutor, getClickhouse } from "../../clickhouse.js";
 import { sqlClient } from "../../db.js";
-import { captureApiProductAnalyticsEvent } from "../../lib/product-analytics.js";
-import { recordUserCliVersion } from "../cli-version.service.js";
 import { resolveIngestOrganizationId } from "../cli-workspace.service.js";
 import { assertNoClickHousePurgeTombstone } from "../clickhouse-purge-tombstone.service.js";
-import { persistGitObservationsBestEffort } from "../git-observation-extraction.service.js";
+import {
+	type GitObservationExtractionInput,
+	persistGitObservationsBestEffort,
+} from "../git-observation-extraction.service.js";
 import { filterSessionTextFieldsOffThread } from "../ingest-filter.service.js";
 import { enqueueSessionEdgesBestEffort } from "../l1-edges/l1-edge-enqueue.js";
 import { hasRawSessionRow } from "../raw-session.service.js";
 import {
+	insertSessionLanguageSignalRows,
 	persistSessionLanguageSignals,
-	persistSessionLanguageSignalsBestEffort,
-	persistSessionLanguageSignalsWithExecutor,
+	type SessionLanguageSignalScanInput,
 } from "../session-language-signal-persistence.service.js";
+import { scanSessionLanguageSignalsOffThread } from "../session-language-signal-scanner.service.js";
 import { projectNativeSessionLineage } from "../session-native-lineage.service.js";
 import {
 	claimSessionIngestOwnership,
@@ -27,10 +29,15 @@ import {
 } from "../skill-extraction-ingest.service.js";
 import {
 	isTranscriptRecordsCurrent,
+	type PersistTranscriptRecordsInput,
 	persistTranscriptRecordsBestEffort,
 } from "../transcript-records-extraction.service.js";
 import { indexUploadedSessionBestEffort } from "../transcript-search/ingest.js";
-import { writeUsageExtraction } from "../usage-event-ingest.service.js";
+import type { SessionIndexInput } from "../transcript-search/session-index.service.js";
+import {
+	type UsageEventWriteInput,
+	writeUsageExtraction,
+} from "../usage-event-ingest.service.js";
 import { extractSessionFactsOffThread } from "../usage-extraction.service.js";
 
 export interface SessionOwner {
@@ -43,72 +50,167 @@ export interface ImportedSession extends SessionOwner {
 	readonly source: string;
 }
 
-export interface SessionImportDependencies {
-	readonly filterText: typeof filterSessionTextFieldsOffThread;
-	readonly resolveOrganizationId: (
-		requested: string | null,
-		userId: string,
-	) => Promise<string>;
-	readonly claimOwnership: (
-		organizationId: string,
-		sessionId: string,
-		userId: string,
-	) => ReturnType<typeof claimSessionIngestOwnership>;
+export type SessionClaim = Awaited<
+	ReturnType<typeof claimSessionIngestOwnership>
+>;
+
+export interface SessionControlState {
+	readonly claim: (request: {
+		readonly requestedOrganizationId: string | null;
+		readonly sessionId: string;
+		readonly userId: string;
+	}) => Promise<{
+		readonly organizationId: string;
+		readonly ownership: SessionClaim;
+	}>;
 	readonly recordAgentMetadata: typeof recordSessionAgentMetadata;
-	readonly projectLineage: typeof projectNativeSessionLineage;
-	readonly clickhouse: () => ClickHouseExecutor;
-	readonly hasRawRow: typeof hasRawSessionRow;
+	readonly projectLineage: (session: {
+		readonly organizationId: string;
+		readonly sessionId: string;
+		readonly userId: string;
+	}) => Promise<unknown>;
 	readonly allocateRevision: typeof allocateSessionRevision;
 	readonly recordContent: typeof recordSessionIngestContent;
-	readonly recordCliVersion: (
-		userId: string,
-		version: unknown,
-	) => Promise<void>;
 	readonly reserveUsageGeneration: typeof reserveUsageExtractionGeneration;
-	readonly assertWritable: (owner: SessionOwner) => Promise<void>;
-	readonly persistLanguageSignals: typeof persistSessionLanguageSignals;
-	readonly persistLanguageSignalsWith: typeof persistSessionLanguageSignalsWithExecutor;
-	readonly persistLanguageSignalsBestEffort: typeof persistSessionLanguageSignalsBestEffort;
-	readonly readSkillReceipt: typeof readSkillExtractionReceipt;
-	readonly recordsCurrent: typeof isTranscriptRecordsCurrent;
-	readonly persistRecords: typeof persistTranscriptRecordsBestEffort;
-	readonly persistGitObservations: typeof persistGitObservationsBestEffort;
-	readonly indexSearch: typeof indexUploadedSessionBestEffort;
-	readonly extractSessionFacts: typeof extractSessionFactsOffThread;
-	readonly writeSkills: typeof writeSkillExtraction;
-	readonly writeUsage: typeof writeUsageExtraction;
-	readonly enqueueRunIndex: (session: ImportedSession) => Promise<void>;
-	readonly captureEvent: typeof captureApiProductAnalyticsEvent;
 }
 
-export const productionDependencies: SessionImportDependencies = {
-	filterText: filterSessionTextFieldsOffThread,
-	resolveOrganizationId: (requested, userId) =>
-		resolveIngestOrganizationId(requested, userId),
-	claimOwnership: (organizationId, sessionId, userId) =>
-		claimSessionIngestOwnership(organizationId, sessionId, userId),
-	recordAgentMetadata: recordSessionAgentMetadata,
-	projectLineage: projectNativeSessionLineage,
-	clickhouse: getClickhouse,
-	hasRawRow: hasRawSessionRow,
-	allocateRevision: allocateSessionRevision,
-	recordContent: recordSessionIngestContent,
-	recordCliVersion: (userId, version) =>
-		recordUserCliVersion(sqlClient, userId, version),
-	reserveUsageGeneration: reserveUsageExtractionGeneration,
-	assertWritable: (owner) =>
-		assertNoClickHousePurgeTombstone(owner, { database: sqlClient }),
-	persistLanguageSignals: persistSessionLanguageSignals,
-	persistLanguageSignalsWith: persistSessionLanguageSignalsWithExecutor,
-	persistLanguageSignalsBestEffort: persistSessionLanguageSignalsBestEffort,
-	readSkillReceipt: readSkillExtractionReceipt,
-	recordsCurrent: isTranscriptRecordsCurrent,
-	persistRecords: persistTranscriptRecordsBestEffort,
-	persistGitObservations: persistGitObservationsBestEffort,
-	indexSearch: indexUploadedSessionBestEffort,
-	extractSessionFacts: extractSessionFactsOffThread,
-	writeSkills: writeSkillExtraction,
-	writeUsage: writeUsageExtraction,
-	enqueueRunIndex: (session) => enqueueSessionEdgesBestEffort(session),
-	captureEvent: captureApiProductAnalyticsEvent,
+type Fenced<Input> = Omit<Input, "assertWritable" | "onWritten">;
+
+export interface SessionStores {
+	readonly executor: () => ClickHouseExecutor;
+	readonly hasRawRow: (
+		executor: ClickHouseExecutor,
+		identity: Parameters<typeof hasRawSessionRow>[0],
+	) => Promise<boolean>;
+	readonly readSkillReceipt: typeof readSkillExtractionReceipt;
+	readonly recordsCurrent: typeof isTranscriptRecordsCurrent;
+	readonly persistRecords: (
+		executor: ClickHouseExecutor,
+		input: Fenced<PersistTranscriptRecordsInput>,
+	) => Promise<"failed" | "skipped" | "written">;
+	readonly persistGitObservations: (
+		executor: ClickHouseExecutor,
+		input: Fenced<GitObservationExtractionInput>,
+	) => Promise<"failed" | "skipped" | "written">;
+	readonly indexSearch: (
+		executor: ClickHouseExecutor,
+		input: Fenced<SessionIndexInput>,
+	) => Promise<void>;
+	readonly writeSkills: typeof writeSkillExtraction;
+	readonly writeUsage: (
+		executor: ClickHouseExecutor,
+		input: Fenced<UsageEventWriteInput>,
+	) => Promise<unknown>;
+	readonly writeLanguageSignals: (
+		executor: ClickHouseExecutor,
+		input: SessionLanguageSignalScanInput,
+		now: () => Date,
+	) => Promise<void>;
+}
+
+export interface SessionWorkers {
+	readonly filter: typeof filterSessionTextFieldsOffThread;
+	readonly extractFacts: typeof extractSessionFactsOffThread;
+}
+
+export interface RunIndexQueue {
+	readonly enqueue: (session: ImportedSession) => Promise<void>;
+}
+
+export interface SessionImportDependencies {
+	readonly control: SessionControlState;
+	readonly stores: SessionStores;
+	readonly workers: SessionWorkers;
+	readonly runIndex: RunIndexQueue;
+}
+
+export type SessionImportOverrides = {
+	readonly [Port in keyof SessionImportDependencies]?: Partial<
+		SessionImportDependencies[Port]
+	>;
 };
+
+function fence<Input extends SessionOwner>(
+	input: Input,
+): Input & { assertWritable: () => Promise<void> } {
+	return {
+		...input,
+		assertWritable: () =>
+			assertNoClickHousePurgeTombstone(
+				{ organizationId: input.organizationId, userId: input.userId },
+				{ database: sqlClient },
+			),
+	};
+}
+
+const QUEUED_BY_THE_IMPORT = { onWritten: async () => {} };
+
+export const productionDependencies: SessionImportDependencies = {
+	control: {
+		claim: async ({ requestedOrganizationId, sessionId, userId }) => {
+			const organizationId = await resolveIngestOrganizationId(
+				requestedOrganizationId,
+				userId,
+			);
+			return {
+				organizationId,
+				ownership: await claimSessionIngestOwnership(
+					organizationId,
+					sessionId,
+					userId,
+				),
+			};
+		},
+		recordAgentMetadata: recordSessionAgentMetadata,
+		projectLineage: (session) =>
+			projectNativeSessionLineage({ ...session, notifyPendingArrival: true }),
+		allocateRevision: allocateSessionRevision,
+		recordContent: recordSessionIngestContent,
+		reserveUsageGeneration: reserveUsageExtractionGeneration,
+	},
+	stores: {
+		executor: getClickhouse,
+		hasRawRow: (executor, identity) => hasRawSessionRow(identity, executor),
+		readSkillReceipt: readSkillExtractionReceipt,
+		recordsCurrent: isTranscriptRecordsCurrent,
+		persistRecords: (executor, input) =>
+			persistTranscriptRecordsBestEffort(executor, {
+				...fence(input),
+				...QUEUED_BY_THE_IMPORT,
+			}),
+		persistGitObservations: (executor, input) =>
+			persistGitObservationsBestEffort(executor, {
+				...fence(input),
+				...QUEUED_BY_THE_IMPORT,
+			}),
+		indexSearch: (executor, input) =>
+			indexUploadedSessionBestEffort(executor, fence(input)),
+		writeSkills: writeSkillExtraction,
+		writeUsage: (executor, input) =>
+			writeUsageExtraction(executor, fence(input)),
+		writeLanguageSignals: (executor, input, now) =>
+			persistSessionLanguageSignals(input, {
+				insertRows: (rows) => insertSessionLanguageSignalRows(executor, rows),
+				now,
+				scan: scanSessionLanguageSignalsOffThread,
+			}),
+	},
+	workers: {
+		filter: filterSessionTextFieldsOffThread,
+		extractFacts: extractSessionFactsOffThread,
+	},
+	runIndex: {
+		enqueue: (session) => enqueueSessionEdgesBestEffort(session),
+	},
+};
+
+export function resolveDependencies(
+	overrides: SessionImportOverrides,
+): SessionImportDependencies {
+	return {
+		control: { ...productionDependencies.control, ...overrides.control },
+		stores: { ...productionDependencies.stores, ...overrides.stores },
+		workers: { ...productionDependencies.workers, ...overrides.workers },
+		runIndex: { ...productionDependencies.runIndex, ...overrides.runIndex },
+	};
+}

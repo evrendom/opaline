@@ -2240,7 +2240,7 @@ describe("R2 ingest commit lifecycle", () => {
 				now: () => firstAttemptAt,
 				process: createRealProcessor(undefined, {
 					awaitLanguageSignals: false,
-					extractSessionFacts: async () => {
+					extractFacts: async () => {
 						throw new UsageExtractionQueueTimeoutError();
 					},
 				}),
@@ -4160,7 +4160,7 @@ function createRealProcessor(
 	failpoint: IngestProcessingFailpoint | undefined,
 	options: {
 		awaitLanguageSignals?: boolean;
-		extractSessionFacts?: SessionImportDependencies["extractSessionFacts"];
+		extractFacts?: SessionImportDependencies["workers"]["extractFacts"];
 	} = {},
 ): (
 	input: IngestSessionInput,
@@ -4183,8 +4183,8 @@ function createRealProcessor(
 				errorFactories: TEST_ERROR_FACTORIES,
 				input,
 			},
-			options.extractSessionFacts
-				? { extractSessionFacts: options.extractSessionFacts }
+			options.extractFacts
+				? { workers: { extractFacts: options.extractFacts } }
 				: {},
 		);
 }

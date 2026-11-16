@@ -15,6 +15,9 @@ const {
 const { IngestFilterQueueFullError } = await import(
 	"../ingest-filter.service.js"
 );
+const { SessionLanguageSignalScannerOperationalError } = await import(
+	"../ingest-worker-operational.error.js"
+);
 
 function upload(content: string): IngestSessionInput {
 	return {
@@ -45,13 +48,11 @@ test("a new transcript is filtered, claimed and stored raw before its derived fa
 	expect(result.contentSha256).toMatch(/^[a-f0-9]{64}$/u);
 	expect(stores.calls.filter((call) => call !== "run_index")).toEqual([
 		"filter",
-		"organization",
 		"claim",
 		"agent_metadata",
 		"revision",
 		"insert rudel.claude_sessions",
 		"content",
-		"cli_version",
 		"language_signals",
 		"records",
 		"git_observations",
@@ -74,7 +75,6 @@ test("an identical re-import leaves before the raw insert and only retries deriv
 	expect(stores.rawRows).toHaveLength(1);
 	expect(stores.calls).toEqual([
 		"filter",
-		"organization",
 		"claim",
 		"agent_metadata",
 		"raw_exists",
@@ -147,10 +147,14 @@ test("an identical re-import queues the run index only when it writes missing gi
 	}
 });
 
-function outcomeOf(stores: MemoryStores, input: IngestSessionInput) {
+function outcomeOf(
+	stores: MemoryStores,
+	input: IngestSessionInput,
+	awaitLanguageSignals = true,
+) {
 	return importSession(
 		{
-			awaitLanguageSignals: true,
+			awaitLanguageSignals,
 			context: { apiKeyId: null, session: null, user: { id: "user" } },
 			enforceRateLimits: false,
 			input,
@@ -185,8 +189,10 @@ test("a full queue and an unexpected failure are retries; incomplete usage is st
 	expect(
 		await outcomeOf(
 			memoryStores({
-				filterText: async () => {
-					throw new IngestFilterQueueFullError("global-jobs");
+				workers: {
+					filter: async () => {
+						throw new IngestFilterQueueFullError("global-jobs");
+					},
 				},
 			}),
 			upload(claudeTranscript(2)),
@@ -195,8 +201,10 @@ test("a full queue and an unexpected failure are retries; incomplete usage is st
 	expect(
 		await outcomeOf(
 			memoryStores({
-				allocateRevision: async () => {
-					throw new Error("Postgres went away");
+				control: {
+					allocateRevision: async () => {
+						throw new Error("Postgres went away");
+					},
 				},
 			}),
 			upload(claudeTranscript(2)),
@@ -207,19 +215,43 @@ test("a full queue and an unexpected failure are retries; incomplete usage is st
 		message: "Postgres went away",
 	});
 	const incomplete = memoryStores();
-	const extract = incomplete.dependencies.extractSessionFacts;
+	const extract = incomplete.dependencies.workers.extractFacts;
 	expect(
 		await outcomeOf(
 			memoryStores({
-				extractSessionFacts: async (request) => {
-					const facts = await extract(request);
-					return {
-						...facts,
-						usage: { ...facts.usage, status: "incomplete", events: [] },
-					};
+				workers: {
+					extractFacts: async (request) => {
+						const facts = await extract(request);
+						return {
+							...facts,
+							usage: { ...facts.usage, status: "incomplete", events: [] },
+						};
+					},
 				},
 			}),
 			upload(claudeTranscript(2)),
 		),
 	).toEqual({ kind: "stored", usage: "incomplete" });
+});
+
+test("a failed language-signal scan fails an import that awaits it and no other", async () => {
+	let scans = 0;
+	const failingScan = () =>
+		memoryStores({
+			stores: {
+				writeLanguageSignals: async () => {
+					scans += 1;
+					throw new SessionLanguageSignalScannerOperationalError("crashed");
+				},
+			},
+		});
+	expect(await outcomeOf(failingScan(), upload(claudeTranscript(2)))).toEqual({
+		kind: "retry",
+		reason: "failed",
+		message: "Language-signal scanning temporarily failed. Retry shortly.",
+	});
+	expect(
+		await outcomeOf(failingScan(), upload(claudeTranscript(2)), false),
+	).toEqual({ kind: "stored", usage: "complete" });
+	expect(scans).toBe(2);
 });

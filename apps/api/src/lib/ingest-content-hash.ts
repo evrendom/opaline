@@ -1,7 +1,29 @@
 import { createHash, type Hash } from "node:crypto";
 import type { IngestSessionInput } from "@rudel/api-routes";
+import { digestTranscriptContent } from "./transcript-content-hash.js";
+
+const SHARED_CHUNK_CHARS = 1 << 20;
 
 export function computeIngestContentHash(input: IngestSessionInput): string {
+	return hashIngestContent(input, null);
+}
+
+export function computeIngestContentHashes(
+	input: IngestSessionInput,
+	subagents: Readonly<Record<string, string>>,
+): { readonly contentSha256: string; readonly transcriptSha256: string } {
+	const transcript = createHash("sha256");
+	const contentSha256 = hashIngestContent(input, transcript);
+	return {
+		contentSha256,
+		transcriptSha256: digestTranscriptContent(transcript, subagents),
+	};
+}
+
+function hashIngestContent(
+	input: IngestSessionInput,
+	transcript: Hash | null,
+): string {
 	const hash = createHash("sha256");
 
 	updateNamedField(hash, "source", input.source);
@@ -13,7 +35,9 @@ export function computeIngestContentHash(input: IngestSessionInput): string {
 	updateNamedNullableField(hash, "gitBranch", input.gitBranch);
 	updateNamedNullableField(hash, "gitSha", input.gitSha);
 	updateNamedNullableField(hash, "tag", input.tag);
-	updateNamedField(hash, "content", input.content);
+	updateFramedField(hash, "content");
+	if (transcript) updateSharedFramedField(hash, transcript, input.content);
+	else updateFramedField(hash, input.content);
 	updateNamedField(hash, "filterVersion", String(input.filter_version ?? 0));
 
 	if (input.source === "claude_code") {
@@ -52,4 +76,25 @@ function updateNamedNullableField(
 function updateFramedField(hash: Hash, field: string): void {
 	hash.update(`${Buffer.byteLength(field, "utf8")}:`);
 	hash.update(field, "utf8");
+}
+
+function updateSharedFramedField(
+	hash: Hash,
+	shared: Hash,
+	field: string,
+): void {
+	hash.update(`${Buffer.byteLength(field, "utf8")}:`);
+	for (let start = 0; start < field.length; ) {
+		let end = Math.min(start + SHARED_CHUNK_CHARS, field.length);
+		if (end < field.length && isHighSurrogate(field.charCodeAt(end - 1)))
+			end -= 1;
+		const bytes = Buffer.from(field.slice(start, end), "utf8");
+		hash.update(bytes);
+		shared.update(bytes);
+		start = end;
+	}
+}
+
+function isHighSurrogate(code: number): boolean {
+	return code >= 0xd800 && code <= 0xdbff;
 }

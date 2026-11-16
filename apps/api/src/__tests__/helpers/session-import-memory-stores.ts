@@ -5,15 +5,14 @@ import type { IngestContentShape } from "../../lib/ingest-content-shape.js";
 import { slimAndFilterSecrets } from "../../services/ingest-filter.core.js";
 import type {
 	ImportedSession,
+	SessionClaim,
 	SessionImportDependencies,
+	SessionImportOverrides,
 } from "../../services/session-import/index.js";
 import { extractSessionSkills } from "../../services/skill-extraction.js";
 import type { SkillExtractionReceiptState } from "../../services/skill-extraction-ingest.service.js";
 
-type Claim = Extract<
-	Awaited<ReturnType<SessionImportDependencies["claimOwnership"]>>,
-	{ owned: true }
->;
+type Claim = Extract<SessionClaim, { owned: true }>;
 
 const NO_CLAIM: Claim = {
 	owned: true,
@@ -42,7 +41,7 @@ export interface MemoryStores {
 }
 
 export function memoryStores(
-	overrides: Partial<SessionImportDependencies> = {},
+	overrides: SessionImportOverrides = {},
 ): MemoryStores {
 	const calls: string[] = [];
 	const rawRows: { table: string; values: object[] }[] = [];
@@ -63,41 +62,24 @@ export function memoryStores(
 			rawRows.push({ table, values });
 		},
 	};
-	const stores: MemoryStores = {
-		calls,
-		rawRows,
-		runIndex,
-		recordsCurrent: true,
-		recordsResult: "written",
-		gitObservationsResult: "skipped",
-		owner: null,
-		dependencies: {
-			filterText: async (request) => {
-				calls.push("filter");
-				return slimAndFilterSecrets(request.fields);
-			},
-			resolveOrganizationId: async (requested) => {
-				calls.push("organization");
-				return requested ?? "org";
-			},
-			claimOwnership: async (_organizationId, _sessionId, userId) => {
+	const dependencies: SessionImportDependencies = {
+		control: {
+			claim: async ({ requestedOrganizationId, userId }) => {
 				calls.push("claim");
+				const organizationId = requestedOrganizationId ?? "org";
 				if (stores.owner !== null && stores.owner !== userId)
-					return { owned: false, ownerId: stores.owner };
+					return {
+						organizationId,
+						ownership: { owned: false, ownerId: stores.owner },
+					};
 				stores.owner = userId;
-				return claim;
+				return { organizationId, ownership: claim };
 			},
 			recordAgentMetadata: async () => {
 				calls.push("agent_metadata");
 			},
 			projectLineage: async () => {
 				calls.push("lineage");
-				return [];
-			},
-			clickhouse: () => executor,
-			hasRawRow: async () => {
-				calls.push("raw_exists");
-				return rawRows.length > 0;
 			},
 			allocateRevision: async () => {
 				calls.push("revision");
@@ -135,22 +117,17 @@ export function memoryStores(
 						: {}),
 				};
 			},
-			recordCliVersion: async () => {
-				calls.push("cli_version");
-			},
 			reserveUsageGeneration: async () => {
 				calls.push("usage_generation");
 				return String(revision);
 			},
-			assertWritable: async () => {},
-			persistLanguageSignals: async () => {
-				calls.push("language_signals");
-			},
-			persistLanguageSignalsWith: async () => {
-				calls.push("language_signals");
-			},
-			persistLanguageSignalsBestEffort: async () => {
-				calls.push("language_signals_best_effort");
+			...overrides.control,
+		},
+		stores: {
+			executor: () => executor,
+			hasRawRow: async () => {
+				calls.push("raw_exists");
+				return rawRows.length > 0;
 			},
 			readSkillReceipt: async () => {
 				calls.push("skill_receipt");
@@ -160,28 +137,44 @@ export function memoryStores(
 				calls.push("records_current");
 				return stores.recordsCurrent;
 			},
-			persistRecords: async (_executor, input) => {
+			persistRecords: async (recordsExecutor, input) => {
 				calls.push("records");
 				if (stores.recordsResult === "written")
-					await stores.dependencies.persistGitObservations(executor, input);
+					await dependencies.stores.persistGitObservations(
+						recordsExecutor,
+						input,
+					);
 				return stores.recordsResult;
 			},
-			persistGitObservations: async (_executor, input) => {
+			persistGitObservations: async () => {
 				calls.push("git_observations");
-				if (stores.gitObservationsResult === "written")
-					await (input.onWritten ?? stores.dependencies.enqueueRunIndex)({
-						organizationId: input.organizationId,
-						userId: input.userId,
-						source: input.source,
-						sessionId: input.sessionId,
-					});
 				return stores.gitObservationsResult;
 			},
 			indexSearch: async () => {
 				calls.push("search_index");
+			},
+			writeSkills: async (_executor, input) => {
+				calls.push("skills");
+				skillReceipt = {
+					parserVersion: input.extraction.parserVersion,
+					sourceContentSha256: input.extraction.sourceContentSha256,
+				};
 				return undefined as never;
 			},
-			extractSessionFacts: async (request) => {
+			writeUsage: async () => {
+				calls.push("usage");
+			},
+			writeLanguageSignals: async () => {
+				calls.push("language_signals");
+			},
+			...overrides.stores,
+		},
+		workers: {
+			filter: async (request) => {
+				calls.push("filter");
+				return slimAndFilterSecrets(request.fields);
+			},
+			extractFacts: async (request) => {
 				calls.push("extract");
 				return {
 					usage: extractUsageEvents(request.input),
@@ -196,27 +189,25 @@ export function memoryStores(
 						: null,
 				};
 			},
-			writeSkills: async (_executor, input) => {
-				calls.push("skills");
-				skillReceipt = {
-					parserVersion: input.extraction.parserVersion,
-					sourceContentSha256: input.extraction.sourceContentSha256,
-				};
-				return undefined as never;
-			},
-			writeUsage: async () => {
-				calls.push("usage");
-				return undefined as never;
-			},
-			enqueueRunIndex: async (session) => {
+			...overrides.workers,
+		},
+		runIndex: {
+			enqueue: async (session) => {
 				calls.push("run_index");
 				runIndex.push(session);
 			},
-			captureEvent: async () => {
-				calls.push("event");
-			},
-			...overrides,
+			...overrides.runIndex,
 		},
+	};
+	const stores: MemoryStores = {
+		dependencies,
+		calls,
+		rawRows,
+		runIndex,
+		recordsCurrent: true,
+		recordsResult: "written",
+		gitObservationsResult: "skipped",
+		owner: null,
 	};
 	return stores;
 }
