@@ -1,7 +1,13 @@
 export type {
 	ImportedSession,
+	RunIndexQueue,
+	SessionClaim,
+	SessionControlState,
 	SessionImportDependencies,
+	SessionImportOverrides,
 	SessionOwner,
+	SessionStores,
+	SessionWorkers,
 } from "./dependencies.js";
 export {
 	createBackgroundIngestErrorFactories,
