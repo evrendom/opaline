@@ -5,7 +5,7 @@ How to bring existing production data up to the L1 stack ([spec](l1-literal-sche
 | Script | Writes | Bounds and throttles |
 |---|---|---|
 | `backfill:transcript-records` | new transcript-records generations, then git observations; queues edges at backfill priority | `--execute --cutoff <printed by the preview>`, `--organization-id`, `--max-sessions` (census cap, default 10,000), `--batch-max-rows`, `--batch-max-bytes`, `--max-session-bytes`, `--max-rows`, `--session-timeout-ms` |
-| `retire:transcript-records` | lightweight DELETEs of superseded generations past the 10-minute grace | `--max-sessions` (default 10,000; `hasMore` when more remain), `--page-size` (sessions per DELETE, default 25, max 100), `--pause-ms` (between DELETEs, default 500) |
+| `retire:transcript-records` | lightweight DELETEs of superseded generations past the 10-minute grace | `--max-sessions` (default 10,000; `hasMore` when more remain, or when a DELETE was deferred behind a pending mutation or left unsettled and the run stopped there), `--page-size` (sessions per DELETE, default 25, max 100), `--pause-ms` (between DELETEs, default 500) |
 | `backfill:l1-edges` | `l1_edge_scope` requests (priority 1) | `--max-sessions` per run (default 10,000, max 100,000), `--after <next>` to continue; repositories are queued by the first run only |
 | `backfill:run-index` | `run_index` scope requests (priority 1) | `--max-sessions` per run (default 10,000, max 100,000), `--after <next>` to continue |
 | `backfill:transcript-search` | search chunks, hits and OpenAI embeddings of past sessions ([section 7b](#7b-transcript-search-history)) | `--max-sessions` (default 10,000, max 100,000), `--after <next>`, `--sessions-per-minute` (default 30), `--max-load` (pause while ClickHouse `LoadAverage1` is above it, default 12); stops at a workspace's OpenAI quota |
@@ -60,7 +60,7 @@ bun run retire:transcript-records --organization-id $ORG                   # pre
 bun run retire:transcript-records --organization-id $ORG --execute
 ```
 
-Repeat the execute run until it reports `sessionCount: 0` and `hasMore: false` (a session published in the last 10 minutes waits for the next run). Then audit and compare:
+Repeat the execute run until it reports `sessionCount: 0` and `hasMore: false` (a session published in the last 10 minutes waits for the next run; a run that stops at a DELETE deferred behind a pending mutation reports `hasMore: true` and is repeated once the mutation is done). Then audit and compare:
 
 - `transcripts.committedByParser.*.v8.sessions` holds (almost) every session; older versions are left only for skipped sessions.
 - `transcripts.totals.supersededGenerations` back near 0.

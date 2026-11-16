@@ -53,16 +53,19 @@ function generation(
 function fakeExecutor(input: {
 	census: { organization_id: string; user_id: string; session_id: string }[];
 	generations: GenerationRow[];
+	pending?: boolean;
+	timesOut?: boolean;
 }) {
 	const queries: ClickHouseStatement[] = [];
 	const executes: ClickHouseStatement[] = [];
 	const executor = {
 		async execute(statement: ClickHouseStatement) {
 			executes.push(statement);
+			if (input.timesOut) throw new Error("Timeout error.");
 		},
 		async query<T>(statement: ClickHouseStatement): Promise<T[]> {
 			if (statement.query.includes("system.mutations"))
-				return [{ pending: 0 }] as T[];
+				return [{ pending: input.pending ? 1 : 0 }] as T[];
 			if (statement.query.includes("SELECT 1 AS found"))
 				return [{ found: 1 }] as T[];
 			queries.push(statement);
@@ -134,7 +137,7 @@ describe("drainTranscriptRecordsRetirement", () => {
 		});
 	});
 
-	test("deletes page by page, never mixing organizations, and waits for each mutation", async () => {
+	test("deletes page by page, never mixing organizations, each DELETE synchronous", async () => {
 		delete process.env.OPALINE_SELF_HOSTED;
 		const fake = fakeExecutor({ census, generations });
 		const pauses: number[] = [];
@@ -172,6 +175,29 @@ describe("drainTranscriptRecordsRetirement", () => {
 		expect(RETIREMENT_DRAIN_REQUEST_TIMEOUT_MS).toBeGreaterThan(
 			RETIREMENT_DELETE_MAX_EXECUTION_SECONDS * 1000,
 		);
+	});
+
+	test("a delete deferred behind a pending mutation, or left unsettled, stops the drain with hasMore", async () => {
+		delete process.env.OPALINE_SELF_HOSTED;
+		const deferred = fakeExecutor({ census, generations, pending: true });
+		expect(
+			await drainTranscriptRecordsRetirement(deferred.executor, {
+				...options,
+				execute: true,
+			}),
+		).toMatchObject({ deleteStatements: 0, hasMore: true });
+		expect(deferred.executes).toEqual([]);
+
+		const unsettled = fakeExecutor({ census, generations, timesOut: true });
+		const result = await drainTranscriptRecordsRetirement(unsettled.executor, {
+			...options,
+			execute: true,
+		});
+		expect(result).toMatchObject({ deleteStatements: 2, hasMore: true });
+		expect(unsettled.executes.map(sessionsOf)).toEqual([
+			["u1/a", "u1/b"],
+			["u1/a", "u1/b"],
+		]);
 	});
 
 	test("deletes the retired generations' record commands before their records", async () => {
