@@ -193,6 +193,7 @@ function revealApp(from, duration) {
 			if (replaced && !replaced.isDestroyed()) replaced.destroy();
 			replaced = undefined;
 			stack.mark("handover");
+			restoreServerPriority();
 		}, 16);
 	});
 }
@@ -316,7 +317,10 @@ ipcMain.on("onboarding:finish", (event, duration) => {
 	if (!fromOnboarding(event)) return;
 	fs.writeFileSync(onboardedMarker(), new Date().toISOString());
 	onboardingDone = true;
-	if (!replaced && BrowserWindow.getAllWindows().length > 1) return onboardingWindow.destroy();
+	if (!replaced && BrowserWindow.getAllWindows().length > 1) {
+		restoreServerPriority();
+		return onboardingWindow.destroy();
+	}
 	revealApp(onboardingWindow, Number(duration) || 750);
 });
 
@@ -343,9 +347,19 @@ function mainWindow() {
 }
 
 const onboarding = Boolean(process.env.OPALINE_ONBOARDING) || !fs.existsSync(onboardedMarker());
+let serverQuiet = onboarding && !explicitUrl;
+
+function restoreServerPriority() {
+	if (!serverQuiet) return;
+	serverQuiet = false;
+	stack.setServerPriority(false);
+}
+
 if (!explicitUrl && stack.isLocal()) {
 	stack.warmClickHouse();
-	stack.prepare();
+	stack.prepare({ priority: serverQuiet ? "background" : undefined }).then((started) => {
+		if (started) stack.setServerPriority(serverQuiet);
+	});
 }
 
 app.whenReady().then(() => {

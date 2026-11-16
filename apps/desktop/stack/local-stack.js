@@ -294,7 +294,7 @@ function createLocalStack(options) {
 		}
 	}
 
-	async function startServer() {
+	async function startServer({ priority } = {}) {
 		starting++;
 		try {
 			const args = ["start"];
@@ -302,7 +302,7 @@ function createLocalStack(options) {
 				const port = await firstServerPort();
 				if (port && port !== DEFAULT_PORT) args.push("--port", String(port));
 			}
-			const result = await launcher.run(args, { onEvent: forward });
+			const result = await launcher.run(args, { onEvent: forward, priority });
 			const error = result.events.find((event) => event.type === "error");
 			if (result.code !== 0 || error)
 				throw new Error(
@@ -338,11 +338,11 @@ function createLocalStack(options) {
 		});
 	}
 
-	function prepare({ attempts = 2 } = {}) {
+	function prepare({ attempts = 2, priority } = {}) {
 		preparing ??= (async () => {
 			for (let attempt = 1; attempt <= attempts; attempt++) {
 				try {
-					return await startServer();
+					return await startServer({ priority });
 				} catch (error) {
 					log(`prepare attempt ${attempt} failed: ${error.message}`);
 					if (shuttingDown) break;
@@ -583,6 +583,21 @@ function createLocalStack(options) {
 		return stopSupervising;
 	}
 
+	function setServerPriority(background) {
+		if (process.platform !== "darwin") return;
+		for (const name of ["clickhouse", "postgres", "server"]) {
+			const record = readJson(path.join(serverDataDir(), "run", `${name}.pid`));
+			if (!Number.isInteger(record?.pid)) continue;
+			execFile(
+				"/usr/sbin/taskpolicy",
+				[background ? "-b" : "-B", "-p", String(record.pid)],
+				(error) =>
+					error && log(`priority of ${name} not changed: ${error.message}`),
+			);
+		}
+		mark(background ? "server-background" : "server-foreground");
+	}
+
 	function detach() {
 		shuttingDown = true;
 		stopSupervising?.();
@@ -621,6 +636,7 @@ function createLocalStack(options) {
 		prepare,
 		ready,
 		warmClickHouse,
+		setServerPriority,
 		ensureLocal,
 		stopLocal,
 		clickhouseBinary,
