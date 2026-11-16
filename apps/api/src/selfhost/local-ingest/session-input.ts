@@ -1,6 +1,4 @@
-import { readFile } from "node:fs/promises";
 import { basename, dirname } from "node:path";
-import { zstdDecompressSync } from "node:zlib";
 import {
 	claudeCodeAdapter,
 	codexAdapter,
@@ -13,7 +11,17 @@ import {
 	IngestSessionInputSchema,
 } from "@rudel/api-routes";
 import { type GitInfo, getGitInfo } from "./git-info.js";
+import {
+	type CollectedImage,
+	createImageCollector,
+	type ImageCollector,
+} from "./image-collection.js";
 import { inferSessionRepository } from "./session-repository.js";
+import {
+	readSlimmedSessionFile,
+	sessionFileSegments,
+	slimSessionText,
+} from "./slim-reader.js";
 import { claudeProjectDirectory, claudeSessionId } from "./sources.js";
 
 export type LocalSessionInput =
@@ -21,6 +29,7 @@ export type LocalSessionInput =
 			readonly kind: "ready";
 			readonly input: IngestSessionInput;
 			readonly bytes: number;
+			readonly images: readonly CollectedImage[];
 	  }
 	| { readonly kind: "skipped"; readonly reason: string };
 
@@ -94,8 +103,9 @@ function byteLength(input: IngestSessionInput): number {
 }
 
 export async function readSessionFile(path: string): Promise<string> {
-	if (!path.endsWith(".zst")) return readFile(path, "utf8");
-	return zstdDecompressSync(await readFile(path)).toString("utf8");
+	const segments: string[] = [];
+	for await (const segment of sessionFileSegments(path)) segments.push(segment);
+	return segments.join("\n");
 }
 
 export async function buildLocalSessionInput(input: {
@@ -104,7 +114,8 @@ export async function buildLocalSessionInput(input: {
 	readonly organizationId: string;
 	readonly now: number;
 }): Promise<LocalSessionInput> {
-	const content = await readSessionFile(input.sessionPath);
+	const images = createImageCollector();
+	const content = await readSlimmedSessionFile(input.sessionPath, images);
 	if (input.source === "codex") {
 		const meta = codexMeta(content);
 		if (!meta) return { kind: "skipped", reason: "not a Codex session" };
@@ -135,6 +146,7 @@ export async function buildLocalSessionInput(input: {
 				upload_mode: "hook",
 			},
 			input.sessionPath,
+			images,
 		);
 	}
 	if (!claudeCodeAdapter.extractTimestamps(content))
@@ -143,10 +155,13 @@ export async function buildLocalSessionInput(input: {
 			reason: "no timestamped user or assistant messages",
 		};
 	const sessionId = claudeSessionId(input.sessionPath);
-	const subagents = await readSubagentFiles(
-		dirname(input.sessionPath),
-		extractAgentIds(content),
-		sessionId,
+	const subagents = slimSubagents(
+		await readSubagentFiles(
+			dirname(input.sessionPath),
+			extractAgentIds(content),
+			sessionId,
+		),
+		images,
 	);
 	const projectPath =
 		firstRecordedCwd(content) ??
@@ -175,10 +190,25 @@ export async function buildLocalSessionInput(input: {
 			upload_mode: "hook",
 		},
 		input.sessionPath,
+		images,
 	);
 }
 
-function parsed(raw: unknown, path: string): LocalSessionInput {
+function slimSubagents<Subagent extends { agentId: string; content: string }>(
+	subagents: readonly Subagent[],
+	images: ImageCollector,
+): Subagent[] {
+	return subagents.map((subagent) => ({
+		...subagent,
+		content: slimSessionText(subagent.content, subagent.agentId, images),
+	}));
+}
+
+function parsed(
+	raw: unknown,
+	path: string,
+	images: ImageCollector,
+): LocalSessionInput {
 	const result = IngestSessionInputSchema.safeParse(raw);
 	if (!result.success)
 		return {
@@ -188,5 +218,10 @@ function parsed(raw: unknown, path: string): LocalSessionInput {
 				.join("; ")
 				.slice(0, 300)}`,
 		};
-	return { kind: "ready", input: result.data, bytes: byteLength(result.data) };
+	return {
+		kind: "ready",
+		input: result.data,
+		bytes: byteLength(result.data),
+		images: images.images(),
+	};
 }
