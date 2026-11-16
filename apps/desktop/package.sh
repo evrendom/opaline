@@ -59,12 +59,13 @@ rm -f "$app/Contents/Resources/default_app.asar"
 resources="$app/Contents/Resources"
 dest="$resources/app"
 mkdir -p "$dest/local-server" "$resources/server" "$resources/runtimes"
-cp "$here/package.json" "$here/main.js" "$here/agents.js" "$here/analyze.js" "$here/pricing.js" \
+cp "$here/package.json" "$here/main.js" "$here/deep-link.js" "$here/agents.js" "$here/analyze.js" "$here/pricing.js" \
 	"$here/preload.js" "$here/onboarding-preload.js" "$here/environments.js" "$here/environment-preload.js" "$dest/"
 cp -R "$here/stack" "$here/analysis" "$here/onboarding" "$here/onboarding-window" "$here/environment-window" "$dest/"
 cp "$repo/packages/local-server/dist/local-server.js" "$dest/local-server/"
 printf '{"type":"module"}\n' > "$dest/local-server/package.json"
 cp -R "$repo/plugins/opaline" "$dest/agent-plugin"
+cp -R "$repo/plugins/opaline-local" "$dest/agent-plugin-local"
 cp "$server_manifest" "$server_tarball" "$resources/server/"
 if [ "$layout" = unpacked ]; then
 	cp -R "$work/unpacked/bin/." "$resources/runtimes/"
@@ -92,6 +93,7 @@ mv "$app/Contents/MacOS/Electron" "$app/Contents/MacOS/Opaline"
 plutil -replace CFBundleExecutable -string Opaline "$plist"
 plutil -replace CFBundleShortVersionString -string "$version" "$plist"
 plutil -replace CFBundleVersion -string "$version" "$plist"
+plutil -replace CFBundleURLTypes -json '[{"CFBundleURLName":"Opaline","CFBundleURLSchemes":["opaline"]}]' "$plist"
 xattr -cr "$app"
 
 if [ "$identity" = "-" ]; then

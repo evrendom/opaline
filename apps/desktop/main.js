@@ -19,6 +19,15 @@ if (!app.requestSingleInstanceLock()) {
 	return;
 }
 
+const { OPALINE_SCHEME, deepLinkFromArgv, deepLinkTarget } = require("./deep-link");
+
+let pendingLink = deepLinkFromArgv(process.argv);
+
+app.on("open-url", (event, url) => {
+	event.preventDefault();
+	openLink(url);
+});
+
 const { analyzeSessions, scanSessions } = require("./analyze");
 const { createAgents } = require("./agents");
 const { createLocalStack, introUrl } = require("./stack/local-stack");
@@ -90,7 +99,7 @@ function isAppUrl(url) {
 
 const appWindows = new Set();
 
-function createWindow({ url, bounds, intro = false } = {}) {
+function createWindow({ url, link, bounds, intro = false } = {}) {
 	const win = new BrowserWindow({
 		width: 1440,
 		height: 900,
@@ -127,9 +136,9 @@ function createWindow({ url, bounds, intro = false } = {}) {
 	});
 	appWindows.add(win);
 	win.on("closed", () => appWindows.delete(win));
-	const target = url ?? explicitUrl;
+	const target = url ?? (explicitUrl ? (link ?? explicitUrl) : undefined);
 	if (target) win.loadURL(intro ? introUrl(target) : target);
-	else stack.openDashboard(win, undefined, { intro }).catch(() => {});
+	else stack.openDashboard(win, link, { intro }).catch(() => {});
 	return win;
 }
 
@@ -171,10 +180,11 @@ function centeredBounds(area, width, height, center = { x: area.x + area.width /
 
 let replaced;
 
-function revealApp(from, duration) {
+async function revealApp(from, duration) {
 	stack.mark("open-clicked");
 	const bounds = from.getBounds();
-	const win = createWindow({ bounds, intro: true });
+	const link = await takeLink();
+	const win = createWindow({ bounds, link, intro: true });
 	let painted = false;
 	const ready = (event) => {
 		if (event.sender !== win.webContents) return;
@@ -322,7 +332,10 @@ ipcMain.on("onboarding:finish", (event, duration) => {
 	restoreServerPriority();
 	fs.writeFileSync(onboardedMarker(), new Date().toISOString());
 	onboardingDone = true;
-	if (!replaced && BrowserWindow.getAllWindows().length > 1) return onboardingWindow.destroy();
+	if (!replaced && BrowserWindow.getAllWindows().length > 1) {
+		onboardingWindow.destroy();
+		return showPendingLink();
+	}
 	revealApp(onboardingWindow, Number(duration) || 750);
 });
 
@@ -368,6 +381,48 @@ function focusCurrentWindow() {
 	app.focus({ steal: true });
 }
 
+async function linkOrigin() {
+	const origin = appOrigin();
+	if (origin || explicitUrl || !stack.isLocal()) return origin;
+	const server = await stack.ready().catch(() => undefined);
+	return server?.publicUrl;
+}
+
+async function takeLink() {
+	const raw = pendingLink;
+	pendingLink = undefined;
+	if (!raw) return undefined;
+	const target = deepLinkTarget(raw, await linkOrigin());
+	stack.mark(target ? "link-opened" : "link-rejected");
+	return target;
+}
+
+function onboardingOpen() {
+	return Boolean(onboardingWindow) && !onboardingWindow.isDestroyed() && !onboardingDone;
+}
+
+async function showPendingLink() {
+	if (!pendingLink || quitting || !app.isReady()) return;
+	if (onboardingOpen()) return focusCurrentWindow();
+	const target = await takeLink();
+	if (!target || quitting) return focusCurrentWindow();
+	const win = mainWindow();
+	if (!win) return createWindow({ link: target });
+	if (win.isMinimized()) win.restore();
+	win.show();
+	win.focus();
+	if (process.platform === "darwin") app.show();
+	app.focus({ steal: true });
+	if (explicitUrl) win.loadURL(target);
+	else stack.openDashboard(win, target).catch(() => {});
+}
+
+function openLink(raw) {
+	if (quitting) return;
+	pendingLink = raw;
+	showPendingLink();
+}
+
 const onboarding = Boolean(process.env.OPALINE_ONBOARDING) || !fs.existsSync(onboardedMarker());
 let serverQuiet = onboarding && !explicitUrl;
 
@@ -391,7 +446,13 @@ if (!explicitUrl && stack.isLocal()) {
 	});
 }
 
-app.on("second-instance", () => app.whenReady().then(focusCurrentWindow));
+app.on("second-instance", (_event, argv) =>
+	app.whenReady().then(() => {
+		const link = deepLinkFromArgv(argv);
+		if (link) openLink(link);
+		else focusCurrentWindow();
+	}),
+);
 
 app.setAboutPanelOptions({
 	applicationName: "Opaline",
@@ -402,6 +463,8 @@ app.setAboutPanelOptions({
 
 app.whenReady().then(() => {
 	stack.mark("ready");
+	if (app.isPackaged && !isDev && !app.isDefaultProtocolClient(OPALINE_SCHEME))
+		app.setAsDefaultProtocolClient(OPALINE_SCHEME);
 	if (!explicitUrl)
 		Menu.setApplicationMenu(
 			createEnvironmentMenu({
@@ -416,14 +479,15 @@ app.whenReady().then(() => {
 		createOnboarding();
 	} else {
 		nativeTheme.themeSource = savedTheme();
-		createWindow();
+		if (pendingLink) showPendingLink();
+		else createWindow();
 	}
 	if (!explicitUrl) {
 		stack.supervise({ onRestart: reloadAppWindows });
 		stack.ready().then(() => agents.refresh()).catch(() => {});
 	}
 	app.on("activate", () => {
-		if (BrowserWindow.getAllWindows().length === 0) createWindow();
+		if (BrowserWindow.getAllWindows().length === 0 && !pendingLink) createWindow();
 	});
 });
 
