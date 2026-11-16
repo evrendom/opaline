@@ -7,6 +7,7 @@ const { createSessionRunner } = await import("./runner.js");
 
 const files = [
 	{
+		path: "/s.jsonl",
 		device: "1",
 		inode: "2",
 		size: 10,

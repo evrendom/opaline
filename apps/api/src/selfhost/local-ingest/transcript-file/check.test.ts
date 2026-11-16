@@ -35,8 +35,10 @@ const line = (index: number) =>
 	`${JSON.stringify({ index, text: "x".repeat(300) })}\n`;
 
 async function ingested(): Promise<FileIdentity> {
-	const [identity] = (await readSession(path, null)).files();
-	if (!identity) throw new Error("no identity");
+	const [read] = (await readSession(path, null)).files();
+	if (!read) throw new Error("no identity");
+	const { path: readPath, ...identity } = read;
+	expect(readPath).toBe(path);
 	return identity;
 }
 

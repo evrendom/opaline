@@ -3,6 +3,7 @@ import {
 	appendFile,
 	mkdir,
 	mkdtemp,
+	rename,
 	rm,
 	utimes,
 	writeFile,
@@ -278,6 +279,39 @@ test("the stored identity is the bytes the import read, also when the file grows
 	await settle(service);
 	expect(calls.map((call) => call.change.kind)).toEqual(["whole", "appended"]);
 	expect(calls[1]?.change.since?.size).toBe(readBytes);
+	await service.stop();
+});
+
+test("a transcript replaced by rename while it is read is imported again", async () => {
+	const path = await session("renamed", 1, "first");
+	const store = memoryStore();
+	const calls: SessionJob[] = [];
+	const service: LocalIngest = create(store, {
+		calls,
+		ingestSession: async (job) => {
+			calls.push(job);
+			if (calls.length > 1)
+				return { kind: "ingested", sessionId: "renamed", bytes: 1 };
+			const read = await readSession(job.sessionPath, job.change);
+			await writeFile(`${path}.next`, `${line("first")}${line("replaced")}`);
+			await rename(`${path}.next`, path);
+			await service.notify([path], false);
+			return {
+				kind: "ingested",
+				sessionId: "renamed",
+				bytes: read.content.length,
+				files: read.files(),
+			};
+		},
+	});
+	await service.start();
+	await settle(service);
+	await service.notify([path], false);
+	await settle(service);
+	expect(calls.map((call) => call.change)).toMatchObject([
+		{ kind: "whole", reason: "new" },
+		{ kind: "whole", reason: "replaced" },
+	]);
 	await service.stop();
 });
 
