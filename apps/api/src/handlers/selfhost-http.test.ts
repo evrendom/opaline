@@ -644,7 +644,11 @@ describe("local ingest endpoints", () => {
 			stop: async () => {},
 		});
 		try {
-			const { deps: d } = deps(() => []);
+			const { deps: d } = deps((query) =>
+				query.startsWith("SELECT count(*)::int AS queued FROM l1_edge_scope")
+					? [{ queued: 7 }]
+					: [],
+			);
 			const call = (path: string, init: RequestInit) => {
 				const request = new Request(`http://localhost:4100${path}`, init);
 				return handleSelfHostRoute(request, new URL(request.url), d);
@@ -654,7 +658,7 @@ describe("local ingest endpoints", () => {
 				headers: { "x-api-key": "good-key" },
 			});
 			expect(answered?.status).toBe(200);
-			expect(await answered?.json()).toEqual(status);
+			expect(await answered?.json()).toEqual({ ...status, derivedQueued: 7 });
 			const bad = await call("/api/selfhost/ingest/notify", {
 				method: "POST",
 				headers: { "x-api-key": "good-key" },
