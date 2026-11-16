@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { resolve } from "node:path";
 import type { RudelSessionLanguageSignalsRow } from "@rudel/ch-schema/generated";
-import type { LanguageSignalCounts } from "@rudel/language-signals";
+import {
+	type LanguageSignalCounts,
+	SCAN_VERSION,
+} from "@rudel/language-signals";
 import {
 	buildSessionLanguageSignalLagCountQuery,
 	buildStaleSessionLanguageSignalQuery,
@@ -108,6 +111,59 @@ describe("session language-signal reconciliation", () => {
 			"middle",
 			"oldest",
 		]);
+	});
+
+	test("refreshes prompt reactions only for sessions scanned with older rules, before their row lands", async () => {
+		const pending = [
+			{
+				...staleRow("older-rules", "2026-08-19T12:00:03.000Z"),
+				scanned_version: 5,
+			},
+			{
+				...staleRow("never-scanned", "2026-08-19T12:00:02.000Z"),
+				scanned_version: 0,
+			},
+			{
+				...staleRow("new-upload", "2026-08-19T12:00:01.000Z"),
+				scanned_version: SCAN_VERSION,
+			},
+			{
+				...staleRow("refresh-fails", "2026-08-19T12:00:00.000Z"),
+				scanned_version: 6,
+			},
+		];
+		const inserted: RudelSessionLanguageSignalsRow[] = [];
+		const refreshed: string[] = [];
+
+		const result = await reconcileSessionLanguageSignalsOnce(25, {
+			insertRows: async (rows) => {
+				inserted.push(...rows);
+			},
+			now: () => new Date("2026-08-19T12:01:00.000Z"),
+			queryLatestRawContent: async (row: StaleSessionLanguageSignalRow) =>
+				latestRawContent(row),
+			queryLagCount: async () => 1,
+			queryStaleRows: async () => pending,
+			scan: async () => ZERO_COUNTS,
+			refreshPromptReactions: async (row) => {
+				if (row.session_id === "refresh-fails") throw new Error("refresh");
+				refreshed.push(row.session_id);
+			},
+		});
+
+		expect(refreshed).toEqual(["older-rules", "never-scanned"]);
+		expect(inserted.map((row) => row.session_id)).toEqual([
+			"older-rules",
+			"never-scanned",
+			"new-upload",
+		]);
+		expect(result).toEqual({ failed: 1, remainingLag: 1, rescanned: 3 });
+	});
+
+	test("the stale query returns the version each session was scanned with", () => {
+		expect(buildStaleSessionLanguageSignalQuery()).toContain(
+			"tupleElement(signals.latest_state, 1) AS scanned_version",
+		);
 	});
 
 	test("a completed row is not inserted again on a duplicate pass", async () => {

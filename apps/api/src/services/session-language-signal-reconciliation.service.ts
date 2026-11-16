@@ -15,6 +15,8 @@ import {
 	type MaintenanceDeadline,
 } from "../lib/bounded-maintenance.js";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
+import { refreshPromptReactions } from "./analysis/prompt-reactions-refresh.js";
+import { assertNoClickHousePurgeTombstone } from "./clickhouse-purge-tombstone.service.js";
 import { SESSION_AGENT_RUN_SCAN_VERSION } from "./session-agent-runs.js";
 import {
 	buildSessionLanguageSignalRow,
@@ -55,6 +57,7 @@ export interface StaleSessionLanguageSignalRow {
 	readonly session_id: string;
 	readonly source: Source;
 	readonly user_id: string;
+	readonly scanned_version?: number;
 }
 
 export interface LatestRawSessionContentRow {
@@ -81,6 +84,9 @@ export interface LanguageSignalReconciliationEnvironment {
 		batchSize: number,
 		offset: number,
 	) => Promise<readonly StaleSessionLanguageSignalRow[]>;
+	readonly refreshPromptReactions?: (
+		row: StaleSessionLanguageSignalRow,
+	) => Promise<unknown>;
 	readonly scan: (
 		content: string,
 	) => Promise<
@@ -154,7 +160,8 @@ const STALE_SESSION_CTES = `
 			raw.session_id AS session_id,
 			raw.user_id AS user_id,
 			raw.raw_ingested_at AS raw_ingested_at,
-			raw.raw_revision AS raw_revision
+			raw.raw_revision AS raw_revision,
+			tupleElement(signals.latest_state, 1) AS scanned_version
 		FROM raw_sessions AS raw
 		LEFT ANY JOIN latest_signals AS signals
 			ON signals.organization_id = raw.organization_id
@@ -176,7 +183,8 @@ export function buildStaleSessionLanguageSignalQuery(): string {
 			session_id,
 			user_id,
 			toString(raw_revision) AS raw_revision,
-			formatDateTime(raw_ingested_at, '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS raw_ingested_at
+			formatDateTime(raw_ingested_at, '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS raw_ingested_at,
+			scanned_version
 		FROM stale_sessions
 		ORDER BY
 			raw_revision DESC,
@@ -235,6 +243,22 @@ function createDefaultEnvironment(): LanguageSignalReconciliationEnvironment {
 				query_params: { batchSize, offset, scanVersion },
 			}),
 		scan: scanSessionLanguageSignalsOffThread,
+		refreshPromptReactions: async (row) => {
+			const { sqlClient } = await import("../db.js");
+			return refreshPromptReactions(
+				clickhouse,
+				{
+					organizationId: row.organization_id,
+					userId: row.user_id,
+					sessionId: row.session_id,
+				},
+				() =>
+					assertNoClickHousePurgeTombstone(
+						{ organizationId: row.organization_id, userId: row.user_id },
+						{ database: sqlClient },
+					),
+			);
+		},
 	};
 }
 
@@ -409,6 +433,8 @@ async function reconcileStaleRows(
 				continue;
 			}
 			const summary = await env.scan(raw.content);
+			if ((row.scanned_version ?? CURRENT_SCAN_VERSION) < CURRENT_SCAN_VERSION)
+				await env.refreshPromptReactions?.(row);
 			rowsToInsert.push(
 				buildSessionLanguageSignalRow(
 					{
