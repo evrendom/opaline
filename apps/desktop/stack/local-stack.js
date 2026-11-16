@@ -116,7 +116,7 @@ function resolveBundle({ app, resourcesPath }) {
 }
 
 function bundleEnvironment(bundle) {
-	const env = {};
+	const env = { OPALINE_DESKTOP_APP: "1" };
 	if (bundle.clickhouse) env.OPALINE_CLICKHOUSE_BIN = bundle.clickhouse;
 	if (bundle.postgres) env.OPALINE_POSTGRES_BIN_DIR = bundle.postgres;
 	if (bundle.bun) env.OPALINE_BUN_BIN = bundle.bun;

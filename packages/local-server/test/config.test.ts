@@ -30,7 +30,10 @@ import {
 	tailFile,
 } from "../src/processes.js";
 import { resolveCheckoutDistribution } from "../src/server-distribution.js";
-import { getServerEnvironment } from "../src/server-runner.js";
+import {
+	desktopAppEnvironment,
+	getServerEnvironment,
+} from "../src/server-runner.js";
 import type { ServerState } from "../src/server-state.js";
 
 let root: string;
@@ -202,6 +205,14 @@ describe("server environment", () => {
 			OPALINE_WEB_DIR: "/srv/athena/apps/web/dist",
 			OPALINE_DATA_DIR: join(root, "data"),
 		});
+	});
+
+	test("says the desktop app is present only when the app started it", () => {
+		expect(desktopAppEnvironment({ OPALINE_DESKTOP_APP: "1" })).toEqual({
+			OPALINE_DESKTOP_APP: "1",
+		});
+		expect(desktopAppEnvironment({})).toEqual({});
+		expect(desktopAppEnvironment({ OPALINE_DESKTOP_APP: "true" })).toEqual({});
 	});
 
 	test("without a web build the server runs API-only", () => {

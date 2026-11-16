@@ -154,6 +154,12 @@ export const LOCAL_INGEST_ENVIRONMENT = {
 	OPALINE_LOCAL_INGEST: "1",
 } as const;
 
+export function desktopAppEnvironment(
+	env: NodeJS.ProcessEnv,
+): Record<string, string> {
+	return env.OPALINE_DESKTOP_APP === "1" ? { OPALINE_DESKTOP_APP: "1" } : {};
+}
+
 const CLICKHOUSE_READY_TIMEOUT_MS = 90_000;
 const POSTGRES_READY_TIMEOUT_MS = 60_000;
 const DEFAULT_SERVER_READY_TIMEOUT_MS = 300_000;
@@ -1286,6 +1292,7 @@ async function startServices(options: {
 				...baseEnv,
 				...LOCAL_INGEST_ENVIRONMENT,
 				...serverSettings.settings,
+				...desktopAppEnvironment(context.env),
 				...getServerEnvironment(dataDir, state, options.distribution),
 			},
 			cwd: dataDir,

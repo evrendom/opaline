@@ -191,6 +191,7 @@ describe("bundle", () => {
 		);
 		expect(bundle.pluginDir).toBe(path.join(appRoot, "agent-plugin"));
 		expect(bundleEnvironment(bundle)).toEqual({
+			OPALINE_DESKTOP_APP: "1",
 			OPALINE_CLICKHOUSE_BIN: path.join(
 				resources,
 				"runtimes/clickhouse-1/clickhouse",
