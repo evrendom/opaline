@@ -2,7 +2,13 @@ const path = require("node:path");
 const { BrowserWindow, dialog, ipcMain, Menu } = require("electron");
 const { environmentLabel } = require("./stack/settings");
 
-function createEnvironmentMenu({ stack, window, openWindow, quitCompletely }) {
+function createEnvironmentMenu({
+	stack,
+	window,
+	openWindow,
+	quitCompletely,
+	updates,
+}) {
 	let prompt;
 
 	const current = () => stack.environment() ?? { kind: "local" };
@@ -85,6 +91,7 @@ function createEnvironmentMenu({ stack, window, openWindow, quitCompletely }) {
 				label: "Opaline",
 				submenu: [
 					{ role: "about" },
+					...(updates ? [updates.menuItem()] : []),
 					{ type: "separator" },
 					{ role: "services" },
 					{ type: "separator" },
@@ -108,6 +115,7 @@ function createEnvironmentMenu({ stack, window, openWindow, quitCompletely }) {
 	}
 
 	stack.on("environment", rebuild);
+	updates?.on("change", rebuild);
 	return build();
 }
 

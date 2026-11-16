@@ -2,7 +2,7 @@ const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { app, BrowserWindow, ipcMain, Menu, nativeImage, nativeTheme, screen, shell } = require("electron");
+const { app, autoUpdater, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, screen, shell } = require("electron");
 
 const explicitUrl = process.env.OPALINE_URL;
 const isDev = Boolean(explicitUrl);
@@ -33,6 +33,7 @@ const { createAgents } = require("./agents");
 const { createLocalStack, introUrl } = require("./stack/local-stack");
 const { createEnvironmentMenu } = require("./environments");
 const { keepClaudeTranscripts } = require("./stack/transcripts");
+const { createUpdateDialogs, createUpdater } = require("./updates");
 
 app.userAgentFallback = `${app.userAgentFallback
 	.replace(/\sElectron\/\S+/, "")
@@ -40,6 +41,33 @@ app.userAgentFallback = `${app.userAgentFallback
 
 const stack = createLocalStack({ app });
 const agents = createAgents({ stack });
+const updates = app.isPackaged && process.platform === "darwin" && !isDev ? createAppUpdater() : undefined;
+
+function updateLog(line) {
+	try {
+		fs.mkdirSync(app.getPath("logs"), { recursive: true });
+		fs.appendFileSync(path.join(app.getPath("logs"), "updates.log"), `${new Date().toISOString()} ${line}\n`);
+	} catch {}
+}
+
+function createAppUpdater() {
+	return createUpdater({
+		autoUpdater,
+		currentVersion: app.getVersion(),
+		log: updateLog,
+		feedFile: path.join(app.getPath("userData"), "update", "feed.json"),
+		ui: createUpdateDialogs({
+			dialog,
+			window: () => {
+				const win = mainWindow();
+				return win?.isVisible() ? win : undefined;
+			},
+			canPrompt: () => !quitting && !onboardingOpen(),
+		}),
+		beforeInstall: stopForUpdate,
+		quit: () => app.quit(),
+	});
+}
 
 const NO_SCROLLBARS = `
 * {
@@ -535,8 +563,9 @@ app.whenReady().then(() => {
 		stack.supervise({ onRestart: () => recoverWindows({ reload: true }) });
 		stack.ready().then(() => agents.refresh()).catch(() => {});
 	}
+	updates?.start();
 	app.on("activate", () => {
-		if (BrowserWindow.getAllWindows().length === 0 && !pendingLink) createWindow();
+		if (!quitting && BrowserWindow.getAllWindows().length === 0 && !pendingLink) createWindow();
 	});
 });
 
@@ -549,10 +578,20 @@ function quitCompletely() {
 	app.quit();
 }
 
+async function stopForUpdate() {
+	quitting = true;
+	stopServer = true;
+	for (const win of BrowserWindow.getAllWindows()) win.hide();
+	await stack.shutdown().catch((error) => updateLog(`server stop before the update failed: ${error.message}`));
+	stopped = true;
+	for (const win of BrowserWindow.getAllWindows()) win.destroy();
+}
+
 app.on("before-quit", (event) => {
 	quitting = true;
 	if (onboardingWindow && !onboardingWindow.isDestroyed()) onboardingWindow.setClosable(true);
 	if (stopped || explicitUrl) return;
+	if (updates?.pending()) stopServer = true;
 	if (!stopServer) {
 		stack.detach();
 		return;
@@ -572,4 +611,4 @@ app.on("window-all-closed", () => {
 	if (process.platform !== "darwin") app.quit();
 });
 
-module.exports = { stack };
+module.exports = { stack, updates };
