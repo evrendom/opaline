@@ -70,12 +70,18 @@ else
 	done
 	cp "$work/runtimes/runtimes.json" "$resources/runtimes/runtimes.json"
 fi
-cp "$here/build/Opaline.icns" "$resources/Opaline.icns"
+cp "$here/icon/Opaline.icns" "$resources/Opaline.icns"
+mkdir -p "$work/icon"
+xcrun actool "$here/icon/Opaline.icon" --compile "$work/icon" --app-icon Opaline --include-all-app-icons \
+	--enable-on-demand-resources NO --development-region en --target-device mac --platform macosx \
+	--minimum-deployment-target 11.0 --output-partial-info-plist "$work/icon.plist" >/dev/null
+cp "$work/icon/Assets.car" "$resources/Assets.car"
 plist="$app/Contents/Info.plist"
 plutil -replace CFBundleName -string Opaline "$plist"
 plutil -replace CFBundleDisplayName -string Opaline "$plist"
 plutil -replace CFBundleIdentifier -string so.opaline.desktop "$plist"
 plutil -replace CFBundleIconFile -string Opaline.icns "$plist"
+plutil -replace CFBundleIconName -string Opaline "$plist"
 mv "$app/Contents/MacOS/Electron" "$app/Contents/MacOS/Opaline"
 plutil -replace CFBundleExecutable -string Opaline "$plist"
 plutil -replace CFBundleShortVersionString -string "$version" "$plist"

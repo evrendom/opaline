@@ -24,7 +24,9 @@
 			"!apps/desktop/onboarding-window",
 			"!apps/desktop/dots",
 			"!apps/desktop/glass3d",
-			"!apps/desktop/onboarding"
+			"!apps/desktop/onboarding",
+			"!apps/desktop/icon",
+			"!apps/desktop/dmg"
 		]
 	},
 	"formatter": {
