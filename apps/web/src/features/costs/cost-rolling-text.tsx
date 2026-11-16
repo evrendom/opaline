@@ -1,10 +1,94 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const SPRING = { type: "spring", damping: 25, stiffness: 350 } as const;
+const LEAVE_LIMIT_MS = 1_000;
 
 const places = (digits: string) =>
 	[...digits].map((digit, at) => ({ digit, place: digits.length - at }));
+
+type Shown = { digit: string; id: number; direction: 1 | -1 };
+export type DigitsState = { shown: Shown; leaving: Shown[] };
+
+export function nextDigits(
+	state: DigitsState,
+	digit: string,
+	direction: 1 | -1,
+) {
+	if (state.shown.digit === digit) return state;
+	return {
+		shown: { digit, id: state.shown.id + 1, direction },
+		leaving: [...state.leaving, { ...state.shown, direction }],
+	};
+}
+
+function DigitSlot({
+	digit,
+	direction,
+	still,
+}: {
+	digit: string;
+	direction: 1 | -1;
+	still: boolean;
+}) {
+	const [state, setState] = useState<DigitsState>({
+		shown: { digit, id: 0, direction },
+		leaving: [],
+	});
+	const next = nextDigits(state, digit, direction);
+	if (next !== state) setState(next);
+	const { shown, leaving } = next;
+	const newest = leaving.at(-1)?.id;
+	useEffect(() => {
+		if (newest === undefined) return;
+		const timer = setTimeout(
+			() =>
+				setState((current) => ({
+					...current,
+					leaving: current.leaving.filter((left) => left.id > newest),
+				})),
+			LEAVE_LIMIT_MS,
+		);
+		return () => clearTimeout(timer);
+	}, [newest]);
+	const shift = (step: Shown) => (still ? 0 : step.direction * 0.7);
+	const transition = still ? { duration: 0 } : SPRING;
+	return (
+		<>
+			{leaving.map((step) => (
+				<motion.span
+					key={step.id}
+					aria-hidden="true"
+					initial={{ y: 0, opacity: 1, filter: "blur(0px)" }}
+					animate={{ y: `${-shift(step)}em`, opacity: 0, filter: "blur(2px)" }}
+					transition={transition}
+					onAnimationComplete={() =>
+						setState((current) => ({
+							...current,
+							leaving: current.leaving.filter((left) => left.id !== step.id),
+						}))
+					}
+					className="pointer-events-none absolute"
+				>
+					{step.digit}
+				</motion.span>
+			))}
+			<motion.span
+				key={shown.id}
+				initial={
+					shown.id === 0
+						? false
+						: { y: `${shift(shown)}em`, opacity: 0, filter: "blur(2px)" }
+				}
+				animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
+				transition={transition}
+				className="absolute"
+			>
+				{shown.digit}
+			</motion.span>
+		</>
+	);
+}
 
 function RollingDigits({
 	digits,
@@ -14,7 +98,6 @@ function RollingDigits({
 	direction: 1 | -1;
 }) {
 	const still = useReducedMotion() ?? false;
-	const shift = still ? 0 : direction * 0.7;
 	return (
 		<span className="inline-flex">
 			<AnimatePresence mode="popLayout" initial={false}>
@@ -27,18 +110,7 @@ function RollingDigits({
 						transition={{ duration: still ? 0 : 0.12 }}
 						className="relative inline-flex h-[1.2em] items-center justify-center"
 					>
-						<AnimatePresence mode="popLayout" initial={false}>
-							<motion.span
-								key={digit}
-								initial={{ y: `${shift}em`, opacity: 0, filter: "blur(2px)" }}
-								animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
-								exit={{ y: `${-shift}em`, opacity: 0, filter: "blur(2px)" }}
-								transition={still ? { duration: 0 } : SPRING}
-								className="absolute"
-							>
-								{digit}
-							</motion.span>
-						</AnimatePresence>
+						<DigitSlot digit={digit} direction={direction} still={still} />
 					</motion.span>
 				))}
 			</AnimatePresence>
