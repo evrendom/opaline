@@ -18,6 +18,7 @@ import {
 	type FileIdentity,
 	type FileStat,
 	identifyTranscript,
+	type ReadFile,
 	statTranscript,
 	type TranscriptChange,
 } from "./transcript-file/index.js";
@@ -43,7 +44,7 @@ export type SessionOutcome = (
 	  }
 	| { readonly kind: "skipped"; readonly reason: string }
 	| { readonly kind: "retry"; readonly reason: string }
-) & { readonly files?: readonly FileIdentity[] };
+) & { readonly files?: readonly ReadFile[] };
 
 export interface IngestStatus {
 	readonly state: "idle" | "importing" | "paused";
@@ -630,18 +631,21 @@ export class LocalIngest {
 
 	private async identities(
 		files: readonly SeenFile[],
-		read: readonly FileIdentity[],
+		read: readonly ReadFile[],
 	): Promise<IngestedFile[]> {
 		const out: IngestedFile[] = [];
 		for (const seen of files) {
 			const identity =
-				read.find(
-					(file) =>
-						file.device === seen.stat.device && file.inode === seen.stat.inode,
-				) ?? (await identifyTranscript(seen.file.path, seen.stat));
+				read.find((file) => file.path === seen.file.path) ??
+				(await identifyTranscript(seen.file.path, seen.stat));
 			if (!identity) continue;
-			const { headSha256, tailSha256, ...stat } = identity;
-			out.push({ file: seen.file, stat, headSha256, tailSha256 });
+			const { device, inode, size, mtimeMs, headSha256, tailSha256 } = identity;
+			out.push({
+				file: seen.file,
+				stat: { device, inode, size, mtimeMs },
+				headSha256,
+				tailSha256,
+			});
 		}
 		return out;
 	}

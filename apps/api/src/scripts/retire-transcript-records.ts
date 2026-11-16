@@ -5,9 +5,6 @@ import {
 } from "../services/transcript-records-retirement-drain.service.js";
 import { parseRetireTranscriptRecordsArgs } from "./l1-script-args.js";
 
-// Retires the transcript-records generations a backfill (or anything else)
-// superseded, once their grace has passed. Preview by default; --execute
-// deletes. Run it again until `sessionCount` is 0 and `hasMore` is false.
 const args = parseRetireTranscriptRecordsArgs(Bun.argv.slice(2));
 const executor = createClickHouseExecutorFromEnv({
 	requestTimeoutMs: RETIREMENT_DRAIN_REQUEST_TIMEOUT_MS,
@@ -27,7 +24,7 @@ try {
 	console.log(JSON.stringify(result, null, 2));
 	if (result.hasMore)
 		console.error(
-			"More sessions remain than --max-sessions; run the command again.",
+			"More remain: more sessions than --max-sessions, or a DELETE was deferred behind a pending mutation or left unsettled. Run the command again.",
 		);
 } finally {
 	await executor.close();

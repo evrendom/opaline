@@ -16,7 +16,10 @@ import {
 	runDeleteOperation,
 	submittedStatements,
 } from "../clickhouse-batched-delete.js";
-import { createTranscriptRecordsDeadline } from "../transcript-records-deadline.js";
+import {
+	createTranscriptRecordsDeadline,
+	TranscriptRecordsDeadlineExceededError,
+} from "../transcript-records-deadline.js";
 
 export const RETIREMENT_GRACE_MS = 10 * 60_000;
 export const MAX_RETIRED_PER_SESSION = 100;
@@ -125,11 +128,11 @@ export function planRetirement(
 				: Number.isFinite(head.publishedAtMs)
 					? supersededPastGrace(older, head.publishedAtMs ?? 0, graceStart)
 					: [];
-	const retired = [...abandoned, ...superseded].slice(
-		0,
-		MAX_RETIRED_PER_SESSION,
-	);
-	return { retired, capped: retired.length >= MAX_RETIRED_PER_SESSION };
+	const candidates = [...abandoned, ...superseded];
+	return {
+		retired: candidates.slice(0, MAX_RETIRED_PER_SESSION),
+		capped: candidates.length > MAX_RETIRED_PER_SESSION,
+	};
 }
 
 function supersededPastGrace(
@@ -295,7 +298,7 @@ export async function retireGenerations(
 	const maxSessions = options.maxSessions ?? store.census.sessionsPerPass;
 	if (!Number.isSafeInteger(maxSessions) || maxSessions < 1)
 		throw new Error("maxSessions must be a positive integer");
-	const reads = createTranscriptRecordsDeadline({
+	const census = createTranscriptRecordsDeadline({
 		deadlineAt: Math.min(
 			options.deadline?.deadlineAt ?? Number.POSITIVE_INFINITY,
 			startedAt + store.census.readsMs,
@@ -303,63 +306,78 @@ export async function retireGenerations(
 		now,
 		signal: options.signal,
 	});
+	const scan = await scanCensusWindows<StoredSession>(executor, {
+		table: store.table,
+		windowRows: store.census.windowRows,
+		limit: maxSessions,
+		organizationId: options.organizationId,
+		maxWindows:
+			options.maxWindows ??
+			(options.organizationId === undefined
+				? store.census.windowsPerPass
+				: undefined),
+		rotation: Math.floor(startedAt / HOUR_MS),
+		signal: census.signal,
+		wait: census.wait,
+		read: (window, limit, signal) =>
+			store.findSessions(executor, {
+				window,
+				limit,
+				retireBefore: startedAt - (store.policy.graceMs ?? 0),
+				organizationId: options.organizationId,
+				signal,
+			}),
+	}).finally(census.dispose);
+	const sessions = scan.rows.slice(0, maxSessions);
+	const result: RetirementResult = {
+		retired: 0,
+		deleteStatements: 0,
+		hasMore: scan.hasMore,
+		sessions: sessions.length,
+		generations: 0,
+		windows: scan.windows,
+		windowsScanned: scan.windowsScanned,
+		outcomes: [],
+	};
+	const reads = createTranscriptRecordsDeadline({
+		deadlineAt: options.deadline?.deadlineAt,
+		now,
+		signal: options.signal,
+	});
+	const stuck = new Set<string>();
 	try {
-		const scan = await scanCensusWindows<StoredSession>(executor, {
-			table: store.table,
-			windowRows: store.census.windowRows,
-			limit: maxSessions,
-			organizationId: options.organizationId,
-			maxWindows:
-				options.maxWindows ??
-				(options.organizationId === undefined
-					? store.census.windowsPerPass
-					: undefined),
-			rotation: Math.floor(startedAt / HOUR_MS),
-			signal: reads.signal,
-			wait: reads.wait,
-			read: (window, limit, signal) =>
-				store.findSessions(executor, {
-					window,
-					limit,
-					retireBefore: startedAt - (store.policy.graceMs ?? 0),
-					organizationId: options.organizationId,
-					signal,
-				}),
-		});
-		const sessions = scan.rows.slice(0, maxSessions);
-		const result: RetirementResult = {
-			retired: 0,
-			deleteStatements: 0,
-			hasMore: scan.hasMore,
-			sessions: sessions.length,
-			generations: 0,
-			windows: scan.windows,
-			windowsScanned: scan.windowsScanned,
-			outcomes: [],
-		};
 		for (const page of organizationPages(sessions, RETIREMENT_PAGE_SESSIONS)) {
+			const organizationId = page[0]?.organizationId ?? "";
+			if (stuck.has(organizationId)) continue;
 			if (!hasKeyedDeleteTime(options.deadline)) {
 				result.hasMore = true;
 				break;
 			}
-			const organizationId = page[0]?.organizationId ?? "";
-			const { retirements, capped } = await reads.wait(() =>
-				selectRetirements(
-					executor,
-					store,
-					organizationId,
-					page,
-					startedAt,
-					reads.signal,
-				),
-			);
-			result.hasMore ||= capped;
-			result.generations += retirements.length;
+			let selected: Awaited<ReturnType<typeof selectRetirements>>;
+			try {
+				selected = await reads.wait(() =>
+					selectRetirements(
+						executor,
+						store,
+						organizationId,
+						page,
+						startedAt,
+						reads.signal,
+					),
+				);
+			} catch (error) {
+				if (!(error instanceof TranscriptRecordsDeadlineExceededError))
+					throw error;
+				result.hasMore = true;
+				break;
+			}
+			result.hasMore ||= selected.capped;
+			result.generations += selected.retirements.length;
 			const deleted = await deleteRetirements(
 				executor,
 				store,
 				organizationId,
-				retirements,
+				selected.retirements,
 				{ deadline: options.deadline, signal: options.signal },
 			);
 			result.retired += deleted.retired;
@@ -367,7 +385,7 @@ export async function retireGenerations(
 			result.deleteStatements += submittedStatements(deleted.outcomes);
 			if (!deleted.settled) {
 				result.hasMore = true;
-				break;
+				stuck.add(organizationId);
 			}
 		}
 		return result;

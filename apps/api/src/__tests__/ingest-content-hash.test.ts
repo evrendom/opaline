@@ -115,6 +115,21 @@ describe("computeIngestContentHash", () => {
 			}),
 		);
 	});
+
+	test("a session import computes one hash and reuses it for compare and record", async () => {
+		const directory = new URL("../services/session-import/", import.meta.url);
+		const sources = await Promise.all(
+			[...new Bun.Glob("*.ts").scanSync(directory.pathname)]
+				.filter((name) => !name.endsWith(".test.ts"))
+				.map((name) => Bun.file(new URL(name, directory)).text()),
+		);
+		const source = sources.join("\n");
+		expect(source.match(/computeIngestContentHash\(/gu)).toHaveLength(1);
+		expect(source).toContain(
+			"const contentHash = computeIngestContentHash(filteredInput);",
+		);
+		expect(source).toContain("ownership.lastContentSha256 === contentHash");
+	});
 });
 
 describe("computeIngestContentHashes", () => {

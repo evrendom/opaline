@@ -13,7 +13,7 @@ import { inferSessionRepository } from "./session-repository.js";
 import { claudeProjectDirectory, claudeSessionId } from "./sources.js";
 import {
 	type CollectedImage,
-	type FileIdentity,
+	type ReadFile,
 	readSession,
 	type SessionRead,
 	type TranscriptChange,
@@ -25,12 +25,12 @@ export type LocalSessionInput =
 			readonly input: IngestSessionInput;
 			readonly bytes: number;
 			readonly images: readonly CollectedImage[];
-			readonly files: readonly FileIdentity[];
+			readonly files: readonly ReadFile[];
 	  }
 	| {
 			readonly kind: "skipped";
 			readonly reason: string;
-			readonly files?: readonly FileIdentity[];
+			readonly files?: readonly ReadFile[];
 	  };
 
 export interface LocalSessionInputRequest {

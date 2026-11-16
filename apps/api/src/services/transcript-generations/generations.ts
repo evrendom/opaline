@@ -49,14 +49,14 @@ export function contentRow(alias = ""): string {
 	return `${columns(alias)("record_idx")} < ${TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX}`;
 }
 
-// ClickHouse prunes by the primary key only when the generation tuples come
-// from a subquery: an inline `IN arrayZip(...)` reads every stored generation.
 export function pinnedRows(alias = ""): string {
 	const column = columns(alias);
 	return `${column("organization_id")} = {organizationId:String} AND ${column("user_id")} = {userId:String}
 		AND ${column("session_id")} IN {sessionIds:Array(String)}
-		AND (${column("session_id")}, ${column("revision")}, ${column("parser_version")}) IN (
-			SELECT g.1, toUInt64(g.2), g.3 FROM (SELECT arrayJoin(arrayZip({sessionIds:Array(String)}, {revisions:Array(String)}, {parserVersions:Array(UInt16)})) AS g))`;
+		AND ${column("revision")} IN CAST({revisions:Array(String)}, 'Array(UInt64)')
+		AND ${column("parser_version")} IN {parserVersions:Array(UInt16)}
+		AND (${column("session_id")}, ${column("revision")}, ${column("parser_version")}) IN arrayZip({sessionIds:Array(String)},
+			arrayMap(r -> toUInt64(r), {revisions:Array(String)}), {parserVersions:Array(UInt16)})`;
 }
 
 export function pinnedRecords(alias = ""): string {

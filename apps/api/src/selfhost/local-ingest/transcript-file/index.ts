@@ -106,12 +106,16 @@ export interface SubagentTranscript {
 	readonly content: string;
 }
 
+export interface ReadFile extends FileIdentity {
+	readonly path: string;
+}
+
 export interface SessionRead {
 	readonly content: string;
 	readonly revision: TranscriptRevision;
 	readonly subagents: () => Promise<readonly SubagentTranscript[]>;
 	readonly images: () => readonly CollectedImage[];
-	readonly files: () => readonly FileIdentity[];
+	readonly files: () => readonly ReadFile[];
 }
 
 export async function readSession(
@@ -125,7 +129,7 @@ export async function readSession(
 		slimmedLines("", images),
 	);
 	const content = main.lines.join("\n");
-	const files: FileIdentity[] = [main.identity];
+	const files: ReadFile[] = [{ ...main.identity, path: sessionPath }];
 	return {
 		content,
 		revision: main.revision,
@@ -139,7 +143,7 @@ async function readSubagents(
 	sessionPath: string,
 	content: string,
 	images: ImageCollector,
-	files: FileIdentity[],
+	files: ReadFile[],
 ): Promise<SubagentTranscript[]> {
 	const subagents = await readSubagentFiles(
 		dirname(sessionPath),
@@ -148,7 +152,7 @@ async function readSubagents(
 		{
 			readFile: async (path) => {
 				const read = await readLines(path, null, rawLines());
-				files.push(read.identity);
+				files.push({ ...read.identity, path });
 				return read.lines.join("\n");
 			},
 		},
