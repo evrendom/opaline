@@ -13,6 +13,7 @@ interface CompiledSurface {
 	readonly categoryPrecedence: number;
 	readonly ruleOrder: number;
 	readonly surfaceOrder: number;
+	readonly lead: string | null;
 }
 
 const CATEGORY_PRECEDENCE: Readonly<
@@ -32,24 +33,28 @@ const NEGATIVE_QUESTION_RUN: CompiledSurface = {
 	categoryPrecedence: CATEGORY_PRECEDENCE.negative,
 	ruleOrder: -1,
 	surfaceOrder: 0,
+	lead: null,
 };
 
 export const MAX_LANGUAGE_SIGNAL_MATCHES = 10_000;
 
-const COMPILED_SURFACES = LANGUAGE_SIGNAL_RULES.flatMap((rule, ruleOrder) =>
-	rule.surfaces.map((surface, surfaceOrder) => ({
-		category: rule.category,
-		ruleId: rule.ruleId,
-		source: compileSurfaceSource(surface),
-		surfaceLength: surface.length,
-		categoryPrecedence: CATEGORY_PRECEDENCE[rule.category],
-		ruleOrder,
-		surfaceOrder,
-	})),
-).sort(compareCompiledSurfaces);
+const COMPILED_SURFACES = groupedByLead(
+	LANGUAGE_SIGNAL_RULES.flatMap((rule, ruleOrder) =>
+		rule.surfaces.map((surface, surfaceOrder) => ({
+			category: rule.category,
+			ruleId: rule.ruleId,
+			source: compileSurfaceSource(surface),
+			surfaceLength: surface.length,
+			categoryPrecedence: CATEGORY_PRECEDENCE[rule.category],
+			ruleOrder,
+			surfaceOrder,
+			lead: compileSurfaceSource(surface.slice(0, 1).toLowerCase()),
+		})),
+	).sort(compareCompiledSurfaces),
+);
 
 export const LANGUAGE_SIGNAL_PATTERN = new RegExp(
-	`(${NEGATIVE_QUESTION_RUN.source})|(?<![\\p{L}\\p{N}])(?:${COMPILED_SURFACES.map(({ source }) => `(${source})`).join("|")})(?![\\p{L}\\p{N}])`,
+	`(${NEGATIVE_QUESTION_RUN.source})|(?<![\\p{L}\\p{N}])${alternationSource(COMPILED_SURFACES, true)}(?![\\p{L}\\p{N}])`,
 	"giu",
 );
 
@@ -87,10 +92,7 @@ const SYSTEM_INSTRUCTION_BLOCK_PATTERN =
 	/<system_instruction>[\s\S]*?<\/system_instruction>/giu;
 
 const LANGUAGE_SIGNAL_CANDIDATE_PATTERN = new RegExp(
-	[
-		NEGATIVE_QUESTION_RUN.source,
-		...COMPILED_SURFACES.map(({ source }) => source),
-	].join("|"),
+	`${NEGATIVE_QUESTION_RUN.source}|(?<![\\p{L}\\p{N}])${alternationSource(COMPILED_SURFACES, false)}`,
 	"giu",
 );
 const LANGUAGE_SIGNAL_AT_PATTERN = new RegExp(
@@ -225,6 +227,40 @@ function findCompiledSurface(
 	}
 
 	return undefined;
+}
+
+function groupedByLead(
+	surfaces: readonly CompiledSurface[],
+): CompiledSurface[] {
+	const groups = new Map<string | null, CompiledSurface[]>();
+	for (const surface of surfaces) {
+		const group = groups.get(surface.lead) ?? [];
+		group.push(surface);
+		groups.set(surface.lead, group);
+	}
+	const unled = groups.get(null) ?? [];
+	groups.delete(null);
+	return [...[...groups.values()].flat(), ...unled];
+}
+
+function alternationSource(
+	surfaces: readonly CompiledSurface[],
+	capture: boolean,
+): string {
+	const wrap = (source: string) => (capture ? `(${source})` : source);
+	const branches: string[] = [];
+	let index = 0;
+	while (index < surfaces.length) {
+		const lead = surfaces[index]?.lead ?? null;
+		let end = index;
+		while (end < surfaces.length && (surfaces[end]?.lead ?? null) === lead)
+			end += 1;
+		const group = surfaces.slice(index, end).map(({ source }) => wrap(source));
+		if (lead === null) branches.push(...group);
+		else branches.push(`(?=${lead})(?:${group.join("|")})`);
+		index = end;
+	}
+	return `(?:${branches.join("|")})`;
 }
 
 function compareCompiledSurfaces(
