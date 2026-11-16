@@ -214,8 +214,11 @@ function readPayloadModel(
 class LazyJsonLines {
 	private readonly parsed: Readonly<Record<string, unknown>>[] = [];
 	private next = 0;
+	private readonly content: string;
 
-	constructor(private readonly content: string) {}
+	constructor(content: string) {
+		this.content = content;
+	}
 
 	find(
 		matches: (line: Readonly<Record<string, unknown>>) => unknown,
