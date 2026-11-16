@@ -246,12 +246,12 @@ export const RETRO_MEASURES: readonly RetroMeasure[] = [
 			"Sessions where the person corrected or complained at least twice, with the words used and re-asks.",
 		unit: "prompts",
 		definition:
-			"Main-stream runs whose first genuine prompt the language-signals word list marks negative or swearing (prompt_reactions), counted per session; sessions with at least 2. top_words: the list's negative and swear words found in those prompts, most frequent first. re_asks and frustration are the approved measures over the session's main-stream runs.",
+			"Main-stream runs whose first genuine prompt the language-signals rules mark negative or swearing (prompt_reactions), counted per session; sessions with at least 2. top_words: the rules' negative and swear words and phrases found in those prompts, most frequent first. re_asks and frustration are the approved measures over the session's main-stream runs.",
 		columns: [
 			{ name: "corrections", meaning: "Flagged prompts in the session." },
 			{
 				name: "top_words",
-				meaning: "Up to 5 words of the list found in them.",
+				meaning: "Up to 5 of the rules' words and phrases found in them.",
 			},
 			{
 				name: "re_asks, unknown_re_asks, frustration",

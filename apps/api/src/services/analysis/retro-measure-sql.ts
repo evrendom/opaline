@@ -394,9 +394,13 @@ export function instructionCostSql(params: MeasureParams): string {
 }
 
 export function unhappyWordsPattern(): string {
-	const surfaces = LANGUAGE_SIGNAL_RULES.filter(
+	const rules = LANGUAGE_SIGNAL_RULES.filter(
 		(rule) => rule.category === "negative" || rule.category === "swear",
-	).flatMap((rule) => rule.surfaces);
+	);
+	const surfaces = rules.flatMap((rule) => rule.surfaces);
+	const patterns = rules
+		.flatMap((rule) => rule.patterns ?? [])
+		.filter((pattern) => !/\(\?<?[=!]/u.test(pattern));
 	const source = (surface: string) =>
 		[...surface.replace(/\s+/gu, " ")]
 			.map((character) =>
@@ -410,7 +414,7 @@ export function unhappyWordsPattern(): string {
 	const sorted = [...new Set(surfaces)].sort(
 		(left, right) => right.length - left.length || left.localeCompare(right),
 	);
-	return `(?i)(?:^|[^\\p{L}\\p{N}])(${sorted.map(source).join("|")})(?:[^\\p{L}\\p{N}]|$)`;
+	return `(?i)(?:^|[^\\p{L}\\p{N}])(${[...sorted.map(source), ...patterns].join("|")})(?:[^\\p{L}\\p{N}]|$)`;
 }
 
 export function repeatedCorrectionsSql(params: MeasureParams): string {
