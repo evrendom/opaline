@@ -12,6 +12,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/app/ui/table";
+import { remarkAppLinks } from "@/features/desktop/app-link-markdown";
 import { type HealthBlock, splitHealthBlock } from "./health-block";
 import { dataWindow, formatDay } from "./report-dates";
 
@@ -20,7 +21,7 @@ type ReportResult = Report["results"][number];
 
 const MARKDOWN_CLASS_NAME =
 	"leading-relaxed [overflow-wrap:anywhere] [&_a]:underline [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:font-mono [&_code]:text-[0.8125rem] [&_h1]:mt-4 [&_h1]:font-semibold [&_h2]:mt-4 [&_h2]:font-semibold [&_h3]:mt-3 [&_h3]:font-semibold [&_li]:my-0.5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-2 [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_table]:my-2 [&_td]:border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:px-2 [&_th]:py-1 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0";
-const REMARK_PLUGINS = [remarkGfm];
+const REMARK_PLUGINS = [remarkGfm, remarkAppLinks];
 
 export function ReportView({
 	report,

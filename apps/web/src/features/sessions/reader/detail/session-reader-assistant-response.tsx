@@ -9,6 +9,7 @@ import Markdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Bone, Bones } from "@/app/ui/bones";
 import { SignalText } from "@/components/signal-text";
+import { remarkAppLinks } from "@/features/desktop/app-link-markdown";
 import { CopyButton } from "@/features/shell/components/copy-button";
 import { CiViewLink, GitHubLink } from "../ci/session-reader-ci-link";
 import { pullRequestKey, useSessionPlaces } from "../session-places";
@@ -91,7 +92,7 @@ const SIGNAL_MARKDOWN: Components = {
 	th: signalMarked("th"),
 };
 
-const REMARK_PLUGINS = [remarkGfm];
+const REMARK_PLUGINS = [remarkGfm, remarkAppLinks];
 
 export const AssistantResponse = memo(function AssistantResponse({
 	text,
