@@ -54,7 +54,7 @@ export interface GitObservationExtractionInput
 	onWritten?: (session: TranscriptRecordsIdentity) => Promise<void>;
 }
 
-interface Generation {
+interface ReceiptRow {
 	revision: string;
 	parser_version: number;
 	ts: string;
@@ -107,7 +107,7 @@ export async function extractGitObservations(
 	const params = identityParams(input);
 	try {
 		const receipts = await deadline.wait(() =>
-			executor.query<Generation>({
+			executor.query<ReceiptRow>({
 				abortSignal: deadline.signal,
 				clickhouse_settings: SCAN_SETTINGS,
 				query: `SELECT toString(revision) AS revision, parser_version, ts FROM rudel.transcript_records WHERE ${identityFilter()} AND ${receiptRow()} ORDER BY toUInt64(revision) DESC, parser_version DESC LIMIT 1`,
@@ -140,7 +140,7 @@ export async function extractGitObservations(
 			parserVersion,
 		};
 		const committed = await deadline.wait(() =>
-			executor.query<Generation>({
+			executor.query<ReceiptRow>({
 				abortSignal: deadline.signal,
 				clickhouse_settings: SCAN_SETTINGS,
 				query: `SELECT toString(revision) AS revision, parser_version, ts FROM ${SESSION_GIT_OBSERVATIONS_TABLE} WHERE ${identityFilter()} AND ${receiptRow()} ORDER BY toUInt64(revision) DESC, parser_version DESC LIMIT 1`,
@@ -375,8 +375,8 @@ export function retireOlderGitObservations(
 }
 
 function compareGeneration(
-	left: Pick<Generation, "revision" | "parser_version">,
-	right: Pick<Generation, "revision" | "parser_version">,
+	left: Pick<ReceiptRow, "revision" | "parser_version">,
+	right: Pick<ReceiptRow, "revision" | "parser_version">,
 ): number {
 	return BigInt(left.revision) === BigInt(right.revision)
 		? left.parser_version - right.parser_version

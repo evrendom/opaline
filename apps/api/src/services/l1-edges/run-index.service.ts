@@ -96,7 +96,10 @@ import {
 	isDeleteSettled,
 } from "../clickhouse-batched-delete.js";
 import { runRetirementDeletes } from "../generation-retirement.js";
-import type { SessionGeneration } from "../transcript-generations/generations.js";
+import type {
+	Generation,
+	SessionGeneration,
+} from "../transcript-generations/generations.js";
 import {
 	MAX_RETIRED_GENERATIONS_PER_PASS,
 	selectRetiredGenerations,
@@ -125,11 +128,8 @@ const UINT32_MAX = 4_294_967_295;
 /** Relative tolerance of the cost conservation check (costs are rounded to 12 places). */
 const COST_TOLERANCE = 1e-9;
 
-/** A run index generation: the transcript generation and the index rules. */
-export interface RunIndexGeneration {
-	revision: string;
-	parserVersion: number;
-	indexVersion: number;
+export interface RunIndexGeneration extends Generation {
+	readonly indexVersion: number;
 }
 
 export interface RunIndexBuild {

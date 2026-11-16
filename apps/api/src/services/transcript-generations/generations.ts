@@ -11,9 +11,12 @@ export interface TranscriptReadScope {
 	readonly userId: string;
 }
 
-export interface SessionGeneration {
+export interface Generation {
 	readonly parserVersion: number;
 	readonly revision: string;
+}
+
+export interface SessionGeneration extends Generation {
 	readonly sessionId: string;
 }
 

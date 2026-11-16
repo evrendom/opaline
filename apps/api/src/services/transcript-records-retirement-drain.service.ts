@@ -6,12 +6,12 @@ import {
 	type ClickHouseExecutor,
 	getSafeClickHouseTable,
 } from "../clickhouse.js";
+import type { Generation } from "./transcript-generations/generations.js";
 import {
 	MAX_RETIRED_GENERATIONS_PER_PASS,
 	selectRetiredGenerations,
 	TRANSCRIPT_RECORDS_RETIRE_GRACE_MS,
 	TRANSCRIPT_RECORDS_TABLE,
-	type TranscriptRecordsGeneration,
 } from "./transcript-records-ingest.service.js";
 import { buildTranscriptRecordsRetirementCensusStatement } from "./transcript-records-retirement.service.js";
 
@@ -120,7 +120,7 @@ export interface RetirementGenerationRow {
 export interface Retirement {
 	readonly userId: string;
 	readonly sessionId: string;
-	readonly generation: TranscriptRecordsGeneration;
+	readonly generation: Generation;
 	readonly rows: number | null;
 }
 
