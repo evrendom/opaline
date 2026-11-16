@@ -159,7 +159,7 @@ describe("which generations retire at a time", () => {
 		expect(retired([uncommitted("2"), uncommitted("1")], NO_GRACE)).toEqual([]);
 	});
 
-	test("a session retires at most its cap per pass and says so", () => {
+	test("a session retires at most its cap per pass and says so only when more remain", () => {
 		const generations = [
 			committed("1000", 30),
 			...Array.from({ length: MAX_RETIRED_PER_SESSION + 5 }, (_, index) =>
@@ -169,6 +169,13 @@ describe("which generations retire at a time", () => {
 		const plan = planRetirement(generations, GRACE, NOW);
 		expect(plan.retired).toHaveLength(MAX_RETIRED_PER_SESSION);
 		expect(plan.capped).toBe(true);
+		const exactly = planRetirement(
+			generations.slice(0, MAX_RETIRED_PER_SESSION + 1),
+			GRACE,
+			NOW,
+		);
+		expect(exactly.retired).toHaveLength(MAX_RETIRED_PER_SESSION);
+		expect(exactly.capped).toBe(false);
 		expect(planRetirement(generations.slice(0, 3), GRACE, NOW).capped).toBe(
 			false,
 		);
@@ -189,11 +196,16 @@ function session(
 
 function fakeStore(
 	sessions: readonly FakeSession[],
-	options: { dependents?: string[]; policy?: RetirementPolicy } = {},
+	options: {
+		dependents?: string[];
+		policy?: RetirementPolicy;
+		table?: string;
+		onRead?: (organizationId: string) => void;
+	} = {},
 ) {
 	const reads: string[][] = [];
 	const store: GenerationStore = {
-		table: "rudel.transcript_records",
+		table: options.table ?? "rudel.transcript_records",
 		dependents: () => options.dependents ?? [],
 		sessionColumns: [
 			{ name: "user_id", type: "String" },
@@ -221,6 +233,7 @@ function fakeStore(
 		},
 		async readGenerations(_executor, organizationId, page) {
 			reads.push(page.map((entry) => `${organizationId}:${entry.key[1]}`));
+			options.onRead?.(organizationId);
 			return page.map((entry) => ({
 				session: entry,
 				generations: (entry as FakeSession).generations,
@@ -232,21 +245,38 @@ function fakeStore(
 
 function fakeExecutor(
 	settle: (statement: ClickHouseStatement) => "ok" | "unknown" = () => "ok",
+	options: {
+		pending?: (statement: ClickHouseStatement) => boolean;
+		rowsRemain?: (statement: ClickHouseStatement) => boolean;
+		onExecute?: () => void;
+	} = {},
 ) {
 	const deletes: ClickHouseStatement[] = [];
 	const executor = {
 		async query(statement: ClickHouseStatement) {
 			if (statement.query.includes("mergeTreeIndex")) return [];
-			if (statement.query.includes("system.mutations")) return [{ pending: 0 }];
-			if (statement.query.includes("SELECT 1 AS found")) return [{ found: 1 }];
+			if (statement.query.includes("system.mutations"))
+				return [{ pending: options.pending?.(statement) ? 1 : 0 }];
+			if (statement.query.includes("SELECT 1 AS found"))
+				return (options.rowsRemain?.(statement) ?? true) ? [{ found: 1 }] : [];
 			return [];
 		},
 		async execute(statement: ClickHouseStatement) {
 			deletes.push(statement);
+			options.onExecute?.();
 			if (settle(statement) === "unknown") throw new Error("Timeout error.");
 		},
 	} as unknown as ClickHouseExecutor;
 	return { executor, deletes };
+}
+
+function oldGenerations(count: number): StoredGeneration[] {
+	return [
+		committed("1000", 30),
+		...Array.from({ length: count }, (_, index) =>
+			uncommitted(String(index + 1)),
+		),
+	];
 }
 
 const deadline = (budgetMs = 600_000) => ({
@@ -383,6 +413,110 @@ describe("a retirement pass over a store", () => {
 		).toMatchObject({ retired: MAX_RETIRED_PER_SESSION, hasMore: true });
 	});
 
+	test("dependent and parent deletes stay aligned chunk by chunk above 256 keys", async () => {
+		const { store } = fakeStore(
+			["s1", "s2", "s3"].map((id) =>
+				session("org-a", id, oldGenerations(MAX_RETIRED_PER_SESSION)),
+			),
+			{ dependents: ["rudel.transcript_record_commands"] },
+		);
+		const run = fakeExecutor();
+		const result = await retireGenerations(run.executor, store, {
+			deadline: deadline(),
+		});
+
+		expect(run.deletes.map(table)).toEqual([
+			"rudel.transcript_record_commands",
+			"rudel.transcript_records",
+			"rudel.transcript_record_commands",
+			"rudel.transcript_records",
+		]);
+		const keys = run.deletes.map(
+			(statement) => statement.query_params?.keys as unknown[],
+		);
+		expect(keys.map((chunk) => chunk.length)).toEqual([256, 256, 44, 44]);
+		expect(keys[0]).toEqual(keys[1] as unknown[]);
+		expect(keys[2]).toEqual(keys[3] as unknown[]);
+		expect(result).toMatchObject({
+			retired: 3 * MAX_RETIRED_PER_SESSION,
+			deleteStatements: 4,
+			hasMore: false,
+		});
+	});
+
+	test("a dependent table without the retired keys is skipped and the parent is still deleted", async () => {
+		const { store } = fakeStore(
+			[session("org-a", "s1", [committed("2", 30), uncommitted("1")])],
+			{ dependents: ["rudel.transcript_record_commands"] },
+		);
+		const run = fakeExecutor(undefined, {
+			rowsRemain: (statement) =>
+				!statement.query.includes("rudel.transcript_record_commands"),
+		});
+		const result = await retireGenerations(run.executor, store, {
+			deadline: deadline(),
+		});
+
+		expect(run.deletes.map(table)).toEqual(["rudel.transcript_records"]);
+		expect(result.outcomes.map((outcome) => outcome.status)).toEqual([
+			"empty",
+			"completed",
+		]);
+		expect(result).toMatchObject({ retired: 1, hasMore: false });
+	});
+
+	test("an organization with a deferred delete is left for the next pass, the next organization still retires", async () => {
+		const stuck = Array.from({ length: 101 }, (_, index) =>
+			session("org-a", `a${index}`, [committed("2", 30), uncommitted("1")]),
+		);
+		const { store, reads } = fakeStore([
+			...stuck,
+			session("org-b", "b1", [committed("2", 30), uncommitted("1")]),
+		]);
+		const run = fakeExecutor(undefined, {
+			pending: (statement) => statement.query_params?.marker === "org-a",
+		});
+		const result = await retireGenerations(run.executor, store, {
+			deadline: deadline(),
+		});
+
+		expect(reads.map((page) => page.length)).toEqual([100, 1]);
+		expect(reads[1]).toEqual(["org-b:b1"]);
+		expect(
+			run.deletes.map((statement) => statement.query_params?.organizationId),
+		).toEqual(["org-b"]);
+		expect(result.outcomes.map((outcome) => outcome.status)).toEqual([
+			"deferred",
+			"completed",
+		]);
+		expect(result).toMatchObject({ retired: 1, hasMore: true });
+	});
+
+	test("a page read the deadline cuts off after deletes returns the work done", async () => {
+		let clock = NOW;
+		const { store } = fakeStore(
+			[
+				session("org-a", "a1", [committed("2", 30), uncommitted("1")]),
+				session("org-b", "b1", [committed("2", 30), uncommitted("1")]),
+			],
+			{
+				onRead: (organizationId) => {
+					if (organizationId === "org-b") clock += 600_000;
+				},
+			},
+		);
+		const run = fakeExecutor();
+		const result = await retireGenerations(run.executor, store, {
+			deadline: { deadlineAt: NOW + 300_000, now: () => clock },
+		});
+
+		expect(result).toMatchObject({
+			retired: 1,
+			deleteStatements: 1,
+			hasMore: true,
+		});
+	});
+
 	test("a session with nothing past its grace deletes nothing", async () => {
 		const { store } = fakeStore([
 			session("org-a", "s1", [committed("2", 1), committed("1", 30)]),
@@ -458,6 +592,64 @@ describe("the hourly retirement pass", () => {
 			"rudel.session_git_observations",
 			"rudel.transcript_chunk_hits",
 		]);
+	});
+
+	test("deletes that outlast the census budget leave the page reads their own budget", async () => {
+		let clock = NOW;
+		const { store } = fakeStore(
+			["org-a", "org-b"].map((organizationId) =>
+				session(organizationId, `s-${organizationId}`, [
+					committed("3", 30),
+					committed("2", 60),
+				]),
+			),
+			{
+				table: "rudel.run_index",
+				dependents: ["rudel.call_facts"],
+				policy: BUILDS,
+			},
+		);
+		const census = { ...store.census, readsMs: 30_000 };
+		const run = fakeExecutor(undefined, {
+			onExecute: () => {
+				clock += 20_000;
+			},
+		});
+		const result = await runRetirementPass({
+			executor: run.executor,
+			deadline: { deadlineAt: NOW + 270_000, now: () => clock },
+			stores: [["runIndex", { ...store, census }]] as const,
+		});
+
+		expect(result.runIndex).toEqual({
+			status: "ok",
+			retired: 1,
+			deleteStatements: 3,
+			hasMore: true,
+		});
+	});
+
+	test("each store's census reads a window under the per-window read budget", async () => {
+		for (const [name, store] of SESSION_RETIREMENT_STORES) {
+			const censuses: ClickHouseStatement[] = [];
+			const executor = {
+				async query(statement: ClickHouseStatement) {
+					if (!statement.query.includes("mergeTreeIndex"))
+						censuses.push(statement);
+					return [];
+				},
+				async execute() {},
+			} as unknown as ClickHouseExecutor;
+			await retireGenerations(executor, store, { deadline: deadline() });
+
+			expect(censuses, name).toHaveLength(1);
+			expect(censuses[0]?.clickhouse_settings, name).toMatchObject({
+				max_execution_time: 10,
+				max_rows_to_read: "4000000",
+				max_bytes_to_read: String(1024 * 1024 * 1024),
+				result_overflow_mode: "throw",
+			});
+		}
 	});
 
 	test("a failing store is reported and the others still run", async () => {
