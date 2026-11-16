@@ -14,6 +14,11 @@ app.setPath("logs", path.join(library, "Logs", app.getName()));
 if (isDev) app.setPath("userData", `${app.getPath("userData")} Dev`);
 process.env.OPALINE_SERVER_DATA_DIR ||= path.join(app.getPath("userData"), "server");
 
+if (!app.requestSingleInstanceLock()) {
+	app.quit();
+	return;
+}
+
 const { analyzeSessions, scanSessions } = require("./analyze");
 const { createAgents } = require("./agents");
 const { createLocalStack, introUrl } = require("./stack/local-stack");
@@ -353,6 +358,16 @@ function mainWindow() {
 	return [...appWindows].findLast((win) => !win.isDestroyed());
 }
 
+function focusCurrentWindow() {
+	if (quitting) return;
+	if (process.platform === "darwin") app.show();
+	const win = onboardingWindow && !onboardingWindow.isDestroyed() ? onboardingWindow : mainWindow();
+	if (!win) return createWindow();
+	if (win.isMinimized()) win.restore();
+	if (win.isVisible()) win.focus();
+	app.focus({ steal: true });
+}
+
 const onboarding = Boolean(process.env.OPALINE_ONBOARDING) || !fs.existsSync(onboardedMarker());
 let serverQuiet = onboarding && !explicitUrl;
 
@@ -375,6 +390,15 @@ if (!explicitUrl && stack.isLocal()) {
 		if (started) stack.setServerPriority(serverQuiet);
 	});
 }
+
+app.on("second-instance", () => app.whenReady().then(focusCurrentWindow));
+
+app.setAboutPanelOptions({
+	applicationName: "Opaline",
+	applicationVersion: app.getVersion(),
+	version: "",
+	copyright: `© ${new Date().getFullYear()} Opaline`,
+});
 
 app.whenReady().then(() => {
 	stack.mark("ready");
