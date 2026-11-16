@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import { takeFirstOpenIntro } from "@/app/first-open";
 import { AppProviders } from "@/app/providers/AppProviders";
 import { BonesProvider } from "@/app/ui/bones";
+import { currentHandoffPage, mayHandOff } from "@/features/desktop/app-handoff";
 import {
 	SelfHostContext,
 	type SelfHostInfo,
@@ -121,4 +122,16 @@ function renderApp(selfHost: SelfHostInfo | null) {
 	}
 }
 
-whenSelfHostInfoKnown(renderApp);
+function renderOrHandOff(selfHost: SelfHostInfo | null) {
+	if (!selfHost || !mayHandOff(currentHandoffPage())) {
+		renderApp(selfHost);
+		return;
+	}
+	const proceed = () => renderApp(selfHost);
+	void import("@/features/desktop/AppHandoff").then(
+		({ handOffToDesktopApp }) => handOffToDesktopApp(root, proceed),
+		proceed,
+	);
+}
+
+whenSelfHostInfoKnown(renderOrHandOff);
