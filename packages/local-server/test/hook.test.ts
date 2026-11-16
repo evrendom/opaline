@@ -55,6 +55,51 @@ describe("the hook ping", () => {
 		).toBeNull();
 	});
 
+	test("Codex hooks send their transcript, final at session end, or find it by session", () => {
+		const now = new Date(2026, 10, 15, 12);
+		const day = join(root, "sessions", "2026", "11", "15");
+		mkdirSync(day, { recursive: true });
+		const file = join(day, "rollout-2026-11-15T09-00-00-def-456.jsonl");
+		writeFileSync(file, "{}\n");
+		expect(
+			codexHookInput(
+				JSON.stringify({
+					session_id: "def-456",
+					transcript_path: "/c/rollout.jsonl",
+					hook_event_name: "Stop",
+					turn_id: "t1",
+				}),
+				root,
+				now,
+			),
+		).toEqual({ paths: ["/c/rollout.jsonl"], final: false });
+		expect(
+			codexHookInput(
+				JSON.stringify({
+					session_id: "def-456",
+					transcript_path: "/c/rollout.jsonl",
+					hook_event_name: "SessionEnd",
+					reason: "other",
+				}),
+				root,
+				now,
+			),
+		).toEqual({ paths: ["/c/rollout.jsonl"], final: true });
+		expect(
+			codexHookInput(
+				JSON.stringify({
+					session_id: "def-456",
+					transcript_path: null,
+					hook_event_name: "SessionEnd",
+				}),
+				root,
+				now,
+			),
+		).toEqual({ paths: [file], final: true });
+		expect(codexHookInput("", root, now)).toBeNull();
+		expect(codexHookInput("null", root, now)).toBeNull();
+	});
+
 	test("posts to this Mac's server with its key, and stays quiet without one", async () => {
 		const calls: { url: string; init: RequestInit }[] = [];
 		const fetchImpl = (async (url: string, init: RequestInit) => {

@@ -1,7 +1,9 @@
-const { execFile } = require("node:child_process");
+const { execFile, spawn } = require("node:child_process");
 const crypto = require("node:crypto");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
+const { createInterface } = require("node:readline");
 const { app } = require("electron");
 
 const MARKETPLACE = "opaline-local";
@@ -93,12 +95,10 @@ function writeHookScript({ launcherPath, dataDir }) {
 
 function writeMarketplace({ pluginDir, server }) {
 	const root = marketplaceDir();
-	const fingerprint = crypto
-		.createHash("sha256")
-		.update(`${server.mcpUrl}\n${server.apiKey}\n${hookScript()}`)
-		.digest("hex")
-		.slice(0, 10);
-	const hook = { type: "command", command: `"${hookScript()}" claude` };
+	const hook = (agent) => ({
+		type: "command",
+		command: `"${hookScript()}" ${agent}`,
+	});
 	const variants = {
 		claude: {
 			mcp: {
@@ -107,7 +107,10 @@ function writeMarketplace({ pluginDir, server }) {
 				headers: { Authorization: `Bearer ${server.apiKey}` },
 			},
 			hooks: {
-				hooks: { SessionEnd: [{ hooks: [hook] }], Stop: [{ hooks: [hook] }] },
+				hooks: {
+					SessionEnd: [{ hooks: [hook("claude")] }],
+					Stop: [{ hooks: [hook("claude")] }],
+				},
 			},
 		},
 		codex: {
@@ -116,8 +119,19 @@ function writeMarketplace({ pluginDir, server }) {
 				url: server.mcpUrl,
 				http_headers: { Authorization: `Bearer ${server.apiKey}` },
 			},
+			hooks: {
+				hooks: {
+					SessionEnd: [{ hooks: [{ ...hook("codex"), timeout: 3 }] }],
+					Stop: [{ hooks: [hook("codex")] }],
+				},
+			},
 		},
 	};
+	const fingerprint = crypto
+		.createHash("sha256")
+		.update(JSON.stringify(variants))
+		.digest("hex")
+		.slice(0, 10);
 	let version;
 	for (const [agent, variant] of Object.entries(variants)) {
 		const target = path.join(root, `opaline-${agent}`);
@@ -175,6 +189,7 @@ const agents = {
 		install: ["plugin", "add", LOCAL_PLUGIN],
 		update: ["plugin", "add", LOCAL_PLUGIN],
 		removeCloud: ["plugin", "remove", CLOUD_PLUGIN],
+		afterInstall: trustCodexHooks,
 	},
 };
 
@@ -217,6 +232,99 @@ function failure(output) {
 		.slice(-6)
 		.join("\n")
 		.slice(-600);
+}
+
+function appServer(binary, work) {
+	return loginShellPath().then(
+		(PATH) =>
+			new Promise((resolve, reject) => {
+				const child = spawn(binary, ["app-server"], {
+					env: { ...process.env, PATH },
+					stdio: ["pipe", "pipe", "ignore"],
+				});
+				const pending = new Map();
+				let next = 0;
+				const finish = (settle, value) => {
+					clearTimeout(timer);
+					child.kill();
+					settle(value);
+				};
+				const timer = setTimeout(
+					() => finish(reject, new Error("codex app-server timed out")),
+					30_000,
+				);
+				child.on("error", (error) => finish(reject, error));
+				child.on("exit", () =>
+					finish(reject, new Error("codex app-server exited")),
+				);
+				createInterface({ input: child.stdout }).on("line", (line) => {
+					const message = parse(line);
+					const waiter = pending.get(message?.id);
+					if (!waiter) return;
+					pending.delete(message.id);
+					if (message.error)
+						waiter.reject(new Error(message.error.message ?? "error"));
+					else waiter.resolve(message.result);
+				});
+				const send = (message) =>
+					child.stdin.write(`${JSON.stringify(message)}\n`);
+				const request = (method, params) =>
+					new Promise((resolveRequest, rejectRequest) => {
+						next += 1;
+						pending.set(next, {
+							resolve: resolveRequest,
+							reject: rejectRequest,
+						});
+						send({ id: next, method, params });
+					});
+				request("initialize", {
+					clientInfo: { name: "opaline", version: app.getVersion() },
+				})
+					.then(() => {
+						send({ method: "initialized" });
+						return work(request);
+					})
+					.then(
+						(value) => finish(resolve, value),
+						(error) => finish(reject, error),
+					);
+			}),
+	);
+}
+
+async function trustCodexHooks(binary) {
+	try {
+		const trusted = await appServer(binary, async (request) => {
+			const listed = await request("hooks/list", { cwds: [os.homedir()] });
+			const ours = new Map(
+				(listed?.data ?? [])
+					.flatMap((entry) => entry.hooks ?? [])
+					.filter(
+						(hook) =>
+							hook.pluginId === LOCAL_PLUGIN &&
+							hook.command?.includes(hookScript()) &&
+							hook.enabled !== false &&
+							(hook.trustStatus === "untrusted" ||
+								hook.trustStatus === "modified"),
+					)
+					.map((hook) => [hook.key, { trusted_hash: hook.currentHash }]),
+			);
+			if (ours.size)
+				await request("config/batchWrite", {
+					edits: [
+						{
+							keyPath: "hooks.state",
+							mergeStrategy: "upsert",
+							value: Object.fromEntries(ours),
+						},
+					],
+				});
+			return [...ours.keys()];
+		});
+		log(`codex: hooks trusted: ${trusted.join(", ") || "none needed"}`);
+	} catch (error) {
+		log(`codex: hooks not trusted: ${error.message}`);
+	}
 }
 
 async function addMarketplace(key, binary, root) {
@@ -291,6 +399,7 @@ function createAgents({ stack }) {
 				error: "Couldn’t install the plugin",
 				detail: failure(installed.output),
 			};
+		await agents[key].afterInstall?.(found.binary);
 		return agentStatus(key, await inspectAgent(key));
 	}
 
@@ -316,6 +425,7 @@ function createAgents({ stack }) {
 			log(
 				`${key}: plugin update to ${version} ${updated.ok ? "ok" : `failed: ${updated.output.trim()}`}`,
 			);
+			if (updated.ok) await agents[key].afterInstall?.(found.binary);
 		}
 	}
 

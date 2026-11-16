@@ -36,12 +36,17 @@ export function codexHookInput(
 	codexHome: string,
 	now = new Date(),
 ): HookInput | null {
-	let threadId: unknown;
+	let value: Record<string, unknown>;
 	try {
-		threadId = (JSON.parse(raw) as { "thread-id"?: unknown })["thread-id"];
+		value = JSON.parse(raw) as Record<string, unknown>;
 	} catch {
 		return null;
 	}
+	if (!value || typeof value !== "object") return null;
+	const final = value.hook_event_name === "SessionEnd";
+	if (typeof value.transcript_path === "string" && value.transcript_path)
+		return { paths: [value.transcript_path], final };
+	const threadId = value.session_id ?? value["thread-id"];
 	if (typeof threadId !== "string" || !/^[\w-]+$/u.test(threadId)) return null;
 	for (let back = 0; back <= CODEX_DAYS_BACK; back++) {
 		const day = new Date(now.getTime() - back * 86_400_000);
@@ -54,9 +59,9 @@ export function codexHookInput(
 		);
 		try {
 			const match = readdirSync(directory).find(
-				(name) => name.endsWith(".jsonl") && name.includes(threadId as string),
+				(name) => name.endsWith(".jsonl") && name.includes(threadId),
 			);
-			if (match) return { paths: [join(directory, match)], final: false };
+			if (match) return { paths: [join(directory, match)], final };
 		} catch {}
 	}
 	return null;

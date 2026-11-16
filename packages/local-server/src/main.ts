@@ -114,7 +114,7 @@ async function run(argv: readonly string[]): Promise<number> {
 		return 0;
 	}
 	if (command === "hook" && (agent === "claude" || agent === "codex")) {
-		const raw = agent === "claude" ? await readStdin() : (positionals[2] ?? "");
+		const raw = positionals[2] ?? (await readStdin());
 		const input: HookInput | null =
 			agent === "claude"
 				? claudeHookInput(raw)
