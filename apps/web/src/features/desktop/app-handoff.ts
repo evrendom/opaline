@@ -2,23 +2,8 @@ import { SELF_HOST_INFO_PATH } from "@/features/self-hosted/self-host-info";
 import { getApiBaseUrl } from "@/lib/api-base-url";
 
 const DESKTOP_APP_TOKEN = "OpalineDesktop/";
-const CONTINUE_KEY = "opaline:continue-in-browser";
 const INFO_TIMEOUT_MS = 3_000;
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
-const BROWSER_PATHS = new Set([
-	"/login",
-	"/welcome",
-	"/device",
-	"/reset-password",
-	"/get-started",
-	"/dashboard/get-started",
-]);
-const BROWSER_PATH_PATTERNS = [
-	/^\/invitation\//u,
-	/^\/team\/invite\//u,
-	/^\/[^/]+\/join\//u,
-];
-const BROWSER_PARAMS = ["redirect", "user_code"];
 
 export interface HandoffPage {
 	readonly userAgent: string;
@@ -27,7 +12,6 @@ export interface HandoffPage {
 	readonly pathname: string;
 	readonly search: string;
 	readonly hash: string;
-	readonly continued: boolean;
 }
 
 export function isDesktopAppWindow(
@@ -36,41 +20,14 @@ export function isDesktopAppWindow(
 	return page.hasDesktopBridge || page.userAgent.includes(DESKTOP_APP_TOKEN);
 }
 
-export function staysInBrowser(pathname: string, search: string): boolean {
-	if (BROWSER_PATHS.has(pathname.replace(/\/+$/u, "") || "/")) return true;
-	if (BROWSER_PATH_PATTERNS.some((pattern) => pattern.test(pathname)))
-		return true;
-	const params = new URLSearchParams(search);
-	return BROWSER_PARAMS.some((name) => params.has(name));
-}
-
 export function mayHandOff(page: HandoffPage): boolean {
-	return (
-		!page.continued &&
-		!isDesktopAppWindow(page) &&
-		LOOPBACK_HOSTS.has(page.hostname) &&
-		!staysInBrowser(page.pathname, page.search)
-	);
+	return !isDesktopAppWindow(page) && LOOPBACK_HOSTS.has(page.hostname);
 }
 
 export function desktopAppLink(
 	page: Pick<HandoffPage, "pathname" | "search" | "hash">,
 ): string {
 	return `opaline://${page.pathname.replace(/^\/+/u, "")}${page.search}${page.hash}`;
-}
-
-function readContinued(): boolean {
-	try {
-		return window.sessionStorage.getItem(CONTINUE_KEY) === "1";
-	} catch {
-		return false;
-	}
-}
-
-export function continueInBrowser(): void {
-	try {
-		window.sessionStorage.setItem(CONTINUE_KEY, "1");
-	} catch {}
 }
 
 export function currentHandoffPage(): HandoffPage {
@@ -81,7 +38,6 @@ export function currentHandoffPage(): HandoffPage {
 		pathname: window.location.pathname,
 		search: window.location.search,
 		hash: window.location.hash,
-		continued: readContinued(),
 	};
 }
 

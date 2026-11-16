@@ -1,4 +1,4 @@
-import { act, fireEvent, screen } from "@testing-library/react";
+import { act, screen } from "@testing-library/react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { handOffToDesktopApp } from "./AppHandoff";
@@ -8,7 +8,6 @@ import {
 	isDesktopAppWindow,
 	mayHandOff,
 	serverHasDesktopApp,
-	staysInBrowser,
 } from "./app-handoff";
 
 const BROWSER = "Mozilla/5.0 (Macintosh) Chrome/141 Safari/537.36";
@@ -22,7 +21,6 @@ function page(overrides: Partial<HandoffPage> = {}): HandoffPage {
 		pathname: "/acme/reports/a1",
 		search: "",
 		hash: "",
-		continued: false,
 		...overrides,
 	};
 }
@@ -41,13 +39,12 @@ describe("mayHandOff", () => {
 		).toBe(true);
 	});
 
-	it("stays in the browser once chosen, and off this Mac", () => {
-		expect(mayHandOff(page({ continued: true }))).toBe(false);
+	it("leaves pages off this Mac alone", () => {
 		expect(mayHandOff(page({ hostname: "opaline.example.com" }))).toBe(false);
 		expect(mayHandOff(page({ hostname: "192.168.1.20" }))).toBe(false);
 	});
 
-	it("leaves sign-in, device and invitation flows in the browser", () => {
+	it("keeps no page in the browser, sign-in and links with a redirect included", () => {
 		for (const [pathname, search] of [
 			["/login", "?redirect=%2Fapi%2Fauth%2Fmcp%2Fauthorize"],
 			["/login", ""],
@@ -59,12 +56,9 @@ describe("mayHandOff", () => {
 			["/team/invite/t1", ""],
 			["/acme/join/t1", ""],
 			["/", "?redirect=%2Facme"],
-		] as const) {
-			expect(staysInBrowser(pathname, search)).toBe(true);
-			expect(mayHandOff(page({ pathname, search }))).toBe(false);
-		}
-		expect(staysInBrowser("/acme/dashboard", "?from=2026-11-01")).toBe(false);
-		expect(staysInBrowser("/", "")).toBe(false);
+			["/", ""],
+		] as const)
+			expect(mayHandOff(page({ pathname, search }))).toBe(true);
 	});
 });
 
@@ -121,7 +115,6 @@ describe("handOffToDesktopApp", () => {
 		act(() => root?.unmount());
 		root = undefined;
 		document.body.innerHTML = "";
-		window.sessionStorage.clear();
 	});
 
 	function mount() {
@@ -145,7 +138,7 @@ describe("handOffToDesktopApp", () => {
 		expect(open).not.toHaveBeenCalled();
 	});
 
-	it("opens the page in the app and offers the browser", async () => {
+	it("opens the page in the app and offers only a retry", async () => {
 		window.history.replaceState(null, "", "/acme/reports/a1?x=1");
 		const proceed = vi.fn();
 		const open = vi.fn();
@@ -154,17 +147,13 @@ describe("handOffToDesktopApp", () => {
 		);
 		expect(open).toHaveBeenCalledWith("opaline://acme/reports/a1?x=1");
 		expect(
-			screen
-				.getByRole("link", { name: "Open in the Opaline app" })
-				.getAttribute("href"),
+			screen.getByRole("heading", { name: "Opened in Opaline" }),
+		).toBeTruthy();
+		expect(
+			screen.getByRole("link", { name: "Open Opaline" }).getAttribute("href"),
 		).toBe("opaline://acme/reports/a1?x=1");
+		expect(screen.queryAllByRole("button")).toHaveLength(0);
+		expect(document.body.textContent).not.toMatch(/browser/iu);
 		expect(proceed).not.toHaveBeenCalled();
-		fireEvent.click(
-			screen.getByRole("button", { name: "Continue in browser" }),
-		);
-		expect(proceed).toHaveBeenCalledOnce();
-		expect(window.sessionStorage.getItem("opaline:continue-in-browser")).toBe(
-			"1",
-		);
 	});
 });
