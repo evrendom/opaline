@@ -233,7 +233,7 @@ async function addMarketplace(key, binary, root) {
 	return added;
 }
 
-function createAgents({ stack, confirmCloudSwitch }) {
+function createAgents({ stack }) {
 	async function prepareMarketplace() {
 		const server =
 			stack.agentServer() ??
@@ -253,13 +253,6 @@ function createAgents({ stack, confirmCloudSwitch }) {
 		const found = await inspectAgent(key);
 		if (!found.binary || found.local) return agentStatus(key, found);
 		if (found.cloud) {
-			const switchIt = await confirmCloudSwitch(agents[key].label);
-			if (!switchIt)
-				return {
-					...agentStatus(key, found),
-					error: "Kept Opaline Cloud",
-					detail: `${agents[key].label} still uses the Opaline Cloud plugin.`,
-				};
 			const removed = await run(found.binary, agents[key].removeCloud);
 			log(
 				`${key}: cloud plugin ${removed.ok ? "turned off" : `not turned off: ${removed.output.trim()}`}`,

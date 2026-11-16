@@ -2,7 +2,7 @@ const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, screen, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, Menu, nativeImage, nativeTheme, screen, shell } = require("electron");
 
 const explicitUrl = process.env.OPALINE_URL;
 const isDev = Boolean(explicitUrl);
@@ -25,20 +25,7 @@ app.userAgentFallback = `${app.userAgentFallback
 	.replace(/\s(opaline-desktop|Opaline)\/\S+/, "")} OpalineDesktop/${app.getVersion()}`;
 
 const stack = createLocalStack({ app });
-const agents = createAgents({
-	stack,
-	confirmCloudSwitch: async (label) => {
-		const { response } = await dialog.showMessageBox(onboardingWindow ?? mainWindow(), {
-			type: "question",
-			buttons: ["Use This Mac", "Keep Opaline Cloud"],
-			defaultId: 0,
-			cancelId: 1,
-			message: `${label} is connected to Opaline Cloud.`,
-			detail: `Connect ${label} to Opaline on this Mac instead? Its Opaline Cloud plugin is turned off; you can turn it back on in ${label} at any time.`,
-		});
-		return response === 0;
-	},
-});
+const agents = createAgents({ stack });
 
 const NO_SCROLLBARS = `
 * {
