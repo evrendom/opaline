@@ -55,6 +55,12 @@ describe("desktopAppLink", () => {
 		expect(desktopAppLink(`${ORIGIN}/`, ORIGIN)).toBe("opaline://");
 	});
 
+	test("an app link is already one", () => {
+		expect(desktopAppLink("opaline://acme/reports/a1", ORIGIN)).toBe(
+			"opaline://acme/reports/a1",
+		);
+	});
+
 	test("refuses pages on another origin", () => {
 		expect(
 			desktopAppLink("https://opaline.so/acme/reports/a1", ORIGIN),
