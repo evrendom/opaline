@@ -77,7 +77,7 @@ export function pinnedParams(
 export function newestGenerations(
 	options: {
 		readonly by?: readonly string[];
-		readonly where?: string;
+		readonly and?: string;
 		readonly columns?: string;
 		readonly table?: string;
 	} = {},
@@ -87,7 +87,7 @@ export function newestGenerations(
 	);
 	return `SELECT ${by}, max((revision, parser_version)) AS generation${options.columns ? `, ${options.columns}` : ""}
 		FROM ${getSafeClickHouseTable(options.table ?? TRANSCRIPT_RECORDS)}
-		WHERE ${receiptRow()}${options.where ? ` AND ${options.where}` : ""}
+		WHERE ${receiptRow()} ${options.and ?? ""}
 		GROUP BY ${by}`;
 }
 

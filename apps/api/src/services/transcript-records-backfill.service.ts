@@ -7,7 +7,6 @@ import {
 	summarizeSplit,
 	TRANSCRIPT_RECORD_TEXT_MAX_CHARS,
 	TRANSCRIPT_RECORDS_PARSER_VERSION,
-	TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
 	TRANSCRIPT_RECORDS_SESSION_TEXT_BUDGET_CHARS,
 	type TranscriptRecordDraft,
 	type TranscriptSource,
@@ -20,6 +19,7 @@ import { ClickHouseWriteFencedError } from "../lib/clickhouse-write-fence.js";
 import { scaleSessionBudget } from "../lib/ingest-size.js";
 import { persistGitObservationsBestEffort } from "./git-observation-extraction.service.js";
 import { enqueueSessionEdgesBestEffort } from "./l1-edges/l1-edge-enqueue.js";
+import { receiptRow } from "./transcript-generations/generations.js";
 import { TranscriptRecordsDeadlineExceededError } from "./transcript-records-deadline.js";
 import {
 	hashTranscriptContent,
@@ -475,15 +475,12 @@ async function readReceipts(
 			WHERE organization_id = {organizationId:String}
 				AND user_id IN {userIds:Array(String)}
 				AND session_id IN {sessionIds:Array(String)}
-				AND agent_id = ''
-				AND record_idx = {receiptRecordIdx:UInt32}
-				AND block_idx = 0
+				AND ${receiptRow()}
 			ORDER BY user_id, session_id, revision DESC, parser_version DESC
 			LIMIT 1 BY user_id, session_id
 		`,
 		query_params: {
 			organizationId: first.organizationId,
-			receiptRecordIdx: TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
 			sessionIds: batch.candidates.map((candidate) => candidate.sessionId),
 			userIds: [
 				...new Set(batch.candidates.map((candidate) => candidate.userId)),

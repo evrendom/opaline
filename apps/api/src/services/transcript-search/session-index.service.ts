@@ -13,6 +13,10 @@ import {
 	type GenerationRetirementOptions,
 	retireGenerationsBelowNewestReceipt,
 } from "../generation-retirement.js";
+import {
+	contentRow,
+	receiptRow,
+} from "../transcript-generations/generations.js";
 import { createTranscriptRecordsDeadline } from "../transcript-records-deadline.js";
 import type { TranscriptRecordsIdentity } from "../transcript-records-ingest.service.js";
 import { chunkRecords, quantizeVector, type RecordText } from "./chunks.js";
@@ -214,7 +218,7 @@ export async function indexSessionText(
 		const [generation] = await read(
 			GenerationSchema,
 			`SELECT toString(revision) AS revision_text, parser_version FROM rudel.transcript_records
-			WHERE ${SESSION_FILTER} AND kind = 'receipt'
+			WHERE ${SESSION_FILTER} AND ${receiptRow()}
 			ORDER BY revision DESC, parser_version DESC LIMIT 1`,
 		);
 		if (!generation)
@@ -223,7 +227,7 @@ export async function indexSessionText(
 			ReceiptSchema,
 			`SELECT toString(revision) AS revision_text, parser_version, pending_chunks
 			FROM ${TRANSCRIPT_CHUNK_HITS_TABLE} FINAL
-			WHERE ${SESSION_FILTER} AND agent_id = '' AND record_idx = ${TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX}
+			WHERE ${SESSION_FILTER} AND ${receiptRow()}
 			ORDER BY revision DESC, parser_version DESC LIMIT 1`,
 		);
 		const sameGeneration =
@@ -278,7 +282,7 @@ export async function indexSessionText(
 					toString(ts) AS ts, substringUTF8(text, 1, {searchChars:UInt32}) AS text, head, tail, text_chars
 				FROM rudel.transcript_records FINAL
 				WHERE ${SESSION_FILTER} AND revision = {revision:UInt64} AND parser_version = {parserVersion:UInt16}
-					AND record_idx < ${TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX} AND turn_idx >= 1
+					AND ${contentRow()} AND turn_idx >= 1
 					AND kind IN {kinds:Array(String)} AND (text != '' OR head != '')${after ? AFTER_RECORD_FILTER : ""}
 				ORDER BY agent_id, record_idx, block_idx
 				LIMIT {pageRecords:UInt32}`,

@@ -5,10 +5,7 @@ import type {
 	RunIndexHealStatus,
 	RunIndexHealTier,
 } from "@rudel/api-routes";
-import {
-	TRANSCRIPT_RECORDS_PARSER_VERSION,
-	TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
-} from "@rudel/api-routes/transcript-records";
+import { TRANSCRIPT_RECORDS_PARSER_VERSION } from "@rudel/api-routes/transcript-records";
 import type postgres from "postgres";
 import { z } from "zod";
 import {
@@ -23,6 +20,7 @@ import {
 	RUN_INDEX_VERSION,
 } from "../analysis/run-index-sql.js";
 import { readClickHouseLoadAverage } from "../backfill-pacing.js";
+import { newestGenerations } from "../transcript-generations/generations.js";
 import { TRANSCRIPT_RECORDS_TABLE } from "../transcript-records-ingest.service.js";
 import { enqueueL1EdgeSessionScopes } from "./l1-edge-queue.service.js";
 import { RUN_INDEX_TABLE } from "./l1-edge-tables.js";
@@ -284,13 +282,11 @@ export function asIndexRow(row: HealRow): RunIndexBackfillRow | null {
 
 function staleSources(organizationFilter: string): string {
 	return `WITH records AS (
-				SELECT organization_id, user_id, session_id, any(source) AS session_source,
-					max((revision, parser_version)) AS generation,
-					argMax(session_date, (revision, parser_version)) AS last_session_date
-				FROM ${getSafeClickHouseTable(TRANSCRIPT_RECORDS_TABLE)}
-				WHERE kind = 'receipt' AND agent_id = '' AND record_idx = {receiptRecordIdx:UInt32} AND block_idx = 0
-					AND source IN ('claude_code', 'codex') ${organizationFilter}
-				GROUP BY organization_id, user_id, session_id
+				${newestGenerations({
+					columns: `any(source) AS session_source,
+					argMax(session_date, (revision, parser_version)) AS last_session_date`,
+					and: `AND source IN ('claude_code', 'codex') ${organizationFilter}`,
+				})}
 			),
 			indexed AS (
 				SELECT organization_id, user_id, session_id, toUInt8(1) AS present,
@@ -316,7 +312,6 @@ function versionParams(reparse: boolean) {
 		indexVersion: RUN_INDEX_VERSION,
 		parserVersion: TRANSCRIPT_RECORDS_PARSER_VERSION,
 		pricingVersion: RUN_INDEX_PRICING_VERSION,
-		receiptRecordIdx: TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
 		reparse: reparse ? 1 : 0,
 	};
 }

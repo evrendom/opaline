@@ -1071,7 +1071,7 @@ function transcriptCte(
 	return `
 	transcript_generations AS (
 		${newestGenerations({
-			where: `session_date < toDateTime64({periodEnd:String}, 3, 'UTC')
+			and: `AND session_date < toDateTime64({periodEnd:String}, 3, 'UTC')
 			AND user_id NOT IN {excludedUsers:Array(String)}
 			${window.keys}`,
 		})}

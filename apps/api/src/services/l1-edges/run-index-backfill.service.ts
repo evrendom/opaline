@@ -1,5 +1,4 @@
 import { Buffer } from "node:buffer";
-import { TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX } from "@rudel/api-routes/transcript-records";
 import type postgres from "postgres";
 import { z } from "zod";
 import {
@@ -11,6 +10,7 @@ import {
 	RUN_INDEX_PRICING_VERSION,
 	RUN_INDEX_VERSION,
 } from "../analysis/run-index-sql.js";
+import { newestGenerations } from "../transcript-generations/generations.js";
 import { TRANSCRIPT_RECORDS_TABLE } from "../transcript-records-ingest.service.js";
 import { sessionScopeId } from "./l1-edge-ids.js";
 import { enqueueL1EdgeSessionScopes } from "./l1-edge-queue.service.js";
@@ -132,12 +132,7 @@ export function buildRunIndexBackfillStatement(input: {
 			max_result_rows: String(input.limit),
 		},
 		query: `WITH records AS (
-				SELECT organization_id, user_id, session_id, any(source) AS session_source,
-					max((revision, parser_version)) AS generation
-				FROM ${getSafeClickHouseTable(TRANSCRIPT_RECORDS_TABLE)}
-				WHERE kind = 'receipt' AND agent_id = '' AND record_idx = {receiptRecordIdx:UInt32} AND block_idx = 0
-					${organizationFilter}
-				GROUP BY organization_id, user_id, session_id
+				${newestGenerations({ columns: "any(source) AS session_source", and: organizationFilter })}
 			),
 			indexed AS (
 				SELECT organization_id, user_id, session_id, toUInt8(1) AS present,
@@ -171,7 +166,6 @@ export function buildRunIndexBackfillStatement(input: {
 			limit: input.limit,
 			organizationId: input.organizationId ?? "",
 			pricingVersion: RUN_INDEX_PRICING_VERSION,
-			receiptRecordIdx: TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
 		},
 	};
 }

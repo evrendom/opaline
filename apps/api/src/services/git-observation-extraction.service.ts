@@ -22,6 +22,7 @@ import {
 	gitObservationGenerationVersion,
 } from "./git-observation-parser.js";
 import { enqueueSessionEdgesBestEffort } from "./l1-edges/l1-edge-enqueue.js";
+import { receiptRow } from "./transcript-generations/generations.js";
 import { readRawTranscriptLine } from "./transcript-raw-line.service.js";
 import { createTranscriptRecordsDeadline } from "./transcript-records-deadline.js";
 import type { TranscriptRecordsIdentity } from "./transcript-records-ingest.service.js";
@@ -109,7 +110,7 @@ export async function extractGitObservations(
 			executor.query<Generation>({
 				abortSignal: deadline.signal,
 				clickhouse_settings: SCAN_SETTINGS,
-				query: `SELECT toString(revision) AS revision, parser_version, ts FROM rudel.transcript_records WHERE ${identityFilter()} AND kind = 'receipt' ORDER BY toUInt64(revision) DESC, parser_version DESC LIMIT 1`,
+				query: `SELECT toString(revision) AS revision, parser_version, ts FROM rudel.transcript_records WHERE ${identityFilter()} AND ${receiptRow()} ORDER BY toUInt64(revision) DESC, parser_version DESC LIMIT 1`,
 				query_params: params,
 			}),
 		);
@@ -142,7 +143,7 @@ export async function extractGitObservations(
 			executor.query<Generation>({
 				abortSignal: deadline.signal,
 				clickhouse_settings: SCAN_SETTINGS,
-				query: `SELECT toString(revision) AS revision, parser_version, ts FROM ${SESSION_GIT_OBSERVATIONS_TABLE} WHERE ${identityFilter()} AND kind = 'receipt' ORDER BY toUInt64(revision) DESC, parser_version DESC LIMIT 1`,
+				query: `SELECT toString(revision) AS revision, parser_version, ts FROM ${SESSION_GIT_OBSERVATIONS_TABLE} WHERE ${identityFilter()} AND ${receiptRow()} ORDER BY toUInt64(revision) DESC, parser_version DESC LIMIT 1`,
 				query_params: params,
 			}),
 		);

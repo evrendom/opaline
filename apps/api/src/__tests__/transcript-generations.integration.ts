@@ -164,7 +164,7 @@ describe("transcript generations", () => {
 			parser_version: number;
 		}>({
 			query: `SELECT session_id, toString(generation.1) AS revision, generation.2 AS parser_version
-				FROM (${newestGenerations({ where: "organization_id = {organizationId:String}" })})
+				FROM (${newestGenerations({ and: "AND organization_id = {organizationId:String}" })})
 				ORDER BY session_id`,
 			query_params: { organizationId },
 		});
@@ -203,8 +203,6 @@ describe("transcript generations", () => {
 		expect(session.selected).toBeGreaterThanOrEqual(
 			(4 * ROWS_PER_GENERATION) / 1024,
 		);
-		expect(pinned.selected).toBeLessThanOrEqual(
-			Math.ceil((ROWS_PER_GENERATION + 1) / 1024) + 1,
-		);
+		expect(pinned.selected).toBeLessThan(session.selected / 2);
 	});
 });

@@ -4,6 +4,7 @@ import type {
 	ClickHouseExecutor,
 	ClickHouseStatement,
 } from "../../clickhouse.js";
+import { receiptRow } from "../transcript-generations/generations.js";
 import type { TranscriptEmbedder } from "./config.js";
 import { createMemoryEmbeddingQuota } from "./quota.js";
 import { indexSessionText } from "./session-index.service.js";
@@ -83,7 +84,7 @@ function storage(
 			}
 			if (
 				sql.includes("FROM rudel.transcript_records") &&
-				sql.includes("'receipt'")
+				sql.includes(receiptRow())
 			)
 				return [{ revision_text: "7", parser_version: 3 }] as T[];
 			if (sql.includes("FROM rudel.transcript_records")) {

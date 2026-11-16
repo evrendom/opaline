@@ -11,6 +11,7 @@ import {
 	RUN_INDEX_PRICING_VERSION,
 	RUN_INDEX_VERSION,
 } from "../analysis/run-index-sql.js";
+import { newestGenerations } from "../transcript-generations/generations.js";
 import { TRANSCRIPT_RECORDS_TABLE } from "../transcript-records-ingest.service.js";
 import { enqueueL1EdgeScope } from "./l1-edge-queue.service.js";
 import { RUN_INDEX_TABLE } from "./l1-edge-tables.js";
@@ -150,10 +151,7 @@ export function buildRunIndexCensusStatement(
 					${organizationFilter}
 			),
 			records AS (
-				SELECT organization_id, user_id, session_id, max(tuple(revision, parser_version)) AS generation
-				FROM ${getSafeClickHouseTable(TRANSCRIPT_RECORDS_TABLE)}
-				WHERE kind = 'receipt' AND source = {source:String} AND ${identities}
-				GROUP BY organization_id, user_id, session_id
+				${newestGenerations({ and: `AND source = {source:String} AND ${identities}` })}
 			),
 			indexed AS (
 				SELECT organization_id, user_id, session_id, toUInt8(1) AS present,

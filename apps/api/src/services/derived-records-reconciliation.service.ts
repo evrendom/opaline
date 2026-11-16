@@ -11,6 +11,7 @@ import {
 	SESSION_GIT_OBSERVATIONS_TABLE,
 } from "./git-observation-extraction.service.js";
 import { GIT_OBSERVATION_PARSER_VERSION } from "./git-observation-parser.js";
+import { newestGenerations } from "./transcript-generations/generations.js";
 import {
 	persistTranscriptRecordsBestEffort,
 	readTranscriptRecordsExtractionConfig,
@@ -325,16 +326,10 @@ function buildCensus(
 				HAVING last_ingested_at <= fromUnixTimestamp64Milli({settledBefore:Int64}, 'UTC')
 			),
 			records AS (
-				SELECT organization_id, user_id, session_id, max(tuple(revision, parser_version)) AS generation
-				FROM ${getSafeClickHouseTable(TRANSCRIPT_RECORDS_TABLE)}
-				WHERE kind = 'receipt' AND source = {source:String} AND ${identities}
-				GROUP BY organization_id, user_id, session_id
+				${newestGenerations({ and: `AND source = {source:String} AND ${identities}` })}
 			),
 			observations AS (
-				SELECT organization_id, user_id, session_id, max(tuple(revision, parser_version)) AS generation
-				FROM ${getSafeClickHouseTable(SESSION_GIT_OBSERVATIONS_TABLE)}
-				WHERE kind = 'receipt' AND source = {source:String} AND ${identities}
-				GROUP BY organization_id, user_id, session_id
+				${newestGenerations({ table: SESSION_GIT_OBSERVATIONS_TABLE, and: `AND source = {source:String} AND ${identities}` })}
 			)
 			SELECT raw.organization_id AS organization_id, raw.user_id AS user_id, raw.session_id AS session_id,
 				toString(raw.raw_revision) AS revision, toString(raw.raw_session_date) AS session_date,

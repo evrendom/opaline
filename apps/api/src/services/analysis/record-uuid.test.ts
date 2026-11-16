@@ -3,6 +3,10 @@ import { ORPCError } from "@orpc/server";
 import { TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX } from "@rudel/api-routes/transcript-records";
 import type { ClickHouseExecutor } from "../../clickhouse.js";
 import {
+	contentRow,
+	receiptRow,
+} from "../transcript-generations/generations.js";
+import {
 	buildRecordUuidLookupStatement,
 	describeRecordUuidHit,
 	findRecordsByUuid,
@@ -37,12 +41,12 @@ describe("record uuid lookup", () => {
 		).toHaveLength(2);
 		// Each session's newest receipt pins the generation read.
 		expect(sql).toContain(
-			"AND agent_id = '' AND record_idx = {receipt:UInt32} AND block_idx = 0 ORDER BY user_id, session_id, revision DESC, parser_version DESC LIMIT 1 BY user_id, session_id",
+			`AND ${receiptRow()} ORDER BY user_id, session_id, revision DESC, parser_version DESC LIMIT 1 BY user_id, session_id`,
 		);
 		expect(sql).toContain(
 			"(user_id, session_id, revision, parser_version) IN (SELECT user_id, session_id, revision, parser_version FROM committed)",
 		);
-		expect(sql).toContain("AND record_idx < {receipt:UInt32}");
+		expect(sql).toContain(`AND ${contentRow()}`);
 		// One row per line, oldest session first.
 		expect(sql).toContain(
 			"GROUP BY user_id, source, session_id, agent_id, record_idx ORDER BY min(session_date), min(ts), session_id, agent_id, record_idx LIMIT {limit:UInt32}",
@@ -52,7 +56,6 @@ describe("record uuid lookup", () => {
 		expect(statement.query_params).toEqual({
 			organizationId: "ws",
 			uuids: [UUID.toUpperCase(), UUID],
-			receipt: TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
 			limit: RECORD_UUID_MAX_HITS,
 		});
 		expect(

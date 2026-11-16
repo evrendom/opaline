@@ -3,6 +3,10 @@ import type { ClickHouseExecutor } from "../clickhouse.js";
 import { ClickHouseWriteFencedError } from "../lib/clickhouse-write-fence.js";
 import { extractGitObservations } from "./git-observation-extraction.service.js";
 import { gitObservationGenerationVersion } from "./git-observation-parser.js";
+import {
+	newestGenerations,
+	receiptRow,
+} from "./transcript-generations/generations.js";
 
 export interface GitObservationBackfillOptions {
 	cutoff: Date;
@@ -54,12 +58,16 @@ export async function backfillGitObservations(
 		query: `WITH records AS (
 			SELECT organization_id, user_id, source, session_id,
 				max(tuple(revision, parser_version, parseDateTime64BestEffortOrZero(JSONExtractString(head, 'publishedAt'), 3, 'UTC'))) AS generation
-			FROM rudel.transcript_records WHERE kind = 'receipt' ${options.organizationId ? "AND organization_id = {organizationId:String}" : ""}
+			FROM rudel.transcript_records WHERE ${receiptRow()} ${options.organizationId ? "AND organization_id = {organizationId:String}" : ""}
 			GROUP BY organization_id, user_id, source, session_id
 		), observations AS (
-			SELECT organization_id, user_id, source, session_id, max(tuple(revision, parser_version)) AS generation
-			FROM rudel.session_git_observations WHERE kind = 'receipt' ${options.organizationId ? "AND organization_id = {organizationId:String}" : ""}
-			GROUP BY organization_id, user_id, source, session_id
+			${newestGenerations({
+				by: ["organization_id", "user_id", "source", "session_id"],
+				table: "rudel.session_git_observations",
+				and: options.organizationId
+					? "AND organization_id = {organizationId:String}"
+					: "",
+			})}
 		)
 		SELECT records.organization_id AS organization_id, records.user_id AS user_id, records.source AS source, records.session_id AS session_id,
 			toString(records.generation.1) AS revision, records.generation.2 AS parser_version,

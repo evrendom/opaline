@@ -4,6 +4,7 @@ import type {
 	ClickHouseStatement,
 } from "../../clickhouse.js";
 import { ClickHouseWriteFencedError } from "../../lib/clickhouse-write-fence.js";
+import { receiptRow } from "../transcript-generations/generations.js";
 import type { TranscriptEmbedder } from "./config.js";
 import {
 	backfillTranscriptSearch,
@@ -108,7 +109,7 @@ function world(sessions: readonly FakeSession[], loads: number[] = []) {
 						parser_version: row.parser_version,
 						pending_chunks: row.pending_chunks,
 					})) as T[];
-			if (sql.includes("'receipt'"))
+			if (sql.includes(receiptRow()))
 				return [{ revision_text: "7", parser_version: 3 }] as T[];
 			if (sql.includes("FROM rudel.transcript_records")) {
 				const session = sessionOf(statement);

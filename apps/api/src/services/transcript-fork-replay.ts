@@ -18,7 +18,7 @@ export function forkParentCallsSql(
 	owner = "organization_id = {organizationId:String} AND user_id = {userId:String}",
 ): string {
 	return `parent_receipts AS (
-		${newestGenerations({ by: ["user_id", "session_id"], where: `${owner} AND ${parents} AND source = 'codex'` })}
+		${newestGenerations({ by: ["user_id", "session_id"], and: `AND ${owner} AND ${parents} AND source = 'codex'` })}
 	), parent_calls AS (
 		SELECT DISTINCT user_id, session_id, call_id FROM ${records()}
 		WHERE ${owner}
