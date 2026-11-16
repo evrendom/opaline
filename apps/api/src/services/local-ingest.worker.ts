@@ -24,39 +24,25 @@ const startedAt = performance.now();
 const runner = (async () => {
 	const [
 		{ setupLogging },
-		router,
 		{ sqlClient },
-		{ getClickhouse },
-		storage,
-		{ createSessionRunner },
-		{ prepareLocalSession },
+		{ loadSessionRunner },
+		{ buildLocalSessionInput },
 	] = await Promise.all([
 		import("../logging.js"),
-		import("../router.js"),
 		import("../db.js"),
-		import("../clickhouse.js"),
-		import("./r2-ingest-storage.service.js"),
 		import("../selfhost/local-ingest/runner.js"),
-		import("../selfhost/local-ingest/prepare.js"),
+		import("../selfhost/local-ingest/session-input.js"),
 	]);
 	await setupLogging();
+	const run = await loadSessionRunner({
+		sql: sqlClient,
+		prepare: buildLocalSessionInput,
+		log: (line) => process.stderr.write(`opaline: ${line}\n`),
+	});
 	process.stderr.write(
 		`opaline: import thread ready in ${Math.round(performance.now() - startedAt)} ms\n`,
 	);
-	return createSessionRunner({
-		processIngestSession: router.processIngestSession,
-		errorFactories: router.createBackgroundIngestErrorFactories,
-		prepare: prepareLocalSession,
-		sql: sqlClient,
-		clickhouse: getClickhouse,
-		objectStore: () => {
-			const availability = storage.readR2IngestAvailability();
-			return availability.enabled
-				? storage.createObjectStoreClient(availability.configuration)
-				: null;
-		},
-		log: (line) => process.stderr.write(`opaline: ${line}\n`),
-	});
+	return run;
 })();
 
 function takeTimings(): LocalIngestThreadResponse["timings"] {

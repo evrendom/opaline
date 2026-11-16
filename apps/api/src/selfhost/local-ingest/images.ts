@@ -4,7 +4,7 @@ import type { ClickHouseExecutor } from "../../clickhouse.js";
 import type { R2EvidenceStorageClient } from "../../services/r2-ingest-storage.service.js";
 import { createEvidenceObjectKey } from "../../services/repository-evidence.service.js";
 import { persistSessionImageRows } from "../../services/session-images.service.js";
-import type { CollectedImage } from "./image-collection.js";
+import type { CollectedImage } from "./transcript-file/index.js";
 
 const CAPTURED_RANK = 3n;
 const RANK_SHIFT = 2n ** 48n;

@@ -184,16 +184,7 @@ async function inProcessRunner(
 	settings: Partial<LocalIngestSettings>,
 	log: (line: string) => void,
 ): Promise<SessionRunner> {
-	const [
-		router,
-		{ getClickhouse },
-		storage,
-		{ createSessionRunner },
-		{ LocalSessionInputPool },
-	] = await Promise.all([
-		import("../../router.js"),
-		import("../../clickhouse.js"),
-		import("../../services/r2-ingest-storage.service.js"),
+	const [{ loadSessionRunner }, { LocalSessionInputPool }] = await Promise.all([
 		import("./runner.js"),
 		import("../../services/local-session-input.service.js"),
 	]);
@@ -201,18 +192,9 @@ async function inProcessRunner(
 		settings.concurrency ?? DEFAULT_LOCAL_INGEST_SETTINGS.concurrency,
 	);
 	return {
-		ingestSession: createSessionRunner({
-			processIngestSession: router.processIngestSession,
-			errorFactories: router.createBackgroundIngestErrorFactories,
-			prepare: (request) => pool.prepare(request),
+		ingestSession: await loadSessionRunner({
 			sql: sqlClient,
-			clickhouse: getClickhouse,
-			objectStore: () => {
-				const availability = storage.readR2IngestAvailability();
-				return availability.enabled
-					? storage.createObjectStoreClient(availability.configuration)
-					: null;
-			},
+			prepare: (request) => pool.prepare(request),
 			log,
 		}),
 		close: () => pool.close(),

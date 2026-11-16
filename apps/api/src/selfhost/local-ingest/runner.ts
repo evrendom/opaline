@@ -1,4 +1,3 @@
-import { ORPCError } from "@orpc/server";
 import { INGEST_AGGREGATE_CONTENT_MAX_BYTES } from "@rudel/api-routes";
 import type postgres from "postgres";
 import type { ClickHouseExecutor } from "../../clickhouse.js";
@@ -12,14 +11,11 @@ import type { R2EvidenceStorageClient } from "../../services/r2-ingest-storage.s
 import { storeSessionImages } from "./images.js";
 import type { Owner, SessionJob, SessionOutcome } from "./service.js";
 
-type ProcessIngestSession =
-	typeof import("../../router.js").processIngestSession;
-type BackgroundErrors =
-	typeof import("../../router.js").createBackgroundIngestErrorFactories;
+type ImportSession =
+	typeof import("../../services/session-import/index.js").importSession;
 
 export interface SessionRunnerDependencies {
-	readonly processIngestSession: ProcessIngestSession;
-	readonly errorFactories: BackgroundErrors;
+	readonly importSession: ImportSession;
 	readonly prepare: (
 		request: LocalSessionInputRequest,
 	) => Promise<PreparedLocalSession>;
@@ -31,50 +27,36 @@ export interface SessionRunnerDependencies {
 	readonly log?: (line: string) => void;
 }
 
-const SHRINK = /smaller/iu;
-const BUSY_REASONS = new Set([
-	"ingest_filter_queue_full",
-	"usage_extraction_queue_full",
-]);
 const BUSY_WAIT_MS = 250;
-const USAGE_INCOMPLETE = "usage_extraction_incomplete";
 const BUSY_WAIT_LIMIT_MS = 10 * 60_000;
+const KEPT_REASON =
+	"The transcript on disk is shorter than the copy Opaline stored; the longer copy is kept.";
+const USAGE_INCOMPLETE_REASON =
+	"Stored without its usage: the transcript's token counts are incomplete. It is imported again when the file changes.";
 
-function busyReason(error: unknown): boolean {
-	if (!(error instanceof ORPCError) || error.code !== "SERVICE_UNAVAILABLE")
-		return false;
-	const data = error.data as { reason?: unknown } | undefined;
-	return typeof data?.reason === "string" && BUSY_REASONS.has(data.reason);
-}
-
-export function classifyIngestError(error: unknown): SessionOutcome {
-	const message = error instanceof Error ? error.message : String(error);
-	if (
-		error instanceof ORPCError &&
-		error.code === "SERVICE_UNAVAILABLE" &&
-		(error.data as { reason?: unknown } | undefined)?.reason ===
-			USAGE_INCOMPLETE
-	)
-		return {
-			kind: "ingested",
-			sessionId: "",
-			bytes: 0,
-			reason:
-				"Stored without its usage: the transcript's token counts are incomplete. It is imported again when the file changes.",
-		};
-	if (error instanceof ORPCError) {
-		if (error.code === "CONFLICT" && SHRINK.test(message))
-			return {
-				kind: "kept",
-				sessionId: "",
-				bytes: 0,
-				reason:
-					"The transcript on disk is shorter than the copy Opaline stored; the longer copy is kept.",
-			};
-		if (error.code === "BAD_REQUEST" || error.code === "CONFLICT")
-			return { kind: "skipped", reason: message.slice(0, 500) };
-	}
-	return { kind: "retry", reason: message.slice(0, 500) };
+export async function loadSessionRunner(options: {
+	readonly sql: postgres.Sql;
+	readonly prepare: SessionRunnerDependencies["prepare"];
+	readonly log: (line: string) => void;
+}): Promise<(job: SessionJob, owner: Owner) => Promise<SessionOutcome>> {
+	const [{ importSession }, { getClickhouse }, storage] = await Promise.all([
+		import("../../services/session-import/index.js"),
+		import("../../clickhouse.js"),
+		import("../../services/r2-ingest-storage.service.js"),
+	]);
+	return createSessionRunner({
+		importSession,
+		prepare: options.prepare,
+		sql: options.sql,
+		clickhouse: getClickhouse,
+		objectStore: () => {
+			const availability = storage.readR2IngestAvailability();
+			return availability.enabled
+				? storage.createObjectStoreClient(availability.configuration)
+				: null;
+		},
+		log: options.log,
+	});
 }
 
 export function createSessionRunner(
@@ -88,49 +70,48 @@ export function createSessionRunner(
 				deps.prepare({
 					sessionPath: job.sessionPath,
 					source: job.source,
+					change: job.change,
 					organizationId: owner.organizationId,
 					now: now().getTime(),
 				}),
 			);
 			if (prepared.kind === "skipped") return prepared;
-			const { input } = prepared;
-			const ingest = () =>
-				deps.processIngestSession({
-					aggregateContentMaxBytes: INGEST_AGGREGATE_CONTENT_MAX_BYTES,
-					awaitLanguageSignals: true,
-					context: {
-						apiKeyId: null,
-						session: { activeOrganizationId: owner.organizationId } as never,
-						user: { id: owner.userId },
-					},
-					enforceRateLimits: false,
-					errorFactories: deps.errorFactories(),
-					input,
-				});
+			const { input, files } = prepared;
+			const request = {
+				aggregateContentMaxBytes: INGEST_AGGREGATE_CONTENT_MAX_BYTES,
+				awaitLanguageSignals: true,
+				context: {
+					apiKeyId: null,
+					session: { activeOrganizationId: owner.organizationId } as never,
+					user: { id: owner.userId },
+				},
+				enforceRateLimits: false,
+				input,
+			};
 			const waitedSince = Date.now();
-			let storedReason: string | undefined;
-			for (;;) {
-				try {
-					await timedIngestPhase("local.ingest_total", ingest);
-					break;
-				} catch (error) {
-					if (
-						busyReason(error) &&
-						Date.now() - waitedSince < BUSY_WAIT_LIMIT_MS
-					) {
-						await sleep(BUSY_WAIT_MS);
-						continue;
-					}
-					const outcome = classifyIngestError(error);
-					if (outcome.kind === "ingested") {
-						storedReason = outcome.reason;
-						break;
-					}
-					return outcome.kind === "kept"
-						? { ...outcome, sessionId: input.sessionId }
-						: outcome;
-				}
+			let imported = await timedIngestPhase("local.ingest_total", () =>
+				deps.importSession(request),
+			);
+			while (
+				imported.kind === "retry" &&
+				imported.reason === "queue_full" &&
+				Date.now() - waitedSince < BUSY_WAIT_LIMIT_MS
+			) {
+				await sleep(BUSY_WAIT_MS);
+				imported = await timedIngestPhase("local.ingest_total", () =>
+					deps.importSession(request),
+				);
 			}
+			if (imported.kind === "kept")
+				return {
+					kind: "kept",
+					sessionId: input.sessionId,
+					bytes: 0,
+					reason: KEPT_REASON,
+					files,
+				};
+			if (imported.kind === "skipped" || imported.kind === "retry")
+				return { kind: imported.kind, reason: imported.message, files };
 			const store = deps.objectStore();
 			if (store && prepared.images.length > 0) {
 				try {
@@ -160,7 +141,10 @@ export function createSessionRunner(
 				kind: "ingested",
 				sessionId: input.sessionId,
 				bytes: prepared.bytes,
-				...(storedReason === undefined ? {} : { reason: storedReason }),
+				files,
+				...(imported.usage === "incomplete"
+					? { reason: USAGE_INCOMPLETE_REASON }
+					: {}),
 			};
 		});
 }

@@ -7,10 +7,6 @@ import {
 } from "../lib/bounded-maintenance.js";
 import { readBooleanEnv } from "../lib/env.js";
 import {
-	createBackgroundIngestErrorFactories,
-	processIngestSession,
-} from "../router.js";
-import {
 	getNextGitHubObjectWorkDueAt,
 	sweepGitHubEvidenceObjects,
 } from "./github-evidence-object-fence.service.js";
@@ -32,6 +28,10 @@ import {
 	getNextEvidenceWorkDueAt,
 	sweepRepositoryEvidence,
 } from "./repository-evidence-fence.service.js";
+import {
+	createBackgroundIngestErrorFactories,
+	processIngestSession,
+} from "./session-import/index.js";
 
 const logger = getLogger(["rudel", "api", "r2-ingest-repair"]);
 const LARGE_INGEST_WATCH_INTERVAL_MS = 15_000;

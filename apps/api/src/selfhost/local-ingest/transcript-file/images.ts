@@ -2,11 +2,6 @@ import { collectInlineImagesFromLine } from "@rudel/api-routes/transcript-slim";
 
 const MAX_IMAGE_BYTES = 64 * 1024 * 1024;
 
-export interface ImageStream {
-	readonly agentId: string;
-	readonly content: string;
-}
-
 export interface CollectedImage {
 	readonly sha256: string;
 	readonly mediaType: string;
@@ -51,23 +46,4 @@ export function createImageCollector(): ImageCollector {
 		},
 		images: () => [...images.values()],
 	};
-}
-
-export function collectSessionImages(
-	streams: readonly ImageStream[],
-): CollectedImage[] {
-	const collector = createImageCollector();
-	for (const stream of streams) {
-		let start = 0;
-		let recordIdx = 0;
-		const { content } = stream;
-		while (start < content.length) {
-			const end = content.indexOf("\n", start);
-			const stop = end === -1 ? content.length : end;
-			recordIdx += 1;
-			collector.add(stream.agentId, recordIdx, content.slice(start, stop));
-			start = stop + 1;
-		}
-	}
-	return collector.images();
 }

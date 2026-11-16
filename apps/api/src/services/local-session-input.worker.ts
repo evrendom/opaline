@@ -1,5 +1,5 @@
 import { lowerWorkerThreadPriority } from "../lib/background-work.js";
-import { prepareLocalSession } from "../selfhost/local-ingest/prepare.js";
+import { buildLocalSessionInput } from "../selfhost/local-ingest/session-input.js";
 import type {
 	LocalSessionInputRequest,
 	LocalSessionInputWorkerResponse,
@@ -27,7 +27,7 @@ self.addEventListener("message", (event) => {
 	const { requestId, request } = event.data;
 	void (async () => {
 		try {
-			const prepared = await prepareLocalSession(request);
+			const prepared = await buildLocalSessionInput(request);
 			self.postMessage(
 				{ requestId, status: "ok", prepared },
 				prepared.kind === "skipped"

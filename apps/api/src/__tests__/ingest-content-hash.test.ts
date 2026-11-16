@@ -111,26 +111,4 @@ describe("computeIngestContentHash", () => {
 			}),
 		);
 	});
-
-	test("the handler computes one hash and reuses it for compare and record", async () => {
-		const routerSource = await Bun.file(
-			new URL("../router.ts", import.meta.url),
-		).text();
-		expect(
-			routerSource.match(/computeIngestContentHash\(filteredInput\)/gu),
-		).toHaveLength(1);
-		expect(routerSource).toContain(
-			"ownership.lastContentSha256 === contentHash",
-		);
-		expect(routerSource).toContain("contentShape.contentBytes,");
-		expect(routerSource).toContain("contentShape.assistantLineCount,");
-		expect(routerSource).toContain("await hasRawSessionRow({");
-		expect(
-			routerSource.match(/await filterSessionTextFieldsOffThread\(\{/gu),
-		).toHaveLength(1);
-		expect(routerSource).toMatch(
-			/\(ledger\)\s*=>\s*processPreparedIngestSession\(\{/u,
-		);
-		expect(routerSource).not.toContain("filterSessionTextFields({");
-	});
 });

@@ -17,6 +17,7 @@ import {
 	type SessionOutcome,
 } from "./service.js";
 import type { LocalIngestRoots } from "./sources.js";
+import { readSession } from "./transcript-file/index.js";
 
 let home: string;
 let roots: LocalIngestRoots;
@@ -238,7 +239,45 @@ test("an appended session is imported again; a hook ping makes it due at once", 
 	await appendFile(path, line("more"));
 	expect(await service.notify([path], true)).toBe(1);
 	await settle(service);
-	expect(ingest.calls.map((call) => call.change)).toEqual(["new", "appended"]);
+	expect(ingest.calls.map((call) => call.change.kind)).toEqual([
+		"whole",
+		"appended",
+	]);
+	await service.stop();
+});
+
+test("the stored identity is the bytes the import read, also when the file grows around the read", async () => {
+	const path = await session("growing", 1, "first");
+	const store = memoryStore();
+	const calls: SessionJob[] = [];
+	const service = create(store, {
+		calls,
+		ingestSession: async (job) => {
+			calls.push(job);
+			if (calls.length > 1)
+				return { kind: "ingested", sessionId: "growing", bytes: 1 };
+			await appendFile(path, line("during"));
+			const read = await readSession(job.sessionPath, job.change);
+			await appendFile(path, line("after"));
+			return {
+				kind: "ingested",
+				sessionId: "growing",
+				bytes: read.content.length,
+				files: read.files(),
+			};
+		},
+	});
+	await service.start();
+	await settle(service);
+	const readBytes = Buffer.byteLength(
+		`${line("first")}${line("during")}`,
+		"utf8",
+	);
+	expect(store.rows.get(path)?.ingestedSize).toBe(readBytes);
+	await service.notify([path], true);
+	await settle(service);
+	expect(calls.map((call) => call.change.kind)).toEqual(["whole", "appended"]);
+	expect(calls[1]?.change.since?.size).toBe(readBytes);
 	await service.stop();
 });
 

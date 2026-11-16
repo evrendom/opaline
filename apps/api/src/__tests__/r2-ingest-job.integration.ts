@@ -25,11 +25,7 @@ import {
 import { ingestProcessingSqlClient, sqlClient } from "../db.js";
 import { handleR2IngestMaintenanceRequest } from "../handlers/api-maintenance.js";
 import { handleLargeR2IngestWorkerRequest } from "../handlers/large-r2-ingest-worker.js";
-import {
-	type IngestErrorFactories,
-	processIngestSession,
-	router,
-} from "../router.js";
+import { router } from "../router.js";
 import { requeueFailedIngestJobs } from "../scripts/requeue-failed-ingest-jobs.js";
 import { setAnalysisLogForTests } from "../services/analysis-log/config.js";
 import { createLocalEmbedder } from "../services/analysis-log/embedder.js";
@@ -79,6 +75,11 @@ import {
 	type R2MultipartUploadInitClient,
 	type R2ObjectMetadata,
 } from "../services/r2-ingest-storage.service.js";
+import {
+	type IngestErrorFactories,
+	processIngestSession,
+	type SessionImportDependencies,
+} from "../services/session-import/index.js";
 import { UsageExtractionQueueTimeoutError } from "../services/usage-extraction.service.js";
 import {
 	type ApiTestServer,
@@ -3156,6 +3157,34 @@ describe("R2 ingest real processor crash recovery", () => {
 		expect(raw?.content).not.toContain(pixels.toString("base64"));
 	}, 180_000);
 
+	test("a stored upload queues its session's run index even when its git observations are skipped", async () => {
+		const jobId = crypto.randomUUID();
+		const initialized = await initializeUploadedJob(
+			jobId,
+			buildRealClaudeTranscript(`run-index-${jobId}`),
+		);
+		const previous = process.env.GIT_OBSERVATION_EXTRACTION_ENABLED;
+		process.env.GIT_OBSERVATION_EXTRACTION_ENABLED = "false";
+		try {
+			const committed = await commitR2IngestJob({
+				input: buildCompletionInput(initialized),
+				process: createRealProcessor(undefined),
+				r2: fakeR2,
+				userId: USER_ID,
+			});
+			expect(committed.status).toBe("completed");
+		} finally {
+			if (previous === undefined)
+				delete process.env.GIT_OBSERVATION_EXTRACTION_ENABLED;
+			else process.env.GIT_OBSERVATION_EXTRACTION_ENABLED = previous;
+		}
+		const queued = await sqlClient<{ scope_kind: string }[]>`
+			SELECT scope_kind FROM l1_edge_scope
+			WHERE organization_id = ${ORGANIZATION_ID} AND session_id = ${jobId}
+		`;
+		expect(queued.map((row) => row.scope_kind)).toEqual(["session"]);
+	}, 180_000);
+
 	test.each(
 		CRASH_BOUNDARIES,
 	)("is physically and logically idempotent after $label acknowledgement", async ({
@@ -4131,31 +4160,33 @@ function createRealProcessor(
 	failpoint: IngestProcessingFailpoint | undefined,
 	options: {
 		awaitLanguageSignals?: boolean;
-		extractSessionFacts?: NonNullable<
-			Parameters<typeof processIngestSession>[0]["extractSessionFacts"]
-		>;
+		extractSessionFacts?: SessionImportDependencies["extractSessionFacts"];
 	} = {},
 ): (
 	input: IngestSessionInput,
 	identity: { operationId: string; organizationId: string; userId: string },
 ) => Promise<R2IngestProcessorResult> {
 	return (input, identity) =>
-		processIngestSession({
-			awaitLanguageSignals: options.awaitLanguageSignals ?? true,
-			context: {
-				apiKeyId: null,
-				session: null,
-				user: { id: identity.userId },
+		processIngestSession(
+			{
+				awaitLanguageSignals: options.awaitLanguageSignals ?? true,
+				context: {
+					apiKeyId: null,
+					session: null,
+					user: { id: identity.userId },
+				},
+				durableProcessing: {
+					failpoint,
+					operationId: identity.operationId,
+				},
+				enforceRateLimits: false,
+				errorFactories: TEST_ERROR_FACTORIES,
+				input,
 			},
-			durableProcessing: {
-				failpoint,
-				operationId: identity.operationId,
-			},
-			enforceRateLimits: false,
-			errorFactories: TEST_ERROR_FACTORIES,
-			extractSessionFacts: options.extractSessionFacts,
-			input,
-		});
+			options.extractSessionFacts
+				? { extractSessionFacts: options.extractSessionFacts }
+				: {},
+		);
 }
 
 const TEST_ERROR_FACTORIES: IngestErrorFactories = {

@@ -13,15 +13,15 @@ import {
 } from "@rudel/api-routes";
 import postgres from "postgres";
 import {
-	createBackgroundIngestErrorFactories,
-	processIngestSession,
-} from "../router.js";
-import {
 	checkIngestRateLimit,
 	createPostgresIngestRateLimitEnvironment,
 	type IngestRateLimitConfig,
 	type IngestRateLimitEnvironment,
 } from "../services/ingest-rate-limit.service.js";
+import {
+	createBackgroundIngestErrorFactories,
+	processIngestSession,
+} from "../services/session-import/index.js";
 import {
 	type ApiTestServer,
 	startApiTestServer,
