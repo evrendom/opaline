@@ -17,7 +17,6 @@ import {
 	readTranscriptRecordsExtractionConfig,
 	type TranscriptRecordsExtractionConfig,
 } from "./transcript-records-extraction.service.js";
-import { TRANSCRIPT_RECORDS_TABLE } from "./transcript-records-ingest.service.js";
 
 /**
  * Repairs derived transcript data that ingest accepted but did not finish.

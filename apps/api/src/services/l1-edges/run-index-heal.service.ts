@@ -21,7 +21,6 @@ import {
 } from "../analysis/run-index-sql.js";
 import { readClickHouseLoadAverage } from "../backfill-pacing.js";
 import { newestGenerations } from "../transcript-generations/generations.js";
-import { TRANSCRIPT_RECORDS_TABLE } from "../transcript-records-ingest.service.js";
 import { enqueueL1EdgeSessionScopes } from "./l1-edge-queue.service.js";
 import { RUN_INDEX_TABLE } from "./l1-edge-tables.js";
 import {

@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import type { ClickHouseExecutor, ClickHouseStatement } from "../../clickhouse.js";
+import type {
+	ClickHouseExecutor,
+	ClickHouseStatement,
+} from "../../clickhouse.js";
 import { TRANSCRIPT_READ_DEADLINE_MS } from "../transcript-records-reader.service.js";
 import {
 	type GenerationStore,
@@ -133,9 +136,9 @@ describe("which generations retire at a time", () => {
 		expect(retired([uncommitted("3", 30), committed("2", 30)], BUILDS)).toEqual(
 			["3/8"],
 		);
-		expect(retired([uncommitted("3", 30), uncommitted("2", 1)], BUILDS)).toEqual(
-			["3/8"],
-		);
+		expect(
+			retired([uncommitted("3", 30), uncommitted("2", 1)], BUILDS),
+		).toEqual(["3/8"]);
 		expect(retired([uncommitted("3", 30), uncommitted("2", 1)], GRACE)).toEqual(
 			[],
 		);
@@ -144,7 +147,12 @@ describe("which generations retire at a time", () => {
 	test("without a grace everything below the newest receipt goes at once, a newer build stays", () => {
 		expect(
 			retired(
-				[uncommitted("4"), committed("3", 0), committed("2", 0), uncommitted("1")],
+				[
+					uncommitted("4"),
+					committed("3", 0),
+					committed("2", 0),
+					uncommitted("1"),
+				],
 				NO_GRACE,
 			),
 		).toEqual(["2/8", "1/8"]);
@@ -229,10 +237,8 @@ function fakeExecutor(
 	const executor = {
 		async query(statement: ClickHouseStatement) {
 			if (statement.query.includes("mergeTreeIndex")) return [];
-			if (statement.query.includes("system.mutations"))
-				return [{ pending: 0 }];
-			if (statement.query.includes("SELECT 1 AS found"))
-				return [{ found: 1 }];
+			if (statement.query.includes("system.mutations")) return [{ pending: 0 }];
+			if (statement.query.includes("SELECT 1 AS found")) return [{ found: 1 }];
 			return [];
 		},
 		async execute(statement: ClickHouseStatement) {

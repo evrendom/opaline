@@ -11,7 +11,6 @@ import {
 	RUN_INDEX_VERSION,
 } from "../analysis/run-index-sql.js";
 import { newestGenerations } from "../transcript-generations/generations.js";
-import { TRANSCRIPT_RECORDS_TABLE } from "../transcript-records-ingest.service.js";
 import { sessionScopeId } from "./l1-edge-ids.js";
 import { enqueueL1EdgeSessionScopes } from "./l1-edge-queue.service.js";
 import { RUN_INDEX_TABLE } from "./l1-edge-tables.js";

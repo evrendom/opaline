@@ -93,9 +93,7 @@ async function readSessions(
 		await executor.query<unknown>({
 			abortSignal: input.signal,
 			clickhouse_settings: input.settings ?? settings,
-			query: query(
-				`${organizationFilter(input.organizationId)} ${bounds.sql}`,
-			),
+			query: query(`${organizationFilter(input.organizationId)} ${bounds.sql}`),
 			query_params: {
 				...params,
 				...bounds.params,

@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import { ORPCError } from "@orpc/server";
-import { TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX } from "@rudel/api-routes/transcript-records";
 import type { ClickHouseExecutor } from "../../clickhouse.js";
 import {
 	contentRow,
