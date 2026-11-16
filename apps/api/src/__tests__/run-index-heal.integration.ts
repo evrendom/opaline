@@ -226,7 +226,6 @@ test("with reparse on, a stale index is queued before a newer session on the cur
 	const result = await tick({
 		config: { ...config, reparse: true, maxReparsePerTick: 1 },
 		reparser: {
-			retire: async () => 0,
 			reparse: async (row) => {
 				reparsed.push(row.session_id);
 				return { outcome: "written", bytes: 1 };

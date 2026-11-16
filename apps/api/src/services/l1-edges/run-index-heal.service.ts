@@ -502,7 +502,6 @@ export type ReparseOutcome =
 	| "missing";
 
 export interface Reparser {
-	retire(deadline: MaintenanceDeadline): Promise<number>;
 	reparse(
 		row: HealRow,
 		context: { readonly deadline: MaintenanceDeadline; runBytes: number },
@@ -522,7 +521,6 @@ export interface RunIndexHealTickResult {
 	frozen: number;
 	reparsed: number;
 	reparseOutcomes: Record<ReparseOutcome, number>;
-	retiredGenerations: number;
 	selections: number;
 	organizations: {
 		organizationId: string;
@@ -569,7 +567,6 @@ function emptyResult(): RunIndexHealTickResult {
 			oversized: 0,
 			missing: 0,
 		},
-		retiredGenerations: 0,
 		selections: 0,
 		organizations: [],
 		stoppedEarly: null,
@@ -641,16 +638,6 @@ export async function runRunIndexHealTick(
 		),
 		config,
 	);
-
-	if (reparse && options.reparser) {
-		try {
-			result.retiredGenerations = await options.reparser.retire(deadline);
-		} catch (error) {
-			logger.warn("Run index heal retirement pass failed: {error}", {
-				error: error instanceof Error ? error.message : String(error),
-			});
-		}
-	}
 
 	const reparseState = { runBytes: 0 };
 	for (const organization of ordered) {
@@ -816,7 +803,6 @@ export function logRunIndexHealTick(result: RunIndexHealTickResult): void {
 		recentFailures: result.queue?.recentFailures ?? null,
 		load: result.load,
 		censusMs: result.censusMs,
-		retiredGenerations: result.retiredGenerations,
 		stoppedEarly: result.stoppedEarly,
 		organizations: result.organizations.length,
 	};

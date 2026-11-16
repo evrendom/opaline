@@ -458,7 +458,6 @@ test("the jobs that poll rest when their last run found nothing, the rare ones n
 				remaining: 0,
 				queued: 0,
 				reparsed: 0,
-				retiredGenerations: 0,
 			},
 		}),
 	).toBe(true);

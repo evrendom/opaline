@@ -4,17 +4,12 @@ import {
 	type ClickHouseExecutor,
 	getSafeClickHouseTable,
 } from "../../clickhouse.js";
-import {
-	createMaintenanceQueueDeadline,
-	type MaintenanceDeadline,
-} from "../../lib/bounded-maintenance.js";
+import type { MaintenanceDeadline } from "../../lib/bounded-maintenance.js";
 import { assertNoClickHousePurgeTombstone } from "../clickhouse-purge-tombstone.service.js";
 import {
 	readRawRevision,
 	toIsoUtc,
 } from "../derived-records-reconciliation.service.js";
-import { retireGenerations } from "../generation-retirement/retirement.js";
-import { transcriptRecordsStore } from "../generation-retirement/stores.js";
 import {
 	persistTranscriptRecordsBestEffort,
 	readTranscriptRecordsExtractionConfig,
@@ -29,7 +24,6 @@ import type {
 
 export const REPARSE_MAX_SESSION_BYTES = 64 * 1024 * 1024;
 export const REPARSE_MAX_RUN_BYTES = 256 * 1024 * 1024;
-const RETIREMENT_BUDGET_MS = 10_000;
 const MIN_REMAINING_MS = 15_000;
 const PROBE_SETTINGS = {
 	readonly: "2",
@@ -51,15 +45,6 @@ export function createReparser(options: {
 	const maxSessionBytes = options.maxSessionBytes ?? REPARSE_MAX_SESSION_BYTES;
 	const maxRunBytes = options.maxRunBytes ?? REPARSE_MAX_RUN_BYTES;
 	return {
-		async retire(deadline) {
-			const pass = await retireGenerations(executor, transcriptRecordsStore, {
-				deadline: createMaintenanceQueueDeadline(
-					deadline,
-					RETIREMENT_BUDGET_MS,
-				),
-			});
-			return pass.retired;
-		},
 		async reparse(row, context) {
 			if (!config.enabled) return { outcome: "failed", bytes: 0 };
 			const remaining = context.deadline.deadlineAt - context.deadline.now();

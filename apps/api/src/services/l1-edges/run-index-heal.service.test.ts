@@ -544,12 +544,7 @@ describe("a run index heal tick", () => {
 		});
 		const pg = fakeSql();
 		const reparsed: string[] = [];
-		let retired = 0;
 		const reparser: Reparser = {
-			retire: async () => {
-				retired++;
-				return 3;
-			},
 			reparse: async (target) => {
 				reparsed.push(target.session_id);
 				return { outcome: "written", bytes: 10 };
@@ -567,7 +562,6 @@ describe("a run index heal tick", () => {
 			deadline: deadline(),
 			reparser,
 		});
-		expect(retired).toBe(1);
 		expect(pg.queued.flatMap((batch) => batch.scopeIds)).toEqual([
 			scope("i1"),
 			scope("i2"),
@@ -577,7 +571,6 @@ describe("a run index heal tick", () => {
 			queued: 2,
 			reparsed: 1,
 			selections: 2,
-			retiredGenerations: 3,
 			reparseOutcomes: { written: 1 },
 		});
 		const selections = clickhouse.statements.filter(
@@ -603,7 +596,6 @@ describe("a run index heal tick", () => {
 		});
 		const pg = fakeSql();
 		const reparser: Reparser = {
-			retire: async () => 0,
 			reparse: async () => {
 				throw new Error("reparse is off");
 			},

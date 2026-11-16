@@ -103,7 +103,6 @@ export const JOB_RESTS = {
 				["runIndexHeal", "queued"],
 				["runIndexHeal", "remaining"],
 				["runIndexHeal", "reparsed"],
-				["runIndexHeal", "retiredGenerations"],
 				["runIndexHeal", "queue", "pending"],
 			],
 			[],
