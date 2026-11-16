@@ -1,28 +1,23 @@
-import { basename, dirname } from "node:path";
+import { basename } from "node:path";
 import {
 	claudeCodeAdapter,
 	codexAdapter,
 	decodeProjectPath,
-	extractAgentIds,
-	readSubagentFiles,
 } from "@rudel/agent-adapters";
 import {
 	type IngestSessionInput,
 	IngestSessionInputSchema,
 } from "@rudel/api-routes";
 import { type GitInfo, getGitInfo } from "./git-info.js";
+import { inferSessionRepository } from "./session-repository.js";
+import { claudeProjectDirectory, claudeSessionId } from "./sources.js";
 import {
 	type CollectedImage,
-	createImageCollector,
-	type ImageCollector,
-} from "./image-collection.js";
-import { inferSessionRepository } from "./session-repository.js";
-import {
-	readSlimmedSessionFile,
-	sessionFileSegments,
-	slimSessionText,
-} from "./slim-reader.js";
-import { claudeProjectDirectory, claudeSessionId } from "./sources.js";
+	type FileIdentity,
+	readSession,
+	type SessionRead,
+	type TranscriptChange,
+} from "./transcript-file/index.js";
 
 export type LocalSessionInput =
 	| {
@@ -30,8 +25,21 @@ export type LocalSessionInput =
 			readonly input: IngestSessionInput;
 			readonly bytes: number;
 			readonly images: readonly CollectedImage[];
+			readonly files: readonly FileIdentity[];
 	  }
-	| { readonly kind: "skipped"; readonly reason: string };
+	| {
+			readonly kind: "skipped";
+			readonly reason: string;
+			readonly files?: readonly FileIdentity[];
+	  };
+
+export interface LocalSessionInputRequest {
+	readonly sessionPath: string;
+	readonly source: "claude_code" | "codex";
+	readonly change: TranscriptChange | null;
+	readonly organizationId: string;
+	readonly now: number;
+}
 
 const GIT_INFO_TTL_MS = 5 * 60_000;
 const gitInfoCache = new Map<string, { at: number; info: Promise<GitInfo> }>();
@@ -102,25 +110,20 @@ function byteLength(input: IngestSessionInput): number {
 	return bytes;
 }
 
-export async function readSessionFile(path: string): Promise<string> {
-	const segments: string[] = [];
-	for await (const segment of sessionFileSegments(path)) segments.push(segment);
-	return segments.join("\n");
+function skipped(reason: string, session: SessionRead): LocalSessionInput {
+	return { kind: "skipped", reason, files: session.files() };
 }
 
-export async function buildLocalSessionInput(input: {
-	readonly sessionPath: string;
-	readonly source: "claude_code" | "codex";
-	readonly organizationId: string;
-	readonly now: number;
-}): Promise<LocalSessionInput> {
-	const images = createImageCollector();
-	const content = await readSlimmedSessionFile(input.sessionPath, images);
+export async function buildLocalSessionInput(
+	input: LocalSessionInputRequest,
+): Promise<LocalSessionInput> {
+	const session = await readSession(input.sessionPath, input.change);
+	const { content } = session;
 	if (input.source === "codex") {
 		const meta = codexMeta(content);
-		if (!meta) return { kind: "skipped", reason: "not a Codex session" };
+		if (!meta) return skipped("not a Codex session", session);
 		if (!codexAdapter.extractTimestamps(content))
-			return { kind: "skipped", reason: "no timestamped records" };
+			return skipped("no timestamped records", session);
 		const gitInfo = meta.cwd ? await cachedGitInfo(meta.cwd, input.now) : {};
 		const inferred = await inferSessionRepository({
 			projectPath: meta.cwd,
@@ -146,23 +149,13 @@ export async function buildLocalSessionInput(input: {
 				upload_mode: "hook",
 			},
 			input.sessionPath,
-			images,
+			session,
 		);
 	}
 	if (!claudeCodeAdapter.extractTimestamps(content))
-		return {
-			kind: "skipped",
-			reason: "no timestamped user or assistant messages",
-		};
+		return skipped("no timestamped user or assistant messages", session);
 	const sessionId = claudeSessionId(input.sessionPath);
-	const subagents = slimSubagents(
-		await readSubagentFiles(
-			dirname(input.sessionPath),
-			extractAgentIds(content),
-			sessionId,
-		),
-		images,
-	);
+	const subagents = await session.subagents();
 	const projectPath =
 		firstRecordedCwd(content) ??
 		(await decodeProjectPath(claudeProjectDirectory(input.sessionPath)));
@@ -185,43 +178,34 @@ export async function buildLocalSessionInput(input: {
 			gitBranch: repository.branch,
 			gitSha: repository.sha,
 			content,
-			subagents: subagents.length > 0 ? subagents : undefined,
+			subagents: subagents.length > 0 ? [...subagents] : undefined,
 			organizationId: input.organizationId,
 			upload_mode: "hook",
 		},
 		input.sessionPath,
-		images,
+		session,
 	);
-}
-
-function slimSubagents<Subagent extends { agentId: string; content: string }>(
-	subagents: readonly Subagent[],
-	images: ImageCollector,
-): Subagent[] {
-	return subagents.map((subagent) => ({
-		...subagent,
-		content: slimSessionText(subagent.content, subagent.agentId, images),
-	}));
 }
 
 function parsed(
 	raw: unknown,
 	path: string,
-	images: ImageCollector,
+	session: SessionRead,
 ): LocalSessionInput {
 	const result = IngestSessionInputSchema.safeParse(raw);
 	if (!result.success)
-		return {
-			kind: "skipped",
-			reason: `${basename(path)} is not a session Opaline can store: ${result.error.issues
+		return skipped(
+			`${basename(path)} is not a session Opaline can store: ${result.error.issues
 				.map((issue) => `${issue.path.join(".")} ${issue.message}`)
 				.join("; ")
 				.slice(0, 300)}`,
-		};
+			session,
+		);
 	return {
 		kind: "ready",
 		input: result.data,
 		bytes: byteLength(result.data),
-		images: images.images(),
+		images: session.images(),
+		files: session.files(),
 	};
 }

@@ -88,6 +88,7 @@ export function createSessionRunner(
 				deps.prepare({
 					sessionPath: job.sessionPath,
 					source: job.source,
+					change: job.change,
 					organizationId: owner.organizationId,
 					now: now().getTime(),
 				}),

@@ -1,13 +1,6 @@
 import { type FSWatcher, watch } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
-import {
-	detectFileChange,
-	endsWithNewline,
-	type FileStat,
-	fingerprintAt,
-	statTranscript,
-} from "./file-identity.js";
 import type {
 	FileState,
 	FileStore,
@@ -20,6 +13,14 @@ import {
 	type TranscriptFile,
 	type TranscriptSource,
 } from "./sources.js";
+import {
+	checkTranscript,
+	type FileIdentity,
+	type FileStat,
+	identifyTranscript,
+	statTranscript,
+	type TranscriptChange,
+} from "./transcript-file/index.js";
 
 export interface Owner {
 	readonly userId: string;
@@ -29,7 +30,7 @@ export interface Owner {
 export interface SessionJob {
 	readonly sessionPath: string;
 	readonly source: TranscriptSource;
-	readonly change: string;
+	readonly change: TranscriptChange;
 	readonly bytes?: number;
 }
 
@@ -105,14 +106,7 @@ export interface LocalIngestDependencies {
 interface SeenFile {
 	file: TranscriptFile;
 	stat: FileStat;
-	ingested: {
-		readonly device: string;
-		readonly inode: string;
-		readonly size: number;
-		readonly mtimeMs: number;
-		readonly headSha256: string;
-		readonly tailSha256: string;
-	} | null;
+	ingested: FileIdentity | null;
 	owner: Owner | null;
 }
 
@@ -521,40 +515,27 @@ export class LocalIngest {
 		final: boolean,
 	): Promise<number | null> {
 		const main = this.files.get(entry.sessionPath);
-		const stat = await statTranscript(entry.sessionPath);
-		if (!main || !stat) {
+		const check = main
+			? await checkTranscript(entry.sessionPath, main.ingested, {
+					final,
+					now: this.now(),
+					partialLineGraceMs: this.settings.partialLineGraceMs,
+				})
+			: null;
+		if (!main || !check || check.kind === "missing") {
 			entry.firstDirtyAt = null;
 			return null;
 		}
-		main.stat = stat;
-		const change = await detectFileChange(
-			entry.sessionPath,
-			main.ingested
-				? {
-						device: main.ingested.device,
-						inode: main.ingested.inode,
-						ingestedSize: main.ingested.size,
-						ingestedMtimeMs: main.ingested.mtimeMs,
-						headSha256: main.ingested.headSha256,
-						tailSha256: main.ingested.tailSha256,
-					}
-				: null,
-			stat,
-		);
-		const recent = this.now() - stat.mtimeMs < this.settings.partialLineGraceMs;
-		if (
-			!final &&
-			recent &&
-			!(await endsWithNewline(entry.sessionPath, stat.size))
-		)
-			return this.now() + this.settings.quietMs;
+		main.stat = check.stat;
+		if (check.kind === "writing") return this.now() + this.settings.quietMs;
+		const { change } = check;
 		const subagents = await this.refreshSubagents(entry);
 		const snapshot = [main, ...subagents];
 		const ownerChanged =
 			main.owner?.organizationId !== owner.organizationId ||
 			main.owner?.userId !== owner.userId;
 		if (
-			change === "unchanged" &&
+			change.kind === "unchanged" &&
 			!ownerChanged &&
 			entry.state !== "failed" &&
 			entry.state !== "pending" &&
@@ -650,9 +631,14 @@ export class LocalIngest {
 	): Promise<IngestedFile[]> {
 		const out: IngestedFile[] = [];
 		for (const seen of files) {
-			const fingerprint = await fingerprintAt(seen.file.path, seen.stat.size);
-			if (!fingerprint) continue;
-			out.push({ file: seen.file, stat: seen.stat, ...fingerprint });
+			const identity = await identifyTranscript(seen.file.path, seen.stat);
+			if (!identity) continue;
+			out.push({
+				file: seen.file,
+				stat: seen.stat,
+				headSha256: identity.headSha256,
+				tailSha256: identity.tailSha256,
+			});
 		}
 		return out;
 	}

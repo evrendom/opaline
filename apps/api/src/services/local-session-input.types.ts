@@ -1,21 +1,10 @@
-import type { IngestSessionInput } from "@rudel/api-routes";
-import type { CollectedImage } from "../selfhost/local-ingest/image-collection.js";
+import type {
+	LocalSessionInput,
+	LocalSessionInputRequest,
+} from "../selfhost/local-ingest/session-input.js";
 
-export interface LocalSessionInputRequest {
-	readonly sessionPath: string;
-	readonly source: "claude_code" | "codex";
-	readonly organizationId: string;
-	readonly now: number;
-}
-
-export type PreparedLocalSession =
-	| {
-			readonly kind: "ready";
-			readonly input: IngestSessionInput;
-			readonly bytes: number;
-			readonly images: readonly CollectedImage[];
-	  }
-	| { readonly kind: "skipped"; readonly reason: string };
+export type { LocalSessionInputRequest };
+export type PreparedLocalSession = LocalSessionInput;
 
 export type LocalSessionInputWorkerResponse =
 	| {

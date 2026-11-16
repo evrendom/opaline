@@ -118,7 +118,9 @@ export async function readSubagentFiles(
 	sessionDir: string,
 	agentIds: string[],
 	sessionId?: string,
+	options: { readonly readFile?: (path: string) => Promise<string> } = {},
 ): Promise<SubagentFile[]> {
+	const read = options.readFile ?? ((path: string) => readFile(path, "utf-8"));
 	const subagents: SubagentFile[] = [];
 	const subagentDirs = await resolveSubagentDirectories(sessionDir, sessionId);
 	const queued = new Set(agentIds.filter(isSafeBasename));
@@ -144,7 +146,7 @@ export async function readSubagentFiles(
 			if (!isContainedPath(subagentDir, agentPath)) continue;
 
 			try {
-				const content = await readFile(agentPath, "utf-8");
+				const content = await read(agentPath);
 				subagents.push({ agentId, content });
 				for (const nestedAgentId of extractAgentIds(content)) {
 					if (queued.size >= MAX_SUBAGENT_FILES || queued.has(nestedAgentId))

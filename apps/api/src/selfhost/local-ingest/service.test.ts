@@ -238,7 +238,10 @@ test("an appended session is imported again; a hook ping makes it due at once", 
 	await appendFile(path, line("more"));
 	expect(await service.notify([path], true)).toBe(1);
 	await settle(service);
-	expect(ingest.calls.map((call) => call.change)).toEqual(["new", "appended"]);
+	expect(ingest.calls.map((call) => call.change.kind)).toEqual([
+		"whole",
+		"appended",
+	]);
 	await service.stop();
 });
 

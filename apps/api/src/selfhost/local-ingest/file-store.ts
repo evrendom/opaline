@@ -1,6 +1,6 @@
 import type postgres from "postgres";
-import type { FileStat } from "./file-identity.js";
 import type { TranscriptFile } from "./sources.js";
+import type { FileStat } from "./transcript-file/index.js";
 
 export type FileState = "pending" | "ingested" | "failed" | "skipped" | "kept";
 

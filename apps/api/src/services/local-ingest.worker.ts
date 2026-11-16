@@ -29,7 +29,7 @@ const runner = (async () => {
 		{ getClickhouse },
 		storage,
 		{ createSessionRunner },
-		{ prepareLocalSession },
+		{ buildLocalSessionInput },
 	] = await Promise.all([
 		import("../logging.js"),
 		import("../router.js"),
@@ -37,7 +37,7 @@ const runner = (async () => {
 		import("../clickhouse.js"),
 		import("./r2-ingest-storage.service.js"),
 		import("../selfhost/local-ingest/runner.js"),
-		import("../selfhost/local-ingest/prepare.js"),
+		import("../selfhost/local-ingest/session-input.js"),
 	]);
 	await setupLogging();
 	process.stderr.write(
@@ -46,7 +46,7 @@ const runner = (async () => {
 	return createSessionRunner({
 		processIngestSession: router.processIngestSession,
 		errorFactories: router.createBackgroundIngestErrorFactories,
-		prepare: prepareLocalSession,
+		prepare: buildLocalSessionInput,
 		sql: sqlClient,
 		clickhouse: getClickhouse,
 		objectStore: () => {

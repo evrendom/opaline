@@ -10,22 +10,23 @@ export interface FileStat {
 	readonly mtimeMs: number;
 }
 
-export interface IngestedIdentity {
-	readonly device: string;
-	readonly inode: string;
-	readonly ingestedSize: number;
-	readonly ingestedMtimeMs: number;
+export interface FileIdentity extends FileStat {
 	readonly headSha256: string;
 	readonly tailSha256: string;
 }
 
-export type FileChange =
+export interface Fingerprint {
+	readonly headSha256: string;
+	readonly tailSha256: string;
+}
+
+export type WholeReason =
 	| "new"
-	| "unchanged"
-	| "appended"
-	| "rewritten"
 	| "replaced"
-	| "truncated";
+	| "rewritten"
+	| "truncated"
+	| "compressed"
+	| "unaligned";
 
 export async function statTranscript(path: string): Promise<FileStat | null> {
 	try {
@@ -61,19 +62,23 @@ async function readWindow(
 	}
 }
 
-function sha256(buffer: Buffer): string {
+export function sha256(buffer: Buffer): string {
 	return createHash("sha256").update(buffer).digest("hex");
+}
+
+export function tailStart(size: number): number {
+	return Math.max(0, size - FINGERPRINT_BYTES);
 }
 
 export async function fingerprintAt(
 	path: string,
 	size: number,
-): Promise<{ headSha256: string; tailSha256: string } | null> {
+): Promise<Fingerprint | null> {
 	const headLength = Math.min(FINGERPRINT_BYTES, size);
-	const tailStart = Math.max(0, size - FINGERPRINT_BYTES);
+	const start = tailStart(size);
 	const [head, tail] = await Promise.all([
 		readWindow(path, 0, headLength),
-		readWindow(path, tailStart, size - tailStart),
+		readWindow(path, start, size - start),
 	]);
 	return head && tail
 		? { headSha256: sha256(head), tailSha256: sha256(tail) }
@@ -89,26 +94,31 @@ export async function endsWithNewline(
 	return last !== null && last[0] === 0x0a;
 }
 
-export async function detectFileChange(
-	path: string,
-	stored: IngestedIdentity | null,
+export type StatComparison =
+	| { readonly kind: "unchanged" }
+	| { readonly kind: "whole"; readonly reason: WholeReason }
+	| { readonly kind: "grown" | "touched" };
+
+export function compareStat(
+	stored: FileIdentity | null,
 	current: FileStat,
-): Promise<FileChange> {
-	if (!stored) return "new";
+): StatComparison {
+	if (!stored) return { kind: "whole", reason: "new" };
 	if (stored.device !== current.device || stored.inode !== current.inode)
-		return "replaced";
-	if (
-		current.size === stored.ingestedSize &&
-		current.mtimeMs === stored.ingestedMtimeMs
-	)
-		return "unchanged";
-	if (current.size < stored.ingestedSize) return "truncated";
-	const before = await fingerprintAt(path, stored.ingestedSize);
-	if (!before) return "rewritten";
-	if (
-		before.headSha256 !== stored.headSha256 ||
-		before.tailSha256 !== stored.tailSha256
-	)
-		return "rewritten";
-	return current.size === stored.ingestedSize ? "unchanged" : "appended";
+		return { kind: "whole", reason: "replaced" };
+	if (current.size === stored.size && current.mtimeMs === stored.mtimeMs)
+		return { kind: "unchanged" };
+	if (current.size < stored.size) return { kind: "whole", reason: "truncated" };
+	return { kind: current.size === stored.size ? "touched" : "grown" };
+}
+
+export function samePrefix(
+	stored: FileIdentity,
+	found: Fingerprint | null,
+): boolean {
+	return (
+		found !== null &&
+		found.headSha256 === stored.headSha256 &&
+		found.tailSha256 === stored.tailSha256
+	);
 }
