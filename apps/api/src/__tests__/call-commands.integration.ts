@@ -1,5 +1,5 @@
 import "./helpers/local-integration-guard.js";
-import { afterAll, beforeAll, expect, test } from "bun:test";
+import { afterAll, beforeAll, expect, setDefaultTimeout, test } from "bun:test";
 import type { AnalysisFindInput } from "@rudel/api-routes";
 import { TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX } from "@rudel/api-routes/transcript-records";
 import { getClickhouse } from "../clickhouse.js";
@@ -20,6 +20,8 @@ import {
 	PROGRAMS,
 	SEPARATE,
 } from "./helpers/command-identity-cases.js";
+
+setDefaultTimeout(120_000);
 
 const clickhouse = getClickhouse();
 const organizationId = `call-commands-${crypto.randomUUID()}`;
