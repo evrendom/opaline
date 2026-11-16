@@ -113,7 +113,7 @@ export function materializeCallCommandsStatements(
 
 const ReceiptSchema = z.object({
 	session_id: z.string(),
-	revision: z.coerce.string(),
+	revision_text: z.string(),
 	parser_version: z.coerce.number(),
 });
 
@@ -125,7 +125,7 @@ export async function missingCallCommandGenerations(
 	if (generations.length === 0) return [];
 	const done = await query(executor, ReceiptSchema, {
 		clickhouse_settings: MATERIALIZE_SETTINGS,
-		query: `SELECT session_id, toString(revision) AS revision, parser_version
+		query: `SELECT session_id, toString(revision) AS revision_text, parser_version
 			FROM ${commandsTable()}
 			WHERE ${pinnedRows()} AND ${receiptRow()}
 			GROUP BY session_id, revision, parser_version`,
@@ -135,7 +135,7 @@ export async function missingCallCommandGenerations(
 		done.map((row) =>
 			generationKey({
 				sessionId: row.session_id,
-				revision: row.revision,
+				revision: row.revision_text,
 				parserVersion: row.parser_version,
 			}),
 		),
