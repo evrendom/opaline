@@ -94,7 +94,7 @@ export function createSessionRunner(
 				}),
 			);
 			if (prepared.kind === "skipped") return prepared;
-			const { input } = prepared;
+			const { input, files } = prepared;
 			const ingest = () =>
 				deps.processIngestSession({
 					aggregateContentMaxBytes: INGEST_AGGREGATE_CONTENT_MAX_BYTES,
@@ -128,8 +128,8 @@ export function createSessionRunner(
 						break;
 					}
 					return outcome.kind === "kept"
-						? { ...outcome, sessionId: input.sessionId }
-						: outcome;
+						? { ...outcome, sessionId: input.sessionId, files }
+						: { ...outcome, files };
 				}
 			}
 			const store = deps.objectStore();
@@ -161,6 +161,7 @@ export function createSessionRunner(
 				kind: "ingested",
 				sessionId: input.sessionId,
 				bytes: prepared.bytes,
+				files,
 				...(storedReason === undefined ? {} : { reason: storedReason }),
 			};
 		});

@@ -34,7 +34,7 @@ export interface SessionJob {
 	readonly bytes?: number;
 }
 
-export type SessionOutcome =
+export type SessionOutcome = (
 	| {
 			readonly kind: "ingested" | "kept";
 			readonly sessionId: string;
@@ -42,7 +42,8 @@ export type SessionOutcome =
 			readonly reason?: string;
 	  }
 	| { readonly kind: "skipped"; readonly reason: string }
-	| { readonly kind: "retry"; readonly reason: string };
+	| { readonly kind: "retry"; readonly reason: string }
+) & { readonly files?: readonly FileIdentity[] };
 
 export interface IngestStatus {
 	readonly state: "idle" | "importing" | "paused";
@@ -574,7 +575,7 @@ export class LocalIngest {
 			});
 			return at + delay;
 		}
-		const decided = await this.identities(snapshot);
+		const decided = await this.identities(snapshot, outcome.files ?? []);
 		if (outcome.kind === "skipped" || outcome.kind === "retry") {
 			const reason =
 				outcome.kind === "retry"
@@ -613,6 +614,7 @@ export class LocalIngest {
 		for (const { file, stat: fileStat, headSha256, tailSha256 } of decided) {
 			const seen = this.files.get(file.path);
 			if (!seen) continue;
+			seen.stat = fileStat;
 			seen.ingested = {
 				device: fileStat.device,
 				inode: fileStat.inode,
@@ -628,17 +630,18 @@ export class LocalIngest {
 
 	private async identities(
 		files: readonly SeenFile[],
+		read: readonly FileIdentity[],
 	): Promise<IngestedFile[]> {
 		const out: IngestedFile[] = [];
 		for (const seen of files) {
-			const identity = await identifyTranscript(seen.file.path, seen.stat);
+			const identity =
+				read.find(
+					(file) =>
+						file.device === seen.stat.device && file.inode === seen.stat.inode,
+				) ?? (await identifyTranscript(seen.file.path, seen.stat));
 			if (!identity) continue;
-			out.push({
-				file: seen.file,
-				stat: seen.stat,
-				headSha256: identity.headSha256,
-				tailSha256: identity.tailSha256,
-			});
+			const { headSha256, tailSha256, ...stat } = identity;
+			out.push({ file: seen.file, stat, headSha256, tailSha256 });
 		}
 		return out;
 	}
