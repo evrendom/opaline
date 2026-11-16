@@ -247,7 +247,7 @@ function createLocalStack(options) {
 	});
 	let preparing;
 	let ensuring;
-	let starting = 0;
+	let starting;
 	let shuttingDown = false;
 	let stopSupervising;
 	let pendingLogin;
@@ -309,29 +309,31 @@ function createLocalStack(options) {
 		}
 	}
 
-	async function startServer({ priority } = {}) {
-		starting++;
-		try {
-			const args = ["start"];
-			if (!localServer()) {
-				const port = await firstServerPort();
-				if (port && port !== DEFAULT_PORT) args.push("--port", String(port));
-			}
-			const result = await launcher.run(args, { onEvent: forward, priority });
-			const error = result.events.find((event) => event.type === "error");
-			if (result.code !== 0 || error)
-				throw new Error(
-					error?.message ??
-						(result.stderr.trim().split("\n").at(-1) ||
-							"The local server did not start."),
-				);
-			const login = result.events.find((event) => event.type === "login")?.url;
-			if (login) pendingLogin = { url: login, at: Date.now() };
-			emitter.emit("server", localServer());
-			return { setup: result.events.find((event) => event.type === "setup") };
-		} finally {
-			starting--;
+	function startServer(options) {
+		starting ??= runStart(options).finally(() => {
+			starting = undefined;
+		});
+		return starting;
+	}
+
+	async function runStart({ priority } = {}) {
+		const args = ["start"];
+		if (!localServer()) {
+			const port = await firstServerPort();
+			if (port && port !== DEFAULT_PORT) args.push("--port", String(port));
 		}
+		const result = await launcher.run(args, { onEvent: forward, priority });
+		const error = result.events.find((event) => event.type === "error");
+		if (result.code !== 0 || error)
+			throw new Error(
+				error?.message ??
+					(result.stderr.trim().split("\n").at(-1) ||
+						"The local server did not start."),
+			);
+		const login = result.events.find((event) => event.type === "login")?.url;
+		if (login) pendingLogin = { url: login, at: Date.now() };
+		emitter.emit("server", localServer());
+		return { setup: result.events.find((event) => event.type === "setup") };
 	}
 
 	function clickhouseBinary(timeoutMs = 120_000) {
@@ -486,13 +488,15 @@ function createLocalStack(options) {
 	async function openDashboard(win, target, { intro = false } = {}) {
 		const current = environment() ?? { kind: "local" };
 		const shape = (url) => (intro ? introUrl(url) : url);
-		win.webContents.once("did-finish-load", () => mark("dashboard-loaded"));
+		const loaded = () => mark("dashboard-loaded");
+		win.webContents.once("did-finish-load", loaded);
 		try {
 			if (current.kind === "local") return await openLocal(win, target, intro);
 			if (current.kind === "cloud")
 				return await win.loadURL(shape(target ?? `${CLOUD_URL}/dashboard`));
 			return await win.loadURL(shape(target ?? `${current.url}/`));
 		} catch (error) {
+			win.webContents.removeListener?.("did-finish-load", loaded);
 			log(`openDashboard failed: ${error.message}`);
 			emitter.emit("error", error);
 			throw error;
@@ -563,6 +567,7 @@ function createLocalStack(options) {
 	} = {}) {
 		stopSupervising?.();
 		let misses = 0;
+		let wasHealthy = false;
 		let timer;
 		const schedule = () => {
 			if (shuttingDown) return;
@@ -571,13 +576,18 @@ function createLocalStack(options) {
 		};
 		const tick = async () => {
 			const server = localServer();
-			if (!isLocal() || !server?.configured || starting > 0) {
+			if (!isLocal() || starting) {
 				misses = 0;
 				return schedule();
 			}
-			if (await isHealthy(server.localUrl, 3_000)) misses = 0;
+			const healthy = Boolean(
+				server?.configured && (await isHealthy(server.localUrl, 3_000)),
+			);
+			if (healthy && !wasHealthy) emitter.emit("healthy", server);
+			wasHealthy = healthy;
+			if (healthy) misses = 0;
 			else misses++;
-			if (misses >= allowedMisses && !shuttingDown && starting === 0) {
+			if (misses >= allowedMisses && !shuttingDown && !starting) {
 				misses = 0;
 				mark("server-restart");
 				try {

@@ -26,6 +26,13 @@ fs.appendFileSync(process.env.FAKE_LOG, JSON.stringify(args) + "\\n");
 const out = (event) => process.stdout.write(JSON.stringify(event) + "\\n");
 const base = process.env.FAKE_BASE;
 if (args[0] === "start") {
+	const failFile = process.env.FAKE_FAIL_FILE;
+	const left = failFile && fs.existsSync(failFile) ? Number(fs.readFileSync(failFile, "utf8")) : 0;
+	if (left > 0) {
+		fs.writeFileSync(failFile, String(left - 1));
+		out({ type: "error", message: "fetch failed" });
+		process.exit(1);
+	}
 	const dataDir = process.env.OPALINE_SERVER_DATA_DIR;
 	const fresh = !fs.existsSync(path.join(dataDir, "server.json"));
 	fs.mkdirSync(dataDir, { recursive: true });
@@ -59,6 +66,7 @@ const ENV = [
 	"OPALINE_DESKTOP_SERVER_PORT",
 	"FAKE_LOG",
 	"FAKE_BASE",
+	"FAKE_FAIL_FILE",
 ];
 
 beforeAll(() => {
@@ -301,6 +309,65 @@ describe("the local stack controller", () => {
 		await until(() => restarted === 1);
 		stop();
 		expect(calls()).toEqual([["start"]]);
+	});
+
+	test("callers that need the server while a start failed share one new start instead of racing two", async () => {
+		process.env.FAKE_FAIL_FILE = path.join(root, "fail");
+		fs.writeFileSync(process.env.FAKE_FAIL_FILE, "2");
+		const stack = createLocalStack({ app: fakeApp() });
+		const prepared = stack.prepare();
+		const [dashboard, agents] = await Promise.all([
+			stack.ready(),
+			stack.ready(),
+		]);
+		expect(await prepared).toBeUndefined();
+		expect(dashboard?.configured).toBe(true);
+		expect(agents?.configured).toBe(true);
+		expect(calls()).toEqual([["start"], ["start"], ["start"]]);
+	});
+
+	test("the supervisor finishes a server that runs but was never set up, then tells the windows", async () => {
+		const dataDir = process.env.OPALINE_SERVER_DATA_DIR;
+		fs.mkdirSync(dataDir, { recursive: true });
+		const port = Number(new URL(base).port);
+		fs.writeFileSync(
+			path.join(dataDir, "server.json"),
+			JSON.stringify({ publicUrl: base, host: "127.0.0.1", port }),
+		);
+		const stack = createLocalStack({ app: fakeApp() });
+		const seen = [];
+		stack.on("healthy", () => seen.push("healthy"));
+		let restarted = 0;
+		const stop = stack.supervise({
+			intervalMs: 20,
+			allowedMisses: 2,
+			onRestart: () => {
+				restarted++;
+				seen.push("restarted");
+			},
+		});
+		await until(() => seen.includes("healthy"));
+		stop();
+		expect(restarted).toBe(1);
+		expect(seen).toEqual(["restarted", "healthy"]);
+		expect(calls()).toEqual([["start"]]);
+		expect(stack.localServer()?.configured).toBe(true);
+	});
+
+	test("the supervisor says once when the server answers again, so a window that could not open retries", async () => {
+		const stack = createLocalStack({ app: fakeApp() });
+		await stack.prepare();
+		healthy = false;
+		let answered = 0;
+		stack.on("healthy", () => answered++);
+		const stop = stack.supervise({ intervalMs: 20, allowedMisses: 1_000 });
+		await new Promise((resolve) => setTimeout(resolve, 120));
+		expect(answered).toBe(0);
+		healthy = true;
+		await until(() => answered === 1);
+		await new Promise((resolve) => setTimeout(resolve, 120));
+		stop();
+		expect(answered).toBe(1);
 	});
 
 	test("a plain quit leaves the server running; quitting completely or leaving this Mac stops it", async () => {

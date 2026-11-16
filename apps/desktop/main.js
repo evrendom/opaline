@@ -145,9 +145,53 @@ function createWindow({ url, link, bounds, intro = false } = {}) {
 	win.on("closed", () => appWindows.delete(win));
 	const target = url ?? (explicitUrl ? (link ?? explicitUrl) : undefined);
 	if (target) win.loadURL(intro ? introUrl(target) : target);
-	else stack.openDashboard(win, link, { intro }).catch(() => {});
+	else openDashboardIn(win, link, { intro });
 	return win;
 }
+
+const openingWindows = new WeakMap();
+const START_PROBLEM_PAGE = path.join(__dirname, "start-window", "index.html");
+
+function isStartProblemPage(url) {
+	try {
+		return new URL(url).protocol === "file:" && decodeURIComponent(new URL(url).pathname) === START_PROBLEM_PAGE;
+	} catch {
+		return false;
+	}
+}
+
+function openDashboardIn(win, link, options) {
+	const opened = stack.openDashboard(win, link, options).then(
+		() => {},
+		(error) => {
+			if (quitting || win.isDestroyed() || openingWindows.get(win) !== opened) return;
+			stack.mark("start-problem-shown");
+			win.loadFile(START_PROBLEM_PAGE, { query: { message: error.message } }).catch(() => {});
+		},
+	);
+	openingWindows.set(win, opened);
+	opened.finally(() => {
+		if (openingWindows.get(win) === opened) openingWindows.delete(win);
+	});
+	return opened;
+}
+
+function recoverWindows({ reload = false } = {}) {
+	if (quitting) return;
+	for (const win of appWindows) {
+		if (win.isDestroyed() || openingWindows.has(win)) continue;
+		const url = win.webContents.getURL();
+		if (isAppUrl(url)) {
+			if (reload) win.reload();
+		} else if (!url || isStartProblemPage(url)) openDashboardIn(win);
+	}
+}
+
+ipcMain.on("app:retry-start", (event) => {
+	const win = BrowserWindow.fromWebContents(event.sender);
+	if (!win || !appWindows.has(win) || !isStartProblemPage(event.senderFrame?.url ?? "") || openingWindows.has(win)) return;
+	openDashboardIn(win);
+});
 
 function fromApp(event) {
 	return isAppUrl(event.senderFrame?.url ?? "");
@@ -368,10 +412,6 @@ ipcMain.on("app:replay-open", (event) => {
 	onboardingWindow.once("show", () => replaced?.hide());
 });
 
-function reloadAppWindows() {
-	for (const win of appWindows) if (!win.isDestroyed() && isAppUrl(win.webContents.getURL())) win.reload();
-}
-
 function mainWindow() {
 	const focused = BrowserWindow.getFocusedWindow();
 	if (focused && appWindows.has(focused)) return focused;
@@ -421,7 +461,7 @@ async function showPendingLink() {
 	if (process.platform === "darwin") app.show();
 	app.focus({ steal: true });
 	if (explicitUrl) win.loadURL(target);
-	else stack.openDashboard(win, target).catch(() => {});
+	else openDashboardIn(win, target);
 }
 
 function openLink(raw) {
@@ -490,7 +530,9 @@ app.whenReady().then(() => {
 		else createWindow();
 	}
 	if (!explicitUrl) {
-		stack.supervise({ onRestart: reloadAppWindows });
+		stack.on("server", () => recoverWindows());
+		stack.on("healthy", () => recoverWindows());
+		stack.supervise({ onRestart: () => recoverWindows({ reload: true }) });
 		stack.ready().then(() => agents.refresh()).catch(() => {});
 	}
 	app.on("activate", () => {

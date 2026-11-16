@@ -61,7 +61,7 @@ dest="$resources/app"
 mkdir -p "$dest/local-server" "$resources/server" "$resources/runtimes"
 cp "$here/package.json" "$here/main.js" "$here/deep-link.js" "$here/agents.js" "$here/analyze.js" "$here/pricing.js" \
 	"$here/preload.js" "$here/onboarding-preload.js" "$here/environments.js" "$here/environment-preload.js" "$dest/"
-cp -R "$here/stack" "$here/analysis" "$here/onboarding" "$here/onboarding-window" "$here/environment-window" "$dest/"
+cp -R "$here/stack" "$here/analysis" "$here/onboarding" "$here/onboarding-window" "$here/environment-window" "$here/start-window" "$dest/"
 cp "$repo/packages/local-server/dist/local-server.js" "$dest/local-server/"
 printf '{"type":"module"}\n' > "$dest/local-server/package.json"
 cp -R "$repo/plugins/opaline" "$dest/agent-plugin"
