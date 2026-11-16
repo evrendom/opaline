@@ -194,7 +194,6 @@ function revealApp(from, duration) {
 			if (replaced && !replaced.isDestroyed()) replaced.destroy();
 			replaced = undefined;
 			stack.mark("handover");
-			restoreServerPriority();
 		}, 16);
 	});
 }
@@ -316,12 +315,10 @@ ipcMain.on("onboarding:theme", (event, theme) => {
 });
 ipcMain.on("onboarding:finish", (event, duration) => {
 	if (!fromOnboarding(event)) return;
+	restoreServerPriority();
 	fs.writeFileSync(onboardedMarker(), new Date().toISOString());
 	onboardingDone = true;
-	if (!replaced && BrowserWindow.getAllWindows().length > 1) {
-		restoreServerPriority();
-		return onboardingWindow.destroy();
-	}
+	if (!replaced && BrowserWindow.getAllWindows().length > 1) return onboardingWindow.destroy();
 	revealApp(onboardingWindow, Number(duration) || 750);
 });
 
@@ -365,7 +362,7 @@ try {
 
 if (!explicitUrl && stack.isLocal()) {
 	stack.warmClickHouse();
-	stack.prepare({ priority: serverQuiet ? "background" : undefined }).then((started) => {
+	stack.prepare().then((started) => {
 		if (started) stack.setServerPriority(serverQuiet);
 	});
 }
