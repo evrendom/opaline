@@ -1,10 +1,8 @@
-import { TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX } from "@rudel/api-routes/transcript-records";
 import {
 	type ClickHouseExecutor,
 	type ClickHouseStatement,
 	getSafeClickHouseTable,
 } from "../clickhouse.js";
-import { TRANSCRIPT_RECORDS_TABLE } from "./transcript-records-ingest.service.js";
 
 export const CENSUS_WINDOW_INDEX_ROWS = 2_000_000;
 export const CENSUS_WINDOW_SETTINGS = {
@@ -19,15 +17,15 @@ const CENSUS_WINDOW_BOUNDS_SETTINGS = {
 	result_overflow_mode: "throw",
 } as const;
 
-export interface TranscriptRecordsSessionKey {
+export interface CensusSessionKey {
 	readonly organizationId: string;
 	readonly userId: string;
 	readonly sessionId: string;
 }
 
-export interface TranscriptRecordsCensusWindow {
-	readonly from?: TranscriptRecordsSessionKey;
-	readonly to?: TranscriptRecordsSessionKey;
+export interface CensusWindow {
+	readonly from?: CensusSessionKey;
+	readonly to?: CensusSessionKey;
 }
 
 interface CensusWindowStartRow {
@@ -36,76 +34,12 @@ interface CensusWindowStartRow {
 	session_id: string;
 }
 
-export interface RetirementSessionRow {
-	organization_id: string;
-	user_id: string;
-	session_id: string;
-	revision_text: string;
-	parser_version: number;
-	receipt_head: string;
-}
-
-/**
- * Sessions with more than one committed generation whose newest receipt was
- * published at or before `retireBefore` (so the generations it superseded
- * are past the grace), in key order, at most `limit`. Shared by the hourly
- * retirement and the operator drain (`drainTranscriptRecordsRetirement`), so
- * both retire exactly the same sessions.
- */
-export function buildTranscriptRecordsRetirementCensusStatement(input: {
-	readonly limit: number;
-	readonly organizationId?: string;
-	readonly retireBefore: number;
-	readonly settings?: ClickHouseStatement["clickhouse_settings"];
-	readonly window?: TranscriptRecordsCensusWindow;
-}): ClickHouseStatement {
-	return {
-		clickhouse_settings: input.settings ?? CENSUS_WINDOW_SETTINGS,
-		query: `
-				SELECT organization_id, user_id, session_id,
-					toString(newest_generation.1) AS revision_text,
-					newest_generation.2 AS parser_version, receipt_head
-				FROM (
-				SELECT organization_id, user_id, session_id,
-					max((revision, parser_version)) AS newest_generation,
-					argMax(head, (revision, parser_version, JSONExtractString(head, 'publishedAt'))) AS receipt_head,
-					arraySort(groupUniqArray(((revision, parser_version),
-						parseDateTime64BestEffortOrNull(JSONExtractString(head, 'publishedAt'), 3, 'UTC')))) AS receipts
-				FROM ${getSafeClickHouseTable(TRANSCRIPT_RECORDS_TABLE)}
-				WHERE agent_id = ''
-					AND record_idx = {receiptRecordIdx:UInt32}
-					AND block_idx = 0 AND kind = 'receipt'
-					${input.organizationId === undefined ? "" : "AND organization_id = {organizationId:String}"}
-					${input.window?.from === undefined ? "" : `AND ${keyBound("from", ">")}`}
-					${input.window?.to === undefined ? "" : `AND ${keyBound("to", "<")}`}
-				GROUP BY organization_id, user_id, session_id
-				HAVING uniqExact((revision, parser_version)) > 1
-					AND arrayExists(
-						receipt -> receipt.2 <= fromUnixTimestamp64Milli({retireBefore:Int64}, 'UTC'),
-						arraySlice(receipts, 2))
-				)
-				ORDER BY organization_id, user_id, session_id
-				LIMIT {maxSessions:UInt32}
-			`,
-		query_params: {
-			maxSessions: input.limit,
-			organizationId: input.organizationId,
-			receiptRecordIdx: TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
-			retireBefore: input.retireBefore,
-			...keyParams("from", input.window?.from),
-			...keyParams("to", input.window?.to),
-		},
-	};
-}
-
-export function buildTranscriptRecordsCensusWindowsStatement(input: {
+export function buildCensusWindowsStatement(input: {
 	readonly organizationId?: string;
 	readonly windowRows: number;
-	readonly table?: string;
+	readonly table: string;
 }): ClickHouseStatement {
-	const [database, table] = getSafeClickHouseTable(
-		input.table ?? TRANSCRIPT_RECORDS_TABLE,
-	).split(".");
+	const [database, table] = getSafeClickHouseTable(input.table).split(".");
 	return {
 		clickhouse_settings: CENSUS_WINDOW_BOUNDS_SETTINGS,
 		query: `
@@ -135,9 +69,9 @@ export function buildTranscriptRecordsCensusWindowsStatement(input: {
 	};
 }
 
-export function transcriptRecordsCensusWindows(
-	starts: readonly TranscriptRecordsSessionKey[],
-): TranscriptRecordsCensusWindow[] {
+export function censusWindows(
+	starts: readonly CensusSessionKey[],
+): CensusWindow[] {
 	const cuts = starts.slice(1);
 	if (cuts.length === 0) return [{}];
 	return [
@@ -147,7 +81,7 @@ export function transcriptRecordsCensusWindows(
 }
 
 export function censusWindowFilter(
-	window: TranscriptRecordsCensusWindow,
+	window: CensusWindow,
 	alias?: string,
 ): {
 	sql: string;
@@ -181,7 +115,7 @@ function keyBound(
 
 function keyParams(
 	side: "from" | "to",
-	key: TranscriptRecordsSessionKey | undefined,
+	key: CensusSessionKey | undefined,
 ): Record<string, string> {
 	if (key === undefined) return {};
 	return {
@@ -204,10 +138,11 @@ export async function scanCensusWindows<Row>(
 		readonly table: string;
 		readonly windowRows: number;
 		readonly limit: number;
-		readonly statement: (
-			window: TranscriptRecordsCensusWindow,
+		readonly read: (
+			window: CensusWindow,
 			remaining: number,
-		) => ClickHouseStatement;
+			signal: AbortSignal | undefined,
+		) => Promise<Row[]>;
 		readonly wait: <T>(operation: () => Promise<T>) => Promise<T>;
 		readonly signal?: AbortSignal;
 		readonly organizationId?: string;
@@ -217,7 +152,7 @@ export async function scanCensusWindows<Row>(
 ): Promise<CensusWindowScan<Row>> {
 	const starts = await options.wait(() =>
 		executor.query<CensusWindowStartRow>({
-			...buildTranscriptRecordsCensusWindowsStatement({
+			...buildCensusWindowsStatement({
 				organizationId: options.organizationId,
 				table: options.table,
 				windowRows: options.windowRows,
@@ -225,7 +160,7 @@ export async function scanCensusWindows<Row>(
 			abortSignal: options.signal,
 		}),
 	);
-	const windows = transcriptRecordsCensusWindows(
+	const windows = censusWindows(
 		starts.map((row) => ({
 			organizationId: row.organization_id,
 			sessionId: row.session_id,
@@ -245,10 +180,7 @@ export async function scanCensusWindows<Row>(
 	while (windowsScanned < maxWindows && rows.length < options.limit) {
 		const window = windows[(first + windowsScanned) % windows.length] ?? {};
 		const found = await options.wait(() =>
-			executor.query<Row>({
-				...options.statement(window, options.limit - rows.length),
-				abortSignal: options.signal,
-			}),
+			options.read(window, options.limit - rows.length, options.signal),
 		);
 		rows.push(...found);
 		windowsScanned++;
@@ -259,31 +191,4 @@ export async function scanCensusWindows<Row>(
 		windowsScanned,
 		hasMore: rows.length >= options.limit || windowsScanned < windows.length,
 	};
-}
-
-export async function findTranscriptRecordsRetirementSessions(
-	executor: ClickHouseExecutor,
-	options: {
-		readonly maxSessions: number;
-		readonly retireBefore: number;
-		readonly wait: <T>(operation: () => Promise<T>) => Promise<T>;
-		readonly signal?: AbortSignal;
-		readonly organizationId?: string;
-		readonly maxWindows?: number;
-		readonly rotation?: number;
-	},
-): Promise<CensusWindowScan<RetirementSessionRow>> {
-	return scanCensusWindows<RetirementSessionRow>(executor, {
-		...options,
-		limit: options.maxSessions,
-		table: TRANSCRIPT_RECORDS_TABLE,
-		windowRows: CENSUS_WINDOW_INDEX_ROWS,
-		statement: (window, remaining) =>
-			buildTranscriptRecordsRetirementCensusStatement({
-				limit: remaining,
-				organizationId: options.organizationId,
-				retireBefore: options.retireBefore,
-				window,
-			}),
-	});
 }

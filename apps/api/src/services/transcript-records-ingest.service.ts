@@ -40,15 +40,6 @@ const RECEIPT_SCAN_SETTINGS = {
 	max_rows_to_read: "5000000",
 } as const;
 
-/**
- * How long a superseded committed generation stays readable, measured from the
- * publication that superseded it. It must exceed the readers' enforced
- * whole-read deadline (`TRANSCRIPT_READ_DEADLINE_MS`), so a read that pinned a
- * generation can never have its rows deleted before it finishes or times out.
- */
-export const TRANSCRIPT_RECORDS_RETIRE_GRACE_MS = 10 * 60_000;
-export const MAX_RETIRED_GENERATIONS_PER_PASS = 100;
-
 const logger = getLogger(["rudel", "api", "transcript-records-ingest"]);
 
 export interface TranscriptRecordsIdentity {
@@ -523,50 +514,6 @@ export async function deleteTranscriptRecordsGeneration(
 			userId: identity.userId,
 		},
 	});
-}
-
-/**
- * A generation older than the published one, with when its receipt was
- * published: null when it never committed, NaN when the time is unreadable.
- */
-export interface OlderGeneration<Entry> {
-	readonly generation: Entry;
-	readonly publishedAtMs: number | null;
-}
-
-/**
- * Older generations (given newest first) that are garbage or past their
- * grace. Shared by every store whose generations commit with a receipt
- * (transcript records; the run index, whose generation also has an index
- * version).
- */
-export function selectRetiredGenerations<Entry>(
-	older: readonly OlderGeneration<Entry>[],
-	retirement: {
-		readonly graceMs: number;
-		readonly now: Date;
-		readonly publishedAtMs: number;
-	},
-): Entry[] {
-	const retired: Entry[] = [];
-	// Publication time of the next newer committed generation: the moment the
-	// generation below it stopped being the committed one.
-	let supersededAtMs = retirement.publishedAtMs;
-	for (const { generation, publishedAtMs } of older) {
-		if (publishedAtMs === null) {
-			retired.push(generation);
-			continue;
-		}
-		if (supersededAtMs <= retirement.now.getTime() - retirement.graceMs) {
-			retired.push(generation);
-		}
-		// An unreadable timestamp keeps this generation and everything below it
-		// for another pass rather than guessing.
-		supersededAtMs = Number.isFinite(publishedAtMs)
-			? publishedAtMs
-			: Number.POSITIVE_INFINITY;
-	}
-	return retired.slice(0, MAX_RETIRED_GENERATIONS_PER_PASS);
 }
 
 async function insertBatch(

@@ -19,6 +19,8 @@ import {
 	enqueueClickHousePurge,
 	runClickHousePurgeWorkerPass,
 } from "../services/clickhouse-purge.service.js";
+import { retireGenerations } from "../services/generation-retirement/retirement.js";
+import { chunkHitsStore } from "../services/generation-retirement/stores.js";
 import { runNodeId } from "../services/l1-edges/l1-edge-ids.js";
 import { buildRunIndex } from "../services/l1-edges/run-index.service.js";
 import {
@@ -38,10 +40,7 @@ import {
 	type SearchEnv,
 	searchTranscripts,
 } from "../services/transcript-search/search.js";
-import {
-	indexSessionText,
-	retireOlderTranscriptChunkHits,
-} from "../services/transcript-search/session-index.service.js";
+import { indexSessionText } from "../services/transcript-search/session-index.service.js";
 import { deleteUserPostgresData } from "../services/user-deletion.service.js";
 
 /** Every agent query gets a slot at once. */
@@ -481,7 +480,7 @@ describe("re-uploads", () => {
 			{ revision: "9" },
 			{ revision: "10" },
 		]);
-		const retirement = await retireOlderTranscriptChunkHits(clickhouse, {
+		const retirement = await retireGenerations(clickhouse, chunkHitsStore, {
 			organizationId: workspace,
 		});
 		expect(retirement).toMatchObject({ hasMore: false });

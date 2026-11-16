@@ -1,4 +1,3 @@
-import { TupleParam } from "@clickhouse/client-web";
 import { TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX } from "@rudel/api-routes/transcript-records";
 import { CALL_FACTS_TABLE } from "@rudel/ch-schema/call-facts";
 import type {
@@ -13,7 +12,6 @@ import {
 	type ClickHouseExecutor,
 	getSafeClickHouseTable,
 } from "../../clickhouse.js";
-import type { MaintenanceDeadline } from "../../lib/bounded-maintenance.js";
 import {
 	type CodexLifecycleFacts,
 	codexLifecycleFactsByRun,
@@ -89,21 +87,10 @@ import {
 	queryCountedGenerations,
 } from "../analysis/scope.js";
 import { ANALYSIS_QUERY_SETTINGS, query } from "../analysis/sql.js";
-import {
-	buildKeyedDeleteOperations,
-	type DeleteOperation,
-	type DeleteOutcome,
-	isDeleteSettled,
-} from "../clickhouse-batched-delete.js";
-import { runRetirementDeletes } from "../generation-retirement.js";
 import type {
 	Generation,
 	SessionGeneration,
 } from "../transcript-generations/generations.js";
-import {
-	MAX_RETIRED_GENERATIONS_PER_PASS,
-	selectRetiredGenerations,
-} from "../transcript-records-ingest.service.js";
 import {
 	type CallTuple,
 	CallTuplesSchema,
@@ -1426,201 +1413,6 @@ export function receiptRow(
 		title: session.facts.title,
 		session_model: session.model,
 	};
-}
-
-const SnapshotRowSchema = z.object({
-	revision_text: z.string(),
-	parser_version: count,
-	index_version: count,
-	build_text: z.string(),
-	receipts: count,
-	receipt_built_ms: count,
-	written_ms: count,
-});
-
-/** A build's snapshot: its generation and build revision. */
-export interface RunIndexSnapshot extends RunIndexGeneration {
-	buildRevision: string;
-}
-
-const SessionSnapshotRowSchema = SnapshotRowSchema.extend({
-	user_id: z.string(),
-	session_id: z.string(),
-});
-
-const RUN_INDEX_SNAPSHOT_KEY_COLUMNS = [
-	{ name: "user_id", type: "String" },
-	{ name: "session_id", type: "String" },
-	{ name: "revision", type: "UInt64" },
-	{ name: "parser_version", type: "UInt16" },
-	{ name: "index_version", type: "UInt16" },
-	{ name: "build_revision", type: "UInt64" },
-] as const;
-
-export interface RunIndexSnapshotRetirement {
-	snapshots: number;
-	retired: number;
-	settled: boolean;
-	outcomes: DeleteOutcome[];
-}
-
-/**
- * Retires the snapshots no reader can pin or will pin again of one
- * organization's sessions, found from all their rows, receipts or not:
- *
- * - older than the committed snapshot (the newest with a receipt) and never
- *   committed: a crashed build, at once;
- * - older and committed: once the grace since the snapshot that superseded
- *   it was published has passed (a reader may still hold it);
- * - newer than the committed snapshot, or with no committed snapshot at all,
- *   and never committed: a crashed build once its last write is older than
- *   the grace (a build in flight writes its receipt within its lease).
- *
- * The committed snapshot itself is never retired, even after its transcript
- * expired. Requests and setup first: the run index rows are what finds a
- * snapshot again, so a pass that stops between the deletes is finished by the
- * next.
- */
-export async function retireRunIndexSnapshots(
-	executor: ClickHouseExecutor,
-	organizationId: string,
-	sessions: readonly Pick<SessionIdentity, "userId" | "sessionId">[],
-	retirement: {
-		abortSignal?: AbortSignal;
-		deadline?: MaintenanceDeadline;
-		graceMs: number;
-		now: Date;
-	},
-): Promise<RunIndexSnapshotRetirement> {
-	const result: RunIndexSnapshotRetirement = {
-		snapshots: 0,
-		retired: 0,
-		settled: true,
-		outcomes: [],
-	};
-	if (sessions.length === 0) return result;
-	const rows = await query(executor, SessionSnapshotRowSchema, {
-		abortSignal: retirement.abortSignal,
-		query: `SELECT user_id, session_id, toString(revision) AS revision_text, parser_version, index_version,
-				toString(build_revision) AS build_text,
-				countIf(row_kind = 'receipt') AS receipts,
-				maxIf(toUnixTimestamp64Milli(built_at), row_kind = 'receipt') AS receipt_built_ms,
-				max(toUnixTimestamp64Milli(built_at)) AS written_ms
-			FROM ${getSafeClickHouseTable(RUN_INDEX_TABLE)}
-			WHERE organization_id = {organizationId:String}
-				AND (user_id, session_id) IN {sessions:Array(Tuple(String, String))}
-			GROUP BY user_id, session_id, revision, parser_version, index_version, build_revision
-			ORDER BY user_id, session_id, revision DESC, parser_version DESC, index_version DESC, build_revision DESC
-			LIMIT {snapshotLimit:UInt32} BY user_id, session_id`,
-		query_params: {
-			organizationId,
-			sessions: sessions.map(
-				(session) => new TupleParam([session.userId, session.sessionId]),
-			),
-			snapshotLimit: 10 * MAX_RETIRED_GENERATIONS_PER_PASS,
-		},
-		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
-	});
-	const bySession = new Map<string, z.infer<typeof SnapshotRowSchema>[]>();
-	for (const row of rows) {
-		const key = `${row.user_id}\u0000${row.session_id}`;
-		const list = bySession.get(key) ?? [];
-		list.push(row);
-		bySession.set(key, list);
-	}
-	const keys: (string | number)[][] = [];
-	for (const [key, snapshots] of bySession) {
-		const [userId = "", sessionId = ""] = key.split("\u0000");
-		for (const snapshot of selectRetiredSnapshots(snapshots, retirement))
-			keys.push([
-				userId,
-				sessionId,
-				snapshot.revision,
-				snapshot.parserVersion,
-				snapshot.indexVersion,
-				snapshot.buildRevision,
-			]);
-	}
-	result.snapshots = keys.length;
-	const byTable = [
-		CALL_FACTS_TABLE,
-		RUN_SETUP_TABLE,
-		RUN_REQUESTS_TABLE,
-		RUN_INDEX_TABLE,
-	].map((table) =>
-		buildKeyedDeleteOperations({
-			table,
-			organizationId,
-			columns: RUN_INDEX_SNAPSHOT_KEY_COLUMNS,
-			keys,
-		}),
-	);
-	const [calls = [], setup = [], requests = [], index = []] = byTable;
-	for (let chunk = 0; chunk < index.length; chunk++) {
-		const operations = [
-			calls[chunk],
-			setup[chunk],
-			requests[chunk],
-			index[chunk],
-		].filter(
-			(operation): operation is DeleteOperation => operation !== undefined,
-		);
-		const outcomes = await runRetirementDeletes(
-			executor,
-			operations,
-			{ signal: retirement.abortSignal, deadline: retirement.deadline },
-			true,
-		);
-		result.outcomes.push(...outcomes);
-		const last = outcomes.at(-1);
-		if (
-			outcomes.length === operations.length &&
-			last !== undefined &&
-			isDeleteSettled(last)
-		)
-			result.retired += last.keyCount;
-		else {
-			result.settled = false;
-			break;
-		}
-	}
-	return result;
-}
-
-/** The snapshots `retireRunIndexSnapshots` deletes, from rows newest first. */
-export function selectRetiredSnapshots(
-	snapshots: readonly z.infer<typeof SnapshotRowSchema>[],
-	retirement: { graceMs: number; now: Date },
-): RunIndexSnapshot[] {
-	const snapshotOf = (
-		row: z.infer<typeof SnapshotRowSchema>,
-	): RunIndexSnapshot => ({
-		revision: row.revision_text,
-		parserVersion: row.parser_version,
-		indexVersion: row.index_version,
-		buildRevision: row.build_text,
-	});
-	const committed = snapshots.findIndex((row) => row.receipts > 0);
-	const graceStart = retirement.now.getTime() - retirement.graceMs;
-	// Never committed and not written for longer than the grace: crashed.
-	const abandoned = (committed < 0 ? snapshots : snapshots.slice(0, committed))
-		.filter((row) => row.receipts === 0 && row.written_ms <= graceStart)
-		.map(snapshotOf);
-	const head = snapshots[committed];
-	const superseded = head
-		? selectRetiredGenerations(
-				snapshots.slice(committed + 1).map((row) => ({
-					generation: snapshotOf(row),
-					// A rebuild's newer receipt only keeps the snapshot below longer.
-					publishedAtMs: row.receipts > 0 ? row.receipt_built_ms : null,
-				})),
-				{ ...retirement, publishedAtMs: head.receipt_built_ms },
-			)
-		: [];
-	return [...abandoned, ...superseded].slice(
-		0,
-		MAX_RETIRED_GENERATIONS_PER_PASS,
-	);
 }
 
 /** 'true' when a record says true, 'false' when records say only false, '' when none says. */

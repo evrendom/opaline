@@ -9,17 +9,17 @@ import {
 	queryClickhouse,
 } from "../clickhouse.js";
 import { readNonNegativeSafeIntegerEnv } from "../lib/env.js";
+import {
+	type CensusWindow,
+	censusWindowFilter,
+	scanCensusWindows,
+} from "./census-windows.js";
 import { SESSION_AGENT_RUN_SCAN_VERSION } from "./session-agent-runs.js";
 import {
 	contentRow,
 	newestGenerations,
 } from "./transcript-generations/generations.js";
 import { TRANSCRIPT_RECORDS_TABLE } from "./transcript-records-ingest.service.js";
-import {
-	censusWindowFilter,
-	scanCensusWindows,
-	type TranscriptRecordsCensusWindow,
-} from "./transcript-records-retirement.service.js";
 import {
 	buildCanonicalPricingModelSql,
 	buildRunPricedUsageCte,
@@ -754,7 +754,7 @@ const RUN_METRICS_SQL = `
  * records yields both the prompts and the failed tool results.
  */
 export function buildFrictionWindowStatement(
-	window: TranscriptRecordsCensusWindow,
+	window: CensusWindow,
 	params: TrendsQueryParams,
 ): ClickHouseStatement {
 	const keys = censusWindowFilter(window);
@@ -830,7 +830,11 @@ export async function queryFriction(
 		table: TRANSCRIPT_RECORDS_TABLE,
 		windowRows,
 		limit: Number.POSITIVE_INFINITY,
-		statement: (window) => buildFrictionWindowStatement(window, params),
+		read: (window, _remaining, abortSignal) =>
+			executor.query<FrictionDeveloperRow>({
+				...buildFrictionWindowStatement(window, params),
+				abortSignal,
+			}),
 		wait: (operation) => operation(),
 	});
 	return frictionRows(scan.rows);

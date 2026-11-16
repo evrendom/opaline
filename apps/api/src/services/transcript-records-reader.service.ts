@@ -51,7 +51,7 @@ export const TRANSCRIPT_READ_MAX_RECORD_SLICE_CHARS = 200_000;
 /**
  * Whole-operation deadline of every reader. A read pins one generation and
  * writers retire a superseded generation only after a grace period longer than
- * this (`TRANSCRIPT_RECORDS_RETIRE_GRACE_MS`), so a pinned generation's rows
+ * this (`RETIREMENT_GRACE_MS`), so a pinned generation's rows
  * outlive every read that can still return: one that runs past the deadline
  * fails instead of returning a partial or mixed answer.
  */

@@ -13,7 +13,8 @@ import {
 	readRawRevision,
 	toIsoUtc,
 } from "../derived-records-reconciliation.service.js";
-import { retireTranscriptRecordsGenerations } from "../session-retirement.service.js";
+import { retireGenerations } from "../generation-retirement/retirement.js";
+import { transcriptRecordsStore } from "../generation-retirement/stores.js";
 import {
 	persistTranscriptRecordsBestEffort,
 	readTranscriptRecordsExtractionConfig,
@@ -51,7 +52,7 @@ export function createReparser(options: {
 	const maxRunBytes = options.maxRunBytes ?? REPARSE_MAX_RUN_BYTES;
 	return {
 		async retire(deadline) {
-			const pass = await retireTranscriptRecordsGenerations(executor, {
+			const pass = await retireGenerations(executor, transcriptRecordsStore, {
 				deadline: createMaintenanceQueueDeadline(
 					deadline,
 					RETIREMENT_BUDGET_MS,

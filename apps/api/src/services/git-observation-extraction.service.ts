@@ -7,11 +7,6 @@ import { readPositiveSafeIntegerEnv } from "../lib/env.js";
 import { ReusableWorkers } from "../lib/reusable-workers.js";
 import { isSelfHosted } from "../lib/self-hosted.js";
 import {
-	type GenerationRetirement,
-	type GenerationRetirementOptions,
-	retireGenerationsBelowNewestReceipt,
-} from "./generation-retirement.js";
-import {
 	baseRow,
 	GIT_OBSERVATION_MAX_RAW_BYTES,
 	GIT_TOOL_PATTERN,
@@ -361,17 +356,6 @@ function parseOffThread(
 			}
 		}
 	});
-}
-
-export function retireOlderGitObservations(
-	executor: ClickHouseExecutor,
-	options: GenerationRetirementOptions = {},
-): Promise<GenerationRetirement> {
-	return retireGenerationsBelowNewestReceipt(
-		executor,
-		SESSION_GIT_OBSERVATIONS_TABLE,
-		options,
-	);
 }
 
 function compareGeneration(

@@ -9,11 +9,6 @@ import { z } from "zod";
 import type { ClickHouseExecutor } from "../../clickhouse.js";
 import { ClickHouseWriteFencedError } from "../../lib/clickhouse-write-fence.js";
 import {
-	type GenerationRetirement,
-	type GenerationRetirementOptions,
-	retireGenerationsBelowNewestReceipt,
-} from "../generation-retirement.js";
-import {
 	contentRow,
 	receiptRow,
 } from "../transcript-generations/generations.js";
@@ -502,17 +497,6 @@ const AFTER_RECORD_FILTER = `
 
 function passDeadline(deadlineAt: number, signal: AbortSignal | undefined) {
 	return createTranscriptRecordsDeadline({ deadlineAt, now: Date.now, signal });
-}
-
-export function retireOlderTranscriptChunkHits(
-	executor: ClickHouseExecutor,
-	options: GenerationRetirementOptions = {},
-): Promise<GenerationRetirement> {
-	return retireGenerationsBelowNewestReceipt(
-		executor,
-		TRANSCRIPT_CHUNK_HITS_TABLE,
-		options,
-	);
 }
 
 async function quotaUsedUp(

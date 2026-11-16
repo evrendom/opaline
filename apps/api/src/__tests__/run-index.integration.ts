@@ -15,6 +15,11 @@ import { getClickhouse } from "../clickhouse.js";
 import { readCommittedRunIndex } from "../services/analysis/run-index-reader.js";
 import { RUN_INDEX_VERSION } from "../services/analysis/run-index-sql.js";
 import { queryRunFacts } from "../services/analysis/run-queries.js";
+import {
+	RETIREMENT_GRACE_MS,
+	retireGenerations,
+} from "../services/generation-retirement/retirement.js";
+import { runIndexStore } from "../services/generation-retirement/stores.js";
 import { runNodeId } from "../services/l1-edges/l1-edge-ids.js";
 import {
 	enqueueL1EdgeDependents,
@@ -23,12 +28,10 @@ import {
 } from "../services/l1-edges/l1-edge-queue.service.js";
 import { runL1EdgePass } from "../services/l1-edges/l1-edge-reconciliation.service.js";
 import { buildRunIndex } from "../services/l1-edges/run-index.service.js";
-import { runRunIndexRetirementPass } from "../services/l1-edges/run-index-retirement.service.js";
 import {
 	buildTranscriptRecordRow,
 	buildTranscriptRecordsReceiptRow,
 	hashTranscriptContent,
-	TRANSCRIPT_RECORDS_RETIRE_GRACE_MS,
 } from "../services/transcript-records-ingest.service.js";
 
 setDefaultTimeout(180_000);
@@ -891,14 +894,14 @@ test("the worker indexes runs literally, keeps them through rebuilds and expiry,
 			session_date: written,
 		})),
 	});
-	const later = () => Date.now() + TRANSCRIPT_RECORDS_RETIRE_GRACE_MS + 60_000;
-	const sweep = await runRunIndexRetirementPass({
+	const later = () => Date.now() + RETIREMENT_GRACE_MS + 60_000;
+	const sweep = await retireGenerations(clickhouse, runIndexStore, {
 		organizationId,
 		deadline: { deadlineAt: later() + 600_000, now: later },
 	});
 	// The claude session's crashed and two superseded builds, and the orphan,
 	// in at most one keyed statement per table.
-	expect(sweep.generationsRetired).toBe(4);
+	expect(sweep.retired).toBe(4);
 	expect(sweep.deleteStatements).toBeGreaterThanOrEqual(1);
 	expect(sweep.deleteStatements).toBeLessThanOrEqual(4);
 	expect(await generations()).toEqual(["2"]);
