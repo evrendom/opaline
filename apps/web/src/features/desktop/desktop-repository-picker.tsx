@@ -114,22 +114,22 @@ export function DesktopRepositoryPicker({
 	const previewRepositories = selected
 		.filter((repo) => repo.sessionCount > 0)
 		.sort((a, b) => b.sessionCount - a.sessionCount);
-	const previewKey =
-		mode === "setup"
-			? previewRepositories.map((repo) => repo.key).join("\n")
+	const previewSelection =
+		mode === "setup" && previewRepositories.length
+			? JSON.stringify(
+					previewRepositories.map(({ key, name, sessionCount, sources }) => ({
+						key,
+						name,
+						sessionCount,
+						sources,
+					})),
+				)
 			: "";
 	useEffect(() => {
-		if (!previewKey) return;
-		setWelcomeSelection(
-			previewRepositories.map(({ key, name, sessionCount, sources }) => ({
-				key,
-				name,
-				sessionCount,
-				sources,
-			})),
-		);
+		if (!previewSelection) return;
+		setWelcomeSelection(JSON.parse(previewSelection));
 		return () => setWelcomeSelection([]);
-	}, [previewKey]);
+	}, [previewSelection]);
 
 	function onEvent(event: DesktopApplyEvent) {
 		if (event.type === "progress")

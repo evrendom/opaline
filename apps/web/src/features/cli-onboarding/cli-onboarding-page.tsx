@@ -79,19 +79,21 @@ function CliPairingOnboardingPage() {
 		snapshot?.repositories.filter(
 			(repository) => repository.enabled && repository.sessionCount > 0,
 		) ?? [];
-	const reportedKey = reported.map((repository) => repository.id).join("\n");
+	const reportedSelection = reported.length
+		? JSON.stringify(
+				reported.map((repository) => ({
+					key: repository.id,
+					name: repository.name,
+					sessionCount: repository.sessionCount,
+					sources: repository.sources,
+				})),
+			)
+		: "";
 	useEffect(() => {
-		if (!reportedKey) return;
-		setWelcomeSelection(
-			reported.map((repository) => ({
-				key: repository.id,
-				name: repository.name,
-				sessionCount: repository.sessionCount,
-				sources: repository.sources,
-			})),
-		);
+		if (!reportedSelection) return;
+		setWelcomeSelection(JSON.parse(reportedSelection));
 		return () => setWelcomeSelection([]);
-	}, [reportedKey]);
+	}, [reportedSelection]);
 
 	useEffect(() => {
 		if (
