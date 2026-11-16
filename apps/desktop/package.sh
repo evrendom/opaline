@@ -13,6 +13,8 @@ notary="${OPALINE_NOTARY_PROFILE:-}"
 electron_app="${ELECTRON_APP:-$here/node_modules/electron/dist/Electron.app}"
 version=$(sed -n 's/^[[:space:]]*"version": "\(.*\)",$/\1/p' "$here/package.json" | head -n 1)
 app="$out/Opaline.app"
+dmg="$out/Opaline.dmg"
+dmg_theme="${OPALINE_DMG_THEME:-dark}"
 work="$out/.work"
 
 step() { printf '%s %s\n' "$(date +%H:%M:%S)" "$*"; }
@@ -22,7 +24,11 @@ for file in onboarding-window/vendor/glass3d.js onboarding-window/dots/dots.js o
 	[ -f "$here/$file" ] || { echo "Missing $file (see build-glass3d.sh, build-dots.sh, scripts/grab-previews.mjs)." >&2; exit 1; }
 done
 
-rm -rf "$app" "$work"
+if [ "${OPALINE_DMG:-1}" != 0 ]; then
+	[ -f "$here/dmg/background-$dmg_theme.tiff" ] || { echo "No DMG background for OPALINE_DMG_THEME=$dmg_theme (dark or light)." >&2; exit 1; }
+fi
+
+rm -rf "$app" "$dmg" "$work"
 mkdir -p "$out" "$work"
 
 step "local server: bun build packages/local-server"
@@ -112,5 +118,72 @@ else
 	fi
 fi
 codesign --verify --deep --strict "$app"
+
+build_dmg() {
+	stage="$work/dmg"
+	rw="$work/Opaline-rw.dmg"
+	for mounted in /Volumes/Opaline "/Volumes/Opaline "[0-9]*; do
+		[ -d "$mounted" ] || continue
+		hdiutil detach "$mounted" >/dev/null 2>&1 || { echo "A volume named Opaline is mounted at $mounted and could not be ejected; eject it and run again." >&2; exit 1; }
+	done
+	mkdir -p "$stage/.background"
+	cp -cR "$app" "$stage/" 2>/dev/null || { rm -rf "$stage/Opaline.app"; ditto "$app" "$stage/Opaline.app"; }
+	ln -s /Applications "$stage/Applications"
+	cp "$here/dmg/background-$dmg_theme.tiff" "$stage/.background/background.tiff"
+	size=$(($(du -sm "$stage" | cut -f1) * 11 / 10 + 64))
+	hdiutil create -srcfolder "$stage" -volname Opaline -fs HFS+ -format UDRW -size "${size}m" "$rw" >/dev/null
+	attached=$(hdiutil attach "$rw" -readwrite -noverify -noautoopen)
+	device=$(printf '%s\n' "$attached" | awk 'NR == 1 { print $1 }')
+	volume=$(printf '%s\n' "$attached" | sed -n 's|^.*[[:space:]]\(/Volumes/.*\)$|\1|p' | tail -n 1)
+	trap 'hdiutil detach "$device" -force >/dev/null 2>&1' EXIT
+	[ "$volume" = /Volumes/Opaline ] || { echo "$rw mounted at ${volume:-nowhere}, not /Volumes/Opaline." >&2; exit 1; }
+	osascript >/dev/null <<'APPLESCRIPT'
+tell application "Finder"
+	tell disk "Opaline"
+		open
+		set current view of container window to icon view
+		set toolbar visible of container window to false
+		set statusbar visible of container window to false
+		set pathbar visible of container window to false
+		set bounds of container window to {200, 120, 860, 552}
+		set viewOptions to icon view options of container window
+		set arrangement of viewOptions to not arranged
+		set icon size of viewOptions to 128
+		set text size of viewOptions to 13
+		set background picture of viewOptions to file ".background:background.tiff"
+		set position of item "Opaline.app" to {170, 178}
+		set position of item "Applications" to {490, 178}
+		update without registering applications
+		delay 1
+		close
+	end tell
+end tell
+APPLESCRIPT
+	waited=0
+	while [ ! -f "$volume/.DS_Store" ] && [ "$waited" -lt 10 ]; do
+		sleep 1
+		waited=$((waited + 1))
+	done
+	rm -rf "$volume/.fseventsd"
+	sync
+	hdiutil detach "$device" >/dev/null 2>&1 || { sleep 2; hdiutil detach "$device" -force >/dev/null; }
+	trap - EXIT
+	hdiutil convert "$rw" -format ULFO -o "$dmg" >/dev/null
+	rm -f "$rw"
+	if [ "$identity" != "-" ]; then
+		codesign --force --timestamp --sign "$identity" "$dmg"
+		if [ -n "$notary" ]; then
+			step "notarize: $dmg"
+			xcrun notarytool submit "$dmg" --keychain-profile "$notary" --wait
+			xcrun stapler staple "$dmg"
+		fi
+	fi
+}
+
+if [ "${OPALINE_DMG:-1}" != 0 ]; then
+	step "dmg: $dmg ($dmg_theme)"
+	build_dmg
+fi
 rm -rf "$work"
 step "done: $app ($(du -sh "$app" | cut -f1)), server $(basename "$server_tarball"), runtimes $layout"
+[ ! -f "$dmg" ] || step "done: $dmg ($(du -sh "$dmg" | cut -f1))"
