@@ -1,7 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import type { SessionImportOverrides } from "./dependencies.js";
+import type { IngestErrorFactories } from "./errors.js";
 import {
-	type IngestErrorFactories,
 	processIngestSession,
 	type SessionImportRequest,
 } from "./import-session.js";
