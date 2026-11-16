@@ -15,6 +15,7 @@ export function hasDesktopApp(env: Environment = process.env): boolean {
 }
 
 export function desktopAppLink(pageUrl: string, origin: string): string | null {
+	if (/^opaline:/iu.test(pageUrl)) return pageUrl;
 	let page: URL;
 	let own: URL;
 	try {

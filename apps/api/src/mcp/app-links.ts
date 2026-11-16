@@ -1,5 +1,7 @@
 import { validateOrgSlug } from "@rudel/api-routes/reserved-slugs";
 import { getFrontendOrigin } from "../frontend-origin.js";
+import { isSelfHosted } from "../lib/self-hosted.js";
+import { hasDesktopApp } from "../selfhost/desktop-app.js";
 import { isRecordUuid } from "../services/analysis/record-uuid.js";
 
 export const APP_ROUTES = {
@@ -48,11 +50,37 @@ export function appUrl(
 		if (value !== undefined && value !== null && `${value}` !== "")
 			search.set(key, `${value}`);
 	const suffix = search.toString();
-	return `${getFrontendOrigin()}${path}${suffix ? `?${suffix}` : ""}`;
+	return pageLink(`${path}${suffix ? `?${suffix}` : ""}`);
 }
 
 export function workspacePageUrl(workspaceSlug: string, path: string): string {
-	return `${getFrontendOrigin()}/${encodeURIComponent(workspaceSlug)}${path}`;
+	return pageLink(`/${encodeURIComponent(workspaceSlug)}${path}`);
+}
+
+const DESKTOP_LINK = /^opaline:(?:\/\/)?(.*)$/isu;
+const SESSION_RESOURCE_LINK = /^sessions\/([^/?#]+)\/([^/?#]+)(.*)$/su;
+
+export function pageLink(path: string): string {
+	return hasDesktopApp()
+		? `opaline://${path.replace(/^\/+/u, "")}`
+		: `${getFrontendOrigin()}${path}`;
+}
+
+export function linkExample(): string {
+	if (hasDesktopApp()) return "opaline://…";
+	return isSelfHosted() ? `${getFrontendOrigin()}/…` : "https://opaline.so/…";
+}
+
+function desktopLinkPage(raw: string, origin: string): URL | null {
+	const rest = (DESKTOP_LINK.exec(raw.replace(/[\t\n\r]/gu, ""))?.[1] ?? "")
+		.replace(/^[/\\]+/u, "")
+		.replace(SESSION_RESOURCE_LINK, "$1/sessions/$2$3");
+	try {
+		const page = new URL(`/${rest}`, origin);
+		return page.origin === origin ? page : null;
+	} catch {
+		return null;
+	}
 }
 
 export function sessionUrl(workspace: string, sessionId: string): string {
@@ -115,12 +143,6 @@ const DASHBOARD_LISTS: Record<string, string> = {
 };
 
 export function classifyOpalineUrl(raw: string): PastedUrl | null {
-	let url: URL;
-	try {
-		url = new URL(raw.trim());
-	} catch {
-		return null;
-	}
 	const ownOrigin = (() => {
 		try {
 			return new URL(getFrontendOrigin()).origin;
@@ -128,6 +150,17 @@ export function classifyOpalineUrl(raw: string): PastedUrl | null {
 			return "";
 		}
 	})();
+	let url: URL;
+	if (hasDesktopApp() && /^opaline:/iu.test(raw.trim())) {
+		const page = ownOrigin ? desktopLinkPage(raw.trim(), ownOrigin) : null;
+		if (!page) return null;
+		url = page;
+	} else
+		try {
+			url = new URL(raw.trim());
+		} catch {
+			return null;
+		}
 	if (!OPALINE_HOST.test(url.hostname) && url.origin !== ownOrigin) return null;
 	const segments = url.pathname
 		.split("/")

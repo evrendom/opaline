@@ -1,8 +1,6 @@
 import { ORPCError } from "@orpc/server";
-import { getFrontendOrigin } from "../frontend-origin.js";
-import { isSelfHosted } from "../lib/self-hosted.js";
 import { splitL1NodeId } from "../services/l1-edges/l1-edge-ids.js";
-import { classifyOpalineUrl, pastedUrlHint } from "./app-links.js";
+import { classifyOpalineUrl, linkExample, pastedUrlHint } from "./app-links.js";
 
 type Args = Record<string, unknown>;
 
@@ -32,10 +30,6 @@ export function runFromUrl(
 	if (pasted.kind === "session" && pasted.record)
 		return { hint: null, args: { ...args, id: pasted.record } };
 	return { hint: pastedUrlHint(pasted), args };
-}
-
-function linkExample(): string {
-	return isSelfHosted() ? `${getFrontendOrigin()}/…` : "https://opaline.so/…";
 }
 
 export function sessionOfRunId(id: string): string | null {

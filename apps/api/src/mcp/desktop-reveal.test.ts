@@ -25,7 +25,7 @@ const client = {
 await tool("save_answer").run(client, { analysis: "an_1", question: "Q", finalAnswer: "A" }, context);
 await tool("get_dashboard").run(client, { startDate: "2026-11-01", endDate: "2026-11-07", repositories: ["a/b"] }, context);
 desktopApp.show = show;
-console.log(JSON.stringify({ shown, real: desktopApp.show("http://localhost:4100/acme/reports/an_1") }));`,
+console.log(JSON.stringify({ shown, real: process.env.OPALINE_DESKTOP_APP ? false : desktopApp.show("http://localhost:4100/acme/reports/an_1") }));`,
 		],
 		{
 			env: {
@@ -54,5 +54,14 @@ test("save_answer and get_dashboard ask the desktop app to show their page", asy
 	expect(await shownPages({})).toEqual([
 		"http://localhost:4100/acme/reports/an_1",
 		"http://localhost:4100/acme/dashboard?from=2026-11-01&to=2026-11-07&repo=a%2Fb",
+	]);
+});
+
+test("in the desktop app they show the app's own opaline:// links", async () => {
+	expect(
+		await shownPages({ OPALINE_SELF_HOSTED: "1", OPALINE_DESKTOP_APP: "1" }),
+	).toEqual([
+		"opaline://acme/reports/an_1",
+		"opaline://acme/dashboard?from=2026-11-01&to=2026-11-07&repo=a%2Fb",
 	]);
 });
