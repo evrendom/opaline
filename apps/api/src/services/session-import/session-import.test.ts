@@ -37,7 +37,7 @@ test("a new transcript is filtered, claimed and stored raw before its derived fa
 	const stores = memoryStores();
 	const result = await importInto(stores, upload(claudeTranscript(2)));
 	expect(result.contentSha256).toMatch(/^[a-f0-9]{64}$/u);
-	expect(stores.calls).toEqual([
+	expect(stores.calls.filter((call) => call !== "run_index")).toEqual([
 		"filter",
 		"organization",
 		"claim",
@@ -99,4 +99,44 @@ test("a grown transcript is stored as a new revision", async () => {
 	await importInto(stores, upload(claudeTranscript(3)));
 	expect(stores.rawRows).toHaveLength(2);
 	expect(stores.calls.filter((call) => call === "revision")).toHaveLength(2);
+});
+
+test("stored records queue the session's run index once, whatever their git observations did", async () => {
+	for (const gitObservations of ["written", "skipped", "failed"] as const) {
+		const stores = memoryStores();
+		stores.gitObservationsResult = gitObservations;
+		await importInto(stores, upload(claudeTranscript(2)));
+		expect(stores.runIndex).toEqual([
+			{
+				organizationId: "org",
+				userId: "user",
+				source: "claude_code",
+				sessionId: "session-1",
+			},
+		]);
+		expect(stores.calls.indexOf("run_index")).toBeGreaterThan(
+			stores.calls.indexOf("git_observations"),
+		);
+	}
+});
+
+test("records that were not stored queue no run index", async () => {
+	for (const records of ["skipped", "failed"] as const) {
+		const stores = memoryStores();
+		stores.recordsResult = records;
+		await importInto(stores, upload(claudeTranscript(2)));
+		expect(stores.runIndex).toEqual([]);
+	}
+});
+
+test("an identical re-import queues the run index only when it writes missing git observations", async () => {
+	for (const gitObservations of ["written", "skipped"] as const) {
+		const stores = memoryStores();
+		const content = claudeTranscript(2);
+		await importInto(stores, upload(content));
+		stores.runIndex.length = 0;
+		stores.gitObservationsResult = gitObservations;
+		await importInto(stores, upload(content));
+		expect(stores.runIndex).toHaveLength(gitObservations === "written" ? 1 : 0);
+	}
 });

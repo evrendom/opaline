@@ -571,6 +571,13 @@ async function processPreparedIngestSession({
 	} = prepared;
 	const assertWritable = () =>
 		deps.assertWritable({ organizationId: orgId, userId: context.user.id });
+	const queueRunIndex = () =>
+		deps.enqueueRunIndex({
+			organizationId: orgId,
+			userId: context.user.id,
+			source: filteredInput.source,
+			sessionId: input.sessionId,
+		});
 	if (durableProcessing && !claimedLedger) {
 		try {
 			const ledgerResult = await withIngestProcessingLedger(
@@ -729,14 +736,19 @@ async function processPreparedIngestSession({
 			// receipt is current and is best-effort, never failing the upload.
 			if (transcriptRecordsConfig.enabled) {
 				const derived = {
-					assertWritable: assertWritable,
+					assertWritable,
+					onWritten: async () => {},
 					organizationId: orgId,
 					sessionId: input.sessionId,
 					signal,
 					source: filteredInput.source,
 					userId: context.user.id,
 				};
-				await deps.persistGitObservations(deps.clickhouse(), derived);
+				if (
+					(await deps.persistGitObservations(deps.clickhouse(), derived)) ===
+					"written"
+				)
+					await queueRunIndex();
 				// Goes on where an earlier pass stopped (time, chunk cap or quota).
 				await deps.indexSearch(deps.clickhouse(), derived);
 			}
@@ -849,19 +861,25 @@ async function processPreparedIngestSession({
 	// Derived data must never endanger the upload or the required extraction
 	// below: the job never rejects, runs in its own worker under its own limits,
 	// and is only awaited (in `finally`) so the response sees its receipt.
-	const transcriptRecordsJob = deps.persistRecords(deps.clickhouse(), {
-		assertWritable: assertWritable,
-		config: transcriptRecordsConfig,
-		content: filteredInput.content,
-		organizationId: orgId,
-		revision,
-		sessionDate: timestamps.sessionDate,
-		sessionId: input.sessionId,
-		signal,
-		source: filteredInput.source,
-		subagents,
-		userId: context.user.id,
-	});
+	const transcriptRecordsJob = deps
+		.persistRecords(deps.clickhouse(), {
+			assertWritable,
+			config: transcriptRecordsConfig,
+			content: filteredInput.content,
+			onWritten: async () => {},
+			organizationId: orgId,
+			revision,
+			sessionDate: timestamps.sessionDate,
+			sessionId: input.sessionId,
+			signal,
+			source: filteredInput.source,
+			subagents,
+			userId: context.user.id,
+		})
+		.then(async (records) => {
+			if (records === "written") await queueRunIndex();
+			return records;
+		});
 
 	try {
 		if (!usageExtractionEnabled && !skillExtractionEnabled) {
@@ -939,7 +957,7 @@ async function processPreparedIngestSession({
 					})
 				) {
 					await deps.writeUsage(clickhouse, {
-						assertWritable: assertWritable,
+						assertWritable,
 						contentSha256: contentHash,
 						extraction: error.extraction,
 						filterVersion: SESSION_INGEST_FILTER_VERSION,
@@ -1024,7 +1042,7 @@ async function processPreparedIngestSession({
 		}
 		await timedIngestPhase("server.usage_write", () =>
 			deps.writeUsage(clickhouse, {
-				assertWritable: assertWritable,
+				assertWritable,
 				contentSha256: contentHash,
 				extraction: usageExtraction,
 				filterVersion: SESSION_INGEST_FILTER_VERSION,
@@ -1132,7 +1150,7 @@ async function processPreparedIngestSession({
 		if ((await transcriptRecordsJob) === "written")
 			await timedIngestPhase("server.search_index", () =>
 				deps.indexSearch(deps.clickhouse(), {
-					assertWritable: assertWritable,
+					assertWritable,
 					organizationId: orgId,
 					sessionId: input.sessionId,
 					signal,

@@ -3157,6 +3157,34 @@ describe("R2 ingest real processor crash recovery", () => {
 		expect(raw?.content).not.toContain(pixels.toString("base64"));
 	}, 180_000);
 
+	test("a stored upload queues its session's run index even when its git observations are skipped", async () => {
+		const jobId = crypto.randomUUID();
+		const initialized = await initializeUploadedJob(
+			jobId,
+			buildRealClaudeTranscript(`run-index-${jobId}`),
+		);
+		const previous = process.env.GIT_OBSERVATION_EXTRACTION_ENABLED;
+		process.env.GIT_OBSERVATION_EXTRACTION_ENABLED = "false";
+		try {
+			const committed = await commitR2IngestJob({
+				input: buildCompletionInput(initialized),
+				process: createRealProcessor(undefined),
+				r2: fakeR2,
+				userId: USER_ID,
+			});
+			expect(committed.status).toBe("completed");
+		} finally {
+			if (previous === undefined)
+				delete process.env.GIT_OBSERVATION_EXTRACTION_ENABLED;
+			else process.env.GIT_OBSERVATION_EXTRACTION_ENABLED = previous;
+		}
+		const queued = await sqlClient<{ scope_kind: string }[]>`
+			SELECT scope_kind FROM l1_edge_scope
+			WHERE organization_id = ${ORGANIZATION_ID} AND session_id = ${jobId}
+		`;
+		expect(queued.map((row) => row.scope_kind)).toEqual(["session"]);
+	}, 180_000);
+
 	test.each(
 		CRASH_BOUNDARIES,
 	)("is physically and logically idempotent after $label acknowledgement", async ({
