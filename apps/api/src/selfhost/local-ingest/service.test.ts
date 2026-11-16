@@ -384,6 +384,35 @@ test("a session that keeps failing is given up until its transcript changes, and
 	await service.stop();
 });
 
+test("a restart gives a session it gave up on one more round", async () => {
+	const broken = await session("broken", 1);
+	const store = memoryStore();
+	const outcomes = new Map<string, SessionOutcome>([
+		[
+			broken,
+			{ kind: "retry", reason: 'could not access file "$libdir/plpgsql"' },
+		],
+	]);
+	const settings = {
+		concurrency: 1,
+		quietMs: 1,
+		liveIntervalMs: 0,
+		retryBaseMs: 1,
+		maxAttempts: 2,
+	};
+	const service = create(store, ingestor(outcomes), { settings });
+	await service.start();
+	await waitFor(() => store.rows.get(broken)?.state === "skipped");
+	await settle(service);
+	await service.stop();
+	const second = ingestor();
+	const restarted = create(store, second, { settings });
+	await restarted.start();
+	await waitFor(() => store.rows.get(broken)?.state === "ingested");
+	expect(second.calls).toHaveLength(1);
+	await restarted.stop();
+});
+
 test("a resumed Codex session in an old day folder is imported by its modification time", async () => {
 	const folder = join(roots.codexSessions, "2026", "08", "25");
 	await mkdir(folder, { recursive: true });

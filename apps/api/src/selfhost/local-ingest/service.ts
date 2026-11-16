@@ -132,6 +132,7 @@ interface SessionEntry {
 
 const SAFE_DIRECTORY = /^[A-Za-z0-9_-]{1,200}$/u;
 const DAY_MS = 86_400_000;
+const GAVE_UP = "gave up after";
 
 export class LocalIngest {
 	private readonly settings: LocalIngestSettings;
@@ -298,7 +299,9 @@ export class LocalIngest {
 		});
 		if (row.role !== "session") return;
 		const entry = this.entry(row.sessionPath, row.source);
-		entry.state = row.state;
+		const retry =
+			row.state === "skipped" && Boolean(row.reason?.startsWith(GAVE_UP));
+		entry.state = retry ? "pending" : row.state;
 		entry.reason = row.reason;
 		entry.attempts = row.attempts;
 		entry.lastIngestAt = row.ingestedAt?.getTime() ?? null;
@@ -308,7 +311,8 @@ export class LocalIngest {
 			entry.lastIngestAt > (this.lastIngestAt ?? 0)
 		)
 			this.lastIngestAt = entry.lastIngestAt;
-		if (row.state === "pending" || row.state === "failed")
+		if (retry) this.schedule(entry, this.now(), true);
+		else if (row.state === "pending" || row.state === "failed")
 			this.schedule(entry, row.nextAttemptAt?.getTime() ?? this.now(), true);
 	}
 
@@ -594,7 +598,7 @@ export class LocalIngest {
 		if (outcome.kind === "skipped" || outcome.kind === "retry") {
 			const reason =
 				outcome.kind === "retry"
-					? `gave up after ${this.settings.maxAttempts} attempts until the transcript changes: ${outcome.reason}`
+					? `${GAVE_UP} ${this.settings.maxAttempts} attempts until the transcript changes or the server restarts: ${outcome.reason}`
 					: outcome.reason;
 			entry.state = "skipped";
 			entry.reason = reason;
