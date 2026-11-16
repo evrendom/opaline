@@ -124,11 +124,10 @@ describe("computeIngestContentHash", () => {
 				.map((name) => Bun.file(new URL(name, directory)).text()),
 		);
 		const source = sources.join("\n");
-		expect(source.match(/computeIngestContentHash\(/gu)).toHaveLength(1);
-		expect(source).toContain(
-			"const contentHash = computeIngestContentHash(filteredInput);",
-		);
-		expect(source).toContain("ownership.lastContentSha256 === contentHash");
+		expect(source.match(/computeIngestContentHash\(/gu)).toBeNull();
+		expect(source.match(/computeIngestContentHashes\(/gu)).toHaveLength(1);
+		expect(source).toContain("contentHash: hashes.contentSha256,");
+		expect(source).toContain("ownership.lastContentSha256 !== contentHash");
 	});
 });
 
