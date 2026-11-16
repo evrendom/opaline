@@ -18,6 +18,7 @@ import {
 	MAX_CLICKHOUSE_URL_BYTES,
 } from "../../clickhouse.js";
 import { sessionScopeId } from "../l1-edges/l1-edge-ids.js";
+import { pinnedParams } from "../transcript-generations/generations.js";
 import {
 	ensureCallCommands,
 	storedCallCommandsEnabled,
@@ -129,7 +130,6 @@ import {
 	isAnalysisWorkLimit,
 	isClickHouseMemoryPressure,
 	paramValueBytes,
-	pinnedParams,
 	query,
 } from "./sql.js";
 import { findWeeklyTotals, weeklyOrder } from "./weekly-totals.js";

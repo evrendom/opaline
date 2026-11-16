@@ -5,10 +5,12 @@ import {
 	getSafeClickHouseTable,
 } from "../../clickhouse.js";
 import { RUN_INDEX_TABLE } from "../l1-edges/l1-edge-tables.js";
-import type {
-	SessionGeneration,
-	TranscriptReadScope,
-} from "../transcript-records-queries.js";
+import {
+	pinnedParams,
+	pinnedRows,
+	type SessionGeneration,
+	type TranscriptReadScope,
+} from "../transcript-generations/generations.js";
 import { committedBuildSql } from "./run-index-reader.js";
 import {
 	RUN_INDEX_PRICING_VERSION,
@@ -55,18 +57,12 @@ export function buildIndexedRunFactsStatement(
 				ifNull(cost_usd, 0) AS session_unattributed,
 				arrayMap(m -> (m.1, ifNull(m.2, 0)), model_costs) AS session_unattributed_models
 			FROM ${table} FINAL
-			WHERE ${owner}
+			WHERE ${pinnedRows()}
 				AND index_version = {indexVersion:UInt16} AND pricing_version = {pricingVersion:String}
-				AND (session_id, revision, parser_version) IN (
-					SELECT g.1, toUInt64(g.2), g.3 FROM (SELECT arrayJoin(arrayZip({sessionIds:Array(String)}, {revisions:Array(String)}, {parserVersions:Array(UInt16)})) AS g)
-				)
 				AND ${committedBuildSql(table, owner, ["session_id"])}
 			ORDER BY session_id, agent_id, first_record`,
 		query_params: {
-			...scope,
-			sessionIds: generations.map((generation) => generation.sessionId),
-			revisions: generations.map((generation) => generation.revision),
-			parserVersions: generations.map((generation) => generation.parserVersion),
+			...pinnedParams(scope, generations),
 			indexVersion: RUN_INDEX_VERSION,
 			pricingVersion: RUN_INDEX_PRICING_VERSION,
 		},

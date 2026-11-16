@@ -3,12 +3,8 @@ import {
 	type ClickHouseExecutor,
 	getSafeClickHouseTable,
 } from "../../clickhouse.js";
-import {
-	ANALYSIS_QUERY_SETTINGS,
-	GenerationRowSchema,
-	query,
-} from "../analysis/sql.js";
-import { buildCommittedGenerationsStatement } from "../transcript-records-queries.js";
+import { ANALYSIS_QUERY_SETTINGS, query } from "../analysis/sql.js";
+import { readCommittedGenerations } from "../transcript-generations/generations.js";
 import type { QuerySession } from "./types.js";
 
 const OwnerRowSchema = z.object({
@@ -49,13 +45,10 @@ export async function describeSessions(
 	const sessions: QuerySession[] = [];
 	for (const userId of new Set(owners.map((owner) => owner.user_id))) {
 		const owned = owners.filter((owner) => owner.user_id === userId);
-		const generations = await query(
+		const generations = await readCommittedGenerations(
 			executor,
-			GenerationRowSchema,
-			buildCommittedGenerationsStatement(
-				{ organizationId, userId },
-				owned.map((owner) => owner.session_id),
-			),
+			{ organizationId, userId },
+			owned.map((owner) => owner.session_id),
 		);
 		for (const generation of generations)
 			sessions.push({

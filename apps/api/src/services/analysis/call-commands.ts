@@ -8,12 +8,17 @@ import {
 } from "../../clickhouse.js";
 import { isSelfHosted } from "../../lib/self-hosted.js";
 import {
-	buildCommittedGenerationsStatement,
+	generationKey,
+	pinnedParams,
+	pinnedRecords,
+	pinnedRows,
+	readCommittedGenerations,
+	receiptRow,
 	type SessionGeneration,
 	type TranscriptReadScope,
-} from "../transcript-records-queries.js";
+} from "../transcript-generations/generations.js";
 import { commandColumnsSql } from "./command-identity.js";
-import { pinnedParams, query, records } from "./sql.js";
+import { query, records } from "./sql.js";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -73,14 +78,6 @@ const INSERT_COLUMNS = [
 	"built_at",
 ].join(", ");
 
-function generationsFilter(): string {
-	return `organization_id = {organizationId:String} AND user_id = {userId:String}
-		AND session_id IN {sessionIds:Array(String)}
-		AND (session_id, revision, parser_version) IN (
-			SELECT g.1, toUInt64(g.2), g.3 FROM (SELECT arrayJoin(arrayZip({sessionIds:Array(String)}, {revisions:Array(String)}, {parserVersions:Array(UInt16)})) AS g)
-		)`;
-}
-
 export function materializeCallCommandsStatements(
 	scope: TranscriptReadScope,
 	generations: readonly SessionGeneration[],
@@ -95,7 +92,7 @@ export function materializeCallCommandsStatements(
 					SELECT ${[...KEY_COLUMNS, ...RECORD_COLUMNS].join(", ")}, ${commandColumnsSql()}
 					FROM ${records()} FINAL
 					PREWHERE kind = 'tool_call' OR (kind = 'file_change' AND file_op = 'write')
-					WHERE ${generationsFilter()} AND record_idx < ${TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX}
+					WHERE ${pinnedRecords()}
 				)
 				WHERE command_from != ''`,
 			query_params: params,
@@ -107,7 +104,7 @@ export function materializeCallCommandsStatements(
 					any(source), min(session_date), 0, now64(3), '', '', '', '',
 					'', NULL, NULL, NULL, NULL, NULL, NULL, now64(3)
 				FROM ${records()}
-				WHERE ${generationsFilter()}
+				WHERE ${pinnedRows()}
 				GROUP BY organization_id, user_id, session_id, revision, parser_version`,
 			query_params: params,
 		},
@@ -120,14 +117,6 @@ const ReceiptSchema = z.object({
 	parser_version: z.coerce.number(),
 });
 
-function generationKey(generation: {
-	sessionId: string;
-	revision: string;
-	parserVersion: number;
-}): string {
-	return `${generation.sessionId}\u0000${generation.revision}\u0000${generation.parserVersion}`;
-}
-
 export async function missingCallCommandGenerations(
 	executor: ClickHouseExecutor,
 	scope: TranscriptReadScope,
@@ -138,7 +127,7 @@ export async function missingCallCommandGenerations(
 		clickhouse_settings: MATERIALIZE_SETTINGS,
 		query: `SELECT session_id, toString(revision) AS revision, parser_version
 			FROM ${commandsTable()}
-			WHERE ${generationsFilter()} AND record_idx = ${TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX}
+			WHERE ${pinnedRows()} AND ${receiptRow()}
 			GROUP BY session_id, revision, parser_version`,
 		query_params: pinnedParams(scope, generations),
 	});
@@ -193,12 +182,6 @@ export async function ensureCallCommands(
 	return built;
 }
 
-const CommittedSchema = z.object({
-	session_id: z.string(),
-	revision_text: z.string(),
-	parser_version: z.coerce.number(),
-});
-
 export async function materializeSessionCallCommands(
 	executor: ClickHouseExecutor,
 	session: {
@@ -220,15 +203,12 @@ export async function materializeSessionsCallCommands(
 	sessionIds: readonly string[],
 ): Promise<number> {
 	if (sessionIds.length === 0) return 0;
-	const committed = await query(
-		executor,
-		CommittedSchema,
-		buildCommittedGenerationsStatement(scope, sessionIds),
-	);
-	const generations = committed.map((row) => ({
-		sessionId: row.session_id,
-		revision: row.revision_text,
-		parserVersion: row.parser_version,
+	const generations = (
+		await readCommittedGenerations(executor, scope, sessionIds)
+	).map(({ sessionId, revision, parserVersion }) => ({
+		sessionId,
+		revision,
+		parserVersion,
 	}));
 	const missing = await missingCallCommandGenerations(
 		executor,

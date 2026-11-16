@@ -96,11 +96,11 @@ import {
 	isDeleteSettled,
 } from "../clickhouse-batched-delete.js";
 import { runRetirementDeletes } from "../generation-retirement.js";
+import type { SessionGeneration } from "../transcript-generations/generations.js";
 import {
 	MAX_RETIRED_GENERATIONS_PER_PASS,
 	selectRetiredGenerations,
 } from "../transcript-records-ingest.service.js";
-import type { SessionGeneration } from "../transcript-records-queries.js";
 import {
 	type CallTuple,
 	CallTuplesSchema,

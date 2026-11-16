@@ -8,9 +8,14 @@ import {
 } from "@rudel/api-routes/transcript-records";
 import { z } from "zod";
 import { type ClickHouseExecutor, getClickhouse } from "../clickhouse.js";
+import {
+	type CommittedGeneration,
+	readCommittedGenerations,
+	type SessionGeneration,
+	type TranscriptReadScope,
+} from "./transcript-generations/generations.js";
 import { readRawTranscriptLine } from "./transcript-raw-line.service.js";
 import {
-	buildCommittedGenerationsStatement,
 	buildMapCommandsStatement,
 	buildMapFilesStatement,
 	buildMapPromptsStatement,
@@ -27,11 +32,9 @@ import {
 	buildTurnParentCommandsStatement,
 	buildTurnPromptStatement,
 	buildTurnRawStatement,
-	type SessionGeneration,
-	type TranscriptReadScope,
 } from "./transcript-records-queries.js";
 
-export type { TranscriptReadScope } from "./transcript-records-queries.js";
+export type { TranscriptReadScope } from "./transcript-generations/generations.js";
 
 /**
  * Tenant-scoped readers over `rudel.transcript_records`.
@@ -287,12 +290,6 @@ interface ReaderOptions {
 	readonly generation?: SessionGeneration;
 }
 
-/** The committed generation of one session plus what its receipt recorded. */
-interface CommittedGeneration extends SessionGeneration {
-	readonly receipt: string;
-	readonly source: string;
-}
-
 /**
  * Resolve each session's committed generation with one query. Every read
  * operation calls this exactly once and binds the result into all of its
@@ -304,24 +301,8 @@ async function resolveGenerations(
 	scope: TranscriptReadScope,
 	sessionIds: readonly string[],
 ): Promise<Map<string, CommittedGeneration>> {
-	const rows = parseRows(
-		committedGenerationRow,
-		await executor.query<unknown>(
-			buildCommittedGenerationsStatement(scope, sessionIds),
-		),
-	);
-	return new Map(
-		rows.map((row) => [
-			row.session_id,
-			{
-				parserVersion: row.parser_version,
-				receipt: row.receipt,
-				revision: row.revision_text,
-				sessionId: row.session_id,
-				source: row.source,
-			},
-		]),
-	);
+	const rows = await readCommittedGenerations(executor, scope, sessionIds);
+	return new Map(rows.map((row) => [row.sessionId, row]));
 }
 
 export function readSessionFacts(
@@ -1430,14 +1411,6 @@ const commandClassName = z.enum([
 	"install",
 	"other",
 ]);
-
-const committedGenerationRow = z.object({
-	parser_version: count,
-	receipt: z.string(),
-	revision_text: z.string(),
-	session_id: z.string(),
-	source: z.string(),
-});
 
 const totalsRow = z.object({
 	ended_ms: count,

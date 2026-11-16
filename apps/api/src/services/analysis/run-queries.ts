@@ -3,10 +3,11 @@ import type {
 	ClickHouseExecutor,
 	ClickHouseStatement,
 } from "../../clickhouse.js";
-import type {
-	SessionGeneration,
-	TranscriptReadScope,
-} from "../transcript-records-queries.js";
+import {
+	pinnedParams,
+	type SessionGeneration,
+	type TranscriptReadScope,
+} from "../transcript-generations/generations.js";
 import { isRunIndexColumnRecordable } from "./run-index-columns.js";
 import {
 	runFactsCtes,
@@ -14,7 +15,7 @@ import {
 	USAGE_MODEL_SQL,
 	usageEventCtes,
 } from "./run-index-sql.js";
-import { ANALYSIS_QUERY_SETTINGS, pinnedParams, query } from "./sql.js";
+import { ANALYSIS_QUERY_SETTINGS, query } from "./sql.js";
 
 const RunFactsRowSchema = z.object({
 	session_id: z.string(),

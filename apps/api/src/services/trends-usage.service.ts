@@ -1,4 +1,3 @@
-import { TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX } from "@rudel/api-routes/transcript-records";
 import type {
 	TrendsUsage,
 	TrendsUsageMetrics,
@@ -11,6 +10,10 @@ import {
 } from "../clickhouse.js";
 import { readNonNegativeSafeIntegerEnv } from "../lib/env.js";
 import { SESSION_AGENT_RUN_SCAN_VERSION } from "./session-agent-runs.js";
+import {
+	contentRow,
+	newestGenerations,
+} from "./transcript-generations/generations.js";
 import { TRANSCRIPT_RECORDS_TABLE } from "./transcript-records-ingest.service.js";
 import {
 	censusWindowFilter,
@@ -293,7 +296,6 @@ export function trendsQueryParams(window: TrendsWindow) {
 		shareStart: window.shareStart,
 		shareEnd: window.shareEndExclusive,
 		scanVersion: SESSION_AGENT_RUN_SCAN_VERSION,
-		receiptRecordIdx: TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX,
 		excludedUsers: readExcludedUserIds(),
 	};
 }
@@ -1068,14 +1070,11 @@ function transcriptCte(
 ): string {
 	return `
 	transcript_generations AS (
-		SELECT organization_id, user_id, session_id,
-			argMax(tuple(revision, parser_version), tuple(revision, parser_version)) AS generation
-		FROM rudel.transcript_records
-		WHERE agent_id = '' AND record_idx = {receiptRecordIdx:UInt32} AND block_idx = 0
-			AND session_date < toDateTime64({periodEnd:String}, 3, 'UTC')
+		${newestGenerations({
+			where: `session_date < toDateTime64({periodEnd:String}, 3, 'UTC')
 			AND user_id NOT IN {excludedUsers:Array(String)}
-			${window.keys}
-		GROUP BY organization_id, user_id, session_id
+			${window.keys}`,
+		})}
 	),
 	transcript_events AS (
 		SELECT r.organization_id AS organization_id, r.user_id AS user_id,
@@ -1086,7 +1085,7 @@ function transcriptCte(
 			ON r.organization_id = g.organization_id AND r.user_id = g.user_id
 			AND r.session_id = g.session_id
 		WHERE r.revision = g.generation.1 AND r.parser_version = g.generation.2
-			AND r.record_idx < {receiptRecordIdx:UInt32}
+			AND ${contentRow("r")}
 			AND r.kind IN ('user_prompt', 'tool_call', 'tool_result')
 			AND r.session_date < toDateTime64({periodEnd:String}, 3, 'UTC')
 			${window.records}

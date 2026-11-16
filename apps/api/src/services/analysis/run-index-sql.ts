@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import { TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX } from "@rudel/api-routes/transcript-records";
 import { z } from "zod";
 import {
 	type ClickHouseStatement,
@@ -7,10 +6,14 @@ import {
 } from "../../clickhouse.js";
 import { MODEL_RATE_CARD_VERSION } from "../pricing.service.js";
 import { forkParentCallsSql } from "../transcript-fork-replay.js";
-import type {
-	SessionGeneration,
-	TranscriptReadScope,
-} from "../transcript-records-queries.js";
+import {
+	pinnedParams,
+	pinnedRecords,
+	pinnedRows,
+	receiptRow,
+	type SessionGeneration,
+	type TranscriptReadScope,
+} from "../transcript-generations/generations.js";
 import { buildPricedUsageEventsCte } from "../usage-event-analytics.service.js";
 import { type ForkReplayRules, runDirectoryRules } from "./run-directories.js";
 import { RUN_INDEX_FACT_COLUMNS } from "./run-index-columns.js";
@@ -31,8 +34,6 @@ import {
 import {
 	ANALYSIS_QUERY_SETTINGS,
 	GENUINE_PROMPT_SQL,
-	pinnedFilter,
-	pinnedParams,
 	records,
 	toolErrorSql,
 } from "./sql.js";
@@ -350,7 +351,7 @@ export function runFactsCtes(options: { literal?: boolean } = {}): string {
 				max(source = 'codex' AND kind = 'tool_call' AND match(head, ${sqlRegex(CODEX_GH_PR_CALL)})) AS gh_pr_call,
 				${foundNothingSql()}
 			FROM ${records()}
-			WHERE ${pinnedFilter()} AND kind IN ('tool_call', 'tool_result', 'meta') AND call_id != '' AND ${FORK_REPLAY_FILTER}
+			WHERE ${pinnedRecords()} AND kind IN ('tool_call', 'tool_result', 'meta') AND call_id != '' AND ${FORK_REPLAY_FILTER}
 			GROUP BY session_id, agent_id, call_id
 		),
 		scripts AS (
@@ -359,7 +360,7 @@ export function runFactsCtes(options: { literal?: boolean } = {}): string {
 			FROM (
 				SELECT session_id, agent_id, call_id, facts['script_call_id'] AS parent
 				FROM ${records()}
-				WHERE ${pinnedFilter()} AND source = 'codex' AND kind = 'tool_call' AND subtype = 'nested'
+				WHERE ${pinnedRecords()} AND source = 'codex' AND kind = 'tool_call' AND subtype = 'nested'
 					AND facts['script_call_id'] != '' AND ${FORK_REPLAY_FILTER}
 			) AS n
 			LEFT ANY JOIN calls nc ON n.session_id = nc.session_id AND n.agent_id = nc.agent_id AND n.call_id = nc.call_id
@@ -375,7 +376,7 @@ export function runFactsCtes(options: { literal?: boolean } = {}): string {
 				tool_name, call_id, file_path, file_op, is_error, exit_code, text_chars, parser_version, source,
 				facts['applied_changes'] AS applied_changes,
 				if(${headKinds}, substringUTF8(head, 1, ${FACT_TEXT_CHARS}), '') AS head${literalColumns}
-			FROM ${records()} FINAL WHERE ${pinnedFilter()} AND turn_idx >= 1 AND ${FORK_REPLAY_FILTER}
+			FROM ${records()} FINAL WHERE ${pinnedRecords()} AND turn_idx >= 1 AND ${FORK_REPLAY_FILTER}
 		),
 		run_facts AS (
 			SELECT w.session_id AS session_id, w.agent_id AS agent_id, w.turn_idx AS turn_idx,
@@ -468,7 +469,7 @@ export const FORK_REPLAY_FILTER = `facts['fork_replayed'] != 'true' AND (session
  * `owner` holds (one member's by default).
  */
 export function forkReplayCtes(
-	children = pinnedFilter(),
+	children = pinnedRecords(),
 	owner?: string,
 ): string {
 	return `fork_links AS (
@@ -522,7 +523,7 @@ export function boundedRunsCte(
 					ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS boundary
 			FROM (
 				SELECT session_id, agent_id, turn_idx, min(record_idx) AS first_record, max(record_idx) AS last_record
-				FROM ${records()} WHERE ${pinnedFilter()} AND turn_idx >= 1 AND ${replayFilter}
+				FROM ${records()} WHERE ${pinnedRecords()} AND turn_idx >= 1 AND ${replayFilter}
 				GROUP BY session_id, agent_id, turn_idx
 			)
 		)`;
@@ -653,7 +654,7 @@ function runContextCtes(): string {
 			SELECT session_id, agent_id,
 				argMinIf(facts['thread_source'], record_idx, facts['thread_source'] != '') AS stream_thread_source
 			FROM ${records()}
-			WHERE ${pinnedFilter()} AND source = 'codex' AND kind = 'meta' AND subtype = 'session_meta'
+			WHERE ${pinnedRecords()} AND source = 'codex' AND kind = 'meta' AND subtype = 'session_meta'
 			GROUP BY session_id, agent_id
 		),
 		run_delegations AS (
@@ -664,7 +665,7 @@ function runContextCtes(): string {
 						['default'], ${CODEX_AGENT_TYPES_SQL}),
 					[${jsonStringField("text", "subagent_type")}])) AS subagent_type
 				FROM ${records()}
-				WHERE ${pinnedFilter()} AND turn_idx >= 1 AND ${FORK_REPLAY_FILTER}
+				WHERE ${pinnedRecords()} AND turn_idx >= 1 AND ${FORK_REPLAY_FILTER}
 					AND (kind = 'tool_call' AND tool_name IN ('Task', 'Agent')
 						OR source = 'codex' AND parser_version >= 9 AND facts['subagent_type_components'] != ''
 						OR source = 'codex' AND parser_version >= 9 AND kind = 'tool_call' AND tool_name = 'spawn_agent')
@@ -736,7 +737,7 @@ function codexLifecycleSql(session: string): string {
 						: `any(facts['${key}']) AS ${key}`,
 				).join(", ")}
 			FROM ${records()}
-			WHERE ${pinnedFilter()} AND source = 'codex' AND kind = 'meta' AND subtype IN ${CODEX_LIFECYCLE_SUBTYPES}
+			WHERE ${pinnedRecords()} AND source = 'codex' AND kind = 'meta' AND subtype IN ${CODEX_LIFECYCLE_SUBTYPES}
 				AND facts['fork_replayed'] != 'true'
 			GROUP BY ${session}agent_id, record_idx, block_idx, turn_idx, subtype
 			ORDER BY ${session}agent_id, record_idx, block_idx`;
@@ -778,7 +779,7 @@ function codexTurnMarksSql(session: string): string {
 	return `SELECT ${session}agent_id, turn_idx, min(record_idx) AS turn_start,
 				maxIf(record_idx, kind IN ${RESPONSE_KINDS}) AS last_response
 			FROM ${records()}
-			WHERE ${pinnedFilter()} AND source = 'codex' AND facts['fork_replayed'] != 'true'
+			WHERE ${pinnedRecords()} AND source = 'codex' AND facts['fork_replayed'] != 'true'
 			GROUP BY ${session}agent_id, turn_idx
 			ORDER BY ${session}agent_id, turn_idx`;
 }
@@ -849,7 +850,7 @@ export function usageEventCtes(
 		),
 		codex_line_streams AS (
 			SELECT session_id, record_idx, any(agent_id) AS stream, uniqExact(agent_id) AS streams
-			FROM ${records()} WHERE ${pinnedFilter()} AND source = 'codex'
+			FROM ${records()} WHERE ${pinnedRecords()} AND source = 'codex'
 			GROUP BY session_id, record_idx
 		),
 		resolved_usage AS (
@@ -1263,7 +1264,7 @@ function runRequestsCtes(batch = false): string {
 			response_lines AS (
 				SELECT session_id, agent_id, record_idx, max(kind IN ${RESPONSE_RECORD_KINDS}) AS response
 				FROM ${records()}
-				WHERE ${pinnedFilter()} AND kind != 'meta' AND ${FORK_REPLAY_FILTER}
+				WHERE ${pinnedRecords()} AND kind != 'meta' AND ${FORK_REPLAY_FILTER}
 				GROUP BY session_id, agent_id, record_idx
 			),
 			(SELECT groupArray((${PLACED_USAGE_COLUMNS.join(", ")}))
@@ -1280,7 +1281,7 @@ function runRequestsCtes(batch = false): string {
 			call_outcomes AS (
 				SELECT session_id, agent_id, call_id, max(${runToolErrorSql()}) AS failed
 				FROM ${records()}
-				WHERE ${pinnedFilter()} AND kind IN ('tool_result', 'meta') AND call_id != '' AND ${FORK_REPLAY_FILTER}
+				WHERE ${pinnedRecords()} AND kind IN ('tool_result', 'meta') AND call_id != '' AND ${FORK_REPLAY_FILTER}
 				GROUP BY session_id, agent_id, call_id
 			),
 			request_work AS (
@@ -1292,7 +1293,7 @@ function runRequestsCtes(batch = false): string {
 					count() OVER (${run} ${order} ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS earlier_rows,
 					anyLast(ts) OVER (${run} ${order} ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS previous_ts
 				FROM ${records()} FINAL
-				WHERE ${pinnedFilter()} AND turn_idx >= 1 AND kind != 'meta' AND ${FORK_REPLAY_FILTER}
+				WHERE ${pinnedRecords()} AND turn_idx >= 1 AND kind != 'meta' AND ${FORK_REPLAY_FILTER}
 			),
 			request_candidates AS (
 				SELECT *, toUInt8(response = 1 AND ifNull(previous_class, 0) = 0) AS candidate,
@@ -1445,15 +1446,8 @@ export function buildRunIndexSessionStatement(
 	const facts = `SELECT
 				${sessionFactsColumns()}
 			FROM ${records()}
-			WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
-				AND session_id = {sessionId:String} AND revision = toUInt64({revision:String})
-				AND parser_version = {parserVersion:UInt16}`;
-	const params = {
-		...scope,
-		sessionId: generation.sessionId,
-		revision: generation.revision,
-		parserVersion: generation.parserVersion,
-	};
+			WHERE ${pinnedRows()}`;
+	const params = pinnedParams(scope, [generation]);
 	if (!calls)
 		return {
 			clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
@@ -1468,14 +1462,14 @@ export function buildRunIndexSessionStatement(
 		query: `WITH ${calls.ctes}
 			SELECT f.*, k.calls AS calls
 			FROM (${facts}) AS f CROSS JOIN (${calls.sql}) AS k`,
-		query_params: { ...pinnedParams(scope, [generation]), ...params },
+		query_params: params,
 	};
 }
 
 function sessionFactsColumns(): string {
 	const costState =
 		"agent_id = '' AND kind = 'meta' AND subtype = 'cost-state'";
-	return `toUnixTimestamp64Milli(anyIf(session_date, record_idx = ${TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX})) AS session_date_ms,
+	return `toUnixTimestamp64Milli(anyIf(session_date, ${receiptRow()})) AS session_date_ms,
 				argMinIf(facts['thread_source'], record_idx, agent_id = '' AND kind = 'meta' AND subtype = 'session_meta' AND facts['thread_source'] != '') AS thread_source,
 				argMaxIf(facts['title'], tuple(record_idx, block_idx), agent_id = '' AND kind = 'meta' AND subtype = 'ai-title' AND facts['title'] != '') AS title,
 				argMaxIf(mapFilter((k, v) -> k IN (${COST_STATE_KEYS.map((key) => `'${key}'`).join(", ")}), facts), tuple(record_idx, block_idx), ${costState}) AS cost_state,
@@ -1502,10 +1496,7 @@ export function buildRunIndexSessionBatchStatement(
 				SELECT session_id,
 					${sessionFactsColumns()}
 				FROM ${records()}
-				WHERE organization_id = {organizationId:String} AND user_id = {userId:String}
-					AND session_id IN {sessionIds:Array(String)}
-					AND (session_id, revision, parser_version) IN (
-						SELECT g.1, toUInt64(g.2), g.3 FROM (SELECT arrayJoin(arrayZip({sessionIds:Array(String)}, {revisions:Array(String)}, {parserVersions:Array(UInt16)})) AS g))
+				WHERE ${pinnedRows()}
 				GROUP BY session_id
 			) AS f
 			LEFT ANY JOIN (${calls.sql}) AS k ON f.session_id = k.session_id
@@ -1575,7 +1566,7 @@ function mcpStateSql(batch = false): string {
 	const session = batch ? "session_id, " : "";
 	return `SELECT ${session}agent_id, turn_idx, argMax(${MCP_UNAVAILABLE}, tuple(record_idx, block_idx)) AS unavailable
 			FROM ${records()}
-			WHERE ${pinnedFilter()} AND ${MCP_STATE_RECORD}
+			WHERE ${pinnedRecords()} AND ${MCP_STATE_RECORD}
 			GROUP BY ${session}agent_id, turn_idx
 			ORDER BY ${session}agent_id, turn_idx`;
 }

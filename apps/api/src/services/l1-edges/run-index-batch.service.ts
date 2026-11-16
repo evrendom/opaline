@@ -43,7 +43,7 @@ import {
 } from "../analysis/run-messages.js";
 import { queryCountedGenerations } from "../analysis/scope.js";
 import { ANALYSIS_QUERY_SETTINGS, query } from "../analysis/sql.js";
-import type { SessionGeneration } from "../transcript-records-queries.js";
+import type { SessionGeneration } from "../transcript-generations/generations.js";
 import {
 	CallTuplesSchema,
 	callFactsCtes,

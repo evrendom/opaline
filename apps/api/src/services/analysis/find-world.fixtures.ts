@@ -79,7 +79,7 @@ export function clickhouse(world: {
 				);
 			else if ("exampleSessions" in params) rows = [];
 			else if (sql.includes("toString(kind) AS kind")) rows = world.links ?? [];
-			else if (sql.includes("{receiptRecordIdx:UInt32}"))
+			else if (sql.includes("head AS receipt"))
 				rows = ids.map((id) => ({
 					session_id: id,
 					revision_text: "1",

@@ -12,8 +12,8 @@ import {
 	FORK_REPLAY_FILTER,
 	forkReplayCtes,
 } from "../analysis/run-index-sql.js";
-import { pinnedFilter } from "../analysis/sql.js";
 import { callRowsSql } from "../analysis/sql-call-rows.js";
+import { pinnedRecords } from "../transcript-generations/generations.js";
 import type { SessionIdentity } from "./l1-edge-ids.js";
 
 const TIMEOUT_LIMIT_SINCE_PARSER_VERSION = 12;
@@ -116,7 +116,7 @@ export function callFactsCtes(): string {
 export function callTuplesSql(): string {
 	return `SELECT groupArray(tuple(${CALL_FIELDS.map(([, expression]) => expression).join(", ")})) AS calls
 		FROM (${callRowsSql({
-			sessions: pinnedFilter(),
+			sessions: pinnedRecords(),
 			fresh: FORK_REPLAY_FILTER,
 			identity: false,
 			programs: false,
@@ -128,7 +128,7 @@ export function callTuplesSql(): string {
 export function callTuplesBatchSql(): string {
 	return `SELECT session_id, groupArray(tuple(${CALL_FIELDS.map(([, expression]) => expression).join(", ")})) AS calls
 		FROM (${callRowsSql({
-			sessions: pinnedFilter(),
+			sessions: pinnedRecords(),
 			fresh: FORK_REPLAY_FILTER,
 			identity: false,
 			programs: false,

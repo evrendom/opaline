@@ -6,17 +6,16 @@ import { buildPromptHeadStatement } from "../analysis/read-queries.js";
 import {
 	ANALYSIS_QUERY_SETTINGS,
 	chunkByParamBytes,
-	GenerationRowSchema,
-	pinnedFilter,
-	pinnedParams,
 	query,
 	records,
 } from "../analysis/sql.js";
 import { committedRunsSql, SQL_SCOPE_PARAMS } from "../analysis/sql-views.js";
 import {
-	buildCommittedGenerationsStatement,
+	pinnedParams,
+	pinnedRecords,
+	readCommittedGenerations,
 	type SessionGeneration,
-} from "../transcript-records-queries.js";
+} from "../transcript-generations/generations.js";
 import { type RunKey, type RunVersion, runKey } from "./answers.js";
 import type { JobRun } from "./jobs.js";
 import { RUN_NOTE_MAX_CHARS, type RunQuestionProvider } from "./provider.js";
@@ -253,12 +252,16 @@ async function committedGeneration(
 	scope: { organizationId: string; userId: string },
 	run: RunKey,
 ): Promise<SessionGeneration | undefined> {
-	const [generation] = await query(
-		executor,
-		GenerationRowSchema,
-		buildCommittedGenerationsStatement(scope, [run.sessionId]),
-	);
-	return generation;
+	const [committed] = await readCommittedGenerations(executor, scope, [
+		run.sessionId,
+	]);
+	return committed === undefined
+		? undefined
+		: {
+				sessionId: committed.sessionId,
+				revision: committed.revision,
+				parserVersion: committed.parserVersion,
+			};
 }
 
 /** Of the next prompt, at most this much is sent with a run. */
@@ -302,7 +305,7 @@ async function toolCounts(
 	return query(executor, ToolCountSchema, {
 		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
 		query: `SELECT tool_name, count() AS calls FROM ${records()}
-			WHERE ${pinnedFilter()} AND agent_id = {agentId:String} AND turn_idx = {turn:UInt32}
+			WHERE ${pinnedRecords()} AND agent_id = {agentId:String} AND turn_idx = {turn:UInt32}
 				AND kind = 'tool_call' AND tool_name != ''
 			GROUP BY tool_name ORDER BY calls DESC, tool_name LIMIT ${TOOL_NAMES}`,
 		query_params: {

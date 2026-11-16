@@ -1,15 +1,15 @@
 import type { RunRef } from "@rudel/api-routes";
 import { z } from "zod";
 import type { ClickHouseStatement } from "../../clickhouse.js";
-import type {
-	SessionGeneration,
-	TranscriptReadScope,
-} from "../transcript-records-queries.js";
+import {
+	pinnedParams,
+	pinnedRecords,
+	type SessionGeneration,
+	type TranscriptReadScope,
+} from "../transcript-generations/generations.js";
 import {
 	ANALYSIS_QUERY_SETTINGS,
 	GENUINE_PROMPT_SQL,
-	pinnedFilter,
-	pinnedParams,
 	REF_RUNS_SQL,
 	records,
 	refParams,
@@ -84,14 +84,14 @@ export function buildFailureScanStatement(
 			SELECT session_id, agent_id, record_idx, block_idx, turn_idx, ts, tool_name, command_class, exit_code, call_id, head, tail
 			FROM ${records()} FINAL
 			PREWHERE turn_idx >= 1 AND ${toolErrorSql()}
-			WHERE ${pinnedFilter()} ${refsFilter(page)} ${cursorFilter(page)}
+			WHERE ${pinnedRecords()} ${refsFilter(page)} ${cursorFilter(page)}
 			ORDER BY session_id, agent_id, record_idx, block_idx LIMIT {limit:UInt32}
 		), calls AS (
 			SELECT session_id, agent_id, call_id, tool_name, command_class,
 				substringUTF8(if(empty(text), head, text), 1, {textChars:UInt32}) AS command,
 				lengthUTF8(text) < text_chars OR lengthUTF8(text) > {textChars:UInt32} AS command_partial
 			FROM ${records()}
-			WHERE ${pinnedFilter()} AND kind = 'tool_call'
+			WHERE ${pinnedRecords()} AND kind = 'tool_call'
 				AND (session_id, agent_id, call_id) IN (SELECT session_id, agent_id, call_id FROM failures WHERE call_id != '')
 		)
 		SELECT f.session_id AS session_id, f.agent_id AS agent_id, f.record_idx AS record_idx, f.block_idx AS block_idx,
@@ -119,7 +119,7 @@ export function buildTextScanStatement(
 			${scanTextSql()} AS text, ${partialSql()} AS partial
 		FROM ${records()} FINAL
 		PREWHERE turn_idx >= 1 AND ((${GENUINE_PROMPT_SQL}) OR kind = 'assistant_text')
-		WHERE ${pinnedFilter()} ${refsFilter(page)} ${cursorFilter(page)}
+		WHERE ${pinnedRecords()} ${refsFilter(page)} ${cursorFilter(page)}
 		ORDER BY session_id, agent_id, record_idx, block_idx LIMIT {limit:UInt32}`,
 	);
 }
@@ -135,7 +135,7 @@ export function buildOpeningPromptsStatement(
 		query: `SELECT session_id, agent_id, record_idx, block_idx, turn_idx, toUnixTimestamp64Milli(ts) AS started_ms, kind, subtype,
 				${scanTextSql()} AS text, ${partialSql()} AS partial
 			FROM ${records()}
-			WHERE ${pinnedFilter()} AND ${GENUINE_PROMPT_SQL}
+			WHERE ${pinnedRecords()} AND ${GENUINE_PROMPT_SQL}
 				AND (session_id, agent_id, turn_idx) IN (SELECT r.1, r.2, r.3 FROM (${REF_RUNS_SQL}))
 			ORDER BY session_id, agent_id, record_idx, block_idx
 			LIMIT 1 BY session_id, agent_id, turn_idx`,

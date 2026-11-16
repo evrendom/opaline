@@ -1,16 +1,11 @@
 import { ORPCError } from "@orpc/server";
 import type { RunRef } from "@rudel/api-routes";
-import { TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX } from "@rudel/api-routes/transcript-records";
 import { z } from "zod";
 import {
 	type ClickHouseExecutor,
 	type ClickHouseStatement,
 	getSafeClickHouseTable,
 } from "../../clickhouse.js";
-import type {
-	SessionGeneration,
-	TranscriptReadScope,
-} from "../transcript-records-queries.js";
 
 /**
  * Per-statement guardrails; result overflow throws so nothing looks complete
@@ -43,28 +38,6 @@ export function toolErrorSql(alias = ""): string {
 export const GENUINE_PROMPT_SQL =
 	"kind = 'user_prompt' AND subtype != 'delegation'";
 
-/** Records of the given sessions, pinned to each session's committed generation. */
-export function pinnedFilter(): string {
-	return `organization_id = {organizationId:String} AND user_id = {userId:String}
-		AND session_id IN {sessionIds:Array(String)}
-		AND revision IN CAST({revisions:Array(String)}, 'Array(UInt64)')
-		AND (session_id, revision, parser_version) IN arrayZip({sessionIds:Array(String)},
-			arrayMap(r -> toUInt64(r), {revisions:Array(String)}), {parserVersions:Array(UInt16)})
-		AND record_idx < ${TRANSCRIPT_RECORDS_RECEIPT_RECORD_IDX}`;
-}
-
-export function pinnedParams(
-	scope: TranscriptReadScope,
-	generations: readonly SessionGeneration[],
-) {
-	return {
-		...scope,
-		sessionIds: generations.map((generation) => generation.sessionId),
-		revisions: generations.map((generation) => generation.revision),
-		parserVersions: generations.map((generation) => generation.parserVersion),
-	};
-}
-
 /** Rows `r` of (sessionId, agentId, turn) for the `refs` parameters. */
 export const REF_RUNS_SQL =
 	"SELECT arrayJoin(arrayZip({refSessionIds:Array(String)}, {refAgentIds:Array(String)}, {refTurns:Array(UInt32)})) AS r";
@@ -76,20 +49,6 @@ export function refParams(refs: readonly RunRef[] | undefined) {
 		refTurns: refs?.map((ref) => ref.turn) ?? [],
 	};
 }
-
-export const GenerationRowSchema = z
-	.object({
-		session_id: z.string(),
-		revision_text: z.string(),
-		parser_version: z.number(),
-	})
-	.transform(
-		(row): SessionGeneration => ({
-			sessionId: row.session_id,
-			revision: row.revision_text,
-			parserVersion: row.parser_version,
-		}),
-	);
 
 /** ClickHouse refused because a row, byte or memory ceiling was hit (not a bug or a deadline). */
 export function isAnalysisWorkLimit(error: unknown): boolean {
