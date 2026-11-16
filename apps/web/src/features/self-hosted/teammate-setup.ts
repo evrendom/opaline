@@ -34,3 +34,49 @@ export function teammateSetupSteps(origin: string): TeammateSetupStep[] {
 		},
 	];
 }
+
+export interface SelfHostedWelcomeStatus {
+	readonly pending: boolean;
+	readonly hasUploadedSessions: boolean;
+	readonly hasCliLogin: boolean;
+}
+
+export interface SelfHostedWelcomeCopy {
+	readonly title: string;
+	readonly body: string;
+	readonly forTeammates: boolean;
+	readonly steps: TeammateSetupStep[];
+}
+
+export function selfHostedWelcomeCopy(
+	origin: string,
+	status: SelfHostedWelcomeStatus,
+	localApp: boolean,
+): SelfHostedWelcomeCopy {
+	if (localApp)
+		return {
+			title: status.pending
+				? "Checking your sessions…"
+				: status.hasUploadedSessions
+					? "Your sessions are arriving"
+					: "Waiting for your sessions",
+			body: "Opaline imports the Claude Code and Codex sessions on this Mac and shows them here as they arrive. Nothing leaves this Mac.",
+			forTeammates: false,
+			steps: [],
+		};
+	const connected = status.hasUploadedSessions || status.hasCliLogin;
+	return {
+		title: status.pending
+			? "Checking your setup…"
+			: status.hasUploadedSessions
+				? "Your sessions are arriving"
+				: connected
+					? "Your terminal is connected"
+					: "Connect your terminal",
+		body: connected
+			? "Sessions upload from this computer as each one ends. Teammates set up their own computers with these commands."
+			: "Run these on each computer whose coding sessions you want in Opaline.",
+		forTeammates: connected,
+		steps: teammateSetupSteps(origin),
+	};
+}

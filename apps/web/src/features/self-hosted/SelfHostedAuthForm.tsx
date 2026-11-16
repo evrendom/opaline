@@ -16,6 +16,7 @@ import {
 	normalizeAuthEmail,
 	sanitizeEmailCodeInput,
 } from "@/features/auth/email-code-auth";
+import { isLocalDesktopApp } from "@/features/desktop/local-app";
 import { authClient, refreshAuthClientState } from "@/lib/auth-client";
 import { getInitialSignupName } from "@/lib/auth-signup-name";
 import { cn } from "@/lib/utils";
@@ -383,7 +384,12 @@ export function SelfHostedAuthForm({
 				</form>
 			)}
 
-			{mode === "sign-in" ? (
+			{mode === "sign-in" &&
+			!isLocalDesktopApp(
+				true,
+				navigator.userAgent,
+				window.location.hostname,
+			) ? (
 				<p className="text-center text-xs text-muted-foreground">
 					Running this server? <code>opaline server open</code> signs you in
 					from its terminal.

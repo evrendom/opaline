@@ -85,6 +85,19 @@ describe("GuestApp on a self-hosted server", () => {
 		expect(screen.getByText("opaline server open")).toBeVisible();
 	});
 
+	it("leaves the terminal sign-in hint out of the desktop app, which signs in by itself", () => {
+		const userAgent = vi
+			.spyOn(navigator, "userAgent", "get")
+			.mockReturnValue("Mozilla/5.0 Chrome/140 OpalineDesktop/0.1.0");
+		try {
+			renderGuest();
+			expect(screen.getByRole("button", { name: "Sign in" })).toBeVisible();
+			expect(screen.queryByText("opaline server open")).not.toBeInTheDocument();
+		} finally {
+			userAgent.mockRestore();
+		}
+	});
+
 	it("signs in and opens the app", async () => {
 		renderGuest();
 		fill("Email", " Ada@Example.com ");
