@@ -56,14 +56,25 @@ const REPLAY_BUTTON = `(() => {
 	const place = () => {
 		if (document.querySelector("[data-opaline-replay]")) return;
 		const settings = [...document.querySelectorAll('[data-slot="sidebar-footer"] [data-slot="sidebar-menu-button"]')].find((element) => element.textContent.trim() === "Settings");
-		const list = settings?.closest('[data-slot="sidebar-menu"]');
-		if (!settings || !list) return;
+		const template = settings ?? document.querySelector('[data-slot="sidebar-content"] [data-slot="sidebar-menu"] [data-slot="sidebar-menu-button"]');
+		if (!template) return;
+		let list = settings?.closest('[data-slot="sidebar-menu"]');
+		if (!list) {
+			const content = document.querySelector('[data-slot="sidebar-content"]');
+			if (!content) return;
+			const footer = document.createElement("div");
+			footer.className = "flex flex-col gap-2 p-2";
+			list = document.createElement("ul");
+			list.className = template.closest('[data-slot="sidebar-menu"]')?.className ?? "";
+			footer.append(list);
+			content.after(footer);
+		}
 		const item = document.createElement("li");
-		item.className = settings.closest("li")?.className ?? "";
+		item.className = template.closest("li")?.className ?? "";
 		item.dataset.opalineReplay = "";
 		const button = document.createElement("button");
 		button.type = "button";
-		button.className = settings.className;
+		button.className = template.className;
 		button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg><span>Replay opening</span>';
 		button.addEventListener("click", () => window.opalineDesktop.replayOpen());
 		item.append(button);

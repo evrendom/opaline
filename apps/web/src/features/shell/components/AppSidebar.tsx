@@ -16,6 +16,7 @@ import {
 	SidebarMenuItem,
 } from "@/app/ui/sidebar";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
+import { useLocalDesktopApp } from "@/features/desktop/local-app";
 import { DesktopWindowBar } from "@/features/shell/components/desktop-window-bar";
 import { SidebarInstallCommand } from "@/features/shell/components/SidebarInstallCommand";
 import { SidebarRepositories } from "@/features/shell/components/SidebarRepositories";
@@ -115,6 +116,7 @@ function SidebarNavTile({
 
 export function AppSidebar() {
 	const currentShellRoute = useCurrentShellRoute();
+	const localApp = useLocalDesktopApp();
 	const visibleRoutes = primaryRoutes;
 
 	return (
@@ -161,19 +163,21 @@ export function AppSidebar() {
 					)}
 				</SidebarContent>
 
-				<SidebarFooter>
-					<SidebarMenu>
-						<SidebarInstallCommand />
-						{footerRoutes.map((route) => (
-							<SidebarNavItem
-								key={route.id}
-								route={route}
-								active={currentShellRoute.id === route.id}
-							/>
-						))}
-						<SidebarUserMenu />
-					</SidebarMenu>
-				</SidebarFooter>
+				{localApp ? null : (
+					<SidebarFooter>
+						<SidebarMenu>
+							<SidebarInstallCommand />
+							{footerRoutes.map((route) => (
+								<SidebarNavItem
+									key={route.id}
+									route={route}
+									active={currentShellRoute.id === route.id}
+								/>
+							))}
+							<SidebarUserMenu />
+						</SidebarMenu>
+					</SidebarFooter>
+				)}
 			</div>
 		</Sidebar>
 	);

@@ -27,6 +27,7 @@ import {
 	SidebarMenuItem,
 } from "@/app/ui/sidebar";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
+import { useLocalDesktopApp } from "@/features/desktop/local-app";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
 import { cn } from "@/lib/utils";
@@ -84,6 +85,7 @@ export function SidebarWorkspaceSwitcher() {
 	const { pathname, search, hash } = useLocation();
 	const getShellRoutePath = useShellRoutePath();
 	const { state, actions } = useOrganization();
+	const localApp = useLocalDesktopApp();
 	const workspaceName = state.activeOrg?.name ?? "Workspace";
 
 	return (
@@ -137,11 +139,17 @@ export function SidebarWorkspaceSwitcher() {
 						<DropdownMenuSeparator />
 						<DropdownMenuItem
 							onClick={() =>
-								navigate(getShellRoutePath(appRoutes.settingsWorkspace()))
+								navigate(
+									getShellRoutePath(
+										localApp
+											? appRoutes.settings()
+											: appRoutes.settingsWorkspace(),
+									),
+								)
 							}
 						>
 							<IconSettings />
-							Workspace settings
+							{localApp ? "Settings" : "Workspace settings"}
 						</DropdownMenuItem>
 						<DropdownMenuItem
 							onClick={() =>
