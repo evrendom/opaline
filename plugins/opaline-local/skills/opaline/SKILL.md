@@ -40,7 +40,7 @@ Each tool's own description has its arguments, output and limits.
 ## On this Mac
 
 `large-results.md` is written for Opaline Cloud as well; on this Mac three things differ:
-- Links in results are pages of this Mac's Opaline and open in the Opaline app; surface them as they are. A link the user pastes from the app goes to `run` as `url`.
+- Links in results are `opaline://` links: they open in the Opaline app, never in a browser, so never suggest a browser or rewrite them to `http://`. Surface them as they are. A link the user pastes from the app (`opaline://…`) goes to `run` as `url`.
 - A `too large to page through here … run: opaline pull …` or `opaline sql … --out` line does not apply here: the `opaline` CLI is not connected to this Mac's Opaline. Aggregate, narrow from/to or the filters, and say what the answer covers.
 - `agent_feedback` reaches nobody at Opaline from here; leave it unused.
 

@@ -95,6 +95,11 @@ test("the local plugin carries the local skills and manifests, and the cloud pla
 		);
 		expect(skill).toContain("Nothing leaves this Mac");
 		expect(skill).toContain("open the Opaline app and connect their agents");
+		expect(skill).toContain("open in the Opaline app, never in a browser");
+		for (const line of skill
+			.split("\n")
+			.filter((line) => /browser/i.test(line)))
+			expect(line).toContain("never in a browser");
 		expect(text(path.join(target, "skills", "setup", "SKILL.md"))).toBe(
 			text(path.join(localPluginDir, "skills", "setup", "SKILL.md")),
 		);
