@@ -1,4 +1,5 @@
 const api = window.opalineOnboarding;
+if (api.nativeShadow) document.documentElement.dataset.nativeShadow = "";
 const DEVICE = /^Mac/i.test(navigator.platform) ? "Mac" : "PC";
 const content = document.querySelector(".content");
 const dots = document.querySelector(".dots");
@@ -1172,6 +1173,7 @@ async function growWindow() {
 	if (!target) return;
 	const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
 	for (let tries = 0; tries < 30 && (innerWidth !== target.width || innerHeight !== target.height); tries++) await frame();
+	delete document.documentElement.dataset.nativeShadow;
 	await frame();
 }
 

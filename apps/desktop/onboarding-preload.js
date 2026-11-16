@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("opalineOnboarding", {
+	nativeShadow: process.platform === "darwin",
 	debug: process.argv.includes("--opaline-debug"),
 	scan: () => ipcRenderer.invoke("onboarding:scan"),
 	analyze: () => ipcRenderer.invoke("onboarding:analyze"),

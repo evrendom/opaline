@@ -214,10 +214,11 @@ let onboardingDone = false;
 
 function createOnboardingWindow(page = "") {
 	const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+	const nativeShadow = process.platform === "darwin";
 	onboardingWindow = new BrowserWindow({
-		...centeredBounds(area, 1120, 800),
+		...(nativeShadow ? centeredBounds(area, 960, 640) : centeredBounds(area, 1120, 800)),
 		frame: false,
-		hasShadow: false,
+		hasShadow: nativeShadow,
 		resizable: false,
 		minimizable: false,
 		maximizable: false,
@@ -338,6 +339,7 @@ ipcMain.handle("onboarding:expand", (event) => {
 	const current = onboardingWindow.getBounds();
 	const area = screen.getDisplayMatching(current).workArea;
 	const next = centeredBounds(area, 1440, 900, { x: current.x + current.width / 2, y: current.y + current.height / 2 });
+	onboardingWindow.setHasShadow(false);
 	onboardingWindow.setBounds(next);
 	return { width: next.width, height: next.height };
 });

@@ -2165,3 +2165,13 @@ body[data-morph] .footer {
 ::-webkit-scrollbar {
 	display: none;
 }
+
+:root[data-native-shadow] .frame {
+	box-shadow:
+		0 0 0 0.5px rgb(0 0 0 / 0.5),
+		inset 0 0 0 0.5px rgb(255 255 255 / 0.12);
+}
+
+:root[data-native-shadow][data-theme="light"] .frame {
+	box-shadow: 0 0 0 0.5px rgb(0 0 0 / 0.18);
+}
