@@ -43,7 +43,7 @@ These are the gotchas no tool description carries.
 - `search('text'[, 'hybrid'|'meaning'|'exact'|'regex'[, days]])` is a table: join it to `runs USING (run_id)` to rank matches by impact; at most 3 per query.
 - Rank with the approved measures (`active_time`, `cost`, `tokens`, `runs`, `members`, `re_asks`, `frustration`, `group_run_time`, `group_call_time`).
 - A result marked `refused, do not retry` stays refused: narrow the query. Every result is stored as `sr_…`; its rows say where to look, and the runs you read say why.
-- `session_links` follows a task across sessions; `setup_snapshots` dates setup changes. `schema view=` explains both.
+- `session_links` follows a task across sessions; `setup_snapshots` dates setup changes, and `effective` says which settings apply. `schema view=` explains both.
 
 ## The playbook
 
@@ -60,6 +60,8 @@ Every analysis question runs these steps in order; dashboard requests skip them.
 Ask once, after the first `sql` and before reading, when the window, the order or the scope is ambiguous: offer options with real counts and mark a default. When the user said "just do it" or nobody can answer (a scheduled run), use the defaults and state them on the first line.
 
 **Conclusions** rest on runs you read. Counts, probabilities and search hits say where to look. A team's rate before and after a fix, over the runs that record the fact, is a trend; numbers come from the tools, and savings stay unestimated. **Unknown is not zero**: name what is unknown (NULL facts, `unrecorded_facts`, `coverage_gaps`, unpriced runs, unindexed sessions, cut results) and the coverage behind each number.
+
+**Evidence** the reader can find without Opaline: the session id, the time the tool printed with it (`started …`, `at …`, the transcript's own UTC timestamp) and a short exact quote. Opaline ids (`sr_…`, pattern ids, `q`/`r`/`c` handles, run ids) come second, never alone.
 
 ## Save and answer
 
