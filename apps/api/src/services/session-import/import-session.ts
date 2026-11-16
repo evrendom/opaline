@@ -21,7 +21,7 @@ import {
 } from "@rudel/secret-filter";
 import type { UsageExtractionResult } from "@rudel/usage-events";
 import { createIdempotentClickHouseExecutor } from "../../clickhouse.js";
-import { ingestProcessingSqlClient } from "../../db.js";
+import * as databases from "../../db.js";
 import { readBooleanEnv } from "../../lib/env.js";
 import { computeIngestContentHash } from "../../lib/ingest-content-hash.js";
 import {
@@ -605,7 +605,7 @@ async function processPreparedIngestSession({
 							: ledger.signal,
 					}),
 				{
-					database: ingestProcessingSqlClient,
+					database: databases.ingestProcessingSqlClient,
 					failpoint: durableProcessing.failpoint,
 					now: getNextIngestedAt,
 					randomUUID: () => crypto.randomUUID(),
