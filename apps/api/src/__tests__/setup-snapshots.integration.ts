@@ -10,6 +10,7 @@ import {
 	summarizeSplit,
 } from "@rudel/api-routes/transcript-records";
 import { getClickhouse } from "../clickhouse.js";
+import { storeLocalSetup } from "../selfhost/local-ingest/local-setup.js";
 import type { AgentQueryLimiter } from "../services/analysis/agent-query-slots.js";
 import { setupFileIdentity } from "../services/analysis/received-setup.js";
 import { runSql, type SqlCaller } from "../services/analysis/sql-gateway.js";
@@ -90,6 +91,7 @@ function manifest(hooked: boolean, captureReason?: string) {
 					...layer,
 					settings: {
 						...(layer.settings ?? {}),
+						model: "sonnet",
 						hooks: { PreToolUse: [HOOK] },
 						permissions: {
 							deny: ["Bash(rm -rf:*)", "Bash(git push --force:*)"],
@@ -370,6 +372,26 @@ test("setup snapshots list each capture's setup, date a hook added between sessi
 		"permission_rule | repository | .claude/settings.json | deny | Bash(git push --force:*)",
 	]);
 
+	// The repository's model overrides the member's; other kinds have no effective value.
+	expect(
+		await sql(
+			`SELECT location, value, effective FROM setup_snapshots
+			WHERE capture_id = '${afterCapture}' AND kind = 'setting' AND name = 'model'
+			ORDER BY location`,
+		),
+	).toEqual([
+		"location | value | effective",
+		".claude/settings.json | sonnet | true",
+		"~/.claude/settings.json | opus | false",
+	]);
+	expect(
+		await sql(
+			`SELECT countIf(effective IS NULL) = countIf(kind != 'setting') AS others_null,
+				countIf(kind = 'setting' AND effective) AS applied
+			FROM setup_snapshots WHERE capture_id = '${beforeCapture}'`,
+		),
+	).toEqual(["others_null | applied", "1 | 3"]);
+
 	// Dated: between the member's last capture without it and her first with it.
 	expect(
 		await sql(
@@ -383,8 +405,8 @@ test("setup snapshots list each capture's setup, date a hook added between sessi
 	).toEqual([
 		"session_id | lifecycle | at_session_time | capture_reason | repository_hooks | runtime_fields | items",
 		`${before} | start | true |  | 0 | 10 | 25`,
-		`${after} | start | true |  | 1 | 10 | 27`,
-		`${swept} | checkpoint | false | task-output-sweep | 1 | 10 | 27`,
+		`${after} | start | true |  | 1 | 10 | 28`,
+		`${swept} | checkpoint | false | task-output-sweep | 1 | 10 | 28`,
 	]);
 
 	// Runs of sessions captured at session time have no setup_snapshot gap;
@@ -423,4 +445,65 @@ test("setup snapshots list each capture's setup, date a hook added between sessi
 			reader(ben, true),
 		),
 	).toEqual(["user_id", ben]);
+});
+
+test("the desktop app's import writes this machine's settings as one capture per session, replaced on the next import", async () => {
+	const local = `${RUN}_local`;
+	await session(ana, local, baseMs + 4 * dayMs);
+	const files = new Map<string, string>([
+		[
+			"/Users/dev/.claude/settings.json",
+			JSON.stringify({
+				model: "opus",
+				autoCompactEnabled: false,
+				env: { ANTHROPIC_AUTH_TOKEN: "sk-ant-api03-abcdefghijklmnop" },
+			}),
+		],
+		[
+			"/Users/dev/code/shop/.claude/settings.local.json",
+			JSON.stringify({ model: "sonnet" }),
+		],
+	]);
+	const store = (at: number) =>
+		storeLocalSetup({
+			clickhouse,
+			session: {
+				organizationId: workspace,
+				userId: ana,
+				sessionId: local,
+				source: "claude_code",
+				projectPath: "/Users/dev/code/shop",
+				repository: "github.com/acme/shop",
+			},
+			paths: {
+				home: "/Users/dev",
+				codexHome: "/Users/dev/.codex",
+				managedSettings: "/nonexistent/managed-settings.json",
+			},
+			now: new Date(at),
+			read: async (path) => files.get(path) ?? null,
+		});
+	await store(baseMs + 4 * dayMs + 60_000);
+	files.set(
+		"/Users/dev/.claude/settings.json",
+		JSON.stringify({ model: "opus", autoCompactEnabled: true }),
+	);
+	await store(baseMs + 4 * dayMs + 120_000);
+	expect(
+		await sql(
+			`SELECT capture_reason, at_session_time, scope, location, name, value, effective
+			FROM setup_snapshots WHERE session_id = '${local}' AND kind = 'setting'
+			ORDER BY name, location`,
+		),
+	).toEqual([
+		"capture_reason | at_session_time | scope | location | name | value | effective",
+		"local-import | false | user | ~/.claude/settings.json | autoCompactEnabled | true | true",
+		"local-import | false | repository | .claude/settings.local.json | model | sonnet | true",
+		"local-import | false | user | ~/.claude/settings.json | model | opus | false",
+	]);
+	expect(
+		await sql(
+			`SELECT has(coverage_gaps, 'setup_snapshot') AS gap FROM runs WHERE session_id = '${local}'`,
+		),
+	).toEqual(["gap", "1"]);
 });

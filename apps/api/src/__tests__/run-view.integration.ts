@@ -551,17 +551,17 @@ test("the run index build writes each request with its calls and tokens, and run
 	const lines = view.text.split("\n");
 	expect(view.phaseRule).toBe(1);
 	expect(lines[0]).toStartWith(
-		`run ${id} · claude_code · "fix the failing login test" · 21 min · `,
+		`run ${id} · claude_code · "fix the failing login test" · started 2026-10-01T09:02:00.000Z · 21 min · `,
 	);
 	expect(lines[0]).toEndWith(" · phases by rule 1");
 	expect(lines[1]).toBe(
-		`PREV ${runId(claudeSession, "claude_code", "", first ?? 0)} · "add rate limiting to login" → END "Done, added a limiter in auth.ts"`,
+		`PREV ${runId(claudeSession, "claude_code", "", first ?? 0)} · started 2026-10-01T09:00:00.000Z · "add rate limiting to login" → END "Done, added a limiter in auth.ts"`,
 	);
 	expect(lines[2]).toMatch(
 		/^END {2}r\d+ · "Fixed! The \\"login\\" test now passes\. Ran `bun test` twice\."$/u,
 	);
 	expect(lines[3]).toBe(
-		`NEXT ${runId(claudeSession, "claude_code", "", third ?? 0)} · user: "it still fails, damn it" · reaction: unhappy (strongly worded)`,
+		`NEXT ${runId(claudeSession, "claude_code", "", third ?? 0)} · started 2026-10-01T09:30:00.000Z · user: "it still fails, damn it" · reaction: unhappy (strongly worded)`,
 	);
 	// The fixture's transcript records no setup text.
 	expect(lines[4]).toBe(
@@ -646,9 +646,11 @@ test("the run index build writes each request with its calls and tokens, and run
 		env,
 	);
 	expect(codex.text).toMatch(
-		/\n {2}q\d+ +exec_command test · 3 min · 1k tokens · /u,
+		/\n {2}q\d+ +exec_command test · at 2026-10-01T09:01:00.000Z · 3 min · 1k tokens · /u,
 	);
-	expect(codex.text).toMatch(/\n {2}q\d+ +text · 1 min · 2k tokens · /u);
+	expect(codex.text).toMatch(
+		/\n {2}q\d+ +text · at 2026-10-01T09:04:00.000Z · 1 min · 2k tokens · /u,
+	);
 });
 
 /** Lines written for the Claude session, moved to another session of this test. */

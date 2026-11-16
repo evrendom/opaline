@@ -110,7 +110,10 @@ export const SETUP_SNAPSHOT_COLUMNS: readonly SqlViewColumn[] = [
 	column(
 		"capture_reason",
 		"LowCardinality(String)",
-		"Why a capture was taken outside the session's hooks: task-output-sweep (a later sweep of an earlier session); empty for one at session time.",
+		"Why a capture was taken outside the session's hooks: task-output-sweep (a later sweep of an earlier session), local-import (the desktop app read this machine's settings files when it imported the session: settings, hooks, permission rules, plugins and MCP servers, no files or runtime); empty for one at session time.",
+		[
+			"A local-import capture holds the settings as they were at the session's latest import, which can be later than the session: compare its captured_at with the session's runs.",
+		],
 	),
 	column(
 		"kind",
@@ -152,6 +155,15 @@ export const SETUP_SNAPSHOT_COLUMNS: readonly SqlViewColumn[] = [
 		"What the settings item says, as the CLI recorded it: the hook's JSON (matcher, type, command, timeoutSeconds, async), the rule, the MCP server's JSON (credentials left out by the CLI), true/false for a plugin, the setting's JSON, the runtime version. For a file, its CLI categories.",
 		[
 			"Cut at 4,096 characters. Commands, URLs and settings passed the CLI's secret filter; a value it removed reads [REDACTED].",
+		],
+	),
+	column(
+		"effective",
+		"Nullable(Bool)",
+		"For a setting: true when its settings file is the one whose value applies, by Claude Code's precedence (managed, then .claude/settings.local.json, then .claude/settings.json, then ~/.claude/settings.local.json, then ~/.claude/settings.json); false when a file earlier in that order sets the same key. NULL for every other kind.",
+		[
+			"Only the settings files the capture read: command-line flags and environment variables also override settings and are not recorded.",
+			"Hooks, permission rules and plugins of every file add up rather than override, so they have no effective value.",
 		],
 	),
 	column(
@@ -209,7 +221,7 @@ export function setupSnapshotsView(params: SqlScopeParams): SqlView {
 		traps: [
 			"Only sessions you may read in this workspace (every member's, unless the workspace keeps members to their own). The server adds the workspace; never filter by it.",
 			"What was on disk, never what the agent received or used: join setup_files for what a run received, calls for what it ran.",
-			"Only sessions the CLI captured evidence for (repositories with evidence upload on, from the CLI version that uploads it), captured since the setup columns existed: a session with no rows is unknown, not without setup (runs.coverage_gaps has setup_snapshot). A capture lists only what the CLI reads: the repository's agent files, ~/.claude, $CODEX_HOME, user skill and plugin directories, instruction files above the repository and the project's auto-memory.",
+			"Only sessions the CLI captured evidence for (repositories with evidence upload on, from the CLI version that uploads it), captured since the setup columns existed, and sessions the desktop app imported (capture_reason local-import: settings only): a session with no rows is unknown, not without setup (runs.coverage_gaps has setup_snapshot). A capture lists only what the CLI reads: the repository's agent files, ~/.claude, $CODEX_HOME, user skill and plugin directories, instruction files above the repository and the project's auto-memory.",
 			"A session has several captures (start, checkpoints, end); for the setup a session started with, keep lifecycle = 'start' AND at_session_time. For the setup a run had, take its session's last capture at or before runs.started_at: argMax(capture_id, captured_at) over the session's captures WHERE captured_at <= started_at.",
 			"To date a change, compare consecutive captures of one member (ORDER BY captured_at) on setup_item and version; modified_at says when a file was last written.",
 			"Joined to runs, every run repeats every item of every capture of its session: reduce setup_snapshots to one row per session first (GROUP BY user_id, session_id with countIf(<the item>) > 0), then join.",
@@ -264,7 +276,7 @@ export function setupSnapshotsSql(owner: string): string {
 					startsWith(setup_item, 'plugin:'), 'plugin', 'user') AS scope,
 				multiIf(startsWith(root_id, 'claude-'), 'claude_code', startsWith(root_id, 'codex-'), 'codex', '') AS agent,
 				root_id AS location, setup_item, path AS name, arrayStringConcat(categories, ',') AS value,
-				hash AS version, hash_kind AS version_kind,
+				CAST(NULL AS Nullable(Bool)) AS effective, hash AS version, hash_kind AS version_kind,
 				CAST(file_bytes AS Nullable(UInt32)) AS bytes,
 				CAST(file_modified_at AS Nullable(DateTime64(3, 'UTC'))) AS modified_at
 			FROM (
@@ -294,18 +306,24 @@ export function setupSnapshotsSql(owner: string): string {
 				agent, location,
 				concat(kind, ':', agent, ':', location, ':', name,
 					if(kind IN ('hook', 'permission_rule'), concat(':', value), '')) AS setup_item,
-				name, value, lower(hex(SHA256(value))) AS version, 'item' AS version_kind,
+				name, value,
+				if(kind = 'setting',
+					CAST(layer_rank = min(layer_rank) OVER (PARTITION BY capture_id, agent, kind, name) AS Nullable(Bool)),
+					NULL) AS effective,
+				lower(hex(SHA256(value))) AS version, 'item' AS version_kind,
 				CAST(NULL AS Nullable(UInt32)) AS bytes,
 				CAST(NULL AS Nullable(DateTime64(3, 'UTC'))) AS modified_at
 			FROM (
 				SELECT ${capture}, item.1 AS agent, item.2 AS layer, item.3 AS location,
 					if(item.4 = 'permission', 'permission_rule', item.4) AS kind,
-					item.5 AS name, item.6 AS value
+					item.5 AS name, item.6 AS value,
+					multiIf(item.2 = 'managed', 0, item.2 = 'project-local', 1, item.2 = 'project', 2,
+						item.2 = 'user-local', 3, 4) AS layer_rank
 				FROM (${captures}) ARRAY JOIN setup_settings AS item
 			)`;
 	const runtime = `SELECT ${capture}, 'runtime' AS kind, 'user' AS scope, '' AS agent,
 				'runtime' AS location, concat('runtime:', field.1) AS setup_item, field.1 AS name,
-				field.2 AS value, field.2 AS version, 'literal' AS version_kind,
+				field.2 AS value, CAST(NULL AS Nullable(Bool)) AS effective, field.2 AS version, 'literal' AS version_kind,
 				CAST(NULL AS Nullable(UInt32)) AS bytes,
 				CAST(NULL AS Nullable(DateTime64(3, 'UTC'))) AS modified_at
 			FROM (${captures}) ARRAY JOIN runtime_versions AS field`;
