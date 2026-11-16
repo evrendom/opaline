@@ -1,4 +1,4 @@
-import { LANGUAGE_SIGNAL_RULES } from "./rules.js";
+import { LANGUAGE_SIGNAL_RULES, SWEAR_INTENSIFIED_POSITIVES } from "./rules.js";
 import type {
 	BuiltInLanguageSignalCategory,
 	LanguageSignalMatch,
@@ -28,7 +28,7 @@ const CATEGORY_PRECEDENCE: Readonly<
 const NEGATIVE_QUESTION_RUN: CompiledSurface = {
 	category: "negative",
 	ruleId: "negative.question-run",
-	source: "\\?{2,}",
+	source: "(?<=\\p{L})\\?{2,}|\\?{2,}(?=[\\s]*$)",
 	surfaceLength: 2,
 	categoryPrecedence: CATEGORY_PRECEDENCE.negative,
 	ruleOrder: -1,
@@ -36,11 +36,22 @@ const NEGATIVE_QUESTION_RUN: CompiledSurface = {
 	lead: null,
 };
 
+const NEGATIVE_EXCLAMATION_RUN: CompiledSurface = {
+	category: "negative",
+	ruleId: "negative.exclamation-run",
+	source: "!{2,}|\\?!|!\\?",
+	surfaceLength: 2,
+	categoryPrecedence: CATEGORY_PRECEDENCE.negative,
+	ruleOrder: -1,
+	surfaceOrder: 1,
+	lead: null,
+};
+
 export const MAX_LANGUAGE_SIGNAL_MATCHES = 10_000;
 
 const COMPILED_SURFACES = groupedByLead(
-	LANGUAGE_SIGNAL_RULES.flatMap((rule, ruleOrder) =>
-		rule.surfaces.map((surface, surfaceOrder) => ({
+	LANGUAGE_SIGNAL_RULES.flatMap((rule, ruleOrder): CompiledSurface[] => [
+		...rule.surfaces.map((surface, surfaceOrder) => ({
 			category: rule.category,
 			ruleId: rule.ruleId,
 			source: compileSurfaceSource(surface),
@@ -50,18 +61,35 @@ const COMPILED_SURFACES = groupedByLead(
 			surfaceOrder,
 			lead: compileSurfaceSource(surface.slice(0, 1).toLowerCase()),
 		})),
-	).sort(compareCompiledSurfaces),
+		...(rule.patterns ?? []).map((pattern, patternOrder) => ({
+			category: rule.category,
+			ruleId: rule.ruleId,
+			source: pattern,
+			surfaceLength: 0,
+			categoryPrecedence: CATEGORY_PRECEDENCE[rule.category],
+			ruleOrder,
+			surfaceOrder: rule.surfaces.length + patternOrder,
+			lead: null,
+		})),
+	]).sort(compareCompiledSurfaces),
 );
 
 export const LANGUAGE_SIGNAL_PATTERN = new RegExp(
-	`(${NEGATIVE_QUESTION_RUN.source})|(?<![\\p{L}\\p{N}])${alternationSource(COMPILED_SURFACES, true)}(?![\\p{L}\\p{N}])`,
+	`(${NEGATIVE_QUESTION_RUN.source})|(${NEGATIVE_EXCLAMATION_RUN.source})|(?<![\\p{L}\\p{N}])${alternationSource(COMPILED_SURFACES, true)}(?![\\p{L}\\p{N}])`,
 	"giu",
 );
 
+const NEGATED_POSITIVE_SOURCE = `(?:not|n['’]?t)\\s+(?:${COMPILED_SURFACES.filter(
+	(surface) => surface.category === "positive",
+)
+	.map(({ source }) => source)
+	.join("|")})`;
+
 /**
- * Cheap check that a text could contain a surface of one category: the
- * category's compiled surfaces without the word-boundary guards, so it can
- * only over-match. Callers run the full scan only when it passes, which keeps
+ * Cheap check that a text could contain a match of one category: the
+ * category's compiled surfaces without the word-boundary guards, plus the
+ * surfaces that can turn into it (negated positives, swears next to praise),
+ * so it can only over-match. Callers run the full scan only when it passes, which keeps
  * results identical while skipping texts that cannot match.
  */
 const CATEGORY_PREFILTERS = new Map(
@@ -69,9 +97,17 @@ const CATEGORY_PREFILTERS = new Map(
 		category,
 		new RegExp(
 			[
-				...(category === "negative" ? [NEGATIVE_QUESTION_RUN.source] : []),
+				...(category === "negative"
+					? [
+							NEGATIVE_QUESTION_RUN.source,
+							NEGATIVE_EXCLAMATION_RUN.source,
+							NEGATED_POSITIVE_SOURCE,
+						]
+					: []),
 				...COMPILED_SURFACES.filter(
-					(surface) => surface.category === category,
+					(surface) =>
+						surface.category === category ||
+						(category === "positive" && surface.category === "swear"),
 				).map(({ source }) => source),
 			].join("|"),
 			"iu",
@@ -88,11 +124,40 @@ export function mayContainLanguageSignal(
 
 const ADJACENT_POSITIVE_NEGATION_PATTERN =
 	/(?:do\s+not|don['’]?t|does\s+not|doesn['’]?t|did\s+not|didn['’]?t|not)\s+$/iu;
+const POSITIVE_WORDS_SOURCE = `(?:${[
+	...LANGUAGE_SIGNAL_RULES.filter(
+		(rule) => rule.ruleId === "positive.praise",
+	).flatMap((rule) => rule.surfaces),
+	...SWEAR_INTENSIFIED_POSITIVES,
+]
+	.map(compileSurfaceSource)
+	.join("|")})`;
+const SWEAR_BEFORE_POSITIVE_PATTERN = new RegExp(
+	`^[\\s,]+(?:(?:so|really|very|super|too)\\s+)?${POSITIVE_WORDS_SOURCE}(?![\\p{L}\\p{N}])`,
+	"iu",
+);
+const POSITIVE_BEFORE_SWEAR_PATTERN = new RegExp(
+	`(?<![\\p{L}\\p{N}])${POSITIVE_WORDS_SOURCE}\\s+(?:as\\s+)?$`,
+	"iu",
+);
 const SYSTEM_INSTRUCTION_BLOCK_PATTERN =
 	/<system_instruction>[\s\S]*?<\/system_instruction>/giu;
 
+const QUOTED_TEXT_PATTERN = new RegExp(
+	[
+		"```[\\s\\S]*?```",
+		"<([\\w-]+)(?:\\s[^>]*)?>[\\s\\S]*?<\\/\\1>",
+		"`[^`\\n]+`",
+		"^[ \\t]*>[^\\n]*",
+		'"[^"\\n]{1,300}"',
+		"“[^”\\n]{1,300}”",
+		"\\[(?:Image|File|Attached image|Pasted text)\\b[^\\]\\n]*\\]",
+	].join("|"),
+	"gmu",
+);
+
 const LANGUAGE_SIGNAL_CANDIDATE_PATTERN = new RegExp(
-	`${NEGATIVE_QUESTION_RUN.source}|(?<![\\p{L}\\p{N}])${alternationSource(COMPILED_SURFACES, false)}`,
+	`${NEGATIVE_QUESTION_RUN.source}|${NEGATIVE_EXCLAMATION_RUN.source}|(?<![\\p{L}\\p{N}])${alternationSource(COMPILED_SURFACES, false)}`,
 	"giu",
 );
 const LANGUAGE_SIGNAL_AT_PATTERN = new RegExp(
@@ -107,7 +172,10 @@ export function scanLanguageSignals(
 
 	for (const match of languageSignalPatternMatches(text)) {
 		const compiledSurface = findCompiledSurface(match);
-		if (compiledSurface !== undefined) {
+		if (
+			compiledSurface !== undefined &&
+			!isSuppressed(text, match.index, compiledSurface, matches)
+		) {
 			matches.push(buildLanguageSignalMatch(text, match, compiledSurface));
 		}
 
@@ -147,12 +215,10 @@ export function scanMemberLanguageSignals(
 ): ReadonlyArray<LanguageSignalMatch> {
 	const matches: LanguageSignalMatch[] = [];
 	let cursor = 0;
-	for (const block of text.matchAll(SYSTEM_INSTRUCTION_BLOCK_PATTERN)) {
-		appendSegmentMatches(matches, text.slice(cursor, block.index), cursor);
-		cursor = block.index + block[0].length;
-		if (matches.length >= MAX_LANGUAGE_SIGNAL_MATCHES) {
-			return matches.slice(0, MAX_LANGUAGE_SIGNAL_MATCHES);
-		}
+	for (const quoted of text.matchAll(QUOTED_TEXT_PATTERN)) {
+		appendSegmentMatches(matches, text.slice(cursor, quoted.index), cursor);
+		cursor = quoted.index + quoted[0].length;
+		if (matches.length >= MAX_LANGUAGE_SIGNAL_MATCHES) break;
 	}
 	appendSegmentMatches(matches, text.slice(cursor), cursor);
 	return matches.slice(0, MAX_LANGUAGE_SIGNAL_MATCHES);
@@ -167,16 +233,61 @@ function appendSegmentMatches(
 	segment: string,
 	offset: number,
 ) {
+	if (segment.trim() === "") return;
 	for (const match of scanLanguageSignals(segment)) {
 		matches.push({
 			...match,
 			end: match.end + offset,
 			start: match.start + offset,
 		});
-		if (matches.length >= MAX_LANGUAGE_SIGNAL_MATCHES) {
-			return;
-		}
+		if (matches.length >= MAX_LANGUAGE_SIGNAL_MATCHES) return;
 	}
+}
+
+const PROBE_FOR_PROBLEMS_PATTERN =
+	/(?:find|spot|see|notice|anything|something|what['’]?s|what\s+is|any)\s+(?:[\p{L}\p{N}]+\s+){0,2}$/iu;
+
+function isSuppressed(
+	text: string,
+	index: number,
+	compiledSurface: CompiledSurface,
+	earlier: readonly LanguageSignalMatch[],
+): boolean {
+	switch (compiledSurface.ruleId) {
+		case "negative.fishy":
+			return PROBE_FOR_PROBLEMS_PATTERN.test(
+				text.slice(Math.max(0, index - 40), index),
+			);
+		case "negative.again-alone":
+			return !startsSentence(text, index);
+		case "negative.exclamation-run":
+			return followsPositiveInSentence(text, index, earlier);
+		default:
+			return false;
+	}
+}
+
+function followsPositiveInSentence(
+	text: string,
+	index: number,
+	earlier: readonly LanguageSignalMatch[],
+): boolean {
+	for (let at = earlier.length - 1; at >= 0; at--) {
+		const match = earlier[at];
+		if (match?.category === "positive")
+			return !/[.?!\n]/u.test(text.slice(match.end, index));
+	}
+	return false;
+}
+
+function startsSentence(text: string, index: number): boolean {
+	for (let at = index - 1; at >= 0; at--) {
+		const character = text[at] ?? "";
+		if (character === "." || character === "!" || character === "?")
+			return true;
+		if (!/\s/u.test(character)) return false;
+	}
+	return true;
 }
 
 function buildLanguageSignalMatch(
@@ -192,6 +303,21 @@ function buildLanguageSignalMatch(
 			: undefined;
 	const start = match.index - (negation?.length ?? 0);
 	const end = match.index + match[0].length;
+	if (
+		compiledSurface.category === "swear" &&
+		(SWEAR_BEFORE_POSITIVE_PATTERN.test(text.slice(end, end + 40)) ||
+			(compiledSurface.ruleId === "swear.as-fuck" &&
+				POSITIVE_BEFORE_SWEAR_PATTERN.test(
+					text.slice(Math.max(0, start - 40), start),
+				)))
+	)
+		return {
+			category: "positive",
+			ruleId: "positive.swear-intensified",
+			matchedText: text.slice(start, end),
+			start,
+			end,
+		};
 
 	return {
 		category: negation === undefined ? compiledSurface.category : "negative",
@@ -219,10 +345,13 @@ function findCompiledSurface(
 	if (match[1] !== undefined) {
 		return NEGATIVE_QUESTION_RUN;
 	}
+	if (match[2] !== undefined) {
+		return NEGATIVE_EXCLAMATION_RUN;
+	}
 
-	for (let captureIndex = 2; captureIndex < match.length; captureIndex += 1) {
+	for (let captureIndex = 3; captureIndex < match.length; captureIndex += 1) {
 		if (match[captureIndex] !== undefined) {
-			return COMPILED_SURFACES[captureIndex - 2];
+			return COMPILED_SURFACES[captureIndex - 3];
 		}
 	}
 
