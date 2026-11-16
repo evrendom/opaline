@@ -16,11 +16,13 @@ import { schema, table } from "@chkit/core";
 // no version column on purpose: rows of one generation are deterministic, so a
 // retry replaces identical rows.
 //
-// A receipt row (kind = 'receipt', record_idx = 4294967295) is written last for
-// each generation; its presence proves the generation was fully extracted. The
-// committed generation of a session is its newest receipt by (revision,
-// parser_version). Writers keep the previous committed generation after a new
-// receipt lands, and delete older generations on the following publication.
+// A receipt row (kind = 'receipt', agent_id = '', record_idx = 4294967295,
+// block_idx = 0) is written last for each generation; its presence proves the
+// generation was fully extracted. The committed generation of a session is its
+// newest receipt by (revision, parser_version). Publication deletes nothing:
+// the hourly session retirement deletes a superseded generation, and its stored
+// record commands first, once the grace since the publication that superseded
+// it has passed; a generation that never got its receipt goes at once.
 const rudel_transcript_records = table({
 	database: "rudel",
 	name: "transcript_records",
