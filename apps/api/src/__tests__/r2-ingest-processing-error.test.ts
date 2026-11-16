@@ -24,12 +24,19 @@ describe("R2 ingest processing error classification", () => {
 	test("awaits best-effort language signals on both R2 processing paths on Vercel and self-hosted servers", async () => {
 		const [routerSource, importSource, repairSource] = await Promise.all([
 			Bun.file(new URL("../router.ts", import.meta.url)).text(),
-			Bun.file(
-				new URL(
-					"../services/session-import/import-session.ts",
-					import.meta.url,
-				),
-			).text(),
+			Promise.all(
+				[
+					...new Bun.Glob("*.ts").scanSync(
+						new URL("../services/session-import/", import.meta.url).pathname,
+					),
+				]
+					.filter((name) => !name.endsWith(".test.ts"))
+					.map((name) =>
+						Bun.file(
+							new URL(`../services/session-import/${name}`, import.meta.url),
+						).text(),
+					),
+			).then((sources) => sources.join("\n")),
 			Bun.file(
 				new URL("../services/r2-ingest-repair.service.ts", import.meta.url),
 			).text(),
@@ -48,7 +55,7 @@ describe("R2 ingest processing error classification", () => {
 			/repairRecoverableR2IngestJobs\([\s\S]*?awaitBestEffortLanguageSignals: awaitsDurableLanguageSignals\(\),/u,
 		);
 		expect(importSource).toMatch(
-			/shouldStartBestEffortLanguageSignals\(\{[\s\S]*?durableProcessing: durableProcessing !== undefined,/u,
+			/shouldStartBestEffortLanguageSignals\(\{[\s\S]*?durableProcessing: (?:request\.)?durableProcessing !== undefined,/u,
 		);
 		expect(importSource).toMatch(
 			/shouldPersistUsageExtractionFailureReceipt\(\{[\s\S]*?durableProcessing: claimedLedger !== undefined,/u,
