@@ -5,6 +5,9 @@ export const FROZEN_ROW_REM = 2.625;
 export const INDENT =
 	"pl-[calc(var(--depth)*8px+4px)] @lg:pl-[calc(var(--depth)*12px+4px)]";
 
+export const MESSAGE_INDENT =
+	"ml-[calc(var(--depth)*8px+1px)] @lg:ml-[calc(var(--depth)*12px+1px)]";
+
 export const GRID =
 	"grid grid-cols-[9.5rem_minmax(0,1fr)_3.25rem] @lg:grid-cols-[15rem_minmax(0,1fr)_6.5rem]";
 

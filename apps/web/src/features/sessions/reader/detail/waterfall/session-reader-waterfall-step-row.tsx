@@ -27,6 +27,7 @@ import {
 	GRID,
 	GRID_UNTIMED,
 	INDENT,
+	MESSAGE_INDENT,
 	ROW,
 	rowState,
 	solidSpan,
@@ -159,12 +160,18 @@ export const StepRowView = memo(function StepRowView({
 				data-start-ms={step.startMs}
 				data-step-failed={step.isError ? "" : undefined}
 				data-talks-to={subagentTalkedTo(step) ?? undefined}
+				className={cn(
+					"relative -my-0.5 bg-(--dashboard-01-content-background,var(--background)) py-0.5",
+					MESSAGE_INDENT,
+				)}
+				style={{ "--depth": depth } as CSSProperties}
 			>
 				<SentMessage
 					model={model}
 					onSelect={() => onSelect(step.id)}
 					selected={selected}
 					step={step}
+					tint={subagentTint}
 				/>
 			</div>
 		);
