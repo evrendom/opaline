@@ -1389,7 +1389,7 @@ describe("run index statements", () => {
 			expect(pinned?.length).toBeGreaterThan(0);
 			expect(
 				query.match(
-					/revision IN CAST\(\{revisions:Array\(String\)\}, 'Array\(UInt64\)'\)/gu,
+					/revision IN CAST\(\{revisions:Array\(String\)\}, 'Array\(UInt64\)'\)\s+AND parser_version IN \{parserVersions:Array\(UInt16\)\}/gu,
 				),
 			).toHaveLength(pinned?.length ?? 0);
 			expect(query).not.toContain(

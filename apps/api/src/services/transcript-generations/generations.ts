@@ -54,6 +54,7 @@ export function pinnedRows(alias = ""): string {
 	return `${column("organization_id")} = {organizationId:String} AND ${column("user_id")} = {userId:String}
 		AND ${column("session_id")} IN {sessionIds:Array(String)}
 		AND ${column("revision")} IN CAST({revisions:Array(String)}, 'Array(UInt64)')
+		AND ${column("parser_version")} IN {parserVersions:Array(UInt16)}
 		AND (${column("session_id")}, ${column("revision")}, ${column("parser_version")}) IN arrayZip({sessionIds:Array(String)},
 			arrayMap(r -> toUInt64(r), {revisions:Array(String)}), {parserVersions:Array(UInt16)})`;
 }
