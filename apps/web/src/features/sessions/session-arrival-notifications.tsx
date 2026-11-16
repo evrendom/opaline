@@ -7,6 +7,7 @@ import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { appRoutes, getWorkspaceAppPath } from "@/app/routes";
+import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import { useOptionalOrganization } from "@/features/workspace/organization/useOrganization";
 import { SESSION_DETAIL_INITIAL_QUERY_PREFIX } from "./components/session-detail-fast-query";
 import {
@@ -21,11 +22,13 @@ import { setSessionArrivalsLive } from "./session-arrivals-live";
 
 export function SessionArrivalNotifications() {
 	const organization = useOptionalOrganization()?.state;
+	const selfHost = useSelfHost();
 	const workspace = organization?.activeOrg;
 	if (!workspace || organization.isLoading) return null;
 	return (
 		<WorkspaceSessionArrivalNotifications
 			key={workspace.id}
+			announce={!selfHost}
 			organizationId={workspace.id}
 			workspaceSlug={workspace.slug}
 		/>
@@ -33,9 +36,11 @@ export function SessionArrivalNotifications() {
 }
 
 function WorkspaceSessionArrivalNotifications({
+	announce,
 	organizationId,
 	workspaceSlug,
 }: {
+	announce: boolean;
 	organizationId: string;
 	workspaceSlug: string;
 }) {
@@ -93,7 +98,7 @@ function WorkspaceSessionArrivalNotifications({
 			if (opening && page.data.sessions.length === 0) return;
 			const next = collectNewSessionArrivals(seen.current, page.data.sessions);
 			seen.current = next.seen;
-			for (const session of next.arrivals) {
+			for (const session of announce ? next.arrivals : []) {
 				const id = `session-arrival:${organizationId}:${session.sessionId}`;
 				toastIds.current.add(id);
 				toast.success("New session uploaded", {
@@ -148,6 +153,6 @@ function WorkspaceSessionArrivalNotifications({
 			if (refreshTimer) clearTimeout(refreshTimer);
 			for (const id of ids) toast.dismiss(id);
 		};
-	}, [organizationId, queryClient, workspaceSlug]);
+	}, [announce, organizationId, queryClient, workspaceSlug]);
 	return null;
 }
