@@ -19,6 +19,7 @@ import { ClickHouseWriteFencedError } from "../../lib/clickhouse-write-fence.js"
 import { NO_CODEX_LIFECYCLE_FACTS } from "../analysis/codex-lifecycle.js";
 import { gateRunIndexRow } from "../analysis/run-index-columns.js";
 import {
+	buildRunIndexSessionStatement,
 	buildRunIndexStatement,
 	buildRunRequestsStatement,
 	buildUnattributedUsageStatement,
@@ -31,6 +32,7 @@ import {
 } from "../analysis/run-index-sql.js";
 import { buildRunFactsStatement } from "../analysis/run-queries.js";
 import { callTuple } from "./call-facts.fixtures.js";
+import { callFactsCtes, callTuplesSql } from "./call-facts.js";
 import { runNodeId } from "./l1-edge-ids.js";
 import { RUN_REQUESTS_TABLE } from "./l1-edge-tables.js";
 import {
@@ -1370,8 +1372,30 @@ describe("run index statements", () => {
 		});
 	});
 
-	test("a build resolves shared sets once", () => {
+	test("a build reads the pinned generation as a constant key set pruned by revision, and resolves shared sets once", () => {
 		const requests = buildRunRequestsStatement(scope, generation).query;
+		for (const query of [
+			requests,
+			buildRunIndexStatement(scope, generation).query,
+			buildUnattributedUsageStatement(scope, generation).query,
+			buildRunIndexSessionStatement(scope, generation, {
+				ctes: callFactsCtes(),
+				sql: callTuplesSql(),
+			}).query,
+		]) {
+			const pinned = query.match(
+				/\(session_id, revision, parser_version\) IN arrayZip\(\{sessionIds:Array\(String\)\}/gu,
+			);
+			expect(pinned?.length).toBeGreaterThan(0);
+			expect(
+				query.match(
+					/revision IN CAST\(\{revisions:Array\(String\)\}, 'Array\(UInt64\)'\)/gu,
+				),
+			).toHaveLength(pinned?.length ?? 0);
+			expect(query).not.toContain(
+				"arrayJoin(arrayZip({sessionIds:Array(String)}, {revisions",
+			);
+		}
 		for (const query of [
 			requests,
 			buildRunIndexStatement(scope, generation).query,

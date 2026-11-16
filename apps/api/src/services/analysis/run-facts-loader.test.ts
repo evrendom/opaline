@@ -84,7 +84,7 @@ test("the index read is pinned to the transcript generation, the index version a
 		"index_version = {indexVersion:UInt16} AND pricing_version = {pricingVersion:String}",
 	);
 	expect(statement.query).toContain(
-		"(session_id, revision, parser_version) IN (",
+		"(session_id, revision, parser_version) IN arrayZip(",
 	);
 	expect(statement.query_params).toMatchObject({
 		sessionIds: ["a"],
