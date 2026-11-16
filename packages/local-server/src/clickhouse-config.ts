@@ -159,9 +159,12 @@ export function renderClickHouseOverlay(maxServerMemoryBytes: number): string {
         <database>system</database>
         <table>query_log</table>
         <partition_by>toYYYYMM(event_date)</partition_by>
-        <ttl>event_date + INTERVAL 30 DAY DELETE</ttl>
+        <ttl>event_date + INTERVAL 3 DAY DELETE</ttl>
         <flush_interval_milliseconds>7500</flush_interval_milliseconds>
     </query_log>
+    <merge_tree>
+        <old_parts_lifetime>120</old_parts_lifetime>
+    </merge_tree>
 </clickhouse>
 `;
 }
@@ -172,6 +175,8 @@ export function renderClickHouseUsers(password: string): string {
     <profiles>
         <default>
             <log_queries>1</log_queries>
+            <log_queries_min_type>QUERY_FINISH</log_queries_min_type>
+            <log_queries_min_query_duration_ms>50</log_queries_min_query_duration_ms>
             <async_insert_poll_timeout_ms>${CLICKHOUSE_ASYNC_INSERT_POLL_MS}</async_insert_poll_timeout_ms>
             <query_plan_merge_expressions>0</query_plan_merge_expressions>
         </default>

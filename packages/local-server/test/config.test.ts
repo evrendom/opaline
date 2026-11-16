@@ -48,6 +48,8 @@ describe("ClickHouse config", () => {
 	test("the overlay carries the self-hosting limits and compatibility", () => {
 		const overlay = renderClickHouseOverlay(3 * 1024 * 1024 * 1024);
 		expect(overlay).toContain("<listen_host>127.0.0.1</listen_host>");
+		expect(overlay).toContain("<ttl>event_date + INTERVAL 3 DAY DELETE</ttl>");
+		expect(overlay).toContain("<old_parts_lifetime>120</old_parts_lifetime>");
 		expect(overlay).toContain(
 			"<max_server_memory_usage>3221225472</max_server_memory_usage>",
 		);
@@ -63,6 +65,9 @@ describe("ClickHouse config", () => {
 		expect(overlay).toContain("<async_insert_threads>4</async_insert_threads>");
 		expect(overlay).toContain(
 			"<memory_worker_period_ms>1000</memory_worker_period_ms>",
+		);
+		expect(renderClickHouseUsers("p")).toContain(
+			"<log_queries_min_type>QUERY_FINISH</log_queries_min_type>",
 		);
 		expect(renderClickHouseUsers("p")).toContain(
 			"<async_insert_poll_timeout_ms>50</async_insert_poll_timeout_ms>",
