@@ -20,11 +20,8 @@ import {
 	SecretFilterJsonIntegrityError,
 } from "@rudel/secret-filter";
 import type { UsageExtractionResult } from "@rudel/usage-events";
-import {
-	createIdempotentClickHouseExecutor,
-	getClickhouse,
-} from "../../clickhouse.js";
-import { ingestProcessingSqlClient, sqlClient } from "../../db.js";
+import { createIdempotentClickHouseExecutor } from "../../clickhouse.js";
+import { ingestProcessingSqlClient } from "../../db.js";
 import { readBooleanEnv } from "../../lib/env.js";
 import { computeIngestContentHash } from "../../lib/ingest-content-hash.js";
 import {
@@ -41,7 +38,6 @@ import {
 } from "../../lib/ingest-size.js";
 import {
 	bucketContentSize,
-	captureApiProductAnalyticsEvent,
 	hashProjectPath,
 } from "../../lib/product-analytics.js";
 import type { AppContext } from "../../middleware.js";
@@ -55,20 +51,13 @@ import {
 	linkUploadedSession,
 } from "../analysis-log/analysis-uploads.js";
 import { FreeWorkspaceMonthlyAgentRunLimitExceededError } from "../billing-entitlements.service.js";
-import { recordUserCliVersion } from "../cli-version.service.js";
-import {
-	getActiveOrganizationId,
-	resolveIngestOrganizationId,
-} from "../cli-workspace.service.js";
-import { assertNoClickHousePurgeTombstone } from "../clickhouse-purge-tombstone.service.js";
-import { persistGitObservationsBestEffort } from "../git-observation-extraction.service.js";
+import { getActiveOrganizationId } from "../cli-workspace.service.js";
 import {
 	shouldAwaitBestEffortLanguageSignals,
 	shouldPersistUsageExtractionFailureReceipt,
 	shouldStartBestEffortLanguageSignals,
 } from "../ingest-derived-fact-policy.js";
 import {
-	filterSessionTextFieldsOffThread,
 	IngestFilterQueueAbortedError,
 	IngestFilterQueueClosedError,
 	IngestFilterQueueFullError,
@@ -109,23 +98,12 @@ import {
 } from "../ingest-worker-operational.error.js";
 import type { R2IngestProcessorResult } from "../r2-ingest-commit.service.js";
 import { readR2IngestAvailability } from "../r2-ingest-storage.service.js";
-import { hasRawSessionRow } from "../raw-session.service.js";
 import {
-	persistSessionLanguageSignals,
-	persistSessionLanguageSignalsBestEffort,
-	persistSessionLanguageSignalsWithExecutor,
-} from "../session-language-signal-persistence.service.js";
-import { projectNativeSessionLineage } from "../session-native-lineage.service.js";
-import {
-	claimSessionIngestOwnership,
-	recordSessionAgentMetadata,
-	recordSessionIngestContent,
-	reserveUsageExtractionGeneration,
+	type claimSessionIngestOwnership,
 	SessionAgentMetadataConflictError,
 	UsageExtractionSupersededError,
 } from "../session-ownership.service.js";
 import {
-	allocateSessionRevision,
 	buildSessionRevisionDeduplicationToken,
 	buildSessionRevisionOperationId,
 } from "../session-revision.service.js";
@@ -134,30 +112,23 @@ import {
 	SKILL_PARSER_VERSION,
 } from "../skill-extraction.js";
 import type { SkillExtractionResult } from "../skill-extraction.types.js";
-import {
-	hasMatchingSkillExtractionReceipt,
-	readSkillExtractionReceipt,
-	writeSkillExtraction,
-} from "../skill-extraction-ingest.service.js";
-import {
-	isTranscriptRecordsCurrent,
-	persistTranscriptRecordsBestEffort,
-	readTranscriptRecordsExtractionConfig,
-} from "../transcript-records-extraction.service.js";
-import { indexUploadedSessionBestEffort } from "../transcript-search/ingest.js";
+import { hasMatchingSkillExtractionReceipt } from "../skill-extraction-ingest.service.js";
+import { readTranscriptRecordsExtractionConfig } from "../transcript-records-extraction.service.js";
 import {
 	hasMatchingUsageExtractionReceipt,
 	shouldReplaceUsageEventsForVersion,
-	writeUsageExtraction,
 } from "../usage-event-ingest.service.js";
 import {
-	extractSessionFactsOffThread,
 	UsageExtractionExecutionError,
 	UsageExtractionQueueAbortedError,
 	UsageExtractionQueueClosedError,
 	UsageExtractionQueueFullError,
 	UsageExtractionQueueTimeoutError,
 } from "../usage-extraction.service.js";
+import {
+	productionDependencies,
+	type SessionImportDependencies,
+} from "./dependencies.js";
 
 const logger = getLogger(["rudel", "api", "router"]);
 
@@ -242,41 +213,46 @@ export function createBackgroundIngestErrorFactories(): IngestErrorFactories {
 	};
 }
 
-export async function processIngestSession({
-	aggregateContentMaxBytes,
-	allowQuiescedIngest = false,
-	analysisUploads,
-	awaitBestEffortLanguageSignals = false,
-	awaitLanguageSignals,
-	context,
-	durableProcessing,
-	enforceRateLimits,
-	errorFactories,
-	extractSessionFacts = extractSessionFactsOffThread,
-	input,
-	signal,
-}: {
-	aggregateContentMaxBytes?: number;
-	allowQuiescedIngest?: boolean;
-	/** Where `input.analysisId` links are recorded; the configured log by default. */
-	analysisUploads?: AnalysisUploadEnv;
-	awaitBestEffortLanguageSignals?: boolean;
-	awaitLanguageSignals: boolean;
-	context: {
-		apiKeyId: string | null;
-		session: AppContext["session"];
-		user: { id: string };
+export async function processIngestSession(
+	{
+		aggregateContentMaxBytes,
+		allowQuiescedIngest = false,
+		analysisUploads,
+		awaitBestEffortLanguageSignals = false,
+		awaitLanguageSignals,
+		context,
+		durableProcessing,
+		enforceRateLimits,
+		errorFactories,
+		input,
+		signal,
+	}: {
+		aggregateContentMaxBytes?: number;
+		allowQuiescedIngest?: boolean;
+		/** Where `input.analysisId` links are recorded; the configured log by default. */
+		analysisUploads?: AnalysisUploadEnv;
+		awaitBestEffortLanguageSignals?: boolean;
+		awaitLanguageSignals: boolean;
+		context: {
+			apiKeyId: string | null;
+			session: AppContext["session"];
+			user: { id: string };
+		};
+		durableProcessing?: {
+			failpoint: IngestProcessingFailpoint | undefined;
+			operationId: string;
+		};
+		enforceRateLimits: boolean;
+		errorFactories: IngestErrorFactories;
+		input: IngestSessionInput;
+		signal?: AbortSignal;
+	},
+	overrides: Partial<SessionImportDependencies> = {},
+): Promise<R2IngestProcessorResult> {
+	const deps: SessionImportDependencies = {
+		...productionDependencies,
+		...overrides,
 	};
-	durableProcessing?: {
-		failpoint: IngestProcessingFailpoint | undefined;
-		operationId: string;
-	};
-	enforceRateLimits: boolean;
-	errorFactories: IngestErrorFactories;
-	extractSessionFacts?: typeof extractSessionFactsOffThread;
-	input: IngestSessionInput;
-	signal?: AbortSignal;
-}): Promise<R2IngestProcessorResult> {
 	if (
 		readBooleanEnv("SESSION_INGEST_QUIESCED", false) &&
 		!allowQuiescedIngest
@@ -304,65 +280,67 @@ export async function processIngestSession({
 		effectiveAggregateContentMaxBytes,
 	);
 	const filterStartedAt = performance.now();
-	const filteredText = await filterSessionTextFieldsOffThread({
-		bytes: aggregateBytes,
-		fields: {
-			content: input.content,
-			subagents: input.subagents,
-		},
-		signal,
-		userId: context.user.id,
-	}).catch((error: unknown) => {
-		if (error instanceof SecretFilterConvergenceError) {
-			throw errorFactories.redactionDidNotConverge(error.maxPasses);
-		}
-		if (error instanceof SecretFilterJsonIntegrityError) {
-			throw errorFactories.secretFilterJsonIntegrity();
-		}
-		if (error instanceof IngestFilterQueueFullError) {
-			throw new ORPCError("SERVICE_UNAVAILABLE", {
-				data: {
-					reason: "ingest_filter_queue_full",
-					limit: error.limit,
-					retryAfterMs: error.retryAfterMs,
-				},
-				message: error.message,
-			});
-		}
-		if (error instanceof IngestFilterQueueClosedError) {
-			throw new ORPCError("SERVICE_UNAVAILABLE", {
-				data: {
-					reason: "ingest_filter_queue_closed",
-					retryAfterMs: error.retryAfterMs,
-				},
-				message: error.message,
-			});
-		}
-		if (error instanceof IngestFilterQueueTimeoutError) {
-			throw new ORPCError("GATEWAY_TIMEOUT", {
-				data: {
-					reason: "ingest_filter_queue_timeout",
-					retryAfterMs: error.retryAfterMs,
-				},
-				message: error.message,
-			});
-		}
-		if (error instanceof IngestFilterQueueAbortedError) {
-			throw new ORPCError("CLIENT_CLOSED_REQUEST", {
-				message: error.message,
-			});
-		}
-		if (error instanceof IngestFilterWorkerOperationalError) {
-			throw new ORPCError("SERVICE_UNAVAILABLE", {
-				data: {
-					reason: "ingest_filter_worker_failed",
-					retryAfterMs: error.retryAfterMs,
-				},
-				message: "Transcript filtering temporarily failed. Retry shortly.",
-			});
-		}
-		throw error;
-	});
+	const filteredText = await deps
+		.filterText({
+			bytes: aggregateBytes,
+			fields: {
+				content: input.content,
+				subagents: input.subagents,
+			},
+			signal,
+			userId: context.user.id,
+		})
+		.catch((error: unknown) => {
+			if (error instanceof SecretFilterConvergenceError) {
+				throw errorFactories.redactionDidNotConverge(error.maxPasses);
+			}
+			if (error instanceof SecretFilterJsonIntegrityError) {
+				throw errorFactories.secretFilterJsonIntegrity();
+			}
+			if (error instanceof IngestFilterQueueFullError) {
+				throw new ORPCError("SERVICE_UNAVAILABLE", {
+					data: {
+						reason: "ingest_filter_queue_full",
+						limit: error.limit,
+						retryAfterMs: error.retryAfterMs,
+					},
+					message: error.message,
+				});
+			}
+			if (error instanceof IngestFilterQueueClosedError) {
+				throw new ORPCError("SERVICE_UNAVAILABLE", {
+					data: {
+						reason: "ingest_filter_queue_closed",
+						retryAfterMs: error.retryAfterMs,
+					},
+					message: error.message,
+				});
+			}
+			if (error instanceof IngestFilterQueueTimeoutError) {
+				throw new ORPCError("GATEWAY_TIMEOUT", {
+					data: {
+						reason: "ingest_filter_queue_timeout",
+						retryAfterMs: error.retryAfterMs,
+					},
+					message: error.message,
+				});
+			}
+			if (error instanceof IngestFilterQueueAbortedError) {
+				throw new ORPCError("CLIENT_CLOSED_REQUEST", {
+					message: error.message,
+				});
+			}
+			if (error instanceof IngestFilterWorkerOperationalError) {
+				throw new ORPCError("SERVICE_UNAVAILABLE", {
+					data: {
+						reason: "ingest_filter_worker_failed",
+						retryAfterMs: error.retryAfterMs,
+					},
+					message: "Transcript filtering temporarily failed. Retry shortly.",
+				});
+			}
+			throw error;
+		});
 	recordIngestPhase(
 		"server.slim_and_secret_filter",
 		performance.now() - filterStartedAt,
@@ -419,16 +397,14 @@ export async function processIngestSession({
 		}
 	}
 
-	const orgId = await resolveIngestOrganizationId(
+	const orgId = await deps.resolveOrganizationId(
 		input.organizationId ?? activeOrgId,
 		context.user.id,
 	);
 
-	const ownership = await claimSessionIngestOwnership(
-		orgId,
-		input.sessionId,
-		context.user.id,
-	).catch(rethrowAgentRunLimitAsForbidden);
+	const ownership = await deps
+		.claimOwnership(orgId, input.sessionId, context.user.id)
+		.catch(rethrowAgentRunLimitAsForbidden);
 	if (!ownership.owned) {
 		throw errorFactories.sessionOwnershipConflict();
 	}
@@ -472,7 +448,7 @@ export async function processIngestSession({
 		source: filteredInput.source,
 	});
 	try {
-		await recordSessionAgentMetadata(orgId, input.sessionId, context.user.id, {
+		await deps.recordAgentMetadata(orgId, input.sessionId, context.user.id, {
 			nativeParentSessionId: nativeLineage?.parentSessionId,
 			nativeSubagentModel: nativeLineage?.model,
 			nativeSubagentPath: nativeLineage?.agentPath,
@@ -488,7 +464,7 @@ export async function processIngestSession({
 		// This runs before both idempotency exits so retries repair lineage even
 		// when the raw transcript and usage receipt are already complete. The
 		// durable arrival marker makes the wake-up below a one-time recovery.
-		await projectNativeSessionLineage({
+		await deps.projectLineage({
 			notifyPendingArrival: true,
 			organizationId: orgId,
 			sessionId: input.sessionId,
@@ -504,8 +480,8 @@ export async function processIngestSession({
 		awaitBestEffortLanguageSignals,
 		awaitLanguageSignals,
 		context,
+		deps,
 		durableProcessing,
-		extractSessionFacts,
 		input,
 		prepared: {
 			adapter,
@@ -560,8 +536,8 @@ async function processPreparedIngestSession({
 	awaitLanguageSignals,
 	claimedLedger,
 	context,
+	deps,
 	durableProcessing,
-	extractSessionFacts,
 	input,
 	prepared,
 	signal,
@@ -578,7 +554,7 @@ async function processPreparedIngestSession({
 		failpoint: IngestProcessingFailpoint | undefined;
 		operationId: string;
 	};
-	extractSessionFacts: typeof extractSessionFactsOffThread;
+	deps: SessionImportDependencies;
 	input: IngestSessionInput;
 	prepared: PreparedIngestSession;
 	signal?: AbortSignal;
@@ -593,6 +569,8 @@ async function processPreparedIngestSession({
 		ownership,
 		timestamps,
 	} = prepared;
+	const assertWritable = () =>
+		deps.assertWritable({ organizationId: orgId, userId: context.user.id });
 	if (durableProcessing && !claimedLedger) {
 		try {
 			const ledgerResult = await withIngestProcessingLedger(
@@ -609,8 +587,8 @@ async function processPreparedIngestSession({
 						awaitLanguageSignals,
 						claimedLedger: ledger,
 						context,
+						deps,
 						durableProcessing,
-						extractSessionFacts,
 						input,
 						prepared,
 						signal: signal
@@ -648,7 +626,7 @@ async function processPreparedIngestSession({
 	}
 	const clickhouse = claimedLedger
 		? createIdempotentClickHouseExecutor(
-				getClickhouse(),
+				deps.clickhouse(),
 				{
 					id: claimedLedger.id,
 					readReceipt: (target) =>
@@ -666,7 +644,7 @@ async function processPreparedIngestSession({
 						target: table,
 					}),
 			)
-		: getClickhouse();
+		: deps.clickhouse();
 	const usageExtractionEnabled = readBooleanEnv(
 		"USAGE_EVENT_EXTRACTION_ENABLED",
 		true,
@@ -699,7 +677,7 @@ async function processPreparedIngestSession({
 	if (
 		ownership.lastContentSha256 === contentHash &&
 		hasMatchingUsageExtractionReceipt(ownership, contentHash) &&
-		(await hasRawSessionRow({
+		(await deps.hasRawRow({
 			organizationId: orgId,
 			sessionDate: ownership.lastSessionDate,
 			sessionId: input.sessionId,
@@ -710,7 +688,7 @@ async function processPreparedIngestSession({
 		const skillReceiptMatches =
 			!skillExtractionEnabled ||
 			hasMatchingSkillExtractionReceipt(
-				await readSkillExtractionReceipt(clickhouse, {
+				await deps.readSkillReceipt(clickhouse, {
 					agent: filteredInput.source === "claude_code" ? "claude" : "codex",
 					organizationId: orgId,
 					sessionId: input.sessionId,
@@ -724,8 +702,8 @@ async function processPreparedIngestSession({
 					),
 				},
 			);
-		const transcriptRecordsCurrent = await isTranscriptRecordsCurrent(
-			getClickhouse(),
+		const transcriptRecordsCurrent = await deps.recordsCurrent(
+			deps.clickhouse(),
 			{
 				config: transcriptRecordsConfig,
 				content: filteredInput.content,
@@ -751,20 +729,16 @@ async function processPreparedIngestSession({
 			// receipt is current and is best-effort, never failing the upload.
 			if (transcriptRecordsConfig.enabled) {
 				const derived = {
-					assertWritable: () =>
-						assertNoClickHousePurgeTombstone(
-							{ organizationId: orgId, userId: context.user.id },
-							{ database: sqlClient },
-						),
+					assertWritable: assertWritable,
 					organizationId: orgId,
 					sessionId: input.sessionId,
 					signal,
 					source: filteredInput.source,
 					userId: context.user.id,
 				};
-				await persistGitObservationsBestEffort(getClickhouse(), derived);
+				await deps.persistGitObservations(deps.clickhouse(), derived);
 				// Goes on where an earlier pass stopped (time, chunk cap or quota).
-				await indexUploadedSessionBestEffort(getClickhouse(), derived);
+				await deps.indexSearch(deps.clickhouse(), derived);
 			}
 			logger.info(
 				"Skipping duplicate session ingest (organization_id={organizationId} session_id={sessionId})",
@@ -789,7 +763,7 @@ async function processPreparedIngestSession({
 		sessionId: input.sessionId,
 		userId: context.user.id,
 	};
-	const revision = await allocateSessionRevision(revisionIdentity);
+	const revision = await deps.allocateRevision(revisionIdentity);
 	const ingestedAt = claimedLedger?.rawIngestedAt ?? getNextIngestedAt();
 	await timedIngestPhase("server.raw_insert", () =>
 		adapter.ingest(
@@ -815,7 +789,7 @@ async function processPreparedIngestSession({
 			},
 		),
 	);
-	await recordSessionIngestContent(
+	await deps.recordContent(
 		orgId,
 		input.sessionId,
 		contentHash,
@@ -830,7 +804,7 @@ async function processPreparedIngestSession({
 		target: "raw-receipt",
 	});
 	// Feeds the web app's CLI update notice; direct and R2 uploads both pass here.
-	await recordUserCliVersion(sqlClient, context.user.id, input.cli_version);
+	await deps.recordCliVersion(context.user.id, input.cli_version);
 	const languageSignalInput = {
 		content: filteredInput.content,
 		organizationId: orgId,
@@ -844,12 +818,9 @@ async function processPreparedIngestSession({
 	if (awaitLanguageSignals) {
 		try {
 			if (claimedLedger) {
-				await persistSessionLanguageSignalsWithExecutor(
-					languageSignalInput,
-					clickhouse,
-				);
+				await deps.persistLanguageSignalsWith(languageSignalInput, clickhouse);
 			} else {
-				await persistSessionLanguageSignals(languageSignalInput);
+				await deps.persistLanguageSignals(languageSignalInput);
 			}
 		} catch (error) {
 			if (error instanceof SessionLanguageSignalScannerOperationalError) {
@@ -871,36 +842,26 @@ async function processPreparedIngestSession({
 		})
 	) {
 		void timedIngestPhase("server.language_signals", () =>
-			persistSessionLanguageSignalsBestEffort(languageSignalInput),
+			deps.persistLanguageSignalsBestEffort(languageSignalInput),
 		);
 	}
 
 	// Derived data must never endanger the upload or the required extraction
 	// below: the job never rejects, runs in its own worker under its own limits,
 	// and is only awaited (in `finally`) so the response sees its receipt.
-	const transcriptRecordsJob = persistTranscriptRecordsBestEffort(
-		getClickhouse(),
-		{
-			assertWritable: () =>
-				assertNoClickHousePurgeTombstone(
-					{
-						organizationId: orgId,
-						userId: context.user.id,
-					},
-					{ database: sqlClient },
-				),
-			config: transcriptRecordsConfig,
-			content: filteredInput.content,
-			organizationId: orgId,
-			revision,
-			sessionDate: timestamps.sessionDate,
-			sessionId: input.sessionId,
-			signal,
-			source: filteredInput.source,
-			subagents,
-			userId: context.user.id,
-		},
-	);
+	const transcriptRecordsJob = deps.persistRecords(deps.clickhouse(), {
+		assertWritable: assertWritable,
+		config: transcriptRecordsConfig,
+		content: filteredInput.content,
+		organizationId: orgId,
+		revision,
+		sessionDate: timestamps.sessionDate,
+		sessionId: input.sessionId,
+		signal,
+		source: filteredInput.source,
+		subagents,
+		userId: context.user.id,
+	});
 
 	try {
 		if (!usageExtractionEnabled && !skillExtractionEnabled) {
@@ -925,7 +886,7 @@ async function processPreparedIngestSession({
 							},
 							durableProcessing?.failpoint,
 						)
-					: await reserveUsageExtractionGeneration(
+					: await deps.reserveUsageGeneration(
 							orgId,
 							input.sessionId,
 							context.user.id,
@@ -949,7 +910,7 @@ async function processPreparedIngestSession({
 			const extraction = await timedIngestPhase(
 				"server.usage_and_skills_extraction",
 				() =>
-					extractSessionFacts({
+					deps.extractSessionFacts({
 						bytes: contentShape.contentBytes,
 						extractSkills: skillExtractionEnabled,
 						input: {
@@ -977,12 +938,8 @@ async function processPreparedIngestSession({
 						extractionAllowsReceipt: error.shouldPersistReceipt,
 					})
 				) {
-					await writeUsageExtraction(clickhouse, {
-						assertWritable: () =>
-							assertNoClickHousePurgeTombstone(
-								{ organizationId: orgId, userId: context.user.id },
-								{ database: sqlClient },
-							),
+					await deps.writeUsage(clickhouse, {
+						assertWritable: assertWritable,
 						contentSha256: contentHash,
 						extraction: error.extraction,
 						filterVersion: SESSION_INGEST_FILTER_VERSION,
@@ -1051,7 +1008,7 @@ async function processPreparedIngestSession({
 		}
 		if (skillExtractionEnabled && skillExtraction) {
 			await timedIngestPhase("server.skills_write", () =>
-				writeSkillExtraction(clickhouse, {
+				deps.writeSkills(clickhouse, {
 					extractedAt: claimedLedger?.rawIngestedAt ?? getNextIngestedAt(),
 					extraction: skillExtraction,
 					organizationId: orgId,
@@ -1066,12 +1023,8 @@ async function processPreparedIngestSession({
 			return { contentSha256: contentHash, result: response };
 		}
 		await timedIngestPhase("server.usage_write", () =>
-			writeUsageExtraction(clickhouse, {
-				assertWritable: () =>
-					assertNoClickHousePurgeTombstone(
-						{ organizationId: orgId, userId: context.user.id },
-						{ database: sqlClient },
-					),
+			deps.writeUsage(clickhouse, {
+				assertWritable: assertWritable,
 				contentSha256: contentHash,
 				extraction: usageExtraction,
 				filterVersion: SESSION_INGEST_FILTER_VERSION,
@@ -1108,7 +1061,7 @@ async function processPreparedIngestSession({
 		}
 
 		try {
-			await recordSessionIngestContent(
+			await deps.recordContent(
 				orgId,
 				input.sessionId,
 				contentHash,
@@ -1146,7 +1099,7 @@ async function processPreparedIngestSession({
 			target: "usage-receipt",
 		});
 		if (filteredInput.source === "codex") {
-			await projectNativeSessionLineage({
+			await deps.projectLineage({
 				notifyPendingArrival: true,
 				organizationId: orgId,
 				sessionId: input.sessionId,
@@ -1165,7 +1118,7 @@ async function processPreparedIngestSession({
 			return { contentSha256: contentHash, result: response };
 		}
 
-		await captureApiProductAnalyticsEvent({
+		await deps.captureEvent({
 			distinctId: context.user.id,
 			eventId: claimedLedger?.id,
 			event: PRODUCT_ANALYTICS_EVENTS.SESSION_UPLOAD_COMPLETED,
@@ -1178,12 +1131,8 @@ async function processPreparedIngestSession({
 		// for uploads only; it is bounded and never fails the upload.
 		if ((await transcriptRecordsJob) === "written")
 			await timedIngestPhase("server.search_index", () =>
-				indexUploadedSessionBestEffort(getClickhouse(), {
-					assertWritable: () =>
-						assertNoClickHousePurgeTombstone(
-							{ organizationId: orgId, userId: context.user.id },
-							{ database: sqlClient },
-						),
+				deps.indexSearch(deps.clickhouse(), {
+					assertWritable: assertWritable,
 					organizationId: orgId,
 					sessionId: input.sessionId,
 					signal,
@@ -1199,7 +1148,7 @@ async function processPreparedIngestSession({
 			})
 		) {
 			await timedIngestPhase("server.language_signals", () =>
-				persistSessionLanguageSignalsBestEffort(languageSignalInput),
+				deps.persistLanguageSignalsBestEffort(languageSignalInput),
 			);
 		}
 	}

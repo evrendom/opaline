@@ -78,6 +78,7 @@ import {
 import {
 	type IngestErrorFactories,
 	processIngestSession,
+	type SessionImportDependencies,
 } from "../services/session-import/index.js";
 import { UsageExtractionQueueTimeoutError } from "../services/usage-extraction.service.js";
 import {
@@ -4131,31 +4132,33 @@ function createRealProcessor(
 	failpoint: IngestProcessingFailpoint | undefined,
 	options: {
 		awaitLanguageSignals?: boolean;
-		extractSessionFacts?: NonNullable<
-			Parameters<typeof processIngestSession>[0]["extractSessionFacts"]
-		>;
+		extractSessionFacts?: SessionImportDependencies["extractSessionFacts"];
 	} = {},
 ): (
 	input: IngestSessionInput,
 	identity: { operationId: string; organizationId: string; userId: string },
 ) => Promise<R2IngestProcessorResult> {
 	return (input, identity) =>
-		processIngestSession({
-			awaitLanguageSignals: options.awaitLanguageSignals ?? true,
-			context: {
-				apiKeyId: null,
-				session: null,
-				user: { id: identity.userId },
+		processIngestSession(
+			{
+				awaitLanguageSignals: options.awaitLanguageSignals ?? true,
+				context: {
+					apiKeyId: null,
+					session: null,
+					user: { id: identity.userId },
+				},
+				durableProcessing: {
+					failpoint,
+					operationId: identity.operationId,
+				},
+				enforceRateLimits: false,
+				errorFactories: TEST_ERROR_FACTORIES,
+				input,
 			},
-			durableProcessing: {
-				failpoint,
-				operationId: identity.operationId,
-			},
-			enforceRateLimits: false,
-			errorFactories: TEST_ERROR_FACTORIES,
-			extractSessionFacts: options.extractSessionFacts,
-			input,
-		});
+			options.extractSessionFacts
+				? { extractSessionFacts: options.extractSessionFacts }
+				: {},
+		);
 }
 
 const TEST_ERROR_FACTORIES: IngestErrorFactories = {
