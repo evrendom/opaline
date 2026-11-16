@@ -1,4 +1,4 @@
-import { LegendList, type LegendListRef } from "@legendapp/list/react";
+import type { LegendListRef } from "@legendapp/list/react";
 import type {
 	SessionDetailTurnSummary,
 	SessionDetailWindow,
@@ -19,7 +19,7 @@ import {
 	keptOf,
 	loadSessionMap,
 } from "../minimap/session-reader-minimap-store";
-import { getCostQuintiles, getCostShade } from "../model/session-reader-model";
+import { getCostQuintiles } from "../model/session-reader-model";
 import { createRunUiStore } from "../model/session-reader-run-ui-store";
 import { useRailTags } from "../rail/session-reader-rail-tags";
 import {
@@ -72,16 +72,15 @@ import { FocusedSubagent } from "./session-reader-focused-subagent";
 import { ReaderHiddenContext } from "./session-reader-hidden-steps";
 import { ReaderStepJump } from "./session-reader-step-jump";
 import { READING_MEASURE, TurnBlock } from "./session-reader-turn-block";
-import { ReaderTurnSlot, TurnsPending } from "./session-reader-turn-slot";
-import { turnKey, turnSizeType, usePlacedTurns } from "./use-placed-turns";
+import { ReaderTurnList } from "./session-reader-turn-list";
+import { TurnsPending } from "./session-reader-turn-slot";
+import { usePlacedTurns } from "./use-placed-turns";
 import { useReaderOpenCall } from "./use-reader-open-call";
 import { useSessionReaderBodies } from "./use-session-reader-bodies";
 import { TipLayer } from "./waterfall/session-reader-tips";
 import { WHOLE_TURN_ID } from "./waterfall/session-reader-waterfall";
 
 export { TurnBlock };
-
-const TURN_OVERHANG_PX = 24;
 
 export const SessionReaderContent = memo(function SessionReaderContent({
 	emptyMessage = "No turns in this session.",
@@ -445,80 +444,26 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 																/>
 															) : null}
 															{turns.length > 0 ? (
-																<LegendList<SessionDetailTurnSummary>
-																	style={{ marginInline: -TURN_OVERHANG_PX }}
-																	ref={listRef}
-																	data={turns}
+																<ReaderTurnList
+																	costThresholds={costThresholds}
+																	flagged={flagged}
+																	focusTurn={focusTurn}
+																	getBody={getBody}
+																	initialTurnIndex={initialTurnIndex}
+																	isTurnHidden={isTurnHidden}
+																	keptHeights={keptHeights}
+																	listRef={listRef}
+																	model={model}
+																	onRetry={retryBody}
+																	questionsByTurn={questionsByTurn}
+																	railTags={railTags}
 																	scrollElement={scrollElement}
-																	keyExtractor={turnKey}
-																	getItemType={turnSizeType}
-																	estimatedItemSize={estimateTurnPx(turns[0])}
-																	drawDistance={1600}
-																	recycleItems={false}
-																	initialScrollIndex={initialTurnIndex}
-																	extraData={{
-																		costThresholds,
-																		flagged,
-																		getBody,
-																		keptHeights,
-																		questionsByTurn,
-																		railTags,
-																		subagents,
-																		focusTurn,
-																	}}
-																	renderItem={({
-																		item: turn,
-																		index,
-																	}: {
-																		item: SessionDetailTurnSummary;
-																		index: number;
-																	}) => (
-																		<div
-																			style={{
-																				paddingBottom: isTurnHidden(turn)
-																					? 0
-																					: TURN_GAP_PX,
-																				paddingInline: TURN_OVERHANG_PX,
-																			}}
-																		>
-																			<ReaderTurnSlot
-																				frustrated={flagged.isFrustrated(turn)}
-																				hidden={isTurnHidden(turn)}
-																				holdsEstimate={
-																					getBody(turn.turnId).status ===
-																					"loading"
-																				}
-																				index={index}
-																				keptHeight={keptHeights?.[turn.turnId]}
-																				slotRef={setTurnElement(turn.turnId)}
-																				turn={turn}
-																			>
-																				<TurnBlock
-																					bodyState={getBody(turn.turnId)}
-																					costShade={getCostShade(
-																						turn.estimatedCost,
-																						costThresholds,
-																					)}
-																					frustrated={flagged.isFrustrated(
-																						turn,
-																					)}
-																					hidden={railTags.hidden}
-																					model={model}
-																					onRetry={retryBody}
-																					questions={questionsByTurn.get(
-																						turn.turnId,
-																					)}
-																					store={runUi}
-																					subagentDurations={
-																						subagents.durations
-																					}
-																					turn={turn}
-																					userImageUrl={userImageUrl}
-																					userLabel={userLabel}
-																				/>
-																			</ReaderTurnSlot>
-																		</div>
-																	)}
+																	setTurnElement={setTurnElement}
+																	store={runUi}
+																	subagents={subagents}
+																	turns={turns}
+																	userImageUrl={userImageUrl}
+																	userLabel={userLabel}
 																/>
 															) : null}
 															{turns.length < totalTurns ? (
