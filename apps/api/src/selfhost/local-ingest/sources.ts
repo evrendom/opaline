@@ -42,8 +42,9 @@ export function classifyTranscriptPath(
 	roots: LocalIngestRoots,
 	path: string,
 ): TranscriptFile | null {
-	if (!path.endsWith(".jsonl")) return null;
-	const claude = inside(roots.claudeProjects, path);
+	const compressed = path.endsWith(".jsonl.zst");
+	if (!path.endsWith(".jsonl") && !compressed) return null;
+	const claude = compressed ? null : inside(roots.claudeProjects, path);
 	if (claude) {
 		const [project, second, third, fourth] = claude;
 		if (claude.length === 2 && project && second) {

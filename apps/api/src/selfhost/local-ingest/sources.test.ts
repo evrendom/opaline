@@ -56,6 +56,23 @@ describe("classifyTranscriptPath", () => {
 	});
 });
 
+test("Codex sessions it has compressed are read too; Claude Code files are never .zst", () => {
+	const compressed =
+		"/home/u/.codex/sessions/2026/10/26/rollout-2026-10-26T12-08-57-abc.jsonl.zst";
+	expect(classifyTranscriptPath(roots, compressed)).toEqual({
+		path: compressed,
+		source: "codex",
+		role: "session",
+		sessionPath: compressed,
+	});
+	expect(
+		classifyTranscriptPath(
+			roots,
+			"/home/u/.claude/projects/-repo/abc-123.jsonl.zst",
+		),
+	).toBeNull();
+});
+
 test("roots follow HOME, CLAUDE_CONFIG_DIR and CODEX_HOME", () => {
 	expect(localIngestRoots({ HOME: "/h" })).toEqual({
 		claudeProjects: "/h/.claude/projects",

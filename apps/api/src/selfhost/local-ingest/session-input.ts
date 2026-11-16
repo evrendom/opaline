@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { basename, dirname } from "node:path";
+import { zstdDecompressSync } from "node:zlib";
 import {
 	claudeCodeAdapter,
 	codexAdapter,
@@ -92,13 +93,18 @@ function byteLength(input: IngestSessionInput): number {
 	return bytes;
 }
 
+export async function readSessionFile(path: string): Promise<string> {
+	if (!path.endsWith(".zst")) return readFile(path, "utf8");
+	return zstdDecompressSync(await readFile(path)).toString("utf8");
+}
+
 export async function buildLocalSessionInput(input: {
 	readonly sessionPath: string;
 	readonly source: "claude_code" | "codex";
 	readonly organizationId: string;
 	readonly now: number;
 }): Promise<LocalSessionInput> {
-	const content = await readFile(input.sessionPath, "utf8");
+	const content = await readSessionFile(input.sessionPath);
 	if (input.source === "codex") {
 		const meta = codexMeta(content);
 		if (!meta) return { kind: "skipped", reason: "not a Codex session" };
@@ -115,7 +121,9 @@ export async function buildLocalSessionInput(input: {
 		return parsed(
 			{
 				source: "codex",
-				sessionId: meta.id ?? basename(input.sessionPath, ".jsonl"),
+				sessionId:
+					meta.id ??
+					basename(input.sessionPath).replace(/\.jsonl(?:\.zst)?$/u, ""),
 				projectPath: meta.cwd,
 				gitRemote: repository.gitRemote,
 				packageName: repository.packageName,

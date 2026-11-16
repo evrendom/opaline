@@ -39,7 +39,7 @@ function scanSessions() {
 	for (const folder of claudeFolders) claude += listFiles(path.join(claudeRoot, folder), /\.jsonl$/).length;
 	let codex = 0;
 	try {
-		codex = codexFolders().flatMap((folder) => listFiles(path.join(codexRoot, folder), /\.jsonl$/)).length;
+		codex = codexFolders().flatMap((folder) => listFiles(path.join(codexRoot, folder), /\.jsonl(\.zst)?$/)).length;
 	} catch {}
 	return { claude, codex, folders: claudeFolders.length, ms: Date.now() - started };
 }
@@ -117,7 +117,7 @@ async function analyzeSessions() {
 	if (!binary) return { error: `ClickHouse is not available on this ${process.platform === "darwin" ? "Mac" : "PC"}.` };
 	const [claude, codex] = await Promise.all([
 		hasClaude ? runQuery(binary, "claude.sql", `${claudeRoot}/**/*.jsonl`) : null,
-		hasCodex ? runQuery(binary, "codex.sql", `${codexRoot}/{${codexFolders().join(",")}}/*.jsonl`) : null,
+		hasCodex ? runQuery(binary, "codex.sql", `${codexRoot}/{${codexFolders().join(",")}}/*.{jsonl,jsonl.zst}`) : null,
 	]);
 	return { claude: priced(claude), codex: priced(codex), ms: Date.now() - started };
 }

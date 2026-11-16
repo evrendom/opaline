@@ -817,7 +817,7 @@ export class LocalIngest {
 						return;
 					}
 					const path = join(root, name.toString());
-					if (!path.endsWith(".jsonl")) return;
+					if (!path.endsWith(".jsonl") && !path.endsWith(".jsonl.zst")) return;
 					this.touched.add(path);
 					if (!this.touchTimer) {
 						this.touchTimer = setTimeout(() => {
