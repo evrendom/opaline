@@ -55,7 +55,7 @@ const COMPLETION_WORDS = [
 /** The word list's categories that make a prompt unhappy. */
 const UNHAPPY = ["negative", "swear"] as const;
 /** Run index version from which runs store their messages. */
-const MESSAGES_SINCE = 4;
+export const MESSAGES_SINCE = 4;
 /**
  * Evidence no view can link yet: embeddings are not in L1. Its slice
  * replaces this with a real check.
