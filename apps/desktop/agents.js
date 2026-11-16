@@ -4,28 +4,44 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { createInterface } = require("node:readline");
-const { app } = require("electron");
+const { app, BrowserWindow, dialog } = require("electron");
 
 const MARKETPLACE = "opaline-local";
 const LOCAL_PLUGIN = `opaline@${MARKETPLACE}`;
 const CLOUD_PLUGIN = "opaline@opaline";
-let shellPath;
+const INSTRUCTION_LINE =
+	"For any analysis of coding-agent sessions (Claude Code or Codex), use the Opaline plugin; its answers open in the Opaline app.";
+const SHELL_VARIABLES = ["PATH", "CODEX_HOME", "CLAUDE_CONFIG_DIR"];
+let shellEnv;
 
-function loginShellPath() {
-	shellPath ??= new Promise((resolve) => {
+function loginShellEnv() {
+	shellEnv ??= new Promise((resolve) => {
 		execFile(
 			process.env.SHELL || "/bin/zsh",
-			["-ilc", 'printf "__OPALINE_PATH__%s__OPALINE_PATH__" "$PATH"'],
+			[
+				"-ilc",
+				SHELL_VARIABLES.map(
+					(name) =>
+						`printf "__OPALINE_${name}__%s__OPALINE_${name}__" "$${name}"`,
+				).join("; "),
+			],
 			{ timeout: 10_000 },
 			(_error, stdout) => {
-				const found = /__OPALINE_PATH__(.*)__OPALINE_PATH__/s.exec(
-					stdout ?? "",
-				)?.[1];
-				resolve(found || process.env.PATH || "/usr/bin:/bin:/usr/sbin:/sbin");
+				const found = (name) =>
+					new RegExp(`__OPALINE_${name}__(.*?)__OPALINE_${name}__`, "s").exec(
+						stdout ?? "",
+					)?.[1] || process.env[name];
+				const env = {};
+				for (const name of SHELL_VARIABLES) {
+					const value = found(name);
+					if (value) env[name] = value;
+				}
+				env.PATH ??= "/usr/bin:/bin:/usr/sbin:/sbin";
+				resolve(env);
 			},
 		);
 	});
-	return shellPath;
+	return shellEnv;
 }
 
 function log(message) {
@@ -35,13 +51,13 @@ function log(message) {
 }
 
 function run(command, args) {
-	return loginShellPath().then(
-		(PATH) =>
+	return loginShellEnv().then(
+		(shell) =>
 			new Promise((resolve) => {
 				execFile(
 					command,
 					args,
-					{ env: { ...process.env, PATH }, timeout: 120_000 },
+					{ env: { ...process.env, ...shell }, timeout: 120_000 },
 					(error, stdout, stderr) =>
 						resolve({
 							ok: !error,
@@ -93,7 +109,26 @@ function writeHookScript({ launcherPath, dataDir }) {
 	);
 }
 
-function writeMarketplace({ pluginDir, server }) {
+function treeDigest(hash, dir) {
+	if (!dir) return;
+	const walk = (relative) => {
+		for (const entry of fs
+			.readdirSync(path.join(dir, relative), { withFileTypes: true })
+			.sort((a, b) => a.name.localeCompare(b.name))) {
+			const child = path.join(relative, entry.name);
+			if (entry.isDirectory()) walk(child);
+			else if (entry.isFile())
+				hash
+					.update(`${child}\0`)
+					.update(fs.readFileSync(path.join(dir, child)))
+					.update("\0");
+		}
+	};
+	hash.update("\0");
+	walk("");
+}
+
+function writeMarketplace({ pluginDir, localPluginDir, server }) {
 	const root = marketplaceDir();
 	const hook = (agent) => ({
 		type: "command",
@@ -127,16 +162,25 @@ function writeMarketplace({ pluginDir, server }) {
 			},
 		},
 	};
-	const fingerprint = crypto
-		.createHash("sha256")
-		.update(JSON.stringify(variants))
-		.digest("hex")
-		.slice(0, 10);
-	let version;
+	const hash = crypto.createHash("sha256").update(JSON.stringify(variants));
+	treeDigest(hash, pluginDir);
+	treeDigest(hash, localPluginDir);
+	const fingerprint = hash.digest("hex").slice(0, 10);
+	const base = String(
+		parse(
+			fs.readFileSync(
+				path.join(pluginDir, ".claude-plugin", "plugin.json"),
+				"utf8",
+			),
+		)?.version ?? "0.0.0",
+	).split("-")[0];
+	const version = `${base}-local.${fingerprint}`;
 	for (const [agent, variant] of Object.entries(variants)) {
 		const target = path.join(root, `opaline-${agent}`);
 		fs.rmSync(target, { recursive: true, force: true });
 		fs.cpSync(pluginDir, target, { recursive: true });
+		if (localPluginDir)
+			fs.cpSync(localPluginDir, target, { recursive: true, force: true });
 		fs.writeFileSync(
 			path.join(target, ".mcp.json"),
 			`${JSON.stringify({ mcpServers: { opaline: variant.mcp } }, null, 2)}\n`,
@@ -155,9 +199,10 @@ function writeMarketplace({ pluginDir, server }) {
 			const file = path.join(target, manifest);
 			const value = parse(fs.readFileSync(file, "utf8"));
 			if (!value) continue;
-			version = `${String(value.version).split("-")[0]}-local.${fingerprint}`;
-			value.version = version;
-			fs.writeFileSync(file, `${JSON.stringify(value, null, "\t")}\n`);
+			fs.writeFileSync(
+				file,
+				`${JSON.stringify({ ...value, version }, null, "\t")}\n`,
+			);
 		}
 	}
 	writeIfChanged(
@@ -193,18 +238,135 @@ const agents = {
 	},
 };
 
+function instructionFile(key, env = process.env) {
+	if (key === "claude")
+		return path.join(
+			env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude"),
+			"CLAUDE.md",
+		);
+	return path.join(
+		env.CODEX_HOME || path.join(os.homedir(), ".codex"),
+		"AGENTS.md",
+	);
+}
+
+function readText(file) {
+	try {
+		return fs.readFileSync(file, "utf8");
+	} catch (error) {
+		if (error.code === "ENOENT") return "";
+		throw error;
+	}
+}
+
+function hasInstructionLine(text) {
+	return text.split("\n").some((line) => line.trim() === INSTRUCTION_LINE);
+}
+
+function addInstructionLine(file) {
+	const text = readText(file);
+	if (hasInstructionLine(text)) return false;
+	const gap = text === "" ? "" : text.endsWith("\n") ? "\n" : "\n\n";
+	fs.mkdirSync(path.dirname(file), { recursive: true });
+	fs.appendFileSync(file, `${gap}${INSTRUCTION_LINE}\n`);
+	return true;
+}
+
+function removeInstructionLine(file) {
+	const text = readText(file);
+	if (!hasInstructionLine(text)) return false;
+	const lines = text.split("\n");
+	const kept = [];
+	for (let index = 0; index < lines.length; index += 1) {
+		if (lines[index].trim() !== INSTRUCTION_LINE) {
+			kept.push(lines[index]);
+			continue;
+		}
+		const next = lines[index + 1];
+		if (kept.at(-1) === "" && (next === undefined || next === "")) kept.pop();
+	}
+	const rest = kept.join("\n");
+	if (rest.trim() === "") fs.rmSync(file, { force: true });
+	else fs.writeFileSync(file, rest);
+	return true;
+}
+
+function instructionsAnswerFile() {
+	return path.join(app.getPath("userData"), "agents", "instructions.json");
+}
+
+function instructionsAnswer() {
+	const answer = parse(readText(instructionsAnswerFile()))?.answer;
+	return answer === "accepted" || answer === "declined" ? answer : undefined;
+}
+
+async function offerInstructionLine({ keys, env, confirm }) {
+	const files = keys.map((key) => instructionFile(key, env));
+	const remembered = instructionsAnswer();
+	if (remembered)
+		return {
+			answer: remembered,
+			added:
+				remembered === "accepted"
+					? files.slice(0, 1).filter(addInstructionLine)
+					: [],
+		};
+	const answer = (await confirm(files)) ? "accepted" : "declined";
+	writeIfChanged(
+		instructionsAnswerFile(),
+		`${JSON.stringify({ answer, answeredAt: new Date().toISOString() }, null, 2)}\n`,
+	);
+	return {
+		answer,
+		added: answer === "accepted" ? files.filter(addInstructionLine) : [],
+	};
+}
+
+function removeInstructionLines({ keys, env }) {
+	if (instructionsAnswer() !== "accepted") return [];
+	return keys
+		.map((key) => instructionFile(key, env))
+		.filter(removeInstructionLine);
+}
+
+async function askInstructionLine(files) {
+	const home = os.homedir();
+	const names = files.map((file) =>
+		file.startsWith(`${home}/`) ? `~/${file.slice(home.length + 1)}` : file,
+	);
+	const options = {
+		type: "question",
+		buttons: ["Add the Line", "Don’t Add"],
+		defaultId: 1,
+		cancelId: 1,
+		message: "Use Opaline for all session analysis?",
+		detail: `Opaline can add one line to ${names.join(" and ")}, so your agents use the Opaline plugin whenever you ask about your sessions:\n\n“${INSTRUCTION_LINE}”\n\nNothing else in ${names.length > 1 ? "these files" : "this file"} changes, and you can delete the line at any time.`,
+	};
+	const parent = BrowserWindow.getFocusedWindow();
+	const { response } = await (parent
+		? dialog.showMessageBox(parent, options)
+		: dialog.showMessageBox(options));
+	return response === 0;
+}
+
 async function inspectAgent(key) {
 	const binary = await which(key);
 	if (!binary) return { binary };
-	const plugins = agents[key].plugins(
-		parse((await run(binary, ["plugin", "list", "--json"])).stdout),
+	const listed = parse(
+		(await run(binary, ["plugin", "list", "--json"])).stdout,
 	);
+	const plugins = agents[key].plugins(listed);
 	const find = (id) =>
 		plugins.find(
 			(plugin) =>
 				agents[key].matches(plugin, id) && agents[key].enabled(plugin),
 		);
-	return { binary, local: find(LOCAL_PLUGIN), cloud: find(CLOUD_PLUGIN) };
+	return {
+		binary,
+		listed: listed !== null,
+		local: find(LOCAL_PLUGIN),
+		cloud: find(CLOUD_PLUGIN),
+	};
 }
 
 function agentStatus(key, { binary, local }) {
@@ -235,11 +397,11 @@ function failure(output) {
 }
 
 function appServer(binary, work) {
-	return loginShellPath().then(
-		(PATH) =>
+	return loginShellEnv().then(
+		(shell) =>
 			new Promise((resolve, reject) => {
 				const child = spawn(binary, ["app-server"], {
-					env: { ...process.env, PATH },
+					env: { ...process.env, ...shell },
 					stdio: ["pipe", "pipe", "ignore"],
 				});
 				const pending = new Map();
@@ -341,7 +503,12 @@ async function addMarketplace(key, binary, root) {
 	return added;
 }
 
-function createAgents({ stack }) {
+function createAgents({ stack, confirmInstructionLine = askInstructionLine }) {
+	const marketplaceSources = () => ({
+		pluginDir: stack.bundle.pluginDir,
+		localPluginDir: stack.bundle.localPluginDir,
+	});
+
 	async function prepareMarketplace() {
 		const server =
 			stack.agentServer() ??
@@ -349,11 +516,35 @@ function createAgents({ stack }) {
 		if (!server) throw new Error("The local Opaline server is not ready yet.");
 		if (!stack.bundle.pluginDir || !stack.bundle.launcherPath)
 			throw new Error("This build has no agent plugin.");
+		if (!stack.bundle.localPluginDir)
+			log("this build has no local plugin text; agents get the cloud text");
 		writeHookScript({
 			launcherPath: stack.bundle.launcherPath,
 			dataDir: server.dataDir,
 		});
-		return writeMarketplace({ pluginDir: stack.bundle.pluginDir, server });
+		return writeMarketplace({ ...marketplaceSources(), server });
+	}
+
+	async function offerInstructions(key) {
+		try {
+			const others = await Promise.all(
+				Object.keys(agents)
+					.filter((other) => other !== key)
+					.map(async (other) =>
+						(await inspectAgent(other)).local ? other : null,
+					),
+			);
+			const { answer, added } = await offerInstructionLine({
+				keys: [key, ...others.filter(Boolean)],
+				env: await loginShellEnv(),
+				confirm: confirmInstructionLine,
+			});
+			log(
+				`instruction line ${answer}${added.length ? `, added to ${added.join(", ")}` : ""}`,
+			);
+		} catch (error) {
+			log(`instruction line not offered: ${error.message}`);
+		}
 	}
 
 	async function connect(key) {
@@ -400,7 +591,9 @@ function createAgents({ stack }) {
 				detail: failure(installed.output),
 			};
 		await agents[key].afterInstall?.(found.binary);
-		return agentStatus(key, await inspectAgent(key));
+		const status = agentStatus(key, await inspectAgent(key));
+		if (status.connected) await offerInstructions(key);
+		return status;
 	}
 
 	async function refresh() {
@@ -414,11 +607,20 @@ function createAgents({ stack }) {
 		const statuses = await Promise.all(
 			Object.keys(agents).map(async (key) => [key, await inspectAgent(key)]),
 		);
+		try {
+			const removed = removeInstructionLines({
+				keys: statuses
+					.filter(([, found]) => found.binary && found.listed && !found.local)
+					.map(([key]) => key),
+				env: await loginShellEnv(),
+			});
+			if (removed.length)
+				log(`instruction line removed from ${removed.join(", ")}`);
+		} catch (error) {
+			log(`instruction line not removed: ${error.message}`);
+		}
 		if (!statuses.some(([, found]) => found.local)) return;
-		const { version } = writeMarketplace({
-			pluginDir: stack.bundle.pluginDir,
-			server,
-		});
+		const { version } = writeMarketplace({ ...marketplaceSources(), server });
 		for (const [key, found] of statuses) {
 			if (!found.local || found.local.version === version) continue;
 			const updated = await run(found.binary, agents[key].update);
@@ -432,4 +634,15 @@ function createAgents({ stack }) {
 	return { statuses: agentStatuses, connect, refresh };
 }
 
-module.exports = { createAgents, writeMarketplace, LOCAL_PLUGIN, CLOUD_PLUGIN };
+module.exports = {
+	createAgents,
+	writeMarketplace,
+	instructionFile,
+	addInstructionLine,
+	removeInstructionLine,
+	offerInstructionLine,
+	removeInstructionLines,
+	INSTRUCTION_LINE,
+	LOCAL_PLUGIN,
+	CLOUD_PLUGIN,
+};
