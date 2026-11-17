@@ -108,6 +108,15 @@ async function main(): Promise<void> {
 				log: status,
 			})
 		: null;
+	const [planUsage, { hasDesktopApp }] = await Promise.all([
+		import("./plan-usage/index.js"),
+		import("./desktop-app.js"),
+	]);
+	const usageRecorder =
+		config.dataDir &&
+		planUsage.isPlanUsageEnabled(process.env, hasDesktopApp(process.env))
+			? planUsage.startPlanUsage({ dataDir: config.dataDir })
+			: null;
 	status(
 		`listening on ${config.host}:${server.port}; jobs: ${jobs.jobs.join(", ")}${config.webDir ? `; web: ${config.webDir}` : "; no OPALINE_WEB_DIR, API only"}`,
 	);
@@ -137,6 +146,7 @@ async function main(): Promise<void> {
 			Promise.race([
 				Promise.all([
 					ingest?.stop(),
+					usageRecorder?.stop(),
 					jobs.stop(),
 					purgeWorker.stop(),
 					server.stop(),

@@ -9,6 +9,8 @@ import { GITHUB_RETENTION_TOOLTIP } from "@rudel/api-routes";
 import {
 	createReactComponent,
 	type Icon,
+	IconBattery3,
+	IconBattery3Filled,
 	IconBolt,
 	IconBoltFilled,
 	IconCircleCheck,
@@ -244,7 +246,19 @@ type Props = {
 	refreshing: boolean;
 	splitBy: CostDashboardInput["splitBy"];
 	onResetSplit: () => void;
+	usage?: UsageTab;
 };
+
+export interface UsageTab {
+	readonly value: string | undefined;
+	readonly trend: number[] | undefined;
+	readonly selected: boolean;
+	readonly onSelect: () => void;
+	readonly chart: ReactNode;
+	readonly breakdowns: ReactNode;
+}
+
+const USAGE_COLOR = "oklch(0.74 0.17 150)";
 
 export function CostChart({
 	dots,
@@ -266,7 +280,10 @@ export function CostChart({
 	onRefresh,
 	refreshing,
 	interval,
+	usage,
 }: Props) {
+	const mergedGitHub =
+		metrics.includes("mergedPullRequests") && metrics.includes("ciRuns");
 	const demo = useDemoRuntime();
 	const workspace = useOptionalOrganization();
 	const overrides = useContext(MetricOverrideContext);
@@ -643,7 +660,23 @@ export function CostChart({
 					aria-label="Chart metric"
 					aria-busy={metricsPending}
 				>
+					{usage ? (
+						<Metric
+							label="Usage"
+							icon={IconBattery3Filled}
+							outlineIcon={IconBattery3}
+							color={USAGE_COLOR}
+							value={usage.value}
+							qualifier={undefined}
+							unavailable={false}
+							trend={usage.trend}
+							primary={usage.selected}
+							onClick={usage.onSelect}
+						/>
+					) : null}
 					{metrics.map((value) => {
+						if (value === "ciRuns" && mergedGitHub) return null;
+						const githubCard = value === "mergedPullRequests" && mergedGitHub;
 						// With previews, each card reads its own request's answer: the
 						// charted dashboard leaves the GitHub metrics out unless one of
 						// them is charted.
@@ -672,7 +705,13 @@ export function CostChart({
 						return (
 							<Metric
 								key={value}
-								label={rates ? "Frustrations" : METRIC_LABELS[value]}
+								label={
+									rates
+										? "Frustrations"
+										: githubCard
+											? "PRs & CI"
+											: METRIC_LABELS[value]
+								}
 								icon={METRIC_APPEARANCE[value].icon}
 								outlineIcon={METRIC_APPEARANCE[value].outline}
 								color={METRIC_APPEARANCE[value].color}
@@ -698,7 +737,11 @@ export function CostChart({
 								qualifier={
 									metricData?.githubHistory?.preview ? "preview" : undefined
 								}
-								primary={selectedMetric === value}
+								primary={
+									!usage?.selected &&
+									(selectedMetric === value ||
+										(githubCard && selectedMetric === "ciRuns"))
+								}
 								disabled={empty?.has(value) ?? false}
 								metricKey={value}
 								expanded={expanded === value}
@@ -762,7 +805,11 @@ export function CostChart({
 						/>
 					) : null}
 				</fieldset>
-				<div className="cost-chart-card">
+				{usage?.selected ? usage.chart : null}
+				<div
+					className="cost-chart-card"
+					style={usage?.selected ? { display: "none" } : undefined}
+				>
 					<div className="cost-chart-key" data-fluid-menu-root="">
 						<FluidMenuHover items=".cost-text-button" />
 						<div className="cost-chart-key-copy">
@@ -928,6 +975,28 @@ export function CostChart({
 								) : null}
 								{filters}
 							</div>
+						) : null}
+						{mergedGitHub &&
+						(selectedMetric === "mergedPullRequests" ||
+							selectedMetric === "ciRuns") ? (
+							<fieldset
+								className="cost-chart-kind"
+								aria-label="Pull requests or CI runs"
+							>
+								{(["mergedPullRequests", "ciRuns"] as const).map((value) => (
+									<button
+										key={value}
+										type="button"
+										aria-pressed={selectedMetric === value}
+										onClick={() => onMetricChange(value)}
+										onPointerEnter={
+											onMetricIntent ? () => onMetricIntent(value) : undefined
+										}
+									>
+										{METRIC_LABELS[value]}
+									</button>
+								))}
+							</fieldset>
 						) : null}
 						{dots === "switch" ? (
 							<fieldset className="cost-chart-kind" aria-label="Chart style">

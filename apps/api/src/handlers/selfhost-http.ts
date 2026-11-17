@@ -95,6 +95,8 @@ export function handleSelfHostRoute(
 			return ingestStatus(request, deps);
 		case "POST /api/selfhost/ingest/notify":
 			return ingestNotify(request, deps);
+		case "GET /api/selfhost/plan-usage":
+			return planUsageReport(request, url, deps);
 		case "GET /api/selfhost/login":
 			return deps.auth.handler(
 				new Request(
@@ -519,6 +521,56 @@ async function ingestNotify(
 			},
 			{ status: 400 },
 		);
+	if (parsed.data.paths.length > 0)
+		void import("../selfhost/plan-usage/index.js").then((module) =>
+			module.markAgentActivity(),
+		);
 	const accepted = await ingest.notify(parsed.data.paths, parsed.data.final);
 	return Response.json({ accepted }, { status: 202 });
+}
+
+const DAY_MS = 86_400_000;
+const MAX_PLAN_USAGE_SPAN_MS = 92 * DAY_MS;
+
+async function planUsageReport(
+	request: Request,
+	url: URL,
+	deps: SelfHostDependencies,
+): Promise<Response> {
+	const { getPlanUsage } = await import("../selfhost/plan-usage/index.js");
+	const recorder = getPlanUsage();
+	if (!recorder) return Response.json({ error: "not_found" }, { status: 404 });
+	const actor = await loginLinkActor(request, deps);
+	if (actor instanceof Response) return actor;
+	const now = Date.now();
+	const to = Date.parse(url.searchParams.get("to") ?? "") || now;
+	const from = Date.parse(url.searchParams.get("from") ?? "") || to - DAY_MS;
+	if (from >= to || to - from > MAX_PLAN_USAGE_SPAN_MS)
+		return Response.json(
+			{ error: "invalid_range", message: "Send from < to, at most 92 days." },
+			{ status: 400 },
+		);
+	if (url.searchParams.get("refresh") === "1") await recorder.sampleNow();
+	const [{ getClickhouse }, rows, { buildPlanUsageReport }] = await Promise.all(
+		[
+			import("../clickhouse.js"),
+			import("../selfhost/plan-usage/cost-rows.js"),
+			import("../selfhost/plan-usage/report.js"),
+		],
+	);
+	const clickhouse = getClickhouse();
+	return Response.json(
+		await buildPlanUsageReport({
+			samples: await recorder.store.all(),
+			errors: recorder.errors(),
+			checkedAt: recorder.checkedAt(),
+			from,
+			to,
+			now,
+			loadRows: (provider, start, end) =>
+				rows.readCostRows(clickhouse, provider, start, end),
+			loadTitles: (ids) => rows.readSessionTitles(clickhouse, ids),
+			loadRepositories: (ids) => rows.readSessionRepositories(clickhouse, ids),
+		}),
+	);
 }

@@ -23,6 +23,7 @@ import {
 } from "./cost-dashboard-data.js";
 import { buildDurationPeriods } from "./dashboard-duration-periods.js";
 import { getGitHubOutcomesDashboardMetrics } from "./github-outcomes-dashboard.service.js";
+import { repositorySql } from "./repository-key-sql.js";
 import { SESSION_AGENT_RUN_SCAN_VERSION } from "./session-agent-runs.js";
 import {
 	buildCanonicalPricingModelSql,
@@ -583,18 +584,6 @@ function orgParams(scope: CostDashboardScope): { orgId?: string } {
 
 function scopedRepositorySql(tenant: AnalyticsTenant, alias: string): string {
 	return tenant === "allOrganizations" ? "''" : repositorySql(alias);
-}
-
-function repositorySql(alias: string): string {
-	// Keep the host and owner in the key, so identically named repositories do
-	// not collide. URL remotes drop `user@` and `:port`; scp-style remotes turn
-	// `user@host:path` into `host/path`. Local projects retain their path.
-	const urlRemote = "'^[A-Za-z][A-Za-z0-9+.-]*://([^/]*@)?([^/:]*)(:[0-9]*)?'";
-	return `if(${alias}.git_remote != '',
-  replaceRegexpOne(if(match(${alias}.git_remote, ${urlRemote}),
-    replaceRegexpOne(${alias}.git_remote, ${urlRemote}, '\\2'),
-    replaceRegexpOne(replaceRegexpOne(${alias}.git_remote, '^[^/@]+@', ''), ':', '/')), '[.]git/?$', ''),
-  if(${alias}.project_path != '', ${alias}.project_path, ${alias}.package_name))`;
 }
 
 async function queryAgentRunDurationStats(

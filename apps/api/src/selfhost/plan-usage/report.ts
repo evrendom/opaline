@@ -1,0 +1,119 @@
+import type { PlanProvider, PlanSample } from "./readings.js";
+import {
+	buildWindowSeries,
+	type CostRow,
+	earliestCostTime,
+	type WindowSeries,
+} from "./window-series.js";
+
+const PROVIDERS: readonly PlanProvider[] = ["claude", "codex"];
+const WEEK_MINUTES = 10_080;
+
+export interface ProviderUsage {
+	readonly provider: PlanProvider;
+	readonly plan: string | null;
+	readonly error: string | null;
+	readonly window: WindowSeries | null;
+}
+
+export interface PlanUsageReport {
+	readonly from: string;
+	readonly to: string;
+	readonly checkedAt: string | null;
+	readonly providers: readonly ProviderUsage[];
+	readonly titles: Readonly<Record<string, string>>;
+}
+
+export function mainWindow(
+	provider: PlanProvider,
+	samples: readonly PlanSample[],
+): string | null {
+	const latest = new Map<string, PlanSample>();
+	for (const sample of samples) latest.set(sample.window, sample);
+	const windows = [...latest.values()];
+	if (provider === "claude")
+		return windows.some((sample) => sample.window === "seven_day")
+			? "seven_day"
+			: null;
+	const weekly = windows.find(
+		(sample) => sample.windowMinutes === WEEK_MINUTES,
+	);
+	if (weekly) return weekly.window;
+	return (
+		windows
+			.filter((sample) => sample.modelScope === null)
+			.sort((a, b) => (b.windowMinutes ?? 0) - (a.windowMinutes ?? 0))[0]
+			?.window ?? null
+	);
+}
+
+export async function buildPlanUsageReport(input: {
+	readonly samples: readonly PlanSample[];
+	readonly errors: Readonly<Partial<Record<PlanProvider, string>>>;
+	readonly checkedAt: string | null;
+	readonly from: number;
+	readonly to: number;
+	readonly now: number;
+	readonly loadRows: (
+		provider: PlanProvider,
+		from: number,
+		to: number,
+	) => Promise<CostRow[]>;
+	readonly loadTitles: (
+		sessionIds: readonly string[],
+	) => Promise<Record<string, string>>;
+	readonly loadRepositories?: (
+		sessionIds: readonly string[],
+	) => Promise<ReadonlyMap<string, string>>;
+}): Promise<PlanUsageReport> {
+	const providers = await Promise.all(
+		PROVIDERS.map(async (provider): Promise<ProviderUsage> => {
+			const mine = input.samples.filter(
+				(sample) => sample.provider === provider,
+			);
+			const error = input.errors[provider] ?? null;
+			const plan = mine.at(-1)?.plan ?? null;
+			const chosen = mainWindow(provider, mine);
+			const samples = mine.filter((sample) => sample.window === chosen);
+			if (!chosen || samples.length === 0)
+				return { provider, plan, error, window: null };
+			const rows = await input.loadRows(
+				provider,
+				earliestCostTime(samples, input.from),
+				input.to,
+			);
+			const repositoryOf = input.loadRepositories
+				? await input
+						.loadRepositories([...new Set(rows.map((row) => row.sessionId))])
+						.catch(() => new Map<string, string>())
+				: undefined;
+			return {
+				provider,
+				plan,
+				error,
+				window: buildWindowSeries({
+					samples,
+					rows,
+					from: input.from,
+					to: input.to,
+					now: input.now,
+					repositoryOf,
+				}),
+			};
+		}),
+	);
+	const sessionIds = new Set<string>();
+	for (const { window } of providers) {
+		for (const session of window?.sessions ?? [])
+			sessionIds.add(session.sessionId);
+		for (const bucket of window?.buckets ?? [])
+			for (const session of bucket.sessions) sessionIds.add(session.sessionId);
+	}
+	return {
+		from: new Date(input.from).toISOString(),
+		to: new Date(input.to).toISOString(),
+		checkedAt: input.checkedAt,
+		providers,
+		titles: await input.loadTitles([...sessionIds]).catch(() => ({})),
+	};
+}

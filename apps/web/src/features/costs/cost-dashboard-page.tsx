@@ -30,6 +30,7 @@ import {
 	PERSON_DIMENSIONS,
 	useDeferredPersonRows,
 } from "./deferred-person-rows";
+import { useUsageTab } from "./plan-usage/use-usage-tab";
 import {
 	COST_LABELS,
 	type CostDashboardController,
@@ -268,6 +269,8 @@ export function CostDashboardView({
 	const showToolbar =
 		toolbarStart !== undefined ||
 		(!headerPortal && !rangeInContent && rangeControls !== null);
+	const usage = useUsageTab(input);
+	const usageShown = usage.tab?.selected === true;
 	const breakdownsRef = useRef<HTMLDivElement>(null);
 	const breakdownRowHeight = useBreakdownRowHeight(breakdownsRef);
 	return (
@@ -350,7 +353,11 @@ export function CostDashboardView({
 								runSignals={input.runSignals}
 								signalTypes={input.signalTypes}
 								interval={interval}
-								onMetricChange={setMetric}
+								onMetricChange={(next) => {
+									usage.deselect();
+									setMetric(next);
+								}}
+								usage={usage.tab}
 								onMetricIntent={onMetricIntent}
 								onRefresh={() => query.refetch()}
 								refreshing={query.isFetching && !isPending}
@@ -363,7 +370,10 @@ export function CostDashboardView({
 								onResetSplit={() => setSplit("none")}
 							/>
 						)}
-						<div className="cost-breakdowns-container" hidden={isError}>
+						<div
+							className="cost-breakdowns-container"
+							hidden={isError || (usageShown && !usage.tab?.breakdowns)}
+						>
 							{tabbed ? (
 								<div className="cost-breakdown-tabs" role="tablist">
 									{dimensions.map((dimension) => (
@@ -398,29 +408,33 @@ export function CostDashboardView({
 								data-pull-requests={isPullRequestMetric}
 								data-ci-runs={metric === "ciRuns"}
 							>
-								{shownDimensions.map((dimension) => (
-									<CostBreakdown
-										key={dimension}
-										dimension={dimension}
-										entries={selectedData?.breakdowns[dimension] ?? []}
-										metric={metric}
-										valueLabel={METRIC_LABELS[metric]}
-										unavailable={selectedData === null}
-										onLoadDeferred={
-											PERSON_DIMENSIONS.has(dimension)
-												? (loadPersonRows ?? undefined)
-												: undefined
-										}
-										selected={input[dimension]}
-										pending={isPending}
-										split={input.splitBy === dimension}
-										onToggle={(id) => toggle(dimension, id)}
-										onClear={() => clear(dimension)}
-										onSplit={() =>
-											setSplit(input.splitBy === dimension ? "none" : dimension)
-										}
-									/>
-								))}
+								{usageShown
+									? usage.tab?.breakdowns
+									: shownDimensions.map((dimension) => (
+											<CostBreakdown
+												key={dimension}
+												dimension={dimension}
+												entries={selectedData?.breakdowns[dimension] ?? []}
+												metric={metric}
+												valueLabel={METRIC_LABELS[metric]}
+												unavailable={selectedData === null}
+												onLoadDeferred={
+													PERSON_DIMENSIONS.has(dimension)
+														? (loadPersonRows ?? undefined)
+														: undefined
+												}
+												selected={input[dimension]}
+												pending={isPending}
+												split={input.splitBy === dimension}
+												onToggle={(id) => toggle(dimension, id)}
+												onClear={() => clear(dimension)}
+												onSplit={() =>
+													setSplit(
+														input.splitBy === dimension ? "none" : dimension,
+													)
+												}
+											/>
+										))}
 							</div>
 						</div>
 					</div>
