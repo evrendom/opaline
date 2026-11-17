@@ -1,5 +1,6 @@
 import type { SessionListFilters } from "@rudel/api-routes";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDateRange } from "@/features/analytics/date-range/useDateRange";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
@@ -324,7 +325,17 @@ export function useSessionsPageData({
 		previewSeed?.totalSessionCount ??
 		sessionPages.data?.pages.flat().length ??
 		0;
-	// The sessions running right now lead the list, whatever the range.
+	// The sessions running right now lead the list, whatever the range; a
+	// picked day keeps only those active on it.
+	const rangeStart = range?.start;
+	const rangeEnd = range?.end;
+	const shownLiveSessions = useMemo(() => {
+		if (!rangeStart || !rangeEnd) return liveSessions.sessions;
+		return liveSessions.sessions.filter((live) => {
+			const day = format(new Date(live.lastActivityAt), "yyyy-MM-dd");
+			return day >= rangeStart && day <= rangeEnd;
+		});
+	}, [liveSessions.sessions, rangeStart, rangeEnd]);
 	const orderedSessions = useMemo(
 		() =>
 			mergeLiveSessionRows(
@@ -332,11 +343,11 @@ export function useSessionsPageData({
 					sessions: snapshotSessionsData,
 					useRolling24Hours,
 				}),
-				liveSessions.sessions,
+				shownLiveSessions,
 				liveSessions.updatedAt,
 			),
 		[
-			liveSessions.sessions,
+			shownLiveSessions,
 			liveSessions.updatedAt,
 			snapshotSessionsData,
 			useRolling24Hours,
