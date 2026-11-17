@@ -11,13 +11,13 @@ const MIN_AREA = { h: 28, w: 40 } as const;
 const MIN_CELL = 18;
 
 const MARK: Record<Tone, string> = {
-	later: "[--mark:currentColor]",
-	minor: "[--mark:currentColor]",
+	later: "[--mark:var(--color-opal-4)]",
+	minor: "[--mark:var(--color-opal-3)]",
 	never: "[--mark:var(--color-rose-500)]",
 };
 
 const MARKED =
-	"border-[color-mix(in_oklab,var(--mark)_28%,transparent)] bg-[color-mix(in_oklab,var(--mark)_9%,transparent)] shadow-[0_0_0_0.5px_color-mix(in_oklab,var(--mark)_20%,transparent),0_2px_4px_-1px_color-mix(in_oklab,var(--mark)_35%,transparent),0_8px_18px_-6px_color-mix(in_oklab,var(--mark)_55%,transparent)]";
+	"border-[color-mix(in_oklab,var(--mark)_45%,transparent)] shadow-[0_0_4px_color-mix(in_oklab,var(--mark)_60%,transparent),0_0_14px_color-mix(in_oklab,var(--mark)_45%,transparent)]";
 
 export function markOf(
 	marks: ReadonlyMap<string, Tone> | undefined,
