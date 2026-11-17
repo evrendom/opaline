@@ -90,6 +90,8 @@ type SessionsOverviewRowProps = {
 	maximumSessionCost: number;
 	/** Share of the plan limit the session used, in percent; desktop only. */
 	planUsage?: number;
+	/** On a subagent row: the whole session's share, which includes this one. */
+	planUsageOfSession?: number;
 	memberProfile: SessionMemberProfileSummary | undefined;
 	onSessionClick: ((session: SessionAnalytics) => void) | undefined;
 	session: SessionAnalytics;
@@ -161,6 +163,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 	liveNowMs,
 	maximumSessionCost,
 	planUsage,
+	planUsageOfSession,
 	memberProfile,
 	onSessionClick,
 	session,
@@ -362,12 +365,18 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 							) : null}
 							{planUsage === undefined ? null : (
 								<span
-									className="ml-1 inline-flex items-center gap-0.5 tabular-nums"
+									className={cn(
+										"ml-1 inline-flex items-center gap-0.5 tabular-nums",
+										session.subagent_of && "opacity-55",
+									)}
 									data-session-overview-metric-value="plan-usage"
+									data-subset={session.subagent_of ? "" : undefined}
 								>
 									<IconBattery2 aria-hidden="true" className="size-3.5" />
 									{formatPlanShare(planUsage)}
-									<span className="sr-only"> of the plan limit</span>
+									<span className="sr-only">
+										{planUsageText(planUsage, planUsageOfSession)}
+									</span>
 								</span>
 							)}
 						</span>
@@ -382,7 +391,10 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 					>
 						{costEstimateLabel ? <p>{costEstimateLabel}</p> : null}
 						{planUsage === undefined ? null : (
-							<p>{formatPlanShare(planUsage)} of the plan limit</p>
+							<p>
+								{formatPlanShare(planUsage)}
+								{planUsageText(planUsage, planUsageOfSession)}
+							</p>
 						)}
 						{tokenTooltipLabel}
 					</TooltipContent>
@@ -607,4 +619,10 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 function formatPlanShare(points: number): string {
 	if (points < 1) return "<1%";
 	return `${Math.round(points)}%`;
+}
+
+function planUsageText(points: number, ofSession: number | undefined): string {
+	return ofSession !== undefined && ofSession >= points
+		? ` of the plan limit · part of this session’s ${formatPlanShare(ofSession)}`
+		: " of the plan limit";
 }

@@ -419,6 +419,11 @@ export function SessionsOverviewTable({
 															planUsage={usageShares?.get(
 																planUsageKey(session),
 															)}
+															planUsageOfSession={
+																transcriptSubagentId(session)
+																	? usageShares?.get(session.session_id)
+																	: undefined
+															}
 															memberProfile={memberProfileSummaries.get(
 																session.user_id,
 															)}
