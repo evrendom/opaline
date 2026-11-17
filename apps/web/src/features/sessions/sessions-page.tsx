@@ -12,7 +12,14 @@ import {
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
+import { DateRangeOverride } from "@/features/analytics/date-range/DateRangeProvider";
+import { useDateRange } from "@/features/analytics/date-range/useDateRange";
 import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
+import {
+	DotPickContext,
+	DotPreviewContext,
+} from "@/features/costs/cost-hover-date";
+import { useDotFilter } from "@/features/costs/use-dot-filter";
 import { SessionDetailErrorBoundary } from "@/features/sessions/components/session-detail-view-parts";
 import { SessionTraceDock } from "@/features/sessions/components/session-trace-dock";
 import { SessionsListSurface } from "@/features/sessions/components/sessions-list-surface";
@@ -68,9 +75,11 @@ export function SessionsPage() {
 			enabled: false,
 			select: () => true,
 		}).data === true;
+	const { dotPick, preview, shownRange } = useDotFilter(useDateRange().state);
 	const data = useSessionsPageData({
 		detail: activeSessionId !== null,
 		detailReady,
+		range: activeSessionId === null ? shownRange : null,
 		trackPageView: activeSessionId === null,
 	});
 	const canViewSession = useCanViewSession();
@@ -225,20 +234,26 @@ export function SessionsPage() {
 						data-rail-beside
 						data-slot="sessions-list-pane"
 					>
-						<SessionsRail />
-						<SessionsListSurface
-							activeSessionId={activeSessionId}
-							canOpenSession={(session) => canViewSession(session.user_id)}
-							data={data}
-							getSessionHref={(session) =>
-								getShellRoutePath(appRoutes.sessionDetail(session.session_id))
-							}
-							layout="workspace"
-							onSessionClick={handleSessionClick}
-							showPlace
-							showSkillsColumn={false}
-							scrollContainerRef={scrollContainerRef}
-						/>
+						<DotPickContext.Provider value={dotPick}>
+							<DotPreviewContext.Provider value={preview}>
+								<SessionsRail />
+							</DotPreviewContext.Provider>
+						</DotPickContext.Provider>
+						<DateRangeOverride range={shownRange}>
+							<SessionsListSurface
+								activeSessionId={activeSessionId}
+								canOpenSession={(session) => canViewSession(session.user_id)}
+								data={data}
+								getSessionHref={(session) =>
+									getShellRoutePath(appRoutes.sessionDetail(session.session_id))
+								}
+								layout="workspace"
+								onSessionClick={handleSessionClick}
+								showPlace
+								showSkillsColumn={false}
+								scrollContainerRef={scrollContainerRef}
+							/>
+						</DateRangeOverride>
 					</section>
 				)}
 			</div>

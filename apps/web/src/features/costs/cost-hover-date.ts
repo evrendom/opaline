@@ -53,6 +53,10 @@ export function useDotPick() {
 	return useContext(DotPickContext);
 }
 
+export const DotPreviewContext = createContext<
+	((next: DotPick | null) => void) | null
+>(null);
+
 export function useMarkedDate() {
 	const hovered = useHoverDate();
 	const picked = useContext(DotPickContext)?.picked?.date ?? null;

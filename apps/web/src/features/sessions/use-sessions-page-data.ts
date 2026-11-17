@@ -19,6 +19,7 @@ import {
 	SESSION_QUERY_STALE_TIME,
 } from "@/features/sessions/sessions-list-query";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
+import { getInclusiveDateRangeDays } from "@/lib/analytics-date-range";
 import { orpc } from "@/lib/orpc";
 import {
 	pollUnlessPushed,
@@ -33,12 +34,14 @@ const FAILURES_PUSHED_POLL_MS = 5 * 60_000;
 export function useSessionsPageData({
 	detail = false,
 	detailReady = false,
+	range = null,
 	trackPageView,
 	paginated = true,
 }: {
 	detail?: boolean;
 	detailReady?: boolean;
 	paginated?: boolean;
+	range?: { start: string; end: string } | null;
 	trackPageView: boolean;
 }) {
 	const demo = useDemoRuntime();
@@ -61,10 +64,15 @@ export function useSessionsPageData({
 		filters: SessionListFilters;
 	} | null>(null);
 	const { state: organization } = useOrganization();
-	const {
-		meta,
-		state: { endDate, startDate },
-	} = useDateRange();
+	const dateRange = useDateRange();
+	const startDate = range?.start ?? dateRange.state.startDate;
+	const endDate = range?.end ?? dateRange.state.endDate;
+	const meta = range
+		? {
+				...dateRange.meta,
+				dayCount: getInclusiveDateRangeDays(range.start, range.end),
+			}
+		: dateRange.meta;
 	const [coldDetail] = useState(
 		() =>
 			detail &&

@@ -18,8 +18,9 @@ import { EmptyState } from "@/components/dashboard/page-parts";
 import { DateRangeOverride } from "@/features/analytics/date-range/DateRangeProvider";
 import type { DashboardVariant } from "@/features/costs/cost-dashboard-page";
 import { CostDashboardView } from "@/features/costs/cost-dashboard-page";
-import { type DotPick, DotPickContext } from "@/features/costs/cost-hover-date";
+import { DotPickContext } from "@/features/costs/cost-hover-date";
 import { useRepositoryCostDashboard } from "@/features/costs/use-cost-dashboard";
+import { useDotFilter } from "@/features/costs/use-dot-filter";
 import {
 	useMetricPreviews,
 	usePrefetchDashboardMetric,
@@ -130,38 +131,7 @@ export function RepoDetailPage({
 	);
 	const pulls = useRepoPullRequests(repoKey);
 	const range = useRepoRangeInput();
-	const pickParam = searchParams.get("pick");
-	const [pending, setPending] = useState<{ param: string | null } | null>(null);
-	if (pending && pending.param === pickParam) setPending(null);
-	const shownPick = pending ? pending.param : pickParam;
-	const picked = useMemo(() => {
-		const [date, end] = shownPick?.split("..") ?? [];
-		return date && end ? { date, end } : null;
-	}, [shownPick]);
-	const pickedRange = useMemo(() => {
-		if (!picked) return null;
-		const start = picked.date > range.startDate ? picked.date : range.startDate;
-		const end = picked.end < range.endDate ? picked.end : range.endDate;
-		return start <= end ? { start, end } : null;
-	}, [picked, range]);
-	const dotPick = useMemo(
-		() => ({
-			picked,
-			pick: (next: DotPick | null) => {
-				const param = next ? `${next.date}..${next.end}` : null;
-				setPending({ param });
-				setSearchParams(
-					(params) => {
-						if (param) params.set("pick", param);
-						else params.delete("pick");
-						return params;
-					},
-					{ replace: true },
-				);
-			},
-		}),
-		[picked, setSearchParams],
-	);
+	const { dotPick, pickedRange } = useDotFilter(range);
 	const allPullRequests = pulls.data?.enabled ? pulls.data.pullRequests : [];
 	const pullRequests = useMemo(
 		() => allPullRequests.filter((pull) => openDuring(pull, range)),

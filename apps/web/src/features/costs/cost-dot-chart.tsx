@@ -32,7 +32,11 @@ import {
 	weekday,
 } from "./cost-dot-calendar";
 import { pebbleMasks } from "./cost-dot-pebble";
-import { useDotPick, useHoverDateStore } from "./cost-hover-date";
+import {
+	DotPreviewContext,
+	useDotPick,
+	useHoverDateStore,
+} from "./cost-hover-date";
 import { RollingText } from "./cost-rolling-text";
 
 type ChartPoint = ReturnType<typeof groupChartTrend>[number];
@@ -418,6 +422,12 @@ export function CostDotChart({
 	const leaving = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const hoverDates = useHoverDateStore();
 	const picker = useDotPick();
+	const preview = useContext(DotPreviewContext);
+	const previewSlot = (slot: number | null) => {
+		if (!preview) return;
+		const point = slot === null ? undefined : slots[slot]?.point;
+		preview(point ? { date: point.date, end: point.endDate } : null);
+	};
 	const pickSlot = (slot: number) => {
 		const point = slots[slot]?.point;
 		if (!picker || !point) return;
@@ -465,6 +475,7 @@ export function CostDotChart({
 		setDirection(next >= from ? 1 : -1);
 		setHovered(next);
 		hoverDates?.set(slotKey(fitted, interval, next));
+		previewSlot(next);
 	};
 	const onPointerMove = (event: PointerEvent<HTMLButtonElement>) => {
 		if (!fitted) return;
@@ -479,6 +490,7 @@ export function CostDotChart({
 		if (hovered !== null && next !== hovered)
 			setDirection(next > hovered ? 1 : -1);
 		hoverDates?.set(slotKey(fitted, interval, next));
+		previewSlot(next);
 		setHovered((current) => (current === next ? current : next));
 	};
 	const onPointerLeave = () => {
@@ -486,6 +498,7 @@ export function CostDotChart({
 		leaving.current = setTimeout(() => {
 			setHovered(null);
 			hoverDates?.set(null);
+			previewSlot(null);
 		}, HOVER_GRACE_MS);
 	};
 	const dot = (
