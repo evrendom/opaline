@@ -33,16 +33,11 @@ import {
 	type PlanProvider,
 	type PlanUsageReport,
 	type ProviderUsage,
-	planLabel,
 	type UsageBucket,
 	type UsageWindow,
 } from "./use-plan-usage";
 import "./plan-usage.css";
 
-const PROVIDER_NAMES: Record<PlanProvider, string> = {
-	claude: "Claude",
-	codex: "Codex",
-};
 const PROVIDER_TABS = [
 	{ id: "claude", label: "Claude", icon: ClaudeModelIcon as unknown as Icon },
 	{ id: "codex", label: "Codex", icon: CodexModelIcon as unknown as Icon },
@@ -63,13 +58,6 @@ const SEGMENT_RADIUS_PX = 2;
 const TICK_STYLE = { fill: "var(--cost-muted)", fontSize: 11 };
 const DAY_MS = 86_400_000;
 
-const resetFormat = new Intl.DateTimeFormat("en-US", {
-	weekday: "short",
-	month: "short",
-	day: "numeric",
-	hour: "numeric",
-	minute: "2-digit",
-});
 const resetTickFormat = new Intl.DateTimeFormat("en-US", {
 	month: "short",
 	day: "numeric",
@@ -81,13 +69,6 @@ export function formatPoints(points: number): string {
 	if (points < 0.1) return `${points.toFixed(2)}%`;
 	if (points < 0.95) return `${points.toFixed(1)}%`;
 	return `${Math.round(points)}%`;
-}
-
-function planName(provider: PlanProvider, plan: string | null): string {
-	const label = planLabel(plan);
-	return label
-		? `${PROVIDER_NAMES[provider]} ${label}`
-		: PROVIDER_NAMES[provider];
 }
 
 export function showsChart(window: UsageWindow): boolean {
@@ -269,8 +250,7 @@ export function PlanUsageChart({
 				<div className="cost-chart-canvas plan-usage-empty">
 					<EmptyState
 						icon={IconAlertTriangle}
-						title={emptyTitle(provider, usage, failed)}
-						description={emptyText(provider, usage, failed)}
+						title={emptyTitle(usage, failed)}
 					/>
 				</div>
 			)}
@@ -278,32 +258,10 @@ export function PlanUsageChart({
 	);
 }
 
-function emptyTitle(
-	provider: PlanProvider,
-	usage: ProviderUsage | undefined,
-	failed: boolean,
-): string {
-	if (failed) return "Plan usage couldn’t load";
-	if (usage?.window) return `No ${PROVIDER_NAMES[provider]} use in this period`;
-	return `No ${PROVIDER_NAMES[provider]} plan limits yet`;
-}
-
-function emptyText(
-	provider: PlanProvider,
-	usage: ProviderUsage | undefined,
-	failed: boolean,
-): string {
-	if (failed) return "Try again in a moment.";
-	const window = usage?.window;
-	if (window) {
-		const left = Math.round(leftPercent(window.usedPercent));
-		const resets = window.resetsAt
-			? `, resetting ${resetFormat.format(new Date(window.resetsAt))}`
-			: "";
-		return `${planName(provider, usage?.plan ?? null)} has ${left}% of its ${window.label.toLowerCase()} limit left${resets}.`;
-	}
-	if (usage?.error) return `${usage.error}.`;
-	return `Opaline asks ${PROVIDER_NAMES[provider]} for its limits every few minutes while the app is open.`;
+function emptyTitle(usage: ProviderUsage | undefined, failed: boolean) {
+	if (failed) return "Usage couldn’t load";
+	if (usage?.window) return "No use";
+	return "No plan limits yet";
 }
 
 function UsageCanvas({
