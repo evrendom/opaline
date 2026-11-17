@@ -83,8 +83,18 @@ export type UseSection = "skills" | "mcp";
 
 const RUNS_STALE_TIME_MS = 5 * 60_000;
 const STALL_MS = 20_000;
+const RUNS_MIN_WIDTH = "13rem";
+const FILE_CARD_MIN_WIDTH = "22.5rem";
+const COLUMN_GAPS = "3rem";
+const RUNS_WIDTH = {
+	minWidth: RUNS_MIN_WIDTH,
+	width: "20rem",
+} satisfies CSSProperties;
+const MIDDLE_WIDTH = {
+	minWidth: `min(26rem, max(0px, 100% - ${RUNS_MIN_WIDTH} - ${FILE_CARD_MIN_WIDTH} - ${COLUMN_GAPS}))`,
+} satisfies CSSProperties;
 const FILE_CARD_WIDTH = {
-	minWidth: "22.5rem",
+	minWidth: FILE_CARD_MIN_WIDTH,
 	width: "29.5rem",
 } satisfies CSSProperties;
 
@@ -94,14 +104,12 @@ const COPY = {
 		missing: (name: string) => `No run called ${name} yet`,
 		pick: "Pick a run",
 		pickHint: "Pick a run on the left to see what it sent and got back.",
-		runs: "Runs that called it",
 	},
 	skills: {
 		icon: IconSparkles,
 		missing: (name: string) => `No run loaded ${name} yet`,
 		pick: "Pick a run",
 		pickHint: "Pick a run on the left to see where it loaded the skill.",
-		runs: "Runs that loaded it",
 	},
 } as const;
 
@@ -180,17 +188,7 @@ export function WorkspaceUseView({
 	return (
 		<div className="h-full overflow-hidden pt-2 pr-8 pb-2 pl-6">
 			<div className="flex h-full min-h-0 gap-6">
-				<div className="-mb-2 flex min-h-0 w-[320px] shrink-0 flex-col gap-1.5">
-					<div className="flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-muted/50 pr-2.5 pl-2 text-xs">
-						<span className="shrink-0 font-medium">{copy.runs}</span>
-						{runs ? (
-							<span className="ml-auto shrink-0 text-[11px] text-muted-foreground tabular-nums">
-								{runs.length}
-								{runsQuery.data?.truncated ? "+" : ""}{" "}
-								{runs.length === 1 ? "run" : "runs"}
-							</span>
-						) : null}
-					</div>
+				<div className="-mb-2 flex min-h-0 shrink flex-col" style={RUNS_WIDTH}>
 					<ScrollColumn className="-mx-1 px-1 pb-8">
 						{loading || (runs && runs.length > 0) ? (
 							<Reveal
@@ -216,9 +214,10 @@ export function WorkspaceUseView({
 				</div>
 				<div
 					className={cn(
-						"relative z-10 flex min-h-0 min-w-0 flex-1 overflow-hidden",
+						"relative z-10 flex min-h-0 flex-1 overflow-hidden",
 						CARD,
 					)}
+					style={MIDDLE_WIDTH}
 				>
 					{missing ? (
 						<CenteredState

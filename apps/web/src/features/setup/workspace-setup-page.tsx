@@ -2,9 +2,12 @@ import { IconChevronRight } from "@tabler/icons-react";
 import { createPortal } from "react-dom";
 import { SkillMark } from "@/components/skill-mark";
 import { ShellNavIcon } from "@/features/shell/components/shell-nav-icon";
+import { useCollapseSidebarBelow } from "@/features/shell/hooks/use-collapse-sidebar-below";
 import { useCurrentShellRoute } from "@/features/shell/hooks/useCurrentShellRoute";
 import { useShellHeaderPortal } from "@/features/shell/shell-header-portal";
 import { type UseSection, WorkspaceUseView } from "./workspace-use-view";
+
+const SIDEBAR_COLLAPSE_BELOW_PX = 1320;
 
 export function WorkspaceSetupPage({
 	name,
@@ -15,6 +18,7 @@ export function WorkspaceSetupPage({
 	onBackToList: () => void;
 	section: UseSection;
 }) {
+	useCollapseSidebarBelow(SIDEBAR_COLLAPSE_BELOW_PX);
 	return (
 		<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-[var(--dashboard-01-content-background,#fcfcfc)] text-(--dashboardy-heading) [--reader-page:var(--dashboard-01-content-background,#fcfcfc)]">
 			<WorkspaceSetupHeader name={name} onBackToList={onBackToList} />
