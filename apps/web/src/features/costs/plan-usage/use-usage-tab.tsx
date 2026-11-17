@@ -3,12 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useLocalDesktopApp } from "@/features/desktop/local-app";
 import type { ChartInterval } from "../chart-interval";
 import type { UsageTab } from "../cost-chart";
-import {
-	formatPoints,
-	PlanUsageChart,
-	periodsOf,
-	showsChart,
-} from "./plan-usage-chart";
+import { formatPoints, PlanUsageChart, periodsOf } from "./plan-usage-chart";
 import { UsageBreakdowns } from "./usage-breakdowns";
 import {
 	leftPercent,
@@ -115,10 +110,9 @@ export function useUsageTab(
 			},
 			selected,
 			onSelect: () => setSelected(true),
-			breakdowns:
-				window && showsChart(window) ? (
-					<UsageBreakdowns window={window} titles={query.data?.titles ?? {}} />
-				) : null,
+			breakdowns: query.isPending ? null : (
+				<UsageBreakdowns window={window} titles={query.data?.titles ?? {}} />
+			),
 			chart: (dots) => (
 				<PlanUsageChart
 					dots={dots}

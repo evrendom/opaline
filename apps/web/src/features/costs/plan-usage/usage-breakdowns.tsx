@@ -59,12 +59,14 @@ export function UsageBreakdowns({
 	window,
 	titles,
 }: {
-	window: UsageWindow;
+	window: UsageWindow | null;
 	titles: Readonly<Record<string, string>>;
 }) {
 	const shellPath = useShellRoutePath();
-	const heading = `Of ${window.label.toLowerCase()} limit`;
-	const sessions: Row[] = window.sessions.map((session) => ({
+	const heading = window
+		? `Of ${window.label.toLowerCase()} limit`
+		: "Of the limit";
+	const sessions: Row[] = (window?.sessions ?? []).map((session) => ({
 		id: session.sessionId,
 		label: titles[session.sessionId] ?? session.sessionId.slice(0, 8),
 		icon: <IconMessages size={14} className="shrink-0" />,
@@ -73,7 +75,7 @@ export function UsageBreakdowns({
 		estimated: session.estimated,
 		href: shellPath(appRoutes.sessionDetail(session.sessionId)),
 	}));
-	if (window.otherPoints > 0)
+	if (window && window.otherPoints > 0)
 		sessions.push({
 			id: "other",
 			label: "Not from this Mac",
@@ -89,7 +91,7 @@ export function UsageBreakdowns({
 			<UsageBreakdown
 				title="Repositories"
 				heading={heading}
-				rows={window.repositories.map((entry) => ({
+				rows={(window?.repositories ?? []).map((entry) => ({
 					id: entry.id || "none",
 					label: repositoryLabel(entry.id),
 					icon: <IconGitBranch size={14} className="shrink-0" />,
@@ -101,7 +103,7 @@ export function UsageBreakdowns({
 			<UsageBreakdown
 				title="Models"
 				heading={heading}
-				rows={window.models.map((entry) => ({
+				rows={(window?.models ?? []).map((entry) => ({
 					id: entry.id,
 					label: costLabel("models", entry.id),
 					icon: <ModelIcon id={entry.id} />,

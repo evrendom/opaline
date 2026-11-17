@@ -1,4 +1,4 @@
-import { type Icon, IconAlertTriangle, IconRefresh } from "@tabler/icons-react";
+import { type Icon, IconRefresh } from "@tabler/icons-react";
 import { useLayoutEffect, useRef, useState } from "react";
 import {
 	Bar,
@@ -11,7 +11,6 @@ import {
 	YAxis,
 } from "recharts";
 import { Skeleton } from "@/app/ui/skeleton";
-import { EmptyState } from "@/components/dashboard/page-parts";
 import { useOptionalDateRange } from "@/features/analytics/date-range/DateRangeProvider";
 import {
 	ClaudeModelIcon,
@@ -238,20 +237,24 @@ export function PlanUsageChart({
 				<div className="cost-chart-canvas">
 					<Skeleton className="size-full rounded-[8px]" />
 				</div>
-			) : showChart && (dots || repository) ? (
-				<UsageDots
-					window={window}
-					interval={interval}
-					repository={repository}
-				/>
-			) : showChart ? (
-				<UsageCanvas window={window} interval={interval} />
 			) : (
-				<div className="cost-chart-canvas plan-usage-empty">
-					<EmptyState
-						icon={IconAlertTriangle}
-						title={emptyTitle(usage, failed)}
-					/>
+				<div className="plan-usage-frame">
+					{dots || repository ? (
+						<UsageDots
+							window={window}
+							interval={interval}
+							repository={repository}
+						/>
+					) : window ? (
+						<UsageCanvas window={window} interval={interval} />
+					) : (
+						<div className="cost-chart-canvas" />
+					)}
+					{showChart ? null : (
+						<div className="cost-chart-empty">
+							<p>{emptyTitle(usage, failed)}</p>
+						</div>
+					)}
 				</div>
 			)}
 		</div>

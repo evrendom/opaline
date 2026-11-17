@@ -1,24 +1,5 @@
-.plan-usage-empty {
-	display: grid;
-	place-items: center;
-	margin-inline: 18px;
-}
-.plan-usage-empty > * {
-	width: 100%;
-}
-.cost-page:is([data-variant="dot-rail"], [data-variant="rail-chat"])
-	.cost-chart-card
-	.cost-chart-canvas.plan-usage-empty {
-	height: auto;
-	min-height: var(--dot-area);
-	overflow: visible;
-	place-items: stretch;
-}
-.cost-page:is([data-variant="dot-rail"], [data-variant="rail-chat"])
-	.plan-usage-empty
-	> [data-slot="empty"] {
-	gap: 12px;
-	padding: 20px 16px;
+.plan-usage-frame {
+	position: relative;
 }
 .plan-usage-tip-session {
 	max-width: 220px;
