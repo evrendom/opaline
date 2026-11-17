@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocalDesktopApp } from "@/features/desktop/local-app";
+import type { ChartInterval } from "../chart-interval";
 import type { UsageTab } from "../cost-chart";
 import { PlanUsageChart, showsChart } from "./plan-usage-chart";
 import { UsageBreakdowns } from "./usage-breakdowns";
@@ -10,7 +11,10 @@ import {
 	usePlanUsage,
 } from "./use-plan-usage";
 
-export function useUsageTab(range: UsageRange): {
+export function useUsageTab(
+	range: UsageRange,
+	interval: ChartInterval,
+): {
 	tab: UsageTab | undefined;
 	deselect: () => void;
 } {
@@ -57,6 +61,7 @@ export function useUsageTab(range: UsageRange): {
 					report={query.data}
 					provider={provider}
 					onProviderChange={setProvider}
+					interval={interval}
 					pending={query.isPending}
 					failed={query.isError}
 					refreshing={refreshing}

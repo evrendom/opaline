@@ -363,3 +363,44 @@ test("shares add up by model and by repository", () => {
 		],
 	);
 });
+
+test("earlier cycles are estimated from cost at the measured cycle's rate", () => {
+	const reset = T0 + 24 * HOUR;
+	const week = 168 * HOUR;
+	const series = buildWindowSeries({
+		samples: [sample(T0, 20, reset)],
+		rows: [
+			{
+				sessionId: "now",
+				at: reset - week + HOUR,
+				model: "claude-opus-5-5",
+				cost: 10,
+			},
+			{
+				sessionId: "before",
+				at: reset - 2 * week + HOUR,
+				model: "claude-opus-5-5",
+				cost: 5,
+			},
+		],
+		from: reset - 2 * week,
+		to: T0,
+		now: T0,
+		bucketMinutes: 1440,
+	});
+	expect(
+		series?.sessions.map((entry) => [
+			entry.sessionId,
+			entry.points,
+			entry.estimated,
+		]),
+	).toEqual([
+		["now", 20, true],
+		["before", 10, true],
+	]);
+	expect(series?.buckets.at(1)).toMatchObject({
+		kind: "estimate",
+		usedPercent: 10,
+	});
+	expect(series?.resets).toContain(new Date(reset - week).toISOString());
+});

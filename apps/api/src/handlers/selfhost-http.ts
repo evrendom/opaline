@@ -530,7 +530,7 @@ async function ingestNotify(
 }
 
 const DAY_MS = 86_400_000;
-const MAX_PLAN_USAGE_SPAN_MS = 92 * DAY_MS;
+const MAX_PLAN_USAGE_SPAN_MS = 400 * DAY_MS;
 
 async function planUsageReport(
 	request: Request,
@@ -547,7 +547,7 @@ async function planUsageReport(
 	const from = Date.parse(url.searchParams.get("from") ?? "") || to - DAY_MS;
 	if (from >= to || to - from > MAX_PLAN_USAGE_SPAN_MS)
 		return Response.json(
-			{ error: "invalid_range", message: "Send from < to, at most 92 days." },
+			{ error: "invalid_range", message: "Send from < to, at most 400 days." },
 			{ status: 400 },
 		);
 	if (url.searchParams.get("refresh") === "1") await recorder.sampleNow();
@@ -571,6 +571,8 @@ async function planUsageReport(
 				rows.readCostRows(clickhouse, provider, start, end),
 			loadTitles: (ids) => rows.readSessionTitles(clickhouse, ids),
 			loadRepositories: (ids) => rows.readSessionRepositories(clickhouse, ids),
+			bucketMinutes:
+				url.searchParams.get("buckets") === "day" ? 1_440 : undefined,
 		}),
 	);
 }

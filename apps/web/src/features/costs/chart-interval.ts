@@ -131,7 +131,7 @@ export function isCiHistoryAvailable(
 	return Boolean(history?.ciFrom && endDate >= history.ciFrom);
 }
 
-function bucketDate(value: string, interval: ChartInterval): string {
+export function bucketDate(value: string, interval: ChartInterval): string {
 	const date = new Date(`${value}T00:00:00Z`);
 	if (interval === "weekly") {
 		date.setUTCDate(date.getUTCDate() - ((date.getUTCDay() + 6) % 7));

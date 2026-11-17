@@ -269,7 +269,7 @@ export function CostDashboardView({
 	const showToolbar =
 		toolbarStart !== undefined ||
 		(!headerPortal && !rangeInContent && rangeControls !== null);
-	const usage = useUsageTab(input);
+	const usage = useUsageTab(input, interval);
 	const usageShown = usage.tab?.selected === true;
 	const breakdownsRef = useRef<HTMLDivElement>(null);
 	const breakdownRowHeight = useBreakdownRowHeight(breakdownsRef);

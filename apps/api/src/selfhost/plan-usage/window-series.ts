@@ -28,6 +28,7 @@ export interface SeriesBucket {
 	readonly usedRange: readonly [number, number] | null;
 	readonly readAt: string | null;
 	readonly plan: string | null;
+	readonly usedPoints: number;
 	readonly reset: boolean;
 	readonly sessions: readonly BucketSession[];
 }
@@ -71,6 +72,7 @@ interface Step {
 	readonly delta: number;
 	readonly opens: boolean;
 	readonly coarse: boolean;
+	readonly synthetic?: boolean;
 	readonly plan: string | null;
 	readonly ends: number[];
 	readonly totals: number[];
@@ -152,6 +154,59 @@ function stepsOf(samples: readonly PlanSample[]): Step[] {
 	return steps;
 }
 
+const MIN_CALIBRATION_PERCENT = 3;
+
+export function pointsPerDollar(
+	samples: readonly PlanSample[],
+	rows: readonly CostRow[],
+): number | null {
+	const latest = samples.at(-1);
+	const start = latest ? cycleStart(latest) : null;
+	if (!latest || start === null) return null;
+	if (latest.usedPercent < MIN_CALIBRATION_PERCENT || latest.usedPercent >= 100)
+		return null;
+	const end = Date.parse(latest.at);
+	let cost = 0;
+	for (const row of rows)
+		if (row.at >= start && row.at + COST_ROW_MS <= end) cost += row.cost;
+	return cost > 0 ? latest.usedPercent / cost : null;
+}
+
+function earlierCycleSteps(
+	samples: readonly PlanSample[],
+	rows: readonly CostRow[],
+	from: number,
+): Step[] {
+	const first = samples[0];
+	const windowMs = (first?.windowMinutes ?? 0) * MINUTE;
+	const firstStart = first ? cycleStart(first) : null;
+	const rate = pointsPerDollar(samples, rows);
+	if (!first || firstStart === null || windowMs <= 0 || rate === null)
+		return [];
+	const steps: Step[] = [];
+	for (let end = firstStart; end > from; end -= windowMs) {
+		const start = end - windowMs;
+		let cost = 0;
+		for (const row of rows)
+			if (row.at >= start && row.at + COST_ROW_MS <= end) cost += row.cost;
+		if (cost <= 0) continue;
+		steps.unshift({
+			t0: start,
+			t1: end,
+			base: 0,
+			delta: Math.min(100, cost * rate),
+			opens: true,
+			coarse: true,
+			synthetic: true,
+			plan: first.plan,
+			ends: [],
+			totals: [],
+			other: 0,
+		});
+	}
+	return steps;
+}
+
 function share(steps: Step[], rows: readonly CostRow[]): RowShare[] {
 	const shares: RowShare[] = [];
 	let from = 0;
@@ -219,7 +274,7 @@ function usedAt(
 	for (const step of steps) {
 		if (time <= step.t0 || time > step.t1) continue;
 		const high = step.base + step.delta;
-		if (time === step.t1)
+		if (time === step.t1 && !step.synthetic)
 			return {
 				used: high,
 				kind: "between",
@@ -294,6 +349,7 @@ export function buildWindowSeries(input: {
 	readonly to: number;
 	readonly now: number;
 	readonly repositoryOf?: ReadonlyMap<string, string>;
+	readonly bucketMinutes?: number;
 }): WindowSeries | null {
 	const samples = [...input.samples].sort((a, b) => a.at.localeCompare(b.at));
 	const first = samples[0];
@@ -303,9 +359,13 @@ export function buildWindowSeries(input: {
 	const rows = input.rows
 		.filter((row) => !scope || row.model.toLowerCase().includes(scope))
 		.sort((a, b) => a.at - b.at);
-	const steps = stepsOf(samples);
+	const steps = [
+		...earlierCycleSteps(samples, rows, input.from),
+		...stepsOf(samples),
+	];
 	const shares = share(steps, rows);
-	const bucketMinutes = bucketMinutesFor(input.to - input.from);
+	const bucketMinutes =
+		input.bucketMinutes ?? bucketMinutesFor(input.to - input.from);
 	const bucketMs = bucketMinutes * MINUTE;
 	const resets = [
 		...steps.filter((step) => step.opens).map((step) => step.t0),
@@ -352,6 +412,12 @@ export function buildWindowSeries(input: {
 				: null,
 			readAt: reading?.readAt ?? null,
 			plan: reading?.plan ?? null,
+			usedPoints: round(
+				[...perSession.values()].reduce((sum, points) => sum + points, 0) +
+					steps
+						.filter((step) => step.t1 >= start && step.t1 < end)
+						.reduce((sum, step) => sum + step.other, 0),
+			),
 			reset: resets.some((time) => time >= start && time < end),
 			sessions: [...perSession]
 				.filter(([, points]) => points >= 0.005)
@@ -413,7 +479,9 @@ export function earliestCostTime(
 	samples: readonly PlanSample[],
 	from: number,
 ): number {
-	let earliest = from;
+	const first = samples[0];
+	const windowMs = (first?.windowMinutes ?? 0) * MINUTE;
+	let earliest = windowMs > 0 ? from - windowMs : from;
 	for (const step of stepsOf(
 		[...samples].sort((a, b) => a.at.localeCompare(b.at)),
 	))

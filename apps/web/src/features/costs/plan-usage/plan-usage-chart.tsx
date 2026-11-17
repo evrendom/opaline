@@ -1,12 +1,29 @@
-import { type Icon, IconAlertTriangle, IconRefresh } from "@tabler/icons-react";
-import { type CSSProperties, useLayoutEffect, useRef, useState } from "react";
+import { type Icon, IconAlertTriangle } from "@tabler/icons-react";
+import { useLayoutEffect, useRef, useState } from "react";
+import {
+	Bar,
+	CartesianGrid,
+	Cell,
+	ComposedChart,
+	ReferenceLine,
+	ResponsiveContainer,
+	Tooltip,
+	XAxis,
+	YAxis,
+} from "recharts";
 import { Skeleton } from "@/app/ui/skeleton";
 import { EmptyState } from "@/components/dashboard/page-parts";
+import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import {
 	ClaudeModelIcon,
 	CodexModelIcon,
 } from "@/features/dashboard/components/DashboardModelBadges";
 import { PillTabs } from "@/features/repos/pill-tabs";
+import {
+	bucketDate,
+	type ChartInterval,
+	formatChartDate,
+} from "../chart-interval";
 import {
 	type BucketKind,
 	leftPercent,
@@ -19,7 +36,6 @@ import {
 } from "./use-plan-usage";
 import "./plan-usage.css";
 
-const LOW_LEFT = 10;
 const PROVIDER_NAMES: Record<PlanProvider, string> = {
 	claude: "Claude",
 	codex: "Codex",
@@ -28,15 +44,24 @@ const PROVIDER_TABS = [
 	{ id: "claude", label: "Claude", icon: ClaudeModelIcon as unknown as Icon },
 	{ id: "codex", label: "Codex", icon: CodexModelIcon as unknown as Icon },
 ] as const;
+const MARGIN = { top: 12, right: 12, bottom: 0, left: 0 };
+const Y_AXIS_WIDTH = 56;
+const BAR_SHARE = 0.6;
+const MAX_BAR_PX = 18;
+const TICK_GAP_PX = 65;
+const LABEL_CHAR_PX = 6.2;
+const LABEL_GAP_PX = 12;
+const LOW_LEFT = 10;
+const USAGE_COLOR = "oklch(0.74 0.17 150)";
+const LOW_COLOR = "oklch(0.64 0.21 27)";
+const ESTIMATE_COLOR =
+	"color-mix(in oklch, var(--cost-muted) 40%, transparent)";
+const TICK_STYLE = { fill: "var(--cost-muted)", fontSize: 11 };
+const DAY_MS = 86_400_000;
 
 const timeFormat = new Intl.DateTimeFormat("en-US", {
 	hour: "numeric",
 	minute: "2-digit",
-});
-const hourFormat = new Intl.DateTimeFormat("en-US", { hour: "numeric" });
-const dayFormat = new Intl.DateTimeFormat("en-US", {
-	month: "short",
-	day: "numeric",
 });
 const resetFormat = new Intl.DateTimeFormat("en-US", {
 	weekday: "short",
@@ -44,6 +69,17 @@ const resetFormat = new Intl.DateTimeFormat("en-US", {
 	day: "numeric",
 	hour: "numeric",
 	minute: "2-digit",
+});
+const resetTickFormat = new Intl.DateTimeFormat("en-US", {
+	month: "short",
+	day: "numeric",
+	hour: "numeric",
+});
+const periodFormat = new Intl.DateTimeFormat("en-US", {
+	month: "short",
+	day: "numeric",
+	year: "numeric",
+	timeZone: "UTC",
 });
 
 export function formatPoints(points: number): string {
@@ -60,25 +96,124 @@ function planName(provider: PlanProvider, plan: string | null): string {
 }
 
 function ago(iso: string | null, now: number): string {
-	if (!iso) return "not checked yet";
+	if (!iso) return "Not checked yet";
 	const minutes = Math.round((now - Date.parse(iso)) / 60_000);
-	if (minutes < 1) return "checked just now";
-	if (minutes < 60) return `checked ${minutes} min ago`;
-	return `checked ${Math.round(minutes / 60)} h ago`;
-}
-
-function limitName(window: UsageWindow): string {
-	return window.label.toLowerCase();
+	if (minutes < 1) return "Checked just now";
+	if (minutes < 60) return `Checked ${minutes} min ago`;
+	return `Checked ${Math.round(minutes / 60)} h ago`;
 }
 
 export function showsChart(window: UsageWindow): boolean {
 	return window.sessions.length > 0 || window.totalPoints > 0;
 }
 
+interface Period {
+	readonly x: number;
+	readonly date: string;
+	readonly startDate: string;
+	readonly endDate: string;
+	readonly last: UsageBucket | null;
+	readonly usedPoints: number;
+	readonly sessions: readonly { sessionId: string; points: number }[];
+	readonly solid: number | null;
+	readonly cap: number | null;
+}
+
+function periodsOf(window: UsageWindow, interval: ChartInterval): Period[] {
+	const groups = new Map<string, UsageBucket[]>();
+	for (const bucket of window.buckets) {
+		const day = bucket.at.slice(0, 10);
+		const key = bucketDate(day, interval);
+		const group = groups.get(key) ?? [];
+		group.push(bucket);
+		groups.set(key, group);
+	}
+	return [...groups].map(([date, buckets], x) => {
+		const last =
+			[...buckets].reverse().find((bucket) => bucket.usedPercent !== null) ??
+			null;
+		const perSession = new Map<string, number>();
+		let usedPoints = 0;
+		for (const bucket of buckets) {
+			usedPoints += bucket.usedPoints;
+			for (const session of bucket.sessions)
+				perSession.set(
+					session.sessionId,
+					(perSession.get(session.sessionId) ?? 0) + session.points,
+				);
+		}
+		const range = last?.usedRange ?? null;
+		const low = range ? leftPercent(range[1]) : null;
+		const high = range ? leftPercent(range[0]) : null;
+		const estimate = last?.kind === "estimate";
+		return {
+			x,
+			date,
+			startDate: buckets[0]?.at.slice(0, 10) ?? date,
+			endDate: buckets.at(-1)?.at.slice(0, 10) ?? date,
+			last,
+			usedPoints,
+			sessions: [...perSession]
+				.sort((a, b) => b[1] - a[1])
+				.slice(0, 4)
+				.map(([sessionId, points]) => ({ sessionId, points })),
+			solid: estimate
+				? last?.usedPercent === null || !last
+					? null
+					: leftPercent(last.usedPercent)
+				: low,
+			cap:
+				!estimate && low !== null && high !== null && high > low
+					? high - low
+					: null,
+		};
+	});
+}
+
+function periodLabel(period: Period): string {
+	return period.startDate === period.endDate
+		? periodFormat.format(new Date(`${period.startDate}T00:00:00Z`))
+		: periodFormat.formatRange(
+				new Date(`${period.startDate}T00:00:00Z`),
+				new Date(`${period.endDate}T00:00:00Z`),
+			);
+}
+
+function resetX(periods: readonly Period[], at: string): number | null {
+	const time = Date.parse(at);
+	for (const period of periods) {
+		const start = Date.parse(`${period.startDate}T00:00:00Z`);
+		const end = Date.parse(`${period.endDate}T00:00:00Z`) + DAY_MS;
+		if (time >= start && time < end)
+			return period.x - 0.5 + (time - start) / (end - start);
+	}
+	return null;
+}
+
+function labelWidth(label: string): number {
+	return label.length * LABEL_CHAR_PX + 8;
+}
+
+function useWidth<T extends HTMLElement>() {
+	const ref = useRef<T>(null);
+	const [width, setWidth] = useState(0);
+	useLayoutEffect(() => {
+		const element = ref.current;
+		if (!element || typeof ResizeObserver === "undefined") return;
+		const measure = () => setWidth(element.getBoundingClientRect().width);
+		measure();
+		const observer = new ResizeObserver(measure);
+		observer.observe(element);
+		return () => observer.disconnect();
+	}, []);
+	return [ref, width] as const;
+}
+
 export function PlanUsageChart({
 	report,
 	provider,
 	onProviderChange,
+	interval,
 	pending,
 	failed,
 	refreshing,
@@ -87,6 +222,7 @@ export function PlanUsageChart({
 	report: PlanUsageReport | null | undefined;
 	provider: PlanProvider;
 	onProviderChange: (provider: PlanProvider) => void;
+	interval: ChartInterval;
 	pending: boolean;
 	failed: boolean;
 	refreshing: boolean;
@@ -96,23 +232,50 @@ export function PlanUsageChart({
 	const usage = report?.providers.find((entry) => entry.provider === provider);
 	const window = usage?.window ?? null;
 	const showChart = window !== null && showsChart(window);
+	const estimated = window?.buckets.some(
+		(bucket) => bucket.kind === "estimate",
+	);
+	const nextReset =
+		window?.resetsAt && Date.parse(window.resetsAt) > now
+			? window.resetsAt
+			: null;
 	return (
-		<div className="cost-chart-card plan-usage-card">
-			<div className="cost-chart-key">
+		<div className="cost-chart-card">
+			<div className="cost-chart-key" data-fluid-menu-root="">
+				<FluidMenuHover items=".cost-text-button" />
 				<div className="cost-chart-key-copy">
-					<h2 className="cost-chart-title">Plan usage</h2>
-					<div className="cost-chart-legend">
-						{showChart ? <KindLegend buckets={window.buckets} /> : null}
+					<h2 className="cost-chart-title">Usage over time</h2>
+					{showChart ? (
+						<div className="cost-chart-legend">
+							<div className="cost-legend-item">
+								<i style={{ backgroundColor: USAGE_COLOR }} />
+								Left, read from {PROVIDER_NAMES[provider]}
+							</div>
+							{estimated ? (
+								<div className="cost-legend-item">
+									<i style={{ backgroundColor: ESTIMATE_COLOR }} />
+									Estimated from session cost
+								</div>
+							) : null}
+							{nextReset ? (
+								<div className="cost-legend-item">
+									Next reset{" "}
+									<strong>{resetFormat.format(new Date(nextReset))}</strong>
+								</div>
+							) : null}
+						</div>
+					) : null}
+					<output className="cost-chart-coverage">
+						<span>{ago(report?.checkedAt ?? null, now)}</span>
 						<button
 							type="button"
-							className="cost-legend-item plan-usage-refresh"
+							className="cost-text-button cost-coverage-refresh"
 							onClick={onRefresh}
 							disabled={refreshing}
 						>
-							<IconRefresh size={12} aria-hidden="true" />
-							{refreshing ? "Checking…" : ago(report?.checkedAt ?? null, now)}
+							{refreshing ? "Checking…" : "Check now"}
 						</button>
-					</div>
+					</output>
 				</div>
 				<PillTabs
 					className="h-8 shrink-0 bg-transparent"
@@ -124,13 +287,18 @@ export function PlanUsageChart({
 				/>
 			</div>
 			{pending ? (
-				<div className="plan-usage-empty">
-					<Skeleton className="h-[220px] w-full rounded-[8px]" />
+				<div className="cost-chart-canvas">
+					<Skeleton className="size-full rounded-[8px]" />
 				</div>
 			) : showChart ? (
-				<UsageBars window={window} titles={report?.titles ?? {}} />
+				<UsageCanvas
+					window={window}
+					provider={usage}
+					interval={interval}
+					titles={report?.titles ?? {}}
+				/>
 			) : (
-				<div className="plan-usage-empty">
+				<div className="cost-chart-canvas plan-usage-empty">
 					<EmptyState
 						icon={IconAlertTriangle}
 						title={emptyTitle(provider, usage, failed)}
@@ -164,415 +332,285 @@ function emptyText(
 		const resets = window.resetsAt
 			? `, resetting ${resetFormat.format(new Date(window.resetsAt))}`
 			: "";
-		return `${planName(provider, usage?.plan ?? null)} has ${left}% of its ${limitName(window)} limit left${resets}.`;
+		return `${planName(provider, usage?.plan ?? null)} has ${left}% of its ${window.label.toLowerCase()} limit left${resets}.`;
 	}
 	if (usage?.error) return `${usage.error}.`;
 	return `Opaline asks ${PROVIDER_NAMES[provider]} for its limits every few minutes while the app is open.`;
 }
 
-const HOUR_STEPS = [1, 2, 3, 4, 6, 12];
-const DAY_STEPS = [1, 2, 3, 4, 5, 7, 14, 28];
-const HOUR_MS = 3_600_000;
-const DAY_MS = 24 * HOUR_MS;
-
-interface AxisTick {
-	readonly key: number;
-	readonly label: string;
-	readonly x: number;
-}
-
-function hourLabel(at: Date): string {
-	return hourFormat.format(at).replace(" ", "").replace("M", "");
-}
-
-function axisTicks(
-	from: number,
-	to: number,
-	xOf: (time: number) => number,
-): AxisTick[] {
-	const pxPerMs = (xOf(to) - xOf(from)) / Math.max(1, to - from);
-	if (to - from <= 36 * HOUR_MS) {
-		const minimum = labelWidth("12P") + LABEL_GAP_PX;
-		const step =
-			HOUR_STEPS.find((hours) => hours * HOUR_MS * pxPerMs >= minimum) ?? 12;
-		const ticks: AxisTick[] = [];
-		const at = new Date(from);
-		at.setMinutes(0, 0, 0);
-		for (let time = at.getTime(); time < to; time += HOUR_MS) {
-			const hour = new Date(time);
-			if (time < from || hour.getHours() % step !== 0) continue;
-			ticks.push({ key: time, label: hourLabel(hour), x: xOf(time) });
-		}
-		return ticks;
-	}
-	const minimum = labelWidth("Oct 30") + LABEL_GAP_PX;
-	const step =
-		DAY_STEPS.find((days) => days * DAY_MS * pxPerMs >= minimum) ?? 28;
-	const ticks: AxisTick[] = [];
-	const day = new Date(from);
-	day.setHours(0, 0, 0, 0);
-	if (day.getTime() < from) day.setDate(day.getDate() + 1);
-	for (let index = 0; day.getTime() < to; index += 1) {
-		if (index % step === 0)
-			ticks.push({
-				key: day.getTime(),
-				label: dayFormat.format(day),
-				x: xOf(day.getTime()),
-			});
-		day.setDate(day.getDate() + 1);
-	}
-	return ticks;
-}
-
-interface ResetMark {
-	readonly at: string;
-	readonly label: string;
-	readonly x: number;
-	readonly start: number;
-	readonly end: number;
-	readonly align: "start" | "end";
-}
-
-function resetMarks(
-	resets: readonly string[],
-	nextReset: string | null,
-	xOf: (time: number) => number,
-	width: number,
-): { marks: ResetMark[]; next: string | null } {
-	let next = nextReset ? `Next reset ${resetLabel(nextReset)}` : null;
-	const nextStart = next ? width - labelWidth(next) - LABEL_GAP_PX : width;
-	const marks = resets.map((at, index): ResetMark => {
-		const x = xOf(Date.parse(at));
-		let label = `Reset ${resetLabel(at)}`;
-		const last = index === resets.length - 1;
-		if (last && next && x > nextStart) {
-			label = `${label} · next ${resetLabel(nextReset ?? at)}`;
-			next = null;
-		}
-		const size = labelWidth(label);
-		const fits = x + size <= (next ? nextStart : width);
-		const start = fits ? x : x - size;
-		return {
-			at,
-			label,
-			x,
-			start,
-			end: start + size,
-			align: fits ? "start" : "end",
-		};
+function UsageCanvas({
+	window,
+	provider,
+	interval,
+	titles,
+}: {
+	window: UsageWindow;
+	provider: ProviderUsage | undefined;
+	interval: ChartInterval;
+	titles: Readonly<Record<string, string>>;
+}) {
+	const [canvasRef, width] = useWidth<HTMLDivElement>();
+	const periods = periodsOf(window, interval);
+	const count = Math.max(1, periods.length);
+	const ratio =
+		typeof globalThis.devicePixelRatio === "number"
+			? Math.max(1, globalThis.devicePixelRatio)
+			: 1;
+	const plot = Math.max(0, width - Y_AXIS_WIDTH - MARGIN.left - MARGIN.right);
+	const pitch = Math.max(1 / ratio, Math.floor((plot / count) * ratio) / ratio);
+	const spare = Math.max(0, plot - pitch * count);
+	const bar = Math.min(
+		MAX_BAR_PX,
+		Math.max(2 / ratio, Math.round(pitch * BAR_SHARE * ratio) / ratio),
+	);
+	const snap = (value: number) => Math.round(value * ratio) / ratio;
+	const resets = window.resets.flatMap((at) => {
+		const x = resetX(periods, at);
+		return x === null
+			? []
+			: [{ at, x, label: `Reset ${resetTickFormat.format(new Date(at))}` }];
 	});
-	return { marks, next };
+	const step = Math.max(1, Math.ceil(TICK_GAP_PX / Math.max(pitch, 1)));
+	const placed: { from: number; to: number }[] = [];
+	const place = (x: number, label: string) => {
+		const center = (x + 0.5) * pitch;
+		const half = labelWidth(label) / 2;
+		const span = { from: center - half, to: center + half };
+		if (
+			placed.some(
+				(other) =>
+					span.from < other.to + LABEL_GAP_PX &&
+					span.to > other.from - LABEL_GAP_PX,
+			)
+		)
+			return false;
+		placed.push(span);
+		return true;
+	};
+	const shownResets = new Set(
+		resets
+			.filter((reset) => place(reset.x, reset.label))
+			.map((reset) => reset.x),
+	);
+	const ticks = periods
+		.filter((period) => period.x % step === 0)
+		.filter((period) => place(period.x, formatChartDate(period.date, interval)))
+		.map((period) => period.x);
+	return (
+		<div ref={canvasRef} className="cost-chart-canvas" skullet-ignore="">
+			{width > 0 ? (
+				<ResponsiveContainer width="100%" height="100%" minWidth={0}>
+					<ComposedChart
+						data={periods}
+						margin={{ ...MARGIN, right: MARGIN.right + spare }}
+						accessibilityLayer
+					>
+						<CartesianGrid
+							vertical={false}
+							stroke="var(--cost-border)"
+							strokeDasharray="3 4"
+						/>
+						<XAxis
+							type="number"
+							dataKey="x"
+							domain={[-0.5, count - 0.5]}
+							ticks={[...ticks, ...shownResets]}
+							interval={0}
+							allowDecimals
+							tickFormatter={(value) => {
+								const reset = resets.find((entry) => entry.x === value);
+								if (reset) return reset.label;
+								const period = periods[Number(value)];
+								return period ? formatChartDate(period.date, interval) : "";
+							}}
+							axisLine={false}
+							tickLine={false}
+							tickMargin={14}
+							height={40}
+							tick={TICK_STYLE}
+						/>
+						<YAxis
+							domain={[0, 100]}
+							ticks={[0, 25, 50, 75, 100]}
+							tickFormatter={(value) => `${value}%`}
+							axisLine={false}
+							tickLine={false}
+							tickMargin={10}
+							width={Y_AXIS_WIDTH}
+							tick={TICK_STYLE}
+						/>
+						{resets.map((reset) => (
+							<ReferenceLine
+								key={reset.at}
+								x={reset.x}
+								stroke="var(--cost-muted)"
+								strokeDasharray="3 4"
+							/>
+						))}
+						<Tooltip
+							position={{ y: 48 }}
+							isAnimationActive={false}
+							cursor={{ fill: "var(--cost-hover)", opacity: 0.5 }}
+							content={({ active, label }) => {
+								const period = periods[Number(label)];
+								return active && period ? (
+									<PeriodTip
+										period={period}
+										provider={provider}
+										titles={titles}
+									/>
+								) : null;
+							}}
+						/>
+						<Bar
+							dataKey="solid"
+							stackId="left"
+							barSize={bar}
+							isAnimationActive={false}
+							shape={(props: BarShapeProps) => (
+								<SnappedBar
+									{...props}
+									snap={snap}
+									radius={props.payload?.cap ? 0 : 2}
+								/>
+							)}
+						>
+							{periods.map((period) => (
+								<Cell key={period.date} fill={solidColor(period)} />
+							))}
+						</Bar>
+						<Bar
+							dataKey="cap"
+							stackId="left"
+							barSize={bar}
+							isAnimationActive={false}
+							shape={(props: BarShapeProps) => (
+								<SnappedBar {...props} snap={snap} radius={2} outline />
+							)}
+						/>
+					</ComposedChart>
+				</ResponsiveContainer>
+			) : null}
+		</div>
+	);
 }
 
-const KIND_LABELS: Record<BucketKind, string> = {
+function solidColor(period: Period): string {
+	if (period.last?.kind === "estimate") return ESTIMATE_COLOR;
+	return period.solid !== null && period.solid < LOW_LEFT
+		? LOW_COLOR
+		: USAGE_COLOR;
+}
+
+interface BarShapeProps {
+	readonly x?: number;
+	readonly y?: number;
+	readonly width?: number;
+	readonly height?: number;
+	readonly fill?: string;
+	readonly payload?: Period;
+}
+
+function SnappedBar({
+	x = 0,
+	y = 0,
+	width = 0,
+	height = 0,
+	fill,
+	snap,
+	radius,
+	outline = false,
+}: BarShapeProps & {
+	snap: (value: number) => number;
+	radius: number;
+	outline?: boolean;
+}) {
+	if (!(height > 0) || !(width > 0)) return null;
+	const left = snap(x);
+	const top = snap(y);
+	const size = snap(width);
+	const tall = snap(y + height) - top;
+	const corner = Math.min(radius, size / 2, tall);
+	const path = `M${left},${top + tall}V${top + corner}Q${left},${top} ${left + corner},${top}H${left + size - corner}Q${left + size},${top} ${left + size},${top + corner}V${top + tall}`;
+	return outline ? (
+		<path
+			d={path}
+			fill="none"
+			stroke={USAGE_COLOR}
+			strokeWidth={1}
+			vectorEffect="non-scaling-stroke"
+		/>
+	) : (
+		<path d={`${path}Z`} fill={fill} />
+	);
+}
+
+const KIND_TEXT: Record<BucketKind, string> = {
 	reading: "Read from the provider",
 	between: "Between two readings",
 	estimate: "Estimated from session cost",
 };
 
-function KindLegend({ buckets }: { buckets: readonly UsageBucket[] }) {
-	const kinds = (["reading", "between", "estimate"] as const).filter((kind) =>
-		buckets.some(
-			(bucket) =>
-				bucket.kind === kind &&
-				(kind !== "between" ||
-					(bucket.usedRange !== null &&
-						bucket.usedRange[0] !== bucket.usedRange[1])),
-		),
-	);
-	return kinds.map((kind) => (
-		<div key={kind} className="cost-legend-item plan-usage-muted">
-			<i className="plan-usage-swatch" data-kind={kind} aria-hidden="true" />
-			{KIND_LABELS[kind]}
-		</div>
-	));
-}
-
-const MAX_BAR_PX = 10;
-const LABEL_GAP_PX = 12;
-const LABEL_CHAR_PX = 6.6;
-
-function labelWidth(label: string): number {
-	return label.length * LABEL_CHAR_PX + 4;
-}
-
-interface BarLayout {
-	readonly pitch: number;
-	readonly bar: number;
-	readonly offset: number;
-}
-
-function barLayout(
-	width: number,
-	count: number,
-	ratio: number,
-): BarLayout | null {
-	if (width <= 0 || count <= 0) return null;
-	const pitch = Math.max(
-		1 / ratio,
-		Math.floor((width / count) * ratio) / ratio,
-	);
-	const bar = Math.min(
-		MAX_BAR_PX,
-		Math.max(1 / ratio, Math.round(pitch * 0.72 * ratio) / ratio),
-	);
-	const offset = Math.floor(((width - pitch * count) / 2) * ratio) / ratio;
-	return { pitch, bar, offset };
-}
-
-function useWidth<T extends HTMLElement>() {
-	const ref = useRef<T>(null);
-	const [width, setWidth] = useState(0);
-	useLayoutEffect(() => {
-		const element = ref.current;
-		if (!element || typeof ResizeObserver === "undefined") return;
-		const measure = () => setWidth(element.getBoundingClientRect().width);
-		measure();
-		const observer = new ResizeObserver(measure);
-		observer.observe(element);
-		return () => observer.disconnect();
-	}, []);
-	return [ref, width] as const;
-}
-
-function UsageBars({
-	window,
+function PeriodTip({
+	period,
+	provider,
 	titles,
 }: {
-	window: UsageWindow;
+	period: Period;
+	provider: ProviderUsage | undefined;
 	titles: Readonly<Record<string, string>>;
 }) {
-	const [hovered, setHovered] = useState<number | null>(null);
-	const [plotRef, width] = useWidth<HTMLDivElement>();
-	const count = window.buckets.length;
-	const ratio =
-		typeof globalThis.devicePixelRatio === "number"
-			? Math.max(1, globalThis.devicePixelRatio)
-			: 1;
-	const layout = barLayout(width, count, ratio);
-	const bucket = hovered === null ? undefined : window.buckets[hovered];
-	const from = Date.parse(window.buckets[0]?.at ?? "");
-	const span = count * window.bucketMinutes * 60_000;
-	const xOf = (time: number) =>
-		layout ? layout.offset + ((time - from) / span) * layout.pitch * count : 0;
-	const nextResetAt =
-		window.resetsAt && Date.parse(window.resetsAt) >= from + span
-			? window.resetsAt
-			: null;
-	const { marks: resets, next: nextReset } = resetMarks(
-		window.resets,
-		nextResetAt,
-		xOf,
-		width,
-	);
-	const nextStart = nextReset
-		? width - labelWidth(nextReset) - LABEL_GAP_PX
-		: width;
-	const ticks = layout
-		? axisTicks(from, from + span, xOf).filter((tick) => {
-				const end = tick.x + labelWidth(tick.label);
-				return (
-					end <= nextStart &&
-					resets.every(
-						(reset) =>
-							end < reset.start - LABEL_GAP_PX ||
-							tick.x > reset.end + LABEL_GAP_PX,
-					)
-				);
-			})
-		: [];
-
+	const last = period.last;
+	const range = last?.usedRange ?? null;
+	const low = range ? Math.round(leftPercent(range[1])) : null;
+	const high = range ? Math.round(leftPercent(range[0])) : null;
+	const estimate = last?.kind === "estimate";
 	return (
-		<div className="plan-usage-chart">
-			<div
-				ref={plotRef}
-				className="plan-usage-plot"
-				onPointerLeave={() => setHovered(null)}
-			>
-				<div className="plan-usage-grid" aria-hidden="true">
-					<i />
-					<i />
-					<i />
-				</div>
-				{layout ? (
-					<div
-						className="plan-usage-bars"
-						role="img"
-						aria-label={`${Math.round(leftPercent(window.usedPercent))}% of the ${window.label.toLowerCase()} limit left`}
-					>
-						{resets.map((reset) => (
-							<i
-								key={reset.at}
-								className="plan-usage-reset-line"
-								style={{ left: reset.x }}
-								aria-hidden="true"
-							/>
-						))}
-						{window.buckets.map((entry, index) => (
-							<div
-								key={entry.at}
-								className="plan-usage-slot"
-								data-hovered={hovered === index || undefined}
-								onPointerEnter={() => setHovered(index)}
-								style={
-									{
-										left: layout.offset + index * layout.pitch,
-										width: layout.pitch,
-										"--bar-width": `${layout.bar}px`,
-									} as CSSProperties
-								}
-							>
-								<UsageBar bucket={entry} />
-							</div>
-						))}
-					</div>
-				) : null}
-				{bucket && layout ? (
-					<BucketTip
-						bucket={bucket}
-						minutes={window.bucketMinutes}
-						titles={titles}
-						side={hovered !== null && hovered > count / 2 ? "left" : "right"}
-						x={layout.offset + ((hovered ?? 0) + 0.5) * layout.pitch}
+		<div className="cost-chart-tooltip">
+			<p>{periodLabel(period)}</p>
+			<div>
+				<span>
+					<i
+						style={{
+							backgroundColor: last ? solidColor(period) : "transparent",
+						}}
 					/>
-				) : null}
+					Left at the end
+				</span>
+				<strong>
+					{last?.usedPercent === null || !last
+						? "—"
+						: estimate
+							? `~${Math.round(leftPercent(last.usedPercent))}%`
+							: low === high
+								? `${low}%`
+								: `${low}–${high}%`}
+				</strong>
 			</div>
-			<div className="plan-usage-axis" aria-hidden="true">
-				<span>100%</span>
-				<span>50%</span>
-				<span>0%</span>
+			<div>
+				<span>Used in this period</span>
+				<strong>
+					{estimate && period.usedPoints >= 1 ? "~" : ""}
+					{formatPoints(period.usedPoints)}
+				</strong>
 			</div>
-			<div className="plan-usage-ticks" aria-hidden="true">
-				{ticks.map((tick) => (
-					<span key={tick.key} style={{ left: tick.x }}>
-						{tick.label}
-					</span>
-				))}
-				{resets.map((reset) => (
-					<span
-						key={reset.at}
-						className="plan-usage-reset-tick"
-						data-align={reset.align}
-						style={{ left: reset.x }}
-					>
-						{reset.label}
-					</span>
-				))}
-				{nextReset ? (
-					<span className="plan-usage-next-reset">{nextReset}</span>
-				) : null}
-			</div>
-		</div>
-	);
-}
-
-const resetTickFormat = new Intl.DateTimeFormat("en-US", {
-	month: "short",
-	day: "numeric",
-	hour: "numeric",
-});
-
-function resetLabel(at: string): string {
-	return resetTickFormat.format(new Date(at));
-}
-
-function UsageBar({ bucket }: { bucket: UsageBucket }) {
-	if (bucket.kind === null || bucket.usedPercent === null || !bucket.usedRange)
-		return null;
-	if (bucket.kind === "estimate") {
-		const left = leftPercent(bucket.usedPercent);
-		return (
-			<span
-				className="plan-usage-bar"
-				data-kind="estimate"
-				style={{ height: `${Math.max(left, 1.5)}%` }}
-			/>
-		);
-	}
-	const low = leftPercent(bucket.usedRange[1]);
-	const high = leftPercent(bucket.usedRange[0]);
-	return (
-		<>
-			<span
-				className="plan-usage-bar"
-				data-kind="reading"
-				data-low={low < LOW_LEFT || undefined}
-				style={{ height: `${Math.max(low, 1.5)}%` }}
-			/>
-			{high - low > 0 ? (
-				<span
-					className="plan-usage-bar"
-					data-kind="between"
-					style={{ bottom: `${low}%`, height: `${high - low}%` }}
-				/>
+			{last?.kind ? (
+				<p>
+					{last.kind === "reading" && last.readAt
+						? `Read at ${timeFormat.format(new Date(last.readAt))}`
+						: KIND_TEXT[last.kind]}
+					{last.plan
+						? ` · ${planName(provider?.provider ?? "claude", last.plan)}${estimate ? " (at the first reading)" : ""}`
+						: ""}
+				</p>
 			) : null}
-		</>
-	);
-}
-
-function bucketValue(bucket: UsageBucket): string {
-	if (bucket.usedPercent === null || !bucket.usedRange || !bucket.kind)
-		return "Not recorded (app closed)";
-	if (bucket.kind === "estimate")
-		return `About ${Math.round(leftPercent(bucket.usedPercent))}% left`;
-	const low = Math.round(leftPercent(bucket.usedRange[1]));
-	const high = Math.round(leftPercent(bucket.usedRange[0]));
-	return low === high ? `${low}% left` : `${low}–${high}% left`;
-}
-
-function bucketSource(bucket: UsageBucket): string | null {
-	if (bucket.kind === "reading" && bucket.readAt)
-		return `Read at ${timeFormat.format(new Date(bucket.readAt))}`;
-	if (bucket.kind === "between")
-		return bucket.usedRange && bucket.usedRange[0] !== bucket.usedRange[1]
-			? "Between two readings; the exact level is unknown"
-			: "Same as the readings on both sides";
-	if (bucket.kind === "estimate")
-		return "Before recording started; spread over this Mac’s sessions by cost";
-	return null;
-}
-
-function BucketTip({
-	bucket,
-	minutes,
-	titles,
-	side,
-	x,
-}: {
-	bucket: UsageBucket;
-	minutes: number;
-	titles: Readonly<Record<string, string>>;
-	side: "left" | "right";
-	x: number;
-}) {
-	const start = new Date(bucket.at);
-	const end = new Date(start.getTime() + minutes * 60_000);
-	const source = bucketSource(bucket);
-	return (
-		<div className="plan-usage-tip" data-side={side} style={{ left: x }}>
-			<div className="plan-usage-tip-time">
-				{minutes >= 1440
-					? dayFormat.format(start)
-					: `${timeFormat.format(start)} – ${timeFormat.format(end)}`}
-			</div>
-			<div className="plan-usage-tip-value">{bucketValue(bucket)}</div>
-			{bucket.plan ? (
-				<div className="plan-usage-tip-plan">
-					{planLabel(bucket.plan)} plan
-					{bucket.kind === "estimate" ? " (at the first reading)" : ""}
-				</div>
-			) : null}
-			{source ? <div className="plan-usage-muted">{source}</div> : null}
-			{bucket.reset ? (
-				<div className="plan-usage-muted">Limit reset</div>
-			) : null}
-			{bucket.sessions.map((session) => (
-				<div key={session.sessionId} className="plan-usage-tip-row">
-					<span>
+			{period.sessions.map((session) => (
+				<div key={session.sessionId}>
+					<span className="plan-usage-tip-session">
 						{titles[session.sessionId] ?? session.sessionId.slice(0, 8)}
 					</span>
 					<strong>
-						{bucket.kind === "estimate" && session.points >= 1 ? "~" : ""}
+						{estimate && session.points >= 1 ? "~" : ""}
 						{formatPoints(session.points)}
 					</strong>
 				</div>

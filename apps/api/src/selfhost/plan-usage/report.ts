@@ -62,6 +62,7 @@ export async function buildPlanUsageReport(input: {
 	readonly loadTitles: (
 		sessionIds: readonly string[],
 	) => Promise<Record<string, string>>;
+	readonly bucketMinutes?: number;
 	readonly loadRepositories?: (
 		sessionIds: readonly string[],
 	) => Promise<ReadonlyMap<string, string>>;
@@ -77,10 +78,15 @@ export async function buildPlanUsageReport(input: {
 			const samples = mine.filter((sample) => sample.window === chosen);
 			if (!chosen || samples.length === 0)
 				return { provider, plan, error, window: null };
+			const latest = samples.at(-1);
+			const cycleStart =
+				latest?.resetsAt && latest.windowMinutes
+					? Date.parse(latest.resetsAt) - latest.windowMinutes * 60_000
+					: input.to;
 			const rows = await input.loadRows(
 				provider,
-				earliestCostTime(samples, input.from),
-				input.to,
+				Math.min(earliestCostTime(samples, input.from), cycleStart),
+				Math.max(input.to, latest ? Date.parse(latest.at) : input.to),
 			);
 			const repositoryOf = input.loadRepositories
 				? await input
@@ -98,6 +104,7 @@ export async function buildPlanUsageReport(input: {
 					to: input.to,
 					now: input.now,
 					repositoryOf,
+					bucketMinutes: input.bucketMinutes,
 				}),
 			};
 		}),

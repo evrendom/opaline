@@ -63,6 +63,7 @@ export function UsageBreakdowns({
 	titles: Readonly<Record<string, string>>;
 }) {
 	const shellPath = useShellRoutePath();
+	const heading = `Of ${window.label.toLowerCase()} limit`;
 	const sessions: Row[] = window.sessions.map((session) => ({
 		id: session.sessionId,
 		label: titles[session.sessionId] ?? session.sessionId.slice(0, 8),
@@ -84,9 +85,10 @@ export function UsageBreakdowns({
 		});
 	return (
 		<>
-			<UsageBreakdown title="Sessions" rows={sessions} />
+			<UsageBreakdown title="Sessions" heading={heading} rows={sessions} />
 			<UsageBreakdown
 				title="Repositories"
+				heading={heading}
 				rows={window.repositories.map((entry) => ({
 					id: entry.id || "none",
 					label: repositoryLabel(entry.id),
@@ -98,6 +100,7 @@ export function UsageBreakdowns({
 			/>
 			<UsageBreakdown
 				title="Models"
+				heading={heading}
 				rows={window.models.map((entry) => ({
 					id: entry.id,
 					label: costLabel("models", entry.id),
@@ -113,9 +116,11 @@ export function UsageBreakdowns({
 
 function UsageBreakdown({
 	title,
+	heading,
 	rows,
 }: {
 	title: string;
+	heading: string;
 	rows: readonly Row[];
 }) {
 	const maximum = Math.max(0, ...rows.map((row) => row.points));
@@ -123,7 +128,7 @@ function UsageBreakdown({
 		<section className="cost-breakdown" aria-label={title}>
 			<div className="cost-breakdown-heading">
 				<h2>{title}</h2>
-				<div>Share of limit</div>
+				<div>{heading}</div>
 			</div>
 			<ScrollFade
 				className="cost-breakdown-list"

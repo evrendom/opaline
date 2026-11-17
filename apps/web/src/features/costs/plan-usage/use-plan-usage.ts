@@ -11,6 +11,7 @@ export interface UsageBucket {
 	readonly usedRange: readonly [number, number] | null;
 	readonly readAt: string | null;
 	readonly plan: string | null;
+	readonly usedPoints: number;
 	readonly reset: boolean;
 	readonly sessions: readonly { sessionId: string; points: number }[];
 }
@@ -68,30 +69,15 @@ export interface UsageRange {
 const DAY_MS = 86_400_000;
 const POLL_MS = 60_000;
 
-function localDay(date: string): number {
-	const match = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(date);
-	return match
-		? new Date(
-				Number(match[1]),
-				Number(match[2]) - 1,
-				Number(match[3]),
-			).getTime()
-		: Date.parse(date);
-}
-
-export function rangeBounds(range: UsageRange, now: number) {
-	const from = localDay(range.startDate);
-	const to = Math.min(localDay(range.endDate) + DAY_MS, now);
-	return { from, to: Math.max(to, from + 60_000) };
-}
-
 async function readPlanUsage(
 	range: UsageRange,
 ): Promise<PlanUsageReport | null> {
-	const { from, to } = rangeBounds(range, Date.now());
+	const from = Date.parse(`${range.startDate}T00:00:00Z`);
+	const to = Date.parse(`${range.endDate}T00:00:00Z`) + DAY_MS;
 	const params = new URLSearchParams({
 		from: new Date(from).toISOString(),
 		to: new Date(to).toISOString(),
+		buckets: "day",
 	});
 	const response = await fetch(`/api/selfhost/plan-usage?${params}`, {
 		credentials: "include",
