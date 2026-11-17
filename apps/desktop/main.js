@@ -126,6 +126,7 @@ function isAppUrl(url) {
 }
 
 const appWindows = new Set();
+let pageBackground;
 
 function createWindow({ url, link, bounds, intro = false } = {}) {
 	const win = new BrowserWindow({
@@ -138,7 +139,7 @@ function createWindow({ url, link, bounds, intro = false } = {}) {
 		titleBarStyle: "hidden",
 		trafficLightPosition: { x: 15, y: 16 },
 		show: false,
-		backgroundColor: nativeTheme.shouldUseDarkColors ? "#0a0a0a" : "#efefef",
+		backgroundColor: pageBackground ?? (nativeTheme.shouldUseDarkColors ? "#0a0a0a" : "#efefef"),
 		webPreferences: { devTools: isDev, preload: path.join(__dirname, "preload.js"), additionalArguments: isDev ? ["--opaline-debug"] : [] },
 	});
 	if (!bounds)
@@ -219,6 +220,13 @@ ipcMain.on("app:retry-start", (event) => {
 	const win = BrowserWindow.fromWebContents(event.sender);
 	if (!win || !appWindows.has(win) || !isStartProblemPage(event.senderFrame?.url ?? "") || openingWindows.has(win)) return;
 	openDashboardIn(win);
+});
+
+ipcMain.on("app:background", (event, color) => {
+	const win = BrowserWindow.fromWebContents(event.sender);
+	if (!win || !appWindows.has(win) || typeof color !== "string" || !/^#[0-9a-f]{6}$/.test(color)) return;
+	win.setBackgroundColor(color);
+	pageBackground = color;
 });
 
 function fromApp(event) {
