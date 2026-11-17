@@ -1,11 +1,11 @@
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
+import { Button } from "@/components/dashboard/button";
 import {
 	Select,
 	SelectContent,
 	SelectItem,
 	SelectTrigger,
 } from "@/components/dashboard/select";
-import { Button } from "@/components/ui/button";
 import { formatNumber } from "@/lib/format";
 
 export const SESSION_PAGE_SIZES = [30, 50, 100] as const;
@@ -35,7 +35,7 @@ export function SessionsOverviewPager({
 	const canPrevious = page > 0 && !isFetching;
 	const canNext = hasNext && !(isFetching && first + pageSize >= known);
 	return (
-		<div className="flex items-center justify-end gap-1 border-t border-(--session-overview-border) px-6 py-3">
+		<div className="flex items-center justify-end gap-1 border-t border-(--session-overview-border) px-6 py-4">
 			<span className="text-xs text-muted-foreground/50 tabular-nums">
 				{formatNumber(known)}
 				{more ? "+" : ""} {known === 1 && !more ? "session" : "sessions"}
