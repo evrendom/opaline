@@ -346,59 +346,38 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 				className={cn(cellClassName, "justify-start")}
 				data-session-overview-column="cost"
 			>
-				<Tooltip>
-					<TooltipTrigger asChild>
+				<span
+					className={cn(
+						SESSION_OVERVIEW_METADATA_CLASS_NAME,
+						"inline-flex shrink-0 items-center gap-1",
+					)}
+					data-session-overview-metric-value="cost"
+					data-session-overview-token-tooltip-label={tokenTooltipLabel}
+				>
+					{sessionCost === null ? "—" : formatApiCost(sessionCost)}
+					{costEstimateLabel ? (
+						<span className="sr-only">{costEstimateLabel}</span>
+					) : null}
+					{sessionCost === null ? (
+						<span className="sr-only">API cost unavailable</span>
+					) : null}
+					{planUsage === undefined ? null : (
 						<span
 							className={cn(
-								SESSION_OVERVIEW_METADATA_CLASS_NAME,
-								"inline-flex shrink-0 items-center gap-1",
+								"ml-1 inline-flex items-center gap-0.5 tabular-nums",
+								session.subagent_of && "opacity-55",
 							)}
-							data-session-overview-metric-value="cost"
-							data-session-overview-token-tooltip-label={tokenTooltipLabel}
+							data-session-overview-metric-value="plan-usage"
+							data-subset={session.subagent_of ? "" : undefined}
 						>
-							{sessionCost === null ? "—" : formatApiCost(sessionCost)}
-							{costEstimateLabel ? (
-								<span className="sr-only">{costEstimateLabel}</span>
-							) : null}
-							{sessionCost === null ? (
-								<span className="sr-only">API cost unavailable</span>
-							) : null}
-							{planUsage === undefined ? null : (
-								<span
-									className={cn(
-										"ml-1 inline-flex items-center gap-0.5 tabular-nums",
-										session.subagent_of && "opacity-55",
-									)}
-									data-session-overview-metric-value="plan-usage"
-									data-subset={session.subagent_of ? "" : undefined}
-								>
-									<IconBattery2 aria-hidden="true" className="size-3.5" />
-									{formatPlanShare(planUsage)}
-									<span className="sr-only">
-										{planUsageText(planUsage, planUsageOfSession)}
-									</span>
-								</span>
-							)}
-						</span>
-					</TooltipTrigger>
-					<TooltipContent
-						align="center"
-						className={SESSION_OVERVIEW_TOOLTIP_CLASS_NAME}
-						data-session-overview-token-tooltip
-						hideArrow
-						side="right"
-						sideOffset={8}
-					>
-						{costEstimateLabel ? <p>{costEstimateLabel}</p> : null}
-						{planUsage === undefined ? null : (
-							<p>
-								{formatPlanShare(planUsage)}
+							<IconBattery2 aria-hidden="true" className="size-3.5" />
+							{formatPlanShare(planUsage)}
+							<span className="sr-only">
 								{planUsageText(planUsage, planUsageOfSession)}
-							</p>
-						)}
-						{tokenTooltipLabel}
-					</TooltipContent>
-				</Tooltip>
+							</span>
+						</span>
+					)}
+				</span>
 			</div>
 			<div
 				className={cn(cellClassName, "gap-2 px-2")}
@@ -617,12 +596,12 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 });
 
 function formatPlanShare(points: number): string {
-	if (points < 1) return "<1%";
-	return `${Math.round(points)}%`;
+	if (points >= 1) return `${Math.round(points)}%`;
+	return `${points >= 0.1 ? points.toFixed(1) : points.toFixed(2)}%`;
 }
 
 function planUsageText(points: number, ofSession: number | undefined): string {
 	return ofSession !== undefined && ofSession >= points
-		? ` of the plan limit · part of this session’s ${formatPlanShare(ofSession)}`
-		: " of the plan limit";
+		? ` of the session’s ${formatPlanShare(ofSession)}`
+		: " of the limit";
 }

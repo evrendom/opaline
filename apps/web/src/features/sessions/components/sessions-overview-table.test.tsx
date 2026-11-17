@@ -314,7 +314,7 @@ describe("SessionsOverviewTable", () => {
 		expect(chart.querySelector("path")).toHaveAttribute("stroke-width", "3");
 		expect(chart.querySelector("path")).not.toHaveAttribute("stroke-dasharray");
 		expect(cost).toHaveClass("text-xs", "font-normal", "text-[#787774]");
-		expect(cost).toHaveAttribute("data-slot", "tooltip-trigger");
+		expect(cost).not.toHaveAttribute("data-slot");
 		expect(cost).toHaveAttribute(
 			"data-session-overview-token-tooltip-label",
 			"Input: 6K / Output: 4K",
