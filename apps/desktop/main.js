@@ -537,23 +537,13 @@ function readBuild() {
 	}
 }
 
-function aboutPanel(build) {
-	const options = {
-		applicationName: "Opaline",
-		applicationVersion: app.getVersion(),
-		version: "",
-		copyright: `© ${new Date().getFullYear()} Opaline`,
-	};
-	if (!build) return options;
-	const built = new Date(build.builtAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
-	return {
-		...options,
-		version: `${build.commit}${build.dirty ? " + local edits" : ""}`,
-		credits: [`Built ${built}`, build.branch && `from ${build.branch}`, `Server ${build.server}`].filter(Boolean).join("\n"),
-	};
-}
-
-app.setAboutPanelOptions(aboutPanel(readBuild()));
+const build = readBuild();
+app.setAboutPanelOptions({
+	applicationName: "Opaline",
+	applicationVersion: app.getVersion(),
+	version: build ? `${build.commit}${build.dirty ? "-dirty" : ""}` : "",
+	copyright: `© ${new Date().getFullYear()} Opaline`,
+});
 
 app.whenReady().then(() => {
 	stack.mark("ready");

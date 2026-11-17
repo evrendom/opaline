@@ -64,9 +64,7 @@ cp "$here/package.json" "$here/main.js" "$here/deep-link.js" "$here/agents.js" "
 cp -R "$here/stack" "$here/analysis" "$here/onboarding" "$here/onboarding-window" "$here/environment-window" "$here/start-window" "$dest/"
 build_dirty=false
 [ -z "$(git -C "$repo" status --porcelain --untracked-files=no)" ] || build_dirty=true
-printf '{"commit":"%s","branch":"%s","dirty":%s,"server":"%s","builtAt":"%s"}\n' \
-	"$(git -C "$repo" rev-parse --short=9 HEAD)" "$(git -C "$repo" branch --show-current | grep . || git -C "$repo" name-rev --name-only --refs="refs/heads/*" HEAD)" "$build_dirty" \
-	"$server_version" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$dest/build.json"
+printf '{"commit":"%s","dirty":%s}\n' "$(git -C "$repo" rev-parse --short=9 HEAD)" "$build_dirty" > "$dest/build.json"
 cp "$repo/packages/local-server/dist/local-server.js" "$dest/local-server/"
 printf '{"type":"module"}\n' > "$dest/local-server/package.json"
 cp -R "$repo/plugins/opaline" "$dest/agent-plugin"
