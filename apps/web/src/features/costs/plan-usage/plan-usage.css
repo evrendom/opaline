@@ -240,3 +240,8 @@ a.plan-usage-session:hover {
 	border-left: 0;
 	color: var(--cost-foreground);
 }
+.plan-usage-ticks > .plan-usage-reset-tick[data-align="end"] {
+	padding-left: 0;
+	padding-right: 3px;
+	transform: translateX(-100%);
+}

@@ -28,7 +28,6 @@ const PROVIDER_TABS = [
 	{ id: "claude", label: "Claude", icon: ClaudeModelIcon as unknown as Icon },
 	{ id: "codex", label: "Codex", icon: CodexModelIcon as unknown as Icon },
 ] as const;
-const MAX_TICKS = 9;
 
 const timeFormat = new Intl.DateTimeFormat("en-US", {
 	hour: "numeric",
@@ -172,29 +171,97 @@ function emptyText(
 }
 
 const HOUR_STEPS = [1, 2, 3, 4, 6, 12];
+const DAY_STEPS = [1, 2, 3, 4, 5, 7, 14, 28];
+const HOUR_MS = 3_600_000;
+const DAY_MS = 24 * HOUR_MS;
 
-function ticksOf(buckets: readonly UsageBucket[], bucketMinutes: number) {
-	const hourly = bucketMinutes < 60;
-	const starts = buckets.flatMap((bucket, index) => {
-		const at = new Date(bucket.at);
-		if (at.getMinutes() !== 0) return [];
-		if (!hourly && at.getHours() !== 0) return [];
-		return [{ index, at }];
-	});
-	if (hourly) {
+interface AxisTick {
+	readonly key: number;
+	readonly label: string;
+	readonly x: number;
+}
+
+function hourLabel(at: Date): string {
+	return hourFormat.format(at).replace(" ", "").replace("M", "");
+}
+
+function axisTicks(
+	from: number,
+	to: number,
+	xOf: (time: number) => number,
+): AxisTick[] {
+	const pxPerMs = (xOf(to) - xOf(from)) / Math.max(1, to - from);
+	if (to - from <= 36 * HOUR_MS) {
+		const minimum = labelWidth("12P") + LABEL_GAP_PX;
 		const step =
-			HOUR_STEPS.find((hours) => starts.length / hours <= MAX_TICKS) ?? 12;
-		return starts
-			.filter((tick) => tick.at.getHours() % step === 0)
-			.map((tick) => ({
-				index: tick.index,
-				label: hourFormat.format(tick.at).replace(" ", "").replace("M", ""),
-			}));
+			HOUR_STEPS.find((hours) => hours * HOUR_MS * pxPerMs >= minimum) ?? 12;
+		const ticks: AxisTick[] = [];
+		const at = new Date(from);
+		at.setMinutes(0, 0, 0);
+		for (let time = at.getTime(); time < to; time += HOUR_MS) {
+			const hour = new Date(time);
+			if (time < from || hour.getHours() % step !== 0) continue;
+			ticks.push({ key: time, label: hourLabel(hour), x: xOf(time) });
+		}
+		return ticks;
 	}
-	const step = Math.max(1, Math.ceil(starts.length / MAX_TICKS));
-	return starts
-		.filter((_, position) => position % step === 0)
-		.map((tick) => ({ index: tick.index, label: dayFormat.format(tick.at) }));
+	const minimum = labelWidth("Oct 30") + LABEL_GAP_PX;
+	const step =
+		DAY_STEPS.find((days) => days * DAY_MS * pxPerMs >= minimum) ?? 28;
+	const ticks: AxisTick[] = [];
+	const day = new Date(from);
+	day.setHours(0, 0, 0, 0);
+	if (day.getTime() < from) day.setDate(day.getDate() + 1);
+	for (let index = 0; day.getTime() < to; index += 1) {
+		if (index % step === 0)
+			ticks.push({
+				key: day.getTime(),
+				label: dayFormat.format(day),
+				x: xOf(day.getTime()),
+			});
+		day.setDate(day.getDate() + 1);
+	}
+	return ticks;
+}
+
+interface ResetMark {
+	readonly at: string;
+	readonly label: string;
+	readonly x: number;
+	readonly start: number;
+	readonly end: number;
+	readonly align: "start" | "end";
+}
+
+function resetMarks(
+	resets: readonly string[],
+	nextReset: string | null,
+	xOf: (time: number) => number,
+	width: number,
+): { marks: ResetMark[]; next: string | null } {
+	let next = nextReset ? `Next reset ${resetLabel(nextReset)}` : null;
+	const nextStart = next ? width - labelWidth(next) - LABEL_GAP_PX : width;
+	const marks = resets.map((at, index): ResetMark => {
+		const x = xOf(Date.parse(at));
+		let label = `Reset ${resetLabel(at)}`;
+		const last = index === resets.length - 1;
+		if (last && next && x > nextStart) {
+			label = `${label} · next ${resetLabel(nextReset ?? at)}`;
+			next = null;
+		}
+		const size = labelWidth(label);
+		const fits = x + size <= (next ? nextStart : width);
+		const start = fits ? x : x - size;
+		return {
+			at,
+			label,
+			x,
+			start,
+			end: start + size,
+			align: fits ? "start" : "end",
+		};
+	});
+	return { marks, next };
 }
 
 const KIND_LABELS: Record<BucketKind, string> = {
@@ -288,37 +355,32 @@ function UsageBars({
 	const span = count * window.bucketMinutes * 60_000;
 	const xOf = (time: number) =>
 		layout ? layout.offset + ((time - from) / span) * layout.pitch * count : 0;
-	const resets = window.resets.map((at) => {
-		const label = `Reset ${resetLabel(at)}`;
-		return {
-			at,
-			label,
-			x: xOf(Date.parse(at)),
-			end: xOf(Date.parse(at)) + labelWidth(label),
-		};
-	});
-	const nextReset =
+	const nextResetAt =
 		window.resetsAt && Date.parse(window.resetsAt) >= from + span
 			? window.resetsAt
 			: null;
-	const ticks = ticksOf(window.buckets, window.bucketMinutes)
-		.map((tick) => ({
-			...tick,
-			x: layout ? layout.offset + tick.index * layout.pitch : 0,
-		}))
-		.filter(
-			(tick) =>
-				resets.every(
-					(reset) =>
-						tick.x + labelWidth(tick.label) < reset.x - LABEL_GAP_PX ||
-						tick.x > reset.end + LABEL_GAP_PX,
-				) &&
-				(!nextReset ||
-					tick.x + labelWidth(tick.label) <
-						width -
-							labelWidth(`Next reset ${resetLabel(nextReset)}`) -
-							LABEL_GAP_PX),
-		);
+	const { marks: resets, next: nextReset } = resetMarks(
+		window.resets,
+		nextResetAt,
+		xOf,
+		width,
+	);
+	const nextStart = nextReset
+		? width - labelWidth(nextReset) - LABEL_GAP_PX
+		: width;
+	const ticks = layout
+		? axisTicks(from, from + span, xOf).filter((tick) => {
+				const end = tick.x + labelWidth(tick.label);
+				return (
+					end <= nextStart &&
+					resets.every(
+						(reset) =>
+							end < reset.start - LABEL_GAP_PX ||
+							tick.x > reset.end + LABEL_GAP_PX,
+					)
+				);
+			})
+		: [];
 
 	return (
 		<div className="plan-usage-chart">
@@ -382,7 +444,7 @@ function UsageBars({
 			</div>
 			<div className="plan-usage-ticks" aria-hidden="true">
 				{ticks.map((tick) => (
-					<span key={tick.index} style={{ left: tick.x }}>
+					<span key={tick.key} style={{ left: tick.x }}>
 						{tick.label}
 					</span>
 				))}
@@ -390,15 +452,14 @@ function UsageBars({
 					<span
 						key={reset.at}
 						className="plan-usage-reset-tick"
+						data-align={reset.align}
 						style={{ left: reset.x }}
 					>
 						{reset.label}
 					</span>
 				))}
 				{nextReset ? (
-					<span className="plan-usage-next-reset">
-						Next reset {resetLabel(nextReset)}
-					</span>
+					<span className="plan-usage-next-reset">{nextReset}</span>
 				) : null}
 			</div>
 		</div>
