@@ -26,7 +26,7 @@ export function ViewToggle<View extends string>({
 	}[];
 	value: View;
 }) {
-	const { pill, row, slides } = useSlidingPill<HTMLFieldSetElement>(value);
+	const { pill, pillRef, row } = useSlidingPill<HTMLFieldSetElement>(value);
 	return (
 		<fieldset
 			ref={row}
@@ -35,13 +35,10 @@ export function ViewToggle<View extends string>({
 		>
 			{pill ? (
 				<span
+					ref={pillRef}
 					aria-hidden="true"
 					skullet-ignore=""
-					className={cn(
-						"pointer-events-none absolute top-1/2 left-0 h-6 rounded-md bg-card shadow-(--custom-shadow) corner-squircle will-change-transform squircle:rounded-xl dark:bg-muted-foreground/10",
-						slides &&
-							"transition-[transform,width] duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
-					)}
+					className="pointer-events-none absolute top-1/2 left-0 h-6 origin-left rounded-md bg-card shadow-(--custom-shadow) corner-squircle will-change-transform squircle:rounded-xl dark:bg-muted-foreground/10"
 					style={{
 						transform: `translate(${pill.left}px, -50%)`,
 						width: pill.width,

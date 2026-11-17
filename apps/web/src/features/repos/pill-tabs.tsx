@@ -38,7 +38,7 @@ export function PillTabs<T extends string>({
 	if (clicked && clicked.from !== value) setClicked(null);
 	const shown = clicked && clicked.from === value ? clicked.to : value;
 
-	const { pill, row, slides } = useSlidingPill<HTMLDivElement>(shown);
+	const { pill, pillRef, row } = useSlidingPill<HTMLDivElement>(shown);
 
 	return (
 		<div
@@ -54,11 +54,10 @@ export function PillTabs<T extends string>({
 		>
 			{pill ? (
 				<span
+					ref={pillRef}
 					aria-hidden="true"
 					className={cn(
-						"pointer-events-none absolute top-1/2 left-0 h-8 rounded-md bg-muted corner-squircle squircle:rounded-xl will-change-transform dark:bg-muted/50",
-						slides &&
-							"transition-[transform,width] duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
+						"pointer-events-none absolute top-1/2 left-0 h-8 origin-left rounded-md bg-muted corner-squircle squircle:rounded-xl will-change-transform dark:bg-muted/50",
 						pillClassName,
 					)}
 					style={{
@@ -106,10 +105,30 @@ export function PillTabs<T extends string>({
 	);
 }
 
+const SLIDE_EASING = "cubic-bezier(0.32,0.72,0,1)";
+
+type Slide = { animation: Animation; from: PillBox; to: PillBox };
+
+function pillTransform(box: PillBox, width: number) {
+	return `translate(${box.left}px, -50%) scaleX(${box.width / width})`;
+}
+
+function boxOnScreen(slide: Slide | null, placed: PillBox): PillBox {
+	const progress = slide?.animation.effect?.getComputedTiming().progress;
+	if (!slide || progress == null) return placed;
+	const along = (from: number, to: number) => from + (to - from) * progress;
+	return {
+		left: along(slide.from.left, slide.to.left),
+		width: along(slide.from.width, slide.to.width),
+	};
+}
+
 export function useSlidingPill<T extends HTMLElement>(shown: string) {
 	const row = useRef<T>(null);
+	const pillRef = useRef<HTMLSpanElement>(null);
 	const [pill, setPill] = useState<PillBox | null>(null);
-	const [pastFirstPlacement, setPastFirstPlacement] = useState(false);
+	const placed = useRef<PillBox | null>(null);
+	const slide = useRef<Slide | null>(null);
 	const measure = useCallback(() => {
 		const tab = row.current?.querySelector<HTMLElement>(
 			`[data-pill-tab="${CSS.escape(shown)}"]`,
@@ -131,10 +150,22 @@ export function useSlidingPill<T extends HTMLElement>(shown: string) {
 		return () => observer.disconnect();
 	}, [measure]);
 	useLayoutEffect(() => {
-		if (pill && !pastFirstPlacement) {
-			const frame = requestAnimationFrame(() => setPastFirstPlacement(true));
-			return () => cancelAnimationFrame(frame);
-		}
-	}, [pill, pastFirstPlacement]);
-	return { pill, row, slides: pastFirstPlacement };
+		const element = pillRef.current;
+		const last = placed.current;
+		placed.current = pill;
+		if (!element || !pill || !last) return;
+		const from = boxOnScreen(slide.current, last);
+		slide.current?.animation.cancel();
+		slide.current = null;
+		if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+		const animation = element.animate(
+			[
+				{ transform: pillTransform(from, pill.width) },
+				{ transform: pillTransform(pill, pill.width) },
+			],
+			{ duration: 200, easing: SLIDE_EASING },
+		);
+		slide.current = { animation, from, to: pill };
+	}, [pill]);
+	return { pill, pillRef, row };
 }
