@@ -533,6 +533,13 @@
 			"when": 1794251010071,
 			"tag": "0075_local_ingest_files",
 			"breakpoints": true
+		},
+		{
+			"idx": 76,
+			"version": "7",
+			"when": 1794905678810,
+			"tag": "0076_local_ingest_milestone",
+			"breakpoints": true
 		}
 	]
 }
