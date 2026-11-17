@@ -3,7 +3,6 @@ import { useLayoutEffect, useRef, useState } from "react";
 import {
 	Bar,
 	CartesianGrid,
-	Cell,
 	ComposedChart,
 	ResponsiveContainer,
 	Tooltip,
@@ -24,6 +23,7 @@ import {
 	type ChartInterval,
 	formatChartDate,
 } from "../chart-interval";
+import { useHoverDateStore } from "../cost-hover-date";
 import {
 	leftPercent,
 	type PlanProvider,
@@ -53,6 +53,11 @@ const RESET_ICON_SPACE_PX = 10;
 const LOW_LEFT = 10;
 const USAGE_COLOR = "oklch(0.74 0.17 150)";
 const LOW_COLOR = "oklch(0.64 0.21 27)";
+const USED_COLOR = "color-mix(in oklch, var(--cost-muted) 26%, transparent)";
+const USED_ESTIMATE_COLOR =
+	"color-mix(in oklch, var(--cost-muted) 14%, transparent)";
+const SEGMENT_GAP_PX = 3;
+const SEGMENT_RADIUS_PX = 2;
 const ESTIMATE_COLOR =
 	"color-mix(in oklch, var(--cost-muted) 40%, transparent)";
 const TICK_STYLE = { fill: "var(--cost-muted)", fontSize: 11 };
@@ -94,12 +99,16 @@ interface Period {
 	readonly startDate: string;
 	readonly endDate: string;
 	readonly last: UsageBucket | null;
-	readonly usedPoints: number;
 	readonly solid: number | null;
 	readonly cap: number | null;
+	readonly used: number | null;
+	readonly full: number | null;
 }
 
-function periodsOf(window: UsageWindow, interval: ChartInterval): Period[] {
+export function periodsOf(
+	window: UsageWindow,
+	interval: ChartInterval,
+): Period[] {
 	const groups = new Map<string, UsageBucket[]>();
 	for (const bucket of window.buckets) {
 		const day = bucket.at.slice(0, 10);
@@ -112,10 +121,6 @@ function periodsOf(window: UsageWindow, interval: ChartInterval): Period[] {
 		const last =
 			[...buckets].reverse().find((bucket) => bucket.usedPercent !== null) ??
 			null;
-		const usedPoints = buckets.reduce(
-			(sum, bucket) => sum + bucket.usedPoints,
-			0,
-		);
 		const range = last?.usedRange ?? null;
 		const low = range ? leftPercent(range[1]) : null;
 		const high = range ? leftPercent(range[0]) : null;
@@ -126,7 +131,6 @@ function periodsOf(window: UsageWindow, interval: ChartInterval): Period[] {
 			startDate: buckets[0]?.at.slice(0, 10) ?? date,
 			endDate: buckets.at(-1)?.at.slice(0, 10) ?? date,
 			last,
-			usedPoints,
 			solid: estimate
 				? last?.usedPercent === null || !last
 					? null
@@ -136,6 +140,15 @@ function periodsOf(window: UsageWindow, interval: ChartInterval): Period[] {
 				!estimate && low !== null && high !== null && high > low
 					? high - low
 					: null,
+			used:
+				last?.usedPercent === null || !last
+					? null
+					: estimate
+						? last.usedPercent
+						: high === null
+							? null
+							: 100 - high,
+			full: last?.usedPercent === null || !last ? null : 100,
 		};
 	});
 }
@@ -197,6 +210,10 @@ export function PlanUsageChart({
 							<div className="cost-legend-item">
 								<i style={{ backgroundColor: USAGE_COLOR }} />
 								Left, read from {PROVIDER_NAMES[provider]}
+							</div>
+							<div className="cost-legend-item">
+								<i style={{ backgroundColor: USED_COLOR }} />
+								Used
 							</div>
 							{estimated ? (
 								<div className="cost-legend-item">
@@ -300,6 +317,7 @@ function UsageCanvas({
 			resetDays.set(day, `Limit reset ${resetTickFormat.format(new Date(at))}`);
 		}
 	const axisHover = useAxisHover();
+	const hoverDates = useHoverDateStore();
 	return (
 		<div ref={canvasRef} className="cost-chart-canvas" skullet-ignore="">
 			{width > 0 ? (
@@ -315,8 +333,17 @@ function UsageCanvas({
 							right: MARGIN.right + spare,
 						}}
 						accessibilityLayer
-						onMouseMove={axisHover.onMouseMove}
-						onMouseLeave={axisHover.onMouseLeave}
+						onMouseMove={(state) => {
+							axisHover.onMouseMove(state);
+							const period = state.isTooltipActive
+								? periods[Number(state.activeTooltipIndex)]
+								: undefined;
+							hoverDates?.set(period?.date ?? null);
+						}}
+						onMouseLeave={() => {
+							axisHover.onMouseLeave();
+							hoverDates?.set(null);
+						}}
 					>
 						<CartesianGrid
 							vertical={false}
@@ -369,38 +396,13 @@ function UsageCanvas({
 							}}
 						/>
 						<Bar
-							dataKey="solid"
-							stackId="left"
+							dataKey="full"
 							barSize={bar}
 							isAnimationActive={false}
 							shape={(props: BarShapeProps) => (
-								<SnappedBar
+								<SplitBar
 									{...props}
 									snap={snap}
-									radius={props.payload?.cap ? 0 : 2}
-									reset={
-										props.payload?.cap
-											? undefined
-											: resetDays.get(props.payload?.x ?? -1)
-									}
-								/>
-							)}
-						>
-							{periods.map((period) => (
-								<Cell key={period.date} fill={solidColor(period)} />
-							))}
-						</Bar>
-						<Bar
-							dataKey="cap"
-							stackId="left"
-							barSize={bar}
-							isAnimationActive={false}
-							shape={(props: BarShapeProps) => (
-								<SnappedBar
-									{...props}
-									snap={snap}
-									radius={2}
-									outline
 									reset={resetDays.get(props.payload?.x ?? -1)}
 								/>
 							)}
@@ -428,53 +430,78 @@ interface BarShapeProps {
 	readonly payload?: Period;
 }
 
-function SnappedBar({
+function SplitBar({
 	x = 0,
 	y = 0,
 	width = 0,
 	height = 0,
-	fill,
+	payload,
 	snap,
-	radius,
-	outline = false,
 	reset,
 }: BarShapeProps & {
 	snap: (value: number) => number;
-	radius: number;
-	outline?: boolean;
 	reset?: string;
 }) {
-	if (!(height > 0) || !(width > 0)) return null;
+	if (!payload || payload.solid === null || !(height > 0) || !(width > 0))
+		return null;
+	const estimate = payload.last?.kind === "estimate";
+	const parts = [
+		{ key: "left", size: payload.solid, fill: solidColor(payload) },
+		{ key: "range", size: payload.cap ?? 0, fill: undefined },
+		{
+			key: "used",
+			size: payload.used ?? 0,
+			fill: estimate ? USED_ESTIMATE_COLOR : USED_COLOR,
+		},
+	].filter((part) => part.size > 0.05);
+	const scale = Math.max(0, height - (parts.length - 1) * SEGMENT_GAP_PX) / 100;
 	const left = snap(x);
-	const top = snap(y);
 	const size = snap(width);
-	const tall = snap(y + height) - top;
-	const corner = Math.min(radius, size / 2, tall);
-	const path = `M${left},${top + tall}V${top + corner}Q${left},${top} ${left + corner},${top}H${left + size - corner}Q${left + size},${top} ${left + size},${top + corner}V${top + tall}`;
-	const shape = outline ? (
-		<path
-			d={path}
-			fill="none"
-			stroke={USAGE_COLOR}
-			strokeWidth={1}
-			vectorEffect="non-scaling-stroke"
-		/>
-	) : (
-		<path d={`${path}Z`} fill={fill} />
-	);
-	if (!reset) return shape;
+	let bottom = y + height;
+	const segments = parts.map((part) => {
+		const top = bottom - part.size * scale;
+		const from = snap(top);
+		const tall = Math.max(1, snap(bottom) - from);
+		bottom = top - SEGMENT_GAP_PX;
+		const corner = Math.min(SEGMENT_RADIUS_PX, size / 2, tall / 2);
+		return part.fill ? (
+			<rect
+				key={part.key}
+				x={left}
+				y={from}
+				width={size}
+				height={tall}
+				rx={corner}
+				fill={part.fill}
+			/>
+		) : (
+			<rect
+				key={part.key}
+				x={left + 0.5}
+				y={from + 0.5}
+				width={Math.max(0, size - 1)}
+				height={Math.max(0, tall - 1)}
+				rx={corner}
+				fill="none"
+				stroke={USAGE_COLOR}
+				strokeWidth={1}
+			/>
+		);
+	});
 	return (
 		<g>
-			{shape}
-			<IconRefresh
-				x={left + size / 2 - RESET_ICON_PX / 2}
-				y={top - RESET_ICON_PX - RESET_ICON_GAP_PX}
-				size={RESET_ICON_PX}
-				stroke={1.75}
-				color="var(--cost-muted)"
-				title={reset}
-				aria-label={reset}
-			/>
+			{segments}
+			{reset ? (
+				<IconRefresh
+					x={left + size / 2 - RESET_ICON_PX / 2}
+					y={snap(y) - RESET_ICON_PX - RESET_ICON_GAP_PX}
+					size={RESET_ICON_PX}
+					stroke={1.75}
+					color="var(--cost-muted)"
+					title={reset}
+					aria-label={reset}
+				/>
+			) : null}
 		</g>
 	);
 }
@@ -517,10 +544,18 @@ function PeriodTip({
 				</strong>
 			</div>
 			<div>
-				<span>Used</span>
+				<span>
+					<i style={{ backgroundColor: USED_COLOR }} />
+					Used
+				</span>
 				<strong>
-					{estimate && period.usedPoints >= 1 ? "~" : ""}
-					{formatPoints(period.usedPoints)}
+					{last?.usedPercent === null || !last
+						? "—"
+						: estimate
+							? `~${Math.round(last.usedPercent)}%`
+							: low === high
+								? `${100 - (low ?? 0)}%`
+								: `${100 - (high ?? 0)}–${100 - (low ?? 0)}%`}
 				</strong>
 			</div>
 		</div>

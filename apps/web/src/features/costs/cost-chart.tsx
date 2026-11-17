@@ -253,6 +253,8 @@ type Props = {
 export interface UsageTab {
 	readonly value: string | undefined;
 	readonly trend: number[] | undefined;
+	readonly dates?: string[];
+	readonly textAt?: (index: number) => string;
 	readonly selected: boolean;
 	readonly onSelect: () => void;
 	readonly chart: ReactNode;
@@ -672,6 +674,9 @@ export function CostChart({
 							qualifier={undefined}
 							unavailable={false}
 							trend={usage.trend}
+							dates={usage.dates}
+							textAt={usage.textAt}
+							step
 							primary={usage.selected}
 							onClick={usage.onSelect}
 						/>
@@ -1060,8 +1065,17 @@ export function CostChart({
 										data={rows}
 										margin={{ top: 12, right: 12, bottom: 0, left: 0 }}
 										accessibilityLayer
-										onMouseMove={axisHover.onMouseMove}
-										onMouseLeave={axisHover.onMouseLeave}
+										onMouseMove={(state) => {
+											axisHover.onMouseMove(state);
+											const point = state.isTooltipActive
+												? trend[Number(state.activeTooltipIndex)]
+												: undefined;
+											hoverStore.set(point?.date ?? null);
+										}}
+										onMouseLeave={() => {
+											axisHover.onMouseLeave();
+											hoverStore.set(null);
+										}}
 									>
 										<defs>
 											<linearGradient
@@ -1511,6 +1525,7 @@ function Metric({
 	dates,
 	format,
 	textAt,
+	step = false,
 	onClick,
 	onIntent,
 }: {
@@ -1533,6 +1548,7 @@ function Metric({
 	dates?: string[];
 	format?: (value: number) => string;
 	textAt?: (index: number) => string;
+	step?: boolean;
 	onClick: () => void;
 	onIntent?: () => void;
 }) {
@@ -1633,6 +1649,7 @@ function Metric({
 			{unavailable || loading ? null : (
 				<MetricSparkline
 					values={trend}
+					step={step}
 					secondary={secondary}
 					marked={markedIndex}
 					pinned={pinnedIndex}
@@ -1679,12 +1696,14 @@ const SAMPLE_SPARKLINE = [0.3, 0.45, 0.38, 0.55, 0.48, 0.66, 0.58, 0.75];
 
 export function MetricSparkline({
 	values,
+	step = false,
 	secondary,
 	marked = -1,
 	pinned = -1,
 	focus = NO_FOCUS,
 }: {
 	values: number[] | undefined;
+	step?: boolean;
 	secondary?: number[];
 	marked?: number;
 	pinned?: number;
@@ -1705,14 +1724,26 @@ export function MetricSparkline({
 		: points.map((value) => value / peak);
 	// CardSparkline insets: 3 units of headroom, 2 for the sample.
 	const inset = placeholder ? 2 : 3;
+	const flat = step && !placeholder;
+	const xAt = (index: number, count: number) =>
+		flat ? ((index + 0.5) / count) * 100 : (index / (count - 1)) * 100;
 	const pathOf = (line: number[]) =>
-		line
-			.map((value, index) => {
-				const x = (index / (line.length - 1)) * 100;
-				const y = 32 - inset - value * (32 - inset);
-				return `${index === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`;
-			})
-			.join(" ");
+		flat
+			? line
+					.map((value, index) => {
+						const from = ((index / line.length) * 100).toFixed(2);
+						const to = (((index + 1) / line.length) * 100).toFixed(2);
+						const y = (32 - inset - value * (32 - inset)).toFixed(2);
+						return `${index === 0 ? "M" : "L"}${from} ${y} H${to}`;
+					})
+					.join(" ")
+			: line
+					.map((value, index) => {
+						const x = (index / (line.length - 1)) * 100;
+						const y = 32 - inset - value * (32 - inset);
+						return `${index === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`;
+					})
+					.join(" ");
 	const path = pathOf(series);
 	return (
 		<svg
@@ -1774,8 +1805,8 @@ export function MetricSparkline({
 								key={mark.tone}
 								className="cost-metric-marker"
 								data-tone={mark.tone}
-								x1={(mark.at / (series.length - 1)) * 100}
-								x2={(mark.at / (series.length - 1)) * 100}
+								x1={xAt(mark.at, series.length)}
+								x2={xAt(mark.at, series.length)}
 								y1={0}
 								y2={32}
 								vectorEffect="non-scaling-stroke"
@@ -1789,8 +1820,8 @@ export function MetricSparkline({
 							<line
 								key={at}
 								className="cost-metric-focus"
-								x1={(at / (series.length - 1)) * 100}
-								x2={(at / (series.length - 1)) * 100}
+								x1={xAt(at, series.length)}
+								x2={xAt(at, series.length)}
 								y1={32 - inset - (series[at] ?? 0) * (32 - inset)}
 								y2={32 - inset - (series[at] ?? 0) * (32 - inset)}
 								strokeLinecap="round"

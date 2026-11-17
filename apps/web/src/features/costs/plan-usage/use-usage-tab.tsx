@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocalDesktopApp } from "@/features/desktop/local-app";
 import type { ChartInterval } from "../chart-interval";
 import type { UsageTab } from "../cost-chart";
-import { PlanUsageChart, showsChart } from "./plan-usage-chart";
+import { PlanUsageChart, periodsOf, showsChart } from "./plan-usage-chart";
 import { UsageBreakdowns } from "./usage-breakdowns";
 import {
 	leftPercent,
@@ -29,6 +29,14 @@ export function useUsageTab(
 		(entry) => entry.provider === provider,
 	);
 	const window = usage?.window ?? null;
+	const periods = window ? periodsOf(window, interval) : [];
+	const lefts = periods.map((period) => period.solid);
+	const firstKnown = lefts.find((left) => left !== null) ?? null;
+	let carried = firstKnown;
+	const trend = lefts.map((left) => {
+		carried = left ?? carried;
+		return carried ?? 0;
+	});
 	return {
 		deselect,
 		tab: {
@@ -37,13 +45,14 @@ export function useUsageTab(
 				: window
 					? `${Math.round(leftPercent(window.usedPercent))}% left`
 					: "—",
-			trend: query.isPending
-				? undefined
-				: (window?.buckets.flatMap((bucket) =>
-						bucket.usedPercent === null
-							? []
-							: [leftPercent(bucket.usedPercent)],
-					) ?? []),
+			trend: query.isPending || firstKnown === null ? undefined : trend,
+			dates: periods.map((period) => period.date),
+			textAt: (index) => {
+				const period = periods[index];
+				if (!period || period.solid === null) return "—";
+				const estimate = period.last?.kind === "estimate";
+				return `${estimate ? "~" : ""}${Math.round(period.solid)}% left`;
+			},
 			selected,
 			onSelect: () => setSelected(true),
 			breakdowns:
