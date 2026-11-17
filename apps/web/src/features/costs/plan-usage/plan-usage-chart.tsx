@@ -1,14 +1,14 @@
-import { type Icon, IconAlertTriangle } from "@tabler/icons-react";
+import { type Icon, IconAlertTriangle, IconRefresh } from "@tabler/icons-react";
 import { useLayoutEffect, useRef, useState } from "react";
 import {
 	Bar,
 	CartesianGrid,
 	Cell,
 	ComposedChart,
-	ReferenceLine,
 	ResponsiveContainer,
 	Tooltip,
 	XAxis,
+	type XAxisTickContentProps,
 	YAxis,
 } from "recharts";
 import { Skeleton } from "@/app/ui/skeleton";
@@ -51,6 +51,8 @@ const MAX_BAR_PX = 18;
 const TICK_GAP_PX = 65;
 const LABEL_CHAR_PX = 6.2;
 const LABEL_GAP_PX = 12;
+const RESET_ICON_PX = 14;
+const RESET_ROW_PX = 15;
 const LOW_LEFT = 10;
 const USAGE_COLOR = "oklch(0.74 0.17 150)";
 const LOW_COLOR = "oklch(0.64 0.21 27)";
@@ -368,34 +370,42 @@ function UsageCanvas({
 		const x = resetX(periods, at);
 		return x === null
 			? []
-			: [{ at, x, label: `Reset ${resetTickFormat.format(new Date(at))}` }];
+			: [
+					{
+						at,
+						x,
+						label: `Limit reset ${resetTickFormat.format(new Date(at))}`,
+					},
+				];
 	});
 	const step = Math.max(1, Math.ceil(TICK_GAP_PX / Math.max(pitch, 1)));
-	const placed: { from: number; to: number }[] = [];
-	const place = (x: number, label: string) => {
+	const rows: { from: number; to: number }[][] = [[], []];
+	const place = (x: number, size: number, row: number) => {
 		const center = (x + 0.5) * pitch;
-		const half = labelWidth(label) / 2;
-		const span = { from: center - half, to: center + half };
+		const span = { from: center - size / 2, to: center + size / 2 };
+		const taken = rows[row] ?? [];
 		if (
-			placed.some(
+			taken.some(
 				(other) =>
 					span.from < other.to + LABEL_GAP_PX &&
 					span.to > other.from - LABEL_GAP_PX,
 			)
 		)
 			return false;
-		placed.push(span);
+		taken.push(span);
 		return true;
 	};
-	const shownResets = new Set(
-		resets
-			.filter((reset) => place(reset.x, reset.label))
-			.map((reset) => reset.x),
-	);
 	const ticks = periods
 		.filter((period) => period.x % step === 0)
-		.filter((period) => place(period.x, formatChartDate(period.date, interval)))
+		.filter((period) =>
+			place(period.x, labelWidth(formatChartDate(period.date, interval)), 0),
+		)
 		.map((period) => period.x);
+	const resetRow = new Map<number, number>();
+	for (const reset of resets) {
+		if (place(reset.x, RESET_ICON_PX, 0)) resetRow.set(reset.x, 0);
+		else if (place(reset.x, RESET_ICON_PX, 1)) resetRow.set(reset.x, 1);
+	}
 	return (
 		<div ref={canvasRef} className="cost-chart-canvas" skullet-ignore="">
 			{width > 0 ? (
@@ -414,20 +424,48 @@ function UsageCanvas({
 							type="number"
 							dataKey="x"
 							domain={[-0.5, count - 0.5]}
-							ticks={[...ticks, ...shownResets]}
+							ticks={[...ticks, ...resetRow.keys()]}
 							interval={0}
 							allowDecimals
-							tickFormatter={(value) => {
-								const reset = resets.find((entry) => entry.x === value);
-								if (reset) return reset.label;
-								const period = periods[Number(value)];
-								return period ? formatChartDate(period.date, interval) : "";
-							}}
 							axisLine={false}
 							tickLine={false}
 							tickMargin={14}
-							height={40}
-							tick={TICK_STYLE}
+							height={
+								resetRow.size > 0 && [...resetRow.values()].includes(1)
+									? 54
+									: 40
+							}
+							tick={(props: XAxisTickContentProps) => {
+								const x = Number(props.x ?? 0);
+								const y = Number(props.y ?? 0);
+								const value = Number(props.payload?.value);
+								const reset = resets.find((entry) => entry.x === value);
+								if (reset)
+									return (
+										<IconRefresh
+											x={x - RESET_ICON_PX / 2}
+											y={y - 1 + (resetRow.get(value) ?? 0) * RESET_ROW_PX}
+											size={RESET_ICON_PX}
+											stroke={1.75}
+											color="var(--cost-muted)"
+											title={reset.label}
+											aria-label={reset.label}
+										/>
+									);
+								const period = periods[Number(value)];
+								return (
+									<text
+										x={x}
+										y={y}
+										dy="0.71em"
+										textAnchor="middle"
+										fill={TICK_STYLE.fill}
+										fontSize={TICK_STYLE.fontSize}
+									>
+										{period ? formatChartDate(period.date, interval) : ""}
+									</text>
+								);
+							}}
 						/>
 						<YAxis
 							domain={[0, 100]}
@@ -439,14 +477,6 @@ function UsageCanvas({
 							width={Y_AXIS_WIDTH}
 							tick={TICK_STYLE}
 						/>
-						{resets.map((reset) => (
-							<ReferenceLine
-								key={reset.at}
-								x={reset.x}
-								stroke="var(--cost-muted)"
-								strokeDasharray="3 4"
-							/>
-						))}
 						<Tooltip
 							position={{ y: 48 }}
 							isAnimationActive={false}
