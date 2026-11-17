@@ -123,6 +123,9 @@ export function CostBreakdown({
 				<ScrollFade
 					className="cost-breakdown-list"
 					data-many={entries.length > 4 || undefined}
+					data-empty={
+						(!pending && !onLoadDeferred && !entries.length) || undefined
+					}
 				>
 					{!pending && onLoadDeferred ? (
 						<p className="cost-breakdown-empty">

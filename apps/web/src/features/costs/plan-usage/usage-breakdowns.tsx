@@ -136,6 +136,7 @@ function UsageBreakdown({
 			<ScrollFade
 				className="cost-breakdown-list"
 				data-many={rows.length > 4 || undefined}
+				data-empty={rows.length === 0 || undefined}
 			>
 				{rows.length === 0 ? (
 					<BreakdownEmpty title="No use" />

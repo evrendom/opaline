@@ -849,6 +849,9 @@
 	opacity: 0.5;
 	cursor: default;
 }
+.cost-breakdown-list[data-empty] > div {
+	height: 100%;
+}
 .cost-breakdown-empty-state {
 	display: flex;
 	height: 100%;
