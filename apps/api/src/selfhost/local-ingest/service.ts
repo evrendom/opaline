@@ -1,6 +1,6 @@
 import { type FSWatcher, watch } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { LIVE_SESSION_ACTIVE_WINDOW_MS } from "@rudel/api-routes";
 import type {
 	FileState,
@@ -53,6 +53,10 @@ export interface LocalLiveSession extends SessionProject {
 	readonly source: TranscriptSource;
 	readonly startedAt: string;
 	readonly lastActivityAt: string;
+	readonly agents: readonly {
+		readonly agentId: string;
+		readonly lastActivityAt: string;
+	}[];
 }
 
 export type SessionOutcome = (
@@ -445,9 +449,33 @@ export class LocalIngest {
 				gitBranch: entry.project?.gitBranch ?? null,
 				startedAt: new Date(born?.birthtimeMs ?? writtenAt).toISOString(),
 				lastActivityAt: new Date(writtenAt).toISOString(),
+				agents: this.runningAgents(sessionPath),
 			});
 		}
 		return live;
+	}
+
+	private runningAgents(
+		sessionPath: string,
+	): { agentId: string; lastActivityAt: string }[] {
+		const now = this.now();
+		const agents: { agentId: string; lastActivityAt: string }[] = [];
+		for (const path of this.subagentPaths.get(sessionPath) ?? []) {
+			const seen = this.files.get(path);
+			const agentId = /^agent-(.+)\.jsonl$/u.exec(basename(path))?.[1];
+			if (
+				!seen ||
+				!agentId ||
+				now - seen.stat.mtimeMs > LIVE_SESSION_ACTIVE_WINDOW_MS ||
+				seen.stat.mtimeMs < this.watchingSince
+			)
+				continue;
+			agents.push({
+				agentId,
+				lastActivityAt: new Date(seen.stat.mtimeMs).toISOString(),
+			});
+		}
+		return agents;
 	}
 
 	private runningSessions(): [string, number][] {

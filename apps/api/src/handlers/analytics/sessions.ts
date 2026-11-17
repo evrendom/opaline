@@ -96,7 +96,7 @@ async function localLiveSessions(
 	if (!ingest) return null;
 	return (await ingest.liveSessions())
 		.filter((live) => ownerId === null || live.userId === ownerId)
-		.map((live) => ({ ...live, endedAt: null }));
+		.map((live) => ({ ...live, agents: [...live.agents], endedAt: null }));
 }
 
 const liveList = os.analytics.sessions.liveList

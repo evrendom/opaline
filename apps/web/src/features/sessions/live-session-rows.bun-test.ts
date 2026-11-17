@@ -153,3 +153,35 @@ describe("compareLiveSessionRows", () => {
 		expect(compareLiveSessionRows(uploaded(), uploaded())).toBe(0);
 	});
 });
+
+describe("live subagent rows", () => {
+	const parent = uploaded({ session_id: "live-1" });
+	const subagent = (agentId: string) =>
+		uploaded({
+			session_id: "live-1",
+			subagent_of: {
+				kind: "agent",
+				session_id: "live-1",
+				source: "claude_code",
+				agent_id: agentId,
+			},
+		});
+
+	test("a subagent written to recently goes live; the others stay as they are", () => {
+		const rows = mergeLiveSessionRows(
+			[parent, subagent("a1"), subagent("b2")],
+			[
+				live({
+					agents: [
+						{ agentId: "a1", lastActivityAt: "2026-10-13T11:59:50.000Z" },
+						{ agentId: "b2", lastActivityAt: "2026-10-13T11:40:00.000Z" },
+					],
+				}),
+			],
+			NOW,
+		);
+		expect(rows.map((row) => row.live_session?.lastActivityAt ?? null)).toEqual(
+			["2026-10-13T11:59:30.000Z", "2026-10-13T11:59:50.000Z", null],
+		);
+	});
+});

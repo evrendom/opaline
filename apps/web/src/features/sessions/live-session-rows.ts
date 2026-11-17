@@ -3,7 +3,7 @@ import {
 	type LiveSessionSummary,
 	type SessionAnalytics,
 } from "@rudel/api-routes";
-import { sessionRowKey } from "./session-row-key";
+import { sessionRowKey, transcriptSubagentId } from "./session-row-key";
 
 /**
  * A sessions-table row for a session running right now, before its upload:
@@ -74,9 +74,26 @@ export function mergeLiveSessionRows(
 		}
 		pinnedKeys.add(key);
 	}
+	const liveAgents = new Map<string, LiveSessionSummary>();
+	for (const summary of live)
+		for (const agent of summary.agents ?? [])
+			liveAgents.set(
+				`${summary.source}:${summary.sessionId}:${agent.agentId}`,
+				{ ...summary, lastActivityAt: agent.lastActivityAt },
+			);
 	return [
 		...pinned,
-		...sessions.filter((session) => !pinnedKeys.has(sessionRowKey(session))),
+		...sessions
+			.filter((session) => !pinnedKeys.has(sessionRowKey(session)))
+			.map((session) => {
+				const agent = transcriptSubagentId(session);
+				const running = agent
+					? liveAgents.get(`${session.source}:${session.session_id}:${agent}`)
+					: undefined;
+				return running && isLiveSessionActive(running, nowMs)
+					? { ...session, live_session: running }
+					: session;
+			}),
 	];
 }
 

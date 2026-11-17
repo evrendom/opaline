@@ -31,6 +31,10 @@ export const LiveSessionSummarySchema = z.object({
 	startedAt: z.string(),
 	lastActivityAt: z.string(),
 	endedAt: z.string().nullable(),
+	/** Subagents written to recently, when the source knows them. */
+	agents: z
+		.array(z.object({ agentId: z.string(), lastActivityAt: z.string() }))
+		.optional(),
 });
 
 export const LiveSessionListOutputSchema = z.object({
