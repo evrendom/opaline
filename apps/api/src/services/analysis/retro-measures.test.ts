@@ -145,6 +145,9 @@ describe("retro measures", () => {
 		expect(pattern).toContain("does\\s+not\\s+work");
 		expect(pattern).toContain("didn['’]t\\s+work");
 		expect(pattern).not.toContain("|thanks|");
+		expect(pattern).toContain("(?:fuck|fcuk|fukc)");
+		expect(pattern).not.toContain("(?=");
+		expect(pattern).not.toContain("(?<");
 		expect(() => new RegExp(pattern.replace("(?i)", ""), "u")).not.toThrow();
 	});
 
