@@ -6,7 +6,7 @@ import {
 	IconRun,
 } from "@tabler/icons-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import type { ReactNode, Ref } from "react";
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
@@ -18,7 +18,7 @@ import {
 	useAgentsRunning,
 	useInitialImport,
 } from "@/features/self-hosted/local-processing";
-import { SessionModelProgressRing } from "@/features/sessions/components/session-model-progress-ring";
+import { SessionModelLoadingMark } from "@/features/sessions/components/session-model-mark";
 import {
 	pollUnlessPushed,
 	useSessionArrivalsLive,
@@ -100,14 +100,12 @@ const handover = {
 const MotionLink = motion.create(Link);
 
 function FooterLink({
-	ref,
 	direction,
 	to,
 	title,
 	icon,
 	children,
 }: {
-	ref?: Ref<HTMLAnchorElement>;
 	direction: number;
 	to: string;
 	title: string;
@@ -117,7 +115,6 @@ function FooterLink({
 	const reduceMotion = useReducedMotion();
 	return (
 		<MotionLink
-			ref={ref}
 			custom={direction}
 			to={to}
 			title={title}
@@ -126,7 +123,7 @@ function FooterLink({
 			animate="shown"
 			exit="leave"
 			transition={reduceMotion ? { duration: 0 } : HANDOVER}
-			className="group/last-upload flex items-center gap-1.25 whitespace-nowrap rounded-sm outline-none transition-colors hover:text-foreground"
+			className="group/last-upload flex items-center gap-1.25 whitespace-nowrap rounded-sm outline-none transition-colors [grid-area:1/1] hover:text-foreground"
 		>
 			{icon}
 			{children}
@@ -170,31 +167,20 @@ export function LastSessionUploadBar() {
 					{initialImportLabel(initialImport)}
 				</output>
 			) : (
-				<div className="relative flex items-center">
-					<AnimatePresence initial={false} mode="popLayout" custom={direction}>
+				<div className="grid items-center">
+					<AnimatePresence initial={false} custom={direction}>
 						{running ? (
 							<FooterLink
 								key="running"
 								direction={direction}
 								to={getShellRoutePath(appRoutes.session())}
 								title="Open your sessions"
-								icon={
-									<span
-										aria-hidden="true"
-										className="relative size-3.25 shrink-0 text-foreground"
-									>
-										<SessionModelProgressRing progress="loading" />
-									</span>
-								}
+								icon={<SessionModelLoadingMark className="size-3.5" />}
 							>
 								<span className="text-foreground">
 									<RollingText text={String(agentsRunning)} />
 								</span>
-								<span className="inline-flex">
-									agent
-									<RollingText text={agentsRunning === 1 ? "" : "s"} />
-								</span>
-								running
+								{agentsRunning === 1 ? "agent running" : "agents running"}
 							</FooterLink>
 						) : latest && uploadedAt && !Number.isNaN(uploadedAt.getTime()) ? (
 							<FooterLink
