@@ -161,6 +161,50 @@ describe("repository evidence setup", () => {
 		]);
 	});
 
+	test("env becomes one setting per variable, and secret-looking names and values are redacted", () => {
+		const manifest = setupManifest();
+		const layers = manifest.userConfiguration.claude.settingsLayers;
+		const setup = readRepositoryEvidenceSetup({
+			...manifest,
+			userConfiguration: {
+				...manifest.userConfiguration,
+				claude: {
+					...manifest.userConfiguration.claude,
+					settingsLayers: [
+						{
+							scope: "user",
+							path: "~/.claude/settings.json",
+							status: "parsed",
+							settings: {
+								autoCompactEnabled: false,
+								apiKeyHelper: "~/bin/key.sh",
+								env: {
+									CLAUDE_CODE_MAX_OUTPUT_TOKENS: "32000",
+									ANTHROPIC_AUTH_TOKEN: "abc123",
+									DEBUG_URL: "https://user:hunter2hunter2@example.com",
+								},
+							},
+						},
+						...layers.slice(2),
+					],
+				},
+			},
+		});
+		const settings = setup.setup_settings
+			.filter(
+				([agent, scope, , kind]) =>
+					agent === "claude_code" && scope === "user" && kind === "setting",
+			)
+			.map(([, , , , name, value]) => [name, value]);
+		expect(settings).toEqual([
+			["autoCompactEnabled", "false"],
+			["apiKeyHelper", "[REDACTED]"],
+			["env.CLAUDE_CODE_MAX_OUTPUT_TOKENS", "32000"],
+			["env.ANTHROPIC_AUTH_TOKEN", "[REDACTED]"],
+			["env.DEBUG_URL", "https://user:[redacted]@example.com"],
+		]);
+	});
+
 	test("an older manifest or an unexpected shape records nothing, and never throws", () => {
 		expect(readRepositoryEvidenceSetup({ contextIndex: {} })).toEqual({
 			capture_reason: "",

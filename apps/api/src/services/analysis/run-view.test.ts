@@ -9,6 +9,7 @@ import {
 
 const RUN_ID = "u1/claude_code/s1//40";
 const MINUTE = 60_000;
+const STARTED = Date.parse("2026-11-13T17:33:12.345Z");
 
 /** A request at minute `at` lasting `minutes`, with its calls as [tool, group, class, failed]. */
 function request(
@@ -21,8 +22,8 @@ function request(
 ): RunViewRequest {
 	return {
 		record,
-		startedMs: at * MINUTE,
-		endedMs: (at + minutes) * MINUTE,
+		startedMs: STARTED + at * MINUTE,
+		endedMs: STARTED + (at + minutes) * MINUTE,
 		calls: calls.map(
 			([tool, group, commandClass = "", failed = false], index) => ({
 				record: record + 1 + index,
@@ -43,6 +44,7 @@ const view: RunView = {
 	agent: "claude_code",
 	prompt: "fix the failing login test",
 	task: null,
+	startedMs: STARTED,
 	minutes: 42,
 	tokens: 410_000,
 	costUsd: 3.1,
@@ -50,9 +52,14 @@ const view: RunView = {
 	previous: {
 		id: "u1/claude_code/s1//10",
 		prompt: "add rate limiting to login",
+		startedMs: Date.parse("2026-11-13T16:50:01.002Z"),
 		end: "Done, added a limiter in auth.ts",
 	},
-	next: { id: "u1/claude_code/s1//90", prompt: "it still fails, damn it" },
+	next: {
+		id: "u1/claude_code/s1//90",
+		prompt: "it still fails, damn it",
+		startedMs: Date.parse("2026-11-13T18:20:40.500Z"),
+	},
 	requests: [
 		request(41, 0, 4, 60_000, [
 			["Grep", "search"],
@@ -113,10 +120,10 @@ test("the default view shows the header, PREV, END, NEXT, the setup the run had 
 	const { text, truncated } = render();
 	expect(truncated).toBe(false);
 	expect(text.split("\n")).toEqual([
-		`run ${RUN_ID} · claude_code · "fix the failing login test" · 42 min · 410k tokens · $3.10 · phases by rule 1`,
-		`PREV u1/claude_code/s1//10 · "add rate limiting to login" → END "Done, added a limiter in auth.ts"`,
+		`run ${RUN_ID} · claude_code · "fix the failing login test" · started 2026-11-13T17:33:12.345Z · 42 min · 410k tokens · $3.10 · phases by rule 1`,
+		`PREV u1/claude_code/s1//10 · started 2026-11-13T16:50:01.002Z · "add rate limiting to login" → END "Done, added a limiter in auth.ts"`,
 		'END  r94 · "Fixed! The test now passes."',
-		'NEXT u1/claude_code/s1//90 · user: "it still fails, damn it" · reaction: unhappy (strongly worded)',
+		'NEXT u1/claude_code/s1//90 · started 2026-11-13T18:20:40.500Z · user: "it still fails, damn it" · reaction: unhappy (strongly worded)',
 		"SETUP s1  system_prompt harness:claude_code:system_prompt · version 3f2a9c1b04de · 91204 chars · received earlier",
 		"      s2  instructions repository:github.com/acme/shop:CLAUDE.md · version e5d10a2b7c44 uncommitted by u1 · 812 chars · received earlier · compacted since",
 		"      s3  skill_body repository:github.com/acme/shop:.claude/skills/fix-tests/SKILL.md · version 77ab01c9d2e0 · 2310 chars",
@@ -132,8 +139,8 @@ test("expanding a phase lists its requests with their time, tokens and cost", ()
 	const { text } = render({ sections: ["header"], expand: ["p3"] });
 	expect(text.split("\n").slice(1)).toEqual([
 		"▸ p3 running checks: 2 requests",
-		"  q70   Bash test · 20 min · 150k tokens · $1.50 · 1 failed",
-		"  q80   Bash test · 11 min · 140k tokens · $1.40",
+		"  q70   Bash test · at 2026-11-13T17:40:12.345Z · 20 min · 150k tokens · $1.50 · 1 failed",
+		"  q80   Bash test · at 2026-11-13T18:00:12.345Z · 11 min · 140k tokens · $1.40",
 	]);
 });
 
@@ -175,7 +182,7 @@ test("an expanded phase of a large run is shown before the run's own lines take 
 	expect(truncated).toBe(true);
 	expect(text.length).toBeLessThanOrEqual(12_000);
 	expect(text).toEndWith(
-		"▸ p10 running checks: 1 request\n  q190  Bash test · 1 min · 10k tokens · $0.10 · 1 failed",
+		"▸ p10 running checks: 1 request\n  q190  Bash test · at 2026-11-13T17:42:12.345Z · 1 min · 10k tokens · $0.10 · 1 failed",
 	);
 	expect(text).toMatch(
 		/lines of the view omitted to fit the response size limit\]/u,
@@ -230,9 +237,9 @@ test("expanding a request lists its calls with their duration and outcome, and t
 	]);
 	const { text } = render({ sections: [], expand: ["q80", "q85"], details });
 	expect(text.split("\n")).toEqual([
-		"▸ q80 1 call · 11 min · 140k tokens · $1.40",
+		"▸ q80 1 call · at 2026-11-13T18:00:12.345Z · 11 min · 140k tokens · $1.40",
 		'  c81   Bash test · "bun test src/auth.test.ts" · 4.2 s',
-		"▸ q85 0 calls · 4 min · 20k tokens · $0.20",
+		"▸ q85 0 calls · at 2026-11-13T18:11:12.345Z · 4 min · 20k tokens · $0.20",
 		'  r94   text: "Fixed! The test now passes."',
 	]);
 });
@@ -293,7 +300,7 @@ test("a call that started a subagent expands into the subagent's run, in the sam
 	const { text } = render({ sections: [], expand: ["c71"], details });
 	expect(text.split("\n")).toEqual([
 		"▸ c71 started subagent run u1/claude_code/s1/a7/3; open it with run to expand its phases, requests and records",
-		'  run u1/claude_code/s1/a7/3 · claude_code · task "find where login is tested" · 3 min · 40k tokens · $0.40 · phases by rule 1',
+		'  run u1/claude_code/s1/a7/3 · claude_code · task "find where login is tested" · started 2026-11-13T17:33:12.345Z · 3 min · 40k tokens · $0.40 · phases by rule 1',
 		"  PREV none: the first run of its stream",
 		'  END  "In auth.test.ts"',
 		"  NEXT none: the last run of its stream",
@@ -389,7 +396,7 @@ test("a text past a record's first block (after reasoning) is named by its block
 	);
 	expect(text.split("\n")).toEqual([
 		'END  r94.2 · "Fixed!"',
-		"▸ q85 0 calls · 4 min · 20k tokens · $0.20",
+		"▸ q85 0 calls · at 2026-11-13T18:11:12.345Z · 4 min · 20k tokens · $0.20",
 		'  r94.2 text: "Fixed!"',
 	]);
 });
@@ -406,7 +413,7 @@ test("a run a queued prompt cut off says so: its last text is where the work was
 		'END  cut off mid-work: the person\'s queued prompt started the next run, which continues it; last text r94 · "Fixed! The test now passes."',
 	);
 	expect(cut[3]).toStartWith(
-		"NEXT u1/claude_code/s1//90 · user (queued while this run worked): ",
+		"NEXT u1/claude_code/s1//90 · started 2026-11-13T18:20:40.500Z · user (queued while this run worked): ",
 	);
 	const continued = render(
 		{},
@@ -416,6 +423,6 @@ test("a run a queued prompt cut off says so: its last text is where the work was
 		},
 	).text.split("\n");
 	expect(continued[1]).toBe(
-		`PREV u1/claude_code/s1//10 · "add rate limiting to login" → cut off mid-work by this run's queued prompt; its last text: "Done, added a limiter in auth.ts"`,
+		`PREV u1/claude_code/s1//10 · started 2026-11-13T16:50:01.002Z · "add rate limiting to login" → cut off mid-work by this run's queued prompt; its last text: "Done, added a limiter in auth.ts"`,
 	);
 });

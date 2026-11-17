@@ -61,6 +61,7 @@ export interface RunViewSetup {
 export interface RunViewNeighbour {
 	readonly id: string;
 	readonly prompt: string | null;
+	readonly startedMs: number;
 	/**
 	 * A queued prompt (sent while the agent worked) sits on the boundary
 	 * between this neighbour and the run: the earlier run was cut off mid-work
@@ -76,6 +77,7 @@ export interface RunView {
 	readonly prompt: string | null;
 	/** Without a human prompt: the task a parent agent delegated (a subagent run). */
 	readonly task: string | null;
+	readonly startedMs: number;
 	readonly minutes: number;
 	readonly tokens: number | null;
 	readonly costUsd: number | null;
@@ -355,6 +357,7 @@ function requestLine(request: RunViewRequest): string {
 
 function requestTotals(request: RunViewRequest): string {
 	return [
+		`at ${at(request.startedMs)}`,
 		minutes(request.endedMs - request.startedMs),
 		`${tokens(request.tokens)} tokens`,
 		cost(request.costUsd),
@@ -458,6 +461,7 @@ function headerLines({ view, rule }: Context): string[] {
 			view.prompt === null && view.task !== null
 				? `task ${quote(view.task)}`
 				: quote(view.prompt),
+			`started ${at(view.startedMs)}`,
 			minutes(view.minutes * 60_000),
 			`${tokens(view.tokens)} tokens`,
 			cost(view.costUsd),
@@ -471,8 +475,8 @@ function previousLines({ view }: Context): string[] {
 	if (!previous) return ["PREV none: the first run of its stream"];
 	return [
 		previous.queuedBoundary
-			? `PREV ${previous.id} · ${quote(previous.prompt)} → cut off mid-work by this run's queued prompt; its last text: ${quote(previous.end)}`
-			: `PREV ${previous.id} · ${quote(previous.prompt)} → END ${quote(previous.end)}`,
+			? `PREV ${previous.id} · started ${at(previous.startedMs)} · ${quote(previous.prompt)} → cut off mid-work by this run's queued prompt; its last text: ${quote(previous.end)}`
+			: `PREV ${previous.id} · started ${at(previous.startedMs)} · ${quote(previous.prompt)} → END ${quote(previous.end)}`,
 	];
 }
 
@@ -518,7 +522,7 @@ function nextLines({ view }: Context): string[] {
 	const next = view.next;
 	if (!next) return ["NEXT none: the last run of its stream"];
 	return [
-		`NEXT ${next.id} · user${next.queuedBoundary ? " (queued while this run worked)" : ""}: ${quote(next.prompt)} · reaction: ${next.prompt === null ? "unknown" : nextPromptReaction(next.prompt)}`,
+		`NEXT ${next.id} · started ${at(next.startedMs)} · user${next.queuedBoundary ? " (queued while this run worked)" : ""}: ${quote(next.prompt)} · reaction: ${next.prompt === null ? "unknown" : nextPromptReaction(next.prompt)}`,
 	];
 }
 
@@ -612,6 +616,10 @@ function quote(text: string | null): string {
 	return text === null
 		? "(not recorded)"
 		: JSON.stringify(text.replace(/\s+/gu, " ").trim());
+}
+
+function at(ms: number): string {
+	return new Date(ms).toISOString();
 }
 
 function minutes(ms: number): string {

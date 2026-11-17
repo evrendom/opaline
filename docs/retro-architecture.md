@@ -64,10 +64,10 @@ Taken from PostHog's agent: staged schema, separate find and read with a "list i
 One run, compact, drillable. The default:
 
 ```
-run r_8f2 · "fix the failing login test" · 42 min · 410k tokens · $3.10
-PREV   r_8f1 · "add rate limiting to login" → END "Done, added a limiter in auth.ts"
+run r_8f2 · "fix the failing login test" · started 2026-11-13T17:33:12.345Z · 42 min · 410k tokens · $3.10
+PREV   r_8f1 · started 2026-11-13T16:50:01.002Z · "add rate limiting to login" → END "Done, added a limiter in auth.ts"
 END    "Fixed! The test now passes."
-NEXT   r_8f3 · user: "it still fails"  (unhappy)
+NEXT   r_8f3 · started 2026-11-13T18:20:40.500Z · user: "it still fails"  (unhappy)
 SKILLS used: none · available: 14 (incl. "fix-tests", "ci-debug")
 GIT    commit a1b2c3 → PR #412 → CI ✗ e2e (failed), lint ✓, unit ✓
 
@@ -77,6 +77,8 @@ p2   edit: Edit×2 (auth.ts)                          2    1 min   12k    $0.09
 p3   test loop: bun test×4 (3 failed)                9   31 min  290k    $2.20
 p4   final answer                                    1    0 min    9k    $0.07
 ```
+
+Every run and request carries its start time as the transcript writes it (ISO 8601, UTC): a run's is its prompt's timestamp, so a citation can be found in the raw file with grep.
 
 - Levels: run → phase → request → call → record. Every line has an id; the agent expands or collapses any list of ids under one character budget.
 - Tokens and cost exist per request, not per call; calls show their duration only.

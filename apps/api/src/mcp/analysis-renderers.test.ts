@@ -156,6 +156,7 @@ test("all group modes and reaction origins render with table headers", () => {
 						{
 							ref: { ...ref, sessionId: "child" },
 							record: 4,
+							at: "2026-10-02T09:15:30.250Z",
 							errorLine: "ENOENT",
 							parentSessionId: "session",
 						},
@@ -164,7 +165,7 @@ test("all group modes and reaction origins render with table headers", () => {
 			],
 		}),
 	).toContain(
-		'"turn":1}@3, {"sessionId":"child","agentId":"","turn":1}@4 (subagent thread of session) ENOENT',
+		'"turn":1}@3, {"sessionId":"child","agentId":"","turn":1}@4 at 2026-10-02T09:15:30.250Z (subagent thread of session) ENOENT',
 	);
 	const user = renderFind({
 		source: "user",
@@ -174,6 +175,7 @@ test("all group modes and reaction origins render with table headers", () => {
 				type: "swear",
 				terms: ["fuck"],
 				eventRef: { ...ref, turn: 2, record: 5 },
+				at: "2026-10-02T09:16:00.000Z",
 				quote: "fuck",
 				partial: true,
 				originRef: ref,
@@ -186,6 +188,9 @@ test("all group modes and reaction origins render with table headers", () => {
 	});
 	expect(user).toContain(
 		"eventRef\toriginRef\toriginMinutes\toriginCostUsd\tpartial\tparentSessionId\tquote",
+	);
+	expect(user).toContain(
+		'"turn":2}@5 at 2026-10-02T09:16:00.000Z\t{"sessionId"',
 	);
 	expect(user).toContain("\t1\t0.25\ttrue\tparent\tfuck");
 	expect(user).toContain("type\tcount\tsessions\nswear\t1\t1");

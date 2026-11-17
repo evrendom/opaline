@@ -31,6 +31,7 @@ const row = (
 		row_kind: "run",
 		source: "claude_code",
 		turn_idx: turn,
+		started_at: `2026-11-13 17:${String(start).padStart(2, "0")}:00.000`,
 		prompt_head: prompt,
 		prompt_subtype: "",
 		minutes: 2,

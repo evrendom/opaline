@@ -9,6 +9,11 @@ import type {
 } from "../../services/local-session-input.types.js";
 import type { R2EvidenceStorageClient } from "../../services/r2-ingest-storage.service.js";
 import { storeSessionImages } from "./images.js";
+import {
+	type LocalSetupPaths,
+	localSetupPaths,
+	storeLocalSetup,
+} from "./local-setup.js";
 import type { Owner, SessionJob, SessionOutcome } from "./service.js";
 
 type ImportSession =
@@ -22,6 +27,7 @@ export interface SessionRunnerDependencies {
 	readonly sql: postgres.Sql;
 	readonly clickhouse: () => ClickHouseExecutor;
 	readonly objectStore: () => R2EvidenceStorageClient | null;
+	readonly setupPaths?: LocalSetupPaths | null;
 	readonly now?: () => Date;
 	readonly sleep?: (ms: number) => Promise<void>;
 	readonly log?: (line: string) => void;
@@ -55,6 +61,7 @@ export async function loadSessionRunner(options: {
 				? storage.createObjectStoreClient(availability.configuration)
 				: null;
 		},
+		setupPaths: localSetupPaths(),
 		log: options.log,
 	});
 }
@@ -142,6 +149,30 @@ export function createSessionRunner(
 				} catch (error) {
 					deps.log?.(
 						`images of ${input.sessionId} were not stored: ${error instanceof Error ? error.message : String(error)}`,
+					);
+				}
+			}
+			const setupPaths = deps.setupPaths;
+			if (setupPaths) {
+				try {
+					await timedIngestPhase("local.setup", () =>
+						storeLocalSetup({
+							clickhouse: deps.clickhouse(),
+							session: {
+								organizationId: owner.organizationId,
+								userId: owner.userId,
+								sessionId: input.sessionId,
+								source: input.source,
+								projectPath: input.projectPath ?? "",
+								repository: input.gitRemote ?? input.projectPath ?? "",
+							},
+							paths: setupPaths,
+							now: now(),
+						}),
+					);
+				} catch (error) {
+					deps.log?.(
+						`settings of ${input.sessionId} were not stored: ${error instanceof Error ? error.message : String(error)}`,
 					);
 				}
 			}

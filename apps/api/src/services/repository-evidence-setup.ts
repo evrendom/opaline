@@ -1,3 +1,5 @@
+import { redactReturnedText } from "@rudel/secret-filter";
+
 /**
  * The setup a session evidence capture recorded, copied from its manifest
  * into the evidence index (`REPOSITORY_EVIDENCE_SETUP_COLUMNS` in
@@ -46,7 +48,15 @@ const PROJECT_MEMORY_ROOT = "claude-project-memory";
 /** Lists of a Claude Code permissions block that hold rules. */
 const PERMISSION_LISTS = ["allow", "deny", "ask", "additionalDirectories"];
 /** Settings keys broken out into items of their own. */
-const ITEMIZED_SETTINGS = new Set(["hooks", "permissions", "enabledPlugins"]);
+const ITEMIZED_SETTINGS = new Set([
+	"hooks",
+	"permissions",
+	"enabledPlugins",
+	"env",
+]);
+const SECRET_NAME =
+	/token(?!s)|secret|passw(?:or)?d|credential|cookie|private.?key|api.?key|access.?key/iu;
+const REDACTED = "[REDACTED]";
 /** Bounds per capture, above the CLI's own (200 items per list). */
 const MAX_FILES = 5_000;
 const MAX_SETTINGS = 5_000;
@@ -171,7 +181,18 @@ function readSettings(
 		name: string,
 		value: unknown,
 	) => {
-		items.push([agent, scope, path, kind, name, valueText(value)]);
+		items.push([
+			agent,
+			scope,
+			path,
+			kind,
+			name,
+			kind === "setting"
+				? settingText(name, value)
+				: kind === "mcp_server"
+					? redactedText(value)
+					: valueText(value),
+		]);
 	};
 	const claude = record(configuration.claude);
 	if (claude) {
@@ -201,6 +222,12 @@ function readSettings(
 			for (const [name, setting] of Object.entries(settings ?? {}))
 				if (!ITEMIZED_SETTINGS.has(name))
 					add(CLAUDE, scope, path, "setting", name, setting);
+			const env = settings?.env;
+			if (record(env))
+				for (const [name, value] of Object.entries(record(env) ?? {}))
+					add(CLAUDE, scope, path, "setting", `env.${name}`, value);
+			else if (env !== undefined)
+				add(CLAUDE, scope, path, "setting", "env", REDACTED);
 		}
 		for (const hook of list(claude.hooks))
 			addHook(record(hook), CLAUDE, "user", userPath, add);
@@ -239,6 +266,8 @@ function readSettings(
 				add(CODEX, "user", config, "setting", key, codex[key]);
 		if (list(codex.notify).length > 0)
 			add(CODEX, "user", config, "setting", "notify", codex.notify);
+		for (const [name, value] of Object.entries(record(codex.settings) ?? {}))
+			add(CODEX, "user", config, "setting", name, value);
 		for (const group of ["features", "apps", "connectors", "tools"] as const)
 			for (const [name, enabled] of Object.entries(record(codex[group]) ?? {}))
 				add(CODEX, "user", config, "setting", `${group}.${name}`, enabled);
@@ -343,6 +372,15 @@ function readRuntime(
 		}
 	}
 	return versions;
+}
+
+function settingText(name: string, value: unknown): string {
+	if (SECRET_NAME.test(name.split(".").at(-1) ?? name)) return REDACTED;
+	return redactedText(value);
+}
+
+function redactedText(value: unknown): string {
+	return redactReturnedText(valueText(value)).slice(0, MAX_VALUE_CHARS);
 }
 
 function valueText(value: unknown): string {
