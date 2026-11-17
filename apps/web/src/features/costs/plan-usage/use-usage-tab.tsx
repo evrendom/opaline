@@ -21,7 +21,6 @@ export function useUsageTab(
 	const desktop = useLocalDesktopApp();
 	const [selected, setSelected] = useState(false);
 	const [provider, setProvider] = useState<PlanProvider>("claude");
-	const [refreshing, setRefreshing] = useState(false);
 	const query = usePlanUsage(desktop, range);
 	const deselect = () => setSelected(false);
 	if (!desktop || query.data === null) return { tab: undefined, deselect };
@@ -29,12 +28,6 @@ export function useUsageTab(
 		(entry) => entry.provider === provider,
 	);
 	const window = usage?.window ?? null;
-	const refresh = () => {
-		setRefreshing(true);
-		void fetch("/api/selfhost/plan-usage?refresh=1", { credentials: "include" })
-			.then(() => query.refetch())
-			.finally(() => setRefreshing(false));
-	};
 	return {
 		deselect,
 		tab: {
@@ -64,8 +57,6 @@ export function useUsageTab(
 					interval={interval}
 					pending={query.isPending}
 					failed={query.isError}
-					refreshing={refreshing}
-					onRefresh={refresh}
 				/>
 			),
 		},

@@ -13,7 +13,6 @@ import {
 } from "recharts";
 import { Skeleton } from "@/app/ui/skeleton";
 import { EmptyState } from "@/components/dashboard/page-parts";
-import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import {
 	ClaudeModelIcon,
 	CodexModelIcon,
@@ -82,14 +81,6 @@ function planName(provider: PlanProvider, plan: string | null): string {
 	return label
 		? `${PROVIDER_NAMES[provider]} ${label}`
 		: PROVIDER_NAMES[provider];
-}
-
-function ago(iso: string | null, now: number): string {
-	if (!iso) return "Not checked yet";
-	const minutes = Math.round((now - Date.parse(iso)) / 60_000);
-	if (minutes < 1) return "Checked just now";
-	if (minutes < 60) return `Checked ${minutes} min ago`;
-	return `Checked ${Math.round(minutes / 60)} h ago`;
 }
 
 export function showsChart(window: UsageWindow): boolean {
@@ -181,8 +172,6 @@ export function PlanUsageChart({
 	interval,
 	pending,
 	failed,
-	refreshing,
-	onRefresh,
 }: {
 	report: PlanUsageReport | null | undefined;
 	provider: PlanProvider;
@@ -190,24 +179,16 @@ export function PlanUsageChart({
 	interval: ChartInterval;
 	pending: boolean;
 	failed: boolean;
-	refreshing: boolean;
-	onRefresh: () => void;
 }) {
-	const now = Date.now();
 	const usage = report?.providers.find((entry) => entry.provider === provider);
 	const window = usage?.window ?? null;
 	const showChart = window !== null && showsChart(window);
 	const estimated = window?.buckets.some(
 		(bucket) => bucket.kind === "estimate",
 	);
-	const nextReset =
-		window?.resetsAt && Date.parse(window.resetsAt) > now
-			? window.resetsAt
-			: null;
 	return (
 		<div className="cost-chart-card">
-			<div className="cost-chart-key" data-fluid-menu-root="">
-				<FluidMenuHover items=".cost-text-button" />
+			<div className="cost-chart-key">
 				<div className="cost-chart-key-copy">
 					<h2 className="cost-chart-title">Usage over time</h2>
 					{showChart ? (
@@ -222,25 +203,8 @@ export function PlanUsageChart({
 									Estimated from session cost
 								</div>
 							) : null}
-							{nextReset ? (
-								<div className="cost-legend-item">
-									Next reset{" "}
-									<strong>{resetFormat.format(new Date(nextReset))}</strong>
-								</div>
-							) : null}
 						</div>
 					) : null}
-					<output className="cost-chart-coverage">
-						<span>{ago(report?.checkedAt ?? null, now)}</span>
-						<button
-							type="button"
-							className="cost-text-button cost-coverage-refresh"
-							onClick={onRefresh}
-							disabled={refreshing}
-						>
-							{refreshing ? "Checking…" : "Check now"}
-						</button>
-					</output>
 				</div>
 				<PillTabs
 					className="h-8 shrink-0 bg-transparent"
@@ -372,6 +336,7 @@ function UsageCanvas({
 									count={periods.length}
 									hover={axisHover.hover}
 									inset={bar / 2}
+									bars
 									label={(index) => {
 										const period = periods[index];
 										return period ? formatChartDate(period.date, interval) : "";

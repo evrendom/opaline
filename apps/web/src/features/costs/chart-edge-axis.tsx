@@ -1,16 +1,9 @@
 import { useCallback, useState } from "react";
 import type { MouseHandlerDataParam, XAxisTickContentProps } from "recharts";
 
-const LABEL_CHAR_PX = 6.2;
-const LABEL_GAP_PX = 10;
-
 export interface AxisHover {
 	readonly index: number;
 	readonly x: number;
-}
-
-function labelWidth(label: string): number {
-	return label.length * LABEL_CHAR_PX;
 }
 
 export function useAxisHover() {
@@ -30,9 +23,8 @@ export function useAxisHover() {
 
 export function edgeTicks(count: number, hover: AxisHover | null): number[] {
 	if (count <= 0) return [];
-	const ticks = new Set([0, count - 1]);
-	if (hover && hover.index >= 0 && hover.index < count) ticks.add(hover.index);
-	return [...ticks];
+	if (hover && hover.index >= 0 && hover.index < count) return [hover.index];
+	return [...new Set([0, count - 1])];
 }
 
 export function EdgeTick({
@@ -41,12 +33,14 @@ export function EdgeTick({
 	hover,
 	label,
 	inset = 0,
+	bars = false,
 }: {
 	tick: XAxisTickContentProps;
 	count: number;
 	hover: AxisHover | null;
 	label: (index: number) => string;
 	inset?: number;
+	bars?: boolean;
 }) {
 	const index = Number(tick.payload?.value);
 	const x = Number(tick.x ?? 0);
@@ -55,18 +49,12 @@ export function EdgeTick({
 	const first = index === 0;
 	const last = index === count - 1 && !first;
 	const hovered = hover?.index === index;
-	if (hover && !hovered) {
-		const half = labelWidth(label(hover.index)) / 2;
-		const from = first ? x - inset : x + inset - labelWidth(text);
-		const to = from + labelWidth(text);
-		if (
-			from < hover.x + half + LABEL_GAP_PX &&
-			to > hover.x - half - LABEL_GAP_PX
-		)
-			return null;
-	}
 	const anchor =
-		hovered && !first && !last ? "middle" : first ? "start" : "end";
+		count === 1 || (bars && count === 2) || (hovered && !first && !last)
+			? "middle"
+			: first
+				? "start"
+				: "end";
 	const position =
 		anchor === "start" ? x - inset : anchor === "end" ? x + inset : x;
 	return (
