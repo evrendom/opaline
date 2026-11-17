@@ -4,8 +4,6 @@ import "./cost-rolling-text.css";
 const ROLL_MS = 460;
 const ROLL_EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
 const ROLL_SHIFT_EM = 0.7;
-const ROLL_BLUR = "blur(1px)";
-const FADE_OUT_AT = 0.4;
 const SCALE: Record<string, number> = { k: 1e3, m: 1e6, b: 1e9 };
 
 export function amountOf(text: string) {
@@ -14,66 +12,29 @@ export function amountOf(text: string) {
 	return Number(match[1]) * (SCALE[match[2]?.toLowerCase() ?? ""] ?? 1);
 }
 
-type Rank = readonly [number, number];
-
-function ranksOf(text: string): Rank[] {
-	const chars = [...text];
-	const first = chars.findIndex((char) => /\d/.test(char));
-	if (first < 0) return chars.map((_, at) => [0, at]);
-	let last = first;
-	for (let at = first; at < chars.length; at += 1) {
-		if (/\d/.test(chars[at] ?? "")) last = at;
-		else if (!/[.,]/.test(chars[at] ?? "")) break;
-	}
-	const point = chars.indexOf(".", first);
-	const anchor = point >= 0 && point <= last ? point : last + 1;
-	return chars.map((_, at) =>
-		at < first
-			? [0, at]
-			: at <= last
-				? [1, at - anchor]
-				: [2, at - chars.length],
-	);
-}
-
-function compare(a: Rank, b: Rank) {
-	return a[0] - b[0] || a[1] - b[1];
-}
-
 export type RollStep =
-	| { kind: "keep"; char: string; old: number }
-	| { kind: "swap"; char: string; old: number }
+	| { kind: "keep"; char: string }
+	| { kind: "swap"; from: string; char: string }
 	| { kind: "add"; char: string }
-	| { kind: "remove"; old: number };
+	| { kind: "remove"; from: string };
 
 export function rollSteps(before: string, after: string): RollStep[] {
 	const from = [...before];
 	const to = [...after];
-	const fromRanks = ranksOf(before);
-	const toRanks = ranksOf(after);
 	const steps: RollStep[] = [];
-	let i = 0;
-	let j = 0;
-	while (i < from.length || j < to.length) {
-		const a = fromRanks[i];
-		const b = toRanks[j];
-		const order = !a ? 1 : !b ? -1 : compare(a, b);
-		if (order < 0) {
-			steps.push({ kind: "remove", old: i });
-			i += 1;
-		} else if (order > 0) {
-			steps.push({ kind: "add", char: to[j] ?? "" });
-			j += 1;
-		} else {
-			const char = to[j] ?? "";
+	for (let place = Math.max(from.length, to.length); place >= 1; place -= 1) {
+		const old = from[from.length - place];
+		const char = to[to.length - place];
+		if (old === undefined && char !== undefined)
+			steps.push({ kind: "add", char });
+		else if (char === undefined && old !== undefined)
+			steps.push({ kind: "remove", from: old });
+		else if (old !== undefined && char !== undefined)
 			steps.push(
-				from[i] === char
-					? { kind: "keep", char, old: i }
-					: { kind: "swap", char, old: i },
+				old === char
+					? { kind: "keep", char }
+					: { kind: "swap", from: old, char },
 			);
-			i += 1;
-			j += 1;
-		}
 	}
 	return steps;
 }
@@ -88,6 +49,7 @@ function glyphOf(char: string) {
 function slotOf(char: string) {
 	const slot = document.createElement("span");
 	slot.className = "cost-roll-slot";
+	slot.dataset.char = char;
 	slot.append(glyphOf(char));
 	return slot;
 }
@@ -98,9 +60,8 @@ function rollIn(glyph: Element, direction: number) {
 			{
 				opacity: 0,
 				transform: `translateY(${direction * ROLL_SHIFT_EM}em)`,
-				filter: ROLL_BLUR,
+				filter: "blur(2px)",
 			},
-			{ opacity: 1, filter: "blur(0px)", offset: 0.55 },
 			{ opacity: 1, transform: "none", filter: "blur(0px)" },
 		],
 		{ duration: ROLL_MS, easing: ROLL_EASE },
@@ -115,20 +76,15 @@ function rollOut(glyph: HTMLElement | null, direction: number) {
 		.animate(
 			[
 				{ opacity: 1, transform: "none", filter: "blur(0px)" },
-				{ opacity: 0, filter: ROLL_BLUR, offset: FADE_OUT_AT },
 				{
 					opacity: 0,
 					transform: `translateY(${-direction * ROLL_SHIFT_EM}em)`,
-					filter: ROLL_BLUR,
+					filter: "blur(2px)",
 				},
 			],
 			{ duration: ROLL_MS, easing: ROLL_EASE, fill: "forwards" },
 		)
 		.finished.then(done, done);
-}
-
-function current(slot: Element) {
-	return slot.querySelector<HTMLElement>(".cost-roll-glyph:not([data-out])");
 }
 
 function roll(
@@ -143,35 +99,54 @@ function roll(
 		),
 	];
 	const steps = rollSteps(before, after);
-	const nextSlot = (from: number) => {
-		for (let at = from; at < steps.length; at += 1) {
-			const step = steps[at];
-			if (step && step.kind !== "add") return slots[step.old] ?? null;
-		}
-		return null;
-	};
-	steps.forEach((step, at) => {
+	const offset =
+		slots.length - steps.filter((step) => step.kind !== "add").length;
+	let at = Math.max(0, offset);
+	let anchor: Element | null = slots[at] ?? null;
+	for (const step of steps) {
 		if (step.kind === "add") {
 			const added = slotOf(step.char);
-			element.insertBefore(added, nextSlot(at + 1));
-			const glyph = current(added);
-			if (glyph) rollIn(glyph, direction);
-			return;
+			element.insertBefore(added, anchor);
+			if (added.firstElementChild) rollIn(added.firstElementChild, direction);
+			continue;
 		}
-		const slot = slots[step.old];
-		if (!slot) return;
+		const slot = slots[at];
+		at += 1;
+		anchor = slots[at] ?? null;
+		if (!slot) continue;
 		if (step.kind === "remove") {
+			const width = slot.offsetWidth;
 			slot.dataset.leaving = "";
-			slot.style.width = `${slot.offsetWidth}px`;
-			rollOut(current(slot), direction);
-			setTimeout(() => slot.remove(), ROLL_MS * FADE_OUT_AT);
+			rollOut(
+				slot.querySelector<HTMLElement>(".cost-roll-glyph:not([data-out])"),
+				direction,
+			);
+			const done = () => slot.remove();
+			slot
+				.animate([{ width: `${width}px` }, { width: "0px" }], {
+					duration: ROLL_MS,
+					easing: ROLL_EASE,
+					fill: "forwards",
+				})
+				.finished.then(done, done);
 		} else if (step.kind === "swap") {
-			rollOut(current(slot), direction);
+			const from = slot.offsetWidth;
+			slot.dataset.char = step.char;
+			rollOut(
+				slot.querySelector<HTMLElement>(".cost-roll-glyph:not([data-out])"),
+				direction,
+			);
 			const glyph = glyphOf(step.char);
 			slot.append(glyph);
 			rollIn(glyph, direction);
+			const to = slot.offsetWidth;
+			if (Math.abs(from - to) > 0.5)
+				slot.animate([{ width: `${from}px` }, { width: `${to}px` }], {
+					duration: ROLL_MS,
+					easing: ROLL_EASE,
+				});
 		}
-	});
+	}
 }
 
 function reducedMotion() {
