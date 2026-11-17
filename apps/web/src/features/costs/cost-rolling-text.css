@@ -1,0 +1,22 @@
+.cost-roll {
+	display: inline-flex;
+	align-items: center;
+}
+.cost-roll-text {
+	display: inline-flex;
+	white-space: pre;
+	font-variant-numeric: tabular-nums;
+}
+.cost-roll-slot {
+	position: relative;
+	display: inline-flex;
+	justify-content: center;
+}
+.cost-roll-glyph {
+	display: inline-block;
+}
+.cost-roll-glyph[data-out] {
+	position: absolute;
+	left: 50%;
+	translate: -50% 0;
+}

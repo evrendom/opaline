@@ -170,7 +170,7 @@ function UsageRow({
 	maximum: number;
 	color: string;
 }) {
-	const share = `${row.estimated && row.points >= 1 ? "~" : ""}${formatPoints(row.points)}`;
+	const share = formatPoints(row.points);
 	const content = (
 		<>
 			<span className="cost-row-identity">
@@ -193,7 +193,7 @@ function UsageRow({
 			</span>
 		</>
 	);
-	const title = `${row.label} · ${share}${row.estimated ? " (estimated)" : ""}`;
+	const title = `${row.label} · ${share}`;
 	return row.href ? (
 		<Link to={row.href} className="cost-breakdown-row" title={title}>
 			{content}

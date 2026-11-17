@@ -50,16 +50,10 @@ const MAX_BAR_PX = 18;
 const RESET_ICON_PX = 14;
 const RESET_ICON_GAP_PX = 6;
 const RESET_ICON_SPACE_PX = 10;
-const LOW_LEFT = 10;
 const USAGE_COLOR = "oklch(0.74 0.17 150)";
-const LOW_COLOR = "oklch(0.64 0.21 27)";
 const USED_COLOR = "color-mix(in oklch, var(--cost-muted) 26%, transparent)";
-const USED_ESTIMATE_COLOR =
-	"color-mix(in oklch, var(--cost-muted) 14%, transparent)";
 const SEGMENT_GAP_PX = 3;
 const SEGMENT_RADIUS_PX = 2;
-const ESTIMATE_COLOR =
-	"color-mix(in oklch, var(--cost-muted) 40%, transparent)";
 const TICK_STYLE = { fill: "var(--cost-muted)", fontSize: 11 };
 const DAY_MS = 86_400_000;
 
@@ -204,32 +198,11 @@ export function PlanUsageChart({
 	const usage = report?.providers.find((entry) => entry.provider === provider);
 	const window = usage?.window ?? null;
 	const showChart = window !== null && showsChart(window);
-	const estimated = window?.buckets.some(
-		(bucket) => bucket.kind === "estimate",
-	);
 	return (
 		<div className="cost-chart-card">
 			<div className="cost-chart-key">
 				<div className="cost-chart-key-copy">
 					<h2 className="cost-chart-title">Usage over time</h2>
-					{showChart ? (
-						<div className="cost-chart-legend">
-							<div className="cost-legend-item">
-								<i style={{ backgroundColor: USAGE_COLOR }} />
-								Left, read from {PROVIDER_NAMES[provider]}
-							</div>
-							<div className="cost-legend-item">
-								<i style={{ backgroundColor: USED_COLOR }} />
-								Used
-							</div>
-							{estimated ? (
-								<div className="cost-legend-item">
-									<i style={{ backgroundColor: ESTIMATE_COLOR }} />
-									Estimated from session cost
-								</div>
-							) : null}
-						</div>
-					) : null}
 				</div>
 				<PillTabs
 					className="h-8 shrink-0 bg-transparent"
@@ -421,11 +394,8 @@ function UsageCanvas({
 	);
 }
 
-function solidColor(period: Period): string {
-	if (period.last?.kind === "estimate") return ESTIMATE_COLOR;
-	return period.solid !== null && period.solid < LOW_LEFT
-		? LOW_COLOR
-		: USAGE_COLOR;
+function solidColor(_period: Period): string {
+	return USAGE_COLOR;
 }
 
 interface BarShapeProps {
@@ -451,14 +421,12 @@ function SplitBar({
 }) {
 	if (!payload || payload.solid === null || !(height > 0) || !(width > 0))
 		return null;
-	const estimate = payload.last?.kind === "estimate";
 	const parts = [
 		{ key: "left", size: payload.solid, fill: solidColor(payload) },
-		{ key: "range", size: payload.cap ?? 0, fill: undefined },
 		{
 			key: "used",
 			size: payload.used ?? 0,
-			fill: estimate ? USED_ESTIMATE_COLOR : USED_COLOR,
+			fill: USED_COLOR,
 		},
 	].filter((part) => part.size > 0.05);
 	const scale = Math.max(0, height - (parts.length - 1) * SEGMENT_GAP_PX) / 100;
@@ -521,10 +489,6 @@ function PeriodTip({
 	provider: ProviderUsage | undefined;
 }) {
 	const last = period.last;
-	const range = last?.usedRange ?? null;
-	const low = range ? Math.round(leftPercent(range[1])) : null;
-	const high = range ? Math.round(leftPercent(range[0])) : null;
-	const estimate = last?.kind === "estimate";
 	const plan = last?.plan
 		? planName(provider?.provider ?? "claude", last.plan)
 		: null;
@@ -541,13 +505,7 @@ function PeriodTip({
 					Left
 				</span>
 				<strong>
-					{last?.usedPercent === null || !last
-						? "—"
-						: estimate
-							? `~${Math.round(leftPercent(last.usedPercent))}%`
-							: low === high
-								? `${low}%`
-								: `${low}–${high}%`}
+					{period.solid === null ? "—" : `${Math.round(period.solid)}%`}
 				</strong>
 			</div>
 			<div>
@@ -558,7 +516,7 @@ function PeriodTip({
 				<strong>
 					{last?.usedPercent === null || !last
 						? "—"
-						: `${estimate && period.usedPoints >= 1 ? "~" : ""}${formatPoints(period.usedPoints)}`}
+						: formatPoints(period.usedPoints)}
 				</strong>
 			</div>
 		</div>

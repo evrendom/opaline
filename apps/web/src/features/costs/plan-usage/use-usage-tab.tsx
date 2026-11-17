@@ -2,7 +2,12 @@ import { useState } from "react";
 import { useLocalDesktopApp } from "@/features/desktop/local-app";
 import type { ChartInterval } from "../chart-interval";
 import type { UsageTab } from "../cost-chart";
-import { PlanUsageChart, periodsOf, showsChart } from "./plan-usage-chart";
+import {
+	formatPoints,
+	PlanUsageChart,
+	periodsOf,
+	showsChart,
+} from "./plan-usage-chart";
 import { UsageBreakdowns } from "./usage-breakdowns";
 import {
 	leftPercent,
@@ -50,8 +55,7 @@ export function useUsageTab(
 			textAt: (index) => {
 				const period = periods[index];
 				if (!period || period.solid === null) return "—";
-				const estimate = period.last?.kind === "estimate";
-				return `${estimate ? "~" : ""}${Math.round(period.solid)}% left`;
+				return `${formatPoints(period.usedPoints)} used`;
 			},
 			selected,
 			onSelect: () => setSelected(true),
