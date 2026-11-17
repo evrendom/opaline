@@ -147,7 +147,7 @@ test("records skills on their own run and counts mixed feedback once", () => {
 		user("u1", "Start"),
 		skill,
 		assistant("a1", "Done"),
-		user("u2", "Great, but it didn’t work", "2026-09-18T10:02:00Z"),
+		user("u2", "Great. It didn’t work", "2026-09-18T10:02:00Z"),
 		assistant("a2", "Done", "2026-09-18T10:03:00Z"),
 		user("u3", "It didn’t work", "2026-09-18T10:04:00Z"),
 	]);

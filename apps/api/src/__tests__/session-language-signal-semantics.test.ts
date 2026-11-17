@@ -22,6 +22,7 @@ const fingerprintsByVersion: Readonly<Record<number, string>> = {
 	5: "39adbbfba8621f3129931bb7849bc9df7aaeec6bfa55d81ea41ec8eb7624b29a",
 	6: "39adbbfba8621f3129931bb7849bc9df7aaeec6bfa55d81ea41ec8eb7624b29a",
 	7: "e119b29c251eb10484a70ef0a39c00903e040d638e501951212384e31a451dd7",
+	8: "0af806a00b99b63138817c5aeb023e2489ff769fe68cfe412a99d92573908e90",
 };
 
 describe("persisted language-signal semantics", () => {

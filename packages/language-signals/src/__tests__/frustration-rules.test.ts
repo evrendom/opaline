@@ -65,6 +65,43 @@ describe("frustration rules", () => {
 		expect(unhappy(text)).toContain(ruleId);
 	});
 
+	test.each([
+		["negative.correction-no", "no, use the other endpoint"],
+		["negative.correction-no", "nah keep the old header"],
+		[
+			"negative.correction-no",
+			"the list looks right.\nno it should be sorted by date",
+		],
+		["negative.correction-no", "nope"],
+		["negative.correction-meant", "that is not what i asked for"],
+		["negative.correction-meant", "i meant the settings page"],
+		["negative.correction-wrong", "that's wrong, the limit is ten"],
+		["negative.correction-wrong-lead", "wrong file. use the config one"],
+		["negative.correction-dislike", "i dont like the new spacing"],
+		["negative.correction-but", "ok but the label is still cut"],
+		["negative.correction-but", "better, but the icon is too big"],
+		["negative.correction-not-seen", "i dont see the new column"],
+		["negative.correction-not-yet", "not quite, the border is thicker"],
+		["negative.correction-too", "the padding is too wide"],
+	])("%s flags %p", (ruleId, text) => {
+		expect(unhappy(text)).toContain(ruleId);
+	});
+
+	test("calm agreement and questions are not corrections", () => {
+		for (const text of [
+			"no need to rerun the tests",
+			"no worries, take your time",
+			"nah thanks",
+			"there is no file named config",
+			"No numbers in the summary section.",
+			"do you know what i mean",
+			"what went wrong in the last deploy",
+			"the wrong answers are marked red",
+			"too many rows to count by hand",
+		])
+			expect(unhappy(text)).toEqual([]);
+	});
+
 	test("bare still and again only count where they stand alone", () => {
 		expect(unhappy("is it still running?")).toEqual([]);
 		expect(unhappy("we still need a migration for this")).toEqual([]);

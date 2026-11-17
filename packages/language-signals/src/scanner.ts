@@ -244,6 +244,8 @@ function appendSegmentMatches(
 	}
 }
 
+const ASKS_IF_UNDERSTOOD_PATTERN = /what\s+$/iu;
+
 const PROBE_FOR_PROBLEMS_PATTERN =
 	/(?:find|spot|see|notice|anything|something|what['’]?s|what\s+is|any)\s+(?:[\p{L}\p{N}]+\s+){0,2}$/iu;
 
@@ -260,6 +262,13 @@ function isSuppressed(
 			);
 		case "negative.again-alone":
 			return !startsSentence(text, index);
+		case "negative.correction-no":
+		case "negative.correction-wrong-lead":
+			return !startsClause(text, index);
+		case "negative.correction-meant":
+			return ASKS_IF_UNDERSTOOD_PATTERN.test(
+				text.slice(Math.max(0, index - 20), index),
+			);
 		case "negative.exclamation-run":
 			return followsPositiveInSentence(text, index, earlier);
 		default:
@@ -278,6 +287,15 @@ function followsPositiveInSentence(
 			return !/[.?!\n]/u.test(text.slice(match.end, index));
 	}
 	return false;
+}
+
+function startsClause(text: string, index: number): boolean {
+	for (let at = index - 1; at >= 0; at--) {
+		const character = text[at] ?? "";
+		if (/[.!?…\n]/u.test(character)) return true;
+		if (!/\s/u.test(character)) return false;
+	}
+	return true;
 }
 
 function startsSentence(text: string, index: number): boolean {

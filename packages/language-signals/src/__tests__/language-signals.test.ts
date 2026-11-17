@@ -214,12 +214,16 @@ describe("language signal rules", () => {
 		}
 	});
 
-	test("leaves calm dislike and like out of the signals", () => {
+	test("counts dislike as a correction and leaves like out of the signals", () => {
 		expect(
 			scanLanguageSignals(
 				"I don't like it. I dont like it. I do not like it. Like this example.",
-			),
-		).toEqual([]);
+			).map(({ category, ruleId }) => `${category}:${ruleId}`),
+		).toEqual([
+			"negative:negative.correction-dislike",
+			"negative:negative.correction-dislike",
+			"negative:negative.correction-dislike",
+		]);
 	});
 
 	test("keeps negative punctuation independent of word boundaries", () => {
