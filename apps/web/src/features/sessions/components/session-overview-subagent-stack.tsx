@@ -87,7 +87,7 @@ export function SessionOverviewSubagentStack({
 	return (
 		<div
 			aria-label={title}
-			className="isolate grid h-5 w-(--subagent-stack-width) shrink-0 grid-flow-col auto-cols-(--subagent-step) items-center"
+			className="isolate grid h-5 w-(--subagent-stack-width) shrink-0 grid-flow-col auto-cols-(--subagent-step) items-center will-change-transform"
 			data-session-overview-subagent-stack
 			data-subagent-icon-count={agents.length}
 			role="img"
