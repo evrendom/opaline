@@ -65,8 +65,9 @@ export function useUsageTab(
 				window && showsChart(window) ? (
 					<UsageBreakdowns window={window} titles={query.data?.titles ?? {}} />
 				) : null,
-			chart: (
+			chart: (dots) => (
 				<PlanUsageChart
+					dots={dots}
 					report={query.data}
 					provider={provider}
 					onProviderChange={setProvider}

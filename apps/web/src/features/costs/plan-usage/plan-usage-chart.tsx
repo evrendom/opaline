@@ -23,6 +23,7 @@ import {
 	type ChartInterval,
 	formatChartDate,
 } from "../chart-interval";
+import { CostDotChart, type DotTone } from "../cost-dot-chart";
 import { useHoverDateStore } from "../cost-hover-date";
 import {
 	leftPercent,
@@ -53,6 +54,7 @@ const RESET_ICON_SPACE_PX = 10;
 const USAGE_COLOR = "oklch(0.74 0.17 150)";
 const RAN_OUT_COLOR = "oklch(0.64 0.21 27)";
 const RAN_OUT_AT = 97;
+const FAINTEST_DOT = 0.14;
 const SEGMENT_GAP_PX = 3;
 const SEGMENT_RADIUS_PX = 2;
 const TICK_STYLE = { fill: "var(--cost-muted)", fontSize: 11 };
@@ -99,6 +101,7 @@ interface Period {
 	readonly used: number | null;
 	readonly usedPoints: number;
 	readonly full: number | null;
+	readonly peak: number | null;
 	readonly ranOut: boolean;
 }
 
@@ -152,6 +155,13 @@ export function periodsOf(
 						),
 			usedPoints,
 			full: last?.usedPercent === null || !last ? null : 100,
+			peak: buckets.reduce<number | null>(
+				(top, bucket) =>
+					bucket.usedPercent === null
+						? top
+						: Math.max(top ?? 0, bucket.usedPercent),
+				null,
+			),
 			ranOut: buckets.some((bucket) => (bucket.usedPercent ?? 0) >= RAN_OUT_AT),
 		};
 	});
@@ -190,6 +200,7 @@ export function PlanUsageChart({
 	interval,
 	pending,
 	failed,
+	dots = false,
 }: {
 	report: PlanUsageReport | null | undefined;
 	provider: PlanProvider;
@@ -197,6 +208,7 @@ export function PlanUsageChart({
 	interval: ChartInterval;
 	pending: boolean;
 	failed: boolean;
+	dots?: boolean;
 }) {
 	const usage = report?.providers.find((entry) => entry.provider === provider);
 	const window = usage?.window ?? null;
@@ -220,6 +232,8 @@ export function PlanUsageChart({
 				<div className="cost-chart-canvas">
 					<Skeleton className="size-full rounded-[8px]" />
 				</div>
+			) : showChart && dots ? (
+				<UsageDots window={window} interval={interval} />
 			) : showChart ? (
 				<UsageCanvas window={window} provider={usage} interval={interval} />
 			) : (
@@ -393,6 +407,49 @@ function UsageCanvas({
 					</ComposedChart>
 				</ResponsiveContainer>
 			) : null}
+		</div>
+	);
+}
+
+function UsageDots({
+	window,
+	interval,
+}: {
+	window: UsageWindow;
+	interval: ChartInterval;
+}) {
+	const periods = periodsOf(window, interval);
+	const byDate = new Map(periods.map((period) => [period.date, period]));
+	const points = periods.map((period) => ({
+		date: period.date,
+		startDate: period.startDate,
+		endDate: period.endDate,
+		total: period.peak ?? 0,
+		values: {},
+	}));
+	const tone = (point: { date: string }): DotTone => {
+		const period = byDate.get(point.date);
+		if (!period || period.peak === null)
+			return { strength: 0, text: "no reading" };
+		if (period.ranOut)
+			return { strength: 1, color: RAN_OUT_COLOR, text: "limit ran out" };
+		const share = Math.min(1, Math.max(0, period.peak / 100));
+		return {
+			strength: share > 0 ? FAINTEST_DOT + (1 - FAINTEST_DOT) * share : 0,
+			text: `${formatPoints(period.peak)} of the limit used`,
+		};
+	};
+	return (
+		<div className="cost-chart-canvas" data-kind="dots" skullet-ignore="">
+			<CostDotChart
+				color={USAGE_COLOR}
+				fit
+				format={formatPoints}
+				interval={interval}
+				label="Usage"
+				points={points}
+				tone={tone}
+			/>
 		</div>
 	);
 }

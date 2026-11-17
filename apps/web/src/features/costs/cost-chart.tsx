@@ -258,7 +258,7 @@ export interface UsageTab {
 	readonly textAt?: (index: number) => string;
 	readonly selected: boolean;
 	readonly onSelect: () => void;
-	readonly chart: ReactNode;
+	readonly chart: (dots: boolean) => ReactNode;
 	readonly breakdowns: ReactNode;
 }
 
@@ -813,7 +813,7 @@ export function CostChart({
 						/>
 					) : null}
 				</fieldset>
-				{usage?.selected ? usage.chart : null}
+				{usage?.selected ? usage.chart(showDots) : null}
 				<div
 					className="cost-chart-card"
 					style={usage?.selected ? { display: "none" } : undefined}

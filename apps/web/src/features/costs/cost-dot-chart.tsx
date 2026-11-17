@@ -37,6 +37,12 @@ import { RollingText } from "./cost-rolling-text";
 
 type ChartPoint = ReturnType<typeof groupChartTrend>[number];
 
+export interface DotTone {
+	readonly strength: number;
+	readonly color?: string;
+	readonly text: string;
+}
+
 export const DotHighlightContext = createContext<ReadonlySet<string> | null>(
 	null,
 );
@@ -301,6 +307,7 @@ export function CostDotChart({
 	label,
 	loading: loadingPoints = false,
 	points,
+	tone,
 }: {
 	color: string;
 	fit?: boolean;
@@ -309,6 +316,7 @@ export function CostDotChart({
 	label: string;
 	loading?: boolean;
 	points: readonly ChartPoint[];
+	tone?: (point: ChartPoint) => DotTone;
 }) {
 	const railLoading = useContext(DotLoadingContext);
 	const loading = loadingPoints || railLoading;
@@ -482,7 +490,13 @@ export function CostDotChart({
 		slot: number | null,
 		style?: CSSProperties,
 	) => {
-		const level = levelOf(point.total, max);
+		const toned = tone?.(point);
+		const level = toned
+			? toned.strength > 0
+				? 1
+				: 0
+			: levelOf(point.total, max);
+		const strength = toned ? toned.strength : LEVELS[level];
 		const current =
 			mark !== null && mark >= point.startDate && mark <= point.endDate;
 		const muted =
@@ -499,11 +513,12 @@ export function CostDotChart({
 				data-lit={(highlight !== null && lights(highlight, point)) || undefined}
 				data-picked={picker?.picked?.date === point.date || undefined}
 				data-muted={muted || undefined}
-				title={`${current ? "Current · " : ""}${short(point.startDate, interval)} · ${format(point.total)} ${label.toLowerCase()}`}
+				title={`${current ? "Current · " : ""}${short(point.startDate, interval)} · ${toned ? toned.text : `${format(point.total)} ${label.toLowerCase()}`}`}
 				style={
 					{
 						...style,
-						"--dot-level": level === 0 || muted ? undefined : LEVELS[level],
+						"--dot-level": level === 0 || muted ? undefined : strength,
+						"--dot-color": muted ? undefined : toned?.color,
 					} as CSSProperties
 				}
 			>
