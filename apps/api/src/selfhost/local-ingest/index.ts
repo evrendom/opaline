@@ -18,7 +18,11 @@ type Environment = Readonly<Record<string, string | undefined>>;
 
 export interface LocalIngestHandle {
 	status(): IngestStatus;
-	notify(paths: readonly string[], final: boolean): Promise<number>;
+	notify(
+		paths: readonly string[],
+		final: boolean,
+		stopped?: boolean,
+	): Promise<number>;
 	wake(): void;
 	stop(): Promise<void>;
 }
@@ -140,7 +144,7 @@ export async function startLocalIngest(options: {
 		);
 	const handle: LocalIngestHandle = {
 		status: () => service.status(),
-		notify: (paths, final) => service.notify(paths, final),
+		notify: (paths, final, stopped) => service.notify(paths, final, stopped),
 		wake: () => service.wake(),
 		stop: async () => {
 			clearTimeout(wakeTimer);

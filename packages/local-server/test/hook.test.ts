@@ -18,7 +18,7 @@ beforeEach(() => {
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 
 describe("the hook ping", () => {
-	test("Claude Code hooks send the transcript, final at session end", () => {
+	test("Claude Code hooks send the transcript, stopped at each turn end and final at session end", () => {
 		expect(
 			claudeHookInput(
 				JSON.stringify({
@@ -26,7 +26,7 @@ describe("the hook ping", () => {
 					hook_event_name: "SessionEnd",
 				}),
 			),
-		).toEqual({ paths: ["/t/a.jsonl"], final: true });
+		).toEqual({ paths: ["/t/a.jsonl"], final: true, stopped: true });
 		expect(
 			claudeHookInput(
 				JSON.stringify({
@@ -34,7 +34,7 @@ describe("the hook ping", () => {
 					hook_event_name: "Stop",
 				}),
 			),
-		).toEqual({ paths: ["/t/a.jsonl"], final: false });
+		).toEqual({ paths: ["/t/a.jsonl"], final: false, stopped: true });
 		expect(claudeHookInput("not json")).toBeNull();
 	});
 
@@ -49,6 +49,7 @@ describe("the hook ping", () => {
 		).toEqual({
 			paths: [file],
 			final: false,
+			stopped: false,
 		});
 		expect(
 			codexHookInput(JSON.stringify({ "thread-id": "../x" }), root, now),
@@ -72,7 +73,7 @@ describe("the hook ping", () => {
 				root,
 				now,
 			),
-		).toEqual({ paths: ["/c/rollout.jsonl"], final: false });
+		).toEqual({ paths: ["/c/rollout.jsonl"], final: false, stopped: true });
 		expect(
 			codexHookInput(
 				JSON.stringify({
@@ -84,7 +85,7 @@ describe("the hook ping", () => {
 				root,
 				now,
 			),
-		).toEqual({ paths: ["/c/rollout.jsonl"], final: true });
+		).toEqual({ paths: ["/c/rollout.jsonl"], final: true, stopped: true });
 		expect(
 			codexHookInput(
 				JSON.stringify({
@@ -95,7 +96,7 @@ describe("the hook ping", () => {
 				root,
 				now,
 			),
-		).toEqual({ paths: [file], final: true });
+		).toEqual({ paths: [file], final: true, stopped: true });
 		expect(codexHookInput("", root, now)).toBeNull();
 		expect(codexHookInput("null", root, now)).toBeNull();
 	});
@@ -108,7 +109,7 @@ describe("the hook ping", () => {
 		}) as unknown as typeof fetch;
 		expect(
 			await notifyLocalServer(
-				{ paths: ["/t/a.jsonl"], final: true },
+				{ paths: ["/t/a.jsonl"], final: true, stopped: true },
 				{ dataDir: root, fetchImpl },
 			),
 		).toBe(false);
@@ -142,7 +143,7 @@ describe("the hook ping", () => {
 		});
 		expect(
 			await notifyLocalServer(
-				{ paths: ["/t/a.jsonl"], final: true },
+				{ paths: ["/t/a.jsonl"], final: true, stopped: true },
 				{ dataDir: root, fetchImpl },
 			),
 		).toBe(true);
@@ -155,6 +156,7 @@ describe("the hook ping", () => {
 		expect(JSON.parse(String(calls[0]?.init.body))).toEqual({
 			paths: ["/t/a.jsonl"],
 			final: true,
+			stopped: true,
 		});
 	});
 });

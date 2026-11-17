@@ -2,10 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useSelfHost } from "@/features/self-hosted/self-host-info";
 
 const BUSY_POLL_MS = 2_000;
-const IDLE_POLL_MS = 15_000;
+const IDLE_POLL_MS = 5_000;
 
 type IngestStatus = {
 	state?: string;
+	agentsRunning?: number;
 	initialImport?: {
 		active?: boolean;
 		sessionsDone?: number;
@@ -46,14 +47,26 @@ async function readIngestStatus(): Promise<IngestStatus | null> {
 	return (await response.json()) as IngestStatus;
 }
 
-export function useInitialImport(): InitialImport | null {
+function useIngestStatus<T>(select: (status: IngestStatus | null) => T) {
 	const selfHost = useSelfHost();
-	const query = useQuery({
+	return useQuery({
 		queryKey: ["selfhost", "ingest-status"],
 		queryFn: readIngestStatus,
 		enabled: Boolean(selfHost),
 		refetchInterval: (current) =>
 			initialImportOf(current.state.data) ? BUSY_POLL_MS : IDLE_POLL_MS,
-	});
-	return initialImportOf(query.data);
+		select,
+	}).data;
+}
+
+export function useInitialImport(): InitialImport | null {
+	return useIngestStatus(initialImportOf) ?? null;
+}
+
+function agentsRunningOf(status: IngestStatus | null): number {
+	return status?.agentsRunning ?? 0;
+}
+
+export function useAgentsRunning(): number {
+	return useIngestStatus(agentsRunningOf) ?? 0;
 }

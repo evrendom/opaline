@@ -12,7 +12,10 @@ export type HookAgent = "claude" | "codex";
 export interface HookInput {
 	readonly paths: readonly string[];
 	readonly final: boolean;
+	readonly stopped: boolean;
 }
+
+const TURN_ENDS = new Set(["Stop", "SessionEnd"]);
 
 export function claudeHookInput(raw: string): HookInput | null {
 	try {
@@ -25,6 +28,7 @@ export function claudeHookInput(raw: string): HookInput | null {
 		return {
 			paths: [value.transcript_path],
 			final: value.hook_event_name === "SessionEnd",
+			stopped: TURN_ENDS.has(String(value.hook_event_name)),
 		};
 	} catch {
 		return null;
@@ -44,8 +48,9 @@ export function codexHookInput(
 	}
 	if (!value || typeof value !== "object") return null;
 	const final = value.hook_event_name === "SessionEnd";
+	const stopped = TURN_ENDS.has(String(value.hook_event_name));
 	if (typeof value.transcript_path === "string" && value.transcript_path)
-		return { paths: [value.transcript_path], final };
+		return { paths: [value.transcript_path], final, stopped };
 	const threadId = value.session_id ?? value["thread-id"];
 	if (typeof threadId !== "string" || !/^[\w-]+$/u.test(threadId)) return null;
 	for (let back = 0; back <= CODEX_DAYS_BACK; back++) {
@@ -61,7 +66,7 @@ export function codexHookInput(
 			const match = readdirSync(directory).find(
 				(name) => name.endsWith(".jsonl") && name.includes(threadId),
 			);
-			if (match) return { paths: [join(directory, match)], final };
+			if (match) return { paths: [join(directory, match)], final, stopped };
 		} catch {}
 	}
 	return null;

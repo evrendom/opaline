@@ -610,6 +610,7 @@ describe("local ingest endpoints", () => {
 			sessionsTotal: 420,
 			completedAt: null,
 		},
+		agentsRunning: 2,
 	};
 
 	test("status and notify answer 404 while local ingest is off", async () => {
@@ -639,11 +640,11 @@ describe("local ingest endpoints", () => {
 		const { registerLocalIngest } = await import(
 			"../selfhost/local-ingest/index.js"
 		);
-		const notified: [readonly string[], boolean][] = [];
+		const notified: [readonly string[], boolean, boolean | undefined][] = [];
 		registerLocalIngest({
 			status: () => status,
-			notify: async (paths, final) => {
-				notified.push([paths, final]);
+			notify: async (paths, final, stopped) => {
+				notified.push([paths, final, stopped]);
 				return paths.length;
 			},
 			wake: () => {},
@@ -677,11 +678,12 @@ describe("local ingest endpoints", () => {
 				body: JSON.stringify({
 					paths: ["/h/.codex/sessions/a.jsonl"],
 					final: true,
+					stopped: true,
 				}),
 			});
 			expect(queued?.status).toBe(202);
 			expect(await queued?.json()).toEqual({ accepted: 1 });
-			expect(notified).toEqual([[["/h/.codex/sessions/a.jsonl"], true]]);
+			expect(notified).toEqual([[["/h/.codex/sessions/a.jsonl"], true, true]]);
 		} finally {
 			registerLocalIngest(null);
 		}

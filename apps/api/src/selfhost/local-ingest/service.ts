@@ -1,6 +1,7 @@
 import { type FSWatcher, watch } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
+import { LIVE_SESSION_ACTIVE_WINDOW_MS } from "@rudel/api-routes";
 import type {
 	FileState,
 	FileStore,
@@ -68,6 +69,7 @@ export interface IngestStatus {
 	readonly etaSeconds: number | null;
 	readonly backgroundPriority: boolean;
 	readonly initialImport: InitialImportStatus;
+	readonly agentsRunning: number;
 }
 
 export interface LocalIngestSettings {
@@ -147,6 +149,7 @@ const SAFE_DIRECTORY = /^[A-Za-z0-9_-]{1,200}$/u;
 const DAY_MS = 86_400_000;
 const GAVE_UP = "gave up after";
 const DRAINED_READS = 2;
+const STOP_GRACE_MS = 10_000;
 
 export class LocalIngest {
 	private readonly settings: LocalIngestSettings;
@@ -156,6 +159,7 @@ export class LocalIngest {
 	private readonly sessions = new Map<string, SessionEntry>();
 	private readonly watchers = new Map<string, FSWatcher>();
 	private readonly touched = new Set<string>();
+	private readonly stoppedAt = new Map<string, number>();
 	private owner: Owner | null = null;
 	private stopped = false;
 	private started = false;
@@ -339,7 +343,11 @@ export class LocalIngest {
 		await Promise.allSettled([...this.inFlight]);
 	}
 
-	async notify(paths: readonly string[], final: boolean): Promise<number> {
+	async notify(
+		paths: readonly string[],
+		final: boolean,
+		stopped = false,
+	): Promise<number> {
 		if (paths.length === 0) {
 			if (this.owner && this.deps.watchFiles !== false) this.watchRoots();
 			await this.scan();
@@ -348,6 +356,9 @@ export class LocalIngest {
 		const files = paths
 			.map((path) => classifyTranscriptPath(this.deps.roots, path))
 			.filter((file): file is TranscriptFile => file !== null);
+		if (stopped)
+			for (const file of files)
+				this.stoppedAt.set(file.sessionPath, this.now());
 		await this.observe(files, { final, force: final });
 		return files.length;
 	}
@@ -390,7 +401,30 @@ export class LocalIngest {
 			etaSeconds: importing && rate > 0 ? Math.ceil(bytesQueued / rate) : null,
 			backgroundPriority: this.deps.backgroundPriority,
 			initialImport: this.initialImportStatus(),
+			agentsRunning: this.agentsRunning(),
 		};
+	}
+
+	private agentsRunning(): number {
+		const now = this.now();
+		const lastWrite = new Map<string, number>();
+		for (const seen of this.files.values()) {
+			const { sessionPath } = seen.file;
+			if (now - seen.stat.mtimeMs > LIVE_SESSION_ACTIVE_WINDOW_MS) continue;
+			lastWrite.set(
+				sessionPath,
+				Math.max(lastWrite.get(sessionPath) ?? 0, seen.stat.mtimeMs),
+			);
+		}
+		let running = 0;
+		for (const [sessionPath, writtenAt] of lastWrite) {
+			if (!this.files.has(sessionPath)) continue;
+			const stoppedAt = this.stoppedAt.get(sessionPath);
+			if (stoppedAt !== undefined && writtenAt <= stoppedAt + STOP_GRACE_MS)
+				continue;
+			running += 1;
+		}
+		return running;
 	}
 
 	private restore(row: StoredFile): void {

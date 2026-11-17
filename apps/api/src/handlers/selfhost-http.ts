@@ -481,6 +481,7 @@ const NotifyBodySchema = z
 	.object({
 		paths: z.array(z.string().min(1).max(4_096)).max(256).default([]),
 		final: z.boolean().default(false),
+		stopped: z.boolean().default(false),
 	})
 	.strict();
 
@@ -517,7 +518,8 @@ async function ingestNotify(
 		return Response.json(
 			{
 				error: "invalid_body",
-				message: "Send { paths: string[], final?: boolean }.",
+				message:
+					"Send { paths: string[], final?: boolean, stopped?: boolean }.",
 			},
 			{ status: 400 },
 		);
@@ -525,7 +527,11 @@ async function ingestNotify(
 		void import("../selfhost/plan-usage/index.js").then((module) =>
 			module.markAgentActivity(),
 		);
-	const accepted = await ingest.notify(parsed.data.paths, parsed.data.final);
+	const accepted = await ingest.notify(
+		parsed.data.paths,
+		parsed.data.final,
+		parsed.data.stopped,
+	);
 	return Response.json({ accepted }, { status: 202 });
 }
 

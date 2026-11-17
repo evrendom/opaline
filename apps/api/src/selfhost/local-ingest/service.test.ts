@@ -216,6 +216,37 @@ test("imports every session once, newest first, and reports progress", async () 
 	await service.stop();
 });
 
+test("counts sessions written in the last five minutes as running until their turn stops", async () => {
+	const working = await session("working", 1);
+	await session("quiet", 10);
+	let clock = Date.now();
+	const service = create(memoryStore(), ingestor(), { now: () => clock });
+	await service.start();
+	await settle(service);
+	expect(service.status().agentsRunning).toBe(1);
+
+	await service.notify([working], false, true);
+	expect(service.status().agentsRunning).toBe(0);
+
+	const stoppedAt = clock;
+	const summary = new Date(stoppedAt + 2_000);
+	await appendFile(working, line("stop hook summary"));
+	await utimes(working, summary, summary);
+	await service.notify([working], false);
+	expect(service.status().agentsRunning).toBe(0);
+
+	clock = stoppedAt + 20_000;
+	const nextTurn = new Date(clock);
+	await appendFile(working, line("next prompt"));
+	await utimes(working, nextTurn, nextTurn);
+	await service.notify([working], false);
+	expect(service.status().agentsRunning).toBe(1);
+
+	clock += 6 * 60_000;
+	expect(service.status().agentsRunning).toBe(0);
+	await service.stop();
+});
+
 test("a restart resumes from the stored state without importing again", async () => {
 	await session("a", 5);
 	await session("b", 10);
