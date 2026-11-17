@@ -42,6 +42,7 @@ export interface UsageWindow {
 		estimated: boolean;
 	}[];
 	readonly sessionPoints?: Readonly<Record<string, number>>;
+	readonly limitHitsAt?: readonly string[];
 	readonly models: readonly GroupShare[];
 	readonly repositories: readonly GroupShare[];
 	readonly otherPoints: number;

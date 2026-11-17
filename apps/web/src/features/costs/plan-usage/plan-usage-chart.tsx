@@ -114,6 +114,11 @@ export function periodsOf(
 	window: UsageWindow,
 	interval: ChartInterval,
 ): Period[] {
+	const hitPeriods = new Set(
+		(window.limitHitsAt ?? []).map((at) =>
+			bucketDate(at.slice(0, 10), interval),
+		),
+	);
 	const groups = new Map<string, UsageBucket[]>();
 	for (const bucket of window.buckets) {
 		const day = bucket.at.slice(0, 10);
@@ -167,7 +172,13 @@ export function periodsOf(
 						: Math.max(top ?? 0, bucket.usedPercent),
 				null,
 			),
-			ranOut: buckets.some((bucket) => (bucket.usedPercent ?? 0) >= RAN_OUT_AT),
+			ranOut:
+				hitPeriods.has(date) ||
+				buckets.some(
+					(bucket) =>
+						bucket.kind !== "estimate" &&
+						(bucket.usedPercent ?? 0) >= RAN_OUT_AT,
+				),
 			repositoryPoints: buckets.reduce(
 				(sum, bucket) => sum + (bucket.repositoryPoints ?? 0),
 				0,

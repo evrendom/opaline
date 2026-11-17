@@ -1,3 +1,4 @@
+import type { LimitHit } from "./cost-rows.js";
 import type { PlanProvider, PlanSample } from "./readings.js";
 import {
 	buildWindowSeries,
@@ -69,8 +70,9 @@ export async function buildPlanUsageReport(input: {
 		sessionIds: readonly string[],
 	) => Promise<ReadonlyMap<string, string>>;
 	readonly repositories?: ReadonlySet<string>;
-	readonly loadLimitHits?: (from: number, to: number) => Promise<string[]>;
+	readonly loadLimitHits?: (from: number, to: number) => Promise<LimitHit[]>;
 }): Promise<PlanUsageReport> {
+	const hits = await limitHitsIn(input);
 	const providers = await Promise.all(
 		PROVIDERS.map(async (provider): Promise<ProviderUsage> => {
 			const mine = input.samples.filter(
@@ -97,20 +99,26 @@ export async function buildPlanUsageReport(input: {
 						.loadRepositories([...new Set(rows.map((row) => row.sessionId))])
 						.catch(() => new Map<string, string>())
 				: undefined;
+			const series = buildWindowSeries({
+				samples,
+				rows,
+				from: input.from,
+				to: input.to,
+				now: input.now,
+				repositoryOf,
+				repositories: input.repositories,
+				bucketMinutes: input.bucketMinutes,
+			});
 			return {
 				provider,
 				plan,
 				error,
-				window: buildWindowSeries({
-					samples,
-					rows,
-					from: input.from,
-					to: input.to,
-					now: input.now,
-					repositoryOf,
-					repositories: input.repositories,
-					bucketMinutes: input.bucketMinutes,
-				}),
+				window: series && {
+					...series,
+					limitHitsAt: hits
+						.filter((hit) => hit.provider === provider)
+						.map((hit) => hit.at),
+				},
 			};
 		}),
 	);
@@ -127,8 +135,31 @@ export async function buildPlanUsageReport(input: {
 		checkedAt: input.checkedAt,
 		providers,
 		titles: await input.loadTitles([...sessionIds]).catch(() => ({})),
-		limitHits: input.loadLimitHits
-			? await input.loadLimitHits(input.from, input.to).catch(() => [])
-			: [],
+		limitHits: hits.map((hit) => hit.id),
 	};
+}
+
+async function limitHitsIn(input: {
+	readonly from: number;
+	readonly to: number;
+	readonly loadLimitHits?: (from: number, to: number) => Promise<LimitHit[]>;
+	readonly loadRepositories?: (
+		sessionIds: readonly string[],
+	) => Promise<ReadonlyMap<string, string>>;
+	readonly repositories?: ReadonlySet<string>;
+}): Promise<LimitHit[]> {
+	if (!input.loadLimitHits) return [];
+	const hits = await input
+		.loadLimitHits(input.from, input.to)
+		.catch(() => [] as LimitHit[]);
+	const repositories = input.repositories;
+	if (!repositories || !input.loadRepositories || hits.length === 0)
+		return hits;
+	const sessionOf = (hit: LimitHit) => hit.id.split(":")[0] ?? hit.id;
+	const repositoryOf = await input
+		.loadRepositories([...new Set(hits.map(sessionOf))])
+		.catch(() => new Map<string, string>());
+	return hits.filter((hit) =>
+		repositories.has(repositoryOf.get(sessionOf(hit)) ?? ""),
+	);
 }

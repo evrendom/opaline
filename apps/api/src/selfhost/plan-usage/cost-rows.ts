@@ -46,23 +46,47 @@ export async function readCostRows(
 	}));
 }
 
+export interface LimitHit {
+	readonly id: string;
+	readonly provider: PlanProvider;
+	readonly at: string;
+}
+
 export async function readLimitHits(
 	clickhouse: Pick<ClickHouseExecutor, "query">,
 	from: number,
 	to: number,
-): Promise<string[]> {
-	const rows = await clickhouse.query<{ sessionId: string; agentId: string }>({
-		query: `SELECT DISTINCT session_id AS sessionId, agent_id AS agentId
+): Promise<LimitHit[]> {
+	const rows = await clickhouse.query<{
+		sessionId: string;
+		agentId: string;
+		source: string;
+		at: string;
+	}>({
+		query: `SELECT session_id AS sessionId, agent_id AS agentId, toString(source) AS source,
+				formatDateTime(max(ifNull(ended_at, started_at)), '%Y-%m-%dT%H:%i:%SZ', 'UTC') AS at
 			FROM rudel.run_index
 			WHERE rate_limited = 1
 				AND started_at < fromUnixTimestamp64Milli({to:Int64})
-				AND ifNull(ended_at, started_at) >= fromUnixTimestamp64Milli({from:Int64})`,
+				AND ifNull(ended_at, started_at) >= fromUnixTimestamp64Milli({from:Int64})
+			GROUP BY sessionId, agentId, source`,
 		query_params: { from, to },
 		format: "JSONEachRow",
 	});
-	return rows.map((row) =>
-		row.agentId ? `${row.sessionId}:${row.agentId}` : row.sessionId,
-	);
+	return rows.flatMap((row) => {
+		const provider = (Object.keys(SOURCES) as PlanProvider[]).find(
+			(key) => SOURCES[key] === row.source,
+		);
+		return provider
+			? [
+					{
+						id: row.agentId ? `${row.sessionId}:${row.agentId}` : row.sessionId,
+						provider,
+						at: row.at,
+					},
+				]
+			: [];
+	});
 }
 
 export async function readSessionTitles(

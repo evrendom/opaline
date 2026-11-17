@@ -62,6 +62,8 @@ export interface WindowSeries {
 	readonly buckets: readonly SeriesBucket[];
 	readonly sessions: readonly SessionShare[];
 	readonly sessionPoints: Readonly<Record<string, number>>;
+	/** When a usage limit refused a run of this provider in the range. */
+	readonly limitHitsAt?: readonly string[];
 	readonly models: readonly GroupShare[];
 	readonly repositories: readonly GroupShare[];
 	readonly otherPoints: number;
