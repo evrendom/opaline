@@ -31,7 +31,7 @@ const { getSessionAnalytics, getSessionAnalyticsSummaryComparison } =
 const { getSessionDimensionAnalysis } = await import(
 	"../services/session-analytics.service.js"
 );
-const { getSessionFilterCatalog } = await import(
+const { getSessionCostMaximum, getSessionFilterCatalog } = await import(
 	"../services/session-list-filters.js"
 );
 const { getLastSessionUpload, LAST_UPLOAD_QUERY_CACHE_SETTINGS } = await import(
@@ -72,6 +72,7 @@ describe("priced analytics reads", () => {
 			metric: "session_count",
 		});
 		await getSessionFilterCatalog("org-1", { days: 30 }).catch(() => null);
+		await getSessionCostMaximum("org-1");
 		await getLastSessionUpload("org-settings");
 		await listRepositories("org-1");
 		await getRepositoryOverview("org-1", {
@@ -100,10 +101,19 @@ describe("priced analytics reads", () => {
 				"analytics.sessions.list",
 				"analytics.sessions.summaryComparison",
 				"analytics.sessions.filterCatalog",
+				"analytics.sessions.costMaximum",
 				"analytics.sessions.lastUpload",
 				"analytics.repositories.overview",
 			]),
 		);
+	});
+
+	test("the biggest session cost reads every session the workspace has, from any date", async () => {
+		expect(await getSessionCostMaximum("org-1")).toBe(0);
+		const [statement] = pricedQueries();
+		expect(statement?.query).toContain("max(");
+		expect(statement?.query).not.toMatch(/\{(?:days|startDate|endDate):/u);
+		expect(statement?.query_params).toEqual({ orgId: "org-1" });
 	});
 
 	test("the last upload bar reads through the ClickHouse query cache for its 30 second reuse window", async () => {

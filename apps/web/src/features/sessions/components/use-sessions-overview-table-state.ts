@@ -48,6 +48,7 @@ const createEmptyRangeFilters = (): SessionOverviewRangeFilterValues => ({
 });
 
 export function useSessionsOverviewTableState({
+	costMaximum,
 	sessionCountLabel,
 	sessions,
 	totalSessionCount,
@@ -59,6 +60,7 @@ export function useSessionsOverviewTableState({
 	onRetryFilterCatalog,
 	onFiltersChange,
 }: {
+	costMaximum?: number;
 	filterCatalog?: SessionFilterCatalog;
 	filterCatalogPending?: boolean;
 	filterCatalogError?: boolean;
@@ -197,8 +199,8 @@ export function useSessionsOverviewTableState({
 						return sessionCost === null
 							? maximum
 							: Math.max(maximum, sessionCost);
-					}, 0),
-		[filteredSessions, previewMaxima],
+					}, costMaximum ?? 0),
+		[costMaximum, filteredSessions, previewMaxima],
 	);
 	const remainingLoadedSessionCount = Math.max(
 		sortedSessions.length - visibleSessions.length,

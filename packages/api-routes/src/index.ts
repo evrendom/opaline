@@ -1426,6 +1426,7 @@ export const contract = {
 			detailSubagent: sessionDetailProcedureContracts.detailSubagent,
 			detailTurn: sessionDetailProcedureContracts.detailTurn,
 			detailWindow: sessionDetailProcedureContracts.detailWindow,
+			costMaximum: oc.output(z.number().nonnegative()),
 			filterCatalog: oc
 				.input(SessionFilterCatalogInputSchema)
 				.output(SessionFilterCatalogSchema),

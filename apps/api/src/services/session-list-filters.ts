@@ -123,6 +123,36 @@ export async function getSessionFilterCatalog(
 	};
 }
 
+export async function getSessionCostMaximum(
+	organizationId: string,
+): Promise<number> {
+	const usage = await getUsageAnalyticsQueryContext(organizationId, {
+		window: {
+			includeNativeDescendants: true,
+			sessionsSql: buildSessionAnalyticsWindowSql("1"),
+		},
+	});
+	const [row] = await queryClickhouse<{ maximum: number | null }>({
+		clickhouse_settings: {
+			...usage.clickhouseSettings,
+			log_comment: "analytics.sessions.costMaximum",
+		},
+		query: `WITH RECURSIVE ${usage.cteDefinitions},
+   ${buildSessionFamilyCostCte({
+			inputRelation: usage.sessionsRelation,
+			outputRelation: "session_max_costs",
+			rootFilterSql: "sa.is_top_level_session = 1",
+			rootRelation: usage.metadataRelation,
+		})}
+   SELECT max(${RANGE_COLUMNS.cost}) AS maximum
+   FROM session_max_costs AS sa
+   WHERE sa.organization_id = {orgId:String}
+    AND sa.is_top_level_session = 1`,
+		query_params: { orgId: organizationId },
+	});
+	return Math.max(row?.maximum ?? 0, 0);
+}
+
 function normalizeBounds(minimum: number, maximum: number, key: RangeKey) {
 	const step = key === "cost" ? 0.0001 : key === "duration" ? 0.1 : 1;
 	const precision = Math.max(0, Math.ceil(-Math.log10(step)));

@@ -133,6 +133,7 @@ export function SessionsListSurface({
 									? { ...pagination, hasNextPage: false }
 									: pagination
 							}
+							costMaximum={data.costMaximum}
 							filterCatalog={data.filterCatalog}
 							filterCatalogPending={data.filterCatalogPending}
 							filterCatalogError={data.filterCatalogError}

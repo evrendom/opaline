@@ -52,6 +52,7 @@ import {
 	sessionRowKey,
 	transcriptSubagentId,
 } from "@/features/sessions/session-row-key";
+import { useSessionCostMaximum } from "@/features/sessions/use-session-cost-maximum";
 import { ShellNavIcon } from "@/features/shell/components/shell-nav-icon";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { useCurrentShellRoute } from "@/features/shell/hooks/useCurrentShellRoute";
@@ -279,6 +280,7 @@ export function UsageSessionsPane({
 				? offset + lastPage.length
 				: undefined,
 	});
+	const costMaximum = useSessionCostMaximum();
 	const sessionsQuery = useInfiniteQuery({
 		...options,
 		queryKey: ["org", state.activeOrg?.id, ...options.queryKey],
@@ -415,6 +417,7 @@ export function UsageSessionsPane({
 				}
 			>
 				<SessionsOverviewTable
+					costMaximum={costMaximum}
 					showPlace={kind === "Repo"}
 					highlightClassName={rowHighlightClassName}
 					onVisibleSessions={onVisibleSessions}

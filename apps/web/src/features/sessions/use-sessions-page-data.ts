@@ -41,6 +41,7 @@ import {
 import { sessionRowKey, transcriptSubagentId } from "./session-row-key";
 import { mergeSessionUploadFailures } from "./session-upload-failure";
 import { useLiveSessionList } from "./use-live-sessions";
+import { useSessionCostMaximum } from "./use-session-cost-maximum";
 
 const FAILURES_PUSHED_POLL_MS = 5 * 60_000;
 
@@ -134,6 +135,7 @@ export function useSessionsPageData({
 		},
 		[filterScope],
 	);
+	const costMaximum = useSessionCostMaximum();
 	const catalogQuery = useAnalyticsQuery({
 		...orpc.analytics.sessions.filterCatalog.queryOptions({
 			input: { startDate, endDate, days: meta.dayCount },
@@ -447,6 +449,7 @@ export function useSessionsPageData({
 			void failurePages.refetch();
 		},
 		organizationId: organization.activeOrg?.id,
+		costMaximum,
 		filterCatalog: catalogQuery.data,
 		filterCatalogPending: !demo && catalogQuery.isPending,
 		filterCatalogError: !demo && catalogQuery.isError && !catalogQuery.data,

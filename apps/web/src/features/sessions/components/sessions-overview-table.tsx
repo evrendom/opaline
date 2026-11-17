@@ -66,6 +66,7 @@ type SessionsOverviewTableProps = {
 	/** Leads the header's toolbar, before sorting, such as a search field. */
 	toolbarStart?: ReactNode;
 	showDateControl?: boolean;
+	costMaximum?: number;
 	filterCatalog?: SessionFilterCatalog;
 	filterCatalogPending?: boolean;
 	filterCatalogError?: boolean;
@@ -108,6 +109,7 @@ export function SessionsOverviewTable({
 	totalSessionCount,
 	usageShares: givenUsageShares,
 	pagination,
+	costMaximum,
 	filterCatalog,
 	filterCatalogPending,
 	filterCatalogError,
@@ -119,6 +121,7 @@ export function SessionsOverviewTable({
 	const [pageSize, setPageSize] = useState<number>(DEFAULT_SESSIONS_PER_PAGE);
 	const { avatarMap, userMap } = useUserMap();
 	const tableState = useSessionsOverviewTableState({
+		costMaximum,
 		sessionCountLabel,
 		sessions,
 		totalSessionCount,

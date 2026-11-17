@@ -447,6 +447,33 @@ describe("SessionsOverviewTable", () => {
 		}
 	});
 
+	it("fills each cost ring against the biggest session of all time, not the listed ones", () => {
+		const table = (costMaximum: number) => (
+			<SessionsOverviewTable
+				activeSessionId={null}
+				canOpenSession={() => true}
+				costMaximum={costMaximum}
+				getSessionHref={undefined}
+				getSessionLinkState={undefined}
+				isLoading={false}
+				onSessionClick={vi.fn()}
+				scrollContainerRef={undefined}
+				sessionCountLabel={1}
+				sessions={[session]}
+				sessionDetailDisabledNote={undefined}
+				totalSessionCount={1}
+			/>
+		);
+		const ring = () =>
+			screen.getByRole("progressbar", {
+				name: "8¢ API cost relative to the most expensive session",
+			});
+		const { rerender } = render(table(0.32));
+		expect(ring()).toHaveAttribute("aria-valuenow", "25");
+		rerender(table(0.04));
+		expect(ring()).toHaveAttribute("aria-valuenow", "100");
+	});
+
 	it("scrolls every column together without frozen cells", () => {
 		render(
 			<SessionsOverviewTable

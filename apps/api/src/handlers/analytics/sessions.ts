@@ -49,7 +49,10 @@ import {
 } from "../../services/session-detail-derivation.service.js";
 import { getSessionFileChanges } from "../../services/session-file-changes/session-file-changes.service.js";
 import { getLastSessionUpload } from "../../services/session-last-upload.service.js";
-import { getSessionFilterCatalog } from "../../services/session-list-filters.js";
+import {
+	getSessionCostMaximum,
+	getSessionFilterCatalog,
+} from "../../services/session-list-filters.js";
 import { readNativeSessionRelationships } from "../../services/session-native-lineage.service.js";
 import { getSessionOwner } from "../../services/session-ownership.service.js";
 import {
@@ -382,6 +385,14 @@ const lastUpload = os.analytics.sessions.lastUpload
 	.use(orgMiddleware)
 	.handler(({ context }) => getLastSessionUpload(context.organizationId));
 
+const costMaximum = os.analytics.sessions.costMaximum
+	.use(orgMiddleware)
+	.handler(({ context }) =>
+		selfHostedRead("sessions.costMaximum", [context.organizationId], () =>
+			getSessionCostMaximum(context.organizationId),
+		),
+	);
+
 const filterCatalog = os.analytics.sessions.filterCatalog
 	.use(orgMiddleware)
 	.handler(({ input, context }) =>
@@ -689,6 +700,7 @@ export const sessionsRouter = os.analytics.sessions.router({
 	setupText,
 	summaryLinks,
 	fileChanges,
+	costMaximum,
 	filterCatalog,
 	summaryComparison,
 	dimensionAnalysis,
