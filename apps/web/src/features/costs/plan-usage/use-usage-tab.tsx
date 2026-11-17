@@ -18,7 +18,7 @@ import {
 } from "./use-plan-usage";
 
 function usedChip(points: number): string {
-	return `\u2212${Math.round(points)}%`;
+	return `\u2193${Math.round(points)}`;
 }
 
 export function useUsageTab(

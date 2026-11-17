@@ -229,25 +229,13 @@
 	letter-spacing: -0.025em;
 }
 .cost-metric-value:has(> .cost-metric-chip) {
-	gap: 3px;
-}
-.cost-metric-header:has(.cost-metric-chip) {
 	gap: 4px;
 }
-.cost-metric-header:has(.cost-metric-chip) .cost-metric-label {
-	gap: 5px;
-}
 .cost-metric-chip {
-	align-self: center;
-	padding: 0 3px;
-	border-radius: 5px;
-	font-size: 0.65625rem;
-	font-weight: 500;
-	line-height: 1rem;
-	letter-spacing: -0.02em;
-	font-variant-numeric: proportional-nums;
+	font-size: 0.75rem;
+	font-weight: 450;
+	letter-spacing: -0.01em;
 	color: var(--cost-muted);
-	background: color-mix(in srgb, var(--cost-muted) 16%, transparent);
 }
 .cost-metric-qualifier {
 	font-size: 0.75rem;
