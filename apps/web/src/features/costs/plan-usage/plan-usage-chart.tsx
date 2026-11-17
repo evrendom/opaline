@@ -19,13 +19,13 @@ import {
 	CodexModelIcon,
 } from "@/features/dashboard/components/DashboardModelBadges";
 import { PillTabs } from "@/features/repos/pill-tabs";
+import { EdgeTick, edgeTicks, useAxisHover } from "../chart-edge-axis";
 import {
 	bucketDate,
 	type ChartInterval,
 	formatChartDate,
 } from "../chart-interval";
 import {
-	type BucketKind,
 	leftPercent,
 	type PlanProvider,
 	type PlanUsageReport,
@@ -48,11 +48,8 @@ const MARGIN = { top: 12, right: 12, bottom: 0, left: 0 };
 const Y_AXIS_WIDTH = 56;
 const BAR_SHARE = 0.6;
 const MAX_BAR_PX = 18;
-const TICK_GAP_PX = 65;
-const LABEL_CHAR_PX = 6.2;
-const LABEL_GAP_PX = 12;
 const RESET_ICON_PX = 14;
-const RESET_ROW_PX = 15;
+const RESET_ICON_GAP_PX = 6;
 const LOW_LEFT = 10;
 const USAGE_COLOR = "oklch(0.74 0.17 150)";
 const LOW_COLOR = "oklch(0.64 0.21 27)";
@@ -61,10 +58,6 @@ const ESTIMATE_COLOR =
 const TICK_STYLE = { fill: "var(--cost-muted)", fontSize: 11 };
 const DAY_MS = 86_400_000;
 
-const timeFormat = new Intl.DateTimeFormat("en-US", {
-	hour: "numeric",
-	minute: "2-digit",
-});
 const resetFormat = new Intl.DateTimeFormat("en-US", {
 	weekday: "short",
 	month: "short",
@@ -76,12 +69,6 @@ const resetTickFormat = new Intl.DateTimeFormat("en-US", {
 	month: "short",
 	day: "numeric",
 	hour: "numeric",
-});
-const periodFormat = new Intl.DateTimeFormat("en-US", {
-	month: "short",
-	day: "numeric",
-	year: "numeric",
-	timeZone: "UTC",
 });
 
 export function formatPoints(points: number): string {
@@ -116,7 +103,6 @@ interface Period {
 	readonly endDate: string;
 	readonly last: UsageBucket | null;
 	readonly usedPoints: number;
-	readonly sessions: readonly { sessionId: string; points: number }[];
 	readonly solid: number | null;
 	readonly cap: number | null;
 }
@@ -134,16 +120,10 @@ function periodsOf(window: UsageWindow, interval: ChartInterval): Period[] {
 		const last =
 			[...buckets].reverse().find((bucket) => bucket.usedPercent !== null) ??
 			null;
-		const perSession = new Map<string, number>();
-		let usedPoints = 0;
-		for (const bucket of buckets) {
-			usedPoints += bucket.usedPoints;
-			for (const session of bucket.sessions)
-				perSession.set(
-					session.sessionId,
-					(perSession.get(session.sessionId) ?? 0) + session.points,
-				);
-		}
+		const usedPoints = buckets.reduce(
+			(sum, bucket) => sum + bucket.usedPoints,
+			0,
+		);
 		const range = last?.usedRange ?? null;
 		const low = range ? leftPercent(range[1]) : null;
 		const high = range ? leftPercent(range[0]) : null;
@@ -155,10 +135,6 @@ function periodsOf(window: UsageWindow, interval: ChartInterval): Period[] {
 			endDate: buckets.at(-1)?.at.slice(0, 10) ?? date,
 			last,
 			usedPoints,
-			sessions: [...perSession]
-				.sort((a, b) => b[1] - a[1])
-				.slice(0, 4)
-				.map(([sessionId, points]) => ({ sessionId, points })),
 			solid: estimate
 				? last?.usedPercent === null || !last
 					? null
@@ -172,15 +148,6 @@ function periodsOf(window: UsageWindow, interval: ChartInterval): Period[] {
 	});
 }
 
-function periodLabel(period: Period): string {
-	return period.startDate === period.endDate
-		? periodFormat.format(new Date(`${period.startDate}T00:00:00Z`))
-		: periodFormat.formatRange(
-				new Date(`${period.startDate}T00:00:00Z`),
-				new Date(`${period.endDate}T00:00:00Z`),
-			);
-}
-
 function resetX(periods: readonly Period[], at: string): number | null {
 	const time = Date.parse(at);
 	for (const period of periods) {
@@ -190,10 +157,6 @@ function resetX(periods: readonly Period[], at: string): number | null {
 			return period.x - 0.5 + (time - start) / (end - start);
 	}
 	return null;
-}
-
-function labelWidth(label: string): number {
-	return label.length * LABEL_CHAR_PX + 8;
 }
 
 function useWidth<T extends HTMLElement>() {
@@ -293,12 +256,7 @@ export function PlanUsageChart({
 					<Skeleton className="size-full rounded-[8px]" />
 				</div>
 			) : showChart ? (
-				<UsageCanvas
-					window={window}
-					provider={usage}
-					interval={interval}
-					titles={report?.titles ?? {}}
-				/>
+				<UsageCanvas window={window} provider={usage} interval={interval} />
 			) : (
 				<div className="cost-chart-canvas plan-usage-empty">
 					<EmptyState
@@ -344,12 +302,10 @@ function UsageCanvas({
 	window,
 	provider,
 	interval,
-	titles,
 }: {
 	window: UsageWindow;
 	provider: ProviderUsage | undefined;
 	interval: ChartInterval;
-	titles: Readonly<Record<string, string>>;
 }) {
 	const [canvasRef, width] = useWidth<HTMLDivElement>();
 	const periods = periodsOf(window, interval);
@@ -366,54 +322,34 @@ function UsageCanvas({
 		Math.max(2 / ratio, Math.round(pitch * BAR_SHARE * ratio) / ratio),
 	);
 	const snap = (value: number) => Math.round(value * ratio) / ratio;
-	const resets = window.resets.flatMap((at) => {
-		const x = resetX(periods, at);
-		return x === null
-			? []
-			: [
-					{
-						at,
-						x,
-						label: `Limit reset ${resetTickFormat.format(new Date(at))}`,
-					},
-				];
-	});
-	const step = Math.max(1, Math.ceil(TICK_GAP_PX / Math.max(pitch, 1)));
-	const rows: { from: number; to: number }[][] = [[], []];
-	const place = (x: number, size: number, row: number) => {
-		const center = (x + 0.5) * pitch;
-		const span = { from: center - size / 2, to: center + size / 2 };
-		const taken = rows[row] ?? [];
-		if (
-			taken.some(
-				(other) =>
-					span.from < other.to + LABEL_GAP_PX &&
-					span.to > other.from - LABEL_GAP_PX,
-			)
-		)
-			return false;
-		taken.push(span);
-		return true;
-	};
-	const ticks = periods
-		.filter((period) => period.x % step === 0)
-		.filter((period) =>
-			place(period.x, labelWidth(formatChartDate(period.date, interval)), 0),
-		)
-		.map((period) => period.x);
-	const resetRow = new Map<number, number>();
-	for (const reset of resets) {
-		if (place(reset.x, RESET_ICON_PX, 0)) resetRow.set(reset.x, 0);
-		else if (place(reset.x, RESET_ICON_PX, 1)) resetRow.set(reset.x, 1);
-	}
+	const resetDays = new Map<number, string>();
+	if (interval === "daily")
+		for (const at of window.resets) {
+			const x = resetX(periods, at);
+			if (x !== null)
+				resetDays.set(
+					Math.round(x),
+					`Limit reset ${resetTickFormat.format(new Date(at))}`,
+				);
+		}
+	const axisHover = useAxisHover();
 	return (
 		<div ref={canvasRef} className="cost-chart-canvas" skullet-ignore="">
 			{width > 0 ? (
 				<ResponsiveContainer width="100%" height="100%" minWidth={0}>
 					<ComposedChart
 						data={periods}
-						margin={{ ...MARGIN, right: MARGIN.right + spare }}
+						margin={{
+							...MARGIN,
+							top:
+								resetDays.size > 0
+									? RESET_ICON_PX + RESET_ICON_GAP_PX + 4
+									: MARGIN.top,
+							right: MARGIN.right + spare,
+						}}
 						accessibilityLayer
+						onMouseMove={axisHover.onMouseMove}
+						onMouseLeave={axisHover.onMouseLeave}
 					>
 						<CartesianGrid
 							vertical={false}
@@ -424,48 +360,24 @@ function UsageCanvas({
 							type="number"
 							dataKey="x"
 							domain={[-0.5, count - 0.5]}
-							ticks={[...ticks, ...resetRow.keys()]}
+							ticks={edgeTicks(periods.length, axisHover.hover)}
 							interval={0}
-							allowDecimals
 							axisLine={false}
 							tickLine={false}
 							tickMargin={14}
-							height={
-								resetRow.size > 0 && [...resetRow.values()].includes(1)
-									? 54
-									: 40
-							}
-							tick={(props: XAxisTickContentProps) => {
-								const x = Number(props.x ?? 0);
-								const y = Number(props.y ?? 0);
-								const value = Number(props.payload?.value);
-								const reset = resets.find((entry) => entry.x === value);
-								if (reset)
-									return (
-										<IconRefresh
-											x={x - RESET_ICON_PX / 2}
-											y={y - 1 + (resetRow.get(value) ?? 0) * RESET_ROW_PX}
-											size={RESET_ICON_PX}
-											stroke={1.75}
-											color="var(--cost-muted)"
-											title={reset.label}
-											aria-label={reset.label}
-										/>
-									);
-								const period = periods[Number(value)];
-								return (
-									<text
-										x={x}
-										y={y}
-										dy="0.71em"
-										textAnchor="middle"
-										fill={TICK_STYLE.fill}
-										fontSize={TICK_STYLE.fontSize}
-									>
-										{period ? formatChartDate(period.date, interval) : ""}
-									</text>
-								);
-							}}
+							height={40}
+							tick={(props: XAxisTickContentProps) => (
+								<EdgeTick
+									tick={props}
+									count={periods.length}
+									hover={axisHover.hover}
+									inset={bar / 2}
+									label={(index) => {
+										const period = periods[index];
+										return period ? formatChartDate(period.date, interval) : "";
+									}}
+								/>
+							)}
 						/>
 						<YAxis
 							domain={[0, 100]}
@@ -484,11 +396,7 @@ function UsageCanvas({
 							content={({ active, label }) => {
 								const period = periods[Number(label)];
 								return active && period ? (
-									<PeriodTip
-										period={period}
-										provider={provider}
-										titles={titles}
-									/>
+									<PeriodTip period={period} provider={provider} />
 								) : null;
 							}}
 						/>
@@ -502,6 +410,11 @@ function UsageCanvas({
 									{...props}
 									snap={snap}
 									radius={props.payload?.cap ? 0 : 2}
+									reset={
+										props.payload?.cap
+											? undefined
+											: resetDays.get(props.payload?.x ?? -1)
+									}
 								/>
 							)}
 						>
@@ -515,7 +428,13 @@ function UsageCanvas({
 							barSize={bar}
 							isAnimationActive={false}
 							shape={(props: BarShapeProps) => (
-								<SnappedBar {...props} snap={snap} radius={2} outline />
+								<SnappedBar
+									{...props}
+									snap={snap}
+									radius={2}
+									outline
+									reset={resetDays.get(props.payload?.x ?? -1)}
+								/>
 							)}
 						/>
 					</ComposedChart>
@@ -550,10 +469,12 @@ function SnappedBar({
 	snap,
 	radius,
 	outline = false,
+	reset,
 }: BarShapeProps & {
 	snap: (value: number) => number;
 	radius: number;
 	outline?: boolean;
+	reset?: string;
 }) {
 	if (!(height > 0) || !(width > 0)) return null;
 	const left = snap(x);
@@ -562,7 +483,7 @@ function SnappedBar({
 	const tall = snap(y + height) - top;
 	const corner = Math.min(radius, size / 2, tall);
 	const path = `M${left},${top + tall}V${top + corner}Q${left},${top} ${left + corner},${top}H${left + size - corner}Q${left + size},${top} ${left + size},${top + corner}V${top + tall}`;
-	return outline ? (
+	const shape = outline ? (
 		<path
 			d={path}
 			fill="none"
@@ -573,31 +494,41 @@ function SnappedBar({
 	) : (
 		<path d={`${path}Z`} fill={fill} />
 	);
+	if (!reset) return shape;
+	return (
+		<g>
+			{shape}
+			<IconRefresh
+				x={left + size / 2 - RESET_ICON_PX / 2}
+				y={top - RESET_ICON_PX - RESET_ICON_GAP_PX}
+				size={RESET_ICON_PX}
+				stroke={1.75}
+				color="var(--cost-muted)"
+				title={reset}
+				aria-label={reset}
+			/>
+		</g>
+	);
 }
-
-const KIND_TEXT: Record<BucketKind, string> = {
-	reading: "Read from the provider",
-	between: "Between two readings",
-	estimate: "Estimated from session cost",
-};
 
 function PeriodTip({
 	period,
 	provider,
-	titles,
 }: {
 	period: Period;
 	provider: ProviderUsage | undefined;
-	titles: Readonly<Record<string, string>>;
 }) {
 	const last = period.last;
 	const range = last?.usedRange ?? null;
 	const low = range ? Math.round(leftPercent(range[1])) : null;
 	const high = range ? Math.round(leftPercent(range[0])) : null;
 	const estimate = last?.kind === "estimate";
+	const plan = last?.plan
+		? planName(provider?.provider ?? "claude", last.plan)
+		: null;
 	return (
 		<div className="cost-chart-tooltip">
-			<p>{periodLabel(period)}</p>
+			{plan ? <p>{plan}</p> : null}
 			<div>
 				<span>
 					<i
@@ -605,7 +536,7 @@ function PeriodTip({
 							backgroundColor: last ? solidColor(period) : "transparent",
 						}}
 					/>
-					Left at the end
+					Left
 				</span>
 				<strong>
 					{last?.usedPercent === null || !last
@@ -618,33 +549,12 @@ function PeriodTip({
 				</strong>
 			</div>
 			<div>
-				<span>Used in this period</span>
+				<span>Used</span>
 				<strong>
 					{estimate && period.usedPoints >= 1 ? "~" : ""}
 					{formatPoints(period.usedPoints)}
 				</strong>
 			</div>
-			{last?.kind ? (
-				<p>
-					{last.kind === "reading" && last.readAt
-						? `Read at ${timeFormat.format(new Date(last.readAt))}`
-						: KIND_TEXT[last.kind]}
-					{last.plan
-						? ` · ${planName(provider?.provider ?? "claude", last.plan)}${estimate ? " (at the first reading)" : ""}`
-						: ""}
-				</p>
-			) : null}
-			{period.sessions.map((session) => (
-				<div key={session.sessionId}>
-					<span className="plan-usage-tip-session">
-						{titles[session.sessionId] ?? session.sessionId.slice(0, 8)}
-					</span>
-					<strong>
-						{estimate && session.points >= 1 ? "~" : ""}
-						{formatPoints(session.points)}
-					</strong>
-				</div>
-			))}
 		</div>
 	);
 }

@@ -45,6 +45,7 @@ import {
 	ResponsiveContainer,
 	Tooltip,
 	XAxis,
+	type XAxisTickContentProps,
 	YAxis,
 } from "recharts";
 import { introRequested } from "@/app/first-open";
@@ -63,6 +64,7 @@ import { useOptionalOrganization } from "@/features/workspace/organization/useOr
 import { formatIsoDate } from "@/lib/format";
 import { type AreaShape, morphAreas, readAreaShape } from "./area-morph";
 import { SERIES_COLORS } from "./chart-colors";
+import { EdgeTick, edgeTicks, useAxisHover } from "./chart-edge-axis";
 import {
 	DASHBOARD_LOADING_LINE,
 	HEARTBEAT_BASE_VALUE,
@@ -75,7 +77,6 @@ import {
 	type ChartInterval,
 	chartPeriodDates,
 	formatChartDate,
-	formatChartPeriod,
 	getChartSeriesValue,
 	groupChartTrend,
 	isCiHistoryAvailable,
@@ -307,6 +308,7 @@ export function CostChart({
 		pending || (perRunChart && previews?.languageSplit === undefined);
 	const [phase, setPhase] = useState<ChartPhase>(loading ? "loading" : "idle");
 	const [hoverStore] = useState(createHoverDateStore);
+	const axisHover = useAxisHover();
 	const metricsRef = useRef<HTMLFieldSetElement>(null);
 	const [expanded, setExpanded] = useState<DashboardMetric | null>(null);
 	if (expanded !== null && expanded !== selectedMetric) setExpanded(null);
@@ -1058,6 +1060,8 @@ export function CostChart({
 										data={rows}
 										margin={{ top: 12, right: 12, bottom: 0, left: 0 }}
 										accessibilityLayer
+										onMouseMove={axisHover.onMouseMove}
+										onMouseLeave={axisHover.onMouseLeave}
 									>
 										<defs>
 											<linearGradient
@@ -1102,23 +1106,33 @@ export function CostChart({
 											type="number"
 											dataKey="x"
 											domain={xDomain}
-											ticks={heartbeat ? [] : trend.map((_, index) => index)}
-											allowDecimals={false}
-											tickFormatter={(value) =>
-												formatChartDate(
-													trend[Number(value)]?.date ?? "",
-													interval,
-												)
+											ticks={
+												heartbeat
+													? []
+													: edgeTicks(trend.length, axisHover.hover)
 											}
+											interval={0}
+											allowDecimals={false}
 											axisLine={false}
 											tickLine={false}
-											minTickGap={65}
 											tickMargin={14}
 											height={40}
 											tick={
 												heartbeat
 													? false
-													: { fill: "var(--cost-muted)", fontSize: 11 }
+													: (props: XAxisTickContentProps) => (
+															<EdgeTick
+																tick={props}
+																count={trend.length}
+																hover={axisHover.hover}
+																label={(index) =>
+																	formatChartDate(
+																		trend[index]?.date ?? "",
+																		interval,
+																	)
+																}
+															/>
+														)
 											}
 										/>
 										<YAxis
@@ -1201,7 +1215,6 @@ export function CostChart({
 												const point = trend[Number(label)];
 												return active && payload?.length ? (
 													<div className="cost-chart-tooltip">
-														<p>{point ? formatChartPeriod(point) : null}</p>
 														{payload.map((item) => (
 															<div key={String(item.name)}>
 																<span>
