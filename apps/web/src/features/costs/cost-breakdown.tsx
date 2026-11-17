@@ -31,15 +31,12 @@ import {
 import { getModelBadgeTone } from "@/features/dashboard/components/dashboard-model-brand";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { SERIES_COLORS } from "./chart-colors";
-import { bucketDate, type ChartInterval } from "./chart-interval";
 import {
 	costLabel,
 	formatMetricRatio,
 	formatRunDuration,
 	METRIC_LABELS,
 } from "./cost-format";
-import { useMarkedDate } from "./cost-hover-date";
-import { RollingText } from "./cost-rolling-text";
 import { COST_LABELS } from "./use-cost-dashboard";
 
 type Props = {
@@ -56,31 +53,7 @@ type Props = {
 	onClear: () => void;
 	/** Set while the rows are not loaded yet (plugin app); shows a load button. */
 	onLoadDeferred?: () => void;
-	daily?: Record<string, Record<string, number>>;
-	interval?: ChartInterval;
 };
-
-function hoveredEntries(
-	entries: CostBreakdownEntry[],
-	daily: Record<string, Record<string, number>> | undefined,
-	interval: ChartInterval | undefined,
-	marked: string | null,
-): CostBreakdownEntry[] {
-	if (!marked || !daily || !interval) return entries;
-	const sums = new Map<string, number>();
-	for (const [day, values] of Object.entries(daily)) {
-		if (bucketDate(day, interval) !== marked) continue;
-		for (const [id, value] of Object.entries(values))
-			sums.set(id, (sums.get(id) ?? 0) + value);
-	}
-	return entries
-		.map((entry) =>
-			entry.denominator === undefined
-				? { ...entry, value: sums.get(entry.id) ?? 0 }
-				: entry,
-		)
-		.sort((a, b) => b.value - a.value);
-}
 
 const INTRO_ROW_SCALES = [1, 0.62, 0.41, 0.27, 0.18, 0.11];
 
@@ -97,8 +70,6 @@ export function CostBreakdown({
 	onSplit,
 	onClear,
 	onLoadDeferred,
-	daily,
-	interval,
 }: Props) {
 	const [expanded, setExpanded] = useState(false);
 	const introHold = useIntroHold();
@@ -106,9 +77,7 @@ export function CostBreakdown({
 	const holding = introHold && introSettled;
 	const [search, setSearch] = useState("");
 	const label = COST_LABELS[dimension];
-	const marked = useMarkedDate();
-	const shown = hoveredEntries(entries, daily, interval, marked);
-	const maximum = Math.max(0, ...shown.map((entry) => entry.value));
+	const maximum = Math.max(0, ...entries.map((entry) => entry.value));
 	const filtered = entries.filter((entry) =>
 		`${entry.id} ${costLabel(dimension, entry.label)}`
 			.toLowerCase()
@@ -183,7 +152,7 @@ export function CostBreakdown({
 							{() => (
 								<div data-fluid-menu-root="">
 									<FluidMenuHover items=".cost-breakdown-row" />
-									{shown.map((entry) => (
+									{entries.map((entry) => (
 										<BreakdownRow
 											key={entry.id}
 											dimension={dimension}
@@ -394,9 +363,7 @@ function BreakdownRow({
 				{selected ? <IconCheck size={14} className="shrink-0" /> : null}
 			</span>
 			<span className="cost-row-amount">
-				<RollingText
-					text={formatMetricRatio(entry.value, metric, entry.denominator)}
-				/>
+				{formatMetricRatio(entry.value, metric, entry.denominator)}
 				{/* The share bar: scaled to the largest row, right-aligned. */}
 				<span className="cost-row-meter" aria-hidden="true">
 					<span

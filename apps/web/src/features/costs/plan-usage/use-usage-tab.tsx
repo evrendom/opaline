@@ -63,11 +63,7 @@ export function useUsageTab(
 			onSelect: () => setSelected(true),
 			breakdowns:
 				window && showsChart(window) ? (
-					<UsageBreakdowns
-						window={window}
-						titles={query.data?.titles ?? {}}
-						interval={interval}
-					/>
+					<UsageBreakdowns window={window} titles={query.data?.titles ?? {}} />
 				) : null,
 			chart: (dots) => (
 				<PlanUsageChart

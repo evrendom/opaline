@@ -173,9 +173,6 @@ export const AgentRunDurationStatsSchema = z.object({
 });
 
 export const DashboardMetricDataSchema = z.object({
-	dailyBreakdowns: z
-		.record(z.string(), z.record(z.string(), z.record(z.string(), z.number())))
-		.optional(),
 	total: z.number().nonnegative(),
 	incomplete: z.boolean(),
 	hasUsage: z.boolean(),

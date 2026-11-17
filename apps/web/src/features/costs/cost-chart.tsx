@@ -101,7 +101,6 @@ import {
 import {
 	createHoverDateStore,
 	HoverDateContext,
-	type HoverDateStore,
 	useDotPick,
 	useMarkedDate,
 } from "./cost-hover-date";
@@ -223,7 +222,6 @@ const CI_COLORS: Record<string, string> = {
 	inProgress: SERIES_COLORS[0],
 };
 type Props = {
-	hoverStore?: HoverDateStore;
 	dots?: "only" | "switch";
 	data: CostDashboard | undefined;
 	pending: boolean;
@@ -267,7 +265,6 @@ export interface UsageTab {
 const USAGE_COLOR = "oklch(0.74 0.17 150)";
 
 export function CostChart({
-	hoverStore: sharedHoverStore,
 	dots,
 	data: dashboard,
 	pending,
@@ -313,8 +310,7 @@ export function CostChart({
 	const loading =
 		pending || (perRunChart && previews?.languageSplit === undefined);
 	const [phase, setPhase] = useState<ChartPhase>(loading ? "loading" : "idle");
-	const [ownHoverStore] = useState(createHoverDateStore);
-	const hoverStore = sharedHoverStore ?? ownHoverStore;
+	const [hoverStore] = useState(createHoverDateStore);
 	const axisHover = useAxisHover();
 	const metricsRef = useRef<HTMLFieldSetElement>(null);
 	const [expanded, setExpanded] = useState<DashboardMetric | null>(null);

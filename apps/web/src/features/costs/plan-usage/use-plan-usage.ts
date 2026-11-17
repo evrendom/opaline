@@ -12,11 +12,6 @@ export interface UsageBucket {
 	readonly readAt: string | null;
 	readonly plan: string | null;
 	readonly usedPoints: number;
-	readonly groups?: {
-		readonly sessions: Readonly<Record<string, readonly [number, number]>>;
-		readonly repositories: Readonly<Record<string, readonly [number, number]>>;
-		readonly models: Readonly<Record<string, readonly [number, number]>>;
-	};
 	readonly reset: boolean;
 	readonly sessions: readonly { sessionId: string; points: number }[];
 }
