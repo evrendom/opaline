@@ -5,12 +5,8 @@ import { getFileLanguage } from "../files/session-reader-file-tag";
 import { squarify } from "../summary/session-reader-breakdown";
 import { tileGlyph, tileLook } from "./session-reader-context-bar";
 import type { ContextItem, ContextPart } from "./session-reader-context-map";
-import {
-	type BoxProblems,
-	ProblemMark,
-	type Tone,
-} from "./session-reader-context-problems";
-import { markOf } from "./session-reader-context-subtiles";
+import type { BoxProblems, Tone } from "./session-reader-context-problems";
+import { markGlow, markOf } from "./session-reader-context-subtiles";
 
 const GAP = 4;
 const MIN_CELL = 40;
@@ -199,6 +195,7 @@ export function ContextZoom({
 							className={cn(
 								"group/thing absolute flex flex-col items-start gap-0.5 overflow-hidden rounded-md border bg-card p-1.5 text-[12px] leading-4 transition-opacity corner-squircle squircle:rounded-xl",
 								"border-current/20",
+								mark && !picked.has(item.label) && markGlow(mark),
 								picked.size > 0 && !picked.has(item.label) && "opacity-40",
 								picked.has(item.label) &&
 									"shadow-[0_2px_10px_-2px_color-mix(in_oklab,var(--tint)_55%,transparent)] ring-2 ring-[color-mix(in_oklab,var(--tint)_55%,transparent)]",
@@ -248,11 +245,6 @@ export function ContextZoom({
 									</span>
 								) : null}
 							</span>
-							{mark && w >= 22 && h >= 22 ? (
-								<span className="pointer-events-none absolute top-2 right-2 flex">
-									<ProblemMark tone={mark} />
-								</span>
-							) : null}
 							{!item.more && w >= 90 && h >= 56 ? (
 								<button
 									type="button"

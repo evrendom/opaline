@@ -19,6 +19,8 @@ const MARK: Record<Tone, string> = {
 const MARKED =
 	"border-[color-mix(in_oklab,var(--mark)_45%,transparent)] shadow-[0_0_4px_color-mix(in_oklab,var(--mark)_60%,transparent),0_0_14px_color-mix(in_oklab,var(--mark)_45%,transparent)]";
 
+export const markGlow = (tone: Tone) => `${MARK[tone]} ${MARKED}`;
+
 export function markOf(
 	marks: ReadonlyMap<string, Tone> | undefined,
 	label: string,
@@ -127,7 +129,7 @@ export function ContextSubTiles({
 						<span
 							className={cn(
 								"absolute inset-0 rounded-[3px] border corner-squircle squircle:rounded-[6px]",
-								mark ? `${MARK[mark]} ${MARKED}` : "border-current opacity-20",
+								mark ? markGlow(mark) : "border-current opacity-20",
 							)}
 						/>
 						{width >= ICON_ROOM && height >= ICON_ROOM ? (
