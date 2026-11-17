@@ -381,7 +381,12 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 									planUsageLimited && "text-[oklch(0.64_0.21_27)]",
 								)}
 							/>
-							{planUsage === undefined ? null : formatPlanShare(planUsage)}
+							{planUsage === undefined ? null : (
+								<span>
+									<span aria-hidden="true">−</span>
+									{formatPlanShare(planUsage)}
+								</span>
+							)}
 							<span className="sr-only">
 								{planUsage === undefined
 									? ""
