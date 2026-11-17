@@ -75,6 +75,7 @@ import {
 import {
 	ContextSubTiles,
 	drawsSubTiles,
+	MarkLegend,
 	ownsInside,
 } from "./session-reader-context-subtiles";
 import {
@@ -181,7 +182,11 @@ export function ContextTiles({
 	const [hidden] = useState<ReadonlySet<ContextKind | "free">>(() => new Set());
 	const shown = useMemo(() => filtered(measured, hidden), [hidden, measured]);
 	const shownBase = useMemo(() => filtered(base, hidden), [base, hidden]);
-	const { keep } = useOwnProblems(problems, measure);
+	const { keep, own: ownProblems } = useOwnProblems(problems, measure);
+	const markTones = useMemo(
+		() => new Set(ownProblems.flatMap(([, box]) => [...box.items.values()])),
+		[ownProblems],
+	);
 	const areaHeight = useContext(ContextAreaHeight) ?? AREA_HEIGHT;
 	const preview = useContext(ContextPreview);
 	const withFree = !preview && !hidden.has("free");
@@ -467,8 +472,11 @@ export function ContextTiles({
 					<ContextMapFrame>
 						<div ref={area} className="min-w-0">
 							{boxChart}
-							{footer ? (
-								<div className="flex px-[3px] pt-2 pb-[3px]">{footer}</div>
+							{footer || markTones.size > 0 ? (
+								<div className="flex items-center gap-3 px-[3px] pt-2 pb-[3px]">
+									<MarkLegend tones={markTones} />
+									{footer ? <div className="ml-auto">{footer}</div> : null}
+								</div>
 							) : null}
 							{pickedTile?.part ||
 							(measure === "runs" && lits.length > 0 && pickedPart) ? (
