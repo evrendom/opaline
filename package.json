@@ -71,6 +71,7 @@
 		"postgres": "^3.4.8"
 	},
 	"patchedDependencies": {
-		"agentation@2.3.3": "patches/agentation@2.3.3.patch"
+		"agentation@2.3.3": "patches/agentation@2.3.3.patch",
+		"skullet@0.0.3": "patches/skullet@0.0.3.patch"
 	}
 }
