@@ -383,7 +383,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 							/>
 							{planUsage === undefined ? null : (
 								<span>
-									<span aria-hidden="true">−</span>
+									<span aria-hidden="true">↓</span>
 									{formatPlanShare(planUsage)}
 								</span>
 							)}
