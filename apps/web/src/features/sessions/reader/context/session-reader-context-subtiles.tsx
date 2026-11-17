@@ -24,9 +24,9 @@ export const markGlow = (tone: Tone) => `${MARK[tone]} ${MARKED}`;
 const MARK_ORDER: readonly Tone[] = ["never", "later", "minor"];
 
 const MARK_LABEL: Record<Tone, string> = {
-	later: "Error that resolved later",
-	minor: "Error that resolved instantly",
-	never: "Error that didn't resolve",
+	later: "Resolved later",
+	minor: "Resolved instantly",
+	never: "Unresolved",
 };
 
 export function MarkLegend({
@@ -39,26 +39,31 @@ export function MarkLegend({
 	const shown = MARK_ORDER.filter((tone) => tones.has(tone));
 	if (shown.length === 0) return null;
 	return (
-		<ul
-			aria-label="Marks"
+		<div
 			className={cn(
-				"flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-muted-foreground",
+				"flex min-w-0 items-center gap-4 text-[12px] text-muted-foreground",
 				className,
 			)}
 		>
-			{shown.map((tone) => (
-				<li key={tone} className="flex items-center gap-2">
-					<span
-						aria-hidden="true"
-						className={cn(
-							"size-2.5 shrink-0 rounded-[3px] border corner-squircle",
-							markGlow(tone),
-						)}
-					/>
-					{MARK_LABEL[tone]}
-				</li>
-			))}
-		</ul>
+			<span className="text-muted-foreground/60">Errors</span>
+			<ul
+				aria-label="Errors"
+				className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1"
+			>
+				{shown.map((tone) => (
+					<li key={tone} className="flex items-center gap-2">
+						<span
+							aria-hidden="true"
+							className={cn(
+								"size-2.5 shrink-0 rounded-[3px] border corner-squircle",
+								markGlow(tone),
+							)}
+						/>
+						{MARK_LABEL[tone]}
+					</li>
+				))}
+			</ul>
+		</div>
 	);
 }
 
