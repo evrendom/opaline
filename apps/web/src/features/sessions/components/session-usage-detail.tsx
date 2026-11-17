@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/horizontal-resize-handle";
 import { clampPaneSize } from "@/components/ui/horizontal-resize-utils";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
+import { useLocalDesktopApp } from "@/features/desktop/local-app";
 import {
 	MINIMUM_SESSION_TRANSCRIPT_PANE_WIDTH_PX,
 	MINIMUM_SESSION_TURN_TABLE_PANE_WIDTH_PX,
@@ -31,6 +32,13 @@ import { SessionDetailErrorBoundary } from "@/features/sessions/components/sessi
 import { SessionsOverviewTable } from "@/features/sessions/components/sessions-overview-table";
 import { SESSION_OVERVIEW_SURFACE_CLASS_NAME } from "@/features/sessions/components/sessions-overview-table-utils";
 import { SessionReaderFallback } from "@/features/sessions/reader/session-reader-light-samples";
+import {
+	type DayRange,
+	SLICE_MAX_DAYS,
+	SLICE_ROW_LIMIT,
+	sessionsOnUtcDays,
+	useSettledFocus,
+} from "@/features/sessions/session-day-slice";
 import {
 	getLoadedSessionReaderView,
 	loadSessionReaderView,
@@ -53,6 +61,7 @@ import {
 } from "@/features/shell/shell-header-portal";
 import { useCanViewSession } from "@/features/workspace/hooks/useCanViewSession";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
+import { getInclusiveDateRangeDays } from "@/lib/analytics-date-range";
 import { client, orpc } from "@/lib/orpc";
 
 const PAGE_SIZE = 50;
@@ -201,6 +210,9 @@ interface UsageSessionsPaneProps {
 	backBar?: boolean;
 	rowHighlightClassName?: string;
 	onVisibleSessions?: (sessions: readonly { session_date: string }[]) => void;
+	/** Days of the range to list, such as a hovered or picked day on the
+	 * rail: the desktop app slices them from the range it holds whole. */
+	focus?: DayRange | null;
 }
 
 /**
@@ -218,6 +230,7 @@ export function UsageSessionsPane({
 	backBar = true,
 	rowHighlightClassName,
 	onVisibleSessions,
+	focus = null,
 }: UsageSessionsPaneProps) {
 	const [searchParams, setSearchParams] = useSearchParams();
 	const selectedSessionId = searchParams.get("session");
@@ -235,17 +248,36 @@ export function UsageSessionsPane({
 	const { state } = useOrganization();
 	const demo = useDemoRuntime();
 	const scrollRef = useRef<HTMLDivElement>(null);
+	const desktop = useLocalDesktopApp();
+	const wholeRange = JSON.stringify([
+		state.activeOrg?.id,
+		sessionFilter,
+		range.startDate,
+		range.endDate,
+	]);
+	const [overflowRange, setOverflowRange] = useState<string | null>(null);
+	const slicing =
+		desktop &&
+		getInclusiveDateRangeDays(range.startDate, range.endDate) <=
+			SLICE_MAX_DAYS &&
+		overflowRange !== wholeRange;
+	const asked = useSettledFocus(slicing ? null : focus, !slicing);
+	const queried = asked
+		? { startDate: asked.start, endDate: asked.end }
+		: range;
 	const options = orpc.analytics.sessions.list.infiniteOptions({
 		input: (offset: number) => ({
 			...sessionFilter,
-			startDate: range.startDate,
-			endDate: range.endDate,
-			limit: PAGE_SIZE,
+			startDate: queried.startDate,
+			endDate: queried.endDate,
+			limit: slicing ? SLICE_ROW_LIMIT : PAGE_SIZE,
 			offset,
 		}),
 		initialPageParam: 0,
 		getNextPageParam: (lastPage, _pages, offset) =>
-			lastPage.length === PAGE_SIZE ? offset + lastPage.length : undefined,
+			!slicing && lastPage.length === PAGE_SIZE
+				? offset + lastPage.length
+				: undefined,
 	});
 	const sessionsQuery = useInfiniteQuery({
 		...options,
@@ -257,21 +289,39 @@ export function UsageSessionsPane({
 				: undefined,
 	});
 	const placeholder = sessionsQuery.isPlaceholderData;
+	const wholeRangeRows = slicing
+		? sessionsQuery.data?.pages[0]?.length
+		: undefined;
+	if (
+		wholeRangeRows !== undefined &&
+		wholeRangeRows >= SLICE_ROW_LIMIT &&
+		overflowRange !== wholeRange
+	)
+		setOverflowRange(wholeRange);
+	const focusStart = focus?.start;
+	const focusEnd = focus?.end;
 	const sessions = useMemo(() => {
 		const loaded =
 			sessionsQuery.data?.pages.flatMap(parseSessionOverviewRows) ?? [];
-		const rows = placeholder
-			? loaded.filter((row) => {
-					const day = row.session_date.slice(0, 10);
-					return day >= range.startDate && day <= range.endDate;
-				})
-			: loaded;
+		const shown =
+			focusStart && focusEnd
+				? { start: focusStart, end: focusEnd }
+				: { start: queried.startDate, end: queried.endDate };
+		const rows =
+			placeholder || focusStart ? sessionsOnUtcDays(loaded, shown) : loaded;
 		return [
 			...new Map(
 				rows.map((row) => [`${row.user_id}:${sessionRowKey(row)}`, row]),
 			).values(),
 		];
-	}, [sessionsQuery.data, placeholder, range.startDate, range.endDate]);
+	}, [
+		sessionsQuery.data,
+		placeholder,
+		queried.startDate,
+		queried.endDate,
+		focusStart,
+		focusEnd,
+	]);
 	// Session ID search: the API has no ID filter, so while a search is on,
 	// read every page once and match IDs here (the loaded rows stand in
 	// until that lands).
@@ -312,8 +362,12 @@ export function UsageSessionsPane({
 		enabled: !!idQuery && !!state.activeOrg?.id && demo?.live !== false,
 		staleTime: 60_000,
 	});
+	const searched =
+		searchQuery.data && focus
+			? sessionsOnUtcDays(searchQuery.data, focus)
+			: searchQuery.data;
 	const matchingSessions = idQuery
-		? (searchQuery.data ?? sessions).filter((session) =>
+		? (searched ?? sessions).filter((session) =>
 				session.session_id.toLowerCase().includes(idQuery),
 			)
 		: sessions;

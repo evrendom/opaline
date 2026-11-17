@@ -33,30 +33,16 @@ import {
 import {
 	type DayRange,
 	isOnUtcDays,
+	SLICE_MAX_DAYS,
+	SLICE_ROW_LIMIT,
 	sessionsOnUtcDays,
+	useSettledFocus,
 } from "./session-day-slice";
 import { sessionRowKey, transcriptSubagentId } from "./session-row-key";
 import { mergeSessionUploadFailures } from "./session-upload-failure";
 import { useLiveSessionList } from "./use-live-sessions";
 
 const FAILURES_PUSHED_POLL_MS = 5 * 60_000;
-const SLICE_MAX_DAYS = 45;
-const SLICE_ROW_LIMIT = 1000;
-const FOCUS_SETTLE_MS = 120;
-
-function useSettledFocus(focus: DayRange | null, delayMs: number) {
-	const key = focus ? `${focus.start}..${focus.end}` : "";
-	const [settled, setSettled] = useState<{
-		key: string;
-		focus: DayRange | null;
-	}>({ key, focus });
-	useEffect(() => {
-		if (delayMs === 0 || settled.key === key) return;
-		const timer = window.setTimeout(() => setSettled({ key, focus }), delayMs);
-		return () => window.clearTimeout(timer);
-	}, [delayMs, key, focus, settled.key]);
-	return delayMs === 0 ? focus : settled.focus;
-}
 
 export function useSessionsPageData({
 	detail = false,
@@ -106,10 +92,7 @@ export function useSessionsPageData({
 		listed &&
 		dateRange.meta.dayCount <= SLICE_MAX_DAYS &&
 		overflowScope !== fullScope;
-	const range = useSettledFocus(
-		slicing ? null : focus,
-		slicing ? 0 : FOCUS_SETTLE_MS,
-	);
+	const range = useSettledFocus(slicing ? null : focus, !slicing);
 	const sliced = slicing ? focus : null;
 	const pagedList = paginated && !slicing;
 	const startDate = range?.start ?? dateRange.state.startDate;

@@ -6,8 +6,10 @@ import { IconChevronRight, IconFolder } from "@tabler/icons-react";
 import {
 	Activity,
 	type ComponentProps,
+	createContext,
 	type ReactNode,
 	useCallback,
+	useContext,
 	useMemo,
 	useState,
 } from "react";
@@ -18,9 +20,15 @@ import { EmptyState } from "@/components/dashboard/page-parts";
 import { DateRangeOverride } from "@/features/analytics/date-range/DateRangeProvider";
 import type { DashboardVariant } from "@/features/costs/cost-dashboard-page";
 import { CostDashboardView } from "@/features/costs/cost-dashboard-page";
-import { DotPickContext } from "@/features/costs/cost-hover-date";
+import {
+	DotPickContext,
+	DotPreviewContext,
+} from "@/features/costs/cost-hover-date";
 import { useRepositoryCostDashboard } from "@/features/costs/use-cost-dashboard";
-import { useDotFilter } from "@/features/costs/use-dot-filter";
+import {
+	type DotFilterRange,
+	useDotFilter,
+} from "@/features/costs/use-dot-filter";
 import {
 	useMetricPreviews,
 	usePrefetchDashboardMetric,
@@ -81,7 +89,10 @@ function openDuring(
 	);
 }
 
+const RepoFocusContext = createContext<DotFilterRange | null>(null);
+
 function RepoSessionsList(props: ComponentProps<typeof UsageSessionsPane>) {
+	const focus = useContext(RepoFocusContext);
 	const [days, setDays] = useState<ReadonlySet<string> | null>(null);
 	const onVisibleSessions = useCallback(
 		(rows: readonly { session_date: string }[]) => {
@@ -102,7 +113,13 @@ function RepoSessionsList(props: ComponentProps<typeof UsageSessionsPane>) {
 		[days],
 	);
 	useRailFilter(filter);
-	return <UsageSessionsPane {...props} onVisibleSessions={onVisibleSessions} />;
+	return (
+		<UsageSessionsPane
+			{...props}
+			focus={focus}
+			onVisibleSessions={onVisibleSessions}
+		/>
+	);
 }
 
 const SETUP_TABS = ["instructions", "skills", "mcp"] as const;
@@ -131,7 +148,7 @@ export function RepoDetailPage({
 	);
 	const pulls = useRepoPullRequests(repoKey);
 	const range = useRepoRangeInput();
-	const { dotPick, pickedRange } = useDotFilter(range);
+	const { dotPick, pickedRange, preview, shownRange } = useDotFilter(range);
 	const allPullRequests = pulls.data?.enabled ? pulls.data.pullRequests : [];
 	const pullRequests = useMemo(
 		() => allPullRequests.filter((pull) => openDuring(pull, range)),
@@ -200,11 +217,7 @@ export function RepoDetailPage({
 						<RepoSessionsList
 							kind="Repo"
 							sessionFilter={{ repoKey }}
-							range={
-								pickedRange
-									? { startDate: pickedRange.start, endDate: pickedRange.end }
-									: range
-							}
+							range={range}
 							sessionCount={undefined}
 							rowHighlightClassName="rounded-lg corner-squircle squircle:rounded-2xl"
 							detailHref={(id) =>
@@ -220,7 +233,7 @@ export function RepoDetailPage({
 			),
 		});
 		return list;
-	}, [ci, headerControls, pickedRange, pullRequests, range, repoKey]);
+	}, [ci, headerControls, pullRequests, range, repoKey]);
 	function closeSession() {
 		setSearchParams((current) => {
 			const params = new URLSearchParams(current);
@@ -290,55 +303,62 @@ export function RepoDetailPage({
 			) : (
 				<RepoDataProvider repoKey={repoKey}>
 					<DotPickContext.Provider value={dotPick}>
-						<RailHighlightProvider tab={shownTab}>
-							<div className="relative isolate min-h-0 min-w-0 flex-1 overflow-hidden [--dashboard-01-content-background:var(--dashboard-01-stage-background)] [--panes-top:calc(var(--stage-top)-0.125rem)] [--stage-top:--spacing(2)] [--tabs-band:--spacing(19)]">
-								<div
-									aria-hidden="true"
-									className="pointer-events-none absolute top-(--stage-top) right-0 bottom-0 left-(--reader-gutter) -z-10 -ml-6 rounded-tl-lg bg-(--dashboard-01-stage-background) corner-squircle squircle:rounded-tl-3xl"
-								/>
-								{headerControls
-									? createPortal(
-											<RepoReaderTabs
-												ci={ci}
-												onChange={(next) => selectTab(next)}
-												value={shownTab}
-											/>,
-											headerControls,
-										)
-									: null}
-								{
+						<RepoFocusContext.Provider value={shownRange}>
+							<RailHighlightProvider tab={shownTab}>
+								<div className="relative isolate min-h-0 min-w-0 flex-1 overflow-hidden [--dashboard-01-content-background:var(--dashboard-01-stage-background)] [--panes-top:calc(var(--stage-top)-0.125rem)] [--stage-top:--spacing(2)] [--tabs-band:--spacing(19)]">
 									<div
-										className={cn(
-											STAGE_PANE,
-											"flex-row [--cost-page-gutter:--spacing(6)]",
-										)}
-									>
-										<ShellHeaderPortalContext.Provider value={null}>
-											<div className="flex h-full w-[300px] shrink-0 flex-col overflow-y-auto">
-												<RepoDashboard repoKey={repoKey} variant="rail-chat" />
+										aria-hidden="true"
+										className="pointer-events-none absolute top-(--stage-top) right-0 bottom-0 left-(--reader-gutter) -z-10 -ml-6 rounded-tl-lg bg-(--dashboard-01-stage-background) corner-squircle squircle:rounded-tl-3xl"
+									/>
+									{headerControls
+										? createPortal(
+												<RepoReaderTabs
+													ci={ci}
+													onChange={(next) => selectTab(next)}
+													value={shownTab}
+												/>,
+												headerControls,
+											)
+										: null}
+									{
+										<div
+											className={cn(
+												STAGE_PANE,
+												"flex-row [--cost-page-gutter:--spacing(6)]",
+											)}
+										>
+											<ShellHeaderPortalContext.Provider value={null}>
+												<div className="flex h-full w-[300px] shrink-0 flex-col overflow-y-auto">
+													<DotPreviewContext.Provider value={preview}>
+														<RepoDashboard
+															repoKey={repoKey}
+															variant="rail-chat"
+														/>
+													</DotPreviewContext.Provider>
+												</div>
+											</ShellHeaderPortalContext.Provider>
+											<div className="relative min-w-0 flex-1">
+												<Activity
+													mode={shownTab === "summary" ? "visible" : "hidden"}
+												>
+													{summaryPane}
+												</Activity>
+												<DateRangeOverride range={pickedRange}>
+													{panes.map(({ id, node }) => (
+														<Activity
+															key={id}
+															mode={shownTab === id ? "visible" : "hidden"}
+														>
+															{node}
+														</Activity>
+													))}
+												</DateRangeOverride>
 											</div>
-										</ShellHeaderPortalContext.Provider>
-										<div className="relative min-w-0 flex-1">
-											<Activity
-												mode={shownTab === "summary" ? "visible" : "hidden"}
-											>
-												{summaryPane}
-											</Activity>
-											<DateRangeOverride range={pickedRange}>
-												{panes.map(({ id, node }) => (
-													<Activity
-														key={id}
-														mode={shownTab === id ? "visible" : "hidden"}
-													>
-														{node}
-													</Activity>
-												))}
-											</DateRangeOverride>
 										</div>
-									</div>
-								}
-							</div>
-						</RailHighlightProvider>
+									}
+								</div>
+							</RailHighlightProvider>
+						</RepoFocusContext.Provider>
 					</DotPickContext.Provider>
 				</RepoDataProvider>
 			)}
