@@ -983,7 +983,11 @@ function buildUsageRollupPricedGroupsCte(usageEventFilters: string): string {
 				group_output_tokens,
 				pricing_model,
 				group_estimated_cost
-			FROM ${getSafeClickHouseTable(USAGE_SESSION_ROLLUPS_TABLE)} FINAL
+			FROM (
+				SELECT *
+				FROM ${getSafeClickHouseTable(USAGE_SESSION_ROLLUPS_TABLE)} FINAL
+				WHERE ${usageEventFilters} AND is_consistent = 1
+			)
 			ARRAY JOIN
 				record_kinds AS record_kind,
 				usage_dates AS usage_date,
@@ -1002,7 +1006,6 @@ function buildUsageRollupPricedGroupsCte(usageEventFilters: string): string {
 				output_tokens AS group_output_tokens,
 				pricing_models AS pricing_model,
 				estimated_costs AS group_estimated_cost
-			WHERE ${usageEventFilters} AND is_consistent = 1
 		)`;
 }
 
