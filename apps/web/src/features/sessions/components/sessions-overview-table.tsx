@@ -416,11 +416,9 @@ export function SessionsOverviewTable({
 																session.live_session ? nowMs : undefined
 															}
 															maximumSessionCost={tableState.maximumSessionCost}
-															planUsage={
-																transcriptSubagentId(session)
-																	? undefined
-																	: usageShares?.get(session.session_id)
-															}
+															planUsage={usageShares?.get(
+																planUsageKey(session),
+															)}
 															memberProfile={memberProfileSummaries.get(
 																session.user_id,
 															)}
@@ -469,4 +467,9 @@ export function SessionsOverviewTable({
 			</div>
 		</div>
 	);
+}
+
+function planUsageKey(session: SessionAnalytics): string {
+	const agent = transcriptSubagentId(session);
+	return agent ? `${session.session_id}:${agent}` : session.session_id;
 }

@@ -9,6 +9,7 @@ const BUCKET_SESSIONS = 4;
 
 export interface CostRow {
 	readonly sessionId: string;
+	readonly agentId?: string;
 	readonly at: number;
 	readonly model: string;
 	readonly cost: number;
@@ -429,11 +430,14 @@ export function buildWindowSeries(input: {
 	}
 
 	const bySession = new Map<string, Total>();
+	const byAgent = new Map<string, Total>();
 	const byModel = new Map<string, Total>();
 	const byRepository = new Map<string, Total>();
 	for (const entry of shares) {
 		if (entry.row.at < input.from || entry.row.at >= input.to) continue;
 		add(bySession, entry.row.sessionId, entry);
+		if (entry.row.agentId)
+			add(byAgent, `${entry.row.sessionId}:${entry.row.agentId}`, entry);
 		add(byModel, entry.row.model, entry);
 		add(
 			byRepository,
@@ -470,9 +474,10 @@ export function buildWindowSeries(input: {
 		buckets,
 		sessions: sessions.slice(0, TOP_SESSIONS),
 		sessionPoints: Object.fromEntries(
-			sessions
-				.filter((entry) => entry.points >= 0.005)
-				.map((entry) => [entry.sessionId, entry.points]),
+			[
+				...sessions.map((entry) => [entry.sessionId, entry.points] as const),
+				...ranked(byAgent).map((entry) => [entry.id, entry.points] as const),
+			].filter(([, points]) => points >= 0.005),
 		),
 		models: ranked(byModel).slice(0, TOP_SESSIONS),
 		repositories: ranked(byRepository).slice(0, TOP_SESSIONS),
