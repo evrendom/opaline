@@ -1,9 +1,11 @@
 import { chartPeriodDates } from "../chart-interval";
-import { sampleLevels } from "../chart-sample";
+import { sampleDates, sampleLevels } from "../chart-sample";
 import type { UsageBucket, UsageWindow } from "./use-plan-usage";
 
-export function sampleUsageWindow(start: string, end: string): UsageWindow {
-	const dates = chartPeriodDates(start, end, "daily");
+export function sampleUsageWindow(end: string, start?: string): UsageWindow {
+	const dates = start
+		? chartPeriodDates(start, end, "daily")
+		: sampleDates(end);
 	const levels = sampleLevels(dates.length);
 	const buckets: UsageBucket[] = dates.map((date, index) => {
 		const used = (levels[index] ?? 0) * 90;
@@ -27,7 +29,7 @@ export function sampleUsageWindow(start: string, end: string): UsageWindow {
 		usedPercent: 0,
 		resetsAt: null,
 		checkedAt: `${end}T12:00:00Z`,
-		recordedFrom: `${start}T00:00:00Z`,
+		recordedFrom: `${dates[0]}T00:00:00Z`,
 		bucketMinutes: 1440,
 		resets: [],
 		buckets,

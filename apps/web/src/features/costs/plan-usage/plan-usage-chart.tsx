@@ -221,7 +221,10 @@ export function PlanUsageChart({
 	const range = useOptionalDateRange()?.state;
 	const sample =
 		!pending && !showChart && range
-			? sampleUsageWindow(range.startDate, range.endDate)
+			? sampleUsageWindow(
+					range.endDate,
+					dots || repository ? range.startDate : undefined,
+				)
 			: null;
 	const shown = sample ?? window;
 	return (

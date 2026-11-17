@@ -84,7 +84,7 @@ import {
 	isCiHistoryAvailable,
 } from "./chart-interval";
 import { ChartMorph } from "./chart-morph";
-import { sampleLevels } from "./chart-sample";
+import { sampleDates, sampleLevels } from "./chart-sample";
 import {
 	CostDotChart,
 	DotFocusContext,
@@ -438,15 +438,15 @@ export function CostChart({
 	]);
 	const trend = useMemo(
 		() =>
-			!sampled || dataTrend.length > 1 || !rangeStart || !rangeEnd
+			!sampled || !rangeEnd
 				? dataTrend
 				: groupChartTrend(
-						chartPeriodDates(rangeStart, rangeEnd, "daily").map((date) => ({
+						sampleDates(rangeEnd).map((date) => ({
 							date,
 							total: 0,
 							values: {},
 						})),
-						interval,
+						"daily",
 					).map((point) => ({
 						...point,
 						cycleMedianSeconds: undefined,
@@ -457,7 +457,7 @@ export function CostChart({
 						medianSeconds: null,
 						p95Seconds: null,
 					})),
-		[sampled, dataTrend, rangeStart, rangeEnd, interval],
+		[sampled, dataTrend, rangeEnd],
 	);
 	const frustration = useMemo(
 		() =>
@@ -484,12 +484,21 @@ export function CostChart({
 		}));
 	}, [trend, frustration]);
 	const sampleDots = useMemo(() => {
-		const levels = sampleLevels(dotPoints.length);
-		return dotPoints.map((point, index) => ({
+		if (!sampled || !rangeStart || !rangeEnd) return dotPoints;
+		const days = groupChartTrend(
+			chartPeriodDates(rangeStart, rangeEnd, "daily").map((date) => ({
+				date,
+				total: 0,
+				values: {},
+			})),
+			interval,
+		);
+		const levels = sampleLevels(days.length);
+		return days.map((point, index) => ({
 			...point,
 			total: levels[index] ?? 0,
 		}));
-	}, [dotPoints]);
+	}, [sampled, dotPoints, rangeStart, rangeEnd, interval]);
 	const loadingDots = useMemo(
 		() =>
 			showDots && loading && rangeStart && rangeEnd

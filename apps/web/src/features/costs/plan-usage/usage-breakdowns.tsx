@@ -9,6 +9,7 @@ import {
 } from "@/features/dashboard/components/DashboardModelBadges";
 import { getModelBadgeTone } from "@/features/dashboard/components/dashboard-model-brand";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
+import { BreakdownEmpty } from "../breakdown-empty";
 import { SERIES_COLORS } from "../chart-colors";
 import { ScrollFade } from "../cost-breakdown";
 import { costLabel } from "../cost-format";
@@ -137,9 +138,7 @@ function UsageBreakdown({
 				data-many={rows.length > 4 || undefined}
 			>
 				{rows.length === 0 ? (
-					<p className="cost-breakdown-empty">
-						Nothing used the limit in this period.
-					</p>
+					<BreakdownEmpty title="No use" />
 				) : (
 					<div data-fluid-menu-root="">
 						<FluidMenuHover items=".cost-breakdown-row" />

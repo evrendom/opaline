@@ -30,6 +30,7 @@ import {
 } from "@/features/dashboard/components/DashboardModelBadges";
 import { getModelBadgeTone } from "@/features/dashboard/components/dashboard-model-brand";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
+import { BreakdownEmpty } from "./breakdown-empty";
 import { SERIES_COLORS } from "./chart-colors";
 import {
 	costLabel,
@@ -134,14 +135,16 @@ export function CostBreakdown({
 							</button>
 						</p>
 					) : !pending && !entries.length ? (
-						<p className="cost-breakdown-empty">
-							{unavailable
-								? metric === "mergedPullRequests" ||
-									metric === "ciFailuresPerPullRequest"
-									? "Pull request data unavailable."
-									: "Still being indexed…"
-								: `No matching ${label.toLowerCase()}.`}
-						</p>
+						<BreakdownEmpty
+							title={
+								unavailable
+									? metric === "mergedPullRequests" ||
+										metric === "ciFailuresPerPullRequest"
+										? "Pull request data unavailable"
+										: "Still being indexed"
+									: `No ${label.toLowerCase()}`
+							}
+						/>
 					) : (
 						<Reveal
 							label={`Loading ${label.toLowerCase()}`}
