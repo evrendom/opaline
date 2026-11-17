@@ -65,6 +65,7 @@ import { formatIsoDate } from "@/lib/format";
 import { type AreaShape, morphAreas, readAreaShape } from "./area-morph";
 import { SERIES_COLORS } from "./chart-colors";
 import { EdgeTick, edgeTicks, useAxisHover } from "./chart-edge-axis";
+import { ChartEmptyNotice } from "./chart-empty-notice";
 import {
 	DASHBOARD_LOADING_LINE,
 	DASHBOARD_LOADING_STEPS,
@@ -83,6 +84,7 @@ import {
 	isCiHistoryAvailable,
 } from "./chart-interval";
 import { ChartMorph } from "./chart-morph";
+import { sampleLevels } from "./chart-sample";
 import {
 	CostDotChart,
 	DotFocusContext,
@@ -372,7 +374,12 @@ export function CostChart({
 			: undefined;
 	const gradientId = useId();
 	const today = formatIsoDate(new Date());
-	const trend = useMemo(() => {
+	const dateRange = useOptionalDateRange();
+	const rangeStart = dateRange?.state.startDate;
+	const rangeEnd = dateRange?.state.endDate;
+	const sampled =
+		!loading && (unavailable || noHistory || Boolean(data && !data.hasUsage));
+	const dataTrend = useMemo(() => {
 		// Percentiles are calculated from individual runs for the requested period.
 		// Never regroup daily percentiles by summing or averaging them.
 		const durations = new Map(
@@ -429,6 +436,29 @@ export function CostChart({
 		metric,
 		today,
 	]);
+	const trend = useMemo(
+		() =>
+			!sampled || dataTrend.length > 1 || !rangeStart || !rangeEnd
+				? dataTrend
+				: groupChartTrend(
+						chartPeriodDates(rangeStart, rangeEnd, "daily").map((date) => ({
+							date,
+							total: 0,
+							values: {},
+						})),
+						interval,
+					).map((point) => ({
+						...point,
+						cycleMedianSeconds: undefined,
+						cycleP90Seconds: undefined,
+						ciMinutes: undefined,
+						ciFailureRatio: null,
+						ciFailureDenominator: undefined,
+						medianSeconds: null,
+						p95Seconds: null,
+					})),
+		[sampled, dataTrend, rangeStart, rangeEnd, interval],
+	);
 	const frustration = useMemo(
 		() =>
 			metric === "signals" && !overrides?.has("signals")
@@ -453,9 +483,13 @@ export function CostChart({
 			total: byDate.get(point.date) ?? 0,
 		}));
 	}, [trend, frustration]);
-	const dateRange = useOptionalDateRange();
-	const rangeStart = dateRange?.state.startDate;
-	const rangeEnd = dateRange?.state.endDate;
+	const sampleDots = useMemo(() => {
+		const levels = sampleLevels(dotPoints.length);
+		return dotPoints.map((point, index) => ({
+			...point,
+			total: levels[index] ?? 0,
+		}));
+	}, [dotPoints]);
 	const loadingDots = useMemo(
 		() =>
 			showDots && loading && rangeStart && rangeEnd
@@ -524,30 +558,40 @@ export function CostChart({
 	const perRun = perRunChart ? frustration : undefined;
 	const seriesValues = useMemo(
 		() =>
-			perRun
-				? [
-						trend.map((point) => {
-							if (point.startDate > today) return null;
-							const at = perRun.dates.indexOf(point.date);
-							return at < 0 ? 0 : (perRun.swears[at] ?? 0);
-						}),
-					]
-				: seriesIdKey
-						.split("\u0000")
-						.filter(Boolean)
-						.map((id) =>
-							trend.map((point) =>
-								getChartSeriesValue(
-									point,
-									id,
-									today,
-									"sum",
-									availableFrom,
-									ciHistoryAvailable,
+			sampled
+				? [sampleLevels(trend.length).map((level) => level * 10)]
+				: perRun
+					? [
+							trend.map((point) => {
+								if (point.startDate > today) return null;
+								const at = perRun.dates.indexOf(point.date);
+								return at < 0 ? 0 : (perRun.swears[at] ?? 0);
+							}),
+						]
+					: seriesIdKey
+							.split("\u0000")
+							.filter(Boolean)
+							.map((id) =>
+								trend.map((point) =>
+									getChartSeriesValue(
+										point,
+										id,
+										today,
+										"sum",
+										availableFrom,
+										ciHistoryAvailable,
+									),
 								),
 							),
-						),
-		[availableFrom, ciHistoryAvailable, perRun, seriesIdKey, today, trend],
+		[
+			availableFrom,
+			ciHistoryAvailable,
+			perRun,
+			sampled,
+			seriesIdKey,
+			today,
+			trend,
+		],
 	);
 	const idleRows = useMemo(
 		() =>
@@ -1031,6 +1075,7 @@ export function CostChart({
 						className="cost-chart-canvas"
 						data-phase={phase}
 						data-kind={showDots ? "dots" : undefined}
+						data-sample={sampled && !heartbeat ? "" : undefined}
 						data-lines-entering={linesEntering || undefined}
 					>
 						{showDots ? (
@@ -1046,7 +1091,7 @@ export function CostChart({
 								interval={interval}
 								label={frustration ? "" : metricLabel}
 								loading={loadingDots !== null}
-								points={loadingDots ?? dotPoints}
+								points={loadingDots ?? (sampled ? sampleDots : dotPoints)}
 							/>
 						) : null}
 						{demo && data ? (
@@ -1289,39 +1334,41 @@ export function CostChart({
 												) : null;
 											}}
 										/>
-										{(heartbeat ? [null] : series).map((entry, index) => (
-											<Area
-												yAxisId="count"
-												// By position: the heartbeat and the series it becomes are
-												// one Area, whose paths the morph animates.
-												key={seriesKey(index)}
-												dataKey={seriesKey(index)}
-												name={entry?.label ?? metricLabel}
-												type="linear"
-												stroke={heartbeat ? accent : entry?.color}
-												strokeWidth={2}
-												strokeLinecap="round"
-												strokeLinejoin="round"
-												fill={
-													index === 0 &&
-													(series.length === 1 || phase !== "idle")
-														? `url(#${gradientId})`
-														: "transparent"
-												}
-												baseValue={heartbeat ? HEARTBEAT_BASE_VALUE : 0}
-												dot={
-													phase === "idle" && visiblePointCount === 1
-														? { r: 3 }
-														: false
-												}
-												activeDot={{
-													r: 4,
-													stroke: "var(--cost-surface)",
-													strokeWidth: 2,
-												}}
-												isAnimationActive={false}
-											/>
-										))}
+										{(heartbeat || sampled ? [null] : series).map(
+											(entry, index) => (
+												<Area
+													yAxisId="count"
+													// By position: the heartbeat and the series it becomes are
+													// one Area, whose paths the morph animates.
+													key={seriesKey(index)}
+													dataKey={seriesKey(index)}
+													name={entry?.label ?? metricLabel}
+													type="linear"
+													stroke={heartbeat ? accent : (entry?.color ?? accent)}
+													strokeWidth={2}
+													strokeLinecap="round"
+													strokeLinejoin="round"
+													fill={
+														index === 0 &&
+														(sampled || series.length === 1 || phase !== "idle")
+															? `url(#${gradientId})`
+															: "transparent"
+													}
+													baseValue={heartbeat ? HEARTBEAT_BASE_VALUE : 0}
+													dot={
+														phase === "idle" && visiblePointCount === 1
+															? { r: 3 }
+															: false
+													}
+													activeDot={{
+														r: 4,
+														stroke: "var(--cost-surface)",
+														strokeWidth: 2,
+													}}
+													isAnimationActive={false}
+												/>
+											),
+										)}
 										{phase !== "idle" ? null : metric === "agentRuns" ||
 											metric === "ciRuns" ? (
 											<>
@@ -1397,11 +1444,10 @@ export function CostChart({
 								</ResponsiveContainer>
 							</div>
 						</div>
-						{!heartbeat &&
-						(unavailable || noHistory || (data && !data.hasUsage)) ? (
-							<div className="cost-chart-empty">
-								<p>
-									{noHistory
+						{!heartbeat && sampled ? (
+							<ChartEmptyNotice
+								title={
+									noHistory
 										? "No GitHub history for these dates"
 										: unavailable
 											? unavailableLabel
@@ -1410,25 +1456,12 @@ export function CostChart({
 														(coverage?.unavailableSessions ?? 0) > 0)
 												? "No indexed agent runs match yet"
 												: metric === "mergedPullRequests"
-													? "No merged pull requests in this selection"
+													? "No merged pull requests"
 													: metric === "ciRuns"
-														? "No CI runs in this selection"
-														: `No ${metric === "cost" ? "usage" : metricLabel.toLowerCase()} in this selection`}
-								</p>
-								{noHistory ? (
-									<p>
-										{metric === "ciRuns"
-											? `CI history starts ${historyDate(availableFrom)}. GitHub had already deleted older runs when this workspace connected.`
-											: `PR history starts ${historyDate(availableFrom)}.`}
-									</p>
-								) : !unavailable &&
-									metric === "agentRuns" &&
-									coverage?.indexingSessions ? (
-									<p>Some sessions are still being indexed.</p>
-								) : !unavailable ? (
-									<p>Try a different date range or clear your filters.</p>
-								) : null}
-							</div>
+														? "No CI runs"
+														: `No ${metric === "cost" ? "usage" : metricLabel.toLowerCase()}`
+								}
+							/>
 						) : null}
 					</div>
 				</div>

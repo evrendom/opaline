@@ -109,7 +109,7 @@ describe("GitHub chart", () => {
 		};
 		const view = chart(data);
 		expect(
-			screen.getByText("No merged pull requests in this selection"),
+			screen.getByText("No merged pull requests"),
 		).toBeInTheDocument();
 		view.unmount();
 		data.metrics.mergedPullRequests = null;
@@ -134,11 +134,6 @@ describe("GitHub chart", () => {
 		chart(data, "ciRuns");
 		expect(
 			screen.getByText("No GitHub history for these dates"),
-		).toBeInTheDocument();
-		expect(
-			screen.getByText(
-				"CI history starts Oct 2, 2026. GitHub had already deleted older runs when this workspace connected.",
-			),
 		).toBeInTheDocument();
 	});
 	test("CI run duration toggles and approximate billed minutes are labelled", () => {

@@ -18,6 +18,7 @@ import {
 } from "@/features/dashboard/components/DashboardModelBadges";
 import { PillTabs } from "@/features/repos/pill-tabs";
 import { EdgeTick, edgeTicks, useAxisHover } from "../chart-edge-axis";
+import { ChartEmptyNotice } from "../chart-empty-notice";
 import {
 	bucketDate,
 	type ChartInterval,
@@ -36,6 +37,7 @@ import {
 	type UsageWindow,
 } from "./use-plan-usage";
 import "./plan-usage.css";
+import { sampleUsageWindow } from "./usage-sample";
 
 const PROVIDER_TABS = [
 	{ id: "claude", label: "Claude", icon: ClaudeModelIcon as unknown as Icon },
@@ -216,6 +218,12 @@ export function PlanUsageChart({
 	const usage = report?.providers.find((entry) => entry.provider === provider);
 	const window = usage?.window ?? null;
 	const showChart = window !== null && showsChart(window);
+	const range = useOptionalDateRange()?.state;
+	const sample =
+		!pending && !showChart && range
+			? sampleUsageWindow(range.startDate, range.endDate)
+			: null;
+	const shown = sample ?? window;
 	return (
 		<div className="cost-chart-card">
 			<div className="cost-chart-key">
@@ -238,22 +246,20 @@ export function PlanUsageChart({
 					<Skeleton className="size-full rounded-[8px]" />
 				</div>
 			) : (
-				<div className="plan-usage-frame">
+				<div className="plan-usage-frame" data-sample={sample ? "" : undefined}>
 					{dots || repository ? (
 						<UsageDots
-							window={window}
+							window={shown}
 							interval={interval}
 							repository={repository}
 						/>
-					) : window ? (
-						<UsageCanvas window={window} interval={interval} />
+					) : shown ? (
+						<UsageCanvas window={shown} interval={interval} />
 					) : (
 						<div className="cost-chart-canvas" />
 					)}
 					{showChart ? null : (
-						<div className="cost-chart-empty">
-							<p>{emptyTitle(usage, failed)}</p>
-						</div>
+						<ChartEmptyNotice title={emptyTitle(usage, failed)} />
 					)}
 				</div>
 			)}
