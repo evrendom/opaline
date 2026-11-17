@@ -604,6 +604,12 @@ describe("local ingest endpoints", () => {
 		lastIngestAt: "2026-11-09T19:00:00.000Z",
 		etaSeconds: 90,
 		backgroundPriority: true,
+		initialImport: {
+			active: true,
+			sessionsDone: 100,
+			sessionsTotal: 420,
+			completedAt: null,
+		},
 	};
 
 	test("status and notify answer 404 while local ingest is off", async () => {

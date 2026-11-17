@@ -8,6 +8,11 @@ import type {
 	StoredFile,
 } from "./file-store.js";
 import {
+	INITIAL_IMPORT_MILESTONE,
+	type MilestoneStore,
+	memoryMilestoneStore,
+} from "./milestone-store.js";
+import {
 	classifyTranscriptPath,
 	type LocalIngestRoots,
 	type TranscriptFile,
@@ -46,6 +51,13 @@ export type SessionOutcome = (
 	| { readonly kind: "retry"; readonly reason: string }
 ) & { readonly files?: readonly ReadFile[] };
 
+export interface InitialImportStatus {
+	readonly active: boolean;
+	readonly sessionsDone: number;
+	readonly sessionsTotal: number;
+	readonly completedAt: string | null;
+}
+
 export interface IngestStatus {
 	readonly state: "idle" | "importing" | "paused";
 	readonly sessionsSeen: number;
@@ -55,6 +67,7 @@ export interface IngestStatus {
 	readonly lastIngestAt: string | null;
 	readonly etaSeconds: number | null;
 	readonly backgroundPriority: boolean;
+	readonly initialImport: InitialImportStatus;
 }
 
 export interface LocalIngestSettings {
@@ -71,6 +84,7 @@ export interface LocalIngestSettings {
 	readonly retryMaxMs: number;
 	readonly maxAttempts: number;
 	readonly ownerPollMs: number;
+	readonly initialPollMs: number;
 }
 
 export const DEFAULT_LOCAL_INGEST_SETTINGS: LocalIngestSettings = {
@@ -87,6 +101,7 @@ export const DEFAULT_LOCAL_INGEST_SETTINGS: LocalIngestSettings = {
 	retryMaxMs: 15 * 60_000,
 	maxAttempts: 5,
 	ownerPollMs: 5_000,
+	initialPollMs: 2_000,
 };
 
 export interface LocalIngestDependencies {
@@ -98,6 +113,8 @@ export interface LocalIngestDependencies {
 		owner: Owner,
 	) => Promise<SessionOutcome>;
 	readonly onIngested?: () => void;
+	readonly milestones?: MilestoneStore;
+	readonly derivedQueued?: () => Promise<number>;
 	readonly backgroundPriority: boolean;
 	readonly settings?: Partial<LocalIngestSettings>;
 	readonly now?: () => number;
@@ -129,6 +146,7 @@ interface SessionEntry {
 const SAFE_DIRECTORY = /^[A-Za-z0-9_-]{1,200}$/u;
 const DAY_MS = 86_400_000;
 const GAVE_UP = "gave up after";
+const DRAINED_READS = 2;
 
 export class LocalIngest {
 	private readonly settings: LocalIngestSettings;
@@ -153,17 +171,131 @@ export class LocalIngest {
 	private importStartedAt: number | null = null;
 	private importBytesDone = 0;
 	private inFlight = new Set<Promise<void>>();
+	private readonly milestones: MilestoneStore;
+	private initialLoaded = false;
+	private initialDoneAt: number | null = null;
+	private initialScope: Set<string> | null = null;
+	private initialTimer: ReturnType<typeof setTimeout> | undefined;
+	private initialDrainedReads = 0;
 
 	constructor(private readonly deps: LocalIngestDependencies) {
 		this.settings = { ...DEFAULT_LOCAL_INGEST_SETTINGS, ...deps.settings };
 		this.now = deps.now ?? Date.now;
+		this.milestones = deps.milestones ?? memoryMilestoneStore();
 	}
 
 	async start(): Promise<void> {
 		if (this.started) return;
 		this.started = true;
-		for (const row of await this.deps.store.loadAll()) this.restore(row);
+		const rows = await this.deps.store.loadAll();
+		for (const row of rows) this.restore(row);
+		await this.loadInitialImport(rows);
 		await this.waitForOwner();
+	}
+
+	private async loadInitialImport(rows: readonly StoredFile[]): Promise<void> {
+		const reached = await this.milestones
+			.reachedAt(INITIAL_IMPORT_MILESTONE)
+			.catch((error: unknown) => {
+				this.deps.log?.(
+					`local ingest could not read the initial import state: ${error instanceof Error ? error.message : String(error)}`,
+				);
+				return null;
+			});
+		if (reached) this.initialDoneAt = reached.getTime();
+		else {
+			const sessions = rows.filter((row) => row.role === "session");
+			if (
+				sessions.length > 0 &&
+				sessions.every(
+					(row) => row.ingestedAt !== null || row.state === "skipped",
+				)
+			)
+				await this.completeInitialImport();
+		}
+		this.initialLoaded = true;
+	}
+
+	private beginInitialImport(): void {
+		if (this.stopped || this.initialDoneAt !== null || this.initialScope)
+			return;
+		this.initialScope = new Set(this.sessions.keys());
+		void this.checkInitialImport();
+	}
+
+	private async checkInitialImport(): Promise<void> {
+		if (this.stopped || this.initialDoneAt !== null) return;
+		if (this.initialSessionsDone() < (this.initialScope?.size ?? 0))
+			this.initialDrainedReads = 0;
+		else {
+			const derived = this.deps.derivedQueued
+				? await this.deps.derivedQueued().catch((error: unknown) => {
+						this.deps.log?.(
+							`local ingest could not count derived work: ${error instanceof Error ? error.message : String(error)}`,
+						);
+						return null;
+					})
+				: 0;
+			this.initialDrainedReads =
+				derived === 0 ? this.initialDrainedReads + 1 : 0;
+			if (
+				this.initialDrainedReads >=
+				(this.deps.derivedQueued ? DRAINED_READS : 1)
+			) {
+				await this.completeInitialImport();
+				return;
+			}
+		}
+		if (this.stopped) return;
+		this.initialTimer = setTimeout(
+			() => void this.checkInitialImport(),
+			this.settings.initialPollMs,
+		);
+		this.initialTimer.unref?.();
+	}
+
+	private async completeInitialImport(): Promise<void> {
+		if (this.initialDoneAt !== null) return;
+		const at = this.now();
+		this.initialDoneAt = at;
+		clearTimeout(this.initialTimer);
+		await this.milestones
+			.reach(INITIAL_IMPORT_MILESTONE, new Date(at))
+			.catch((error: unknown) =>
+				this.deps.log?.(
+					`local ingest could not record the finished initial import: ${error instanceof Error ? error.message : String(error)}`,
+				),
+			);
+	}
+
+	private initialSessionsDone(): number {
+		let done = 0;
+		for (const sessionPath of this.initialScope ?? []) {
+			const entry = this.sessions.get(sessionPath);
+			if (
+				!entry ||
+				entry.lastIngestAt !== null ||
+				entry.state === "ingested" ||
+				entry.state === "kept" ||
+				entry.state === "skipped" ||
+				(!entry.running && entry.dueAt === null)
+			)
+				done += 1;
+		}
+		return done;
+	}
+
+	private initialImportStatus(): InitialImportStatus {
+		const total = this.initialScope?.size ?? 0;
+		const done = this.initialDoneAt !== null;
+		return {
+			active: this.initialLoaded && !done,
+			sessionsDone: done ? total : this.initialSessionsDone(),
+			sessionsTotal: total,
+			completedAt: done
+				? new Date(this.initialDoneAt ?? 0).toISOString()
+				: null,
+		};
 	}
 
 	private async waitForOwner(): Promise<void> {
@@ -180,6 +312,7 @@ export class LocalIngest {
 		for (const seen of this.files.values()) this.markIfStale(seen);
 		if (this.deps.watchFiles !== false) this.watchRoots();
 		await this.scan();
+		this.beginInitialImport();
 		this.scanTimer = setInterval(() => {
 			if (this.deps.watchFiles !== false) this.watchRoots();
 			void this.scan();
@@ -199,6 +332,7 @@ export class LocalIngest {
 		clearTimeout(this.pumpTimer);
 		clearTimeout(this.touchTimer);
 		clearTimeout(this.ownerTimer);
+		clearTimeout(this.initialTimer);
 		clearInterval(this.scanTimer);
 		for (const watcher of this.watchers.values()) watcher.close();
 		this.watchers.clear();
@@ -255,6 +389,7 @@ export class LocalIngest {
 					: new Date(this.lastIngestAt).toISOString(),
 			etaSeconds: importing && rate > 0 ? Math.ceil(bytesQueued / rate) : null,
 			backgroundPriority: this.deps.backgroundPriority,
+			initialImport: this.initialImportStatus(),
 		};
 	}
 
