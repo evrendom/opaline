@@ -12,6 +12,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { FileStore, StoredFile } from "./file-store.js";
 import {
+	INITIAL_IMPORT_MILESTONE,
+	type MilestoneStore,
+	memoryMilestoneStore,
+} from "./milestone-store.js";
+import {
 	LocalIngest,
 	type Owner,
 	type SessionJob,
@@ -507,5 +512,223 @@ test("a resumed Codex session in an old day folder is imported by its modificati
 	await service.start();
 	await settle(service);
 	expect(ingest.calls.map((call) => call.sessionPath)).toEqual([resumed]);
+	await service.stop();
+});
+
+const initialSettings = {
+	concurrency: 1,
+	quietMs: 1,
+	liveIntervalMs: 0,
+	retryBaseMs: 1,
+	initialPollMs: 5,
+};
+
+function gated(ingest: ReturnType<typeof ingestor>) {
+	let open: () => void = () => {};
+	let gate = new Promise<void>((resolve) => {
+		open = resolve;
+	});
+	return {
+		ingestSession: async (job: SessionJob) => {
+			await gate;
+			return ingest.ingestSession(job);
+		},
+		open: () => open(),
+		close: () => {
+			gate = new Promise<void>((resolve) => {
+				open = resolve;
+			});
+		},
+	};
+}
+
+async function initialImportDone(service: LocalIngest) {
+	await waitFor(() => service.status().initialImport.active === false);
+	return service.status().initialImport;
+}
+
+test("the initial import is active through the first backfill and its derived work, then finishes", async () => {
+	await session("a", 5);
+	await session("b", 10);
+	const store = memoryStore();
+	const milestones = memoryMilestoneStore();
+	const ingest = ingestor();
+	const gate = gated(ingest);
+	let derived = 0;
+	const service = create(store, ingest, {
+		ingestSession: gate.ingestSession,
+		milestones,
+		derivedQueued: async () => derived,
+		settings: initialSettings,
+	});
+	await service.start();
+	expect(service.status().initialImport).toEqual({
+		active: true,
+		sessionsDone: 0,
+		sessionsTotal: 2,
+		completedAt: null,
+	});
+	derived = 3;
+	gate.open();
+	await settle(service);
+	await Bun.sleep(30);
+	expect(service.status().initialImport).toMatchObject({
+		active: true,
+		sessionsDone: 2,
+		sessionsTotal: 2,
+	});
+	expect(await milestones.reachedAt(INITIAL_IMPORT_MILESTONE)).toBeNull();
+	derived = 0;
+	const finished = await initialImportDone(service);
+	expect(finished).toMatchObject({ sessionsDone: 2, sessionsTotal: 2 });
+	expect(finished.completedAt).not.toBeNull();
+	expect(await milestones.reachedAt(INITIAL_IMPORT_MILESTONE)).not.toBeNull();
+	await service.stop();
+});
+
+test("a finished initial import stays finished for live re-imports, new sessions and restarts", async () => {
+	const live = await session("live", 1);
+	const store = memoryStore();
+	const milestones = memoryMilestoneStore();
+	const ingest = ingestor();
+	const gate = gated(ingest);
+	let derived = 0;
+	const service = create(store, ingest, {
+		ingestSession: gate.ingestSession,
+		milestones,
+		derivedQueued: async () => derived,
+		settings: initialSettings,
+	});
+	gate.open();
+	await service.start();
+	await initialImportDone(service);
+	gate.close();
+	derived = 4;
+	await appendFile(live, line("more"));
+	const fresh = await session("fresh", 0);
+	await service.notify([live, fresh], false);
+	await waitFor(() => service.status().state === "importing");
+	expect(service.status().initialImport.active).toBe(false);
+	await Bun.sleep(30);
+	expect(service.status().initialImport.active).toBe(false);
+	gate.open();
+	await settle(service);
+	await service.stop();
+
+	await session("after-restart", 0);
+	const restarted = create(store, ingestor(), {
+		milestones,
+		derivedQueued: async () => 9,
+		settings: initialSettings,
+	});
+	await restarted.start();
+	expect(restarted.status().initialImport.active).toBe(false);
+	await settle(restarted);
+	expect(restarted.status().initialImport.active).toBe(false);
+	await restarted.stop();
+});
+
+test("an install whose sessions were all imported before counts as finished at start", async () => {
+	await session("a", 5);
+	await session("b", 10);
+	const store = memoryStore();
+	const before = create(store, ingestor(), { settings: initialSettings });
+	await before.start();
+	await settle(before);
+	await before.stop();
+
+	await session("new-while-closed", 0);
+	const milestones: MilestoneStore = memoryMilestoneStore();
+	const upgraded = create(store, ingestor(), {
+		milestones,
+		derivedQueued: async () => 12,
+		settings: initialSettings,
+	});
+	await upgraded.start();
+	expect(upgraded.status().initialImport.active).toBe(false);
+	expect(upgraded.status().initialImport.completedAt).not.toBeNull();
+	expect(await milestones.reachedAt(INITIAL_IMPORT_MILESTONE)).not.toBeNull();
+	await settle(upgraded);
+	expect(upgraded.status().initialImport.active).toBe(false);
+	await upgraded.stop();
+});
+
+test("an install with a session that was never imported resumes its initial import", async () => {
+	const done = await session("done", 5);
+	const unread = await session("unread", 10);
+	const store = memoryStore();
+	await store.recordIngested({
+		files: [
+			{
+				file: {
+					path: done,
+					source: "claude_code",
+					role: "session",
+					sessionPath: done,
+				},
+				stat: { device: "1", inode: "1", size: 1, mtimeMs: 1 },
+				headSha256: "h",
+				tailSha256: "t",
+			},
+		],
+		sessionId: done,
+		organizationId: owner.organizationId,
+		userId: owner.userId,
+		state: "ingested",
+		reason: null,
+		at: new Date(),
+	});
+	await store.recordSeen([
+		{
+			file: {
+				path: unread,
+				source: "claude_code",
+				role: "session",
+				sessionPath: unread,
+			},
+			stat: { device: "1", inode: "2", size: 1, mtimeMs: 1 },
+		},
+	]);
+	const ingest = ingestor();
+	const gate = gated(ingest);
+	const service = create(store, ingest, {
+		ingestSession: gate.ingestSession,
+		settings: initialSettings,
+	});
+	await service.start();
+	expect(service.status().initialImport).toMatchObject({
+		active: true,
+		sessionsDone: 1,
+		sessionsTotal: 2,
+	});
+	gate.open();
+	await initialImportDone(service);
+	await service.stop();
+});
+
+test("skipped and given-up sessions do not keep the initial import active", async () => {
+	const good = await session("good", 1);
+	const oversized = await session("oversized", 2);
+	const broken = await session("broken", 3);
+	const store = memoryStore();
+	const ingest = ingestor(
+		new Map<string, SessionOutcome>([
+			[oversized, { kind: "skipped", reason: "content Too big" }],
+			[broken, { kind: "retry", reason: "usage telemetry is malformed" }],
+		]),
+	);
+	const milestones = memoryMilestoneStore();
+	const service = create(store, ingest, {
+		milestones,
+		derivedQueued: async () => 0,
+		settings: { ...initialSettings, maxAttempts: 2 },
+	});
+	await service.start();
+	const finished = await initialImportDone(service);
+	expect(finished).toMatchObject({ sessionsDone: 3, sessionsTotal: 3 });
+	expect(store.rows.get(good)?.state).toBe("ingested");
+	expect(store.rows.get(oversized)?.state).toBe("skipped");
+	expect(store.rows.get(broken)?.state).toBe("skipped");
+	expect(await milestones.reachedAt(INITIAL_IMPORT_MILESTONE)).not.toBeNull();
 	await service.stop();
 });

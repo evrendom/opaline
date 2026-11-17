@@ -44,3 +44,10 @@ export const localIngestFile = pgTable(
 );
 
 export type LocalIngestFileSelect = typeof localIngestFile.$inferSelect;
+
+export const localIngestMilestone = pgTable("local_ingest_milestone", {
+	name: text("name").primaryKey(),
+	reachedAt: timestamp("reached_at", { withTimezone: true, mode: "date" })
+		.defaultNow()
+		.notNull(),
+});

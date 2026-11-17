@@ -2,6 +2,7 @@ import type postgres from "postgres";
 import { BACKGROUND_WORKERS_ENV } from "../../lib/background-work.js";
 import { isSelfHosted } from "../../lib/self-hosted.js";
 import { createFileStore } from "./file-store.js";
+import { createMilestoneStore } from "./milestone-store.js";
 import {
 	DEFAULT_LOCAL_INGEST_SETTINGS,
 	type IngestStatus,
@@ -73,6 +74,14 @@ export function readLocalIngestSettings(
 	};
 }
 
+export async function countDerivedQueued(sql: postgres.Sql): Promise<number> {
+	const [derived] = await sql<{ queued: number }[]>`
+		SELECT count(*)::int AS queued FROM l1_edge_scope
+		WHERE request_count > built_request_count AND last_error IS NULL
+	`;
+	return derived?.queued ?? 0;
+}
+
 export async function resolveLocalOwner(
 	sql: postgres.Sql,
 ): Promise<Owner | null> {
@@ -106,6 +115,8 @@ export async function startLocalIngest(options: {
 	const service = new LocalIngest({
 		roots,
 		store: createFileStore(sqlClient),
+		milestones: createMilestoneStore(sqlClient),
+		derivedQueued: () => countDerivedQueued(sqlClient),
 		resolveOwner: () => resolveLocalOwner(sqlClient),
 		ingestSession: runner.ingestSession,
 		onIngested: () => {

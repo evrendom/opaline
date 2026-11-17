@@ -486,18 +486,16 @@ async function ingestStatus(
 	request: Request,
 	deps: SelfHostDependencies,
 ): Promise<Response> {
-	const { getLocalIngest } = await import("../selfhost/local-ingest/index.js");
+	const { getLocalIngest, countDerivedQueued } = await import(
+		"../selfhost/local-ingest/index.js"
+	);
 	const ingest = getLocalIngest();
 	if (!ingest) return Response.json({ error: "not_found" }, { status: 404 });
 	const actor = await loginLinkActor(request, deps);
 	if (actor instanceof Response) return actor;
-	const [derived] = await deps.sql<{ queued: number }[]>`
-		SELECT count(*)::int AS queued FROM l1_edge_scope
-		WHERE request_count > built_request_count AND last_error IS NULL
-	`;
 	return Response.json({
 		...ingest.status(),
-		derivedQueued: derived?.queued ?? 0,
+		derivedQueued: await countDerivedQueued(deps.sql),
 	});
 }
 
