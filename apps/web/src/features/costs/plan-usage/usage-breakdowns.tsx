@@ -172,7 +172,13 @@ function UsageBreakdown({
 	heading: string;
 	rows: readonly Row[];
 }) {
-	const maximum = Math.max(0, ...rows.map((row) => row.points));
+	const marked = useMarkedDate();
+	const shown = marked
+		? [...rows].sort(
+				(a, b) => Number(a.muted) - Number(b.muted) || b.points - a.points,
+			)
+		: rows;
+	const maximum = Math.max(0, ...shown.map((row) => row.points));
 	return (
 		<section className="cost-breakdown" aria-label={title}>
 			<div className="cost-breakdown-heading">
@@ -190,7 +196,7 @@ function UsageBreakdown({
 				) : (
 					<div data-fluid-menu-root="">
 						<FluidMenuHover items=".cost-breakdown-row" />
-						{rows.map((row, index) => (
+						{shown.map((row, index) => (
 							<UsageRow
 								key={row.id}
 								row={row}

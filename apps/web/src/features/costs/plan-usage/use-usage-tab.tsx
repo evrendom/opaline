@@ -50,14 +50,14 @@ export function useUsageTab(
 			value: query.isPending
 				? undefined
 				: window
-					? `${Math.round(window.usedPercent)}%\u2009/\u2009${Math.round(leftPercent(window.usedPercent))}%`
+					? `${Math.round(window.usedPercent)}%/${Math.round(leftPercent(window.usedPercent))}%`
 					: "—",
 			trend: query.isPending || firstKnown === null ? undefined : trend,
 			dates: periods.map((period) => period.date),
 			textAt: (index) => {
 				const period = periods[index];
 				if (!period || period.solid === null) return "—";
-				return `${formatPoints(period.usedPoints)}\u2009/\u2009${Math.round(period.solid)}%`;
+				return `${formatPoints(period.usedPoints)}/${Math.round(period.solid)}%`;
 			},
 			selected,
 			onSelect: () => setSelected(true),

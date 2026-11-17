@@ -73,11 +73,13 @@ function hoveredEntries(
 		for (const [id, value] of Object.entries(values))
 			sums.set(id, (sums.get(id) ?? 0) + value);
 	}
-	return entries.map((entry) =>
-		entry.denominator === undefined
-			? { ...entry, value: sums.get(entry.id) ?? 0 }
-			: entry,
-	);
+	return entries
+		.map((entry) =>
+			entry.denominator === undefined
+				? { ...entry, value: sums.get(entry.id) ?? 0 }
+				: entry,
+		)
+		.sort((a, b) => b.value - a.value);
 }
 
 const INTRO_ROW_SCALES = [1, 0.62, 0.41, 0.27, 0.18, 0.11];
