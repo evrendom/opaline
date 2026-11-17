@@ -607,7 +607,8 @@
 	transition: background-color 150ms ease;
 }
 /* Of-type, not child: the fluid hover's layer sits among the rows. */
-.cost-breakdown-list .cost-breakdown-row:first-of-type {
+.cost-breakdown-list .cost-breakdown-row:first-of-type,
+.cost-breakdown-list .fluid-menu-hover-layer + .cost-breakdown-row {
 	border-top-color: transparent;
 }
 /* A hovered row hides the hairlines around it, so the highlight reads as one

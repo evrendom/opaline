@@ -468,6 +468,7 @@ function useBreakdownRowHeight(ref: RefObject<HTMLElement | null>) {
 		if (!grid || !scroll || !content || typeof ResizeObserver === "undefined")
 			return;
 		const measure = () => {
+			if (grid.getClientRects().length === 0) return;
 			const top =
 				grid.getBoundingClientRect().top -
 				scroll.getBoundingClientRect().top +
@@ -483,6 +484,7 @@ function useBreakdownRowHeight(ref: RefObject<HTMLElement | null>) {
 		measure();
 		const observer = new ResizeObserver(measure);
 		observer.observe(scroll);
+		if (grid.parentElement) observer.observe(grid.parentElement);
 		for (const child of content.children) {
 			if (!child.contains(grid)) observer.observe(child);
 		}
