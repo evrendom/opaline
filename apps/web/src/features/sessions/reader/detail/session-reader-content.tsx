@@ -32,7 +32,12 @@ import {
 	READER_CONTENT_MARK,
 	READER_SCROLL_MARK,
 } from "../reader-dom";
-import { AGENT_PARAM, TURN_PARAM, writePick } from "../reader-params";
+import {
+	AGENT_PARAM,
+	TURN_PARAM,
+	updateReaderParams,
+	writePick,
+} from "../reader-params";
 import {
 	READER_RAIL_BACKGROUND,
 	TabsBandFade,
@@ -339,13 +344,9 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 			const index = turns.findIndex((turn) => turn.turnId === turnId);
 			if (index >= 0) void listRef.current?.scrollToIndex({ index });
 		}
-		setSearchParams(
-			(params) => {
-				writePick(params, { kind: "run", run: turnId });
-				return params;
-			},
-			{ replace: true },
-		);
+		updateReaderParams(setSearchParams, (params) => {
+			writePick(params, { kind: "run", run: turnId });
+		});
 	}
 
 	const subagentsContext = useMemo(

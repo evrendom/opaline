@@ -24,6 +24,7 @@ import {
 	RUN_PARAM,
 	SUBAGENT_PARAM,
 	syncPick,
+	updateReaderParams,
 } from "../reader-params";
 import { resolveSessionFile } from "../session-places";
 import { FilesColumnsSample } from "../session-reader-samples";
@@ -145,26 +146,22 @@ export function SessionReaderFilesView({
 		read?: string | null;
 		run?: string | null;
 	}) =>
-		setSearchParams(
-			(params) => {
-				for (const [key, value] of [
-					[FILE_PARAM, next.file],
-					[RUN_PARAM, next.run],
-					[
-						SUBAGENT_PARAM,
-						next.run !== undefined ? (next.agent ?? null) : next.agent,
-					],
-					[READ_PARAM, next.read ?? null],
-				] as const) {
-					if (value === undefined) continue;
-					if (value === null) params.delete(key);
-					else params.set(key, value);
-				}
-				syncPick(params);
-				return params;
-			},
-			{ replace: true },
-		);
+		updateReaderParams(setSearchParams, (params) => {
+			for (const [key, value] of [
+				[FILE_PARAM, next.file],
+				[RUN_PARAM, next.run],
+				[
+					SUBAGENT_PARAM,
+					next.run !== undefined ? (next.agent ?? null) : next.agent,
+				],
+				[READ_PARAM, next.read ?? null],
+			] as const) {
+				if (value === undefined) continue;
+				if (value === null) params.delete(key);
+				else params.set(key, value);
+			}
+			syncPick(params);
+		});
 	const pickRun = (turnId: string | null, subagent: string | null = null) =>
 		setPicks({ agent: subagent, file: null, run: turnId });
 	const pickStep = (step: SessionRunStep, picked?: string) => {

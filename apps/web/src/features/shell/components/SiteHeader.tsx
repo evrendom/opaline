@@ -177,7 +177,6 @@ export function SiteHeader({
 						{readingSubagent ? (
 							<Link
 								to={mainThreadPath}
-								replace
 								data-fluid-menu-root=""
 								title={sessionDetailId}
 								className="truncate text-muted-foreground transition-colors hover:text-foreground"

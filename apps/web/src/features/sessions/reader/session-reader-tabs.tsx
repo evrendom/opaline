@@ -34,6 +34,7 @@ import {
 	type SessionReaderTab,
 	SUBAGENT_PARAM,
 	TURN_PARAM,
+	updateReaderParams,
 	writeAgent,
 	writePick,
 	writeView,
@@ -46,13 +47,9 @@ export function useWholeSessionLine() {
 	return useMemo(
 		() => ({
 			onPick: () =>
-				setSearchParamsRef.current(
-					(params) => {
-						writePick(params, SESSION_PICK);
-						return params;
-					},
-					{ replace: true },
-				),
+				updateReaderParams(setSearchParamsRef.current, (params) => {
+					writePick(params, SESSION_PICK);
+				}),
 			picked,
 		}),
 		[picked, setSearchParamsRef],
@@ -63,13 +60,9 @@ export function useReaderPick() {
 	const [searchParams, setSearchParams] = useSearchParams();
 	const address = readPick(searchParams);
 	const pick = (turnId: string | null, subagentId: string | null = null) =>
-		setSearchParams(
-			(params) => {
-				writePick(params, pickOf(turnId, subagentId));
-				return params;
-			},
-			{ replace: true },
-		);
+		updateReaderParams(setSearchParams, (params) => {
+			writePick(params, pickOf(turnId, subagentId));
+		});
 	return {
 		address,
 		agent: pickedAgentOf(address),
@@ -166,82 +159,58 @@ export function useSessionReaderTab() {
 	const tab: SessionReaderTab = isTab(param) ? param : "summary";
 
 	function selectTab(next: SessionReaderTab, reading?: string | null) {
-		setSearchParams(
-			(params) => {
-				writeView(params, next);
-				if (reading && reading !== params.get(RUN_PARAM))
-					writePick(params, { kind: "run", run: reading });
-				return params;
-			},
-			{ replace: true },
-		);
+		updateReaderParams(setSearchParams, (params) => {
+			writeView(params, next);
+			if (reading && reading !== params.get(RUN_PARAM))
+				writePick(params, { kind: "run", run: reading });
+		});
 	}
 
 	function openTurn(turnId: string, agent?: string) {
-		setSearchParams(
-			(params) => {
-				writeView(params, "detail");
-				writePick(params, pickOf(turnId, agent ?? null));
-				return params;
-			},
-			{ replace: !agent },
-		);
+		updateReaderParams(setSearchParams, (params) => {
+			writeView(params, "detail");
+			writePick(params, pickOf(turnId, agent ?? null));
+		});
 	}
 
 	function openFiles(picks: { file?: string; run?: string }) {
-		setSearchParams(
-			(params) => {
-				writeView(params, "files");
-				if (picks.file) params.set(FILE_PARAM, picks.file);
-				else params.delete(FILE_PARAM);
-				params.delete(READ_PARAM);
-				writePick(params, pickOf(picks.run ?? null, null));
-				return params;
-			},
-			{ replace: true },
-		);
+		updateReaderParams(setSearchParams, (params) => {
+			writeView(params, "files");
+			if (picks.file) params.set(FILE_PARAM, picks.file);
+			else params.delete(FILE_PARAM);
+			params.delete(READ_PARAM);
+			writePick(params, pickOf(picks.run ?? null, null));
+		});
 	}
 
 	function openSetup(setupFile?: string) {
-		setSearchParams(
-			(params) => {
-				writeView(params, "setup");
-				if (setupFile) params.set(SETUP_PARAM, setupFile);
-				else params.delete(SETUP_PARAM);
-				return params;
-			},
-			{ replace: true },
-		);
+		updateReaderParams(setSearchParams, (params) => {
+			writeView(params, "setup");
+			if (setupFile) params.set(SETUP_PARAM, setupFile);
+			else params.delete(SETUP_PARAM);
+		});
 	}
 
 	function openCi(picks: { ci?: string; pr?: string }) {
-		setSearchParams(
-			(params) => {
-				writeView(params, "ci");
-				for (const [key, value] of [
-					[PR_PARAM, picks.pr],
-					[CI_PARAM, picks.ci],
-				] as const) {
-					if (value) params.set(key, value);
-					else params.delete(key);
-				}
-				writePick(params, SESSION_PICK);
-				return params;
-			},
-			{ replace: true },
-		);
+		updateReaderParams(setSearchParams, (params) => {
+			writeView(params, "ci");
+			for (const [key, value] of [
+				[PR_PARAM, picks.pr],
+				[CI_PARAM, picks.ci],
+			] as const) {
+				if (value) params.set(key, value);
+				else params.delete(key);
+			}
+			writePick(params, SESSION_PICK);
+		});
 	}
 
 	function openSubagent(subagentId?: string) {
-		setSearchParams(
-			(params) => {
-				writeView(params, "detail");
-				writePick(params, SESSION_PICK);
-				if (subagentId) writeAgent(params, subagentId);
-				return params;
-			},
-			{ replace: !subagentId },
-		);
+		updateReaderParams(setSearchParams, (params) => {
+			writeView(params, "detail");
+			writePick(params, SESSION_PICK);
+			if (subagentId) writeAgent(params, subagentId);
+		});
 	}
 
 	const setupFile = searchParams.get(SETUP_PARAM);

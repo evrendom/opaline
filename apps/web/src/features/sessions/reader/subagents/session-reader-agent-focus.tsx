@@ -17,33 +17,42 @@ import { cn } from "@/lib/utils";
 import { ReaderMinimap } from "../minimap/session-reader-minimap";
 import type { SessionMapKey } from "../minimap/session-reader-minimap-store";
 import type { SessionReaderStep } from "../model/session-reader-model";
-import { AGENT_PARAM, pickOf, writeAgent, writePick } from "../reader-params";
+import {
+	AGENT_PARAM,
+	pickOf,
+	updateReaderParams,
+	writeAgent,
+	writePick,
+} from "../reader-params";
 import { getSubagentLaunches } from "../summary/session-summary-model";
 
 export { subagentIdOf } from "@rudel/api-routes/session-context/session-reader-subagents";
 
 export function useAgentFocus(): {
 	focus: string | null;
-	setFocus: (subagentId: string | null, run?: string) => void;
+	setFocus: (
+		subagentId: string | null,
+		run?: string,
+		options?: { replace?: boolean },
+	) => void;
 } {
 	const [searchParams, setSearchParams] = useSearchParams();
 	const setSearchParamsRef = useLatestValueRef(setSearchParams);
 	return {
 		focus: searchParams.get(AGENT_PARAM),
 		setFocus: useCallback(
-			(subagentId: string | null, run?: string) =>
-				setSearchParamsRef.current(
+			(
+				subagentId: string | null,
+				run?: string,
+				options?: { replace?: boolean },
+			) =>
+				updateReaderParams(
+					setSearchParamsRef.current,
 					(params) => {
 						if (run !== undefined) writePick(params, pickOf(run, subagentId));
 						else writeAgent(params, subagentId);
-						return params;
 					},
-					{
-						replace:
-							!subagentId ||
-							new URLSearchParams(window.location.search).get(AGENT_PARAM) ===
-								subagentId,
-					},
+					options,
 				),
 			[setSearchParamsRef],
 		),
@@ -135,7 +144,8 @@ export function useReaderFocus({
 		return span ? turns.slice(span.first + 1, span.last + 1) : [];
 	}, [focus, turns, subagents]);
 	useLayoutEffect(() => {
-		if (focus && !turnId && complete) setFocus(null);
+		if (focus && !turnId && complete)
+			setFocus(null, undefined, { replace: true });
 	}, [focus, turnId, complete, setFocus]);
 	useLayoutEffect(() => {
 		if (turnId) requestBodyRef.current(turnId);

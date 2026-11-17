@@ -35,6 +35,26 @@ export const SUBAGENT_PARAM = "subagent";
 export const AGENT_PARAM = "agent";
 export const TURN_PARAM = "turn";
 
+type SetReaderParams = (
+	params: URLSearchParams,
+	options: { replace: boolean },
+) => void;
+
+export function updateReaderParams(
+	setSearchParams: SetReaderParams,
+	update: (params: URLSearchParams) => void,
+	options?: { replace?: boolean },
+) {
+	const before = new URLSearchParams(window.location.search);
+	const next = new URLSearchParams(before);
+	update(next);
+	const sameView =
+		next.get(AGENT_PARAM) === before.get(AGENT_PARAM) &&
+		readSessionReaderTab(next.get(SESSION_TAB_PARAM)) ===
+			readSessionReaderTab(before.get(SESSION_TAB_PARAM));
+	setSearchParams(next, { replace: options?.replace ?? sameView });
+}
+
 export function writeAgent(params: URLSearchParams, subagent: string | null) {
 	for (const key of [AGENT_PARAM, SUBAGENT_PARAM]) {
 		if (subagent) params.set(key, subagent);

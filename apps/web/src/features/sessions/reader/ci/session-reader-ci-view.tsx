@@ -20,7 +20,13 @@ import {
 	railLineKey,
 	subagentIdsOf,
 } from "../rail/session-reader-turn-rail-row";
-import { CI_PARAM, PR_PARAM, pickOf, writePick } from "../reader-params";
+import {
+	CI_PARAM,
+	PR_PARAM,
+	pickOf,
+	updateReaderParams,
+	writePick,
+} from "../reader-params";
 import { CiColumnsSample } from "../session-reader-samples";
 import { READER_RAIL_BACKGROUND, useReaderPick } from "../session-reader-tabs";
 import {
@@ -105,19 +111,15 @@ export function SessionReaderCiView({
 		next: { ci?: string | null; pr?: string | null },
 		rail?: { run: string | null; subagent: string | null },
 	) =>
-		setSearchParams(
-			(params) => {
-				for (const [key, value] of [
-					[CI_PARAM, next.ci],
-					[PR_PARAM, next.pr],
-				] as const)
-					if (value === null) params.delete(key);
-					else if (value !== undefined) params.set(key, value);
-				if (rail) writePick(params, pickOf(rail.run, rail.subagent));
-				return params;
-			},
-			{ replace: true },
-		);
+		updateReaderParams(setSearchParams, (params) => {
+			for (const [key, value] of [
+				[CI_PARAM, next.ci],
+				[PR_PARAM, next.pr],
+			] as const)
+				if (value === null) params.delete(key);
+				else if (value !== undefined) params.set(key, value);
+			if (rail) writePick(params, pickOf(rail.run, rail.subagent));
+		});
 	const pickRun = (turnId: string | null, subagent: string | null = null) =>
 		setPicks({ ci: null }, { run: turnId, subagent });
 	const openSubagent = (subagentId: string) => {
