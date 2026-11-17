@@ -3,12 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useLocalDesktopApp } from "@/features/desktop/local-app";
 import type { ChartInterval } from "../chart-interval";
 import type { UsageTab } from "../cost-chart";
-import {
-	formatPoints,
-	PlanUsageChart,
-	periodsOf,
-	showsChart,
-} from "./plan-usage-chart";
+import { PlanUsageChart, periodsOf, showsChart } from "./plan-usage-chart";
 import { UsageBreakdowns } from "./usage-breakdowns";
 import {
 	leftPercent,
@@ -16,6 +11,10 @@ import {
 	type UsageRange,
 	usePlanUsage,
 } from "./use-plan-usage";
+
+function usedChip(points: number): string {
+	return `\u2212${Math.round(points)}%`;
+}
 
 export function useUsageTab(
 	range: UsageRange,
@@ -86,20 +85,28 @@ export function useUsageTab(
 		carried = left ?? carried;
 		return carried ?? 0;
 	});
+	const latest = [...periods].reverse().find((period) => period.solid !== null);
 	return {
 		deselect,
 		tab: {
 			value: query.isPending
 				? undefined
 				: window
-					? `${Math.round(window.usedPercent)}%/${Math.round(leftPercent(window.usedPercent))}%`
+					? `${Math.round(leftPercent(window.usedPercent))}%`
 					: "—",
+			chip: latest ? usedChip(latest.usedPoints) : undefined,
+			chipAt: (index) => {
+				const period = periods[index];
+				return period && period.solid !== null
+					? usedChip(period.usedPoints)
+					: "";
+			},
 			trend: query.isPending || firstKnown === null ? undefined : trend,
 			dates: periods.map((period) => period.date),
 			textAt: (index) => {
 				const period = periods[index];
 				if (!period || period.solid === null) return "—";
-				return `${formatPoints(period.usedPoints)}/${Math.round(period.solid)}%`;
+				return `${Math.round(period.solid)}%`;
 			},
 			selected,
 			onSelect: () => setSelected(true),

@@ -256,6 +256,8 @@ export interface UsageTab {
 	readonly trend: number[] | undefined;
 	readonly dates?: string[];
 	readonly textAt?: (index: number) => string;
+	readonly chip?: string;
+	readonly chipAt?: (index: number) => string;
 	readonly selected: boolean;
 	readonly onSelect: () => void;
 	readonly chart: (dots: boolean) => ReactNode;
@@ -677,6 +679,8 @@ export function CostChart({
 							trend={usage.trend}
 							dates={usage.dates}
 							textAt={usage.textAt}
+							chip={usage.chip}
+							chipAt={usage.chipAt}
 							step
 							primary={usage.selected}
 							onClick={usage.onSelect}
@@ -1530,6 +1534,8 @@ function Metric({
 	dates,
 	format,
 	textAt,
+	chip,
+	chipAt,
 	step = false,
 	onClick,
 	onIntent,
@@ -1553,6 +1559,8 @@ function Metric({
 	dates?: string[];
 	format?: (value: number) => string;
 	textAt?: (index: number) => string;
+	chip?: string;
+	chipAt?: (index: number) => string;
 	step?: boolean;
 	onClick: () => void;
 	onIntent?: () => void;
@@ -1583,6 +1591,7 @@ function Metric({
 			: markedValue !== undefined && format
 				? format(markedValue)
 				: value;
+	const shownChip = markedIndex >= 0 && chipAt ? chipAt(markedIndex) : chip;
 	const [roll, setRoll] = useState({ at: markedIndex, direction: 1 as 1 | -1 });
 	if (roll.at !== markedIndex)
 		setRoll({ at: markedIndex, direction: markedIndex >= roll.at ? 1 : -1 });
@@ -1636,6 +1645,11 @@ function Metric({
 						) : (
 							<RollingText text={shown} direction={roll.direction} />
 						)}
+						{shownChip && !unavailable ? (
+							<span className="cost-metric-chip">
+								<RollingText text={shownChip} direction={roll.direction} />
+							</span>
+						) : null}
 					</span>
 				)}
 			</div>
