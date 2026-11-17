@@ -11,10 +11,60 @@ const MIN_AREA = { h: 28, w: 40 } as const;
 const MIN_CELL = 18;
 
 const MARK: Record<Tone, string> = {
-	later: "border-opal-4",
-	minor: "border-opal-3",
-	never: "border-rose-500",
+	later: "[--mark:var(--color-opal-4)]",
+	minor: "[--mark:var(--color-opal-3)]",
+	never: "[--mark:var(--color-rose-500)]",
 };
+
+const MARKED =
+	"border-[color-mix(in_oklab,var(--mark)_45%,transparent)] shadow-[0_0_4px_color-mix(in_oklab,var(--mark)_60%,transparent),0_0_14px_color-mix(in_oklab,var(--mark)_45%,transparent)]";
+
+export const markGlow = (tone: Tone) => `${MARK[tone]} ${MARKED}`;
+
+const MARK_ORDER: readonly Tone[] = ["never", "later", "minor"];
+
+const MARK_LABEL: Record<Tone, string> = {
+	later: "Resolved later",
+	minor: "Resolved instantly",
+	never: "Unresolved",
+};
+
+export function MarkLegend({
+	className,
+	tones,
+}: {
+	className?: string;
+	tones: ReadonlySet<Tone>;
+}) {
+	const shown = MARK_ORDER.filter((tone) => tones.has(tone));
+	if (shown.length === 0) return null;
+	return (
+		<div
+			className={cn(
+				"inline-flex min-w-0 shrink-0 items-center gap-0.5 rounded-lg bg-black/[0.04] p-0.5 text-xs font-medium text-muted-foreground corner-squircle squircle:rounded-[14px] dark:bg-white/[0.06]",
+				className,
+			)}
+		>
+			<span className="flex h-6 items-center px-2 text-muted-foreground/60">
+				Errors
+			</span>
+			<ul aria-label="Errors" className="flex min-w-0 items-center gap-0.5">
+				{shown.map((tone) => (
+					<li key={tone} className="flex h-6 items-center gap-1.5 px-2">
+						<span
+							aria-hidden="true"
+							className={cn(
+								"size-2.5 shrink-0 rounded-[3px] border corner-squircle",
+								markGlow(tone),
+							)}
+						/>
+						{MARK_LABEL[tone]}
+					</li>
+				))}
+			</ul>
+		</div>
+	);
+}
 
 export function markOf(
 	marks: ReadonlyMap<string, Tone> | undefined,
@@ -124,9 +174,7 @@ export function ContextSubTiles({
 						<span
 							className={cn(
 								"absolute inset-0 rounded-[3px] border corner-squircle squircle:rounded-[6px]",
-								mark
-									? `${MARK[mark]} border-[1.5px]`
-									: "border-current opacity-20",
+								mark ? markGlow(mark) : "border-current opacity-20",
 							)}
 						/>
 						{width >= ICON_ROOM && height >= ICON_ROOM ? (
