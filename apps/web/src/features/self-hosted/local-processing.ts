@@ -6,17 +6,36 @@ const IDLE_POLL_MS = 15_000;
 
 type IngestStatus = {
 	state?: string;
-	sessionsQueued?: number;
-	derivedQueued?: number;
+	initialImport?: {
+		active?: boolean;
+		sessionsDone?: number;
+		sessionsTotal?: number;
+	};
 };
 
-export function isProcessing(status: IngestStatus | null | undefined) {
-	return Boolean(
-		status &&
-			(status.state === "importing" ||
-				(status.sessionsQueued ?? 0) > 0 ||
-				(status.derivedQueued ?? 0) > 0),
-	);
+export type InitialImport = {
+	sessionsDone: number;
+	sessionsTotal: number;
+};
+
+export function initialImportOf(
+	status: IngestStatus | null | undefined,
+): InitialImport | null {
+	const initial = status?.initialImport;
+	if (initial?.active !== true) return null;
+	return {
+		sessionsDone: initial.sessionsDone ?? 0,
+		sessionsTotal: initial.sessionsTotal ?? 0,
+	};
+}
+
+export function initialImportLabel({
+	sessionsDone,
+	sessionsTotal,
+}: InitialImport): string {
+	return sessionsTotal > 0 && sessionsDone < sessionsTotal
+		? `Processing ${sessionsDone.toLocaleString("en-US")} of ${sessionsTotal.toLocaleString("en-US")} sessions`
+		: "Processing sessions and repos";
 }
 
 async function readIngestStatus(): Promise<IngestStatus | null> {
@@ -27,14 +46,14 @@ async function readIngestStatus(): Promise<IngestStatus | null> {
 	return (await response.json()) as IngestStatus;
 }
 
-export function useLocalProcessing(): boolean {
+export function useInitialImport(): InitialImport | null {
 	const selfHost = useSelfHost();
 	const query = useQuery({
 		queryKey: ["selfhost", "ingest-status"],
 		queryFn: readIngestStatus,
 		enabled: Boolean(selfHost),
 		refetchInterval: (current) =>
-			isProcessing(current.state.data) ? BUSY_POLL_MS : IDLE_POLL_MS,
+			initialImportOf(current.state.data) ? BUSY_POLL_MS : IDLE_POLL_MS,
 	});
-	return isProcessing(query.data);
+	return initialImportOf(query.data);
 }
