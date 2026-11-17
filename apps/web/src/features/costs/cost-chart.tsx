@@ -67,6 +67,7 @@ import { SERIES_COLORS } from "./chart-colors";
 import { EdgeTick, edgeTicks, useAxisHover } from "./chart-edge-axis";
 import {
 	DASHBOARD_LOADING_LINE,
+	DASHBOARD_LOADING_STEPS,
 	HEARTBEAT_BASE_VALUE,
 	HEARTBEAT_DOMAIN,
 	LOADING_ROWS,
@@ -1641,7 +1642,7 @@ function Metric({
 					className="cost-metric-sparkline cost-metric-wave"
 					viewBoxHeight={LOADING_WAVE_HEIGHT}
 					color={color}
-					linePath={DASHBOARD_LOADING_LINE}
+					linePath={step ? DASHBOARD_LOADING_STEPS : DASHBOARD_LOADING_LINE}
 					strokeWidth={1.2}
 					guides={false}
 				/>
@@ -1734,7 +1735,7 @@ export function MetricSparkline({
 						const from = ((index / line.length) * 100).toFixed(2);
 						const to = (((index + 1) / line.length) * 100).toFixed(2);
 						const y = (32 - inset - value * (32 - inset)).toFixed(2);
-						return `${index === 0 ? "M" : "L"}${from} ${y} H${to}`;
+						return `${index === 0 ? "M" : "L"}${from} ${y} L${to} ${y}`;
 					})
 					.join(" ")
 			: line

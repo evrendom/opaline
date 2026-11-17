@@ -26,6 +26,32 @@ export const DASHBOARD_LOADING_LINE = [
 	"L 954.1 48 L 959.2 39.8 L 964.3 14.9 L 969.5 10.1 L 974.6 35.7 L 979.7 19 L 984.9 39.2 L 990 48",
 ].join(" ");
 
+const STEP_COUNT = 28;
+
+/** The heartbeat as flat steps, for charts whose values hold per period. */
+export const DASHBOARD_LOADING_STEPS = (() => {
+	const numbers =
+		DASHBOARD_LOADING_LINE.match(/-?\d*\.?\d+/g)?.map(Number) ?? [];
+	const points: [number, number][] = [];
+	for (let index = 0; index + 1 < numbers.length; index += 2)
+		points.push([numbers[index] ?? 0, numbers[index + 1] ?? 0]);
+	const width = (990 - 10) / STEP_COUNT;
+	const levels = Array.from({ length: STEP_COUNT }, (_, step) => {
+		const from = 10 + step * width;
+		const inside = points.filter(([x]) => x >= from && x < from + width);
+		return inside.length
+			? Math.min(...inside.map(([, y]) => y))
+			: (points.find(([x]) => x >= from)?.[1] ?? 48);
+	});
+	return levels
+		.map((y, step) => {
+			const from = (10 + step * width).toFixed(1);
+			const to = (10 + (step + 1) * width).toFixed(1);
+			return `${step === 0 ? "M" : "L"} ${from} ${y.toFixed(1)} L ${to} ${y.toFixed(1)}`;
+		})
+		.join(" ");
+})();
+
 /** The loading waves' viewBox height (chart and stat cards). */
 export const LOADING_WAVE_HEIGHT = 56;
 /** The heartbeat's value axis while loading: the wave's height, bottom up. */

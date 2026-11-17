@@ -102,6 +102,7 @@ interface Period {
 	readonly solid: number | null;
 	readonly cap: number | null;
 	readonly used: number | null;
+	readonly usedPoints: number;
 	readonly full: number | null;
 }
 
@@ -121,6 +122,10 @@ export function periodsOf(
 		const last =
 			[...buckets].reverse().find((bucket) => bucket.usedPercent !== null) ??
 			null;
+		const usedPoints = buckets.reduce(
+			(sum, bucket) => sum + bucket.usedPoints,
+			0,
+		);
 		const range = last?.usedRange ?? null;
 		const low = range ? leftPercent(range[1]) : null;
 		const high = range ? leftPercent(range[0]) : null;
@@ -143,11 +148,13 @@ export function periodsOf(
 			used:
 				last?.usedPercent === null || !last
 					? null
-					: estimate
-						? last.usedPercent
-						: high === null
-							? null
-							: 100 - high,
+					: Math.min(
+							usedPoints,
+							100 -
+								(estimate ? leftPercent(last.usedPercent) : (low ?? 0)) -
+								(estimate ? 0 : high !== null && low !== null ? high - low : 0),
+						),
+			usedPoints,
 			full: last?.usedPercent === null || !last ? null : 100,
 		};
 	});
@@ -551,11 +558,7 @@ function PeriodTip({
 				<strong>
 					{last?.usedPercent === null || !last
 						? "—"
-						: estimate
-							? `~${Math.round(last.usedPercent)}%`
-							: low === high
-								? `${100 - (low ?? 0)}%`
-								: `${100 - (high ?? 0)}–${100 - (low ?? 0)}%`}
+						: `${estimate && period.usedPoints >= 1 ? "~" : ""}${formatPoints(period.usedPoints)}`}
 				</strong>
 			</div>
 		</div>
