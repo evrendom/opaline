@@ -14,6 +14,7 @@ export interface UsageBucket {
 	readonly usedPoints: number;
 	readonly reset: boolean;
 	readonly sessions: readonly { sessionId: string; points: number }[];
+	readonly repositoryPoints?: number | null;
 }
 
 export interface GroupShare {
@@ -45,6 +46,7 @@ export interface UsageWindow {
 	readonly repositories: readonly GroupShare[];
 	readonly otherPoints: number;
 	readonly totalPoints: number;
+	readonly repositoryPoints?: number | null;
 }
 
 export interface ProviderUsage {
@@ -72,6 +74,7 @@ const POLL_MS = 60_000;
 
 async function readPlanUsage(
 	range: UsageRange,
+	repositories: readonly string[],
 ): Promise<PlanUsageReport | null> {
 	const from = Date.parse(`${range.startDate}T00:00:00Z`);
 	const to = Date.parse(`${range.endDate}T00:00:00Z`) + DAY_MS;
@@ -80,6 +83,8 @@ async function readPlanUsage(
 		to: new Date(to).toISOString(),
 		buckets: "day",
 	});
+	for (const repository of repositories)
+		params.append("repository", repository);
 	const response = await fetch(`/api/selfhost/plan-usage?${params}`, {
 		credentials: "include",
 	});
@@ -88,10 +93,20 @@ async function readPlanUsage(
 	return (await response.json()) as PlanUsageReport;
 }
 
-export function usePlanUsage(enabled: boolean, range: UsageRange) {
+export function usePlanUsage(
+	enabled: boolean,
+	range: UsageRange,
+	repositories: readonly string[] = [],
+) {
 	return useQuery({
-		queryKey: ["selfhost", "plan-usage", range.startDate, range.endDate],
-		queryFn: () => readPlanUsage(range),
+		queryKey: [
+			"selfhost",
+			"plan-usage",
+			range.startDate,
+			range.endDate,
+			...repositories,
+		],
+		queryFn: () => readPlanUsage(range, repositories),
 		enabled,
 		refetchInterval: POLL_MS,
 		placeholderData: (previous) => previous,

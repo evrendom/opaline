@@ -444,3 +444,68 @@ test("earlier cycles are estimated from cost at the measured cycle's rate", () =
 	});
 	expect(series?.resets).toContain(new Date(reset - week).toISOString());
 });
+
+test("a repository's points add up its sessions, per bucket and for the range", () => {
+	const series = buildWindowSeries({
+		samples: [sample(T0, 40), sample(T0 + 30 * 60_000, 46)],
+		rows: [
+			{
+				sessionId: "a",
+				at: T0 + 5 * 60_000,
+				model: "claude-opus-5-5",
+				cost: 3,
+			},
+			{
+				sessionId: "b",
+				at: T0 + 40 * 60_000,
+				model: "claude-opus-5-5",
+				cost: 2,
+			},
+			{
+				sessionId: "c",
+				at: T0 + 15 * 60_000,
+				model: "claude-opus-5-5",
+				cost: 1,
+			},
+		],
+		from: T0,
+		to: T0 + HOUR,
+		now: T0 + HOUR,
+		bucketMinutes: 30,
+		repositoryOf: new Map([
+			["a", "github.com/opalinehq/athena"],
+			["b", "github.com/opalinehq/athena"],
+			["c", "github.com/opalinehq/sales"],
+		]),
+		repositories: new Set(["github.com/opalinehq/athena"]),
+	});
+	const sessionPoints = series?.sessionPoints ?? {};
+	expect(series?.repositoryPoints).toBe(
+		Math.round(((sessionPoints.a ?? 0) + (sessionPoints.b ?? 0)) * 100) / 100,
+	);
+	expect(series?.buckets.map((bucket) => bucket.repositoryPoints)).toEqual([
+		sessionPoints.a ?? 0,
+		sessionPoints.b ?? 0,
+	]);
+});
+
+test("without a repository the series has no repository points", () => {
+	const series = buildWindowSeries({
+		samples: [sample(T0, 40), sample(T0 + 30 * 60_000, 46)],
+		rows: [
+			{
+				sessionId: "a",
+				at: T0 + 5 * 60_000,
+				model: "claude-opus-5-5",
+				cost: 3,
+			},
+		],
+		from: T0,
+		to: T0 + HOUR,
+		now: T0 + HOUR,
+	});
+	expect(series?.repositoryPoints).toBeNull();
+	expect(
+		series?.buckets.every((bucket) => bucket.repositoryPoints === null),
+	).toBe(true);
+});

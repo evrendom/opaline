@@ -66,6 +66,7 @@ export async function buildPlanUsageReport(input: {
 	readonly loadRepositories?: (
 		sessionIds: readonly string[],
 	) => Promise<ReadonlyMap<string, string>>;
+	readonly repositories?: ReadonlySet<string>;
 }): Promise<PlanUsageReport> {
 	const providers = await Promise.all(
 		PROVIDERS.map(async (provider): Promise<ProviderUsage> => {
@@ -104,6 +105,7 @@ export async function buildPlanUsageReport(input: {
 					to: input.to,
 					now: input.now,
 					repositoryOf,
+					repositories: input.repositories,
 					bucketMinutes: input.bucketMinutes,
 				}),
 			};

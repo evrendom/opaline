@@ -32,6 +32,7 @@ export interface SeriesBucket {
 	readonly usedPoints: number;
 	readonly reset: boolean;
 	readonly sessions: readonly BucketSession[];
+	readonly repositoryPoints: number | null;
 }
 
 export interface SessionShare {
@@ -65,6 +66,7 @@ export interface WindowSeries {
 	readonly repositories: readonly GroupShare[];
 	readonly otherPoints: number;
 	readonly totalPoints: number;
+	readonly repositoryPoints: number | null;
 }
 
 interface Step {
@@ -382,6 +384,7 @@ export function buildWindowSeries(input: {
 	readonly to: number;
 	readonly now: number;
 	readonly repositoryOf?: ReadonlyMap<string, string>;
+	readonly repositories?: ReadonlySet<string>;
 	readonly bucketMinutes?: number;
 }): WindowSeries | null {
 	const samples = [...input.samples].sort((a, b) => a.at.localeCompare(b.at));
@@ -406,6 +409,17 @@ export function buildWindowSeries(input: {
 			.map((sample) => (sample.resetsAt ? Date.parse(sample.resetsAt) : 0))
 			.filter((time) => time > 0 && time <= input.now),
 	];
+
+	const repositories = input.repositories;
+	const inRepositories = (sessionId: string) =>
+		repositories?.has(input.repositoryOf?.get(sessionId) ?? "") ?? false;
+	const repositoryPointsOf = (points: Iterable<[string, number]>) => {
+		if (!repositories) return null;
+		let sum = 0;
+		for (const [sessionId, value] of points)
+			if (inRepositories(sessionId)) sum += value;
+		return round(sum);
+	};
 
 	const buckets: SeriesBucket[] = [];
 	let shareAt = 0;
@@ -457,6 +471,7 @@ export function buildWindowSeries(input: {
 				.sort((a, b) => b[1] - a[1])
 				.slice(0, BUCKET_SESSIONS)
 				.map(([sessionId, points]) => ({ sessionId, points: round(points) })),
+			repositoryPoints: repositoryPointsOf(perSession),
 		});
 	}
 
@@ -514,6 +529,11 @@ export function buildWindowSeries(input: {
 		repositories: ranked(byRepository).slice(0, TOP_SESSIONS),
 		otherPoints: round(otherPoints),
 		totalPoints: round(sessionPoints + otherPoints),
+		repositoryPoints: repositoryPointsOf(
+			sessions.map(
+				(entry) => [entry.sessionId, entry.points] as [string, number],
+			),
+		),
 	};
 }
 

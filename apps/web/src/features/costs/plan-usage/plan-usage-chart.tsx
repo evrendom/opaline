@@ -107,6 +107,7 @@ interface Period {
 	readonly full: number | null;
 	readonly peak: number | null;
 	readonly ranOut: boolean;
+	readonly repositoryPoints: number;
 }
 
 export function periodsOf(
@@ -167,6 +168,10 @@ export function periodsOf(
 				null,
 			),
 			ranOut: buckets.some((bucket) => (bucket.usedPercent ?? 0) >= RAN_OUT_AT),
+			repositoryPoints: buckets.reduce(
+				(sum, bucket) => sum + (bucket.repositoryPoints ?? 0),
+				0,
+			),
 		};
 	});
 }
@@ -205,6 +210,7 @@ export function PlanUsageChart({
 	pending,
 	failed,
 	dots = false,
+	repository = false,
 }: {
 	report: PlanUsageReport | null | undefined;
 	provider: PlanProvider;
@@ -213,6 +219,8 @@ export function PlanUsageChart({
 	pending: boolean;
 	failed: boolean;
 	dots?: boolean;
+	/** Shade by the repository's own points instead of the plan's. */
+	repository?: boolean;
 }) {
 	const usage = report?.providers.find((entry) => entry.provider === provider);
 	const window = usage?.window ?? null;
@@ -232,14 +240,18 @@ export function PlanUsageChart({
 					value={provider}
 				/>
 			</div>
-			{pending && dots ? (
-				<UsageDots window={null} interval={interval} />
+			{pending && (dots || repository) ? (
+				<UsageDots window={null} interval={interval} repository={repository} />
 			) : pending ? (
 				<div className="cost-chart-canvas">
 					<Skeleton className="size-full rounded-[8px]" />
 				</div>
-			) : showChart && dots ? (
-				<UsageDots window={window} interval={interval} />
+			) : showChart && (dots || repository) ? (
+				<UsageDots
+					window={window}
+					interval={interval}
+					repository={repository}
+				/>
 			) : showChart ? (
 				<UsageCanvas window={window} interval={interval} />
 			) : (
@@ -412,9 +424,11 @@ function UsageCanvas({
 function UsageDots({
 	window,
 	interval,
+	repository = false,
 }: {
 	window: UsageWindow | null;
 	interval: ChartInterval;
+	repository?: boolean;
 }) {
 	const range = useOptionalDateRange()?.state;
 	const periods = window ? periodsOf(window, interval) : [];
@@ -424,7 +438,7 @@ function UsageDots({
 				date: period.date,
 				startDate: period.startDate,
 				endDate: period.endDate,
-				total: period.peak ?? 0,
+				total: repository ? period.repositoryPoints : (period.peak ?? 0),
 				values: {},
 			}))
 		: range
@@ -435,8 +449,23 @@ function UsageDots({
 					interval,
 				)
 			: [];
+	const busiest = Math.max(
+		0,
+		...periods.map((period) => period.repositoryPoints),
+	);
 	const tone = (point: { date: string }): DotTone => {
 		const period = byDate.get(point.date);
+		if (repository) {
+			const points = period?.repositoryPoints ?? 0;
+			const share = busiest > 0 ? points / busiest : 0;
+			return {
+				strength: share > 0 ? FAINTEST_DOT + (1 - FAINTEST_DOT) * share : 0,
+				text:
+					points > 0
+						? `${formatPoints(points)} of the limit used here`
+						: "not used here",
+			};
+		}
 		if (!period || period.peak === null)
 			return { strength: 0, text: "no reading" };
 		if (period.ranOut)

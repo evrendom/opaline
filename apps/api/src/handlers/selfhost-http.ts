@@ -579,6 +579,17 @@ async function planUsageReport(
 			loadRepositories: (ids) => rows.readSessionRepositories(clickhouse, ids),
 			bucketMinutes:
 				url.searchParams.get("buckets") === "day" ? 1_440 : undefined,
+			repositories: repositoriesParam(url),
 		}),
 	);
+}
+
+const MAX_PLAN_USAGE_REPOSITORIES = 100;
+
+function repositoriesParam(url: URL): ReadonlySet<string> | undefined {
+	const repositories = url.searchParams
+		.getAll("repository")
+		.filter((repository) => repository.length > 0)
+		.slice(0, MAX_PLAN_USAGE_REPOSITORIES);
+	return repositories.length > 0 ? new Set(repositories) : undefined;
 }
