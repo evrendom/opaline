@@ -72,24 +72,18 @@ export function TurnsPending({
 }) {
 	return (
 		<div {...TURNS_PENDING_MARK} style={{ minHeight }}>
-			<p className="text-xs text-muted-foreground tabular-nums">
-				{failed ? (
-					<>
-						Turns {from}–{to} could not be loaded.{" "}
-						<button
-							type="button"
-							onClick={onRetry}
-							className="underline underline-offset-2 hover:text-foreground"
-						>
-							Retry
-						</button>
-					</>
-				) : (
-					<>
-						Loading turns {from}–{to}…
-					</>
-				)}
-			</p>
+			{failed ? (
+				<p className="text-xs text-muted-foreground tabular-nums">
+					Turns {from}–{to} could not be loaded.{" "}
+					<button
+						type="button"
+						onClick={onRetry}
+						className="underline underline-offset-2 hover:text-foreground"
+					>
+						Retry
+					</button>
+				</p>
+			) : null}
 		</div>
 	);
 }

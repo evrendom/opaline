@@ -63,7 +63,7 @@ describe("a turn's slot", () => {
 });
 
 describe("the turns still to load", () => {
-	test("loading, or failed with a retry, in the room held for them", () => {
+	test("blank while loading, or failed with a retry, in the room held for them", () => {
 		const loading = renderToStaticMarkup(
 			<TurnsPending
 				failed={false}
@@ -75,7 +75,7 @@ describe("the turns still to load", () => {
 		).replace(/<!-- -->/gu, "");
 		expect(loading).toContain('data-turns-pending=""');
 		expect(loading).toContain("min-height:900px");
-		expect(loading).toContain("Loading turns 41–120…");
+		expect(loading).not.toContain("<p");
 		const failed = renderToStaticMarkup(
 			<TurnsPending
 				failed

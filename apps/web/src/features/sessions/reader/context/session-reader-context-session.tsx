@@ -289,14 +289,7 @@ function WholeContext({
 			<CompactionShareContext.Provider value={lastShare.current}>
 				<ContextTiles
 					{...lastShown.current}
-					footer={
-						<>
-							{footer}
-							<span className="ml-3 self-center text-xs text-muted-foreground tabular-nums">
-								Reading {read} of {runs.length} runs…
-							</span>
-						</>
-					}
+					footer={footer}
 					measure={measure}
 				/>
 			</CompactionShareContext.Provider>
@@ -309,14 +302,7 @@ function WholeContext({
 					compacting={new Set(storedView.compacting)}
 					cost={cost}
 					costOutside={costOutside}
-					footer={
-						<>
-							{footer}
-							<span className="ml-3 self-center text-xs text-muted-foreground tabular-nums">
-								Reading {read} of {runs.length} runs…
-							</span>
-						</>
-					}
+					footer={footer}
 					map={storedView.map}
 					measure={measure}
 					memory={`session:${overview.session.sessionId}`}
@@ -336,9 +322,6 @@ function WholeContext({
 						<div className="flex px-[3px] pt-2 pb-[3px]">{footer}</div>
 					) : null}
 				</ContextMapFrame>
-				<p className="text-xs text-muted-foreground tabular-nums">
-					Reading {read} of {runs.length} runs…
-				</p>
 			</div>
 		);
 	if (!map)
