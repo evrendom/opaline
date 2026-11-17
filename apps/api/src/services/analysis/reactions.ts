@@ -18,7 +18,7 @@ const QUOTE_CHARS = 200;
 const QUOTE_LEAD = 60;
 
 /**
- * Lexicon events of one record: negative and swearing words in a genuine
+ * Lexicon events of one record: negative (correcting included) and swearing words in a genuine
  * prompt, apologies in an assistant message. `@rudel/language-signals` is the
  * only matcher. Each event points at its origin run (see `originRef`).
  */
@@ -64,7 +64,9 @@ export function nextPromptReaction(text: string): string {
 		scanMemberLanguageSignals(text).map((match) => match.category),
 	);
 	if (categories.has("swear")) return "unhappy (strongly worded)";
-	return categories.has("negative") ? "unhappy" : "no complaint found";
+	return categories.has("negative")
+		? "unhappy or correcting"
+		: "no complaint found";
 }
 
 /**

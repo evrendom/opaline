@@ -79,6 +79,10 @@ _Avoid_: capture (the evidence it is built from)
 A prompt that asks again, in the same session, for what an earlier prompt asked, because the agent did not get it done; a sign the agent lacked context or know-how.
 _Avoid_: retry (the agent's own retries), repeated prompt
 
+**Frustration**:
+A member's prompt that pushes back on what the agent just did: annoyance, complaints, swearing at the work, saying it still does not work, or a correction, even a calm one ("no, the other file", "that's not what I meant"). A short verdict on its own counts by its meaning: "worse", "still" or "and?" count; "ok", "good" or "fine" never do. Swearing that praises ("damn good") is not frustration. Only the member's own words count, never quoted, pasted or code text.
+_Avoid_: unhappy, negative, sentiment
+
 **Recurring request**:
 The same kind of request made across many sessions, often by several members.
 _Avoid_: repeated prompt
@@ -88,7 +92,7 @@ What a group of runs cost the team, as separate measures: active time, cost, fru
 _Avoid_: score, severity
 
 **Approved measure**:
-One impact measure defined once for every analysis, so two analyses never compute it differently: active time, cost, tokens, re-asks, frustration, runs, members, and a group's time two ways. `schema` lists them. Frustration is a next prompt the language-signals word list marks negative or swearing; until the meaning of a re-ask is settled, a re-ask is such a prompt right after a run whose final message said it was done.
+One impact measure defined once for every analysis, so two analyses never compute it differently: active time, cost, tokens, re-asks, frustration, runs, members, and a group's time two ways. `schema` lists them. Frustration is a next prompt that reads as frustration (see Frustration); until the meaning of a re-ask is settled, a re-ask is such a prompt right after a run whose final message said it was done.
 _Avoid_: metric, KPI
 
 **Run question**:

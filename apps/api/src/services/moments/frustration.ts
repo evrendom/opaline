@@ -33,9 +33,9 @@ export const FRUSTRATION_QUESTION: AskedQuestion = {
 	id: "user_frustrated",
 	question: "Is the user frustrated?",
 	criteria: {
-		true: "The member's message shows frustration, annoyance or impatience with the agent: complaining, repeating an instruction the agent ignored, exasperated corrections, swearing, shouting, or saying it still does not work.",
+		true: "The member's message pushes back on what the agent did: frustration, annoyance or impatience, complaining, repeating an instruction the agent ignored, correcting the agent (calmly or not), swearing, shouting, or saying it still does not work.",
 		false:
-			"A neutral or positive message: a new task, a plain follow-up, a question, or a correction stated calmly.",
+			"A neutral or positive message: a new task, a plain follow-up, a question, praise, or a short approval like ok or good.",
 	},
 };
 
