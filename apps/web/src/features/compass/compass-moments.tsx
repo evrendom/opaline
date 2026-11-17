@@ -22,6 +22,7 @@ import {
 	useState,
 } from "react";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
+import { SessionMenuPopup } from "@/features/sessions/components/session-menu-popup";
 import { formatReaderCost } from "@/features/sessions/reader/model/session-reader-model";
 import "@/features/sessions/components/session-menu.css";
 import {
@@ -241,53 +242,48 @@ export function FlagKindsPopup({
 	});
 	const offset = any ? 1 : 0;
 	return (
-		<Menu.Portal>
-			<Menu.Positioner align={align} sideOffset={6} className="z-50">
-				<Menu.Popup
-					aria-label="Flags"
-					data-fluid-menu-root=""
-					className="session-menu-surface session-menu-sort session-menu-picks"
+		<SessionMenuPopup
+			align={align}
+			aria-label="Flags"
+			className="session-menu-picks"
+		>
+			{any ? (
+				<FlagKindRow
+					checked={all}
+					count={any.count}
+					joins={joinsAt(0)}
+					filled={IconAlertTriangleFilled}
+					outline={IconAlertTriangle}
+					onCheckedChange={(next) => onChange(next ? [...options] : [])}
+					tint="var(--color-rose-500)"
 				>
-					<FluidMenuHover />
-					{any ? (
-						<FlagKindRow
-							checked={all}
-							count={any.count}
-							joins={joinsAt(0)}
-							filled={IconAlertTriangleFilled}
-							outline={IconAlertTriangle}
-							onCheckedChange={(next) => onChange(next ? [...options] : [])}
-							tint="var(--color-rose-500)"
-						>
-							{any.label}
-						</FlagKindRow>
-					) : null}
-					{options.map((kind, index) => {
-						const appearance = MOMENT_KINDS_APPEARANCE[kind];
-						return (
-							<FlagKindRow
-								key={kind}
-								checked={picked.includes(kind)}
-								count={count(kind)}
-								filled={appearance.filled}
-								joins={joinsAt(index + offset)}
-								outline={appearance.outline}
-								onCheckedChange={(next) =>
-									onChange(
-										options.filter((each) =>
-											each === kind ? next : picked.includes(each),
-										),
-									)
-								}
-								tint={appearance.color}
-							>
-								{appearance.label}
-							</FlagKindRow>
-						);
-					})}
-				</Menu.Popup>
-			</Menu.Positioner>
-		</Menu.Portal>
+					{any.label}
+				</FlagKindRow>
+			) : null}
+			{options.map((kind, index) => {
+				const appearance = MOMENT_KINDS_APPEARANCE[kind];
+				return (
+					<FlagKindRow
+						key={kind}
+						checked={picked.includes(kind)}
+						count={count(kind)}
+						filled={appearance.filled}
+						joins={joinsAt(index + offset)}
+						outline={appearance.outline}
+						onCheckedChange={(next) =>
+							onChange(
+								options.filter((each) =>
+									each === kind ? next : picked.includes(each),
+								),
+							)
+						}
+						tint={appearance.color}
+					>
+						{appearance.label}
+					</FlagKindRow>
+				);
+			})}
+		</SessionMenuPopup>
 	);
 }
 

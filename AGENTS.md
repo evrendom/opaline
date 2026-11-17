@@ -16,7 +16,7 @@
 
 ## Web UI
 
-- Menus, selects and popover lists get the fluid hover. Build them from `apps/web/src/app/ui` (dropdown-menu, select, popover) or `components/dashboard/select`, which include it. A raw Base UI popup (`Menu.Popup`, `Select.List`, …) renders `<FluidMenuHover />` inside a `data-fluid-menu-root` element. `components/ui/fluid-menu-coverage.test.ts` fails on a popup without it.
+- Menus, selects and popover lists get the fluid hover by building them from the components that carry it: `apps/web/src/app/ui` (dropdown-menu, select, popover), `components/dashboard/select`, and `SessionMenuPopup` for the session-style menus. Do not hand-roll a Base UI popup.
 
 ## Tests
 

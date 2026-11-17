@@ -6,7 +6,7 @@ import {
 	IconSortDescending,
 } from "@tabler/icons-react";
 import { useRef } from "react";
-import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
+import { SessionMenuPopup } from "./session-menu-popup";
 import "./session-menu.css";
 import {
 	getInitialSortDirection,
@@ -100,68 +100,55 @@ export function ToolbarSortMenu<K extends string>({
 					className="pointer-fine:hidden absolute top-1/2 left-1/2 size-12 -translate-1/2"
 				/>
 			</Menu.Trigger>
-			<Menu.Portal>
-				<Menu.Positioner align="start" sideOffset={6} className="z-50">
-					<Menu.Popup
-						aria-label={`Sort ${noun}`}
-						data-fluid-menu-root=""
-						className="session-menu-surface session-menu-sort"
+			<SessionMenuPopup aria-label={`Sort ${noun}`}>
+				<Menu.RadioGroup
+					aria-label="Sort by"
+					value={sort.key}
+					onValueChange={(value: unknown) => {
+						const option = options.find((item) => item.key === value);
+						if (option) {
+							onSortChange({
+								key: option.key,
+								direction: getInitialDirection(option.key),
+							});
+						}
+					}}
+				>
+					{options.map((option) => (
+						<Menu.RadioItem
+							key={option.key}
+							value={option.key}
+							closeOnClick
+							className="session-menu-row"
+						>
+							<SortCheck />
+							{option.label}
+						</Menu.RadioItem>
+					))}
+				</Menu.RadioGroup>
+				<Menu.Separator className="session-menu-separator" />
+				<Menu.RadioGroup
+					aria-label="Sort direction"
+					value={sort.direction}
+					onValueChange={(value: unknown) => {
+						if (value === "asc" || value === "desc")
+							onSortChange({ ...sort, direction: value });
+					}}
+				>
+					<Menu.RadioItem value="asc" closeOnClick className="session-menu-row">
+						<SortCheck />
+						Ascending
+					</Menu.RadioItem>
+					<Menu.RadioItem
+						value="desc"
+						closeOnClick
+						className="session-menu-row"
 					>
-						<FluidMenuHover />
-						<Menu.RadioGroup
-							aria-label="Sort by"
-							value={sort.key}
-							onValueChange={(value: unknown) => {
-								const option = options.find((item) => item.key === value);
-								if (option) {
-									onSortChange({
-										key: option.key,
-										direction: getInitialDirection(option.key),
-									});
-								}
-							}}
-						>
-							{options.map((option) => (
-								<Menu.RadioItem
-									key={option.key}
-									value={option.key}
-									closeOnClick
-									className="session-menu-row"
-								>
-									<SortCheck />
-									{option.label}
-								</Menu.RadioItem>
-							))}
-						</Menu.RadioGroup>
-						<Menu.Separator className="session-menu-separator" />
-						<Menu.RadioGroup
-							aria-label="Sort direction"
-							value={sort.direction}
-							onValueChange={(value: unknown) => {
-								if (value === "asc" || value === "desc")
-									onSortChange({ ...sort, direction: value });
-							}}
-						>
-							<Menu.RadioItem
-								value="asc"
-								closeOnClick
-								className="session-menu-row"
-							>
-								<SortCheck />
-								Ascending
-							</Menu.RadioItem>
-							<Menu.RadioItem
-								value="desc"
-								closeOnClick
-								className="session-menu-row"
-							>
-								<SortCheck />
-								Descending
-							</Menu.RadioItem>
-						</Menu.RadioGroup>
-					</Menu.Popup>
-				</Menu.Positioner>
-			</Menu.Portal>
+						<SortCheck />
+						Descending
+					</Menu.RadioItem>
+				</Menu.RadioGroup>
+			</SessionMenuPopup>
 		</Menu.Root>
 	);
 }
