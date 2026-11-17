@@ -79,7 +79,7 @@ const resetTickFormat = new Intl.DateTimeFormat("en-US", {
 export function formatPoints(points: number): string {
 	if (points <= 0) return "0%";
 	if (points < 0.1) return `${points.toFixed(2)}%`;
-	if (points < 1) return `${points.toFixed(1)}%`;
+	if (points < 0.95) return `${points.toFixed(1)}%`;
 	return `${Math.round(points)}%`;
 }
 

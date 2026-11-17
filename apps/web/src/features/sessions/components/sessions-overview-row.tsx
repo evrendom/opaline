@@ -596,7 +596,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 });
 
 function formatPlanShare(points: number): string {
-	if (points >= 1) return `${Math.round(points)}%`;
+	if (points >= 0.95) return `${Math.round(points)}%`;
 	return `${points >= 0.1 ? points.toFixed(1) : points.toFixed(2)}%`;
 }
 
