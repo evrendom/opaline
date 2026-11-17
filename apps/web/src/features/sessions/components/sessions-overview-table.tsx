@@ -15,7 +15,10 @@ import {
 import { useEffectOnceWhen } from "@/app/hooks/useEffectOnceWhen";
 import { useLatestValueRef } from "@/app/hooks/useLatestValueRef";
 import { Reveal } from "@/app/ui/bones";
-import { useSessionUsageShares } from "@/features/costs/plan-usage/use-session-usage-shares";
+import {
+	useSessionLimitHits,
+	useSessionUsageShares,
+} from "@/features/costs/plan-usage/use-session-usage-shares";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { useLocalDesktopApp } from "@/features/desktop/local-app";
 import { useLiveClock } from "@/features/sessions/use-live-sessions";
@@ -155,6 +158,7 @@ export function SessionsOverviewTable({
 	const ownUsageShares = useSessionUsageShares(givenUsageShares === undefined);
 	const usageShares =
 		givenUsageShares === undefined ? ownUsageShares : givenUsageShares;
+	const limitHits = useSessionLimitHits();
 	const reserveUsageColumn = useLocalDesktopApp() || usageShares !== null;
 	// Live rows read "12s ago"; only they follow the clock.
 	const hasLiveRows = tableState.sortedSessions.some(
@@ -425,6 +429,9 @@ export function SessionsOverviewTable({
 															}
 															maximumSessionCost={tableState.maximumSessionCost}
 															planUsage={usageShares?.get(
+																planUsageKey(session),
+															)}
+															planUsageLimited={limitHits.has(
 																planUsageKey(session),
 															)}
 															planUsageOfSession={

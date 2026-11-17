@@ -46,6 +46,25 @@ export async function readCostRows(
 	}));
 }
 
+export async function readLimitHits(
+	clickhouse: Pick<ClickHouseExecutor, "query">,
+	from: number,
+	to: number,
+): Promise<string[]> {
+	const rows = await clickhouse.query<{ sessionId: string; agentId: string }>({
+		query: `SELECT DISTINCT session_id AS sessionId, agent_id AS agentId
+			FROM rudel.run_index
+			WHERE rate_limited = 1
+				AND started_at < fromUnixTimestamp64Milli({to:Int64})
+				AND ifNull(ended_at, started_at) >= fromUnixTimestamp64Milli({from:Int64})`,
+		query_params: { from, to },
+		format: "JSONEachRow",
+	});
+	return rows.map((row) =>
+		row.agentId ? `${row.sessionId}:${row.agentId}` : row.sessionId,
+	);
+}
+
 export async function readSessionTitles(
 	clickhouse: Pick<ClickHouseExecutor, "query">,
 	sessionIds: readonly string[],

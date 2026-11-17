@@ -92,6 +92,8 @@ type SessionsOverviewRowProps = {
 	planUsage?: number;
 	/** On a subagent row: the whole session's share, which includes this one. */
 	planUsageOfSession?: number;
+	/** A usage limit refused this session (or subagent) in the range. */
+	planUsageLimited?: boolean;
 	memberProfile: SessionMemberProfileSummary | undefined;
 	onSessionClick: ((session: SessionAnalytics) => void) | undefined;
 	session: SessionAnalytics;
@@ -164,6 +166,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 	maximumSessionCost,
 	planUsage,
 	planUsageOfSession,
+	planUsageLimited = false,
 	memberProfile,
 	onSessionClick,
 	session,
@@ -361,19 +364,29 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 					{sessionCost === null ? (
 						<span className="sr-only">API cost unavailable</span>
 					) : null}
-					{planUsage === undefined ? null : (
+					{planUsage === undefined && !planUsageLimited ? null : (
 						<span
 							className={cn(
 								"ml-1 inline-flex items-center gap-0.5 tabular-nums",
-								session.subagent_of && "opacity-55",
+								session.subagent_of && !planUsageLimited && "opacity-55",
 							)}
 							data-session-overview-metric-value="plan-usage"
 							data-subset={session.subagent_of ? "" : undefined}
+							data-limited={planUsageLimited || undefined}
 						>
-							<IconBattery2 aria-hidden="true" className="size-3.5" />
-							{formatPlanShare(planUsage)}
+							<IconBattery2
+								aria-hidden="true"
+								className={cn(
+									"size-3.5",
+									planUsageLimited && "text-[oklch(0.64_0.21_27)]",
+								)}
+							/>
+							{planUsage === undefined ? null : formatPlanShare(planUsage)}
 							<span className="sr-only">
-								{planUsageText(planUsage, planUsageOfSession)}
+								{planUsage === undefined
+									? ""
+									: planUsageText(planUsage, planUsageOfSession)}
+								{planUsageLimited ? " · hit the usage limit" : ""}
 							</span>
 						</span>
 					)}

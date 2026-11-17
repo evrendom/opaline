@@ -19,6 +19,7 @@ vi.mock("@/features/sessions/use-run-question-tags", () => ({
 
 vi.mock("@/features/costs/plan-usage/use-session-usage-shares", () => ({
 	useSessionUsageShares: () => null,
+	useSessionLimitHits: () => new Set(),
 }));
 
 vi.mock("@/features/desktop/local-app", () => ({

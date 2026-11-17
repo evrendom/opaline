@@ -17,3 +17,16 @@ export function useSessionUsageShares(
 		[desktop, query.data],
 	);
 }
+
+export function useSessionLimitHits(): ReadonlySet<string> {
+	const desktop = useLocalDesktopApp();
+	const range = useOptionalDateRange()?.state;
+	const query = usePlanUsage(desktop && range !== undefined, {
+		startDate: range?.startDate ?? "",
+		endDate: range?.endDate ?? "",
+	});
+	return useMemo(
+		() => new Set(desktop ? (query.data?.limitHits ?? []) : []),
+		[desktop, query.data],
+	);
+}

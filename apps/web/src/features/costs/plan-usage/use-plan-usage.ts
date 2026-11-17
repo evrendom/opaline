@@ -62,6 +62,7 @@ export interface PlanUsageReport {
 	readonly checkedAt: string | null;
 	readonly providers: readonly ProviderUsage[];
 	readonly titles: Readonly<Record<string, string>>;
+	readonly limitHits?: readonly string[];
 }
 
 export interface UsageRange {

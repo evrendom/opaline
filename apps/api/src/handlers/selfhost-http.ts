@@ -577,6 +577,7 @@ async function planUsageReport(
 				rows.readCostRows(clickhouse, provider, start, end),
 			loadTitles: (ids) => rows.readSessionTitles(clickhouse, ids),
 			loadRepositories: (ids) => rows.readSessionRepositories(clickhouse, ids),
+			loadLimitHits: (start, end) => rows.readLimitHits(clickhouse, start, end),
 			bucketMinutes:
 				url.searchParams.get("buckets") === "day" ? 1_440 : undefined,
 			repositories: repositoriesParam(url),

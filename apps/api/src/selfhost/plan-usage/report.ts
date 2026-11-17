@@ -22,6 +22,8 @@ export interface PlanUsageReport {
 	readonly checkedAt: string | null;
 	readonly providers: readonly ProviderUsage[];
 	readonly titles: Readonly<Record<string, string>>;
+	/** Sessions, or session:agent subagents, a usage limit refused in the range. */
+	readonly limitHits: readonly string[];
 }
 
 export function mainWindow(
@@ -67,6 +69,7 @@ export async function buildPlanUsageReport(input: {
 		sessionIds: readonly string[],
 	) => Promise<ReadonlyMap<string, string>>;
 	readonly repositories?: ReadonlySet<string>;
+	readonly loadLimitHits?: (from: number, to: number) => Promise<string[]>;
 }): Promise<PlanUsageReport> {
 	const providers = await Promise.all(
 		PROVIDERS.map(async (provider): Promise<ProviderUsage> => {
@@ -124,5 +127,8 @@ export async function buildPlanUsageReport(input: {
 		checkedAt: input.checkedAt,
 		providers,
 		titles: await input.loadTitles([...sessionIds]).catch(() => ({})),
+		limitHits: input.loadLimitHits
+			? await input.loadLimitHits(input.from, input.to).catch(() => [])
+			: [],
 	};
 }
