@@ -41,17 +41,16 @@ export function MarkLegend({
 	return (
 		<div
 			className={cn(
-				"flex min-w-0 items-center gap-2.5 text-[12px] text-muted-foreground",
+				"inline-flex min-w-0 shrink-0 items-center gap-0.5 rounded-lg bg-black/[0.04] p-0.5 text-xs font-medium text-muted-foreground corner-squircle squircle:rounded-[14px] dark:bg-white/[0.06]",
 				className,
 			)}
 		>
-			<span className="text-muted-foreground/60">Errors</span>
-			<ul
-				aria-label="Errors"
-				className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1"
-			>
+			<span className="flex h-6 items-center px-2 text-muted-foreground/60">
+				Errors
+			</span>
+			<ul aria-label="Errors" className="flex min-w-0 items-center gap-0.5">
 				{shown.map((tone) => (
-					<li key={tone} className="flex items-center gap-2">
+					<li key={tone} className="flex h-6 items-center gap-1.5 px-2">
 						<span
 							aria-hidden="true"
 							className={cn(
