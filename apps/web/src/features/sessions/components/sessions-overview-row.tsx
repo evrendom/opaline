@@ -15,16 +15,15 @@ import { ConversationSkillLink } from "@/components/conversation/conversation-sk
 import { ConversationTraceTag } from "@/components/conversation/conversation-trace-tag";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
-import {
-	getNewseshLanguageSignalMatches,
-	type NewseshLanguageSignalMatch,
-} from "@/features/sessions/components/newsesh-session-language-signal";
 import { SessionOverviewQuestionTags } from "@/features/sessions/components/run-question-tag";
 import { SessionMemberProfilePreview } from "@/features/sessions/components/session-member-profile-preview";
 import type { SessionMemberProfileSummary } from "@/features/sessions/components/session-member-profile-summary";
 import { SessionModelMark } from "@/features/sessions/components/session-model-mark";
 import { resolveSessionErrorCount } from "@/features/sessions/components/session-overview-metrics";
-import { SessionOverviewSubagentStack } from "@/features/sessions/components/session-overview-subagent-stack";
+import {
+	SessionOverviewSubagentCountTag,
+	SessionOverviewSubagentTag,
+} from "@/features/sessions/components/session-overview-subagent-tags";
 import {
 	getSessionBranchLabel,
 	getSessionOverviewCost,
@@ -49,6 +48,11 @@ import {
 	startSessionDetail,
 } from "../session-detail-prefetch";
 import { markSessionOpenFromClick } from "../session-open-timing";
+import {
+	sessionRowKey,
+	transcriptSubagentId,
+	withTranscriptSubagent,
+} from "../session-row-key";
 import { getSessionModelDisplayValue } from "./session-model-identity";
 import {
 	describeLiveSessionRow,
@@ -62,7 +66,7 @@ import {
 	SESSION_OVERVIEW_ROW_CLASS_NAME,
 	SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME,
 	SESSION_OVERVIEW_SWEAR_TAG_CLASS_NAME,
-	SessionLanguageSignalTag,
+	SessionOverviewLanguageSignals,
 } from "./session-overview-row-elements";
 import { SessionPlaceLabel } from "./session-place";
 
@@ -110,53 +114,6 @@ const SESSION_OVERVIEW_SKILL_OVERFLOW_TIERS = [
 	},
 	{ limit: 7, className: "hidden @min-[2200px]/sessions-overview:inline" },
 ];
-
-function SessionOverviewLanguageSignals({
-	session,
-	speaker,
-}: {
-	session: SessionAnalytics;
-	speaker: NewseshLanguageSignalMatch["speaker"];
-}) {
-	const signals = getNewseshLanguageSignalMatches(session, speaker);
-	if (signals.length === 0) {
-		return null;
-	}
-
-	const signalSummary = signals.map((signal) => signal.matchedText).join(", ");
-
-	return (
-		<div
-			className="flex min-w-0 max-w-full items-center gap-1 overflow-hidden"
-			data-language-signal-speaker={speaker}
-			title={`${speaker === "member" ? "Member" : "Model"} language signals: ${signalSummary}`}
-		>
-			{(["positive", "apology", "swear"] as const).map((category) => {
-				const [signal, ...hidden] = signals.filter(
-					(signal) => signal.category === category,
-				);
-				if (!signal) {
-					return null;
-				}
-				return (
-					<SessionLanguageSignalTag
-						key={category}
-						category={category}
-						text={signal.matchedText}
-						title={`${speaker === "member" ? "Member" : "Model"}: ${signal.matchedText}`}
-						remainingCount={hidden.length}
-						remainingTitle={hidden
-							.map(
-								(signal) =>
-									`${speaker === "member" ? "Member" : "Model"}: ${signal.matchedText}`,
-							)
-							.join(" · ")}
-					/>
-				);
-			})}
-		</div>
-	);
-}
 
 function getSessionClockParts(dateString: string, utc: boolean) {
 	const normalizedDate = dateString.endsWith("Z")
@@ -211,7 +168,11 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 	const demo = useDemoRuntime();
 	const itemRef = useRef<HTMLLIElement>(null);
 	useRegisterFluidHoverItem(registerItem, index, itemRef);
-	const sessionHref = getSessionHref?.(session);
+	const sessionHref = withTranscriptSubagent(
+		getSessionHref?.(session),
+		session,
+	);
+	const transcriptSubagent = transcriptSubagentId(session);
 	const branchLabel = getSessionBranchLabel(session);
 	const sessionCost = getSessionOverviewCost(session);
 	// A session running right now reads in the shape of every other row.
@@ -234,7 +195,8 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 	const isClickable =
 		(onSessionClick !== undefined || sessionHref !== undefined) &&
 		(canOpenSession?.(session) ?? true);
-	const isActive = activeSessionId === session.session_id;
+	const isActive =
+		transcriptSubagent === null && activeSessionId === session.session_id;
 	const failure = session.upload_failure;
 	const clock = getSessionClockParts(
 		failure ? (failure.sessionDate ?? "") : session.session_date,
@@ -445,9 +407,14 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 						</p>
 					) : null}
 				</div>
-				<SessionOverviewSubagentStack session={session} />
+				{session.subagent_of ? (
+					<SessionOverviewSubagentTag subagentOf={session.subagent_of} />
+				) : null}
+				<SessionOverviewSubagentCountTag session={session} />
 				<SessionOverviewLanguageSignals session={session} speaker="model" />
-				{!failure && errorCount !== 0 ? (
+				{!failure &&
+				errorCount !== 0 &&
+				!(errorCount === null && transcriptSubagent !== null) ? (
 					<span
 						className={cn(
 							SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME,
@@ -527,7 +494,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 		<li
 			aria-posinset={position === undefined ? undefined : position + 1}
 			aria-setsize={setSize}
-			data-session-key={`${session.source}:${session.session_id}`}
+			data-session-key={sessionRowKey(session)}
 			style={
 				virtualTop === undefined
 					? undefined

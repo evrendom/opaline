@@ -258,3 +258,86 @@ test("hover leaves unchanged rows alone while session data and permissions stay 
 		mount.remove();
 	}
 });
+
+test("a subagent row says so, has no error tag and stays unselected while its parent is open", async () => {
+	const { DemoSeedSchema } = await import("@/features/demo/demo-runtime");
+	const base = DemoSeedSchema.parse(seed).sessions[0];
+	assert.ok(base);
+	const parent: SessionAnalytics = {
+		...base,
+		session_id: "parent-session",
+		subagent_count: 3,
+		native_subagents: [],
+		native_child_sessions: [],
+		linked_subagent_count: 0,
+		linked_subagents: [],
+	};
+	const agent: SessionAnalytics = {
+		...parent,
+		error_count: undefined,
+		subagent_count: 0,
+		subagent_of: {
+			agent_id: "a1",
+			kind: "agent",
+			session_id: "parent-session",
+			source: parent.source ?? "claude_code",
+		},
+	};
+	const mount = document.createElement("div");
+	document.body.append(mount);
+	const root = createRoot(mount);
+	await act(async () => {
+		root.render(
+			<TooltipProvider>
+				<SessionsOverviewFluidList>
+					{({ registerItem, setActiveIndex }) =>
+						[parent, agent].map((session, index) => (
+							<SessionsOverviewRow
+								key={session.subagent_of ? "agent" : "parent"}
+								index={index}
+								registerItem={registerItem}
+								setHoverActiveIndex={setActiveIndex}
+								activeSessionId="parent-session"
+								avatarUrl={undefined}
+								canOpenSession={() => true}
+								getSessionHref={undefined}
+								getSessionLinkState={undefined}
+								maximumSessionCost={50}
+								memberProfile={undefined}
+								onSessionClick={() => {}}
+								session={session}
+								userLabel="Test member"
+							/>
+						))
+					}
+				</SessionsOverviewFluidList>
+			</TooltipProvider>,
+		);
+	});
+	const [parentRow, agentRow] = Array.from(
+		mount.querySelectorAll<HTMLElement>("li[data-session-key]"),
+	);
+	assert.ok(parentRow && agentRow);
+	expect(parentRow.dataset.sessionKey).not.toBe(agentRow.dataset.sessionKey);
+	expect(
+		parentRow.querySelector("[data-session-overview-subagent-count]")
+			?.textContent,
+	).toBe("3×");
+	expect(
+		parentRow.querySelector("[data-session-overview-subagent-tag]"),
+	).toBeNull();
+	expect(
+		agentRow.querySelector("[data-session-overview-subagent-tag]")?.textContent,
+	).toBe("Subagent");
+	expect(
+		agentRow.querySelector("[data-session-overview-error-tag]"),
+	).toBeNull();
+	expect(
+		parentRow.querySelector("[data-selected]")?.getAttribute("data-selected"),
+	).toBe("true");
+	expect(agentRow.querySelector("[data-selected]")).toBeNull();
+	await act(async () => {
+		root.unmount();
+	});
+	mount.remove();
+});

@@ -520,6 +520,7 @@ export interface UsageAnalyticsQueryContext {
 	readonly metadataRelation: "usage_analytics_metadata";
 	readonly mode: "events" | "legacy";
 	readonly sessionsRelation: "usage_analytics_sessions";
+	readonly usageSource?: UsageSource;
 }
 
 interface ReadinessState {
@@ -648,6 +649,7 @@ function buildUsageEventFilters(scope: UsageAnalyticsScope): string {
 function buildPricingCandidatesSelect(
 	from: string,
 	keys: readonly string[] = [],
+	aggregates: readonly string[] = [],
 ): string {
 	return `
 			SELECT
@@ -675,7 +677,7 @@ function buildPricingCandidatesSelect(
 				sum(e.cache_read_input_tokens) AS group_cache_read_input_tokens,
 				sum(e.cache_write_5m_input_tokens) AS group_cache_write_5m_input_tokens,
 				sum(e.cache_write_1h_input_tokens) AS group_cache_write_1h_input_tokens,
-				sum(e.output_tokens) AS group_output_tokens
+				sum(e.output_tokens) AS group_output_tokens${aggregates.map((aggregate) => `,\n\t\t\t\t${aggregate}`).join("")}
 			FROM ${from} AS e
 			GROUP BY
 				e.organization_id,
@@ -695,13 +697,16 @@ function buildPricingCandidatesSelect(
 }
 
 /** Prices pricing groups (aliased `g`) against the dated rate card. */
-function buildPricedGroupsSelect(from: string): string {
+function buildPricedGroupsSelect(
+	from: string,
+	rateCard = "usage_event_pricing_rate_card",
+): string {
 	return `
 			SELECT
 				g.*,
 				${EVENT_GROUP_COST_SQL} AS group_estimated_cost
 			FROM ${from} AS g
-			ANY LEFT JOIN usage_event_pricing_rate_card AS r
+			ANY LEFT JOIN ${rateCard} AS r
 				ON g.pricing_model = r.model
 				AND r.context_band = if(
 					g.context_band = 'long'
@@ -746,6 +751,109 @@ export function buildRunPricedUsageCte(runWindowsRelation: string): string {
 		),
 		run_priced_usage_groups AS (
 			${buildPricedGroupsSelect("run_usage_pricing_groups")}
+		)`;
+}
+
+const SUBAGENT_MODEL_SQL =
+	"if(e.resolved_model != '', e.resolved_model, trimBoth(e.raw_model))";
+const SUBAGENT_HAS_MODEL_SQL = `e.model_status IN ('resolved', 'unresolved')
+					AND lowerUTF8(${SUBAGENT_MODEL_SQL}) NOT IN ('', 'unknown', '<synthetic>')`;
+const SUBAGENT_MODEL_ORDER_SQL =
+	"tuple(e.has_valid_timestamp, e.occurred_at, e.first_observed_line, e.event_id)";
+const SUBAGENT_SPAN_AGGREGATES = [
+	"countIf(e.has_valid_timestamp = 1) AS group_timed_requests",
+	"minIf(e.occurred_at, e.has_valid_timestamp = 1) AS group_first_request_at",
+	"maxIf(e.occurred_at, e.has_valid_timestamp = 1) AS group_last_request_at",
+	`argMaxIf(${SUBAGENT_MODEL_SQL}, ${SUBAGENT_MODEL_ORDER_SQL}, ${SUBAGENT_HAS_MODEL_SQL}) AS group_model`,
+	`maxIf(${SUBAGENT_MODEL_ORDER_SQL}, ${SUBAGENT_HAS_MODEL_SQL}) AS group_model_at`,
+];
+
+export function buildSubagentUsageCte(
+	parentsRelation: string,
+	usageSource: UsageSource = "events",
+): string {
+	const parentKeys = `(organization_id, user_id, source, session_id) IN (
+				SELECT organization_id, user_id, source, session_id FROM ${parentsRelation}
+			)`;
+	const receipts =
+		usageSource === "rollups"
+			? `
+			SELECT organization_id, user_id, source, session_id, receipt_generation
+			FROM ${getSafeClickHouseTable(USAGE_SESSION_ROLLUPS_TABLE)} FINAL
+			WHERE ${organizationMatchSql("organization_id")}
+				AND ${parentKeys}
+				AND is_consistent = 1`
+			: `
+			SELECT
+				organization_id,
+				user_id,
+				source,
+				session_id,
+				argMaxIf(event_version, event_version, record_kind = 'receipt') AS receipt_generation
+			FROM ${getSafeClickHouseTable(USAGE_EVENTS_TABLE)} FINAL
+			WHERE ${organizationMatchSql("organization_id")}
+				AND ${parentKeys}
+			GROUP BY organization_id, user_id, source, session_id
+			HAVING argMaxIf(receipt_is_complete, event_version, record_kind = 'receipt') = 1
+				AND argMaxIf(is_deleted, event_version, record_kind = 'receipt') = 0`;
+	return `
+		subagent_usage_receipts AS (${receipts}
+		),
+		subagent_usage_records AS (
+			SELECT
+				e.*,
+				'' AS latest_main_model,
+				'' AS latest_event_model
+			FROM ${getSafeClickHouseTable(USAGE_EVENTS_TABLE)} AS e FINAL
+			INNER JOIN subagent_usage_receipts AS r
+				ON e.organization_id = r.organization_id
+				AND e.user_id = r.user_id
+				AND e.source = r.source
+				AND e.session_id = r.session_id
+			WHERE ${organizationMatchSql("e.organization_id")}
+				AND (e.organization_id, e.user_id, e.source, e.session_id) IN (
+					SELECT organization_id, user_id, source, session_id FROM ${parentsRelation}
+				)
+				AND e.agent_id != 'main'
+				AND e.agent_id != ''
+				AND e.record_kind = 'event'
+				AND e.is_deleted = 0
+				AND e.event_version = r.receipt_generation
+		),
+		subagent_usage_candidates AS (
+			${buildPricingCandidatesSelect("subagent_usage_records", ["agent_id"], SUBAGENT_SPAN_AGGREGATES)}
+		),
+		subagent_usage_pricing_groups AS (
+			SELECT
+				c.*,
+				${EVENT_CANONICAL_PRICING_MODEL_SQL} AS pricing_model
+			FROM subagent_usage_candidates AS c
+		),
+		subagent_usage_rate_card AS (
+			${EVENT_PRICING_RATE_CARD_SQL}
+		),
+		subagent_priced_usage_groups AS (
+			${buildPricedGroupsSelect("subagent_usage_pricing_groups", "subagent_usage_rate_card")}
+		),
+		subagent_usage_rows AS (
+			SELECT
+				organization_id,
+				user_id,
+				source,
+				session_id,
+				agent_id,
+				sum(group_uncached_input_tokens + group_cache_read_input_tokens + group_cache_write_5m_input_tokens + group_cache_write_1h_input_tokens) AS input_tokens,
+				sum(group_output_tokens) AS output_tokens,
+				input_tokens + output_tokens AS total_tokens,
+				toNullable(sum(ifNull(group_estimated_cost, 0))) AS estimated_cost,
+				toUInt8(countIf(isNull(group_estimated_cost)) = 0) AS cost_is_complete,
+				toUInt8(countIf(has_geo_gap = 1) > 0) AS cost_uses_default_region,
+				sum(group_timed_requests) AS timed_requests,
+				minIf(group_first_request_at, group_timed_requests > 0) AS first_request_at,
+				maxIf(group_last_request_at, group_timed_requests > 0) AS last_request_at,
+				argMax(group_model, group_model_at) AS model_used
+			FROM subagent_priced_usage_groups
+			GROUP BY organization_id, user_id, source, session_id, agent_id
 		)`;
 }
 
@@ -1170,6 +1278,7 @@ export async function getUsageAnalyticsQueryContext(
 		metadataRelation: "usage_analytics_metadata",
 		mode: "events",
 		sessionsRelation: "usage_analytics_sessions",
+		usageSource,
 	};
 }
 

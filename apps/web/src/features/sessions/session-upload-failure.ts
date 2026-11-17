@@ -1,4 +1,5 @@
 import type { SessionAnalytics, StoredUploadFailure } from "@rudel/api-routes";
+import { sessionRowKey } from "./session-row-key";
 
 /** Adapt diagnostics to the existing row/navigation model, never to analytics totals.
  * Numeric placeholders are hidden and excluded from metric filters for these rows.
@@ -36,7 +37,7 @@ export function mergeSessionUploadFailures(
 ): SessionAnalytics[] {
 	const rows = new Map(
 		sessions.map((session) => [
-			`${session.user_id}:${session.source}:${session.session_id}`,
+			`${session.user_id}:${sessionRowKey(session)}`,
 			session,
 		]),
 	);

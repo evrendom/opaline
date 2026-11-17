@@ -160,11 +160,22 @@ describe("native Codex lineage", () => {
 			(
 				await getSessionAnalytics(organizationId, {
 					...dateRange,
-					limit: 1,
+					limit: 2,
 					offset: 0,
 				})
-			).map((session) => session.session_id),
-		).toEqual([parentId]);
+			).map((session) => [session.session_id, session.subagent_of]),
+		).toEqual([
+			[
+				childId,
+				{
+					agent_id: null,
+					kind: "child",
+					session_id: parentId,
+					source: "codex",
+				},
+			],
+			[parentId, undefined],
+		]);
 		const comparison = await getSessionAnalyticsSummaryComparison(
 			organizationId,
 			{ days: 1 },

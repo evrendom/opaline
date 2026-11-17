@@ -24,6 +24,7 @@ import {
 	pollUnlessPushed,
 	useSessionArrivalsLive,
 } from "./session-arrivals-live";
+import { sessionRowKey } from "./session-row-key";
 import { mergeSessionUploadFailures } from "./session-upload-failure";
 import { useLiveSessionList } from "./use-live-sessions";
 
@@ -230,11 +231,7 @@ export function useSessionsPageData({
 			sessionPages.data?.pages.flatMap(parseSessionOverviewRows) ?? [];
 		// Concurrent uploads can move an offset boundary. Do not show a row twice.
 		return mergeSessionUploadFailures(
-			[
-				...new Map(
-					rows.map((row) => [`${row.source}:${row.session_id}`, row]),
-				).values(),
-			],
+			[...new Map(rows.map((row) => [sessionRowKey(row), row])).values()],
 			failurePages.data?.pages.flatMap((page) => page.failures) ?? [],
 		);
 	}, [sessionPages.data, failurePages.data, previewSeed]);

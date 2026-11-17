@@ -928,12 +928,41 @@ describe("usage-event analytics ClickHouse rollups", () => {
 				limit: 20,
 				start_date: "2026-09-20",
 			});
-			expect(rows.map((row) => row.session_id).sort()).toEqual(
+			const childRows = [
+				[childSessionId, parentSessionId],
+				[grandchildSessionId, childSessionId],
+				[incompleteChildSessionId, incompleteParentSessionId],
+				[unseededChildSessionId, unseededParentSessionId],
+			] as const;
+			expect(
+				rows
+					.filter((row) => row.subagent_of === undefined)
+					.map((row) => row.session_id)
+					.sort(),
+			).toEqual(
 				[
 					parentSessionId,
 					incompleteParentSessionId,
 					otherOwnerSessionId,
 				].sort(),
+			);
+			expect(
+				rows
+					.filter((row) => row.subagent_of !== undefined)
+					.map((row) => [row.session_id, row.subagent_of])
+					.sort(),
+			).toEqual(
+				childRows
+					.map(([sessionId, parentId]) => [
+						sessionId,
+						{
+							agent_id: null,
+							kind: "child",
+							session_id: parentId,
+							source: "codex",
+						} as const,
+					])
+					.sort(),
 			);
 			expect(
 				rows.find((row) => row.session_id === parentSessionId),
@@ -971,7 +1000,11 @@ describe("usage-event analytics ClickHouse rollups", () => {
 				user_id: familyUserId,
 			});
 			expect(ownerRows.map((row) => row.session_id).sort()).toEqual(
-				[parentSessionId, incompleteParentSessionId].sort(),
+				[
+					parentSessionId,
+					incompleteParentSessionId,
+					...childRows.map(([sessionId]) => sessionId),
+				].sort(),
 			);
 
 			const catalog = await getSessionFilterCatalog(familyOrganizationId, {

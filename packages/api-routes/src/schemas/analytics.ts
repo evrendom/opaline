@@ -107,12 +107,21 @@ export const NativeChildSessionSchema = z.object({
 	session_id: z.string(),
 });
 
+export const SessionSubagentOfSchema = z.object({
+	kind: z.enum(["agent", "child", "linked"]),
+	session_id: z.string(),
+	source: SourceSchema,
+	agent_id: z.string().nullable(),
+});
+export type SessionSubagentOf = z.infer<typeof SessionSubagentOfSchema>;
+
 export const SessionAnalyticsSchema = z.object({
 	// Present only for a diagnostic row; transcript-derived metrics are unavailable.
 	upload_failure: StoredUploadFailureSchema.optional(),
 	// Present only for a row the web app builds from a session running right
 	// now, before its upload; transcript-derived metrics are unavailable.
 	live_session: LiveSessionSummarySchema.optional(),
+	subagent_of: SessionSubagentOfSchema.optional(),
 	session_id: z.string(),
 	user_id: z.string(),
 	session_date: z.string(),
@@ -185,6 +194,19 @@ export const SessionOverviewAnalyticsSchema = SessionAnalyticsSchema.extend({
 });
 export type SessionOverviewAnalytics = z.infer<
 	typeof SessionOverviewAnalyticsSchema
+>;
+
+export const SessionOverviewSubagentAnalyticsSchema =
+	SessionOverviewAnalyticsSchema.extend({
+		error_count: SessionAnalyticsSchema.shape.error_count,
+		subagent_of: SessionSubagentOfSchema,
+	});
+export const SessionOverviewListRowSchema = z.union([
+	SessionOverviewAnalyticsSchema,
+	SessionOverviewSubagentAnalyticsSchema,
+]);
+export type SessionOverviewListRow = z.infer<
+	typeof SessionOverviewListRowSchema
 >;
 
 /**

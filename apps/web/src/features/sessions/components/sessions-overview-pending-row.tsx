@@ -10,7 +10,7 @@ import {
 	SESSION_OVERVIEW_SWEAR_TAG_CLASS_NAME,
 	SessionLanguageSignalTag,
 } from "./session-overview-row-elements";
-import { SessionOverviewSubagentStack } from "./session-overview-subagent-stack";
+import { SessionOverviewSubagentCountTag } from "./session-overview-subagent-tags";
 import { SESSION_OVERVIEW_GRID_CLASS_NAME } from "./sessions-overview-table-utils";
 
 const PENDING_SKILL_WIDTHS = ["w-8", "w-14", "w-10", "w-16", "w-6", "w-12"];
@@ -149,17 +149,10 @@ export function SessionsOverviewPendingRow({
 						</p>
 						<span className="inline-block h-1.5 w-12 shrink-0 rounded-sm bg-black/5 dark:bg-white/8" />
 					</div>
-					<SessionOverviewSubagentStack
+					<SessionOverviewSubagentCountTag
 						session={{
 							subagent_count: subagentCount,
 							subagent_types: [],
-							native_subagents: Array.from(
-								{ length: subagentCount },
-								(_, agentIndex) => ({
-									subagent_id: `pending-${index}-${agentIndex}`,
-									model: model || null,
-								}),
-							),
 						}}
 					/>
 					{/* Four of every eleven rows (about 36%) show an apology placeholder. */}

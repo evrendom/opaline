@@ -426,7 +426,7 @@ import {
 	SessionFilterCatalogInputSchema,
 	SessionFilterCatalogSchema,
 	SessionListInputSchema,
-	SessionOverviewAnalyticsSchema,
+	SessionOverviewListRowSchema,
 	UserDailyTrendDataSchema,
 } from "./schemas/analytics.js";
 import { sessionDetailProcedureContracts } from "./session-detail-contract.js";
@@ -1431,7 +1431,7 @@ export const contract = {
 				.output(SessionFilterCatalogSchema),
 			list: oc
 				.input(SessionListInputSchema)
-				.output(z.array(SessionOverviewAnalyticsSchema)),
+				.output(z.array(SessionOverviewListRowSchema)),
 			/** The session the "Last session uploaded" bar links to, or null. */
 			lastUpload: oc.output(LastSessionUploadSchema.nullable()),
 			/** Live sessions of the active workspace the caller may read (last 24 hours). */

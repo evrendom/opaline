@@ -3,7 +3,7 @@ import {
 	type RepoIdentityResolver,
 	type SessionAnalyticsSummary as SessionAnalyticsSummaryBase,
 	type SessionListFilters,
-	type SessionOverviewAnalytics,
+	type SessionOverviewListRow,
 	type Source,
 	unifyRepoIdentities,
 } from "@rudel/api-routes";
@@ -20,12 +20,16 @@ import {
 	getWorkspaceRepoIdentities,
 } from "./repository-filter.service.js";
 import { buildSessionFamilyCostCte } from "./session-family-cost.service.js";
-import { buildSessionHasSubagentsSql } from "./session-lineage-analytics.service.js";
+import {
+	buildLinkedSubagentParentsCte,
+	buildSessionHasSubagentsSql,
+} from "./session-lineage-analytics.service.js";
 import { appendSessionListSqlFilters } from "./session-list-filters.js";
 import { buildActiveSkillUsesCte } from "./skill-extraction-ingest.service.js";
 import {
 	buildSessionAnalyticsWindowSql,
 	buildSessionDateWindow,
+	buildSubagentUsageCte,
 	getUsageAnalyticsQueryContext,
 } from "./usage-event-analytics.service.js";
 
@@ -79,8 +83,13 @@ export interface SessionAnalyticsRaw {
 	slash_commands: string[];
 
 	// Effectiveness correlation factors
-	error_count: number;
+	error_count: number | null;
 	model_used: string;
+
+	subagent_kind?: "" | "agent" | "child" | "linked";
+	subagent_parent_session_id?: string;
+	subagent_parent_source?: Source;
+	subagent_agent_id?: string;
 
 	// Persisted language-signal counts
 	member_swears: number;
@@ -141,10 +150,19 @@ const EMPTY_SESSION_LANGUAGE_SIGNALS: PersistedSessionLanguageSignals = {
 export function mapSessionAnalyticsRow(
 	row: SessionAnalyticsRaw,
 	resolver: RepoIdentityResolver = unifyRepoIdentities([]),
-): SessionOverviewAnalytics {
+): SessionOverviewListRow {
 	const repositoryIdentity = resolver.resolve(toRepoIdentityInput(row));
+	const subagentOf =
+		row.subagent_kind && row.subagent_parent_session_id
+			? {
+					kind: row.subagent_kind,
+					session_id: row.subagent_parent_session_id,
+					source: row.subagent_parent_source ?? row.source,
+					agent_id: row.subagent_agent_id || null,
+				}
+			: undefined;
 
-	return {
+	const mapped = {
 		source: row.source,
 		session_id: row.session_id,
 		user_id: row.user_id,
@@ -185,7 +203,7 @@ export function mapSessionAnalyticsRow(
 		),
 		skills: row.skills,
 		slash_commands: row.slash_commands,
-		error_count: row.error_count,
+		error_count: row.error_count ?? undefined,
 		model_used: row.model_used,
 		member_swears: row.member_swears,
 		member_apologies: row.member_apologies,
@@ -200,7 +218,40 @@ export function mapSessionAnalyticsRow(
 		model_apology_matches: row.model_apology_matches,
 		model_positive_matches: row.model_positive_matches,
 	};
+	if (subagentOf) return { ...mapped, subagent_of: subagentOf };
+	if (row.error_count === null)
+		throw new Error(`Session ${row.session_id} has no error count`);
+	return { ...mapped, error_count: row.error_count };
 }
+
+const SESSION_LIST_ROW_COLUMNS = `
+				sa.source AS source,
+				sa.session_id AS session_id,
+				sa.user_id AS user_id,
+				sa.session_date AS session_date,
+				sa.project_path AS project_path,
+				sa.organization_id AS organization_id,
+				sa.git_remote AS git_remote,
+				sa.package_name AS package_name,
+				sa.total_interactions AS total_interactions,
+				sa.actual_duration_min AS actual_duration_min,
+				sa.last_interaction_date AS last_interaction_date,
+				sa.total_tokens AS total_tokens,
+				sa.input_tokens AS input_tokens,
+				sa.output_tokens AS output_tokens,
+				sa.estimated_cost AS estimated_cost,
+				sa.cost_is_complete AS cost_is_complete,
+				sa.cost_uses_default_region AS cost_uses_default_region,
+				sa.git_sha AS git_sha,
+				sa.git_branch AS git_branch,
+				sa.subagent_types AS subagent_types,
+				sa.subagent_count AS subagent_count,
+				sa.native_subagents AS native_subagents,
+				sa.native_child_sessions AS native_child_sessions,
+				sa.linked_subagent_count AS linked_subagent_count,
+				sa.linked_subagents AS linked_subagents,
+				sa.skills AS skills,
+				sa.slash_commands AS slash_commands`;
 
 /**
  * Get session analytics from the materialized view
@@ -268,7 +319,7 @@ async function getSessionAnalyticsBaseRows(
 		query_params.organizationId = orgId;
 		filters.push(
 			useSkillReceipts
-				? `(sa.user_id, sa.source, sa.session_id) IN (
+				? `sa.subagent_kind != 'agent' AND (sa.user_id, sa.source, sa.session_id) IN (
 				SELECT user_id, if(agent = 'claude', 'claude_code', 'codex'), session_id
 				FROM active_skill_uses
 			)`
@@ -333,8 +384,6 @@ async function getSessionAnalyticsBaseRows(
 			sessionsSql: buildSessionAnalyticsWindowSql(windowFilter),
 		},
 	});
-	const estimatedCostSql = "sa.estimated_cost";
-
 	const query = `
 		WITH RECURSIVE ${usage.cteDefinitions},
 		${buildSessionFamilyCostCte({
@@ -342,7 +391,88 @@ async function getSessionAnalyticsBaseRows(
 			outputRelation: "session_list_costs",
 			rootFilterSql: `sa.is_top_level_session = 1 AND ${dateFilter}`,
 			rootRelation: usage.metadataRelation,
-		})}
+		})},
+		${buildLinkedSubagentParentsCte("session_list_linked_parents")},
+		session_list_agent_parents AS (
+			SELECT sa.organization_id AS organization_id, sa.user_id AS user_id, sa.source AS source, sa.session_id AS session_id
+			FROM ${usage.metadataRelation} AS sa
+			WHERE sa.is_top_level_session = 1
+				AND ${buildSessionHasSubagentsSql("sa")}
+				AND ${dateFilter}
+		),
+		${buildSubagentUsageCte("session_list_agent_parents", usage.usageSource)},
+		session_list_rows AS (
+			SELECT ${SESSION_LIST_ROW_COLUMNS},
+				error_count,
+				model_used,
+				if(lp.parent_session_id != '', 'linked', '') AS subagent_kind,
+				lp.parent_session_id AS subagent_parent_session_id,
+				toString(lp.parent_source) AS subagent_parent_source,
+				'' AS subagent_agent_id
+			FROM session_list_costs AS sa
+			LEFT JOIN session_list_linked_parents AS lp
+				ON lp.organization_id = sa.organization_id
+				AND lp.user_id = sa.user_id
+				AND lp.child_source = sa.source
+				AND lp.child_session_id = sa.session_id
+			WHERE sa.is_top_level_session = 1
+
+			UNION ALL
+
+			SELECT ${SESSION_LIST_ROW_COLUMNS},
+				error_count,
+				model_used,
+				'child' AS subagent_kind,
+				sa.native_parent_session_id AS subagent_parent_session_id,
+				'codex' AS subagent_parent_source,
+				'' AS subagent_agent_id
+			FROM ${usage.sessionsRelation} AS sa
+			WHERE sa.is_top_level_session = 0
+
+			UNION ALL
+
+			SELECT
+				p.source AS source,
+				p.session_id AS session_id,
+				p.user_id AS user_id,
+				if(a.timed_requests > 0, a.first_request_at, p.session_date) AS session_date,
+				p.project_path AS project_path,
+				p.organization_id AS organization_id,
+				p.git_remote AS git_remote,
+				p.package_name AS package_name,
+				toUInt32(0) AS total_interactions,
+				if(a.timed_requests > 0, toUInt32(greatest(dateDiff('minute', a.first_request_at, a.last_request_at), 0)), toUInt32(0)) AS actual_duration_min,
+				if(a.timed_requests > 0, a.last_request_at, p.last_interaction_date) AS last_interaction_date,
+				a.total_tokens AS total_tokens,
+				a.input_tokens AS input_tokens,
+				a.output_tokens AS output_tokens,
+				a.estimated_cost AS estimated_cost,
+				a.cost_is_complete AS cost_is_complete,
+				a.cost_uses_default_region AS cost_uses_default_region,
+				p.git_sha AS git_sha,
+				p.git_branch AS git_branch,
+				CAST([], 'Array(String)') AS subagent_types,
+				toUInt32(0) AS subagent_count,
+				CAST([], 'Array(Tuple(String, String))') AS native_subagents,
+				CAST([], 'Array(Tuple(String, String))') AS native_child_sessions,
+				toUInt64(0) AS linked_subagent_count,
+				CAST([], 'Array(Tuple(String, String, String, String, String))') AS linked_subagents,
+				CAST([], 'Array(String)') AS skills,
+				CAST([], 'Array(String)') AS slash_commands,
+				CAST(NULL, 'Nullable(UInt32)') AS error_count,
+				if(a.model_used != '', a.model_used, tupleElement(arrayFirst(agent -> tupleElement(agent, 1) = a.agent_id, p.native_subagents), 2)) AS model_used,
+				'agent' AS subagent_kind,
+				p.session_id AS subagent_parent_session_id,
+				toString(p.source) AS subagent_parent_source,
+				a.agent_id AS subagent_agent_id
+			FROM subagent_usage_rows AS a
+			INNER JOIN ${usage.metadataRelation} AS p
+				ON p.organization_id = a.organization_id
+				AND p.user_id = a.user_id
+				AND p.source = a.source
+				AND p.session_id = a.session_id
+			WHERE p.is_top_level_session = 1
+		)
 		${useSkillReceipts ? `, ${buildActiveSkillUsesCte({ filterSkillName: true })}` : ""}
 	    SELECT
 	      sa.source AS source,
@@ -360,7 +490,7 @@ async function getSessionAnalyticsBaseRows(
       total_tokens,
       input_tokens,
       output_tokens,
-	  ${estimatedCostSql} AS estimated_cost,
+	  sa.estimated_cost AS estimated_cost,
 	  sa.cost_is_complete AS cost_is_complete,
 	  sa.cost_uses_default_region AS cost_uses_default_region,
       git_sha,
@@ -374,13 +504,16 @@ async function getSessionAnalyticsBaseRows(
 	      skills,
       slash_commands,
       error_count,
-      model_used
-	    FROM session_list_costs AS sa
+      model_used,
+      subagent_kind,
+      subagent_parent_session_id,
+      subagent_parent_source,
+      subagent_agent_id
+	    FROM session_list_rows AS sa
     WHERE ${dateFilter}
       AND sa.organization_id = {orgId:String}
-	  AND sa.is_top_level_session = 1
       ${filters.length > 0 ? `AND ${filters.join("\n      AND ")}` : ""}
-    ORDER BY ${sortColumn} ${sortDirection}, sa.source ASC, sa.session_id ASC
+    ORDER BY ${sortColumn} ${sortDirection}, sa.source ASC, sa.session_id ASC, sa.subagent_agent_id ASC
     ${filterRepositories ? "" : "LIMIT {limit:UInt32} OFFSET {offset:UInt32}"}
   `;
 
@@ -413,7 +546,7 @@ async function getSessionAnalyticsBaseRows(
 export async function getSessionAnalytics(
 	orgId: string,
 	params: Parameters<typeof getSessionAnalyticsBaseRows>[1] = {},
-): Promise<SessionOverviewAnalytics[]> {
+): Promise<SessionOverviewListRow[]> {
 	const raw = await getSessionAnalyticsBaseRows(orgId, params);
 
 	// Query parameters travel in the ClickHouse HTTP URL. Split large pages so
@@ -437,6 +570,7 @@ export async function getSessionAnalytics(
 	let batch: SessionAnalyticsListRow[] = [];
 	let batchSize = 0;
 	for (const row of raw) {
+		if (row.subagent_kind === "agent") continue;
 		const rowSize = parameterSize(signalKey(row));
 		if (
 			batch.length > 0 &&
@@ -497,7 +631,10 @@ export async function getSessionAnalytics(
 	);
 
 	return raw.map((baseRow) => {
-		const storedSignals = signalsByKey.get(signalKey(baseRow));
+		const storedSignals =
+			baseRow.subagent_kind === "agent"
+				? undefined
+				: signalsByKey.get(signalKey(baseRow));
 		const signals =
 			storedSignals?.user_id === baseRow.user_id
 				? storedSignals

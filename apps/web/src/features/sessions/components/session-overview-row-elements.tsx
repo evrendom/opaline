@@ -1,6 +1,10 @@
+import type { SessionAnalytics } from "@rudel/api-routes";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import type { NewseshLanguageSignalMatch } from "./newsesh-session-language-signal";
+import {
+	getNewseshLanguageSignalMatches,
+	type NewseshLanguageSignalMatch,
+} from "./newsesh-session-language-signal";
 
 export const SESSION_OVERVIEW_ROW_CLASS_NAME =
 	"group/session grid h-12 w-full text-left outline-none focus-visible:z-20 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--session-overview-accent)";
@@ -59,6 +63,53 @@ export function SessionLanguageSignalTag({
 					+{remainingCount}
 				</span>
 			) : null}
+		</div>
+	);
+}
+
+export function SessionOverviewLanguageSignals({
+	session,
+	speaker,
+}: {
+	session: SessionAnalytics;
+	speaker: NewseshLanguageSignalMatch["speaker"];
+}) {
+	const signals = getNewseshLanguageSignalMatches(session, speaker);
+	if (signals.length === 0) {
+		return null;
+	}
+
+	const signalSummary = signals.map((signal) => signal.matchedText).join(", ");
+
+	return (
+		<div
+			className="flex min-w-0 max-w-full items-center gap-1 overflow-hidden"
+			data-language-signal-speaker={speaker}
+			title={`${speaker === "member" ? "Member" : "Model"} language signals: ${signalSummary}`}
+		>
+			{(["positive", "apology", "swear"] as const).map((category) => {
+				const [signal, ...hidden] = signals.filter(
+					(signal) => signal.category === category,
+				);
+				if (!signal) {
+					return null;
+				}
+				return (
+					<SessionLanguageSignalTag
+						key={category}
+						category={category}
+						text={signal.matchedText}
+						title={`${speaker === "member" ? "Member" : "Model"}: ${signal.matchedText}`}
+						remainingCount={hidden.length}
+						remainingTitle={hidden
+							.map(
+								(signal) =>
+									`${speaker === "member" ? "Member" : "Model"}: ${signal.matchedText}`,
+							)
+							.join(" · ")}
+					/>
+				);
+			})}
 		</div>
 	);
 }

@@ -1,5 +1,6 @@
 import type { SessionAnalytics, SessionListInput } from "@rudel/api-routes";
 import { parseSessionOverviewRows } from "@/features/sessions/session-overview-response";
+import { isFamilyMemberRow } from "@/features/sessions/session-row-key";
 import { client } from "@/lib/orpc";
 
 const SESSION_PAGE_SIZE = 1000;
@@ -27,7 +28,7 @@ export async function fetchSessionRows(
 				{ signal },
 			),
 		);
-		sessions.push(...page);
+		sessions.push(...page.filter((session) => !isFamilyMemberRow(session)));
 		if (page.length < SESSION_PAGE_SIZE) break;
 	}
 	return sessions;

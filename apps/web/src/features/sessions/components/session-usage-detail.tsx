@@ -40,6 +40,10 @@ import {
 	type SessionNavigation,
 } from "@/features/sessions/session-navigation";
 import { parseSessionOverviewRows } from "@/features/sessions/session-overview-response";
+import {
+	sessionRowKey,
+	transcriptSubagentId,
+} from "@/features/sessions/session-row-key";
 import { ShellNavIcon } from "@/features/shell/components/shell-nav-icon";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { useCurrentShellRoute } from "@/features/shell/hooks/useCurrentShellRoute";
@@ -264,10 +268,7 @@ export function UsageSessionsPane({
 			: loaded;
 		return [
 			...new Map(
-				rows.map((row) => [
-					`${row.user_id}:${row.source}:${row.session_id}`,
-					row,
-				]),
+				rows.map((row) => [`${row.user_id}:${sessionRowKey(row)}`, row]),
 			).values(),
 		];
 	}, [sessionsQuery.data, placeholder, range.startDate, range.endDate]);
@@ -317,12 +318,15 @@ export function UsageSessionsPane({
 			)
 		: sessions;
 	// Steps through the loaded rows, in the table's order.
+	const navigableSessions = sessions.filter(
+		(session) => transcriptSubagentId(session) === null,
+	);
 	const { previousSession, nextSession } = getSessionNeighbours({
 		canViewSession,
-		orderedSessions: sessions,
+		orderedSessions: navigableSessions,
 		selectedSessionId,
 	});
-	const selectedIndex = sessions.findIndex(
+	const selectedIndex = navigableSessions.findIndex(
 		(session) => session.session_id === selectedSessionId,
 	);
 

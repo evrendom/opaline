@@ -29,6 +29,7 @@ import {
 	loadSessionReaderView,
 } from "./session-detail-prefetch";
 import { markSessionOpen } from "./session-open-timing";
+import { transcriptSubagentId } from "./session-row-key";
 
 const LazySessionReaderView = lazy(() =>
 	loadSessionReaderView().then((module) => ({
@@ -119,8 +120,9 @@ export function SessionsPage() {
 			scrollContainer.removeEventListener("scroll", saveScrollPosition);
 		};
 	}, [location.key]);
-	const viewableSessions = data.orderedSessions.filter((session) =>
-		canViewSession(session.user_id),
+	const viewableSessions = data.orderedSessions.filter(
+		(session) =>
+			transcriptSubagentId(session) === null && canViewSession(session.user_id),
 	);
 	const { nextSession, previousSession } = getSessionNeighbours({
 		canViewSession,

@@ -103,6 +103,27 @@ export function buildSessionLineageCteDefinitions(
 		)`;
 }
 
+export function buildLinkedSubagentParentsCte(
+	outputRelation: string,
+	enabled = shouldReadSessionLineage(),
+): string {
+	return `
+		${outputRelation} AS (
+			SELECT
+				organization_id,
+				user_id,
+				child_source,
+				child_session_id,
+				parent_source,
+				parent_session_id
+			FROM session_lineage_current
+			WHERE ${enabled ? "" : "0 AND"}
+				countable = 1
+				AND outcome = 'successful'
+				AND confidence IN ('id_echo', 'prompt_echo', 'attested_temporal')
+		)`;
+}
+
 export function buildLineageEnrichedMetadataCte(input: {
 	readonly baseRelation: string;
 	readonly outputRelation: string;

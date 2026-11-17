@@ -16,6 +16,7 @@ import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { useShellBottomNavigationPortal } from "@/features/shell/shell-bottom-navigation-portal";
 import { useCanViewSession } from "@/features/workspace/hooks/useCanViewSession";
 import { markSessionOpen } from "./session-open-timing";
+import { transcriptSubagentId } from "./session-row-key";
 
 export function NewSessionPage() {
 	const params = useParams<{ sessionId?: string }>();
@@ -29,8 +30,9 @@ export function NewSessionPage() {
 	const shellBottomNavigationPortal = useShellBottomNavigationPortal();
 	const { trackDrilldown } = useAnalyticsTracking();
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
-	const viewableSessions = data.orderedSessions.filter((session) =>
-		canViewSession(session.user_id),
+	const viewableSessions = data.orderedSessions.filter(
+		(session) =>
+			transcriptSubagentId(session) === null && canViewSession(session.user_id),
 	);
 	const defaultSessionId = viewableSessions[0]?.session_id ?? null;
 	const activeSessionId = params.sessionId ?? defaultSessionId;

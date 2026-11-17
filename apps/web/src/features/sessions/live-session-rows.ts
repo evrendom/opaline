@@ -3,6 +3,7 @@ import {
 	type LiveSessionSummary,
 	type SessionAnalytics,
 } from "@rudel/api-routes";
+import { sessionRowKey } from "./session-row-key";
 
 /**
  * A sessions-table row for a session running right now, before its upload:
@@ -57,7 +58,7 @@ export function mergeLiveSessionRows(
 ): SessionAnalytics[] {
 	if (live.length === 0) return [...sessions];
 	const uploadedByKey = new Map(
-		sessions.map((session) => [rowKey(session), session]),
+		sessions.map((session) => [sessionRowKey(session), session]),
 	);
 	const pinned: SessionAnalytics[] = [];
 	const pinnedKeys = new Set<string>();
@@ -75,7 +76,7 @@ export function mergeLiveSessionRows(
 	}
 	return [
 		...pinned,
-		...sessions.filter((session) => !pinnedKeys.has(rowKey(session))),
+		...sessions.filter((session) => !pinnedKeys.has(sessionRowKey(session))),
 	];
 }
 
@@ -106,8 +107,4 @@ function byLastActivityDescending(
 	right: LiveSessionSummary,
 ): number {
 	return Date.parse(right.lastActivityAt) - Date.parse(left.lastActivityAt);
-}
-
-function rowKey(session: SessionAnalytics): string {
-	return `${session.source}:${session.session_id}`;
 }

@@ -23,6 +23,7 @@ import {
 } from "@/features/sessions/reader/files/session-reader-files-parts";
 import { pullRequestKey } from "@/features/sessions/reader/session-places";
 import { parseSessionOverviewRows } from "@/features/sessions/session-overview-response";
+import { isFamilyMemberRow } from "@/features/sessions/session-row-key";
 import { orpc } from "@/lib/orpc";
 import { cn } from "@/lib/utils";
 import { money } from "./repo-reader/repo-page-kit";
@@ -270,9 +271,9 @@ function usePullCosts(
 			getPullCosts(
 				pullRequests,
 				new Map(
-					(query.data ? parseSessionOverviewRows(query.data) : []).map(
-						(session) => [session.session_id, session],
-					),
+					(query.data ? parseSessionOverviewRows(query.data) : [])
+						.filter((session) => !isFamilyMemberRow(session))
+						.map((session) => [session.session_id, session]),
 				),
 			),
 		[pullRequests, query.data],

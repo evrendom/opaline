@@ -511,6 +511,7 @@ function expectSameRows(
 	expected: ReferenceRow[],
 ) {
 	const actual = rows
+		.filter((row) => row.subagent_of === undefined)
 		.map((row) => ({
 			cost_uses_default_region: row.cost_uses_default_region,
 			duration_min: row.duration_min,

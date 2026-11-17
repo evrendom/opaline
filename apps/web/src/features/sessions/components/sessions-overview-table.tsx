@@ -22,6 +22,7 @@ import { useUserMap } from "@/features/workspace/hooks/useUserMap";
 import { useScrollFade } from "@/hooks/use-scroll-fade";
 import { formatNumber, formatUsername } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { sessionRowKey } from "../session-row-key";
 import { buildSessionMemberProfileSummaries } from "./session-member-profile-summary";
 import { SessionsOverviewControls } from "./sessions-overview-controls";
 import { SessionsOverviewFluidList } from "./sessions-overview-fluid-list";
@@ -163,7 +164,7 @@ export function SessionsOverviewTable({
 		[tableState.sortedSessions, shownPage, pageSize],
 	);
 	const focusedIndex = pageSessions.findIndex(
-		(session) => `${session.source}:${session.session_id}` === focusedKey,
+		(session) => sessionRowKey(session) === focusedKey,
 	);
 	const reportVisible = useLatestValueRef(() =>
 		onVisibleSessions?.(pageSessions),
@@ -284,7 +285,7 @@ export function SessionsOverviewTable({
 						const next = pageSessions[nextIndex];
 						if (!next) return;
 						event.preventDefault();
-						const key = `${next.source}:${next.session_id}`;
+						const key = sessionRowKey(next);
 						setFocusedKey(key);
 						requestAnimationFrame(() => {
 							const row = Array.from(
@@ -359,7 +360,7 @@ export function SessionsOverviewTable({
 														<SessionsOverviewRow
 															showPlace={showPlace}
 															showSkillsColumn={showSkillsColumn}
-															key={`${session.source}:${session.session_id}`}
+															key={sessionRowKey(session)}
 															virtualTop={start}
 															index={index}
 															position={position}
