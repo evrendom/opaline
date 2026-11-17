@@ -51,7 +51,8 @@ const RESET_ICON_PX = 14;
 const RESET_ICON_GAP_PX = 6;
 const RESET_ICON_SPACE_PX = 10;
 const USAGE_COLOR = "oklch(0.74 0.17 150)";
-const USED_COLOR = "color-mix(in oklch, var(--cost-muted) 26%, transparent)";
+const RAN_OUT_COLOR = "oklch(0.64 0.21 27)";
+const RAN_OUT_AT = 97;
 const SEGMENT_GAP_PX = 3;
 const SEGMENT_RADIUS_PX = 2;
 const TICK_STYLE = { fill: "var(--cost-muted)", fontSize: 11 };
@@ -98,6 +99,7 @@ interface Period {
 	readonly used: number | null;
 	readonly usedPoints: number;
 	readonly full: number | null;
+	readonly ranOut: boolean;
 }
 
 export function periodsOf(
@@ -150,6 +152,7 @@ export function periodsOf(
 						),
 			usedPoints,
 			full: last?.usedPercent === null || !last ? null : 100,
+			ranOut: buckets.some((bucket) => (bucket.usedPercent ?? 0) >= RAN_OUT_AT),
 		};
 	});
 }
@@ -394,8 +397,12 @@ function UsageCanvas({
 	);
 }
 
-function solidColor(_period: Period): string {
-	return USAGE_COLOR;
+function solidColor(period: Period): string {
+	return period.ranOut ? RAN_OUT_COLOR : USAGE_COLOR;
+}
+
+function usedColor(period: Period): string {
+	return `color-mix(in srgb, ${solidColor(period)} 38%, var(--cost-surface))`;
 }
 
 interface BarShapeProps {
@@ -426,7 +433,7 @@ function SplitBar({
 		{
 			key: "used",
 			size: payload.used ?? 0,
-			fill: USED_COLOR,
+			fill: usedColor(payload),
 		},
 	].filter((part) => part.size > 0.05);
 	const scale = Math.max(0, height - (parts.length - 1) * SEGMENT_GAP_PX) / 100;
@@ -510,7 +517,7 @@ function PeriodTip({
 			</div>
 			<div>
 				<span>
-					<i style={{ backgroundColor: USED_COLOR }} />
+					<i style={{ backgroundColor: usedColor(period) }} />
 					Used
 				</span>
 				<strong>
