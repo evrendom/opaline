@@ -6,7 +6,7 @@ import { RollingText } from "@/features/costs/cost-rolling-text";
 
 const ENTER = { duration: 0.46, ease: [0.22, 1, 0.36, 1] } as const;
 
-function dayLabel(pick: DotPick) {
+export function dayLabel(pick: DotPick) {
 	const start = parseISO(pick.date);
 	if (pick.date === pick.end) return format(start, "MMM d");
 	return `${format(start, "MMM d")} – ${format(parseISO(pick.end), "MMM d")}`;

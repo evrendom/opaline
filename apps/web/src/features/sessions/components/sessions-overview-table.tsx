@@ -3,7 +3,6 @@ import type {
 	SessionFilterCatalog,
 	SessionListFilters,
 } from "@rudel/api-routes";
-import { IconCalendarOff, IconFilterOff } from "@tabler/icons-react";
 import {
 	type CSSProperties,
 	type ReactNode,
@@ -16,7 +15,6 @@ import {
 import { useEffectOnceWhen } from "@/app/hooks/useEffectOnceWhen";
 import { useLatestValueRef } from "@/app/hooks/useLatestValueRef";
 import { Reveal } from "@/app/ui/bones";
-import { EmptyState } from "@/components/dashboard/page-parts";
 import {
 	useSessionLimitHits,
 	useSessionUsageShares,
@@ -34,6 +32,7 @@ import { subagentTintAt } from "../reader/subagents/session-reader-subagent-tint
 import { sessionRowKey, transcriptSubagentId } from "../session-row-key";
 import { buildSessionMemberProfileSummaries } from "./session-member-profile-summary";
 import { SessionsOverviewControls } from "./sessions-overview-controls";
+import { SessionsOverviewEmpty } from "./sessions-overview-empty";
 import { SessionsOverviewFluidList } from "./sessions-overview-fluid-list";
 import { SessionsOverviewHeader } from "./sessions-overview-header";
 import {
@@ -367,33 +366,14 @@ export function SessionsOverviewTable({
 						)}
 						data-slot="sessions-overview-canvas"
 					>
-						{!isLoading && tableState.recentSessions.length === 0 ? (
-							<div className="flex min-h-64 flex-1 flex-col p-6">
-								<EmptyState
-									icon={IconCalendarOff}
-									title="No sessions in this range"
-									description="Pick a wider date range to see more sessions."
-								/>
-							</div>
-						) : !isLoading && tableState.filteredSessions.length === 0 ? (
-							<div className="flex min-h-64 flex-1 flex-col p-6">
-								<EmptyState
-									icon={IconFilterOff}
-									title={
-										pagination?.hasNextPage
-											? "Looking for matching sessions…"
-											: "No sessions match the selected filters"
-									}
-								>
-									<button
-										type="button"
-										className="mx-auto rounded-md px-2 py-1 text-sm font-medium text-(--session-overview-accent) outline-none hover:bg-(--session-overview-hover) focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-(--session-overview-accent)"
-										onClick={tableState.clearAllFilters}
-									>
-										Clear filters
-									</button>
-								</EmptyState>
-							</div>
+						{!isLoading &&
+						(tableState.recentSessions.length === 0 ||
+							tableState.filteredSessions.length === 0) ? (
+							<SessionsOverviewEmpty
+								noneInRange={tableState.recentSessions.length === 0}
+								searching={pagination?.hasNextPage === true}
+								onClearFilters={tableState.clearAllFilters}
+							/>
 						) : (
 							<Reveal
 								fill

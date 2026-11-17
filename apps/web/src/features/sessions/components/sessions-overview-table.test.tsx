@@ -3,6 +3,7 @@ import type { LiveSessionSummary, SessionAnalytics } from "@rudel/api-routes";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { assert, describe, expect, it, vi } from "vitest";
+import { DotPickContext } from "@/features/costs/cost-hover-date";
 import { liveSessionRow } from "../live-session-rows";
 import { SessionsOverviewTable } from "./sessions-overview-table";
 
@@ -882,5 +883,38 @@ describe("SessionsOverviewTable", () => {
 				name: "Filter sessions, 1 active",
 			}),
 		).toBeInTheDocument();
+	});
+
+	it("names the picked rail day when it has no sessions and offers every day back", async () => {
+		const user = userEvent.setup();
+		const pick = vi.fn();
+		const table = (
+			<SessionsOverviewTable
+				activeSessionId={null}
+				canOpenSession={() => true}
+				getSessionHref={undefined}
+				getSessionLinkState={undefined}
+				isLoading={false}
+				onSessionClick={vi.fn()}
+				scrollContainerRef={undefined}
+				sessionCountLabel={0}
+				sessions={[]}
+				sessionDetailDisabledNote={undefined}
+				totalSessionCount={0}
+			/>
+		);
+		const { rerender } = render(table);
+		expect(screen.getByText("No sessions in this range")).toBeVisible();
+
+		rerender(
+			<DotPickContext.Provider
+				value={{ picked: { date: "2026-09-25", end: "2026-09-25" }, pick }}
+			>
+				{table}
+			</DotPickContext.Provider>,
+		);
+		expect(screen.getByText("No sessions on Sep 25")).toBeVisible();
+		await user.click(screen.getByRole("button", { name: "Show every day" }));
+		expect(pick).toHaveBeenCalledWith(null);
 	});
 });
