@@ -366,12 +366,8 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 					) : null}
 					{planUsage === undefined && !planUsageLimited ? null : (
 						<span
-							className={cn(
-								"ml-1 inline-flex items-center gap-0.5 tabular-nums",
-								session.subagent_of && !planUsageLimited && "opacity-55",
-							)}
+							className="ml-1 inline-flex items-center gap-0.5 tabular-nums"
 							data-session-overview-metric-value="plan-usage"
-							data-subset={session.subagent_of ? "" : undefined}
 							data-limited={planUsageLimited || undefined}
 						>
 							<IconBattery2
