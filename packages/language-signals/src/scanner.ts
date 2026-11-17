@@ -1,4 +1,9 @@
-import { LANGUAGE_SIGNAL_RULES, SWEAR_INTENSIFIED_POSITIVES } from "./rules.js";
+import {
+	LANGUAGE_SIGNAL_RULES,
+	SHORT_CALM_VERDICTS,
+	SHORT_NEGATIVE_VERDICTS,
+	SWEAR_INTENSIFIED_POSITIVES,
+} from "./rules.js";
 import type {
 	BuiltInLanguageSignalCategory,
 	LanguageSignalMatch,
@@ -102,6 +107,11 @@ const CATEGORY_PREFILTERS = new Map(
 							NEGATIVE_QUESTION_RUN.source,
 							NEGATIVE_EXCLAMATION_RUN.source,
 							NEGATED_POSITIVE_SOURCE,
+							...SHORT_NEGATIVE_VERDICTS.map((verdict) =>
+								verdict.endsWith("?")
+									? `${compileSurfaceSource(verdict.slice(0, -1))}\\s*\\?`
+									: compileSurfaceSource(verdict),
+							),
 						]
 					: []),
 				...COMPILED_SURFACES.filter(
@@ -132,14 +142,16 @@ const POSITIVE_WORDS_SOURCE = `(?:${[
 ]
 	.map(compileSurfaceSource)
 	.join("|")})`;
-const SWEAR_BEFORE_POSITIVE_PATTERN = new RegExp(
-	`^[\\s,]+(?:(?:so|really|very|super|too)\\s+)?${POSITIVE_WORDS_SOURCE}(?![\\p{L}\\p{N}])`,
+const POSITIVE_WORD_PATTERN = new RegExp(
+	`(?<![\\p{L}\\p{N}])${POSITIVE_WORDS_SOURCE}(?![\\p{L}\\p{N}])`,
 	"iu",
 );
-const POSITIVE_BEFORE_SWEAR_PATTERN = new RegExp(
-	`(?<![\\p{L}\\p{N}])${POSITIVE_WORDS_SOURCE}\\s+(?:as\\s+)?$`,
-	"iu",
-);
+const NEGATION_WORD_PATTERN =
+	/(?<![\p{L}\p{N}])(?:not|no|never|nothing|dont|doesnt|didnt|isnt|wasnt|arent|werent|cant|cannot|wont|wouldnt|shouldnt|aint|\p{L}+n['’]t)(?![\p{L}\p{N}])/iu;
+const CLAUSE_END_PATTERN = /[.!?;:…\n]/u;
+const WORDS_BEFORE_PATTERN = /(?:[\p{L}\p{N}'’-]+[\s,]*){0,2}$/u;
+const WORDS_AFTER_PATTERN = /^(?:[\s,]*[\p{L}\p{N}'’-]+){0,2}/u;
+const SWEAR_WINDOW_CHARS = 60;
 const SYSTEM_INSTRUCTION_BLOCK_PATTERN =
 	/<system_instruction>[\s\S]*?<\/system_instruction>/giu;
 
@@ -184,7 +196,67 @@ export function scanLanguageSignals(
 		}
 	}
 
-	return matches;
+	return withSentenceVerdicts(text, matches);
+}
+
+const SENTENCE_PATTERN = /[^.!?…\n]+[.!?…]*/gu;
+const VERDICT_BODY_PATTERN = /^[\s,~-]*(.*?)[\s,~-]*([.!?…]*)$/su;
+const MAX_VERDICT_CHARS = 24;
+const NEGATIVE_VERDICTS = new Set(SHORT_NEGATIVE_VERDICTS);
+const CALM_VERDICTS = new Set(SHORT_CALM_VERDICTS);
+
+function withSentenceVerdicts(
+	text: string,
+	matches: LanguageSignalMatch[],
+): LanguageSignalMatch[] {
+	const unhappy = matches.filter(
+		(match) => match.category === "negative" || match.category === "swear",
+	);
+	const dropped = new Set<LanguageSignalMatch>();
+	const added: LanguageSignalMatch[] = [];
+	let cursor = 0;
+	for (const sentence of text.matchAll(SENTENCE_PATTERN)) {
+		const from = sentence.index;
+		const to = from + sentence[0].length;
+		while ((unhappy[cursor]?.end ?? Number.POSITIVE_INFINITY) <= from)
+			cursor += 1;
+		if (sentence[0].length > MAX_VERDICT_CHARS + 8) continue;
+		const parts = sentence[0].match(VERDICT_BODY_PATTERN);
+		const body = parts?.[1] ?? "";
+		if (body === "" || body.length > MAX_VERDICT_CHARS) continue;
+		const verdict = body.toLowerCase().replace(/\s+/gu, " ");
+		const asked = (parts?.[2] ?? "").includes("?");
+		if (CALM_VERDICTS.has(verdict)) {
+			for (
+				let at = cursor;
+				at < unhappy.length && (unhappy[at]?.start ?? to) < to;
+				at += 1
+			) {
+				const match = unhappy[at];
+				if (match && match.start >= from && match.end <= to) dropped.add(match);
+			}
+			continue;
+		}
+		if (
+			!NEGATIVE_VERDICTS.has(asked ? `${verdict}?` : verdict) ||
+			(unhappy[cursor]?.start ?? to) < to ||
+			matches.length + added.length >= MAX_LANGUAGE_SIGNAL_MATCHES
+		)
+			continue;
+		const start = from + sentence[0].indexOf(body);
+		const end = asked ? to : start + body.length;
+		added.push({
+			category: "negative",
+			ruleId: "negative.short-verdict",
+			matchedText: text.slice(start, end),
+			start,
+			end,
+		});
+	}
+	if (dropped.size === 0 && added.length === 0) return matches;
+	return [...matches.filter((match) => !dropped.has(match)), ...added].sort(
+		(left, right) => left.start - right.start,
+	);
 }
 
 export function* languageSignalPatternMatches(
@@ -244,6 +316,8 @@ function appendSegmentMatches(
 	}
 }
 
+const ASKS_IF_UNDERSTOOD_PATTERN = /what\s+$/iu;
+
 const PROBE_FOR_PROBLEMS_PATTERN =
 	/(?:find|spot|see|notice|anything|something|what['’]?s|what\s+is|any)\s+(?:[\p{L}\p{N}]+\s+){0,2}$/iu;
 
@@ -260,6 +334,13 @@ function isSuppressed(
 			);
 		case "negative.again-alone":
 			return !startsSentence(text, index);
+		case "negative.correction-no":
+		case "negative.correction-wrong-lead":
+			return !startsClause(text, index);
+		case "negative.correction-meant":
+			return ASKS_IF_UNDERSTOOD_PATTERN.test(
+				text.slice(Math.max(0, index - 20), index),
+			);
 		case "negative.exclamation-run":
 			return followsPositiveInSentence(text, index, earlier);
 		default:
@@ -280,6 +361,15 @@ function followsPositiveInSentence(
 	return false;
 }
 
+function startsClause(text: string, index: number): boolean {
+	for (let at = index - 1; at >= 0; at--) {
+		const character = text[at] ?? "";
+		if (/[.!?…\n]/u.test(character)) return true;
+		if (!/\s/u.test(character)) return false;
+	}
+	return true;
+}
+
 function startsSentence(text: string, index: number): boolean {
 	for (let at = index - 1; at >= 0; at--) {
 		const character = text[at] ?? "";
@@ -288,6 +378,41 @@ function startsSentence(text: string, index: number): boolean {
 		if (!/\s/u.test(character)) return false;
 	}
 	return true;
+}
+
+function praisesNextToSwear(text: string, start: number, end: number): boolean {
+	const lead = text.slice(Math.max(0, start - SWEAR_WINDOW_CHARS), start);
+	const trail = text.slice(end, end + SWEAR_WINDOW_CHARS);
+	const before = (
+		lead.slice(lastClauseEnd(lead) + 1).match(WORDS_BEFORE_PATTERN)?.[0] ?? ""
+	).trim();
+	const trailEnd = trail.search(CLAUSE_END_PATTERN);
+	const after = (
+		trail
+			.slice(0, trailEnd === -1 ? undefined : trailEnd)
+			.match(WORDS_AFTER_PATTERN)?.[0] ?? ""
+	).trim();
+	return (
+		(POSITIVE_WORD_PATTERN.test(before) || POSITIVE_WORD_PATTERN.test(after)) &&
+		![before, after].some(
+			(words) => NEGATION_WORD_PATTERN.test(words) || hasUnhappySurface(words),
+		)
+	);
+}
+
+function lastClauseEnd(text: string): number {
+	for (let at = text.length - 1; at >= 0; at--)
+		if (CLAUSE_END_PATTERN.test(text[at] ?? "")) return at;
+	return -1;
+}
+
+function hasUnhappySurface(words: string): boolean {
+	if (words === "") return false;
+	for (const match of languageSignalPatternMatches(words)) {
+		const category = findCompiledSurface(match)?.category;
+		if (category === "negative" || category === "swear") return true;
+	}
+	return false;
 }
 
 function buildLanguageSignalMatch(
@@ -305,11 +430,7 @@ function buildLanguageSignalMatch(
 	const end = match.index + match[0].length;
 	if (
 		compiledSurface.category === "swear" &&
-		(SWEAR_BEFORE_POSITIVE_PATTERN.test(text.slice(end, end + 40)) ||
-			(compiledSurface.ruleId === "swear.as-fuck" &&
-				POSITIVE_BEFORE_SWEAR_PATTERN.test(
-					text.slice(Math.max(0, start - 40), start),
-				)))
+		praisesNextToSwear(text, start, end)
 	)
 		return {
 			category: "positive",

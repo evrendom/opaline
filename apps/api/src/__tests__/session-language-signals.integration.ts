@@ -233,8 +233,8 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 	test("the upload writer stores counts and phrase frequencies with the current scan version", async () => {
 		const sessionId = `upload_${runId}`;
 		const content = transcript(
-			"shit sorry excellent excellent. This did not work. This did not work.",
-			"fuck sorry sorry great",
+			"shit. sorry excellent excellent. This did not work. This did not work.",
+			"fuck. sorry sorry great",
 		);
 		const ingestedAt = new Date("2099-01-01T00:00:01.000Z");
 		const raw = await ingestRawSession({ content, ingestedAt, sessionId });
@@ -323,7 +323,7 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 
 	test("upgrades version-two count-only rows into overview word tags", async () => {
 		const sessionId = `legacy_matches_${runId}`;
-		const content = transcript("shit sorry excellent", "fuck sorry");
+		const content = transcript("shit. sorry excellent", "fuck sorry");
 		const ingestedAt = new Date("2099-01-01T00:00:01.500Z");
 		const raw = await ingestRawSession({ content, ingestedAt, sessionId });
 		const scannedAt = new Date();
@@ -513,8 +513,8 @@ describe("persisted session language signals (ClickHouse integration)", () => {
 		const zeroSessionId = `list_zero_${runId}`;
 		const noRowSessionId = `list_no_row_${runId}`;
 		const countedContent = transcript(
-			"shit sorry excellent",
-			"fuck sorry great work",
+			"shit. sorry excellent",
+			"fuck. sorry great work",
 		);
 		const filteredContent = transcript("shit shit sorry");
 		const zeroContent = transcript("plain prompt");

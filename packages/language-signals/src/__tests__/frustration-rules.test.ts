@@ -65,6 +65,43 @@ describe("frustration rules", () => {
 		expect(unhappy(text)).toContain(ruleId);
 	});
 
+	test.each([
+		["negative.correction-no", "no, use the other endpoint"],
+		["negative.correction-no", "nah keep the old header"],
+		[
+			"negative.correction-no",
+			"the list looks right.\nno it should be sorted by date",
+		],
+		["negative.correction-no", "nope"],
+		["negative.correction-meant", "that is not what i asked for"],
+		["negative.correction-meant", "i meant the settings page"],
+		["negative.correction-wrong", "that's wrong, the limit is ten"],
+		["negative.correction-wrong-lead", "wrong file. use the config one"],
+		["negative.correction-dislike", "i dont like the new spacing"],
+		["negative.correction-but", "ok but the label is still cut"],
+		["negative.correction-but", "better, but the icon is too big"],
+		["negative.correction-not-seen", "i dont see the new column"],
+		["negative.correction-not-yet", "not quite, the border is thicker"],
+		["negative.correction-too", "the padding is too wide"],
+	])("%s flags %p", (ruleId, text) => {
+		expect(unhappy(text)).toContain(ruleId);
+	});
+
+	test("calm agreement and questions are not corrections", () => {
+		for (const text of [
+			"no need to rerun the tests",
+			"no worries, take your time",
+			"nah thanks",
+			"there is no file named config",
+			"No numbers in the summary section.",
+			"do you know what i mean",
+			"what went wrong in the last deploy",
+			"the wrong answers are marked red",
+			"too many rows to count by hand",
+		])
+			expect(unhappy(text)).toEqual([]);
+	});
+
 	test("bare still and again only count where they stand alone", () => {
 		expect(unhappy("is it still running?")).toEqual([]);
 		expect(unhappy("we still need a migration for this")).toEqual([]);
@@ -107,6 +144,78 @@ describe("frustration rules", () => {
 		]);
 		expect(unhappy("this is fucking broken")).toEqual(["swear.fuck"]);
 		expect(unhappy("this better fucking work")).toEqual(["swear.fuck"]);
+	});
+
+	test.each([
+		["fucking shit", ["swear", "swear"]],
+		["fucking great", ["positive", "positive"]],
+		["damn good", ["positive", "positive"]],
+		["hell yeah", ["positive"]],
+		["holy shit that's amazing", ["positive", "positive"]],
+		["shit, still broken", ["swear", "negative"]],
+		["this is fucking awful", ["swear", "negative"]],
+		["not fucking good", ["swear", "positive"]],
+		["great work. the fucking build broke", ["positive", "swear"]],
+	])("a swear is positive only with praise and nothing unhappy within two words: %p", (text, categories) => {
+		expect(signals(text).map(({ category }): string => category)).toEqual(
+			categories,
+		);
+	});
+
+	test.each([
+		["horror.", "horror"],
+		["nah bad....", "nah"],
+		["worse now", "worse now"],
+		["still", "still"],
+		["and?", "and?"],
+		["the toolbar moved. bad.", "bad"],
+		["meh", "meh"],
+	])("a short negative verdict counts: %p", (text, matchedText) => {
+		const matches = scanMemberLanguageSignals(text).filter(
+			(match) => match.category === "negative",
+		);
+		expect(matches.map((match) => match.matchedText)).toContain(matchedText);
+	});
+
+	test("a short calm verdict is never frustration", () => {
+		for (const text of [
+			"good",
+			"ok",
+			"fine!!",
+			"nice",
+			"yes??",
+			"ok. thanks!!",
+			"Sure?!",
+		])
+			expect(unhappy(text)).toEqual([]);
+	});
+
+	test("verdict words inside a longer sentence are left to the rules", () => {
+		for (const text of [
+			"bad request handling is in the router",
+			"is it bad?",
+			"and then run the migration",
+			"still waiting on the build to finish?",
+			"same as yesterday please",
+		])
+			expect(unhappy(text)).toEqual([]);
+		expect(unhappy("ok, the header is still broken")).toContain(
+			"negative.still",
+		);
+	});
+
+	test("omg on its own is not frustration", () => {
+		expect(unhappy("omg")).toEqual([]);
+		expect(unhappy("omg this is amazing")).toEqual([]);
+		expect(unhappy("omg it still crashes")).toEqual(["negative.still"]);
+	});
+
+	test("question runs inside code stay out while prose question runs count", () => {
+		expect(unhappy("use `a ?? b` here")).toEqual([]);
+		expect(unhappy("```\nconst x = a ?? b\n```\nis that right")).toEqual([]);
+		expect(unhappy("where did the tests go??")).toEqual([
+			"negative.question-run",
+		]);
 	});
 
 	test("question runs count after a word or at the end, never between operands", () => {

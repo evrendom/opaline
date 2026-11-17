@@ -185,7 +185,7 @@ export const COMPASS_FLAGS: readonly {
 		kind: "user_frustrated",
 		label: "User frustrated",
 		description:
-			"The member's next prompt reads frustrated: the dashboard's negative words, or SubQ answering yes where the frustration check is on.",
+			"The member's next prompt reads frustrated: the dashboard's negative, correcting or swear words, or SubQ answering yes where the frustration check is on.",
 		value: {
 			label: "SubQ says yes at",
 			unit: "% or more",

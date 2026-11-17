@@ -30,7 +30,7 @@ import {
  * Re-ask is interim until OPL-381 settles it: a run whose final message said
  * the work was done (a literal word rule, `COMPLETION_WORDS`) and whose next
  * prompt in the same stream the language-signals word list marks negative
- * or swearing. The run index stores only what the messages say (index 4,
+ * (calm corrections included) or swearing. The run index stores only what the messages say (index 4,
  * `run-messages.ts`); the rules live here, so changing one rebuilds nothing.
  * Each reads the run index's message columns only from index 4 on (later
  * versions keep them): older builds read as unknown.
@@ -52,7 +52,7 @@ const COMPLETION_WORDS = [
 	"finished",
 	"resolved",
 ] as const;
-/** The word list's categories that make a prompt unhappy. */
+/** The word list's categories that make a prompt frustrated; negative includes calm corrections. */
 const UNHAPPY = ["negative", "swear"] as const;
 /** Run index version from which runs store their messages. */
 export const MESSAGES_SINCE = 4;
@@ -102,12 +102,12 @@ export const SQL_MEASURES: readonly SqlMeasure[] = [
 	{
 		name: "re_asks",
 		sql: "countIf(reasked)",
-		definition: `Runs the member had to ask again for (interim definition): ${SAID_DONE_RULE} (said_done), and the next prompt in the same stream is one the language-signals rules mark negative or swearing (frustrated). A run a queued prompt ended mid-work (ended_by_queued_prompt) is never re-asked: the person spoke while it worked. Per week: GROUP BY toMonday(started_at). NULL runs are unknown (built before run index ${MESSAGES_SINCE}, or the stored final message was cut before it said done): report countIf(reasked IS NULL). ${RATES}`,
+		definition: `Runs the member had to ask again for (interim definition): ${SAID_DONE_RULE} (said_done), and the next prompt in the same stream is one the language-signals rules mark frustrated: negative, a correction or swearing (frustrated). A run a queued prompt ended mid-work (ended_by_queued_prompt) is never re-asked: the person spoke while it worked. Per week: GROUP BY toMonday(started_at). NULL runs are unknown (built before run index ${MESSAGES_SINCE}, or the stored final message was cut before it said done): report countIf(reasked IS NULL). ${RATES}`,
 	},
 	{
 		name: "frustration",
 		sql: "countIf(frustrated)",
-		definition: `Runs whose next prompt in the same stream the language-signals rules mark negative or swearing: the member reacted unhappily to the run (complaints, swearing, still-broken and again reports, exasperation at the agent; quoted and code text in the prompt is not read, and swearing next to praise counts as praise). Words only, so sarcasm, calm corrections, polite complaints and other languages are missed. ${RATES}`,
+		definition: `Runs whose next prompt in the same stream the language-signals rules mark frustrated: negative, a correction or swearing. The member pushed back on the run: complaints, swearing, still-broken and again reports, exasperation at the agent, and corrections, calm ones too ("no, ...", "i meant ...", "ok but ...", "that's wrong"). A sentence that is only a short verdict counts by its meaning ("worse", "still", "and?" count; "ok", "good", "fine" never do). Quoted and code text in the prompt is not read, and swearing next to praise counts as praise. Words only, so sarcasm, corrections phrased as plain instructions, polite complaints and other languages are missed. ${RATES}`,
 	},
 	{
 		name: "group_run_time",
@@ -165,7 +165,7 @@ export const RUN_MEASURE_COLUMNS: readonly SqlViewColumn[] = [
 		name: "frustrated",
 		type: "Nullable(Bool)",
 		meaning:
-			"The next run's prompt in the same stream is one the language-signals rules mark negative or swearing (its prompt_reactions).",
+			"The next run's prompt in the same stream is one the language-signals rules mark frustrated: negative (calm corrections included) or swearing (its prompt_reactions).",
 		traps: [
 			`NULL (unknown) for runs built before run index ${MESSAGES_SINCE}. False for a stream's last run: a reaction in a new session is not linked.`,
 		],

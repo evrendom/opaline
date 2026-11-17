@@ -502,7 +502,7 @@ export function flagsOfRun(
 				count: context.frustration ?? 1,
 				detail: subq
 					? `SubQ: ${Math.round((context.frustration ?? 0) * 100)}% frustrated next prompt`
-					: "The next prompt reads negative",
+					: "The next prompt reads frustrated or corrects the agent",
 			});
 	}
 

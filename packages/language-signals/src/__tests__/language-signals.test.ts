@@ -49,7 +49,7 @@ describe("language signal rules", () => {
 	}
 
 	test("matches without regard to case", () => {
-		expect(scanLanguageSignals("FUCK Sorry EXCELLENT")).toEqual([
+		expect(scanLanguageSignals("FUCK. Sorry EXCELLENT")).toEqual([
 			{
 				category: "swear",
 				ruleId: "swear.fuck",
@@ -61,15 +61,15 @@ describe("language signal rules", () => {
 				category: "apology",
 				ruleId: "apology.sorry",
 				matchedText: "Sorry",
-				start: 5,
-				end: 10,
+				start: 6,
+				end: 11,
 			},
 			{
 				category: "positive",
 				ruleId: "positive.praise",
 				matchedText: "EXCELLENT",
-				start: 11,
-				end: 20,
+				start: 12,
+				end: 21,
 			},
 		]);
 	});
@@ -214,12 +214,16 @@ describe("language signal rules", () => {
 		}
 	});
 
-	test("leaves calm dislike and like out of the signals", () => {
+	test("counts dislike as a correction and leaves like out of the signals", () => {
 		expect(
 			scanLanguageSignals(
 				"I don't like it. I dont like it. I do not like it. Like this example.",
-			),
-		).toEqual([]);
+			).map(({ category, ruleId }) => `${category}:${ruleId}`),
+		).toEqual([
+			"negative:negative.correction-dislike",
+			"negative:negative.correction-dislike",
+			"negative:negative.correction-dislike",
+		]);
 	});
 
 	test("keeps negative punctuation independent of word boundaries", () => {
