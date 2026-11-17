@@ -322,13 +322,12 @@ test("a subagent row says so, has no error tag and stays unselected while its pa
 	expect(
 		parentRow.querySelector("[data-session-overview-subagent-count]")
 			?.textContent,
-	).toBe("3×");
+	).toBe("3");
+	expect(parentRow.querySelector("[title=Subagent]")).toBeNull();
+	expect(agentRow.querySelector("[title=Subagent]")).not.toBeNull();
 	expect(
-		parentRow.querySelector("[data-session-overview-subagent-tag]"),
-	).toBeNull();
-	expect(
-		agentRow.querySelector("[data-session-overview-subagent-tag]")?.textContent,
-	).toBe("Subagent");
+		agentRow.querySelector("[data-session-overview-model-label]")?.textContent,
+	).toContain("Subagent");
 	expect(
 		agentRow.querySelector("[data-session-overview-error-tag]"),
 	).toBeNull();

@@ -112,6 +112,7 @@ export const SessionSubagentOfSchema = z.object({
 	session_id: z.string(),
 	source: SourceSchema,
 	agent_id: z.string().nullable(),
+	order: z.number().int().nonnegative().optional(),
 });
 export type SessionSubagentOf = z.infer<typeof SessionSubagentOfSchema>;
 

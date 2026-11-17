@@ -19,6 +19,10 @@ const SUBAGENT_TINTS = [
 	"var(--color-teal-500)",
 ] as const;
 
+export function subagentTintAt(order: number): string {
+	return SUBAGENT_TINTS[order % SUBAGENT_TINTS.length] as string;
+}
+
 const SubagentTintsContext = createContext<ReadonlyMap<string, string> | null>(
 	null,
 );

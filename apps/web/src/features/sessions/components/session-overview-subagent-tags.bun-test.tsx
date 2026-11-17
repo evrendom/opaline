@@ -10,7 +10,7 @@ import {
 
 const session = SessionAnalyticsSchema.parse(seed.sessions[0]);
 
-test("a parent shows one bot tag with how many subagents it ran", () => {
+test("a parent shows a ghost tag with how many subagents it ran", () => {
 	const markup = renderToStaticMarkup(
 		<SessionOverviewSubagentCountTag
 			session={{ ...session, subagent_count: 12 }}
@@ -18,8 +18,9 @@ test("a parent shows one bot tag with how many subagents it ran", () => {
 	);
 	expect(markup).toContain('data-session-overview-subagent-count="12"');
 	expect(markup).toContain('title="12 subagents"');
-	expect(markup).toContain("12×");
-	expect(markup.match(/data-trace-glyph/gu)).toHaveLength(1);
+	expect(markup).toContain(">12</span>");
+	expect(markup).not.toContain("×");
+	expect(markup).not.toContain("12x");
 });
 
 test("counts native and linked subagents together", () => {

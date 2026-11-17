@@ -22,6 +22,7 @@ import { useUserMap } from "@/features/workspace/hooks/useUserMap";
 import { useScrollFade } from "@/hooks/use-scroll-fade";
 import { formatNumber, formatUsername } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { subagentTintAt } from "../reader/subagents/session-reader-subagent-tints";
 import { sessionRowKey } from "../session-row-key";
 import { buildSessionMemberProfileSummaries } from "./session-member-profile-summary";
 import { SessionsOverviewControls } from "./sessions-overview-controls";
@@ -174,6 +175,27 @@ export function SessionsOverviewTable({
 		isReady: onVisibleSessions !== undefined,
 		key: `${shownPage}:${pageSessions.length}:${loaded}`,
 	});
+	const subagentTints = useMemo(() => {
+		const byParent = new Map<string, SessionAnalytics[]>();
+		for (const session of tableState.sortedSessions) {
+			if (session.subagent_of?.kind !== "agent") continue;
+			const key = `${session.subagent_of.source}:${session.subagent_of.session_id}`;
+			byParent.set(key, [...(byParent.get(key) ?? []), session]);
+		}
+		const tints = new Map<string, string>();
+		for (const rows of byParent.values()) {
+			const launched = [...rows].sort((left, right) =>
+				left.session_date.localeCompare(right.session_date),
+			);
+			launched.forEach((session, index) => {
+				tints.set(
+					sessionRowKey(session),
+					subagentTintAt(session.subagent_of?.order ?? index),
+				);
+			});
+		}
+		return tints;
+	}, [tableState.sortedSessions]);
 	const renderedRows = pageSessions.map((session, index) => ({
 		session,
 		position: shownPage * pageSize + index,
@@ -260,7 +282,7 @@ export function SessionsOverviewTable({
 					// Focusable only for the demo, which focuses it on entry so the
 					// keyboard scrolls it; in the app a click must not focus it.
 					tabIndex={demo ? -1 : undefined}
-					className="scroll-fade isolate h-full min-h-0 min-w-0 touch-pan-x touch-pan-y overflow-auto overscroll-none [--scroll-fade-top-offset:--spacing(12)] [overflow-anchor:none] [scrollbar-gutter:stable]"
+					className="scroll-fade @container isolate h-full min-h-0 min-w-0 touch-pan-x touch-pan-y overflow-auto overscroll-none [--scroll-fade-top-offset:--spacing(12)] in-data-rail-beside:[--scroll-fade-top-offset:--spacing(15)] [overflow-anchor:none] [scrollbar-gutter:stable]"
 					data-slot="sessions-overview-scroll-container"
 					onFocusCapture={(event) => {
 						setFocusedKey(
@@ -312,9 +334,7 @@ export function SessionsOverviewTable({
 					<div
 						className={cn(
 							"@container/sessions-overview flex min-h-[calc(100%-3rem)] flex-col",
-							showSkillsColumn
-								? SESSION_OVERVIEW_MIN_WIDTH_CLASS_NAME
-								: "min-w-[812px]",
+							showSkillsColumn && SESSION_OVERVIEW_MIN_WIDTH_CLASS_NAME,
 						)}
 						data-slot="sessions-overview-canvas"
 					>
@@ -351,13 +371,19 @@ export function SessionsOverviewTable({
 								{() => (
 									<SessionsOverviewFluidList
 										fillHeight={!pagination?.hasNextPage}
-										highlightClassName={highlightClassName}
+										highlightClassName={cn(
+											"in-data-rail-beside:rounded-lg in-data-rail-beside:corner-squircle in-data-rail-beside:squircle:rounded-2xl",
+											highlightClassName,
+										)}
 									>
 										{({ registerItem, setActiveIndex }) => (
 											<>
 												{renderedRows.map(
 													({ session, position, start }, index) => (
 														<SessionsOverviewRow
+															subagentTint={subagentTints.get(
+																sessionRowKey(session),
+															)}
 															showPlace={showPlace}
 															showSkillsColumn={showSkillsColumn}
 															key={sessionRowKey(session)}

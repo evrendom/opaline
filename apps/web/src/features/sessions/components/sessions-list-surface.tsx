@@ -16,6 +16,8 @@ type SessionsListSurfaceProps = {
 	layout: "page" | "pane" | "workspace";
 	onSessionClick: (session: SessionAnalytics) => void;
 	scrollContainerRef?: Ref<HTMLDivElement>;
+	showPlace?: boolean;
+	showSkillsColumn?: boolean;
 };
 
 export function SessionsListSurface({
@@ -27,6 +29,8 @@ export function SessionsListSurface({
 	layout,
 	onSessionClick,
 	scrollContainerRef,
+	showPlace,
+	showSkillsColumn,
 }: SessionsListSurfaceProps) {
 	const {
 		endDate,
@@ -105,6 +109,8 @@ export function SessionsListSurface({
 							getSessionLinkState={getSessionLinkState}
 							isLoading={isSnapshotSessionsPending}
 							onSessionClick={onSessionClick}
+							showPlace={showPlace}
+							showSkillsColumn={showSkillsColumn}
 							sessionCountLabel={
 								search.active ? (sessions?.length ?? 0) : totalSessionCount
 							}

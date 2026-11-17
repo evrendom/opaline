@@ -31,7 +31,7 @@ export const SESSION_OVERVIEW_SURFACE_CLASS_NAME =
 export const SESSION_OVERVIEW_GRID_CLASS_NAME =
 	"grid-cols-[56px_clamp(460px,calc(460px_+_(100cqw_-_1112px)_*_0.55),960px)_minmax(284px,1fr)_240px_56px_minmax(0,16px)]";
 export const SESSION_OVERVIEW_GRID_WITHOUT_SKILLS_CLASS_NAME =
-	"grid-cols-[56px_minmax(460px,1fr)_240px_56px_minmax(0,16px)]";
+	"grid-cols-[56px_minmax(0,1fr)_auto_56px_minmax(0,16px)] [&>[data-session-overview-column=model]]:overflow-hidden";
 export const SESSION_OVERVIEW_MIN_WIDTH_CLASS_NAME = "min-w-[1096px]";
 export const SESSION_OVERVIEW_COLUMNS = [
 	{ align: "left", key: "cost", label: "API Cost" },

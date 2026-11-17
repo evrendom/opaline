@@ -30,6 +30,7 @@ import {
 } from "./session-detail-prefetch";
 import { markSessionOpen } from "./session-open-timing";
 import { transcriptSubagentId } from "./session-row-key";
+import { SessionsRail } from "./sessions-rail";
 
 const LazySessionReaderView = lazy(() =>
 	loadSessionReaderView().then((module) => ({
@@ -221,8 +222,10 @@ export function SessionsPage() {
 						onPointerEnter={preloadSessionDetail}
 						onFocusCapture={preloadSessionDetail}
 						className="flex min-h-0 min-w-0 flex-1"
+						data-rail-beside
 						data-slot="sessions-list-pane"
 					>
+						<SessionsRail />
 						<SessionsListSurface
 							activeSessionId={activeSessionId}
 							canOpenSession={(session) => canViewSession(session.user_id)}
@@ -232,6 +235,8 @@ export function SessionsPage() {
 							}
 							layout="workspace"
 							onSessionClick={handleSessionClick}
+							showPlace
+							showSkillsColumn={false}
 							scrollContainerRef={scrollContainerRef}
 						/>
 					</section>

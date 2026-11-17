@@ -20,10 +20,7 @@ import { SessionMemberProfilePreview } from "@/features/sessions/components/sess
 import type { SessionMemberProfileSummary } from "@/features/sessions/components/session-member-profile-summary";
 import { SessionModelMark } from "@/features/sessions/components/session-model-mark";
 import { resolveSessionErrorCount } from "@/features/sessions/components/session-overview-metrics";
-import {
-	SessionOverviewSubagentCountTag,
-	SessionOverviewSubagentTag,
-} from "@/features/sessions/components/session-overview-subagent-tags";
+import { SessionOverviewSubagentCountTag } from "@/features/sessions/components/session-overview-subagent-tags";
 import {
 	getSessionBranchLabel,
 	getSessionOverviewCost,
@@ -61,14 +58,18 @@ import {
 } from "./session-overview-live-row";
 import {
 	SESSION_OVERVIEW_CELL_CLASS_NAME,
+	SESSION_OVERVIEW_ICON_TAG_CLASS_NAME,
 	SESSION_OVERVIEW_METADATA_CLASS_NAME,
 	SESSION_OVERVIEW_MODEL_LABEL_CLASS_NAME,
 	SESSION_OVERVIEW_ROW_CLASS_NAME,
 	SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME,
 	SESSION_OVERVIEW_SWEAR_TAG_CLASS_NAME,
+	SESSION_OVERVIEW_TAG_ICON_CLASS_NAME,
+	SESSION_OVERVIEW_TAG_NUMBER_CLASS_NAME,
 	SessionOverviewLanguageSignals,
 } from "./session-overview-row-elements";
 import { SessionPlaceLabel } from "./session-place";
+import { SubagentPebble } from "./session-subagent-pebble";
 
 type SessionsOverviewRowProps = {
 	showPlace?: boolean;
@@ -98,6 +99,7 @@ type SessionsOverviewRowProps = {
 	expanded?: boolean;
 	/** Column widths in place of the overview's, for a narrower list. */
 	gridClassName?: string;
+	subagentTint?: string;
 };
 
 const MAX_SESSION_OVERVIEW_SKILL_TAGS = 7;
@@ -164,6 +166,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 	expanded,
 	gridClassName,
 	showPlace,
+	subagentTint,
 }: SessionsOverviewRowProps) {
 	const demo = useDemoRuntime();
 	const itemRef = useRef<HTMLLIElement>(null);
@@ -312,6 +315,25 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 			)}
 		</div>
 	);
+	const modelMark = (
+		<SessionModelMark
+			avatarUrl={avatarUrl}
+			loading={liveRow?.state === "running"}
+			showMember={false}
+			model={displayModel}
+			disclosure={expanded === undefined ? undefined : { open: expanded }}
+			progress={
+				sessionCost === null
+					? undefined
+					: {
+							label: `${formatApiCost(sessionCost)} API cost relative to the most expensive session`,
+							maximumValue: maximumSessionCost,
+							value: sessionCost,
+						}
+			}
+			userLabel={userLabel}
+		/>
+	);
 	const rowContents = (
 		<>
 			<div
@@ -354,23 +376,16 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 				className={cn(cellClassName, "gap-2 px-2")}
 				data-session-overview-column="model"
 			>
-				<SessionModelMark
-					avatarUrl={avatarUrl}
-					loading={liveRow?.state === "running"}
-					showMember={false}
-					model={displayModel}
-					disclosure={expanded === undefined ? undefined : { open: expanded }}
-					progress={
-						sessionCost === null
-							? undefined
-							: {
-									label: `${formatApiCost(sessionCost)} API cost relative to the most expensive session`,
-									maximumValue: maximumSessionCost,
-									value: sessionCost,
-								}
-					}
-					userLabel={userLabel}
-				/>
+				{session.subagent_of ? (
+					<span className="flex shrink-0 items-center">
+						{modelMark}
+						<span className="relative -ml-3.75" title="Subagent">
+							<SubagentPebble tint={subagentTint} />
+						</span>
+					</span>
+				) : (
+					modelMark
+				)}
 				<div
 					className="flex min-w-0 items-center gap-1.5"
 					data-session-overview-model-repository
@@ -381,12 +396,17 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 							"min-w-0 truncate",
 							failure || displayModel === "Claude (failed start)"
 								? "max-w-40"
-								: "max-w-28",
+								: session.subagent_of
+									? "max-w-44"
+									: "max-w-28",
 							SESSION_OVERVIEW_MODEL_LABEL_CLASS_NAME,
 						)}
 						title={failure ? `${displayModel} (Upload failed)` : displayModel}
 						data-session-overview-model-label
 					>
+						{session.subagent_of ? (
+							<span className="text-(--session-overview-muted)">Subagent </span>
+						) : null}
 						{formatModelDisplayLabel(displayModel)}
 						{failure ? (
 							<span title={failure.error} data-session-upload-failed>
@@ -407,9 +427,6 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 						</p>
 					) : null}
 				</div>
-				{session.subagent_of ? (
-					<SessionOverviewSubagentTag subagentOf={session.subagent_of} />
-				) : null}
 				<SessionOverviewSubagentCountTag session={session} />
 				<SessionOverviewLanguageSignals session={session} speaker="model" />
 				{!failure &&
@@ -418,6 +435,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 					<span
 						className={cn(
 							SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME,
+							SESSION_OVERVIEW_ICON_TAG_CLASS_NAME,
 							SESSION_OVERVIEW_SWEAR_TAG_CLASS_NAME,
 							"shrink-0",
 						)}
@@ -428,8 +446,13 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 								: `${formatNumber(errorCount)} detected tool/API ${errorCount === 1 ? "error" : "errors"}`
 						}
 					>
-						<IconAlertCircle aria-hidden="true" className="size-3 shrink-0" />
-						<span>{errorCount === null ? "—" : formatNumber(errorCount)}</span>
+						<IconAlertCircle
+							aria-hidden="true"
+							className={SESSION_OVERVIEW_TAG_ICON_CLASS_NAME}
+						/>
+						<span className={SESSION_OVERVIEW_TAG_NUMBER_CLASS_NAME}>
+							{errorCount === null ? "—" : formatNumber(errorCount)}
+						</span>
 					</span>
 				) : null}
 			</div>

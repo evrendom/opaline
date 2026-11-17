@@ -220,7 +220,7 @@ export function RepoDetailPage({
 		list.push({
 			id: "sessions",
 			node: (
-				<div className={TAB_PANE}>
+				<div className={TAB_PANE} data-rail-beside>
 					<div
 						className={cn(
 							SESSION_OVERVIEW_SURFACE_CLASS_NAME,

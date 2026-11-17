@@ -21,6 +21,14 @@ export const SESSION_OVERVIEW_METADATA_CLASS_NAME =
 export const SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME =
 	"flex min-w-0 shrink items-center gap-0.75 rounded-sm px-1.5 py-0.5 text-[0.625rem] font-normal tabular-nums";
 
+export const SESSION_OVERVIEW_ICON_TAG_CLASS_NAME = "h-[1.1875rem] pl-1";
+
+export const SESSION_OVERVIEW_TAG_ICON_CLASS_NAME =
+	"size-3 shrink-0 [@media(min-resolution:2dppx)]:translate-y-[0.25px]";
+
+export const SESSION_OVERVIEW_TAG_NUMBER_CLASS_NAME =
+	"[text-box:trim-both_cap_alphabetic]";
+
 export const SESSION_OVERVIEW_SWEAR_TAG_CLASS_NAME =
 	"bg-[#ffe4e6] text-[#be123c] dark:bg-[#4c1d25] dark:text-[#fb7185]";
 

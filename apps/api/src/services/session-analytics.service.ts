@@ -90,6 +90,7 @@ export interface SessionAnalyticsRaw {
 	subagent_parent_session_id?: string;
 	subagent_parent_source?: Source;
 	subagent_agent_id?: string;
+	subagent_order?: number | null;
 
 	// Persisted language-signal counts
 	member_swears: number;
@@ -159,6 +160,9 @@ export function mapSessionAnalyticsRow(
 					session_id: row.subagent_parent_session_id,
 					source: row.subagent_parent_source ?? row.source,
 					agent_id: row.subagent_agent_id || null,
+					...(row.subagent_order === null || row.subagent_order === undefined
+						? {}
+						: { order: row.subagent_order }),
 				}
 			: undefined;
 
@@ -408,7 +412,8 @@ async function getSessionAnalyticsBaseRows(
 				if(lp.parent_session_id != '', 'linked', '') AS subagent_kind,
 				lp.parent_session_id AS subagent_parent_session_id,
 				toString(lp.parent_source) AS subagent_parent_source,
-				'' AS subagent_agent_id
+				'' AS subagent_agent_id,
+				CAST(NULL, 'Nullable(UInt64)') AS subagent_order
 			FROM session_list_costs AS sa
 			LEFT JOIN session_list_linked_parents AS lp
 				ON lp.organization_id = sa.organization_id
@@ -425,7 +430,8 @@ async function getSessionAnalyticsBaseRows(
 				'child' AS subagent_kind,
 				sa.native_parent_session_id AS subagent_parent_session_id,
 				'codex' AS subagent_parent_source,
-				'' AS subagent_agent_id
+				'' AS subagent_agent_id,
+				CAST(NULL, 'Nullable(UInt64)') AS subagent_order
 			FROM ${usage.sessionsRelation} AS sa
 			WHERE sa.is_top_level_session = 0
 
@@ -464,7 +470,8 @@ async function getSessionAnalyticsBaseRows(
 				'agent' AS subagent_kind,
 				p.session_id AS subagent_parent_session_id,
 				toString(p.source) AS subagent_parent_source,
-				a.agent_id AS subagent_agent_id
+				a.agent_id AS subagent_agent_id,
+				toNullable(toUInt64(row_number() OVER (PARTITION BY a.organization_id, a.user_id, a.source, a.session_id ORDER BY a.first_request_at, a.agent_id) - 1)) AS subagent_order
 			FROM subagent_usage_rows AS a
 			INNER JOIN ${usage.metadataRelation} AS p
 				ON p.organization_id = a.organization_id
@@ -508,7 +515,8 @@ async function getSessionAnalyticsBaseRows(
       subagent_kind,
       subagent_parent_session_id,
       subagent_parent_source,
-      subagent_agent_id
+      subagent_agent_id,
+      subagent_order
 	    FROM session_list_rows AS sa
     WHERE ${dateFilter}
       AND sa.organization_id = {orgId:String}
