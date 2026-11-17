@@ -89,6 +89,7 @@ test("a full queue is waited out, then the import's outcome is the session's", a
 		reason:
 			"The transcript on disk is shorter than the copy Opaline stored; the longer copy is kept.",
 		files,
+		project: { projectPath: "/repo", gitRemote: null, gitBranch: null },
 	});
 	expect(runner.sleeps).toEqual([250, 250]);
 });
@@ -99,6 +100,7 @@ test("stored, skipped and failed imports become ingested, skipped and retry", as
 		sessionId: "session-1",
 		bytes: 2,
 		files,
+		project: { projectPath: "/repo", gitRemote: null, gitBranch: null },
 	});
 	expect(
 		await run([{ kind: "stored", usage: "incomplete" }]).outcome(),

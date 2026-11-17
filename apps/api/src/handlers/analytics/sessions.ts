@@ -1,5 +1,7 @@
 import { ORPCError } from "@orpc/server";
+import type { LiveSessionSummary } from "@rudel/api-routes";
 import { sqlClient } from "../../db.js";
+import { isSelfHosted } from "../../lib/self-hosted.js";
 import { orgMiddleware, os } from "../../middleware.js";
 import { selfHostedRead } from "../../selfhost/read-cache.js";
 import { isLiveSessionsReadable } from "../../services/live-session/live-session-config.js";
@@ -83,19 +85,35 @@ const uploadFailures = os.analytics.sessions.uploadFailures
 		),
 	);
 
+async function localLiveSessions(
+	ownerId: string | null,
+): Promise<LiveSessionSummary[] | null> {
+	if (!isSelfHosted()) return null;
+	const { getLocalIngest } = await import(
+		"../../selfhost/local-ingest/index.js"
+	);
+	const ingest = getLocalIngest();
+	if (!ingest) return null;
+	return (await ingest.liveSessions())
+		.filter((live) => ownerId === null || live.userId === ownerId)
+		.map((live) => ({ ...live, endedAt: null }));
+}
+
 const liveList = os.analytics.sessions.liveList
 	.use(orgMiddleware)
-	.handler(async ({ context }) => ({
-		sessions: !isLiveSessionsReadable(context.organizationId)
-			? []
-			: await listLiveSessions(
-					{
-						organizationId: context.organizationId,
-						ownerId: readableSessionOwner(context.sessionReader),
-					},
+	.handler(async ({ context }) => {
+		if (!isLiveSessionsReadable(context.organizationId))
+			return { sessions: [] };
+		const ownerId = readableSessionOwner(context.sessionReader);
+		return {
+			sessions:
+				(await localLiveSessions(ownerId)) ??
+				(await listLiveSessions(
+					{ organizationId: context.organizationId, ownerId },
 					{ database: sqlClient, now: () => new Date() },
-				),
-	}));
+				)),
+		};
+	});
 
 /**
  * Who owns the session the detail is read for: its upload's owner, or
@@ -124,6 +142,18 @@ async function getSessionDetailOwner(
 const liveTail = os.analytics.sessions.liveTail
 	.use(orgMiddleware)
 	.handler(async ({ input, context, signal }) => {
+		const local = isLiveSessionsReadable(context.organizationId)
+			? await localLiveSessions(readableSessionOwner(context.sessionReader))
+			: null;
+		if (local) {
+			const running =
+				local.find(
+					(live) =>
+						live.sessionId === input.sessionId &&
+						(!input.source || live.source === input.source),
+				) ?? null;
+			return { session: running, streams: [], uploaded: running !== null };
+		}
 		const session = isLiveSessionsReadable(context.organizationId)
 			? await readLiveSession(
 					{

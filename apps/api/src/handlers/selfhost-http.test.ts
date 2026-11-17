@@ -643,6 +643,7 @@ describe("local ingest endpoints", () => {
 		const notified: [readonly string[], boolean, boolean | undefined][] = [];
 		registerLocalIngest({
 			status: () => status,
+			liveSessions: async () => [],
 			notify: async (paths, final, stopped) => {
 				notified.push([paths, final, stopped]);
 				return paths.length;

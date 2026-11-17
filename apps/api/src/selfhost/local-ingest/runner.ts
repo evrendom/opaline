@@ -117,6 +117,11 @@ export function createSessionRunner(
 					deps.importSession(request),
 				);
 			}
+			const project = {
+				projectPath: input.projectPath ?? "",
+				gitRemote: input.gitRemote ?? null,
+				gitBranch: input.gitBranch ?? null,
+			};
 			if (imported.kind === "kept")
 				return {
 					kind: "kept",
@@ -124,6 +129,7 @@ export function createSessionRunner(
 					bytes: 0,
 					reason: KEPT_REASON,
 					files,
+					project,
 				};
 			if (imported.kind === "skipped" || imported.kind === "retry")
 				return { kind: imported.kind, reason: imported.message, files };
@@ -181,6 +187,7 @@ export function createSessionRunner(
 				sessionId: input.sessionId,
 				bytes: prepared.bytes,
 				files,
+				project,
 				...(imported.usage === "incomplete"
 					? { reason: USAGE_INCOMPLETE_REASON }
 					: {}),

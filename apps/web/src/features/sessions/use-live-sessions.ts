@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
+import { useLocalDesktopApp } from "@/features/desktop/local-app";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
 import { client, orpc } from "@/lib/orpc";
 import { sessionDetailInitialQueryOptions } from "./components/session-detail-fast-query";
@@ -35,6 +36,7 @@ export function useLiveSessionList({
 } = {}) {
 	const available = useLiveSessionsAvailable();
 	const pushed = useSessionArrivalsLive();
+	const localApp = useLocalDesktopApp();
 	const { state: organization } = useOrganization();
 	const organizationId = organization.activeOrg?.id;
 	const options = orpc.analytics.sessions.liveList.queryOptions();
@@ -46,7 +48,7 @@ export function useLiveSessionList({
 			liveSessionListPollInterval(
 				poll,
 				current.state.data?.sessions.length ?? 0,
-				pushed,
+				pushed && !localApp,
 			),
 		retry: false,
 	});

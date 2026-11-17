@@ -20,19 +20,11 @@ const MODEL_ICON_SHELL_CLASS_NAME =
 const MODEL_ICON_CLASS_NAME =
 	"session-turn-table-model-icon size-5 rounded-none border-0 bg-white shadow-none dark:bg-[color-mix(in_oklab,#fff_14%,var(--background))] [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]";
 
-export function SessionModelLoadingMark({
-	className,
-}: {
-	className?: string;
-} = {}) {
+export function SessionModelLoadingMark() {
 	return (
 		<span
 			aria-hidden="true"
-			className={cn(
-				MODEL_MARK_CLASS_NAME,
-				"text-[#111] dark:text-white",
-				className,
-			)}
+			className={cn(MODEL_MARK_CLASS_NAME, "text-[#111] dark:text-white")}
 		>
 			<span
 				className={cn(

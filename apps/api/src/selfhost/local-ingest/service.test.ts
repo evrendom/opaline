@@ -224,9 +224,13 @@ test("counts sessions written in the last five minutes as running until their tu
 	await service.start();
 	await settle(service);
 	expect(service.status().agentsRunning).toBe(1);
+	expect(await service.liveSessions()).toMatchObject([
+		{ sessionId: working, userId: owner.userId, source: "claude_code" },
+	]);
 
 	await service.notify([working], false, true);
 	expect(service.status().agentsRunning).toBe(0);
+	expect(await service.liveSessions()).toEqual([]);
 
 	const stoppedAt = clock;
 	const summary = new Date(stoppedAt + 2_000);

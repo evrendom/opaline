@@ -8,6 +8,7 @@ import {
 	type IngestStatus,
 	LocalIngest,
 	type LocalIngestSettings,
+	type LocalLiveSession,
 	type Owner,
 	type SessionJob,
 	type SessionOutcome,
@@ -18,6 +19,7 @@ type Environment = Readonly<Record<string, string | undefined>>;
 
 export interface LocalIngestHandle {
 	status(): IngestStatus;
+	liveSessions(): Promise<LocalLiveSession[]>;
 	notify(
 		paths: readonly string[],
 		final: boolean,
@@ -144,6 +146,7 @@ export async function startLocalIngest(options: {
 		);
 	const handle: LocalIngestHandle = {
 		status: () => service.status(),
+		liveSessions: () => service.liveSessions(),
 		notify: (paths, final, stopped) => service.notify(paths, final, stopped),
 		wake: () => service.wake(),
 		stop: async () => {

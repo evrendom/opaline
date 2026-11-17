@@ -1,5 +1,5 @@
 import { type FSWatcher, watch } from "node:fs";
-import { readdir } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { LIVE_SESSION_ACTIVE_WINDOW_MS } from "@rudel/api-routes";
 import type {
@@ -41,12 +41,27 @@ export interface SessionJob {
 	readonly bytes?: number;
 }
 
+export interface SessionProject {
+	readonly projectPath: string;
+	readonly gitRemote: string | null;
+	readonly gitBranch: string | null;
+}
+
+export interface LocalLiveSession extends SessionProject {
+	readonly sessionId: string;
+	readonly userId: string;
+	readonly source: TranscriptSource;
+	readonly startedAt: string;
+	readonly lastActivityAt: string;
+}
+
 export type SessionOutcome = (
 	| {
 			readonly kind: "ingested" | "kept";
 			readonly sessionId: string;
 			readonly bytes: number;
 			readonly reason?: string;
+			readonly project?: SessionProject;
 	  }
 	| { readonly kind: "skipped"; readonly reason: string }
 	| { readonly kind: "retry"; readonly reason: string }
@@ -143,6 +158,8 @@ interface SessionEntry {
 	again: boolean;
 	attempts: number;
 	lastIngestAt: number | null;
+	sessionId: string | null;
+	project: SessionProject | null;
 }
 
 const SAFE_DIRECTORY = /^[A-Za-z0-9_-]{1,200}$/u;
@@ -406,6 +423,32 @@ export class LocalIngest {
 	}
 
 	private agentsRunning(): number {
+		return this.runningSessions().length;
+	}
+
+	async liveSessions(): Promise<LocalLiveSession[]> {
+		const owner = this.owner;
+		if (!owner) return [];
+		const live: LocalLiveSession[] = [];
+		for (const [sessionPath, writtenAt] of this.runningSessions()) {
+			const entry = this.sessions.get(sessionPath);
+			if (!entry?.sessionId) continue;
+			const born = await stat(sessionPath).catch(() => null);
+			live.push({
+				sessionId: entry.sessionId,
+				userId: owner.userId,
+				source: entry.source,
+				projectPath: entry.project?.projectPath ?? "",
+				gitRemote: entry.project?.gitRemote ?? null,
+				gitBranch: entry.project?.gitBranch ?? null,
+				startedAt: new Date(born?.birthtimeMs ?? writtenAt).toISOString(),
+				lastActivityAt: new Date(writtenAt).toISOString(),
+			});
+		}
+		return live;
+	}
+
+	private runningSessions(): [string, number][] {
 		const now = this.now();
 		const lastWrite = new Map<string, number>();
 		for (const seen of this.files.values()) {
@@ -416,13 +459,13 @@ export class LocalIngest {
 				Math.max(lastWrite.get(sessionPath) ?? 0, seen.stat.mtimeMs),
 			);
 		}
-		let running = 0;
+		const running: [string, number][] = [];
 		for (const [sessionPath, writtenAt] of lastWrite) {
 			if (!this.files.has(sessionPath)) continue;
 			const stoppedAt = this.stoppedAt.get(sessionPath);
 			if (stoppedAt !== undefined && writtenAt <= stoppedAt + STOP_GRACE_MS)
 				continue;
-			running += 1;
+			running.push([sessionPath, writtenAt]);
 		}
 		return running;
 	}
@@ -464,6 +507,7 @@ export class LocalIngest {
 		});
 		if (row.role !== "session") return;
 		const entry = this.entry(row.sessionPath, row.source);
+		if (row.sessionId) entry.sessionId = row.sessionId;
 		const retry = row.state === "skipped";
 		entry.state = retry ? "pending" : row.state;
 		entry.reason = row.reason;
@@ -506,6 +550,8 @@ export class LocalIngest {
 				again: false,
 				attempts: 0,
 				lastIngestAt: null,
+				sessionId: null,
+				project: null,
 			};
 			this.sessions.set(sessionPath, entry);
 		}
@@ -768,6 +814,8 @@ export class LocalIngest {
 			entry.reason = outcome.reason ?? null;
 			entry.attempts = 0;
 			entry.lastIngestAt = at;
+			entry.sessionId = outcome.sessionId;
+			entry.project = outcome.project ?? entry.project;
 			this.lastIngestAt = at;
 			this.importBytesDone += outcome.bytes;
 			await this.deps.store.recordIngested({

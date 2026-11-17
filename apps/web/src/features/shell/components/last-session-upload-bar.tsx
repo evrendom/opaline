@@ -18,7 +18,6 @@ import {
 	useAgentsRunning,
 	useInitialImport,
 } from "@/features/self-hosted/local-processing";
-import { SessionModelLoadingMark } from "@/features/sessions/components/session-model-mark";
 import {
 	pollUnlessPushed,
 	useSessionArrivalsLive,
@@ -97,41 +96,30 @@ const handover = {
 	}),
 };
 
-const MotionLink = motion.create(Link);
-
-function FooterLink({
+function FooterLabel({
 	direction,
-	to,
-	title,
-	icon,
 	children,
 }: {
 	direction: number;
-	to: string;
-	title: string;
-	icon: ReactNode;
 	children: ReactNode;
 }) {
 	const reduceMotion = useReducedMotion();
 	return (
-		<MotionLink
+		<motion.span
 			custom={direction}
-			to={to}
-			title={title}
 			variants={handover}
 			initial="enter"
 			animate="shown"
 			exit="leave"
 			transition={reduceMotion ? { duration: 0 } : HANDOVER}
-			className="group/last-upload flex items-center gap-1.25 whitespace-nowrap rounded-sm outline-none transition-colors [grid-area:1/1] hover:text-foreground"
+			className="flex items-center gap-1.25 whitespace-nowrap [grid-area:1/1]"
 		>
-			{icon}
 			{children}
 			<IconArrowUpRight
 				aria-hidden="true"
 				className="-ml-0.5 size-3.25 text-muted-foreground transition-colors group-hover/last-upload:text-foreground"
 			/>
-		</MotionLink>
+		</motion.span>
 	);
 }
 
@@ -153,6 +141,8 @@ export function LastSessionUploadBar() {
 	const agentsRunning = useAgentsRunning();
 	const latest = query.data;
 	const uploadedAt = latest ? getSessionEnd(latest) : null;
+	const shownAt =
+		uploadedAt && !Number.isNaN(uploadedAt.getTime()) ? uploadedAt : null;
 	const running = localApp && agentsRunning > 0;
 	const direction = running ? 1 : -1;
 
@@ -166,64 +156,60 @@ export function LastSessionUploadBar() {
 					/>
 					{initialImportLabel(initialImport)}
 				</output>
-			) : (
-				<div className="grid items-center">
-					<AnimatePresence initial={false} custom={direction}>
-						{running ? (
-							<FooterLink
-								key="running"
-								direction={direction}
-								to={getShellRoutePath(appRoutes.session())}
-								title="Open your sessions"
-								icon={<SessionModelLoadingMark className="size-3.5" />}
-							>
-								<span className="text-foreground">
-									<RollingText text={String(agentsRunning)} />
-								</span>
-								{agentsRunning === 1 ? "agent running" : "agents running"}
-							</FooterLink>
-						) : latest && uploadedAt && !Number.isNaN(uploadedAt.getTime()) ? (
-							<FooterLink
-								key="last"
-								direction={direction}
-								to={getShellRoutePath(
-									appRoutes.sessionDetail(latest.session_id),
-								)}
-								title={`Open the session ${localApp ? "that ended" : "uploaded"} ${fixedFormat ? formatUtcTime(uploadedAt) : uploadedAt.toLocaleString()}`}
-								icon={
-									localApp ? (
-										<IconRun
-											aria-hidden="true"
-											className="size-3.25 opacity-80"
-										/>
-									) : (
-										<IconCloudUpload
-											aria-hidden="true"
-											className="size-3.25 opacity-80"
-										/>
-									)
-								}
-							>
-								{localApp ? "Last agent run" : "Last session uploaded"}
-								<span className="text-foreground">
-									{fixedFormat
-										? formatUtcTime(uploadedAt)
-										: uploadedAt.toLocaleString(undefined, {
-												month: "short",
-												day: "numeric",
-												year:
-													uploadedAt.getFullYear() !== new Date().getFullYear()
-														? "numeric"
-														: undefined,
-												hour: "numeric",
-												minute: "2-digit",
-											})}
-								</span>
-							</FooterLink>
-						) : null}
-					</AnimatePresence>
-				</div>
-			)}
+			) : running || shownAt ? (
+				<Link
+					to={
+						running || !latest
+							? getShellRoutePath(appRoutes.session())
+							: getShellRoutePath(appRoutes.sessionDetail(latest.session_id))
+					}
+					title={
+						running || !shownAt
+							? "Open your sessions"
+							: `Open the session ${localApp ? "that ended" : "uploaded"} ${fixedFormat ? formatUtcTime(shownAt) : shownAt.toLocaleString()}`
+					}
+					className="group/last-upload flex items-center gap-1.25 rounded-sm outline-none transition-colors hover:text-foreground"
+				>
+					{localApp ? (
+						<IconRun aria-hidden="true" className="size-3.25 opacity-80" />
+					) : (
+						<IconCloudUpload
+							aria-hidden="true"
+							className="size-3.25 opacity-80"
+						/>
+					)}
+					<span className="grid items-center">
+						<AnimatePresence initial={false} custom={direction}>
+							{running ? (
+								<FooterLabel key="running" direction={direction}>
+									<span className="text-foreground">
+										<RollingText text={String(agentsRunning)} />
+									</span>
+									{agentsRunning === 1 ? "agent running" : "agents running"}
+								</FooterLabel>
+							) : shownAt ? (
+								<FooterLabel key="last" direction={direction}>
+									{localApp ? "Last agent run" : "Last session uploaded"}
+									<span className="text-foreground">
+										{fixedFormat
+											? formatUtcTime(shownAt)
+											: shownAt.toLocaleString(undefined, {
+													month: "short",
+													day: "numeric",
+													year:
+														shownAt.getFullYear() !== new Date().getFullYear()
+															? "numeric"
+															: undefined,
+													hour: "numeric",
+													minute: "2-digit",
+												})}
+									</span>
+								</FooterLabel>
+							) : null}
+						</AnimatePresence>
+					</span>
+				</Link>
+			) : null}
 			{demo === null ? <DockedSupportEmailButton className="ml-auto" /> : null}
 		</div>
 	);
