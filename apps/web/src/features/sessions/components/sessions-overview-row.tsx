@@ -2,7 +2,7 @@ import type {
 	SessionAnalytics,
 	SessionRunQuestionTag,
 } from "@rudel/api-routes";
-import { IconAlertCircle } from "@tabler/icons-react";
+import { IconAlertCircle, IconBattery2 } from "@tabler/icons-react";
 import { memo, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -88,6 +88,8 @@ type SessionsOverviewRowProps = {
 	/** The time a live row reads its activity against; set only on live rows. */
 	liveNowMs?: number;
 	maximumSessionCost: number;
+	/** Share of the plan limit the session used, in percent; desktop only. */
+	planUsage?: number;
 	memberProfile: SessionMemberProfileSummary | undefined;
 	onSessionClick: ((session: SessionAnalytics) => void) | undefined;
 	session: SessionAnalytics;
@@ -158,6 +160,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 	getSessionLinkState,
 	liveNowMs,
 	maximumSessionCost,
+	planUsage,
 	memberProfile,
 	onSessionClick,
 	session,
@@ -357,6 +360,16 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 							{sessionCost === null ? (
 								<span className="sr-only">API cost unavailable</span>
 							) : null}
+							{planUsage === undefined ? null : (
+								<span
+									className="ml-1 inline-flex items-center gap-0.5 tabular-nums"
+									data-session-overview-metric-value="plan-usage"
+								>
+									<IconBattery2 aria-hidden="true" className="size-3.5" />
+									{formatPlanShare(planUsage)}
+									<span className="sr-only"> of the plan limit</span>
+								</span>
+							)}
 						</span>
 					</TooltipTrigger>
 					<TooltipContent
@@ -368,6 +381,9 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 						sideOffset={8}
 					>
 						{costEstimateLabel ? <p>{costEstimateLabel}</p> : null}
+						{planUsage === undefined ? null : (
+							<p>{formatPlanShare(planUsage)} of the plan limit</p>
+						)}
 						{tokenTooltipLabel}
 					</TooltipContent>
 				</Tooltip>
@@ -587,3 +603,8 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 		</li>
 	);
 });
+
+function formatPlanShare(points: number): string {
+	if (points < 1) return "<1%";
+	return `${Math.round(points)}%`;
+}

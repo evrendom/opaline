@@ -4,6 +4,7 @@ import type {
 	SessionListFilters,
 } from "@rudel/api-routes";
 import {
+	type CSSProperties,
 	type ReactNode,
 	type Ref,
 	useCallback,
@@ -14,6 +15,7 @@ import {
 import { useEffectOnceWhen } from "@/app/hooks/useEffectOnceWhen";
 import { useLatestValueRef } from "@/app/hooks/useLatestValueRef";
 import { Reveal } from "@/app/ui/bones";
+import { useSessionUsageShares } from "@/features/costs/plan-usage/use-session-usage-shares";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { useLiveClock } from "@/features/sessions/use-live-sessions";
 import { useLoadSessionPages } from "@/features/sessions/use-load-session-pages";
@@ -23,7 +25,7 @@ import { useScrollFade } from "@/hooks/use-scroll-fade";
 import { formatNumber, formatUsername } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { subagentTintAt } from "../reader/subagents/session-reader-subagent-tints";
-import { sessionRowKey } from "../session-row-key";
+import { sessionRowKey, transcriptSubagentId } from "../session-row-key";
 import { buildSessionMemberProfileSummaries } from "./session-member-profile-summary";
 import { SessionsOverviewControls } from "./sessions-overview-controls";
 import { SessionsOverviewFluidList } from "./sessions-overview-fluid-list";
@@ -145,6 +147,7 @@ export function SessionsOverviewTable({
 		[sessions, showSkillsColumn],
 	);
 	const questionTags = useSessionRunQuestionTags(taggedSessionIds);
+	const usageShares = useSessionUsageShares();
 	// Live rows read "12s ago"; only they follow the clock.
 	const hasLiveRows = tableState.sortedSessions.some(
 		(session) => session.live_session !== undefined,
@@ -268,7 +271,14 @@ export function SessionsOverviewTable({
 		[fadeRef, handleContainedWheel, scrollContainerRef],
 	);
 	return (
-		<div className={SESSION_OVERVIEW_SURFACE_CLASS_NAME}>
+		<div
+			className={SESSION_OVERVIEW_SURFACE_CLASS_NAME}
+			style={
+				usageShares
+					? ({ "--session-cost-column": "104px" } as CSSProperties)
+					: undefined
+			}
+		>
 			{sessionDetailDisabledNote ? (
 				<p className="border-t border-(--session-overview-border) px-3 py-2 text-base font-medium text-(--session-overview-muted) sm:text-sm">
 					{sessionDetailDisabledNote}
@@ -406,6 +416,11 @@ export function SessionsOverviewTable({
 																session.live_session ? nowMs : undefined
 															}
 															maximumSessionCost={tableState.maximumSessionCost}
+															planUsage={
+																transcriptSubagentId(session)
+																	? undefined
+																	: usageShares?.get(session.session_id)
+															}
 															memberProfile={memberProfileSummaries.get(
 																session.user_id,
 															)}

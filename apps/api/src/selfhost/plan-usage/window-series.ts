@@ -59,6 +59,7 @@ export interface WindowSeries {
 	readonly resets: readonly string[];
 	readonly buckets: readonly SeriesBucket[];
 	readonly sessions: readonly SessionShare[];
+	readonly sessionPoints: Readonly<Record<string, number>>;
 	readonly models: readonly GroupShare[];
 	readonly repositories: readonly GroupShare[];
 	readonly otherPoints: number;
@@ -468,6 +469,11 @@ export function buildWindowSeries(input: {
 			.map((time) => new Date(time).toISOString()),
 		buckets,
 		sessions: sessions.slice(0, TOP_SESSIONS),
+		sessionPoints: Object.fromEntries(
+			sessions
+				.filter((entry) => entry.points >= 0.005)
+				.map((entry) => [entry.sessionId, entry.points]),
+		),
 		models: ranked(byModel).slice(0, TOP_SESSIONS),
 		repositories: ranked(byRepository).slice(0, TOP_SESSIONS),
 		otherPoints: round(otherPoints),

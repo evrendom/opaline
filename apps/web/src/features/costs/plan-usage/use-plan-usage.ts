@@ -40,6 +40,7 @@ export interface UsageWindow {
 		cost: number;
 		estimated: boolean;
 	}[];
+	readonly sessionPoints?: Readonly<Record<string, number>>;
 	readonly models: readonly GroupShare[];
 	readonly repositories: readonly GroupShare[];
 	readonly otherPoints: number;
@@ -108,4 +109,17 @@ export function planLabel(plan: string | null): string | null {
 		.filter(Boolean)
 		.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
 		.join(" ");
+}
+
+export function sessionUsageShares(
+	report: PlanUsageReport | null | undefined,
+): ReadonlyMap<string, number> | null {
+	if (!report) return null;
+	const shares = new Map<string, number>();
+	for (const usage of report.providers)
+		for (const [sessionId, points] of Object.entries(
+			usage.window?.sessionPoints ?? {},
+		))
+			shares.set(sessionId, (shares.get(sessionId) ?? 0) + points);
+	return shares;
 }

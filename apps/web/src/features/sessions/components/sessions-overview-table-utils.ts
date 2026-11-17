@@ -29,9 +29,9 @@ export const SESSION_OVERVIEW_SURFACE_CLASS_NAME =
 // Split the former 112px metadata track into cost at the start and date at the end.
 // The empty trailing track provides breathing room without raising the table minimum width.
 export const SESSION_OVERVIEW_GRID_CLASS_NAME =
-	"grid-cols-[56px_clamp(460px,calc(460px_+_(100cqw_-_1112px)_*_0.55),960px)_minmax(284px,1fr)_240px_56px_minmax(0,16px)]";
+	"grid-cols-[var(--session-cost-column,56px)_clamp(460px,calc(460px_+_(100cqw_-_1112px)_*_0.55),960px)_minmax(284px,1fr)_240px_56px_minmax(0,16px)]";
 export const SESSION_OVERVIEW_GRID_WITHOUT_SKILLS_CLASS_NAME =
-	"grid-cols-[56px_minmax(0,1fr)_auto_56px_minmax(0,16px)] [&>[data-session-overview-column=model]]:overflow-hidden";
+	"grid-cols-[var(--session-cost-column,56px)_minmax(0,1fr)_auto_56px_minmax(0,16px)] [&>[data-session-overview-column=model]]:overflow-hidden";
 export const SESSION_OVERVIEW_MIN_WIDTH_CLASS_NAME = "min-w-[1096px]";
 export const SESSION_OVERVIEW_COLUMNS = [
 	{ align: "left", key: "cost", label: "API Cost" },
