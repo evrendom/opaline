@@ -177,7 +177,6 @@ export function SessionReaderSummary({
 		? "It ended before its first model call, so no model received any."
 		: undefined;
 	const setup = runSetup ? groupSetupFiles(runSetup) : undefined;
-	const partial = !run && turns.length < totalTurns;
 	const railTags = useFilesRailTags();
 	const scroll = useScrollFade<HTMLDivElement>();
 	const subagentCount = overview.subagents?.length ?? 0;
@@ -317,13 +316,6 @@ export function SessionReaderSummary({
 								/>
 							</SummarySection>
 						</div>
-
-						{partial ? (
-							<p className="-mt-1 text-xs text-muted-foreground tabular-nums">
-								Counted over the first {turns.length} of {totalTurns} turns
-								while the rest load.
-							</p>
-						) : null}
 
 						<div className="grid gap-4 lg:grid-cols-2">
 							<SummarySection
