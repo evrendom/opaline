@@ -489,7 +489,7 @@
 	font-weight: 500;
 	text-wrap: balance;
 }
-.cost-chart-canvas[data-sample] > *,
+.cost-chart-canvas[data-sample] > :not(.cost-chart-empty),
 .plan-usage-frame[data-sample] > :not(.cost-chart-empty) {
 	filter: blur(3px);
 	opacity: 0.5;
