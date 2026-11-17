@@ -1,6 +1,5 @@
 import type { SessionListFilters } from "@rudel/api-routes";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDateRange } from "@/features/analytics/date-range/useDateRange";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
@@ -31,23 +30,47 @@ import {
 	pollUnlessPushed,
 	useSessionArrivalsLive,
 } from "./session-arrivals-live";
-import { sessionRowKey } from "./session-row-key";
+import {
+	type DayRange,
+	isOnUtcDays,
+	sessionsOnUtcDays,
+} from "./session-day-slice";
+import { sessionRowKey, transcriptSubagentId } from "./session-row-key";
 import { mergeSessionUploadFailures } from "./session-upload-failure";
 import { useLiveSessionList } from "./use-live-sessions";
 
 const FAILURES_PUSHED_POLL_MS = 5 * 60_000;
+const SLICE_MAX_DAYS = 45;
+const SLICE_ROW_LIMIT = 1000;
+const FOCUS_SETTLE_MS = 120;
+
+function useSettledFocus(focus: DayRange | null, delayMs: number) {
+	const key = focus ? `${focus.start}..${focus.end}` : "";
+	const [settled, setSettled] = useState<{
+		key: string;
+		focus: DayRange | null;
+	}>({ key, focus });
+	useEffect(() => {
+		if (delayMs === 0 || settled.key === key) return;
+		const timer = window.setTimeout(() => setSettled({ key, focus }), delayMs);
+		return () => window.clearTimeout(timer);
+	}, [delayMs, key, focus, settled.key]);
+	return delayMs === 0 ? focus : settled.focus;
+}
 
 export function useSessionsPageData({
 	detail = false,
 	detailReady = false,
-	range = null,
+	focus = null,
 	trackPageView,
 	paginated = true,
 }: {
 	detail?: boolean;
 	detailReady?: boolean;
+	/** Days to list within the range: the desktop app slices them from the
+	 * whole range it already holds; otherwise they are asked for. */
+	focus?: DayRange | null;
 	paginated?: boolean;
-	range?: { start: string; end: string } | null;
 	trackPageView: boolean;
 }) {
 	const demo = useDemoRuntime();
@@ -71,6 +94,24 @@ export function useSessionsPageData({
 	} | null>(null);
 	const { state: organization } = useOrganization();
 	const dateRange = useDateRange();
+	const desktop = useLocalDesktopApp();
+	const fullScope = JSON.stringify([
+		organization.activeOrg?.id,
+		dateRange.state.startDate,
+		dateRange.state.endDate,
+	]);
+	const [overflowScope, setOverflowScope] = useState<string | null>(null);
+	const slicing =
+		desktop &&
+		listed &&
+		dateRange.meta.dayCount <= SLICE_MAX_DAYS &&
+		overflowScope !== fullScope;
+	const range = useSettledFocus(
+		slicing ? null : focus,
+		slicing ? 0 : FOCUS_SETTLE_MS,
+	);
+	const sliced = slicing ? focus : null;
+	const pagedList = paginated && !slicing;
 	const startDate = range?.start ?? dateRange.state.startDate;
 	const endDate = range?.end ?? dateRange.state.endDate;
 	const meta = range
@@ -158,13 +199,13 @@ export function useSessionsPageData({
 			startDate,
 		}),
 		filters,
-		limit: paginated ? SESSION_PAGE_SIZE : 1000,
+		limit: pagedList ? SESSION_PAGE_SIZE : SLICE_ROW_LIMIT,
 	};
 	const options = orpc.analytics.sessions.list.infiniteOptions({
 		input: (offset: number) => ({ ...input, offset }),
 		initialPageParam: 0,
 		getNextPageParam: (lastPage, _pages, offset) =>
-			paginated && lastPage.length === SESSION_PAGE_SIZE
+			pagedList && lastPage.length === SESSION_PAGE_SIZE
 				? offset + lastPage.length
 				: undefined,
 	});
@@ -249,6 +290,13 @@ export function useSessionsPageData({
 			failurePages.data?.pages.flatMap((page) => page.failures) ?? [],
 		);
 	}, [sessionPages.data, failurePages.data, previewSeed]);
+	const fullRangeRows = slicing
+		? sessionPages.data?.pages[0]?.length
+		: undefined;
+	useEffect(() => {
+		if (fullRangeRows !== undefined && fullRangeRows >= SLICE_ROW_LIMIT)
+			setOverflowScope(fullScope);
+	}, [fullRangeRows, fullScope]);
 	const isSnapshotSessionsPending =
 		sessionPages.isPending ||
 		(demo?.live !== false &&
@@ -331,21 +379,33 @@ export function useSessionsPageData({
 		sessionPages.data?.pages.flat().length ??
 		0;
 	// The sessions running right now lead the list, whatever the range; a
-	// picked day keeps only those active on it.
-	const rangeStart = range?.start;
-	const rangeEnd = range?.end;
+	// focused day keeps only those active on it. Days are UTC, as the list
+	// query counts them.
+	const shownDays = sliced ?? range;
+	const shownStart = shownDays?.start;
+	const shownEnd = shownDays?.end;
 	const shownLiveSessions = useMemo(() => {
-		if (!rangeStart || !rangeEnd) return liveSessions.sessions;
-		return liveSessions.sessions.filter((live) => {
-			const day = format(new Date(live.lastActivityAt), "yyyy-MM-dd");
-			return day >= rangeStart && day <= rangeEnd;
+		if (!shownStart || !shownEnd) return liveSessions.sessions;
+		const days = { start: shownStart, end: shownEnd };
+		return liveSessions.sessions.filter((live) =>
+			isOnUtcDays(live.lastActivityAt, days),
+		);
+	}, [liveSessions.sessions, shownStart, shownEnd]);
+	const sliceStart = sliced?.start;
+	const sliceEnd = sliced?.end;
+	const slicedSessions = useMemo(() => {
+		if (!sliceStart || !sliceEnd || !snapshotSessionsData)
+			return snapshotSessionsData;
+		return sessionsOnUtcDays(snapshotSessionsData, {
+			start: sliceStart,
+			end: sliceEnd,
 		});
-	}, [liveSessions.sessions, rangeStart, rangeEnd]);
+	}, [snapshotSessionsData, sliceStart, sliceEnd]);
 	const orderedSessions = useMemo(
 		() =>
 			mergeLiveSessionRows(
 				orderSessionsForDisplay({
-					sessions: snapshotSessionsData,
+					sessions: slicedSessions,
 					useRolling24Hours,
 				}),
 				shownLiveSessions,
@@ -354,12 +414,20 @@ export function useSessionsPageData({
 		[
 			shownLiveSessions,
 			liveSessions.updatedAt,
-			snapshotSessionsData,
+			slicedSessions,
 			useRolling24Hours,
 		],
 	);
+	const slicedCount = useMemo(
+		() =>
+			sliced && slicedSessions
+				? slicedSessions.filter(
+						(session) => transcriptSubagentId(session) === null,
+					).length
+				: null,
+		[sliced, slicedSessions],
+	);
 
-	const desktop = useLocalDesktopApp();
 	const planUsage = usePlanUsage(desktop && listed, { startDate, endDate });
 	const freshShares = useMemo(
 		() => (desktop ? sessionUsageShares(planUsage.data) : null),
@@ -373,8 +441,8 @@ export function useSessionsPageData({
 			(planUsage.status !== "pending" && !planUsage.isPlaceholderData));
 	const fresh = {
 		orderedSessions,
-		startDate,
-		endDate,
+		startDate: sliced?.start ?? startDate,
+		endDate: sliced?.end ?? endDate,
 		usageShares: freshShares,
 		loaded: true,
 	};
@@ -420,6 +488,7 @@ export function useSessionsPageData({
 		startDate: shown.startDate,
 		usageShares: shown.usageShares,
 		totalSessionCount:
+			slicedCount ??
 			rangeSessionCount + (failurePages.data?.pages[0]?.totalCount ?? 0),
 		useRolling24Hours,
 	};

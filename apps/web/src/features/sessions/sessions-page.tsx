@@ -79,7 +79,7 @@ export function SessionsPage() {
 	const data = useSessionsPageData({
 		detail: activeSessionId !== null,
 		detailReady,
-		range: activeSessionId === null ? shownRange : null,
+		focus: activeSessionId === null ? shownRange : null,
 		trackPageView: activeSessionId === null,
 	});
 	const canViewSession = useCanViewSession();

@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { DotPick } from "./cost-hover-date";
-
-const PREVIEW_SETTLE_MS = 120;
 
 export type DotFilterRange = { start: string; end: string };
 
@@ -50,24 +48,11 @@ export function useDotFilter(range: { startDate: string; endDate: string }) {
 	);
 
 	const [previewed, setPreviewed] = useState<DotPick | null>(null);
-	const settle = useRef<ReturnType<typeof setTimeout> | null>(null);
-	useEffect(
-		() => () => {
-			if (settle.current) clearTimeout(settle.current);
-		},
+	const preview = useCallback(
+		(next: DotPick | null) =>
+			setPreviewed((current) => (sameDay(current, next) ? current : next)),
 		[],
 	);
-	const preview = useCallback((next: DotPick | null) => {
-		if (settle.current) clearTimeout(settle.current);
-		const apply = () =>
-			setPreviewed((current) => (sameDay(current, next) ? current : next));
-		if (next === null) {
-			settle.current = null;
-			apply();
-			return;
-		}
-		settle.current = setTimeout(apply, PREVIEW_SETTLE_MS);
-	}, []);
 
 	const { startDate, endDate } = range;
 	const pickedRange = useMemo(
