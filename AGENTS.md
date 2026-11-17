@@ -14,6 +14,10 @@
 - The published CLI (npm `rudel` and `opaline`) lives in [opalinehq/cli](https://github.com/opalinehq/cli). Put CLI fixes and features there.
 - `apps/cli` in this repository is only a test harness for the API. It is not published.
 
+## Web UI
+
+- Menus, selects and popover lists get the fluid hover. Build them from `apps/web/src/app/ui` (dropdown-menu, select, popover) or `components/dashboard/select`, which include it. A raw Base UI popup (`Menu.Popup`, `Select.List`, …) renders `<FluidMenuHover />` inside a `data-fluid-menu-root` element. `components/ui/fluid-menu-coverage.test.ts` fails on a popup without it.
+
 ## Tests
 
 - Keep a test only if it catches something no other test catches. `bun run test:kill-matrix <module.ts>` builds the mutation-testing kill matrix and lists the tests that kill no unique mutant; see `.claude/skills/testing-bun/SKILL.md` ("Every Test Earns Its Place").
