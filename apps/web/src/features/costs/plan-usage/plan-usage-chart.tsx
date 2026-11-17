@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import { Skeleton } from "@/app/ui/skeleton";
 import { EmptyState } from "@/components/dashboard/page-parts";
+import { useOptionalDateRange } from "@/features/analytics/date-range/DateRangeProvider";
 import {
 	ClaudeModelIcon,
 	CodexModelIcon,
@@ -21,7 +22,9 @@ import { EdgeTick, edgeTicks, useAxisHover } from "../chart-edge-axis";
 import {
 	bucketDate,
 	type ChartInterval,
+	chartPeriodDates,
 	formatChartDate,
+	groupChartTrend,
 } from "../chart-interval";
 import { CostDotChart, type DotTone } from "../cost-dot-chart";
 import { useHoverDateStore } from "../cost-hover-date";
@@ -228,7 +231,9 @@ export function PlanUsageChart({
 					value={provider}
 				/>
 			</div>
-			{pending ? (
+			{pending && dots ? (
+				<UsageDots window={null} interval={interval} />
+			) : pending ? (
 				<div className="cost-chart-canvas">
 					<Skeleton className="size-full rounded-[8px]" />
 				</div>
@@ -415,18 +420,28 @@ function UsageDots({
 	window,
 	interval,
 }: {
-	window: UsageWindow;
+	window: UsageWindow | null;
 	interval: ChartInterval;
 }) {
-	const periods = periodsOf(window, interval);
+	const range = useOptionalDateRange()?.state;
+	const periods = window ? periodsOf(window, interval) : [];
 	const byDate = new Map(periods.map((period) => [period.date, period]));
-	const points = periods.map((period) => ({
-		date: period.date,
-		startDate: period.startDate,
-		endDate: period.endDate,
-		total: period.peak ?? 0,
-		values: {},
-	}));
+	const points = window
+		? periods.map((period) => ({
+				date: period.date,
+				startDate: period.startDate,
+				endDate: period.endDate,
+				total: period.peak ?? 0,
+				values: {},
+			}))
+		: range
+			? groupChartTrend(
+					chartPeriodDates(range.startDate, range.endDate, "daily").map(
+						(date) => ({ date, total: 0, values: {} }),
+					),
+					interval,
+				)
+			: [];
 	const tone = (point: { date: string }): DotTone => {
 		const period = byDate.get(point.date);
 		if (!period || period.peak === null)
@@ -447,6 +462,7 @@ function UsageDots({
 				format={formatPoints}
 				interval={interval}
 				label="Usage"
+				loading={window === null}
 				points={points}
 				tone={tone}
 			/>
