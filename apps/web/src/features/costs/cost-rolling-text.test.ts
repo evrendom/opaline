@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { rollSteps } from "./cost-rolling-text";
+import { rollSteps, unitsOf } from "./cost-rolling-text";
 
 describe("rollSteps", () => {
 	test("characters line up from the right, so only changed places roll", () => {
@@ -24,9 +24,6 @@ describe("rollSteps", () => {
 			"keep",
 			"keep",
 			"keep",
-			"keep",
-			"keep",
-			"keep",
 		]);
 	});
 
@@ -34,5 +31,18 @@ describe("rollSteps", () => {
 		expect(rollSteps("445", "445").every((step) => step.kind === "keep")).toBe(
 			true,
 		);
+	});
+});
+
+describe("unitsOf", () => {
+	test("words roll as one unit, digits and signs one by one", () => {
+		expect(unitsOf("24% used")).toEqual(["2", "4", "%", " ", "used"]);
+		expect(rollSteps("24% used", "43% left").map((step) => step.kind)).toEqual([
+			"swap",
+			"swap",
+			"keep",
+			"keep",
+			"swap",
+		]);
 	});
 });

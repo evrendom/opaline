@@ -12,6 +12,10 @@ export function amountOf(text: string) {
 	return Number(match[1]) * (SCALE[match[2]?.toLowerCase() ?? ""] ?? 1);
 }
 
+export function unitsOf(text: string): string[] {
+	return text.match(/\p{L}+|./gsu) ?? [];
+}
+
 export type RollStep =
 	| { kind: "keep"; char: string }
 	| { kind: "swap"; from: string; char: string }
@@ -19,8 +23,8 @@ export type RollStep =
 	| { kind: "remove"; from: string };
 
 export function rollSteps(before: string, after: string): RollStep[] {
-	const from = [...before];
-	const to = [...after];
+	const from = unitsOf(before);
+	const to = unitsOf(after);
 	const steps: RollStep[] = [];
 	for (let place = Math.max(from.length, to.length); place >= 1; place -= 1) {
 		const old = from[from.length - place];
@@ -171,7 +175,7 @@ export function RollingText({
 		const before = shown.current;
 		shown.current = text;
 		if (before === null || reducedMotion()) {
-			element.replaceChildren(...[...text].map(slotOf));
+			element.replaceChildren(...unitsOf(text).map(slotOf));
 			return;
 		}
 		if (before === text) return;
