@@ -3,6 +3,7 @@ import type {
 	SessionFilterCatalog,
 	SessionListFilters,
 } from "@rudel/api-routes";
+import { IconCalendarOff, IconFilterOff } from "@tabler/icons-react";
 import {
 	type CSSProperties,
 	type ReactNode,
@@ -15,6 +16,7 @@ import {
 import { useEffectOnceWhen } from "@/app/hooks/useEffectOnceWhen";
 import { useLatestValueRef } from "@/app/hooks/useLatestValueRef";
 import { Reveal } from "@/app/ui/bones";
+import { EmptyState } from "@/components/dashboard/page-parts";
 import {
 	useSessionLimitHits,
 	useSessionUsageShares,
@@ -361,23 +363,31 @@ export function SessionsOverviewTable({
 						data-slot="sessions-overview-canvas"
 					>
 						{!isLoading && tableState.recentSessions.length === 0 ? (
-							<div className="flex min-h-64 flex-1 items-center justify-center border-b border-(--session-overview-border) px-6 text-center text-base text-(--session-overview-muted) sm:text-sm">
-								No recent sessions in the selected range.
+							<div className="flex min-h-64 flex-1 flex-col p-6">
+								<EmptyState
+									icon={IconCalendarOff}
+									title="No sessions in this range"
+									description="Pick a wider date range to see more sessions."
+								/>
 							</div>
 						) : !isLoading && tableState.filteredSessions.length === 0 ? (
-							<div className="flex min-h-64 flex-1 flex-col items-center justify-center gap-2 border-b border-(--session-overview-border) px-6 text-center text-base text-(--session-overview-muted) sm:text-sm">
-								<p>
-									{pagination?.hasNextPage
-										? "Looking for matching sessions…"
-										: "No sessions match the selected filters."}
-								</p>
-								<button
-									type="button"
-									className="rounded-md px-2 py-1 font-medium text-(--session-overview-accent) outline-none hover:bg-(--session-overview-hover) focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-(--session-overview-accent)"
-									onClick={tableState.clearAllFilters}
+							<div className="flex min-h-64 flex-1 flex-col p-6">
+								<EmptyState
+									icon={IconFilterOff}
+									title={
+										pagination?.hasNextPage
+											? "Looking for matching sessions…"
+											: "No sessions match the selected filters"
+									}
 								>
-									Clear filters
-								</button>
+									<button
+										type="button"
+										className="mx-auto rounded-md px-2 py-1 text-sm font-medium text-(--session-overview-accent) outline-none hover:bg-(--session-overview-hover) focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-(--session-overview-accent)"
+										onClick={tableState.clearAllFilters}
+									>
+										Clear filters
+									</button>
+								</EmptyState>
 							</div>
 						) : (
 							<Reveal

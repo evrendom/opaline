@@ -678,7 +678,7 @@ describe("SessionsOverviewTable", () => {
 
 		await user.click(screen.getByRole("checkbox", { name: "rudel" }));
 		expect(
-			screen.getByText("No sessions match the selected filters."),
+			screen.getByText("No sessions match the selected filters"),
 		).toBeVisible();
 		expect(
 			screen.queryByRole("list", { name: "Recent sessions" }),
