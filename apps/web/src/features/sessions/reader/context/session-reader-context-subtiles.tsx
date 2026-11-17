@@ -11,10 +11,13 @@ const MIN_AREA = { h: 28, w: 40 } as const;
 const MIN_CELL = 18;
 
 const MARK: Record<Tone, string> = {
-	later: "border-opal-4",
-	minor: "border-opal-3",
-	never: "border-rose-500",
+	later: "[--mark:currentColor]",
+	minor: "[--mark:currentColor]",
+	never: "[--mark:var(--color-rose-500)]",
 };
+
+const MARKED =
+	"border-[color-mix(in_oklab,var(--mark)_28%,transparent)] bg-[color-mix(in_oklab,var(--mark)_9%,transparent)] shadow-[0_0_0_0.5px_color-mix(in_oklab,var(--mark)_20%,transparent),0_2px_4px_-1px_color-mix(in_oklab,var(--mark)_35%,transparent),0_8px_18px_-6px_color-mix(in_oklab,var(--mark)_55%,transparent)]";
 
 export function markOf(
 	marks: ReadonlyMap<string, Tone> | undefined,
@@ -124,9 +127,7 @@ export function ContextSubTiles({
 						<span
 							className={cn(
 								"absolute inset-0 rounded-[3px] border corner-squircle squircle:rounded-[6px]",
-								mark
-									? `${MARK[mark]} border-[1.5px]`
-									: "border-current opacity-20",
+								mark ? `${MARK[mark]} ${MARKED}` : "border-current opacity-20",
 							)}
 						/>
 						{width >= ICON_ROOM && height >= ICON_ROOM ? (
