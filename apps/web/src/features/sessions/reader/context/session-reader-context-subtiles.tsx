@@ -24,9 +24,9 @@ export const markGlow = (tone: Tone) => `${MARK[tone]} ${MARKED}`;
 const MARK_ORDER: readonly Tone[] = ["never", "later", "minor"];
 
 const MARK_LABEL: Record<Tone, string> = {
-	later: "Worked again later",
-	minor: "Fixed right away",
-	never: "Never worked again",
+	later: "Error that resolved later",
+	minor: "Error that resolved instantly",
+	never: "Error that didn't resolve",
 };
 
 export function MarkLegend({
