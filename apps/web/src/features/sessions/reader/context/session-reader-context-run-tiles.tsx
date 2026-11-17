@@ -8,8 +8,8 @@ import type {
 	RunPart,
 	RunThing,
 } from "./session-reader-context-map";
-import { ProblemMark, type Tone } from "./session-reader-context-problems";
-import { markOf } from "./session-reader-context-subtiles";
+import type { Tone } from "./session-reader-context-problems";
+import { markGlow, markOf } from "./session-reader-context-subtiles";
 
 const INSET = 6;
 const PART_INSET = 3;
@@ -147,6 +147,7 @@ export function ContextRunTiles({
 						className={cn(
 							"absolute rounded-[4px] border corner-squircle transition-opacity squircle:rounded-[8px]",
 							detailed ? look.className : "border-current/20",
+							tone && markGlow(tone),
 							anyLit && !holds && (detailed ? "opacity-55" : "opacity-25"),
 						)}
 						style={
@@ -172,11 +173,6 @@ export function ContextRunTiles({
 								<Glyph className="size-3 shrink-0" />
 								<span className="truncate">{each.label}</span>
 							</button>
-						) : null}
-						{tone && width >= 12 && height >= 12 ? (
-							<span className="pointer-events-none absolute right-1 bottom-1 z-20 flex">
-								<ProblemMark tone={tone} />
-							</span>
 						) : null}
 						<span
 							className="absolute"

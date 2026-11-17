@@ -2,7 +2,6 @@ import type { MomentKind, SessionDetailTurnSummary } from "@rudel/api-routes";
 import { useMemo } from "react";
 import { MOMENT_KINDS_APPEARANCE } from "@/features/compass/moment-labels";
 import { shortRunId } from "@/features/sessions/run-id";
-import { cn } from "@/lib/utils";
 import {
 	getReaderAgentMessages,
 	getReaderWaterfall,
@@ -253,19 +252,4 @@ export function useOwnProblems(
 		);
 		return { keep: new Set(own.map(([key]) => key)), own };
 	}, [byRun, problems]);
-}
-
-const BADGE: Record<Tone, string> = {
-	later: "bg-opal-4 text-white",
-	minor: "bg-opal-3 text-white",
-	never: "bg-rose-500 text-white",
-};
-
-export function ProblemMark({ tone }: { tone: Tone }) {
-	return (
-		<span
-			aria-hidden="true"
-			className={cn("size-2 shrink-0 rounded-full", BADGE[tone])}
-		/>
-	);
 }
