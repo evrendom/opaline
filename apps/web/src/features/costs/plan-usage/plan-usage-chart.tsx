@@ -49,6 +49,7 @@ const BAR_SHARE = 0.6;
 const MAX_BAR_PX = 18;
 const RESET_ICON_PX = 14;
 const RESET_ICON_GAP_PX = 6;
+const RESET_ICON_SPACE_PX = 10;
 const LOW_LEFT = 10;
 const USAGE_COLOR = "oklch(0.74 0.17 150)";
 const LOW_COLOR = "oklch(0.64 0.21 27)";
@@ -287,14 +288,16 @@ function UsageCanvas({
 	);
 	const snap = (value: number) => Math.round(value * ratio) / ratio;
 	const resetDays = new Map<number, string>();
+	let lastReset = Number.NEGATIVE_INFINITY;
 	if (interval === "daily")
 		for (const at of window.resets) {
 			const x = resetX(periods, at);
-			if (x !== null)
-				resetDays.set(
-					Math.round(x),
-					`Limit reset ${resetTickFormat.format(new Date(at))}`,
-				);
+			if (x === null) continue;
+			const day = Math.round(x);
+			if ((day - lastReset) * pitch < RESET_ICON_PX + RESET_ICON_SPACE_PX)
+				continue;
+			lastReset = day;
+			resetDays.set(day, `Limit reset ${resetTickFormat.format(new Date(at))}`);
 		}
 	const axisHover = useAxisHover();
 	return (

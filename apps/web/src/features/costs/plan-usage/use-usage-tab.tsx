@@ -14,11 +14,12 @@ import {
 export function useUsageTab(
 	range: UsageRange,
 	interval: ChartInterval,
+	enabled: boolean,
 ): {
 	tab: UsageTab | undefined;
 	deselect: () => void;
 } {
-	const desktop = useLocalDesktopApp();
+	const desktop = useLocalDesktopApp() && enabled;
 	const [selected, setSelected] = useState(false);
 	const [provider, setProvider] = useState<PlanProvider>("claude");
 	const query = usePlanUsage(desktop, range);
