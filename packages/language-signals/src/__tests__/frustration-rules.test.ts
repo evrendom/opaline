@@ -162,6 +162,62 @@ describe("frustration rules", () => {
 		);
 	});
 
+	test.each([
+		["horror.", "horror"],
+		["nah bad....", "nah"],
+		["worse now", "worse now"],
+		["still", "still"],
+		["and?", "and?"],
+		["the toolbar moved. bad.", "bad"],
+		["meh", "meh"],
+	])("a short negative verdict counts: %p", (text, matchedText) => {
+		const matches = scanMemberLanguageSignals(text).filter(
+			(match) => match.category === "negative",
+		);
+		expect(matches.map((match) => match.matchedText)).toContain(matchedText);
+	});
+
+	test("a short calm verdict is never frustration", () => {
+		for (const text of [
+			"good",
+			"ok",
+			"fine!!",
+			"nice",
+			"yes??",
+			"ok. thanks!!",
+			"Sure?!",
+		])
+			expect(unhappy(text)).toEqual([]);
+	});
+
+	test("verdict words inside a longer sentence are left to the rules", () => {
+		for (const text of [
+			"bad request handling is in the router",
+			"is it bad?",
+			"and then run the migration",
+			"still waiting on the build to finish?",
+			"same as yesterday please",
+		])
+			expect(unhappy(text)).toEqual([]);
+		expect(unhappy("ok, the header is still broken")).toContain(
+			"negative.still",
+		);
+	});
+
+	test("omg on its own is not frustration", () => {
+		expect(unhappy("omg")).toEqual([]);
+		expect(unhappy("omg this is amazing")).toEqual([]);
+		expect(unhappy("omg it still crashes")).toEqual(["negative.still"]);
+	});
+
+	test("question runs inside code stay out while prose question runs count", () => {
+		expect(unhappy("use `a ?? b` here")).toEqual([]);
+		expect(unhappy("```\nconst x = a ?? b\n```\nis that right")).toEqual([]);
+		expect(unhappy("where did the tests go??")).toEqual([
+			"negative.question-run",
+		]);
+	});
+
 	test("question runs count after a word or at the end, never between operands", () => {
 		expect(unhappy("const port = env.PORT ?? 3000")).toEqual([]);
 		expect(unhappy("value ??= fallback")).toEqual([]);

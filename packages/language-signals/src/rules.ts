@@ -28,12 +28,88 @@ export const SWEAR_INTENSIFIED_POSITIVES: readonly string[] = [
 	"best",
 ];
 
+export const SHORT_NEGATIVE_VERDICTS: readonly string[] = [
+	"bad",
+	"nah bad",
+	"no bad",
+	"still bad",
+	"worse",
+	"worse now",
+	"even worse",
+	"still",
+	"still same",
+	"same",
+	"same thing",
+	"same issue",
+	"same error",
+	"same problem",
+	"nothing",
+	"nothing changed",
+	"broken",
+	"still broken",
+	"wrong",
+	"meh",
+	"nope",
+	"nah",
+	"no",
+	"not yet",
+	"not quite",
+	"not really",
+	"no change",
+	"no difference",
+	"horror",
+	"and?",
+	"so?",
+	"well?",
+];
+
+export const SHORT_CALM_VERDICTS: readonly string[] = [
+	"good",
+	"very good",
+	"all good",
+	"ok",
+	"okay",
+	"ok good",
+	"ok cool",
+	"ok thanks",
+	"k",
+	"kk",
+	"fine",
+	"nice",
+	"yes",
+	"yep",
+	"yup",
+	"yeah",
+	"sure",
+	"great",
+	"perfect",
+	"cool",
+	"alright",
+	"looks good",
+	"sounds good",
+	"lgtm",
+	"thanks",
+	"thank you",
+	"thx",
+	"done",
+	"go",
+	"go ahead",
+	"go on",
+	"continue",
+	"proceed",
+	"do it",
+	"next",
+	"works",
+	"it works",
+];
+
 // Positive swearing: a swear counts as positive only when a word from the praise list or SWEAR_INTENSIFIED_POSITIVES is within two words of it on either side in the same clause (commas allowed; . ! ? ; : … or a line break end it), and no negation (not, no, never, -n't), negative surface or other swear is within those words.
 // Deterministic surface lists plus a few bounded patterns (word-internal and
 // transposed "fuck" stems, short failure constructions); no stemming, open
 // fuzzy matching, or leetspeak. The scanner handles immediately adjacent
-// explicit negation, quoted and code text in member prompts (skipped), and the
-// context guards it keys by rule id.
+// explicit negation, quoted and code text in member prompts (skipped), a
+// sentence that is only a short verdict, and the context guards it keys by
+// rule id.
 // Identity slurs stay excluded. "hellish", bare "absolutely right", and bare
 // "exactly" are deliberate non-surfaces (boundary and ordering semantics
 // depend on them).

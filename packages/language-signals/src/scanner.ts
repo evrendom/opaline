@@ -1,4 +1,9 @@
-import { LANGUAGE_SIGNAL_RULES, SWEAR_INTENSIFIED_POSITIVES } from "./rules.js";
+import {
+	LANGUAGE_SIGNAL_RULES,
+	SHORT_CALM_VERDICTS,
+	SHORT_NEGATIVE_VERDICTS,
+	SWEAR_INTENSIFIED_POSITIVES,
+} from "./rules.js";
 import type {
 	BuiltInLanguageSignalCategory,
 	LanguageSignalMatch,
@@ -102,6 +107,11 @@ const CATEGORY_PREFILTERS = new Map(
 							NEGATIVE_QUESTION_RUN.source,
 							NEGATIVE_EXCLAMATION_RUN.source,
 							NEGATED_POSITIVE_SOURCE,
+							...SHORT_NEGATIVE_VERDICTS.map((verdict) =>
+								verdict.endsWith("?")
+									? `${compileSurfaceSource(verdict.slice(0, -1))}\\s*\\?`
+									: compileSurfaceSource(verdict),
+							),
 						]
 					: []),
 				...COMPILED_SURFACES.filter(
@@ -186,7 +196,67 @@ export function scanLanguageSignals(
 		}
 	}
 
-	return matches;
+	return withSentenceVerdicts(text, matches);
+}
+
+const SENTENCE_PATTERN = /[^.!?…\n]+[.!?…]*/gu;
+const VERDICT_BODY_PATTERN = /^[\s,~-]*(.*?)[\s,~-]*([.!?…]*)$/su;
+const MAX_VERDICT_CHARS = 24;
+const NEGATIVE_VERDICTS = new Set(SHORT_NEGATIVE_VERDICTS);
+const CALM_VERDICTS = new Set(SHORT_CALM_VERDICTS);
+
+function withSentenceVerdicts(
+	text: string,
+	matches: LanguageSignalMatch[],
+): LanguageSignalMatch[] {
+	const unhappy = matches.filter(
+		(match) => match.category === "negative" || match.category === "swear",
+	);
+	const dropped = new Set<LanguageSignalMatch>();
+	const added: LanguageSignalMatch[] = [];
+	let cursor = 0;
+	for (const sentence of text.matchAll(SENTENCE_PATTERN)) {
+		const from = sentence.index;
+		const to = from + sentence[0].length;
+		while ((unhappy[cursor]?.end ?? Number.POSITIVE_INFINITY) <= from)
+			cursor += 1;
+		if (sentence[0].length > MAX_VERDICT_CHARS + 8) continue;
+		const parts = sentence[0].match(VERDICT_BODY_PATTERN);
+		const body = parts?.[1] ?? "";
+		if (body === "" || body.length > MAX_VERDICT_CHARS) continue;
+		const verdict = body.toLowerCase().replace(/\s+/gu, " ");
+		const asked = (parts?.[2] ?? "").includes("?");
+		if (CALM_VERDICTS.has(verdict)) {
+			for (
+				let at = cursor;
+				at < unhappy.length && (unhappy[at]?.start ?? to) < to;
+				at += 1
+			) {
+				const match = unhappy[at];
+				if (match && match.start >= from && match.end <= to) dropped.add(match);
+			}
+			continue;
+		}
+		if (
+			!NEGATIVE_VERDICTS.has(asked ? `${verdict}?` : verdict) ||
+			(unhappy[cursor]?.start ?? to) < to ||
+			matches.length + added.length >= MAX_LANGUAGE_SIGNAL_MATCHES
+		)
+			continue;
+		const start = from + sentence[0].indexOf(body);
+		const end = asked ? to : start + body.length;
+		added.push({
+			category: "negative",
+			ruleId: "negative.short-verdict",
+			matchedText: text.slice(start, end),
+			start,
+			end,
+		});
+	}
+	if (dropped.size === 0 && added.length === 0) return matches;
+	return [...matches.filter((match) => !dropped.has(match)), ...added].sort(
+		(left, right) => left.start - right.start,
+	);
 }
 
 export function* languageSignalPatternMatches(
