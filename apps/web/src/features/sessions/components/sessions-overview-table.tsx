@@ -17,6 +17,7 @@ import { useLatestValueRef } from "@/app/hooks/useLatestValueRef";
 import { Reveal } from "@/app/ui/bones";
 import { useSessionUsageShares } from "@/features/costs/plan-usage/use-session-usage-shares";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
+import { useLocalDesktopApp } from "@/features/desktop/local-app";
 import { useLiveClock } from "@/features/sessions/use-live-sessions";
 import { useLoadSessionPages } from "@/features/sessions/use-load-session-pages";
 import { useSessionRunQuestionTags } from "@/features/sessions/use-run-question-tags";
@@ -77,6 +78,9 @@ type SessionsOverviewTableProps = {
 	sessions: readonly SessionAnalytics[] | undefined;
 	sessionDetailDisabledNote: string | undefined;
 	totalSessionCount: number;
+	/** Each session's share of the plan limit, loaded with the rows; without
+	 * it the table reads the shares itself. */
+	usageShares?: ReadonlyMap<string, number> | null;
 };
 
 export function SessionsOverviewTable({
@@ -97,6 +101,7 @@ export function SessionsOverviewTable({
 	sessions,
 	sessionDetailDisabledNote,
 	totalSessionCount,
+	usageShares: givenUsageShares,
 	pagination,
 	filterCatalog,
 	filterCatalogPending,
@@ -147,7 +152,10 @@ export function SessionsOverviewTable({
 		[sessions, showSkillsColumn],
 	);
 	const questionTags = useSessionRunQuestionTags(taggedSessionIds);
-	const usageShares = useSessionUsageShares();
+	const ownUsageShares = useSessionUsageShares(givenUsageShares === undefined);
+	const usageShares =
+		givenUsageShares === undefined ? ownUsageShares : givenUsageShares;
+	const reserveUsageColumn = useLocalDesktopApp() || usageShares !== null;
 	// Live rows read "12s ago"; only they follow the clock.
 	const hasLiveRows = tableState.sortedSessions.some(
 		(session) => session.live_session !== undefined,
@@ -274,7 +282,7 @@ export function SessionsOverviewTable({
 		<div
 			className={SESSION_OVERVIEW_SURFACE_CLASS_NAME}
 			style={
-				usageShares
+				reserveUsageColumn
 					? ({ "--session-cost-column": "104px" } as CSSProperties)
 					: undefined
 			}

@@ -8,8 +8,13 @@ import {
 	type PageViewSection,
 	useTrackProductPageView,
 } from "@/features/analytics/tracking/useTrackProductPageView";
+import {
+	sessionUsageShares,
+	usePlanUsage,
+} from "@/features/costs/plan-usage/use-plan-usage";
 import { buildDashboardSessionTabMetrics } from "@/features/dashboard/data/dashboard-tab-adapters";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
+import { useLocalDesktopApp } from "@/features/desktop/local-app";
 import { mergeLiveSessionRows } from "@/features/sessions/live-session-rows";
 import { resolveActiveSessionDateRangeOptionId } from "@/features/sessions/session-date-ranges";
 import { orderSessionsForDisplay } from "@/features/sessions/session-ordering";
@@ -354,6 +359,37 @@ export function useSessionsPageData({
 		],
 	);
 
+	const desktop = useLocalDesktopApp();
+	const planUsage = usePlanUsage(desktop && listed, { startDate, endDate });
+	const freshShares = useMemo(
+		() => (desktop ? sessionUsageShares(planUsage.data) : null),
+		[desktop, planUsage.data],
+	);
+	// Rows, their range and their plan shares change together: a new range
+	// keeps the last loaded view until its rows and shares have both arrived.
+	const settled =
+		!sessionPages.isPlaceholderData &&
+		(!desktop ||
+			(planUsage.status !== "pending" && !planUsage.isPlaceholderData));
+	const fresh = {
+		orderedSessions,
+		startDate,
+		endDate,
+		usageShares: freshShares,
+		loaded: true,
+	};
+	const [held, setHeld] = useState({ ...fresh, loaded: false });
+	if (
+		settled &&
+		(!held.loaded ||
+			held.orderedSessions !== fresh.orderedSessions ||
+			held.usageShares !== fresh.usageShares ||
+			held.startDate !== fresh.startDate ||
+			held.endDate !== fresh.endDate)
+	)
+		setHeld(fresh);
+	const shown = settled ? fresh : held;
+
 	return {
 		uploadFailuresError: failurePages.isError,
 		retryUploadFailures: () => {
@@ -371,16 +407,18 @@ export function useSessionsPageData({
 		listInput: input,
 		pagination,
 		dateRangeDays: meta.dayCount,
-		endDate,
+		endDate: shown.endDate,
 		headlineMetrics,
 		organizationSessionCount: overviewKpis?.total_sessions ?? rangeSessionCount,
 		isSnapshotSessionsError,
-		isSnapshotSessionsPending,
+		isSnapshotSessionsPending:
+			isSnapshotSessionsPending || (!settled && !held.loaded),
 		isSummaryError,
 		isSummaryPending,
-		orderedSessions,
+		orderedSessions: shown.orderedSessions,
 		snapshotSessionsData,
-		startDate,
+		startDate: shown.startDate,
+		usageShares: shown.usageShares,
 		totalSessionCount:
 			rangeSessionCount + (failurePages.data?.pages[0]?.totalCount ?? 0),
 		useRolling24Hours,

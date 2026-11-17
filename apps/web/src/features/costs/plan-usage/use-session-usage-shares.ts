@@ -3,10 +3,12 @@ import { useOptionalDateRange } from "@/features/analytics/date-range/DateRangeP
 import { useLocalDesktopApp } from "@/features/desktop/local-app";
 import { sessionUsageShares, usePlanUsage } from "./use-plan-usage";
 
-export function useSessionUsageShares(): ReadonlyMap<string, number> | null {
+export function useSessionUsageShares(
+	enabled = true,
+): ReadonlyMap<string, number> | null {
 	const desktop = useLocalDesktopApp();
 	const range = useOptionalDateRange()?.state;
-	const query = usePlanUsage(desktop && range !== undefined, {
+	const query = usePlanUsage(enabled && desktop && range !== undefined, {
 		startDate: range?.startDate ?? "",
 		endDate: range?.endDate ?? "",
 	});

@@ -17,6 +17,14 @@ vi.mock("@/features/sessions/use-run-question-tags", () => ({
 	useSessionRunQuestionTags: () => new Map(),
 }));
 
+vi.mock("@/features/costs/plan-usage/use-session-usage-shares", () => ({
+	useSessionUsageShares: () => null,
+}));
+
+vi.mock("@/features/desktop/local-app", () => ({
+	useLocalDesktopApp: () => false,
+}));
+
 vi.mock("@/features/workspace/hooks/useUserMap", () => ({
 	useUserMap: () => ({
 		avatarMap: {},

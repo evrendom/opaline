@@ -126,6 +126,7 @@ export function SessionsListSurface({
 							scrollContainerRef={scrollContainerRef}
 							sessionDetailDisabledNote={undefined}
 							totalSessionCount={totalSessionCount}
+							usageShares={data.usageShares}
 							// A search reads every page itself.
 							pagination={
 								search.active
