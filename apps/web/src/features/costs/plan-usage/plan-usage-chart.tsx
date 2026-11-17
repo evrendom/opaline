@@ -240,7 +240,7 @@ export function PlanUsageChart({
 			) : showChart && dots ? (
 				<UsageDots window={window} interval={interval} />
 			) : showChart ? (
-				<UsageCanvas window={window} provider={usage} interval={interval} />
+				<UsageCanvas window={window} interval={interval} />
 			) : (
 				<div className="cost-chart-canvas plan-usage-empty">
 					<EmptyState
@@ -284,11 +284,9 @@ function emptyText(
 
 function UsageCanvas({
 	window,
-	provider,
 	interval,
 }: {
 	window: UsageWindow;
-	provider: ProviderUsage | undefined;
 	interval: ChartInterval;
 }) {
 	const [canvasRef, width] = useWidth<HTMLDivElement>();
@@ -387,15 +385,9 @@ function UsageCanvas({
 							tick={TICK_STYLE}
 						/>
 						<Tooltip
-							position={{ y: 48 }}
 							isAnimationActive={false}
 							cursor={{ fill: "var(--cost-hover)", opacity: 0.5 }}
-							content={({ active, label }) => {
-								const period = periods[Number(label)];
-								return active && period ? (
-									<PeriodTip period={period} provider={provider} />
-								) : null;
-							}}
+							content={() => null}
 						/>
 						<Bar
 							dataKey="full"
@@ -558,47 +550,5 @@ function SplitBar({
 				/>
 			) : null}
 		</g>
-	);
-}
-
-function PeriodTip({
-	period,
-	provider,
-}: {
-	period: Period;
-	provider: ProviderUsage | undefined;
-}) {
-	const last = period.last;
-	const plan = last?.plan
-		? planName(provider?.provider ?? "claude", last.plan)
-		: null;
-	return (
-		<div className="cost-chart-tooltip">
-			{plan ? <p>{plan}</p> : null}
-			<div>
-				<span>
-					<i
-						style={{
-							backgroundColor: last ? solidColor(period) : "transparent",
-						}}
-					/>
-					Left
-				</span>
-				<strong>
-					{period.solid === null ? "—" : `${Math.round(period.solid)}%`}
-				</strong>
-			</div>
-			<div>
-				<span>
-					<i style={{ backgroundColor: usedColor(period) }} />
-					Used
-				</span>
-				<strong>
-					{last?.usedPercent === null || !last
-						? "—"
-						: formatPoints(period.usedPoints)}
-				</strong>
-			</div>
-		</div>
 	);
 }

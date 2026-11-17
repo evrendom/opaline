@@ -10,8 +10,11 @@ import {
 import { getModelBadgeTone } from "@/features/dashboard/components/dashboard-model-brand";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { SERIES_COLORS } from "../chart-colors";
+import { bucketDate, type ChartInterval } from "../chart-interval";
 import { ScrollFade } from "../cost-breakdown";
 import { costLabel } from "../cost-format";
+import { useMarkedDate } from "../cost-hover-date";
+import { RollingText } from "../cost-rolling-text";
 import { formatPoints } from "./plan-usage-chart";
 import type { UsageWindow } from "./use-plan-usage";
 
@@ -55,30 +58,78 @@ function ModelIcon({ id }: { id: string }) {
 	);
 }
 
+type Shares = Map<string, readonly [number, number]>;
+
+function hoveredShares(
+	window: UsageWindow,
+	interval: ChartInterval,
+	marked: string,
+) {
+	const sessions: Shares = new Map();
+	const repositories: Shares = new Map();
+	const models: Shares = new Map();
+	let used = 0;
+	const add = (
+		target: Shares,
+		shares: Readonly<Record<string, readonly [number, number]>> | undefined,
+	) => {
+		for (const [id, [points, cost]] of Object.entries(shares ?? {})) {
+			const [sumPoints, sumCost] = target.get(id) ?? [0, 0];
+			target.set(id, [sumPoints + points, sumCost + cost]);
+		}
+	};
+	for (const bucket of window.buckets) {
+		if (bucketDate(bucket.at.slice(0, 10), interval) !== marked) continue;
+		used += bucket.usedPoints;
+		add(sessions, bucket.groups?.sessions);
+		add(repositories, bucket.groups?.repositories);
+		add(models, bucket.groups?.models);
+	}
+	const local = [...sessions.values()].reduce(
+		(sum, [points]) => sum + points,
+		0,
+	);
+	return { sessions, repositories, models, other: Math.max(0, used - local) };
+}
+
 export function UsageBreakdowns({
 	window,
 	titles,
+	interval,
 }: {
 	window: UsageWindow;
 	titles: Readonly<Record<string, string>>;
+	interval: ChartInterval;
 }) {
 	const shellPath = useShellRoutePath();
+	const marked = useMarkedDate();
+	const hovered = marked ? hoveredShares(window, interval, marked) : null;
+	const at = (
+		group: "sessions" | "repositories" | "models",
+		id: string,
+		points: number,
+		cost: number,
+	) => {
+		if (!hovered) return { points, cost };
+		const [sharePoints, shareCost] = hovered[group].get(id) ?? [0, 0];
+		return { points: sharePoints, cost: shareCost };
+	};
 	const heading = `Of ${window.label.toLowerCase()} limit`;
 	const sessions: Row[] = window.sessions.map((session) => ({
 		id: session.sessionId,
 		label: titles[session.sessionId] ?? session.sessionId.slice(0, 8),
 		icon: <IconMessages size={14} className="shrink-0" />,
-		points: session.points,
-		cost: session.cost,
+		...at("sessions", session.sessionId, session.points, session.cost),
 		estimated: session.estimated,
 		href: shellPath(appRoutes.sessionDetail(session.sessionId)),
 	}));
+	const otherPoints = hovered ? hovered.other : window.otherPoints;
 	if (window.otherPoints > 0)
 		sessions.push({
 			id: "other",
 			label: "Not from this Mac",
 			icon: <IconDevices size={14} className="shrink-0" />,
-			points: window.otherPoints,
+			points: otherPoints,
 			cost: null,
 			estimated: false,
 			muted: true,
@@ -93,8 +144,7 @@ export function UsageBreakdowns({
 					id: entry.id || "none",
 					label: repositoryLabel(entry.id),
 					icon: <IconGitBranch size={14} className="shrink-0" />,
-					points: entry.points,
-					cost: entry.cost,
+					...at("repositories", entry.id, entry.points, entry.cost),
 					estimated: entry.estimated,
 				}))}
 			/>
@@ -105,8 +155,7 @@ export function UsageBreakdowns({
 					id: entry.id,
 					label: costLabel("models", entry.id),
 					icon: <ModelIcon id={entry.id} />,
-					points: entry.points,
-					cost: entry.cost,
+					...at("models", entry.id, entry.points, entry.cost),
 					estimated: entry.estimated,
 				}))}
 			/>
@@ -178,7 +227,7 @@ function UsageRow({
 				<span className="truncate">{row.label}</span>
 			</span>
 			<span className="cost-row-amount">
-				{share}
+				<RollingText text={share} />
 				<span className="cost-row-meter" aria-hidden="true">
 					<span
 						style={{
@@ -188,7 +237,9 @@ function UsageRow({
 					/>
 				</span>
 				{row.cost !== null ? (
-					<small className="cost-cycle-time">{money.format(row.cost)}</small>
+					<small className="cost-cycle-time">
+						<RollingText text={money.format(row.cost)} />
+					</small>
 				) : null}
 			</span>
 		</>

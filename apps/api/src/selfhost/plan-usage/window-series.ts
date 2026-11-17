@@ -22,6 +22,33 @@ export interface BucketSession {
 
 export type BucketKind = "reading" | "between" | "estimate";
 
+export type GroupShares = Record<string, readonly [number, number]>;
+
+export interface BucketGroups {
+	readonly sessions: GroupShares;
+	readonly repositories: GroupShares;
+	readonly models: GroupShares;
+}
+
+function addGroup(target: GroupShares, key: string, entry: RowShare): void {
+	const [points, cost] = target[key] ?? [0, 0];
+	target[key] = [points + entry.points, cost + entry.row.cost];
+}
+
+function roundGroups(groups: BucketGroups): BucketGroups {
+	const clean = (shares: GroupShares): GroupShares =>
+		Object.fromEntries(
+			Object.entries(shares)
+				.filter(([, [points]]) => points >= 0.005)
+				.map(([key, [points, cost]]) => [key, [round(points), round(cost)]]),
+		);
+	return {
+		sessions: clean(groups.sessions),
+		repositories: clean(groups.repositories),
+		models: clean(groups.models),
+	};
+}
+
 export interface SeriesBucket {
 	readonly at: string;
 	readonly usedPercent: number | null;
@@ -32,6 +59,7 @@ export interface SeriesBucket {
 	readonly usedPoints: number;
 	readonly reset: boolean;
 	readonly sessions: readonly BucketSession[];
+	readonly groups: BucketGroups;
 }
 
 export interface SessionShare {
@@ -381,16 +409,25 @@ export function buildWindowSeries(input: {
 	for (let start = input.from; start < input.to; start += bucketMs) {
 		const end = start + bucketMs;
 		const perSession = new Map<string, number>();
+		const groups: BucketGroups = { sessions: {}, repositories: {}, models: {} };
 		while (shareAt < shares.length && (shares[shareAt]?.row.at ?? 0) < start)
 			shareAt += 1;
 		let cursor = shareAt;
 		while (cursor < shares.length && (shares[cursor]?.row.at ?? 0) < end) {
 			const entry = shares[cursor];
-			if (entry)
+			if (entry) {
 				perSession.set(
 					entry.row.sessionId,
 					(perSession.get(entry.row.sessionId) ?? 0) + entry.points,
 				);
+				addGroup(groups.sessions, entry.row.sessionId, entry);
+				addGroup(
+					groups.repositories,
+					input.repositoryOf?.get(entry.row.sessionId) ?? "",
+					entry,
+				);
+				addGroup(groups.models, entry.row.model, entry);
+			}
 			cursor += 1;
 		}
 		const read = latestIn(samples, start, end);
@@ -426,6 +463,7 @@ export function buildWindowSeries(input: {
 				.sort((a, b) => b[1] - a[1])
 				.slice(0, BUCKET_SESSIONS)
 				.map(([sessionId, points]) => ({ sessionId, points: round(points) })),
+			groups: roundGroups(groups),
 		});
 	}
 

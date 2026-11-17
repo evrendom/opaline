@@ -24,6 +24,7 @@ import { useOptionalOrganization } from "@/features/workspace/organization/useOr
 import { CostBreakdown } from "./cost-breakdown";
 import { CostChart } from "./cost-chart";
 import { costLabel, getMetricData, METRIC_LABELS } from "./cost-format";
+import { createHoverDateStore, HoverDateContext } from "./cost-hover-date";
 import { RangeLeadContext } from "./cost-rail-override";
 import { DashboardRangeControls } from "./dashboard-range-controls";
 import {
@@ -269,6 +270,7 @@ export function CostDashboardView({
 	const showToolbar =
 		toolbarStart !== undefined ||
 		(!headerPortal && !rangeInContent && rangeControls !== null);
+	const [hoverStore] = useState(createHoverDateStore);
 	const usage = useUsageTab(input, interval, scope === "workspace");
 	const usageShown = usage.tab?.selected === true;
 	const breakdownsRef = useRef<HTMLDivElement>(null);
@@ -335,6 +337,7 @@ export function CostDashboardView({
 							</div>
 						) : (
 							<CostChart
+								hoverStore={hoverStore}
 								dots={
 									variant === "rail-card"
 										? "switch"
@@ -370,73 +373,77 @@ export function CostDashboardView({
 								onResetSplit={() => setSplit("none")}
 							/>
 						)}
-						<div
-							className="cost-breakdowns-container"
-							hidden={isError || (usageShown && !usage.tab?.breakdowns)}
-						>
-							{tabbed ? (
-								<div className="cost-breakdown-tabs" role="tablist">
-									{dimensions.map((dimension) => (
-										<button
-											key={dimension}
-											type="button"
-											role="tab"
-											aria-selected={dimension === activeTab}
-											onClick={() => setBreakdownTab(dimension)}
-										>
-											{COST_LABELS[dimension]}
-										</button>
-									))}
-								</div>
-							) : null}
+						<HoverDateContext.Provider value={hoverStore}>
 							<div
-								ref={breakdownsRef}
-								className="cost-breakdowns"
-								// Every row is as tall as the space left under the chart: one row
-								// fits the page exactly, more rows keep that height and scroll.
-								data-sized={breakdownRowHeight ? "" : undefined}
-								style={
-									breakdownRowHeight
-										? ({
-												"--breakdown-row-height": `${breakdownRowHeight}px`,
-											} as CSSProperties)
-										: undefined
-								}
-								data-scope={scope}
-								data-layout={breakdownLayout}
-								data-signals={metric === "signals"}
-								data-pull-requests={isPullRequestMetric}
-								data-ci-runs={metric === "ciRuns"}
+								className="cost-breakdowns-container"
+								hidden={isError || (usageShown && !usage.tab?.breakdowns)}
 							>
-								{usageShown
-									? usage.tab?.breakdowns
-									: shownDimensions.map((dimension) => (
-											<CostBreakdown
+								{tabbed ? (
+									<div className="cost-breakdown-tabs" role="tablist">
+										{dimensions.map((dimension) => (
+											<button
 												key={dimension}
-												dimension={dimension}
-												entries={selectedData?.breakdowns[dimension] ?? []}
-												metric={metric}
-												valueLabel={METRIC_LABELS[metric]}
-												unavailable={selectedData === null}
-												onLoadDeferred={
-													PERSON_DIMENSIONS.has(dimension)
-														? (loadPersonRows ?? undefined)
-														: undefined
-												}
-												selected={input[dimension]}
-												pending={isPending}
-												split={input.splitBy === dimension}
-												onToggle={(id) => toggle(dimension, id)}
-												onClear={() => clear(dimension)}
-												onSplit={() =>
-													setSplit(
-														input.splitBy === dimension ? "none" : dimension,
-													)
-												}
-											/>
+												type="button"
+												role="tab"
+												aria-selected={dimension === activeTab}
+												onClick={() => setBreakdownTab(dimension)}
+											>
+												{COST_LABELS[dimension]}
+											</button>
 										))}
+									</div>
+								) : null}
+								<div
+									ref={breakdownsRef}
+									className="cost-breakdowns"
+									// Every row is as tall as the space left under the chart: one row
+									// fits the page exactly, more rows keep that height and scroll.
+									data-sized={breakdownRowHeight ? "" : undefined}
+									style={
+										breakdownRowHeight
+											? ({
+													"--breakdown-row-height": `${breakdownRowHeight}px`,
+												} as CSSProperties)
+											: undefined
+									}
+									data-scope={scope}
+									data-layout={breakdownLayout}
+									data-signals={metric === "signals"}
+									data-pull-requests={isPullRequestMetric}
+									data-ci-runs={metric === "ciRuns"}
+								>
+									{usageShown
+										? usage.tab?.breakdowns
+										: shownDimensions.map((dimension) => (
+												<CostBreakdown
+													key={dimension}
+													dimension={dimension}
+													entries={selectedData?.breakdowns[dimension] ?? []}
+													daily={selectedData?.dailyBreakdowns?.[dimension]}
+													interval={interval}
+													metric={metric}
+													valueLabel={METRIC_LABELS[metric]}
+													unavailable={selectedData === null}
+													onLoadDeferred={
+														PERSON_DIMENSIONS.has(dimension)
+															? (loadPersonRows ?? undefined)
+															: undefined
+													}
+													selected={input[dimension]}
+													pending={isPending}
+													split={input.splitBy === dimension}
+													onToggle={(id) => toggle(dimension, id)}
+													onClear={() => clear(dimension)}
+													onSplit={() =>
+														setSplit(
+															input.splitBy === dimension ? "none" : dimension,
+														)
+													}
+												/>
+											))}
+								</div>
 							</div>
-						</div>
+						</HoverDateContext.Provider>
 					</div>
 				</div>
 			</div>

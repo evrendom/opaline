@@ -351,6 +351,30 @@ function buildSignal(
 	return result.incomplete ? null : result;
 }
 
+const DAILY_DIMENSIONS = new Set<CostDimension>(
+	DIMENSIONS.filter((dimension) => dimension !== "phrases"),
+);
+
+function dailyBreakdownsOf(
+	rows: readonly CostAggregateRow[],
+	breakdowns: DashboardMetricData["breakdowns"],
+): NonNullable<DashboardMetricData["dailyBreakdowns"]> {
+	const daily: Record<string, Record<string, Record<string, number>>> = {};
+	for (const row of rows) {
+		const dimension = row.dimension as CostDimension;
+		if (!DAILY_DIMENSIONS.has(dimension) || !row.date) continue;
+		if (!breakdowns[dimension]?.length) continue;
+		const value = Number(row.value);
+		if (!value) continue;
+		const byDate = daily[dimension] ?? {};
+		daily[dimension] = byDate;
+		const byId = byDate[row.date] ?? {};
+		byDate[row.date] = byId;
+		byId[row.id] = (byId[row.id] ?? 0) + value;
+	}
+	return daily;
+}
+
 export function buildMetric(
 	rows: CostAggregateRow[],
 	input: CostDashboardInput,
@@ -452,6 +476,7 @@ export function buildMetric(
 	}
 	return {
 		breakdowns,
+		dailyBreakdowns: dailyBreakdownsOf(rows, breakdowns),
 		trend,
 		series,
 		total: headlineRows.reduce(
