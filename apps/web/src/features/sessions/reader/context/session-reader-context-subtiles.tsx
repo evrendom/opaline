@@ -41,7 +41,7 @@ export function MarkLegend({
 	return (
 		<div
 			className={cn(
-				"flex min-w-0 items-center gap-4 text-[12px] text-muted-foreground",
+				"flex min-w-0 items-center gap-2.5 text-[12px] text-muted-foreground",
 				className,
 			)}
 		>
