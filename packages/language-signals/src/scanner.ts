@@ -456,7 +456,7 @@ export function scanModelLanguageSignals(
 	text: string,
 ): ReadonlyArray<ModelLanguageSignalMatch> {
 	return scanLanguageSignals(text).filter(
-		(match): match is ModelLanguageSignalMatch => match.category !== "positive",
+		(match): match is ModelLanguageSignalMatch => match.category === "apology",
 	);
 }
 

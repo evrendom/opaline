@@ -503,13 +503,10 @@ function createTurnSummary(
 	);
 	const signalOccurrencesOmittedCount =
 		allSignalOccurrences.length - signalOccurrences.length;
-	const modelSignals = scanModelLanguageSignalSegments(
+	const modelApologyCount = scanModelLanguageSignalSegments(
 		getTurnModelMessageSegments(turn),
-	).filter((signal) => signal.category !== "swear");
-	const modelSignalCount = modelSignals.length;
-	const modelApologyCount = modelSignals.filter(
-		(signal) => signal.category === "apology",
 	).length;
+	const modelSignalCount = modelApologyCount;
 	return {
 		...createActivitySummary(
 			metrics,

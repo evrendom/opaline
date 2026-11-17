@@ -869,7 +869,7 @@ describe("session detail derivation", () => {
 			expect(turn.signalOccurrences).toHaveLength(turn.signalCount);
 		}
 		expect(derivation.turnSummaries[0]).toMatchObject({
-			modelSignalCount: 2,
+			modelSignalCount: 1,
 			signalCount: 2,
 			signalOccurrences: [
 				{ category: "positive", matchedText: "Great" },

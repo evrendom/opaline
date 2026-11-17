@@ -183,7 +183,7 @@ describe("summarizeSessionLanguageSignals", () => {
 			member_swears: 1,
 			model_apologies: 1,
 			model_positive: 0,
-			model_swears: 1,
+			model_swears: 0,
 		});
 	});
 });

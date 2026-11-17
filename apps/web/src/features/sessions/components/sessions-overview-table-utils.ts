@@ -337,10 +337,7 @@ export function getInitialSortDirection(
 
 function getSessionLanguageSignalCount(session: SessionAnalytics) {
 	return (
-		session.member_swears +
-		session.member_apologies +
-		session.model_swears +
-		session.model_apologies
+		session.member_swears + session.member_apologies + session.model_apologies
 	);
 }
 

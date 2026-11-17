@@ -98,17 +98,12 @@ describe("language signal rules", () => {
 		]);
 	});
 
-	test("keeps model signals while removing positive noise", () => {
+	test("keeps only the agent's apologies: its praise, negatives and swears are not tracked", () => {
 		expect(
 			scanModelLanguageSignals("Excellent, sorry, this feels fishy fuck??").map(
 				({ category, matchedText }) => ({ category, matchedText }),
 			),
-		).toEqual([
-			{ category: "apology", matchedText: "sorry" },
-			{ category: "negative", matchedText: "fishy" },
-			{ category: "swear", matchedText: "fuck" },
-			{ category: "negative", matchedText: "??" },
-		]);
+		).toEqual([{ category: "apology", matchedText: "sorry" }]);
 	});
 
 	test("treats fishy and consecutive question marks as negative", () => {
@@ -404,7 +399,7 @@ describe("language signal summaries", () => {
 			member_swears: 1,
 			model_apologies: 1,
 			model_positive: 0,
-			model_swears: 1,
+			model_swears: 0,
 			model_apology_counts: { "My bad": 1 },
 			member_negative_counts: {},
 			member_positive_counts: { "Great work": 1, "GREAT WORK": 1 },
@@ -413,7 +408,7 @@ describe("language signal summaries", () => {
 			member_swear_matches: ["shit"],
 			model_apology_matches: ["My bad"],
 			model_positive_matches: [],
-			model_swear_matches: ["Damn"],
+			model_swear_matches: [],
 		});
 	});
 
@@ -428,7 +423,7 @@ describe("language signal summaries", () => {
 			member_swears: 1,
 			member_apologies: 1,
 			member_positive: 1,
-			model_swears: 1,
+			model_swears: 0,
 			model_apologies: 1,
 			model_positive: 0,
 		});
@@ -448,7 +443,7 @@ describe("language signal summaries", () => {
 			member_swears: 0,
 			member_apologies: 0,
 			member_positive: 1,
-			model_swears: 1,
+			model_swears: 0,
 			model_apologies: 1,
 			model_positive: 0,
 		});

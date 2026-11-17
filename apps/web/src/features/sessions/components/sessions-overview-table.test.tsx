@@ -248,7 +248,7 @@ describe("SessionsOverviewTable", () => {
 			modelGlyph.querySelector('[style*="--opal-tint: #D97757"]'),
 		).toBeInTheDocument();
 		expect(within(sessionsList).getByText("fuck")).toBeVisible();
-		expect(within(sessionsList).getByText("Great work")).toBeVisible();
+		expect(within(sessionsList).queryByText("Great work")).toBeNull();
 		expect(within(sessionsList).getByText("pr2-usage-events")).toBeVisible();
 		expect(
 			within(sessionsList).queryByText("rudel/pr2-usage-events"),

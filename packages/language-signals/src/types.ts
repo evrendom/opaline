@@ -20,9 +20,9 @@ export interface LanguageSignalMatch {
 	readonly end: number;
 }
 
-export type ModelLanguageSignalCategory = Exclude<
+export type ModelLanguageSignalCategory = Extract<
 	BuiltInLanguageSignalCategory,
-	"positive"
+	"apology"
 >;
 
 export interface ModelLanguageSignalMatch extends LanguageSignalMatch {

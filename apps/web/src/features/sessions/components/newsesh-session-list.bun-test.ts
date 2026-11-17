@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { getNewseshLanguageSignalMatches } from "./newsesh-session-language-signal";
 
 describe("newsesh session language signal matches", () => {
-	test("separates member and model words before selecting visible tags", () => {
+	test("separates member and model words; the agent shows only its apologies", () => {
 		const session = {
 			member_swears: 1,
 			member_apologies: 1,
@@ -35,8 +35,6 @@ describe("newsesh session language signal matches", () => {
 			"sorry",
 			"I misunderstood",
 			"I misread",
-			"shit",
-			"nice",
 		]);
 		expect(model.every((signal) => signal.speaker === "model")).toBe(true);
 	});

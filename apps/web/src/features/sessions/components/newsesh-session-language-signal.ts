@@ -22,9 +22,7 @@ const NEWSHESH_LANGUAGE_SIGNAL_ORDER: ReadonlyArray<{
 		| "member_swears"
 		| "member_apologies"
 		| "member_positive"
-		| "model_swears"
-		| "model_apologies"
-		| "model_positive";
+		| "model_apologies";
 	matchKey: LanguageSignalMatchKey;
 	speaker: NewseshLanguageSignalMatch["speaker"];
 }> = [
@@ -47,21 +45,9 @@ const NEWSHESH_LANGUAGE_SIGNAL_ORDER: ReadonlyArray<{
 		speaker: "member",
 	},
 	{
-		category: "swear",
-		countKey: "model_swears",
-		matchKey: "model_swear_matches",
-		speaker: "model",
-	},
-	{
 		category: "apology",
 		countKey: "model_apologies",
 		matchKey: "model_apology_matches",
-		speaker: "model",
-	},
-	{
-		category: "positive",
-		countKey: "model_positive",
-		matchKey: "model_positive_matches",
 		speaker: "model",
 	},
 ];
