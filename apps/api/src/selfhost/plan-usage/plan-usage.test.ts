@@ -108,6 +108,46 @@ test("splits a rise across the sessions that ran, by cost", () => {
 	});
 });
 
+test("work between two equal readings shares the next rise", () => {
+	const rows: CostRow[] = [
+		{ sessionId: "a", at: T0 + 5 * 60_000, model: "claude-opus-5-5", cost: 1 },
+		{ sessionId: "b", at: T0 + 35 * 60_000, model: "claude-opus-5-5", cost: 1 },
+	];
+	const series = buildWindowSeries({
+		samples: [
+			sample(T0, 40),
+			sample(T0 + 30 * 60_000, 40),
+			sample(T0 + 60 * 60_000, 42),
+		],
+		rows,
+		from: T0,
+		to: T0 + 2 * HOUR,
+		now: T0 + 2 * HOUR,
+	});
+	expect(series?.sessionPoints).toEqual({ a: 1, b: 1 });
+});
+
+test("work after the latest reading is estimated at the cycle's rate", () => {
+	const rows: CostRow[] = [
+		{ sessionId: "a", at: T0 + 5 * 60_000, model: "claude-opus-5-5", cost: 2 },
+		{
+			sessionId: "b",
+			agentId: "sub",
+			at: T0 + 40 * 60_000,
+			model: "claude-opus-5-5",
+			cost: 1,
+		},
+	];
+	const series = buildWindowSeries({
+		samples: [sample(T0, 40), sample(T0 + 30 * 60_000, 44)],
+		rows,
+		from: T0,
+		to: T0 + HOUR,
+		now: T0 + HOUR,
+	});
+	expect(series?.sessionPoints).toEqual({ a: 4, b: 2, "b:sub": 2 });
+});
+
 test("usage with no local activity, before or between samples, is other devices", () => {
 	const series = buildWindowSeries({
 		samples: [sample(T0, 40), sample(T0 + 30 * 60_000, 42)],

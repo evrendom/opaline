@@ -209,12 +209,21 @@ function earlierCycleSteps(
 	return steps;
 }
 
-function share(steps: Step[], rows: readonly CostRow[]): RowShare[] {
+function share(
+	steps: Step[],
+	rows: readonly CostRow[],
+	rate: number | null,
+): RowShare[] {
 	const shares: RowShare[] = [];
 	let from = 0;
+	let carried = false;
 	for (const step of steps) {
-		while (from < rows.length && (rows[from]?.at ?? 0) + COST_ROW_MS <= step.t0)
-			from += 1;
+		if (step.opens || !carried)
+			while (
+				from < rows.length &&
+				(rows[from]?.at ?? 0) + COST_ROW_MS <= step.t0
+			)
+				from += 1;
 		let to = from;
 		let total = 0;
 		while (to < rows.length && (rows[to]?.at ?? 0) + COST_ROW_MS <= step.t1) {
@@ -224,8 +233,14 @@ function share(steps: Step[], rows: readonly CostRow[]): RowShare[] {
 		if (total <= 0) {
 			step.other = step.delta;
 			from = to;
+			carried = false;
 			continue;
 		}
+		if (step.delta <= 0 && !step.synthetic) {
+			carried = true;
+			continue;
+		}
+		carried = false;
 		let running = 0;
 		for (let index = from; index < to; index += 1) {
 			const row = rows[index];
@@ -243,7 +258,23 @@ function share(steps: Step[], rows: readonly CostRow[]): RowShare[] {
 		}
 		from = to;
 	}
-	return shares;
+	let cycle = 0;
+	for (const step of steps) if (step.opens) cycle = step.t0;
+	let points = 0;
+	let cost = 0;
+	for (const entry of shares)
+		if (entry.row.at >= cycle) {
+			points += entry.points;
+			cost += entry.row.cost;
+		}
+	const tailRate = cost > 0 ? points / cost : rate;
+	if (tailRate !== null)
+		for (let index = from; index < rows.length; index += 1) {
+			const row = rows[index];
+			if (row && row.at >= cycle)
+				shares.push({ row, points: row.cost * tailRate, coarse: true });
+		}
+	return shares.sort((a, b) => a.row.at - b.row.at);
 }
 
 interface Reading {
@@ -365,7 +396,7 @@ export function buildWindowSeries(input: {
 		...earlierCycleSteps(samples, rows, input.from),
 		...stepsOf(samples),
 	];
-	const shares = share(steps, rows);
+	const shares = share(steps, rows, pointsPerDollar(samples, rows));
 	const bucketMinutes =
 		input.bucketMinutes ?? bucketMinutesFor(input.to - input.from);
 	const bucketMs = bucketMinutes * MINUTE;
