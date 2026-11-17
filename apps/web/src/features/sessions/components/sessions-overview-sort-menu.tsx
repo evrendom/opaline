@@ -12,22 +12,25 @@ import {
 	getInitialSortDirection,
 	SESSION_OVERVIEW_MENU_TRIGGER_CLASS_NAME,
 	SESSION_OVERVIEW_SORT_OPTIONS,
+	type SessionOverviewSortKey,
 	type SessionSortState,
 } from "./sessions-overview-table-utils";
 
 export function SessionsOverviewSortMenu({
 	activeSortLabel,
 	onSortChange,
+	options = SESSION_OVERVIEW_SORT_OPTIONS,
 	sort,
 }: {
 	activeSortLabel: string;
 	onSortChange: (sort: SessionSortState) => void;
+	options?: readonly { key: SessionOverviewSortKey; label: string }[];
 	sort: SessionSortState;
 }) {
 	return (
 		<ToolbarSortMenu
 			noun="sessions"
-			options={SESSION_OVERVIEW_SORT_OPTIONS}
+			options={options}
 			activeSortLabel={activeSortLabel}
 			getInitialDirection={getInitialSortDirection}
 			onSortChange={onSortChange}

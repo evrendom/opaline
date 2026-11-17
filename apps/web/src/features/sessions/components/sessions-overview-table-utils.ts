@@ -9,6 +9,7 @@ import {
 } from "@/features/sessions/components/session-overview-metrics";
 import { isLiveOnlySessionRow } from "@/features/sessions/live-session-rows";
 import { getSessionTimestamp } from "@/features/sessions/session-ordering";
+import { transcriptSubagentId } from "@/features/sessions/session-row-key";
 import { calculateCost, formatUsername } from "@/lib/format";
 
 // One-line table rows: 48px (8px of air around a 32px line).
@@ -64,10 +65,12 @@ export type SessionOverviewColumnKey =
 export type SessionOverviewSortKey =
 	| SessionOverviewColumnKey
 	| "duration"
-	| "messages";
+	| "messages"
+	| "usage";
 export const SESSION_OVERVIEW_SORT_OPTIONS = [
 	{ key: "time", label: "Date" },
 	{ key: "cost", label: "Cost" },
+	{ key: "usage", label: "Usage" },
 	{ key: "tokens", label: "Tokens" },
 	{ key: "skills", label: "Skills" },
 	{ key: "errors", label: "Errors" },
@@ -233,6 +236,7 @@ export function compareSessions(
 	rightSession: SessionAnalytics,
 	sortKey: SessionOverviewSortKey,
 	userMap: Record<string, string>,
+	usageShares?: ReadonlyMap<string, number> | null,
 ) {
 	switch (sortKey) {
 		case "user":
@@ -291,6 +295,11 @@ export function compareSessions(
 				getSessionOverviewCost(leftSession),
 				getSessionOverviewCost(rightSession),
 			);
+		case "usage":
+			return compareNullableNumbers(
+				usageShares?.get(planUsageKey(leftSession)) ?? null,
+				usageShares?.get(planUsageKey(rightSession)) ?? null,
+			);
 		case "errors":
 			return compareNullableNumbers(
 				resolveSessionErrorCount(leftSession.error_count),
@@ -315,6 +324,7 @@ export function getInitialSortDirection(
 		case "tokens":
 		case "output":
 		case "cost":
+		case "usage":
 		case "errors":
 		case "time":
 		case "duration":
@@ -332,6 +342,11 @@ function getSessionLanguageSignalCount(session: SessionAnalytics) {
 		session.model_swears +
 		session.model_apologies
 	);
+}
+
+export function planUsageKey(session: SessionAnalytics): string {
+	const agent = transcriptSubagentId(session);
+	return agent ? `${session.session_id}:${agent}` : session.session_id;
 }
 
 export function getRepositoryLabel(session: SessionAnalytics) {

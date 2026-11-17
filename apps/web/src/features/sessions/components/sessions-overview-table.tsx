@@ -44,6 +44,7 @@ import { SessionsOverviewRow } from "./sessions-overview-row";
 import { getContainedWheelScroll } from "./sessions-overview-scroll";
 import { SessionsOverviewSample } from "./sessions-overview-skeleton";
 import {
+	planUsageKey,
 	SESSION_OVERVIEW_MIN_WIDTH_CLASS_NAME,
 	SESSION_OVERVIEW_SURFACE_CLASS_NAME,
 } from "./sessions-overview-table-utils";
@@ -120,8 +121,12 @@ export function SessionsOverviewTable({
 	const [page, setPage] = useState(0);
 	const [pageSize, setPageSize] = useState<number>(DEFAULT_SESSIONS_PER_PAGE);
 	const { avatarMap, userMap } = useUserMap();
+	const ownUsageShares = useSessionUsageShares(givenUsageShares === undefined);
+	const usageShares =
+		givenUsageShares === undefined ? ownUsageShares : givenUsageShares;
 	const tableState = useSessionsOverviewTableState({
 		costMaximum,
+		usageShares,
 		sessionCountLabel,
 		sessions,
 		totalSessionCount,
@@ -160,9 +165,6 @@ export function SessionsOverviewTable({
 		[sessions, showSkillsColumn],
 	);
 	const questionTags = useSessionRunQuestionTags(taggedSessionIds);
-	const ownUsageShares = useSessionUsageShares(givenUsageShares === undefined);
-	const usageShares =
-		givenUsageShares === undefined ? ownUsageShares : givenUsageShares;
 	const limitHits = useSessionLimitHits();
 	const reserveUsageColumn = useLocalDesktopApp() || usageShares !== null;
 	// Live rows read "12s ago"; only they follow the clock.
@@ -500,9 +502,4 @@ export function SessionsOverviewTable({
 			</div>
 		</div>
 	);
-}
-
-function planUsageKey(session: SessionAnalytics): string {
-	const agent = transcriptSubagentId(session);
-	return agent ? `${session.session_id}:${agent}` : session.session_id;
 }

@@ -59,6 +59,7 @@ export function useSessionsOverviewTableState({
 	filterCatalogError,
 	onRetryFilterCatalog,
 	onFiltersChange,
+	usageShares = null,
 }: {
 	costMaximum?: number;
 	filterCatalog?: SessionFilterCatalog;
@@ -70,6 +71,7 @@ export function useSessionsOverviewTableState({
 	sessionCountLabel: number;
 	sessions: readonly SessionAnalytics[] | undefined;
 	totalSessionCount: number;
+	usageShares?: ReadonlyMap<string, number> | null;
 	userMap: Record<string, string>;
 }) {
 	const demo = useDemoRuntime();
@@ -150,14 +152,25 @@ export function useSessionsOverviewTableState({
 			),
 		[excludedFilterValues, rangeFilterValues, recentSessions],
 	);
+	const sortOptions = useMemo(
+		() =>
+			usageShares
+				? SESSION_OVERVIEW_SORT_OPTIONS
+				: SESSION_OVERVIEW_SORT_OPTIONS.filter(
+						(option) => option.key !== "usage",
+					),
+		[usageShares],
+	);
+	const sortKey = sort.key === "usage" && !usageShares ? "time" : sort.key;
 	const sortedSessions = useMemo(
 		() =>
 			[...filteredSessions].sort((leftSession, rightSession) => {
 				const comparison = compareSessions(
 					leftSession,
 					rightSession,
-					sort.key,
+					sortKey,
 					userMap,
+					usageShares,
 				);
 				const directedComparison =
 					sort.direction === "asc" ? comparison : -comparison;
@@ -168,7 +181,7 @@ export function useSessionsOverviewTableState({
 					compareSessionLabels(leftSession.session_id, rightSession.session_id)
 				);
 			}),
-		[filteredSessions, sort.direction, sort.key, userMap],
+		[filteredSessions, sort.direction, sortKey, usageShares, userMap],
 	);
 	const visibleSessions = sortedSessions.slice(0, visibleRowCount);
 	const previewMaxima =
@@ -248,8 +261,7 @@ export function useSessionsOverviewTableState({
 		filterCatalogError,
 		onRetryFilterCatalog,
 		activeSortLabel:
-			SESSION_OVERVIEW_SORT_OPTIONS.find((option) => option.key === sort.key)
-				?.label ??
+			sortOptions.find((option) => option.key === sortKey)?.label ??
 			SESSION_OVERVIEW_COLUMNS.find((column) => column.key === sort.key)
 				?.label ??
 			"Date",
@@ -295,7 +307,8 @@ export function useSessionsOverviewTableState({
 			}));
 			resetVisibleRows();
 		},
-		sort,
+		sort: sortKey === sort.key ? sort : { ...sort, key: sortKey },
+		sortOptions,
 		sortedSessions,
 		changeSort: (nextSort: SessionSortState) => {
 			resetVisibleRows();

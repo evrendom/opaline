@@ -27,6 +27,7 @@ export function SessionsOverviewControls({
 			<SessionsOverviewSortMenu
 				activeSortLabel={tableState.activeSortLabel}
 				onSortChange={tableState.changeSort}
+				options={tableState.sortOptions}
 				sort={tableState.sort}
 			/>
 			{tableState.filterCatalogError && !tableState.filterCatalogPending ? (

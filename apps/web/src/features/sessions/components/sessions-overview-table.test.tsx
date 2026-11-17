@@ -524,6 +524,62 @@ describe("SessionsOverviewTable", () => {
 		).not.toBeInTheDocument();
 	});
 
+	it("sorts by plan usage only where sessions have a share of the limit", async () => {
+		const user = userEvent.setup();
+		const table = (usageShares: ReadonlyMap<string, number> | null) => (
+			<SessionsOverviewTable
+				activeSessionId={null}
+				canOpenSession={() => true}
+				getSessionHref={undefined}
+				getSessionLinkState={undefined}
+				isLoading={false}
+				onSessionClick={vi.fn()}
+				scrollContainerRef={undefined}
+				sessionCountLabel={2}
+				sessions={[session, otherSession]}
+				sessionDetailDisabledNote={undefined}
+				totalSessionCount={2}
+				usageShares={usageShares}
+			/>
+		);
+		const withoutShares = render(table(null));
+		await user.click(screen.getByRole("button", { name: /^Sort sessions, / }));
+		expect(
+			await screen.findByRole("menuitemradio", { name: "Cost" }),
+		).toBeInTheDocument();
+		expect(
+			screen.queryByRole("menuitemradio", { name: "Usage" }),
+		).not.toBeInTheDocument();
+		withoutShares.unmount();
+
+		render(
+			table(
+				new Map([
+					[session.session_id, 0.5],
+					[otherSession.session_id, 3],
+				]),
+			),
+		);
+		await user.click(screen.getByRole("button", { name: /^Sort sessions, / }));
+		await user.click(
+			await screen.findByRole("menuitemradio", { name: "Usage" }),
+		);
+		expect(
+			screen.getByRole("button", {
+				name: "Sort sessions, Usage, descending",
+			}),
+		).toBeVisible();
+		const rows = [
+			...document.querySelectorAll<HTMLElement>(
+				'[data-dashboard-grid-row-scope="session"]',
+			),
+		];
+		expect(rows.map((row) => within(row).queryByText("4¢") !== null)).toEqual([
+			true,
+			false,
+		]);
+	});
+
 	it("filters rows by model and clears the active filter", async () => {
 		const user = userEvent.setup();
 

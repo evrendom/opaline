@@ -63,3 +63,18 @@ test("keeps unavailable cost and errors distinct from confirmed zero", () => {
 	expect(compareSessions(unknown, zero, "cost", {})).toBeLessThan(0);
 	expect(compareSessions(unknown, zero, "errors", {})).toBeLessThan(0);
 });
+
+test("sorts usage by each session's share of the plan limit, unknown below none", () => {
+	const left = { ...smaller, session_id: "left" };
+	const right = { ...larger, session_id: "right" };
+	const unread = { ...smaller, session_id: "unread" };
+	const shares = new Map([
+		["left", 0.4],
+		["right", 6.2],
+	]);
+	expect(compareSessions(left, right, "usage", {}, shares)).toBeLessThan(0);
+	expect(compareSessions(right, left, "usage", {}, shares)).toBeGreaterThan(0);
+	expect(compareSessions(unread, left, "usage", {}, shares)).toBeLessThan(0);
+	expect(compareSessions(left, right, "usage", {})).toBe(0);
+	expect(getInitialSortDirection("usage")).toBe("desc");
+});
