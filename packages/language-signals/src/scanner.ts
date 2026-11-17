@@ -132,14 +132,16 @@ const POSITIVE_WORDS_SOURCE = `(?:${[
 ]
 	.map(compileSurfaceSource)
 	.join("|")})`;
-const SWEAR_BEFORE_POSITIVE_PATTERN = new RegExp(
-	`^[\\s,]+(?:(?:so|really|very|super|too)\\s+)?${POSITIVE_WORDS_SOURCE}(?![\\p{L}\\p{N}])`,
+const POSITIVE_WORD_PATTERN = new RegExp(
+	`(?<![\\p{L}\\p{N}])${POSITIVE_WORDS_SOURCE}(?![\\p{L}\\p{N}])`,
 	"iu",
 );
-const POSITIVE_BEFORE_SWEAR_PATTERN = new RegExp(
-	`(?<![\\p{L}\\p{N}])${POSITIVE_WORDS_SOURCE}\\s+(?:as\\s+)?$`,
-	"iu",
-);
+const NEGATION_WORD_PATTERN =
+	/(?<![\p{L}\p{N}])(?:not|no|never|nothing|dont|doesnt|didnt|isnt|wasnt|arent|werent|cant|cannot|wont|wouldnt|shouldnt|aint|\p{L}+n['’]t)(?![\p{L}\p{N}])/iu;
+const CLAUSE_END_PATTERN = /[.!?;:…\n]/u;
+const WORDS_BEFORE_PATTERN = /(?:[\p{L}\p{N}'’-]+[\s,]*){0,2}$/u;
+const WORDS_AFTER_PATTERN = /^(?:[\s,]*[\p{L}\p{N}'’-]+){0,2}/u;
+const SWEAR_WINDOW_CHARS = 60;
 const SYSTEM_INSTRUCTION_BLOCK_PATTERN =
 	/<system_instruction>[\s\S]*?<\/system_instruction>/giu;
 
@@ -308,6 +310,41 @@ function startsSentence(text: string, index: number): boolean {
 	return true;
 }
 
+function praisesNextToSwear(text: string, start: number, end: number): boolean {
+	const lead = text.slice(Math.max(0, start - SWEAR_WINDOW_CHARS), start);
+	const trail = text.slice(end, end + SWEAR_WINDOW_CHARS);
+	const before = (
+		lead.slice(lastClauseEnd(lead) + 1).match(WORDS_BEFORE_PATTERN)?.[0] ?? ""
+	).trim();
+	const trailEnd = trail.search(CLAUSE_END_PATTERN);
+	const after = (
+		trail
+			.slice(0, trailEnd === -1 ? undefined : trailEnd)
+			.match(WORDS_AFTER_PATTERN)?.[0] ?? ""
+	).trim();
+	return (
+		(POSITIVE_WORD_PATTERN.test(before) || POSITIVE_WORD_PATTERN.test(after)) &&
+		![before, after].some(
+			(words) => NEGATION_WORD_PATTERN.test(words) || hasUnhappySurface(words),
+		)
+	);
+}
+
+function lastClauseEnd(text: string): number {
+	for (let at = text.length - 1; at >= 0; at--)
+		if (CLAUSE_END_PATTERN.test(text[at] ?? "")) return at;
+	return -1;
+}
+
+function hasUnhappySurface(words: string): boolean {
+	if (words === "") return false;
+	for (const match of languageSignalPatternMatches(words)) {
+		const category = findCompiledSurface(match)?.category;
+		if (category === "negative" || category === "swear") return true;
+	}
+	return false;
+}
+
 function buildLanguageSignalMatch(
 	text: string,
 	match: RegExpExecArray,
@@ -323,11 +360,7 @@ function buildLanguageSignalMatch(
 	const end = match.index + match[0].length;
 	if (
 		compiledSurface.category === "swear" &&
-		(SWEAR_BEFORE_POSITIVE_PATTERN.test(text.slice(end, end + 40)) ||
-			(compiledSurface.ruleId === "swear.as-fuck" &&
-				POSITIVE_BEFORE_SWEAR_PATTERN.test(
-					text.slice(Math.max(0, start - 40), start),
-				)))
+		praisesNextToSwear(text, start, end)
 	)
 		return {
 			category: "positive",

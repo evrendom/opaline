@@ -49,7 +49,7 @@ describe("language signal rules", () => {
 	}
 
 	test("matches without regard to case", () => {
-		expect(scanLanguageSignals("FUCK Sorry EXCELLENT")).toEqual([
+		expect(scanLanguageSignals("FUCK. Sorry EXCELLENT")).toEqual([
 			{
 				category: "swear",
 				ruleId: "swear.fuck",
@@ -61,15 +61,15 @@ describe("language signal rules", () => {
 				category: "apology",
 				ruleId: "apology.sorry",
 				matchedText: "Sorry",
-				start: 5,
-				end: 10,
+				start: 6,
+				end: 11,
 			},
 			{
 				category: "positive",
 				ruleId: "positive.praise",
 				matchedText: "EXCELLENT",
-				start: 11,
-				end: 20,
+				start: 12,
+				end: 21,
 			},
 		]);
 	});

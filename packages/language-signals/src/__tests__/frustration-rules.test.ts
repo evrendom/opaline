@@ -146,6 +146,22 @@ describe("frustration rules", () => {
 		expect(unhappy("this better fucking work")).toEqual(["swear.fuck"]);
 	});
 
+	test.each([
+		["fucking shit", ["swear", "swear"]],
+		["fucking great", ["positive", "positive"]],
+		["damn good", ["positive", "positive"]],
+		["hell yeah", ["positive"]],
+		["holy shit that's amazing", ["positive", "positive"]],
+		["shit, still broken", ["swear", "negative"]],
+		["this is fucking awful", ["swear", "negative"]],
+		["not fucking good", ["swear", "positive"]],
+		["great work. the fucking build broke", ["positive", "swear"]],
+	])("a swear is positive only with praise and nothing unhappy within two words: %p", (text, categories) => {
+		expect(signals(text).map(({ category }): string => category)).toEqual(
+			categories,
+		);
+	});
+
 	test("question runs count after a word or at the end, never between operands", () => {
 		expect(unhappy("const port = env.PORT ?? 3000")).toEqual([]);
 		expect(unhappy("value ??= fallback")).toEqual([]);

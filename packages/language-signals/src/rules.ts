@@ -28,11 +28,12 @@ export const SWEAR_INTENSIFIED_POSITIVES: readonly string[] = [
 	"best",
 ];
 
+// Positive swearing: a swear counts as positive only when a word from the praise list or SWEAR_INTENSIFIED_POSITIVES is within two words of it on either side in the same clause (commas allowed; . ! ? ; : … or a line break end it), and no negation (not, no, never, -n't), negative surface or other swear is within those words.
 // Deterministic surface lists plus a few bounded patterns (word-internal and
 // transposed "fuck" stems, short failure constructions); no stemming, open
 // fuzzy matching, or leetspeak. The scanner handles immediately adjacent
-// explicit negation, swears next to praise (positive), quoted and code text in
-// member prompts (skipped), and the context guards it keys by rule id.
+// explicit negation, quoted and code text in member prompts (skipped), and the
+// context guards it keys by rule id.
 // Identity slurs stay excluded. "hellish", bare "absolutely right", and bare
 // "exactly" are deliberate non-surfaces (boundary and ordering semantics
 // depend on them).
