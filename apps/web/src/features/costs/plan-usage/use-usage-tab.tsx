@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useLocalDesktopApp } from "@/features/desktop/local-app";
 import type { ChartInterval } from "../chart-interval";
 import type { UsageTab } from "../cost-chart";
@@ -25,7 +26,8 @@ export function useUsageTab(
 	deselect: () => void;
 } {
 	const desktop = useLocalDesktopApp() && enabled;
-	const [selected, setSelected] = useState(false);
+	const [params] = useSearchParams();
+	const [selected, setSelected] = useState(() => !params.get("metric"));
 	const [provider, setProvider] = useState<PlanProvider>("claude");
 	const query = usePlanUsage(desktop, range);
 	const deselect = () => setSelected(false);
