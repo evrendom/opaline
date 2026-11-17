@@ -3,7 +3,12 @@ import { useSearchParams } from "react-router-dom";
 import { useLocalDesktopApp } from "@/features/desktop/local-app";
 import type { ChartInterval } from "../chart-interval";
 import type { UsageTab } from "../cost-chart";
-import { PlanUsageChart, periodsOf, showsChart } from "./plan-usage-chart";
+import {
+	formatPoints,
+	PlanUsageChart,
+	periodsOf,
+	showsChart,
+} from "./plan-usage-chart";
 import { UsageBreakdowns } from "./usage-breakdowns";
 import {
 	leftPercent,
