@@ -9,7 +9,7 @@ import { Bone, Reveal } from "@/app/ui/bones";
 import { Button } from "@/app/ui/button";
 import { getToolPresentation } from "@/components/conversation/conversation-tools";
 import { ConversationTraceTag } from "@/components/conversation/conversation-trace-tag";
-import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
+import { SessionMenuPopup } from "@/features/sessions/components/session-menu-popup";
 import { SESSION_OVERVIEW_MENU_TRIGGER_CLASS_NAME } from "@/features/sessions/components/sessions-overview-table-utils";
 import { CopyButton } from "@/features/shell/components/copy-button";
 import { RichSkillDocument } from "@/features/skills/components/rich-skill-document";
@@ -214,39 +214,30 @@ function SkillVersionMenu({
 					className="size-4 shrink-0 text-[#5d5d5d] dark:text-[#acaeb2]"
 				/>
 			</Menu.Trigger>
-			<Menu.Portal>
-				<Menu.Positioner align="start" sideOffset={6} className="z-50">
-					<Menu.Popup
-						aria-label="Skill versions"
-						data-fluid-menu-root=""
-						className="session-menu-surface session-menu-sort"
-					>
-						<FluidMenuHover />
-						<Menu.RadioGroup
-							aria-label="Version"
-							value={getVersionKey(selectedVersion)}
-							onValueChange={(value: unknown) => {
-								if (typeof value === "string") onSelect(value);
-							}}
+			<SessionMenuPopup aria-label="Skill versions">
+				<Menu.RadioGroup
+					aria-label="Version"
+					value={getVersionKey(selectedVersion)}
+					onValueChange={(value: unknown) => {
+						if (typeof value === "string") onSelect(value);
+					}}
+				>
+					{versions.map((version, index) => (
+						<Menu.RadioItem
+							key={getVersionKey(version)}
+							value={getVersionKey(version)}
+							closeOnClick
+							className="session-menu-row"
+							title={`Last used ${formatFullDateLabel(version.lastUsedAt)}`}
 						>
-							{versions.map((version, index) => (
-								<Menu.RadioItem
-									key={getVersionKey(version)}
-									value={getVersionKey(version)}
-									closeOnClick
-									className="session-menu-row"
-									title={`Last used ${formatFullDateLabel(version.lastUsedAt)}`}
-								>
-									<Menu.RadioItemIndicator className="session-menu-sort-check">
-										<IconCheck aria-hidden="true" className="size-3.5" />
-									</Menu.RadioItemIndicator>
-									Version {versions.length - index}
-								</Menu.RadioItem>
-							))}
-						</Menu.RadioGroup>
-					</Menu.Popup>
-				</Menu.Positioner>
-			</Menu.Portal>
+							<Menu.RadioItemIndicator className="session-menu-sort-check">
+								<IconCheck aria-hidden="true" className="size-3.5" />
+							</Menu.RadioItemIndicator>
+							Version {versions.length - index}
+						</Menu.RadioItem>
+					))}
+				</Menu.RadioGroup>
+			</SessionMenuPopup>
 		</Menu.Root>
 	);
 }

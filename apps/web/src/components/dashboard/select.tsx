@@ -8,6 +8,7 @@ import {
 	IconSelector,
 } from "@tabler/icons-react";
 import * as React from "react";
+import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { cn } from "@/lib/utils";
 
 function collectSelectItemLabels(
@@ -134,7 +135,10 @@ function SelectContent({
 					{...props}
 				>
 					<SelectScrollUpButton />
-					<SelectPrimitive.List>{children}</SelectPrimitive.List>
+					<SelectPrimitive.List data-fluid-menu-root="">
+						<FluidMenuHover items='[role="option"]' />
+						{children}
+					</SelectPrimitive.List>
 					<SelectScrollDownButton />
 				</SelectPrimitive.Popup>
 			</SelectPrimitive.Positioner>

@@ -11,6 +11,7 @@ import {
 	useMemo,
 	useState,
 } from "react";
+import { SessionMenuPopup } from "@/features/sessions/components/session-menu-popup";
 import { cn } from "@/lib/utils";
 import "../../components/session-menu.css";
 import {
@@ -262,21 +263,18 @@ export function RailTagsPicker({
 					<IconAdjustmentsHorizontal aria-hidden="true" className="size-3.5" />
 				</Menu.Trigger>
 			</Tip>
-			<Menu.Portal>
-				<Menu.Positioner align="end" sideOffset={6} className="z-50">
-					<Menu.Popup
-						aria-label="Beside each turn"
-						className="session-menu-surface session-menu-sort"
-						style={{ width: "max-content" }}
-					>
-						<FigureToggle
-							onPick={figure.onPick}
-							options={figure.options}
-							value={figure.value}
-						/>
-					</Menu.Popup>
-				</Menu.Positioner>
-			</Menu.Portal>
+			<SessionMenuPopup
+				align="end"
+				fluidHover={false}
+				aria-label="Beside each turn"
+				style={{ width: "max-content" }}
+			>
+				<FigureToggle
+					onPick={figure.onPick}
+					options={figure.options}
+					value={figure.value}
+				/>
+			</SessionMenuPopup>
 		</Menu.Root>
 	);
 }
