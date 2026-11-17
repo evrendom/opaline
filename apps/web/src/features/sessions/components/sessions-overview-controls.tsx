@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { DashboardDateControls } from "@/features/dashboard/components/DashboardDateControls";
+import { SessionsFocusedDayTag } from "./sessions-focused-day-tag";
 import { SessionsOverviewFiltersMenu } from "./sessions-overview-filters-menu";
 import { SessionsOverviewSortMenu } from "./sessions-overview-sort-menu";
 import type { useSessionsOverviewTableState } from "./use-sessions-overview-table-state";
@@ -51,6 +52,7 @@ export function SessionsOverviewControls({
 					rangeFilterValues={tableState.rangeFilterValues}
 				/>
 			)}
+			<SessionsFocusedDayTag />
 			{/* The range control trails at the toolbar's right. */}
 			{showDateControl ? (
 				<div className="ml-auto in-data-rail-beside:hidden">

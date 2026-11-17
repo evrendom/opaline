@@ -238,22 +238,24 @@ export function SessionsPage() {
 							<DotPreviewContext.Provider value={preview}>
 								<SessionsRail />
 							</DotPreviewContext.Provider>
+							<DateRangeOverride range={shownRange}>
+								<SessionsListSurface
+									activeSessionId={activeSessionId}
+									canOpenSession={(session) => canViewSession(session.user_id)}
+									data={data}
+									getSessionHref={(session) =>
+										getShellRoutePath(
+											appRoutes.sessionDetail(session.session_id),
+										)
+									}
+									layout="workspace"
+									onSessionClick={handleSessionClick}
+									showPlace
+									showSkillsColumn={false}
+									scrollContainerRef={scrollContainerRef}
+								/>
+							</DateRangeOverride>
 						</DotPickContext.Provider>
-						<DateRangeOverride range={shownRange}>
-							<SessionsListSurface
-								activeSessionId={activeSessionId}
-								canOpenSession={(session) => canViewSession(session.user_id)}
-								data={data}
-								getSessionHref={(session) =>
-									getShellRoutePath(appRoutes.sessionDetail(session.session_id))
-								}
-								layout="workspace"
-								onSessionClick={handleSessionClick}
-								showPlace
-								showSkillsColumn={false}
-								scrollContainerRef={scrollContainerRef}
-							/>
-						</DateRangeOverride>
 					</section>
 				)}
 			</div>
