@@ -219,10 +219,17 @@ test("imports every session once, newest first, and reports progress", async () 
 test("counts sessions written in the last five minutes as running until their turn stops", async () => {
 	const working = await session("working", 1);
 	await session("quiet", 10);
-	let clock = Date.now();
+	let clock = Date.now() - 1_000;
 	const service = create(memoryStore(), ingestor(), { now: () => clock });
 	await service.start();
 	await settle(service);
+	expect(service.status().agentsRunning).toBe(0);
+
+	clock += 1_000;
+	const written = new Date(clock);
+	await appendFile(working, line("working"));
+	await utimes(working, written, written);
+	await service.notify([working], false);
 	expect(service.status().agentsRunning).toBe(1);
 	expect(await service.liveSessions()).toMatchObject([
 		{ sessionId: working, userId: owner.userId, source: "claude_code" },

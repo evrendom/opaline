@@ -1,9 +1,9 @@
 import type { LastSessionUpload, SessionAnalytics } from "@rudel/api-routes";
 import {
+	IconAiAgent,
 	IconArrowUpRight,
 	IconCloudUpload,
 	IconLoader2,
-	IconRun,
 } from "@tabler/icons-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { ReactNode } from "react";
@@ -171,7 +171,7 @@ export function LastSessionUploadBar() {
 					className="group/last-upload flex items-center gap-1.25 rounded-sm outline-none transition-colors hover:text-foreground"
 				>
 					{localApp ? (
-						<IconRun aria-hidden="true" className="size-3.25 opacity-80" />
+						<IconAiAgent aria-hidden="true" className="size-3.25 opacity-80" />
 					) : (
 						<IconCloudUpload
 							aria-hidden="true"

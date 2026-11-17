@@ -177,6 +177,7 @@ export class LocalIngest {
 	private readonly watchers = new Map<string, FSWatcher>();
 	private readonly touched = new Set<string>();
 	private readonly stoppedAt = new Map<string, number>();
+	private watchingSince = Number.POSITIVE_INFINITY;
 	private owner: Owner | null = null;
 	private stopped = false;
 	private started = false;
@@ -208,6 +209,7 @@ export class LocalIngest {
 	async start(): Promise<void> {
 		if (this.started) return;
 		this.started = true;
+		this.watchingSince = this.now();
 		const rows = await this.deps.store.loadAll();
 		for (const row of rows) this.restore(row);
 		await this.loadInitialImport(rows);
@@ -453,7 +455,11 @@ export class LocalIngest {
 		const lastWrite = new Map<string, number>();
 		for (const seen of this.files.values()) {
 			const { sessionPath } = seen.file;
-			if (now - seen.stat.mtimeMs > LIVE_SESSION_ACTIVE_WINDOW_MS) continue;
+			if (
+				now - seen.stat.mtimeMs > LIVE_SESSION_ACTIVE_WINDOW_MS ||
+				seen.stat.mtimeMs < this.watchingSince
+			)
+				continue;
 			lastWrite.set(
 				sessionPath,
 				Math.max(lastWrite.get(sessionPath) ?? 0, seen.stat.mtimeMs),
