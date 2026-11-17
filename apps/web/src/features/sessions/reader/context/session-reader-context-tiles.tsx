@@ -56,7 +56,6 @@ import {
 } from "./session-reader-context-place";
 import {
 	type BoxProblems,
-	ProblemMark,
 	problemsOf,
 	useOwnProblems,
 } from "./session-reader-context-problems";
@@ -76,6 +75,7 @@ import {
 	ContextSubTiles,
 	drawsSubTiles,
 	MarkLegend,
+	markGlow,
 	ownsInside,
 } from "./session-reader-context-subtiles";
 import {
@@ -342,6 +342,7 @@ export function ContextTiles({
 									? "z-30"
 									: "z-20"
 								: focused && "z-10",
+							its && !markedInside && !focused && markGlow(its.tone),
 							focused &&
 								(tile.part
 									? "bg-[color-mix(in_oklab,var(--tint)_34%,transparent)] shadow-[0_2px_10px_-2px_color-mix(in_oklab,var(--tint)_45%,transparent)] dark:bg-[color-mix(in_oklab,var(--tint)_40%,transparent)] dark:shadow-[0_2px_12px_-2px_color-mix(in_oklab,var(--tint)_55%,transparent)]"
@@ -384,11 +385,10 @@ export function ContextTiles({
 								) : null}
 							</span>
 						</span>
-						{((its && !markedInside) || (its?.strokes.length ?? 0) > 0) &&
+						{(its?.strokes.length ?? 0) > 0 &&
 						tile.h - GAP >= 22 &&
 						tile.w - GAP >= 22 ? (
 							<span className="pointer-events-none absolute right-1.5 bottom-1.5 z-20 flex items-center gap-1">
-								{its && !markedInside ? <ProblemMark tone={its.tone} /> : null}
 								{(its?.strokes ?? []).map((kind) => (
 									<span
 										key={kind}
