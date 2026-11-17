@@ -27,7 +27,7 @@ import { SessionsOverviewControls } from "./sessions-overview-controls";
 import { SessionsOverviewFluidList } from "./sessions-overview-fluid-list";
 import { SessionsOverviewHeader } from "./sessions-overview-header";
 import {
-	SESSIONS_PER_PAGE,
+	DEFAULT_SESSIONS_PER_PAGE,
 	SessionsOverviewPager,
 } from "./sessions-overview-pager";
 import { SessionsOverviewRow } from "./sessions-overview-row";
@@ -102,6 +102,7 @@ export function SessionsOverviewTable({
 }: SessionsOverviewTableProps) {
 	const tableScrollElementRef = useRef<HTMLDivElement | null>(null);
 	const [page, setPage] = useState(0);
+	const [pageSize, setPageSize] = useState<number>(DEFAULT_SESSIONS_PER_PAGE);
 	const { avatarMap, userMap } = useUserMap();
 	const tableState = useSessionsOverviewTableState({
 		sessionCountLabel,
@@ -149,17 +150,17 @@ export function SessionsOverviewTable({
 	const nowMs = useLiveClock(hasLiveRows ? LIVE_ROW_CLOCK_MS : false);
 	const [focusedKey, setFocusedKey] = useState<string | null>(null);
 	const loaded = tableState.sortedSessions.length;
-	const lastLoadedPage = Math.max(Math.ceil(loaded / SESSIONS_PER_PAGE) - 1, 0);
+	const lastLoadedPage = Math.max(Math.ceil(loaded / pageSize) - 1, 0);
 	const shownPage = pagination?.hasNextPage
 		? page
 		: Math.min(page, lastLoadedPage);
 	const pageSessions = useMemo(
 		() =>
 			tableState.sortedSessions.slice(
-				shownPage * SESSIONS_PER_PAGE,
-				(shownPage + 1) * SESSIONS_PER_PAGE,
+				shownPage * pageSize,
+				(shownPage + 1) * pageSize,
 			),
-		[tableState.sortedSessions, shownPage],
+		[tableState.sortedSessions, shownPage, pageSize],
 	);
 	const focusedIndex = pageSessions.findIndex(
 		(session) => `${session.source}:${session.session_id}` === focusedKey,
@@ -174,10 +175,10 @@ export function SessionsOverviewTable({
 	});
 	const renderedRows = pageSessions.map((session, index) => ({
 		session,
-		position: shownPage * SESSIONS_PER_PAGE + index,
+		position: shownPage * pageSize + index,
 		start: undefined,
 	}));
-	useLoadSessionPages((shownPage + 2) * SESSIONS_PER_PAGE > loaded, pagination);
+	useLoadSessionPages((shownPage + 2) * pageSize > loaded, pagination);
 	const knownTotal =
 		pagination?.hasNextPage && !tableState.hasActiveFilters
 			? Math.max(loaded, totalSessionCount ?? 0)
@@ -187,6 +188,13 @@ export function SessionsOverviewTable({
 		if (tableScrollElementRef.current)
 			tableScrollElementRef.current.scrollTop = 0;
 	}, []);
+	const changePageSize = useCallback(
+		(next: number) => {
+			setPageSize(next);
+			showPage(Math.floor((shownPage * pageSize) / next));
+		},
+		[pageSize, shownPage, showPage],
+	);
 	// Filtering and sorting must keep searching older pages. Never claim the
 	// loaded subset is the full result while those pages are still outstanding.
 	useLoadSessionPages(
@@ -400,7 +408,9 @@ export function SessionsOverviewTable({
 									(pagination?.hasNextPage ?? false) && knownTotal === loaded
 								}
 								onPage={showPage}
+								onPageSize={changePageSize}
 								page={shownPage}
+								pageSize={pageSize}
 								shown={pageSessions.length}
 							/>
 						) : null}
