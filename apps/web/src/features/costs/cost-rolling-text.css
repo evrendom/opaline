@@ -12,6 +12,9 @@
 	display: inline-flex;
 	justify-content: center;
 }
+.cost-roll-slot::before {
+	content: "\200b";
+}
 .cost-roll-glyph {
 	display: inline-block;
 }
