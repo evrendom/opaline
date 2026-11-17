@@ -334,6 +334,7 @@ function createUpdater(options) {
 			return;
 		}
 		const restart = await ui.askToRestart(state.release);
+		if (state.kind !== "ready") return;
 		if (restart) return install();
 		log(`update ${state.release.version} postponed until Opaline quits`);
 	}
