@@ -1033,6 +1033,7 @@ export function CostChart({
 							<CostDotChart
 								color={primaryColor}
 								fit={dots === "only"}
+								shown={!usage?.selected}
 								format={
 									frustration
 										? formatPerRun

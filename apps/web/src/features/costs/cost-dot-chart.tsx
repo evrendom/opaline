@@ -67,19 +67,20 @@ const LEVELS = [0, 0.28, 0.5, 0.74, 1];
 const LONG_DAILY_DAYS = 120;
 const HOVER_GRACE_MS = 80;
 
-function useBoxSize(fit: boolean) {
+function useBoxSize(fit: boolean, shown: boolean) {
 	const ref = useRef<HTMLDivElement>(null);
 	const [box, setBox] = useState<{ width: number; height: number } | null>(
 		null,
 	);
 	useLayoutEffect(() => {
 		const area = ref.current?.parentElement;
-		if (!fit || !area) return;
+		if (!fit || !shown || !area) return;
 		const read = () => {
 			const rect = area.getBoundingClientRect();
 			const cap = Number.parseFloat(getComputedStyle(area).maxHeight);
 			const width = Math.floor(rect.width);
 			const height = Math.floor(Number.isFinite(cap) ? cap : rect.height);
+			if (width <= 0 || height <= 0) return;
 			setBox((current) =>
 				current && current.width === width && current.height === height
 					? current
@@ -90,7 +91,7 @@ function useBoxSize(fit: boolean) {
 		const observer = new ResizeObserver(read);
 		observer.observe(area);
 		return () => observer.disconnect();
-	}, [fit]);
+	}, [fit, shown]);
 	return [ref, box] as const;
 }
 
@@ -308,6 +309,7 @@ export function CostDotChart({
 	loading: loadingPoints = false,
 	points,
 	tone,
+	shown = true,
 }: {
 	color: string;
 	fit?: boolean;
@@ -317,10 +319,11 @@ export function CostDotChart({
 	loading?: boolean;
 	points: readonly ChartPoint[];
 	tone?: (point: ChartPoint) => DotTone;
+	shown?: boolean;
 }) {
 	const railLoading = useContext(DotLoadingContext);
 	const loading = loadingPoints || railLoading;
-	const [boxRef, box] = useBoxSize(fit);
+	const [boxRef, box] = useBoxSize(fit, shown);
 	const [hovered, setHovered] = useState<number | null>(null);
 	const [direction, setDirection] = useState<1 | -1>(1);
 	const [trail, setTrail] = useState<number | null>(null);
