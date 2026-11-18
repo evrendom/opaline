@@ -1326,16 +1326,16 @@
 .cost-metric-trend-secondary {
 	opacity: 0.45;
 }
-.cost-chart-canvas[data-ci-boxes] .cost-chart-flow {
+.cost-chart-canvas[data-ci-chart] .cost-chart-flow {
 	visibility: hidden;
 }
-.cost-ci-boxes {
+.cost-ci-chart {
 	position: absolute;
 	inset: 0;
-	--ci-run: color-mix(in oklab, var(--cost-foreground) 16%, transparent);
+	--ci-run: color-mix(in oklab, var(--cost-foreground) 18%, transparent);
 	--ci-failed: oklch(0.637 0.208 25.331);
 }
-.cost-ci-boxes svg {
+.cost-ci-chart svg {
 	display: block;
 	overflow: visible;
 }
@@ -1347,18 +1347,35 @@
 	fill: var(--cost-muted);
 	font-size: 11px;
 }
-.cost-ci-day rect:not(.cost-ci-hit) {
+.cost-ci-tick[data-merged] {
+	fill: color-mix(in oklab, var(--ci-merged) 75%, var(--cost-muted));
+}
+.cost-ci-day rect {
 	fill: var(--ci-run);
 	transition: opacity 150ms ease;
 }
 .cost-ci-day rect[data-failed] {
 	fill: var(--ci-failed);
 }
-.cost-ci-day rect[data-merged] {
-	fill: var(--ci-merged);
-}
-.cost-ci-day[data-dim] rect:not(.cost-ci-hit) {
+.cost-ci-day[data-dim] rect {
 	opacity: 0.35;
+}
+.cost-ci-line {
+	fill: none;
+	stroke: var(--ci-merged);
+	stroke-width: 2;
+	stroke-linejoin: round;
+	stroke-linecap: round;
+	pointer-events: none;
+}
+.cost-ci-area {
+	pointer-events: none;
+}
+.cost-ci-dot {
+	fill: var(--ci-merged);
+	stroke: var(--cost-surface);
+	stroke-width: 2;
+	pointer-events: none;
 }
 .cost-ci-hit {
 	fill: transparent;
@@ -1373,13 +1390,6 @@
 	top: 0;
 	pointer-events: none;
 	z-index: 2;
-}
-.cost-ci-scale {
-	position: absolute;
-	right: 0;
-	top: -4px;
-	color: var(--cost-muted);
-	font-size: 11px;
 }
 :is(.cost-legend-item, .cost-chart-tooltip) i[data-ci="runs"] {
 	background: color-mix(in oklab, var(--cost-foreground) 35%, transparent);

@@ -6,6 +6,7 @@ import type {
 import {
 	type CSSProperties,
 	type RefObject,
+	useId,
 	useLayoutEffect,
 	useMemo,
 	useRef,
@@ -162,11 +163,12 @@ export function CiRing({ totals }: { totals: CiTotals }) {
 	);
 }
 
-const COLUMNS = 3;
-const BOX_GAP = 2;
-const MIN_ROW = 6;
-const AXIS_WIDTH = 44;
+const AXIS_LEFT = 44;
+const AXIS_RIGHT = 36;
 const AXIS_BOTTOM = 26;
+const PLOT_TOP = 12;
+const SEGMENT_GAP = 2;
+const MAX_BAR = 18;
 
 function useBox(ref: RefObject<HTMLDivElement | null>) {
 	const [size, setSize] = useState({ width: 0, height: 0 });
@@ -183,67 +185,97 @@ function useBox(ref: RefObject<HTMLDivElement | null>) {
 	return size;
 }
 
-function niceStep(max: number) {
-	const raw = max / 3;
-	const power = 10 ** Math.floor(Math.log10(Math.max(1, raw)));
+function niceTop(max: number) {
+	const raw = Math.max(1, max) / 3;
+	const power = 10 ** Math.floor(Math.log10(raw));
 	for (const factor of [1, 2, 2.5, 5, 10])
-		if (raw <= factor * power) return Math.max(1, Math.round(factor * power));
-	return Math.max(1, Math.round(10 * power));
+		if (raw <= factor * power)
+			return Math.max(3, Math.ceil(factor * power) * 3);
+	return Math.ceil(10 * power) * 3;
 }
 
-export function CiBoxChart({
+export function CiChart({
 	days,
 	interval,
 }: {
 	days: readonly CiDay[];
 	interval: ChartInterval;
 }) {
+	const gradient = useId().replace(/[^\w-]/g, "");
 	const ref = useRef<HTMLDivElement>(null);
 	const { width, height } = useBox(ref);
 	const store = useHoverDateStore();
 	const marked = useMarkedDate();
 	const layout = useMemo(() => {
 		if (width <= 0 || height <= 0 || days.length === 0) return null;
-		const plotWidth = width - AXIS_WIDTH;
-		const plotHeight = height - AXIS_BOTTOM;
+		const plotWidth = width - AXIS_LEFT - AXIS_RIGHT;
+		const base = height - AXIS_BOTTOM;
+		const plotHeight = base - PLOT_TOP;
 		const column = plotWidth / days.length;
-		const maxRuns = Math.max(1, ...days.map((day) => day.runs));
-		const maxMerged = Math.max(1, ...days.map((day) => day.merged));
-		const rowsFor = (count: number, per: number) =>
-			Math.ceil(count / per / COLUMNS);
-		let per = 1;
-		while (
-			(rowsFor(maxRuns, per) + rowsFor(maxMerged, per) + 1.2) * MIN_ROW >
-			plotHeight
-		)
-			per += 1;
-		const upRows = rowsFor(maxRuns, per);
-		const downRows = rowsFor(maxMerged, per);
-		const row = plotHeight / (upRows + downRows + 1.2);
-		const box = Math.max(
-			2,
-			Math.min(row - BOX_GAP, (column - 4 - (COLUMNS - 1) * BOX_GAP) / COLUMNS),
+		const bar = Math.max(2, Math.min(MAX_BAR, column * 0.56));
+		const runsTop = niceTop(Math.max(...days.map((day) => day.runs)));
+		const mergedTop = niceTop(Math.max(...days.map((day) => day.merged)));
+		const yRuns = (value: number) => base - (value / runsTop) * plotHeight;
+		const yMerged = (value: number) => base - (value / mergedTop) * plotHeight;
+		const points = days.map(
+			(day, index) => [(index + 0.5) * column, yMerged(day.merged)] as const,
 		);
-		const zero = (upRows + 0.4) * row;
-		return { plotWidth, column, per, row, box, zero, maxRuns, maxMerged };
+		const line = points
+			.map(
+				([x, y], index) =>
+					`${index === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`,
+			)
+			.join(" ");
+		const first = points[0];
+		const last = points.at(-1);
+		const area =
+			first && last
+				? `${line} L${last[0].toFixed(1)} ${base} L${first[0].toFixed(1)} ${base} Z`
+				: "";
+		return {
+			plotWidth,
+			base,
+			column,
+			bar,
+			runsTop,
+			mergedTop,
+			yRuns,
+			yMerged,
+			points,
+			line,
+			area,
+		};
 	}, [days, height, width]);
 	const hovered = marked ? days.find((day) => day.date === marked) : undefined;
 	const hoveredIndex = hovered ? days.indexOf(hovered) : -1;
 	return (
 		<div
 			ref={ref}
-			className="cost-ci-boxes"
+			className="cost-ci-chart"
 			style={{ "--ci-merged": PULL_REQUEST_COLOR } as CSSProperties}
 			onPointerLeave={() => store?.set(null)}
 		>
 			{layout ? (
 				<svg width={width} height={height} aria-hidden="true">
-					<g transform={`translate(${AXIS_WIDTH} 0)`}>
-						{ticks(layout.maxRuns).map((value) => {
-							const y =
-								layout.zero - (value / layout.per / COLUMNS) * layout.row;
+					<defs>
+						<linearGradient id={gradient} x1="0" y1="0" x2="0" y2="1">
+							<stop
+								offset="0%"
+								stopColor={PULL_REQUEST_COLOR}
+								stopOpacity={0.16}
+							/>
+							<stop
+								offset="100%"
+								stopColor={PULL_REQUEST_COLOR}
+								stopOpacity={0}
+							/>
+						</linearGradient>
+					</defs>
+					<g transform={`translate(${AXIS_LEFT} 0)`}>
+						{range(4).map((step) => {
+							const y = layout.base - (step / 3) * (layout.base - PLOT_TOP);
 							return (
-								<g key={`up-${value}`}>
+								<g key={step}>
 									<line
 										className="cost-ci-grid"
 										x1={0}
@@ -257,114 +289,94 @@ export function CiBoxChart({
 										y={y + 4}
 										textAnchor="end"
 									>
-										{value}
+										{Math.round((layout.runsTop * step) / 3).toLocaleString(
+											"en-US",
+										)}
 									</text>
-								</g>
-							);
-						})}
-						<line
-							className="cost-ci-grid"
-							x1={0}
-							x2={layout.plotWidth}
-							y1={layout.zero}
-							y2={layout.zero}
-						/>
-						<text
-							className="cost-ci-tick"
-							x={-14}
-							y={layout.zero + 4}
-							textAnchor="end"
-						>
-							0
-						</text>
-						{ticks(layout.maxMerged).map((value) => {
-							const y =
-								layout.zero + 4 + (value / layout.per / COLUMNS) * layout.row;
-							return (
-								<g key={`down-${value}`}>
-									<line
-										className="cost-ci-grid"
-										x1={0}
-										x2={layout.plotWidth}
-										y1={y}
-										y2={y}
-									/>
 									<text
 										className="cost-ci-tick"
-										x={-14}
+										data-merged=""
+										x={layout.plotWidth + 14}
 										y={y + 4}
-										textAnchor="end"
 									>
-										{value}
+										{Math.round((layout.mergedTop * step) / 3)}
 									</text>
 								</g>
 							);
 						})}
 						{days.map((day, index) => {
-							const left =
-								index * layout.column +
-								(layout.column -
-									(COLUMNS * layout.box + (COLUMNS - 1) * BOX_GAP)) /
-									2;
-							const up = Math.ceil(day.runs / layout.per);
-							const red =
-								day.failed === 0
-									? 0
-									: Math.max(1, Math.round(day.failed / layout.per));
-							const down = Math.ceil(day.merged / layout.per);
+							const x = (index + 0.5) * layout.column - layout.bar / 2;
+							const failedTop = layout.yRuns(day.failed);
+							const runsTop = layout.yRuns(day.runs);
+							const passed = day.runs - day.failed;
 							const dim = hovered !== undefined && hovered !== day;
-							const at = (n: number) =>
-								left + (n % COLUMNS) * (layout.box + BOX_GAP);
 							return (
 								<g
 									key={day.date}
-									data-dim={dim || undefined}
 									className="cost-ci-day"
+									data-dim={dim || undefined}
 								>
-									{range(up).map((n) => (
+									{passed > 0 ? (
 										<rect
-											key={`u${n}`}
-											x={at(n)}
-											y={
-												layout.zero - (Math.floor(n / COLUMNS) + 1) * layout.row
-											}
-											width={layout.box}
-											height={layout.box}
-											rx={Math.min(2.5, layout.box / 3)}
-											data-failed={n < red || undefined}
+											x={x}
+											y={runsTop}
+											width={layout.bar}
+											height={Math.max(
+												1,
+												failedTop -
+													runsTop -
+													(day.failed > 0 ? SEGMENT_GAP : 0),
+											)}
+											rx={Math.min(3, layout.bar / 3)}
 										/>
-									))}
-									{range(down).map((n) => (
+									) : null}
+									{day.failed > 0 ? (
 										<rect
-											key={`d${n}`}
-											x={at(n)}
-											y={layout.zero + 4 + Math.floor(n / COLUMNS) * layout.row}
-											width={layout.box}
-											height={layout.box}
-											rx={Math.min(2.5, layout.box / 3)}
-											data-merged=""
+											x={x}
+											y={failedTop}
+											width={layout.bar}
+											height={Math.max(1.5, layout.base - failedTop)}
+											rx={Math.min(3, layout.bar / 3)}
+											data-failed=""
 										/>
-									))}
-									<rect
-										className="cost-ci-hit"
-										x={index * layout.column}
-										y={0}
-										width={layout.column}
-										height={height - AXIS_BOTTOM}
-										onPointerEnter={() => store?.set(day.date)}
-									/>
+									) : null}
 								</g>
 							);
 						})}
+						<path
+							d={layout.area}
+							fill={`url(#${gradient})`}
+							className="cost-ci-area"
+						/>
+						<path d={layout.line} className="cost-ci-line" />
 						{hoveredIndex >= 0 ? (
-							<line
-								className="cost-ci-marker"
-								x1={(hoveredIndex + 0.5) * layout.column}
-								x2={(hoveredIndex + 0.5) * layout.column}
-								y1={0}
-								y2={height - AXIS_BOTTOM}
-							/>
+							<>
+								<line
+									className="cost-ci-marker"
+									x1={(hoveredIndex + 0.5) * layout.column}
+									x2={(hoveredIndex + 0.5) * layout.column}
+									y1={PLOT_TOP}
+									y2={layout.base}
+								/>
+								<circle
+									className="cost-ci-dot"
+									cx={layout.points[hoveredIndex]?.[0]}
+									cy={layout.points[hoveredIndex]?.[1]}
+									r={4}
+								/>
+							</>
 						) : null}
+						{days.map((day, index) => (
+							<rect
+								key={day.date}
+								className="cost-ci-hit"
+								x={index * layout.column}
+								y={0}
+								width={layout.column}
+								height={layout.base}
+								onPointerEnter={() => store?.set(day.date)}
+							/>
+						))}
 						<text className="cost-ci-tick" x={0} y={height - 6}>
 							{days[0] ? formatChartDate(days[0].date, interval) : ""}
 						</text>
@@ -374,9 +386,7 @@ export function CiBoxChart({
 							y={height - 6}
 							textAnchor="end"
 						>
-							{days.at(-1)
-								? formatChartDate(days.at(-1)?.date ?? "", interval)
-								: ""}
+							{formatChartDate(days.at(-1)?.date ?? "", interval)}
 						</text>
 					</g>
 				</svg>
@@ -386,7 +396,7 @@ export function CiBoxChart({
 					className="cost-chart-tooltip cost-ci-tooltip"
 					style={{
 						left: Math.min(
-							AXIS_WIDTH + (hoveredIndex + 1) * layout.column + 12,
+							AXIS_LEFT + (hoveredIndex + 1) * layout.column + 12,
 							width - 196,
 						),
 					}}
@@ -415,18 +425,8 @@ export function CiBoxChart({
 					</div>
 				</div>
 			) : null}
-			{layout && layout.per > 1 ? (
-				<span className="cost-ci-scale">1 box = {layout.per}</span>
-			) : null}
 		</div>
 	);
-}
-
-function ticks(max: number) {
-	const step = niceStep(max);
-	const values: number[] = [];
-	for (let value = step; value <= max; value += step) values.push(value);
-	return values;
 }
 
 function range(count: number) {

@@ -86,12 +86,12 @@ import {
 import { ChartMorph } from "./chart-morph";
 import { sampleDates, sampleLevels } from "./chart-sample";
 import {
-	CiBoxChart,
+	CiChart,
 	CiRing,
 	type CiTotals,
 	ciTotals,
 	useCiDays,
-} from "./ci-boxes";
+} from "./ci-chart";
 import {
 	CostDotChart,
 	DotFocusContext,
@@ -409,7 +409,7 @@ export function CostChart({
 	const rangeEnd = dateRange?.state.endDate;
 	const sampled =
 		!loading && (unavailable || noHistory || Boolean(data && !data.hasUsage));
-	const ciBoxes =
+	const ciChart =
 		mergedGitHub &&
 		metric === "mergedPullRequests" &&
 		inputFor !== undefined &&
@@ -746,7 +746,7 @@ export function CostChart({
 						? "CI runs with median and P95 duration over time"
 						: metric === "agentRuns"
 							? "Agent runs with median and P95 duration over time"
-							: ciBoxes
+							: ciChart
 								? "Merged pull requests and CI runs over time"
 								: metric === "mergedPullRequests"
 									? "Merged pull requests with CI failures per pull request over time"
@@ -920,7 +920,7 @@ export function CostChart({
 						<FluidMenuHover items=".cost-text-button" />
 						<div className="cost-chart-key-copy">
 							<h2 className="cost-chart-title">
-								{ciBoxes ? "PRs & CI" : metricLabel} over time
+								{ciChart ? "PRs & CI" : metricLabel} over time
 							</h2>
 							<div className="cost-chart-legend">
 								{pending && series.length === 0 ? (
@@ -929,7 +929,7 @@ export function CostChart({
 										style={{ width: metricLabel.length * TICK_CHAR_PX + 14 }}
 									/>
 								) : null}
-								{ciBoxes && ciRange ? (
+								{ciChart && ciRange ? (
 									<>
 										<div className="cost-legend-item">
 											<i data-ci="runs" />
@@ -951,7 +951,7 @@ export function CostChart({
 										</div>
 									</>
 								) : null}
-								{(ciBoxes ? [] : series).map((entry) => (
+								{(ciChart ? [] : series).map((entry) => (
 									<div key={entry.id} className="cost-legend-item">
 										<i style={{ backgroundColor: entry.color }} />
 										{entry.label}
@@ -999,7 +999,7 @@ export function CostChart({
 											</strong>
 										</button>
 									</>
-								) : metric === "mergedPullRequests" && !ciBoxes ? (
+								) : metric === "mergedPullRequests" && !ciChart ? (
 									<button
 										type="button"
 										className="cost-legend-item cost-duration-legend"
@@ -1155,10 +1155,10 @@ export function CostChart({
 						data-kind={showDots ? "dots" : undefined}
 						data-sample={sampled && !heartbeat ? "" : undefined}
 						data-lines-entering={linesEntering || undefined}
-						data-ci-boxes={ciBoxes || undefined}
+						data-ci-chart={ciChart || undefined}
 					>
-						{ciBoxes && ciDays && phase === "idle" ? (
-							<CiBoxChart days={ciDays} interval={interval} />
+						{ciChart && ciDays && phase === "idle" ? (
+							<CiChart days={ciDays} interval={interval} />
 						) : null}
 						{showDots ? (
 							<CostDotChart

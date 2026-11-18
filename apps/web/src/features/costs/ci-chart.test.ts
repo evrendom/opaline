@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { ciTotals, failedSegments } from "./ci-boxes";
+import { ciTotals, failedSegments } from "./ci-chart";
 
 describe("failedSegments", () => {
 	test("a clean period shows no red segment", () => {
