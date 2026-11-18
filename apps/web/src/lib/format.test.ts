@@ -8,6 +8,7 @@ import {
 	formatPaddedTimeOfDay,
 	formatShare,
 	formatShareOf,
+	formatShortCount,
 	formatTimeOfDay,
 	formatWholeCurrency,
 } from "./format";
@@ -81,5 +82,29 @@ describe("times of day and paths", () => {
 		expect(basename("src/app/")).toBe("app");
 		expect(basename("main.ts")).toBe("main.ts");
 		expect(basename("")).toBe("");
+	});
+});
+
+describe("short counts", () => {
+	test("read whole below a thousand, then in k, rounded down, capped", () => {
+		expect(
+			[
+				0, 894, 999, 1_000, 1_232, 1_999, 9_999, 10_000, 12_345, 999_999,
+				1_000_000, 5e7,
+			].map(formatShortCount),
+		).toEqual([
+			"0",
+			"894",
+			"999",
+			"1k",
+			"1.2k",
+			"1.9k",
+			"9.9k",
+			"10k",
+			"12k",
+			"999k",
+			"999k+",
+			"999k+",
+		]);
 	});
 });

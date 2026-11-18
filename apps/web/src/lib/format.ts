@@ -96,6 +96,16 @@ export function formatCompactWholeNumber(value: number) {
 	return compactWholeNumberFormatter.format(value);
 }
 
+export function formatShortCount(value: number): string {
+	if (value < 1_000) return String(value);
+	if (value < 10_000) {
+		const tenths = Math.floor(value / 100) / 10;
+		return `${Number.isInteger(tenths) ? tenths : tenths.toFixed(1)}k`;
+	}
+	if (value < 1_000_000) return `${Math.floor(value / 1_000)}k`;
+	return "999k+";
+}
+
 export function formatDecimal(value: number) {
 	return decimalFormatter.format(value);
 }

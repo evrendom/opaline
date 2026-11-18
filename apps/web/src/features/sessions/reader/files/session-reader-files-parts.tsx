@@ -2,6 +2,7 @@ import { type Icon, IconX } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { useSlidingPill } from "@/features/repos/pill-tabs";
 import { useScrollFade } from "@/hooks/use-scroll-fade";
+import { formatNumber, formatShortCount } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export const TOGGLE =
@@ -68,7 +69,8 @@ export function ViewToggle<View extends string>({
 					{iconsOnly ? null : word}
 					{count === undefined ? null : (
 						<span className="font-normal text-muted-foreground tabular-nums">
-							{count}
+							<span aria-hidden="true">{formatShortCount(count)}</span>
+							<span className="sr-only">{formatNumber(count)}</span>
 						</span>
 					)}
 				</button>
