@@ -188,10 +188,11 @@ function useBox(ref: RefObject<HTMLDivElement | null>) {
 function niceTop(max: number) {
 	const raw = Math.max(1, max) / 3;
 	const power = 10 ** Math.floor(Math.log10(raw));
-	for (const factor of [1, 2, 2.5, 5, 10])
-		if (raw <= factor * power)
-			return Math.max(3, Math.ceil(factor * power) * 3);
-	return Math.ceil(10 * power) * 3;
+	const step =
+		[1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find(
+			(factor) => raw <= factor * power,
+		) ?? 10;
+	return Math.max(3, Math.ceil(step * power) * 3);
 }
 
 export function CiChart({
