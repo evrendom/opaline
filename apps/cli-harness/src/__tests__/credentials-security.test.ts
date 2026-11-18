@@ -56,7 +56,7 @@ mock.module("node:fs", () => ({
 
 Object.defineProperty(process, "platform", { value: platform });
 const { loadCredentials, saveCredentials } = await import(
-	"./apps/cli/src/lib/credentials.ts"
+	"./apps/cli-harness/src/lib/credentials.ts"
 );
 
 if (platform === "win32") {

@@ -27,7 +27,7 @@ describe("CliUpdateNoticeContent", () => {
 		).toHaveAttribute("title", "npx opaline@latest update");
 		expect(screen.getByRole("link", { name: /What's new/ })).toHaveAttribute(
 			"href",
-			"https://github.com/opalinehq/cli/releases/tag/opaline-cli%400.11.0",
+			"https://github.com/evrendom/opaline/releases/tag/opaline-cli%400.11.0",
 		);
 	});
 

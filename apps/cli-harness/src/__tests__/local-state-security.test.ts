@@ -15,7 +15,7 @@ import { normalizeRemoteUrl } from "../lib/git-info.js";
 const REPO_ROOT = resolve(import.meta.dir, "../../../..");
 const FAKE_TOKEN = "fake_pat_RUD204";
 const PROJECT_CONFIG_SCRIPT = `
-import { getProjectOrgId, setProjectOrgId } from "./apps/cli/src/lib/project-config.ts";
+import { getProjectOrgId, setProjectOrgId } from "./apps/cli-harness/src/lib/project-config.ts";
 
 const action = process.argv[1];
 const projectDir = process.argv[2];
@@ -28,9 +28,9 @@ if (action === "set") {
 const LOCAL_STATE_SCRIPT = `
 import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { recordFailedUpload } from "./apps/cli/src/lib/failed-uploads.ts";
-import { cacheRemotes } from "./apps/cli/src/lib/remote-cache.ts";
-import { disposeLogging, setupHookLogging } from "./apps/cli/src/logging.ts";
+import { recordFailedUpload } from "./apps/cli-harness/src/lib/failed-uploads.ts";
+import { cacheRemotes } from "./apps/cli-harness/src/lib/remote-cache.ts";
+import { disposeLogging, setupHookLogging } from "./apps/cli-harness/src/logging.ts";
 
 const configDir = process.env.RUDEL_CONFIG_DIR;
 if (!configDir) throw new Error("RUDEL_CONFIG_DIR is required");

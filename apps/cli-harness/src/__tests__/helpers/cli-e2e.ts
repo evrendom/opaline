@@ -22,7 +22,7 @@ export const MONOREPO_ROOT = resolve(
 export const BUILT_CLI_PATH = join(
 	MONOREPO_ROOT,
 	"apps",
-	"cli",
+	"cli-harness",
 	"dist",
 	"cli.js",
 );
@@ -175,7 +175,7 @@ export function renderFixture(
 }
 
 export async function buildCliArtifact(): Promise<void> {
-	const proc = Bun.spawn(["bun", "run", "--cwd", "apps/cli", "build"], {
+	const proc = Bun.spawn(["bun", "run", "--cwd", "apps/cli-harness", "build"], {
 		cwd: MONOREPO_ROOT,
 		stdout: "pipe",
 		stderr: "pipe",

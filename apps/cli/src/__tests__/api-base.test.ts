@@ -66,16 +66,16 @@ describe("resolveApiBase", () => {
 		).toBe("http://internal.example");
 	});
 
-	test.each(["http://localhost:4010", "https://opaline.so"])(
-		"accepts %p with neither the flag nor the env var",
-		(input) => {
-			delete process.env[ENV_VAR];
+	test.each([
+		"http://localhost:4010",
+		"https://opaline.so",
+	])("accepts %p with neither the flag nor the env var", (input) => {
+		delete process.env[ENV_VAR];
 
-			expect(acceptedUrl(resolveApiBase(input, allowsPlaintext(false)))).toBe(
-				input,
-			);
-		},
-	);
+		expect(acceptedUrl(resolveApiBase(input, allowsPlaintext(false)))).toBe(
+			input,
+		);
+	});
 
 	test("normalizes away a trailing slash", () => {
 		delete process.env[ENV_VAR];
@@ -99,23 +99,29 @@ describe("resolveApiBase", () => {
 });
 
 describe("allowsInsecureApiBaseFromEnv", () => {
-	test.each(["1", "true", "TRUE", "yes", "on"])(
-		"treats %p as opting in",
-		(value) => {
-			process.env[ENV_VAR] = value;
+	test.each([
+		"1",
+		"true",
+		"TRUE",
+		"yes",
+		"on",
+	])("treats %p as opting in", (value) => {
+		process.env[ENV_VAR] = value;
 
-			expect(allowsInsecureApiBaseFromEnv()).toBe(true);
-		},
-	);
+		expect(allowsInsecureApiBaseFromEnv()).toBe(true);
+	});
 
-	test.each(["0", "false", "no", "", "maybe"])(
-		"treats %p as not opting in",
-		(value) => {
-			process.env[ENV_VAR] = value;
+	test.each([
+		"0",
+		"false",
+		"no",
+		"",
+		"maybe",
+	])("treats %p as not opting in", (value) => {
+		process.env[ENV_VAR] = value;
 
-			expect(allowsInsecureApiBaseFromEnv()).toBe(false);
-		},
-	);
+		expect(allowsInsecureApiBaseFromEnv()).toBe(false);
+	});
 
 	test("is false when unset", () => {
 		delete process.env[ENV_VAR];
@@ -135,17 +141,17 @@ describe("describeApiBaseRejection", () => {
 		expect(message).toContain("--allow-insecure-endpoint");
 	});
 
-	test.each(["file:///etc/passwd", "not a url"])(
-		"does not offer a useless override for %p",
-		(input) => {
-			process.env[ENV_VAR] = "1";
-			const message = describeApiBaseRejection(
-				rejection(resolveApiBase(input, allowsPlaintext(true))),
-			);
+	test.each([
+		"file:///etc/passwd",
+		"not a url",
+	])("does not offer a useless override for %p", (input) => {
+		process.env[ENV_VAR] = "1";
+		const message = describeApiBaseRejection(
+			rejection(resolveApiBase(input, allowsPlaintext(true))),
+		);
 
-			expect(message).not.toContain("--allow-insecure-api-base");
-		},
-	);
+		expect(message).not.toContain("--allow-insecure-api-base");
+	});
 });
 
 describe("describeLogoutApiBaseRisk", () => {
@@ -165,12 +171,12 @@ describe("describeLogoutApiBaseRisk", () => {
 		);
 	});
 
-	test.each(["https://opaline.so", "http://localhost:4010"])(
-		"stays silent for %p",
-		(storedApiBase) => {
-			expect(describeLogoutApiBaseRisk(storedApiBase)).toBeUndefined();
-		},
-	);
+	test.each([
+		"https://opaline.so",
+		"http://localhost:4010",
+	])("stays silent for %p", (storedApiBase) => {
+		expect(describeLogoutApiBaseRisk(storedApiBase)).toBeUndefined();
+	});
 });
 
 describe("describeStoredApiBaseRisk", () => {
@@ -188,10 +194,10 @@ describe("describeStoredApiBaseRisk", () => {
 		expect(describeStoredApiBaseRisk("http://internal.example")).toBeString();
 	});
 
-	test.each(["https://opaline.so", "http://localhost:4010"])(
-		"stays silent for %p",
-		(storedApiBase) => {
-			expect(describeStoredApiBaseRisk(storedApiBase)).toBeUndefined();
-		},
-	);
+	test.each([
+		"https://opaline.so",
+		"http://localhost:4010",
+	])("stays silent for %p", (storedApiBase) => {
+		expect(describeStoredApiBaseRisk(storedApiBase)).toBeUndefined();
+	});
 });

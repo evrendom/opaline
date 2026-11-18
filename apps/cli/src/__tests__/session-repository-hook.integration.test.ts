@@ -117,63 +117,59 @@ async function startOutsideRepository(
 	return fixture;
 }
 
-test.each(HOOK_CASES)(
-	"$name attributes a session started outside a repository to the one it edited",
-	async (hookCase) => {
-		const stub = startIngestStub();
-		try {
-			const fixture = await startOutsideRepository(
-				hookCase.source,
-				undefined,
-				stub.loopbackBase,
-			);
-			const invocation = hookCase.buildInvocation(fixture);
-			const result = await runCli(invocation.command, fixture, {
-				stdin: invocation.stdin,
-			});
+test.each(
+	HOOK_CASES,
+)("$name attributes a session started outside a repository to the one it edited", async (hookCase) => {
+	const stub = startIngestStub();
+	try {
+		const fixture = await startOutsideRepository(
+			hookCase.source,
+			undefined,
+			stub.loopbackBase,
+		);
+		const invocation = hookCase.buildInvocation(fixture);
+		const result = await runCli(invocation.command, fixture, {
+			stdin: invocation.stdin,
+		});
 
-			expect(result.exitCode).toBe(0);
-			const index = stub.requests.findIndex(
+		expect(result.exitCode).toBe(0);
+		const index = stub.requests.findIndex(
+			(request) => request.pathname === "/rpc/ingestSession",
+		);
+		expect(index).toBeGreaterThanOrEqual(0);
+		const body = JSON.parse(stub.bodies[index] ?? "{}").json;
+		expect(body).toMatchObject({
+			gitRemote: "github.com/acme/work",
+			gitBranch: "main",
+			projectPath: fixture.projectPath,
+		});
+	} finally {
+		await stub.server.stop(true);
+	}
+}, 30_000);
+
+test.each(
+	HOOK_CASES,
+)("$name skips a session that worked in a repository with automatic upload off", async (hookCase) => {
+	const stub = startIngestStub();
+	try {
+		const fixture = await startOutsideRepository(
+			hookCase.source,
+			false,
+			stub.loopbackBase,
+		);
+		const invocation = hookCase.buildInvocation(fixture);
+		const result = await runCli(invocation.command, fixture, {
+			stdin: invocation.stdin,
+		});
+
+		expect(result.exitCode).toBe(0);
+		expect(
+			stub.requests.filter(
 				(request) => request.pathname === "/rpc/ingestSession",
-			);
-			expect(index).toBeGreaterThanOrEqual(0);
-			const body = JSON.parse(stub.bodies[index] ?? "{}").json;
-			expect(body).toMatchObject({
-				gitRemote: "github.com/acme/work",
-				gitBranch: "main",
-				projectPath: fixture.projectPath,
-			});
-		} finally {
-			await stub.server.stop(true);
-		}
-	},
-	30_000,
-);
-
-test.each(HOOK_CASES)(
-	"$name skips a session that worked in a repository with automatic upload off",
-	async (hookCase) => {
-		const stub = startIngestStub();
-		try {
-			const fixture = await startOutsideRepository(
-				hookCase.source,
-				false,
-				stub.loopbackBase,
-			);
-			const invocation = hookCase.buildInvocation(fixture);
-			const result = await runCli(invocation.command, fixture, {
-				stdin: invocation.stdin,
-			});
-
-			expect(result.exitCode).toBe(0);
-			expect(
-				stub.requests.filter(
-					(request) => request.pathname === "/rpc/ingestSession",
-				),
-			).toEqual([]);
-		} finally {
-			await stub.server.stop(true);
-		}
-	},
-	30_000,
-);
+			),
+		).toEqual([]);
+	} finally {
+		await stub.server.stop(true);
+	}
+}, 30_000);
