@@ -6,7 +6,6 @@ import type {
 import {
 	type CSSProperties,
 	type RefObject,
-	useId,
 	useLayoutEffect,
 	useMemo,
 	useRef,
@@ -202,7 +201,6 @@ export function CiChart({
 	days: readonly CiDay[];
 	interval: ChartInterval;
 }) {
-	const gradient = useId().replace(/[^\w-]/g, "");
 	const ref = useRef<HTMLDivElement>(null);
 	const { width, height } = useBox(ref);
 	const store = useHoverDateStore();
@@ -227,12 +225,6 @@ export function CiChart({
 					`${index === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`,
 			)
 			.join(" ");
-		const first = points[0];
-		const last = points.at(-1);
-		const area =
-			first && last
-				? `${line} L${last[0].toFixed(1)} ${base} L${first[0].toFixed(1)} ${base} Z`
-				: "";
 		return {
 			plotWidth,
 			base,
@@ -244,7 +236,6 @@ export function CiChart({
 			yMerged,
 			points,
 			line,
-			area,
 		};
 	}, [days, height, width]);
 	const hovered = marked ? days.find((day) => day.date === marked) : undefined;
@@ -258,20 +249,6 @@ export function CiChart({
 		>
 			{layout ? (
 				<svg width={width} height={height} aria-hidden="true">
-					<defs>
-						<linearGradient id={gradient} x1="0" y1="0" x2="0" y2="1">
-							<stop
-								offset="0%"
-								stopColor={PULL_REQUEST_COLOR}
-								stopOpacity={0.16}
-							/>
-							<stop
-								offset="100%"
-								stopColor={PULL_REQUEST_COLOR}
-								stopOpacity={0}
-							/>
-						</linearGradient>
-					</defs>
 					<g transform={`translate(${AXIS_LEFT} 0)`}>
 						{range(4).map((step) => {
 							const y = layout.base - (step / 3) * (layout.base - PLOT_TOP);
@@ -344,11 +321,6 @@ export function CiChart({
 								</g>
 							);
 						})}
-						<path
-							d={layout.area}
-							fill={`url(#${gradient})`}
-							className="cost-ci-area"
-						/>
 						<path d={layout.line} className="cost-ci-line" />
 						{hoveredIndex >= 0 ? (
 							<>

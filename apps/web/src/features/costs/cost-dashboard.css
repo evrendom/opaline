@@ -1368,9 +1368,6 @@
 	stroke-linecap: round;
 	pointer-events: none;
 }
-.cost-ci-area {
-	pointer-events: none;
-}
 .cost-ci-dot {
 	fill: var(--ci-merged);
 	stroke: var(--cost-surface);
