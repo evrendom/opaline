@@ -1280,19 +1280,24 @@
 }
 
 /* Breakdown rows sized to the space under the chart (data-sized, from
-   CostDashboardView): one row fits the page, more rows keep the same height and
-   the page scrolls. Each card's list fills its card and scrolls inside. */
+   CostDashboardView) at most: a row is as tall as its tallest card's rows, up
+   to the height that fits the page, and a longer list scrolls inside. */
 .cost-breakdowns[data-sized] {
-	grid-auto-rows: var(--breakdown-row-height);
+	grid-auto-rows: auto;
 }
 .cost-breakdowns[data-sized] .cost-breakdown {
 	min-height: 0;
+	max-height: var(--breakdown-row-height);
 }
 .cost-breakdowns[data-sized] .cost-scroll-fade {
-	flex: 1 1 0;
+	display: flex;
+	flex: 0 1 auto;
+	flex-direction: column;
 }
 .cost-breakdowns[data-sized] .cost-breakdown-list {
-	height: 100%;
+	flex: 0 1 auto;
+	height: auto;
+	min-height: 0;
 }
 
 /* Split rows for a narrow pane: two breakdown cards side by side (Members
