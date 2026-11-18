@@ -32,12 +32,7 @@ import { getModelBadgeTone } from "@/features/dashboard/components/dashboard-mod
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { BreakdownEmpty } from "./breakdown-empty";
 import { SERIES_COLORS } from "./chart-colors";
-import {
-	costLabel,
-	formatMetricRatio,
-	formatRunDuration,
-	METRIC_LABELS,
-} from "./cost-format";
+import { costLabel, formatMetricRatio, METRIC_LABELS } from "./cost-format";
 import { COST_LABELS } from "./use-cost-dashboard";
 
 type Props = {
@@ -392,12 +387,6 @@ function BreakdownRow({
 							maximumFractionDigits: 1,
 						}).format(entry.approximateMinutes)}{" "}
 						CI minutes (approx.)
-					</small>
-				) : null}
-				{entry.medianSeconds !== undefined ? (
-					<small className="cost-cycle-time">
-						Median {formatRunDuration(entry.medianSeconds)} · P90{" "}
-						{formatRunDuration(entry.p90Seconds)}
 					</small>
 				) : null}
 			</span>

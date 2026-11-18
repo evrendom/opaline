@@ -95,11 +95,14 @@ function renderPage(
 		</MemoryRouter>,
 	);
 }
-test("GitHub breakdowns hide Members and Models, show GitHub author", async () => {
+test("GitHub breakdowns show repositories, not members, models or GitHub authors", async () => {
 	renderPage();
 	expect(
-		await screen.findByRole("region", { name: "GitHub author" }),
+		await screen.findByRole("region", { name: "Repositories" }),
 	).toBeInTheDocument();
+	expect(
+		screen.queryByRole("region", { name: "GitHub author" }),
+	).not.toBeInTheDocument();
 	expect(
 		screen.queryByRole("region", { name: "Members" }),
 	).not.toBeInTheDocument();

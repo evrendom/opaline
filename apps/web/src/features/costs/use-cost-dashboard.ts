@@ -52,11 +52,7 @@ export const RUN_DIMENSIONS: CostDimension[] = [
 	"skillsUsed",
 ];
 export const SIGNAL_DIMENSIONS: CostDimension[] = ["signalTypes", "phrases"];
-export const PR_DIMENSIONS: CostDimension[] = [
-	"repositories",
-	"githubAuthors",
-	"pullRequestCi",
-];
+export const PR_DIMENSIONS: CostDimension[] = ["repositories", "pullRequestCi"];
 export const CI_DIMENSIONS: CostDimension[] = [
 	"ciConclusions",
 	"ciEvents",
@@ -69,6 +65,7 @@ export const ALL_COST_DIMENSIONS = [
 	...SIGNAL_DIMENSIONS,
 	...COST_DIMENSIONS,
 	...PR_DIMENSIONS,
+	"githubAuthors" as const,
 	...CI_DIMENSIONS,
 ];
 export const COST_LABELS = {
