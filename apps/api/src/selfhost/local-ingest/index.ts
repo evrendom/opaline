@@ -158,7 +158,7 @@ export async function startLocalIngest(options: {
 	};
 	registerLocalIngest(handle);
 	options.log(
-		`local ingest: ${roots.claudeProjects} and ${roots.codexSessions}, last ${settings.historyDays} days, background priority ${backgroundPrioritySupported(env) ? "on" : "off"}`,
+		`local ingest: ${roots.claudeProjects}, ${roots.codexSessions} and ${roots.codexArchivedSessions}, first import ${settings.historyDays} days then all history, background priority ${backgroundPrioritySupported(env) ? "on" : "off"}`,
 	);
 	return handle;
 }

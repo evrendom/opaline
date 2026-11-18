@@ -34,6 +34,7 @@ beforeEach(async () => {
 	roots = {
 		claudeProjects: join(home, ".claude", "projects"),
 		codexSessions: join(home, ".codex", "sessions"),
+		codexArchivedSessions: join(home, ".codex", "archived_sessions"),
 	};
 	await mkdir(join(roots.claudeProjects, "-repo"), { recursive: true });
 	await mkdir(join(roots.codexSessions, "2026", "11", "09"), {
@@ -540,20 +541,53 @@ test("a restart gives a session it gave up on or skipped one more round", async 
 	await restarted.stop();
 });
 
-test("a resumed Codex session in an old day folder is imported by its modification time", async () => {
+test("the first import holds recent sessions by modification time, then every older one follows", async () => {
 	const folder = join(roots.codexSessions, "2026", "08", "25");
 	await mkdir(folder, { recursive: true });
 	const resumed = join(folder, "rollout-2026-08-25T19-51-29-a.jsonl");
 	await writeFile(resumed, line("resumed"));
 	const stale = join(folder, "rollout-2026-08-25T19-51-30-b.jsonl");
 	await writeFile(stale, line("stale"));
+	const archive = join(home, ".codex", "archived_sessions");
+	await mkdir(archive, { recursive: true });
+	const archived = join(archive, "rollout-2026-03-01T10-00-00-c.jsonl");
+	await writeFile(archived, line("archived"));
+	const old = new Date(Date.now() - 80 * 86_400_000);
+	const older = new Date(Date.now() - 200 * 86_400_000);
+	await utimes(stale, old, old);
+	await utimes(archived, older, older);
+	const ingest = ingestor();
+	const service = create(memoryStore(), ingest, {
+		settings: initialSettings,
+	});
+	await service.start();
+	const first = await initialImportDone(service);
+	expect(first).toMatchObject({ sessionsDone: 1, sessionsTotal: 1 });
+	await waitFor(() => ingest.calls.length === 3);
+	await settle(service);
+	expect(ingest.calls.map((call) => call.sessionPath)).toEqual([
+		resumed,
+		stale,
+		archived,
+	]);
+	await service.stop();
+});
+
+test("after a finished first import, a restart imports history the window had left out", async () => {
+	const folder = join(roots.codexSessions, "2026", "08", "25");
+	await mkdir(folder, { recursive: true });
+	const stale = join(folder, "rollout-2026-08-25T19-51-30-b.jsonl");
+	await writeFile(stale, line("stale"));
 	const old = new Date(Date.now() - 80 * 86_400_000);
 	await utimes(stale, old, old);
+	const milestones = memoryMilestoneStore();
+	await milestones.reach(INITIAL_IMPORT_MILESTONE, new Date());
 	const ingest = ingestor();
-	const service = create(memoryStore(), ingest);
+	const service = create(memoryStore(), ingest, { milestones });
 	await service.start();
+	await waitFor(() => ingest.calls.length === 1);
 	await settle(service);
-	expect(ingest.calls.map((call) => call.sessionPath)).toEqual([resumed]);
+	expect(ingest.calls.map((call) => call.sessionPath)).toEqual([stale]);
 	await service.stop();
 });
 
@@ -772,5 +806,51 @@ test("skipped and given-up sessions do not keep the initial import active", asyn
 	expect(store.rows.get(oversized)?.state).toBe("skipped");
 	expect(store.rows.get(broken)?.state).toBe("skipped");
 	expect(await milestones.reachedAt(INITIAL_IMPORT_MILESTONE)).not.toBeNull();
+	await service.stop();
+});
+
+test("older history comes in batches, newest first, and waits while the disk is nearly full", async () => {
+	const folder = join(roots.codexSessions, "2026", "07", "01");
+	await mkdir(folder, { recursive: true });
+	const paths: string[] = [];
+	for (let index = 0; index < 5; index += 1) {
+		const path = join(
+			folder,
+			`rollout-2026-07-01T10-00-0${index}-h${index}.jsonl`,
+		);
+		await writeFile(path, line(`history ${index}`));
+		const at = new Date(Date.now() - (60 + index) * 86_400_000);
+		await utimes(path, at, at);
+		paths.push(path);
+	}
+	const milestones = memoryMilestoneStore();
+	await milestones.reach(INITIAL_IMPORT_MILESTONE, new Date());
+	let free = 1024;
+	const logged: string[] = [];
+	const ingest = ingestor();
+	const service = create(memoryStore(), ingest, {
+		milestones,
+		freeBytes: async () => free,
+		log: (entry) => logged.push(entry),
+		settings: {
+			concurrency: 1,
+			quietMs: 1,
+			liveIntervalMs: 0,
+			retryBaseMs: 20,
+			historyBatchSessions: 2,
+			historyMinFreeBytes: 4096,
+		},
+	});
+	await service.start();
+	await settle(service);
+	expect(ingest.calls).toHaveLength(0);
+	expect(logged.some((entry) => entry.includes("paused older history"))).toBe(
+		true,
+	);
+	free = 8192;
+	await service.notify([], false);
+	await waitFor(() => ingest.calls.length === 5);
+	await settle(service);
+	expect(ingest.calls.map((call) => call.sessionPath)).toEqual(paths);
 	await service.stop();
 });

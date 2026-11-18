@@ -6,6 +6,7 @@ type Environment = Readonly<Record<string, string | undefined>>;
 export interface LocalIngestRoots {
 	readonly claudeProjects: string;
 	readonly codexSessions: string;
+	readonly codexArchivedSessions: string;
 }
 
 export type TranscriptSource = "claude_code" | "codex";
@@ -29,6 +30,7 @@ export function localIngestRoots(
 	return {
 		claudeProjects: join(claude, "projects"),
 		codexSessions: join(codex, "sessions"),
+		codexArchivedSessions: join(codex, "archived_sessions"),
 	};
 }
 
@@ -74,7 +76,9 @@ export function classifyTranscriptPath(
 			};
 		return null;
 	}
-	const codex = inside(roots.codexSessions, path);
+	const codex =
+		inside(roots.codexSessions, path) ??
+		inside(roots.codexArchivedSessions, path);
 	if (codex && !basename(path).startsWith("."))
 		return { path, source: "codex", role: "session", sessionPath: path };
 	return null;

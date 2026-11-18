@@ -4,6 +4,7 @@ import { classifyTranscriptPath, localIngestRoots } from "./sources.js";
 const roots = {
 	claudeProjects: "/home/u/.claude/projects",
 	codexSessions: "/home/u/.codex/sessions",
+	codexArchivedSessions: "/home/u/.codex/archived_sessions",
 };
 
 describe("classifyTranscriptPath", () => {
@@ -77,8 +78,28 @@ test("roots follow HOME, CLAUDE_CONFIG_DIR and CODEX_HOME", () => {
 	expect(localIngestRoots({ HOME: "/h" })).toEqual({
 		claudeProjects: "/h/.claude/projects",
 		codexSessions: "/h/.codex/sessions",
+		codexArchivedSessions: "/h/.codex/archived_sessions",
 	});
 	expect(
 		localIngestRoots({ HOME: "/h", CLAUDE_CONFIG_DIR: "/c", CODEX_HOME: "/x" }),
-	).toEqual({ claudeProjects: "/c/projects", codexSessions: "/x/sessions" });
+	).toEqual({
+		claudeProjects: "/c/projects",
+		codexSessions: "/x/sessions",
+		codexArchivedSessions: "/x/archived_sessions",
+	});
+});
+
+test("an archived Codex rollout is a Codex session, compressed or not", () => {
+	for (const name of [
+		"rollout-2026-03-01T10-00-00-a.jsonl",
+		"rollout-2026-03-01T10-00-00-a.jsonl.zst",
+	]) {
+		const path = `/home/u/.codex/archived_sessions/${name}`;
+		expect(classifyTranscriptPath(roots, path)).toEqual({
+			path,
+			source: "codex",
+			role: "session",
+			sessionPath: path,
+		});
+	}
 });

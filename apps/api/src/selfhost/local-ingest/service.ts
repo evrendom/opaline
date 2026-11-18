@@ -1,5 +1,6 @@
 import { type FSWatcher, watch } from "node:fs";
-import { readdir, stat } from "node:fs/promises";
+import { readdir, stat, statfs } from "node:fs/promises";
+import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import { LIVE_SESSION_ACTIVE_WINDOW_MS } from "@rudel/api-routes";
 import type {
@@ -93,6 +94,8 @@ export interface IngestStatus {
 
 export interface LocalIngestSettings {
 	readonly historyDays: number;
+	readonly historyBatchSessions: number;
+	readonly historyMinFreeBytes: number;
 	readonly concurrency: number;
 	readonly memoryBudgetBytes: number;
 	readonly exclusiveBytes: number;
@@ -110,6 +113,8 @@ export interface LocalIngestSettings {
 
 export const DEFAULT_LOCAL_INGEST_SETTINGS: LocalIngestSettings = {
 	historyDays: 30,
+	historyBatchSessions: 100,
+	historyMinFreeBytes: 5 * 1024 * 1024 * 1024,
 	concurrency: 3,
 	memoryBudgetBytes: 256 * 1024 * 1024,
 	exclusiveBytes: 48 * 1024 * 1024,
@@ -140,7 +145,17 @@ export interface LocalIngestDependencies {
 	readonly settings?: Partial<LocalIngestSettings>;
 	readonly now?: () => number;
 	readonly watchFiles?: boolean;
+	readonly freeBytes?: () => Promise<number | null>;
 	readonly log?: (line: string) => void;
+}
+
+async function homeVolumeFreeBytes(): Promise<number | null> {
+	try {
+		const volume = await statfs(homedir());
+		return Number(volume.bavail) * Number(volume.bsize);
+	} catch {
+		return null;
+	}
 }
 
 interface SeenFile {
@@ -203,6 +218,8 @@ export class LocalIngest {
 	private initialScope: Set<string> | null = null;
 	private initialTimer: ReturnType<typeof setTimeout> | undefined;
 	private initialDrainedReads = 0;
+	private historyLeft = false;
+	private historyPaused = false;
 
 	constructor(private readonly deps: LocalIngestDependencies) {
 		this.settings = { ...DEFAULT_LOCAL_INGEST_SETTINGS, ...deps.settings };
@@ -286,6 +303,7 @@ export class LocalIngest {
 		const at = this.now();
 		this.initialDoneAt = at;
 		clearTimeout(this.initialTimer);
+		if (this.owner && !this.stopped) void this.scan();
 		await this.milestones
 			.reach(INITIAL_IMPORT_MILESTONE, new Date(at))
 			.catch((error: unknown) =>
@@ -712,6 +730,21 @@ export class LocalIngest {
 			if (entry.running || entry.dueAt !== null) return;
 		this.importStartedAt = null;
 		this.importBytesDone = 0;
+		if (this.historyLeft) void this.scan();
+	}
+
+	private async historyRoom(): Promise<boolean> {
+		const free = await (this.deps.freeBytes ?? homeVolumeFreeBytes)();
+		if (free === null || free >= this.settings.historyMinFreeBytes) {
+			this.historyPaused = false;
+			return true;
+		}
+		if (!this.historyPaused)
+			this.deps.log?.(
+				`local ingest paused older history: ${(free / 1024 ** 3).toFixed(1)} GiB free, it waits for ${(this.settings.historyMinFreeBytes / 1024 ** 3).toFixed(1)} GiB`,
+			);
+		this.historyPaused = true;
+		return false;
 	}
 
 	private get exclusiveRunning(): boolean {
@@ -962,11 +995,12 @@ export class LocalIngest {
 		const cutoff = this.now() - this.settings.historyDays * DAY_MS;
 		const changed: { file: TranscriptFile; stat: FileStat }[] = [];
 		const dirty = new Set<string>();
-		for (const file of files) {
-			const stat = await statTranscript(file.path);
-			if (!stat) continue;
+		const history = new Map<
+			string,
+			{ newest: number; files: { file: TranscriptFile; stat: FileStat }[] }
+		>();
+		const admit = (file: TranscriptFile, stat: FileStat) => {
 			const known = this.files.get(file.path);
-			if (!known && stat.mtimeMs < cutoff) continue;
 			const same =
 				known &&
 				known.stat.device === stat.device &&
@@ -979,7 +1013,33 @@ export class LocalIngest {
 			const seen = this.files.get(file.path);
 			if (seen && (options.force || this.isStale(seen)))
 				dirty.add(file.sessionPath);
+		};
+		for (const file of files) {
+			const stat = await statTranscript(file.path);
+			if (!stat) continue;
+			if (!this.files.has(file.path) && stat.mtimeMs < cutoff) {
+				if (this.initialDoneAt === null) continue;
+				const group = history.get(file.sessionPath) ?? {
+					newest: 0,
+					files: [],
+				};
+				group.newest = Math.max(group.newest, stat.mtimeMs);
+				group.files.push({ file, stat });
+				history.set(file.sessionPath, group);
+				continue;
+			}
+			admit(file, stat);
 		}
+		const groups = [...history.values()].sort(
+			(left, right) => right.newest - left.newest,
+		);
+		const batch =
+			groups.length > 0 && (await this.historyRoom())
+				? groups.slice(0, this.settings.historyBatchSessions)
+				: [];
+		for (const group of batch)
+			for (const { file, stat } of group.files) admit(file, stat);
+		if (groups.length > 0) this.historyLeft = groups.length > batch.length;
 		if (changed.length > 0) await this.deps.store.recordSeen(changed);
 		for (const sessionPath of dirty) {
 			const main = this.files.get(sessionPath);
@@ -1005,7 +1065,8 @@ export class LocalIngest {
 
 	private async walk(): Promise<TranscriptFile[]> {
 		const files: TranscriptFile[] = [];
-		const { claudeProjects, codexSessions } = this.deps.roots;
+		const { claudeProjects, codexSessions, codexArchivedSessions } =
+			this.deps.roots;
 		const projects = await readdir(claudeProjects, {
 			withFileTypes: true,
 		}).catch(() => []);
@@ -1048,6 +1109,7 @@ export class LocalIngest {
 			}
 		};
 		await walkCodex(codexSessions);
+		await walkCodex(codexArchivedSessions);
 		return files;
 	}
 
@@ -1055,6 +1117,7 @@ export class LocalIngest {
 		for (const root of [
 			this.deps.roots.claudeProjects,
 			this.deps.roots.codexSessions,
+			this.deps.roots.codexArchivedSessions,
 		]) {
 			if (this.watchers.has(root)) continue;
 			try {
