@@ -2,6 +2,7 @@ import { IconAdjustmentsHorizontal, IconUser } from "@tabler/icons-react";
 import { type ReactNode, useRef, useState } from "react";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
+import { FlowNumber } from "@/app/ui/flow-number";
 import { Popover, PopoverTitle, PopoverTrigger } from "@/app/ui/popover";
 import { FluidHoverHighlight } from "@/components/ui/fluid-hover-highlight";
 import { SessionMenuPopoverContent } from "@/features/sessions/components/session-menu-popover-content";
@@ -14,6 +15,7 @@ import {
 	type UseFluidHoverReturn,
 	useFluidHover,
 } from "@/hooks/use-fluid-hover";
+import { PLAIN_NUMBER } from "@/lib/figure";
 import { cn } from "@/lib/utils";
 
 // The two-line overview rows shared by Repos and Skills: a name over who uses
@@ -226,7 +228,7 @@ export function OverviewRangeFiltersMenu<TKey extends string>({
 				<span>Filter</span>
 				{activeFilterCount > 0 ? (
 					<span className="min-w-4 rounded-full bg-(--session-overview-accent) px-1 text-center text-[10px] leading-4 font-semibold tabular-nums text-white">
-						{activeFilterCount}
+						<FlowNumber value={activeFilterCount} format={PLAIN_NUMBER} />
 					</span>
 				) : null}
 			</PopoverTrigger>

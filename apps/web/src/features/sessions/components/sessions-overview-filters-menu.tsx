@@ -5,6 +5,7 @@ import {
 } from "@tabler/icons-react";
 import { useRef, useState } from "react";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
+import { FlowNumber } from "@/app/ui/flow-number";
 import {
 	Popover,
 	PopoverContent,
@@ -37,6 +38,7 @@ import type {
 } from "@/features/sessions/components/sessions-overview-table-utils";
 import { SESSION_OVERVIEW_TOOLBAR_FILTERS } from "@/features/sessions/components/sessions-overview-toolbar-filters";
 import { useSessionOverviewFilterWheelContainment } from "@/features/sessions/components/use-session-overview-filter-wheel-containment";
+import { PLAIN_NUMBER } from "@/lib/figure";
 import { cn } from "@/lib/utils";
 import { SessionMenuPopoverContent } from "./session-menu-popover-content";
 
@@ -187,7 +189,7 @@ export function SessionsOverviewFiltersMenu({
 				{iconOnly ? null : <span>Filter</span>}
 				{activeFilterCount > 0 && !iconOnly ? (
 					<span className="min-w-4 rounded-full bg-(--session-overview-accent) px-1 text-center text-[10px] leading-4 font-semibold tabular-nums text-white">
-						{activeFilterCount}
+						<FlowNumber value={activeFilterCount} format={PLAIN_NUMBER} />
 					</span>
 				) : null}
 				<span

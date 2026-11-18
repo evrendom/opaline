@@ -8,6 +8,7 @@ import {
 	useState,
 } from "react";
 import { Link } from "react-router-dom";
+import { FlowNumber } from "@/app/ui/flow-number";
 import { ConversationSkillLink } from "@/components/conversation/conversation-skill-link";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { FileTree } from "@/components/pierre/file-tree";
@@ -361,9 +362,7 @@ export function SummaryChangesStrip({ changes }: { changes: SummaryChanges }) {
 				{counts.map((each, index) => (
 					<span key={each.label}>
 						{index > 0 ? " · " : null}
-						<span className="text-foreground">
-							{each.count.toLocaleString("en")}
-						</span>{" "}
+						<FlowNumber className="text-foreground" value={each.count} />{" "}
 						{each.label}
 					</span>
 				))}

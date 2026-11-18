@@ -6,16 +6,19 @@ import {
 	IconMessagesFilled,
 } from "@tabler/icons-react";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
-import { formatCompactNumber, formatRoundedDuration } from "@/lib/format";
+import {
+	countFigure,
+	formatCompactNumber,
+	roundedDurationFigure,
+	unitFigure,
+} from "@/lib/format";
 import type { NormalizedSessionDetailOverview } from "../../components/session-detail-fast-response";
 import { ContextMark } from "../context/session-reader-context-bar";
 import { getContextUseFill } from "../context/session-reader-context-fill";
 import type { ContextMeasure } from "../context/session-reader-context-measure";
 import { fullestCall } from "../context/session-reader-context-runs";
-import { formatReaderCost } from "../model/session-reader-model";
+import { readerCostFigure } from "../model/session-reader-model";
 import type { SummaryFigure } from "./session-reader-summary-figures";
-
-type Figure = SummaryFigure;
 
 const tokensDetail = (
 	input: number | null | undefined,
@@ -66,13 +69,13 @@ function contextFigure(
 	tokens: number,
 	called = true,
 	window: number | null = null,
-): Figure {
+): SummaryFigure {
 	if (!called)
 		return {
 			...CONTEXT,
 			detail: "It ended before its first model call",
 			valueTip: window ? `0 / ${formatCompactNumber(window)}` : undefined,
-			value: window ? "0%" : "—",
+			value: window ? [unitFigure(0, "%")] : ["—"],
 		};
 	return {
 		...CONTEXT,
@@ -84,7 +87,7 @@ function contextFigure(
 		valueTip: fill
 			? `${formatCompactNumber(fill.tokens)} / ${formatCompactNumber(fill.window)}`
 			: undefined,
-		value: fill ? `${Math.round(fill.share * 100)}%` : "—",
+		value: fill ? [unitFigure(Math.round(fill.share * 100), "%")] : ["—"],
 	};
 }
 
@@ -103,7 +106,7 @@ export function sessionFigures(
 	turns: readonly SessionDetailTurnSummary[],
 	totalTurns: number,
 	subagentCount: number,
-): Figure[] {
+): SummaryFigure[] {
 	let fullest: ReturnType<typeof fullestCall> = null;
 	for (const turn of turns) {
 		const call = fullestCall(turn);
@@ -128,13 +131,13 @@ export function sessionFigures(
 			...COST,
 			detail: tokensDetail(tokens.inputTokens, tokens.outputTokens),
 			label: "Cost",
-			value: formatReaderCost(session.estimatedCost),
+			value: readerCostFigure(session.estimatedCost),
 		},
 		{
 			...DURATION,
 			detail: startedAt(session.sessionDate),
 			label: "Duration",
-			value: formatRoundedDuration(session.durationMinutes ?? undefined),
+			value: roundedDurationFigure(session.durationMinutes ?? undefined),
 		},
 		contextFigure(fill, session.totalTokens),
 		{
@@ -143,7 +146,7 @@ export function sessionFigures(
 			label: "Turns",
 			measure: "runs",
 			tint: "text-emerald-500",
-			value: totalTurns.toLocaleString(),
+			value: countFigure(totalTurns),
 		},
 	];
 }
@@ -151,7 +154,7 @@ export function sessionFigures(
 export function runFigures(
 	turn: SessionDetailTurnSummary,
 	turns: readonly SessionDetailTurnSummary[] = [],
-): Figure[] {
+): SummaryFigure[] {
 	const tokens = (turn.inputTokens ?? 0) + (turn.outputTokens ?? 0);
 	const called = turn.usageCalls.length > 0 || turn.estimatedCost !== null;
 	return [
@@ -161,13 +164,13 @@ export function runFigures(
 				? tokensDetail(turn.inputTokens, turn.outputTokens)
 				: "No model call",
 			label: "Cost",
-			value: formatReaderCost(called ? turn.estimatedCost : 0),
+			value: readerCostFigure(called ? turn.estimatedCost : 0),
 		},
 		{
 			...DURATION,
 			detail: turn.startedAt ? startedAt(turn.startedAt) : "",
 			label: "Duration",
-			value: formatRoundedDuration(
+			value: roundedDurationFigure(
 				turn.durationSeconds === null ? undefined : turn.durationSeconds / 60,
 			),
 		},
@@ -182,19 +185,19 @@ export function runFigures(
 
 export function subagentFigures(
 	subagent: NonNullable<NormalizedSessionDetailOverview["subagents"]>[number],
-): Figure[] {
+): SummaryFigure[] {
 	return [
 		{
 			...COST,
 			detail: tokensDetail(subagent.inputTokens, subagent.outputTokens),
 			label: "Cost",
-			value: formatReaderCost(subagent.estimatedCost),
+			value: readerCostFigure(subagent.estimatedCost),
 		},
 		{
 			...DURATION,
 			detail: "From its launch to its answer",
 			label: "Duration",
-			value: formatRoundedDuration(
+			value: roundedDurationFigure(
 				typeof subagent.durationSeconds === "number"
 					? subagent.durationSeconds / 60
 					: undefined,
@@ -209,7 +212,7 @@ export function subagentFigures(
 			icon: IconHexagonFilled,
 			label: "Model",
 			tint: "text-muted-foreground",
-			value: subagent.model ? formatModelDisplayLabel(subagent.model) : "—",
+			value: [subagent.model ? formatModelDisplayLabel(subagent.model) : "—"],
 		},
 	];
 }

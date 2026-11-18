@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { SessionDetailTurnSummary } from "@rudel/api-routes";
+import { figureText } from "@/lib/figure";
 import type { NormalizedSessionDetailOverview } from "../../components/session-detail-fast-response";
 import {
 	runFigures,
@@ -12,7 +13,7 @@ const words = (figures: ReturnType<typeof sessionFigures>) =>
 		detail: detail?.startsWith("Started ") ? "Started …" : detail,
 		label,
 		measure,
-		value,
+		value: figureText(value),
 		valueTip,
 	}));
 

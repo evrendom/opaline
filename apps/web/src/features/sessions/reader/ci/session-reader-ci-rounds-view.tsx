@@ -6,6 +6,8 @@ import {
 	IconRepeat,
 	IconX,
 } from "@tabler/icons-react";
+import { FlowNumber } from "@/app/ui/flow-number";
+import { PLAIN_NUMBER } from "@/lib/figure";
 import { cn } from "@/lib/utils";
 import { CI_STATUS } from "../detail/step/session-reader-step-fields";
 import { formatReaderDuration } from "../model/session-reader-model";
@@ -181,7 +183,8 @@ export function CiPushDetail({
 				<div className="flex min-w-0 items-center gap-2 text-sm">
 					<Glyph icon={look.icon} className={cn("size-4", look.className)} />
 					<span className="font-medium">
-						Push {index + 1} of {total}
+						Push <FlowNumber value={index + 1} format={PLAIN_NUMBER} /> of{" "}
+						<FlowNumber value={total} format={PLAIN_NUMBER} />
 					</span>
 					<span
 						className={cn(

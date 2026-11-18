@@ -6,7 +6,9 @@ import {
 } from "@/features/dashboard/components/DashboardModelBadges";
 import { SessionMenuPopup } from "@/features/sessions/components/session-menu-popup";
 import "@/features/sessions/components/session-menu.css";
+import { FlowNumber } from "@/app/ui/flow-number";
 import { SESSION_OVERVIEW_MENU_TRIGGER_CLASS_NAME } from "@/features/sessions/components/sessions-overview-table-utils";
+import { PLAIN_NUMBER } from "@/lib/figure";
 import { cn } from "@/lib/utils";
 
 export const SKILL_AGENTS = [
@@ -47,7 +49,7 @@ export function RepoSkillsFilterMenu({
 				<span>Filter</span>
 				{activeCount > 0 ? (
 					<span className="min-w-4 rounded-full bg-(--session-overview-accent) px-1 text-center text-[10px] leading-4 font-semibold tabular-nums text-white">
-						{activeCount}
+						<FlowNumber value={activeCount} format={PLAIN_NUMBER} />
 					</span>
 				) : null}
 				<span

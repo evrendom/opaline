@@ -1,10 +1,12 @@
 import type { SessionFile } from "@rudel/api-routes";
 import { IconCode, IconFileCode, IconFileDiff } from "@tabler/icons-react";
 import { useMemo, useState } from "react";
+import { FlowNumber } from "@/app/ui/flow-number";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { DiffView, languageForPath } from "@/components/pierre/diff-view";
 import { countChanges, diffLines } from "@/components/pierre/line-diff";
 import { shortRunId } from "@/features/sessions/run-id";
+import { PLAIN_NUMBER } from "@/lib/figure";
 import { SubagentTag } from "../subagents/session-reader-subagent-chip";
 import type { OpenPlace } from "../summary/session-reader-summary-sections";
 import { changesOf, wholeText } from "./session-files-model";
@@ -76,8 +78,18 @@ export function LineCounts({
 }) {
 	return (
 		<>
-			<span className="text-green-600 dark:text-green-400">+{added}</span>{" "}
-			<span className="text-red-600 dark:text-red-400">−{removed}</span>
+			<FlowNumber
+				className="text-green-600 dark:text-green-400"
+				value={added}
+				format={PLAIN_NUMBER}
+				prefix="+"
+			/>{" "}
+			<FlowNumber
+				className="text-red-600 dark:text-red-400"
+				value={removed}
+				format={PLAIN_NUMBER}
+				prefix="−"
+			/>
 		</>
 	);
 }

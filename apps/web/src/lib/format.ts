@@ -1,12 +1,17 @@
+import type { Format } from "@number-flow/react";
 import { calculateEstimatedCost as calculateEstimatedModelCost } from "@rudel/api-routes";
 import { setCompactNumberLocale } from "@rudel/api-routes/session-context/format";
+import {
+	DISPLAY_LOCALE,
+	type Figure,
+	type FigureNumber,
+	figureText,
+	PLAIN_NUMBER,
+} from "./figure";
 
 export { formatCompactNumber } from "@rudel/api-routes/session-context/format";
 
-// The static English demo must format identically at build time and hydration.
-// Normal product builds continue to use the visitor's locale.
-const displayLocale =
-	import.meta.env.MODE === "product-demo" ? "en-US" : undefined;
+const displayLocale = DISPLAY_LOCALE;
 const numberFormatter = new Intl.NumberFormat(displayLocale);
 setCompactNumberLocale(displayLocale);
 
@@ -168,26 +173,35 @@ export function formatMinutes(value: number) {
 	return `${minuteFormatter.format(value)} min`;
 }
 
+const HALVES: Format = { useGrouping: false, maximumFractionDigits: 1 };
+
+export const unitFigure = (value: number, suffix: string): FigureNumber => ({
+	value,
+	format: PLAIN_NUMBER,
+	suffix,
+});
+
+export function halfHoursFigure(seconds: number): Figure {
+	return [
+		{ value: Math.round(seconds / 1800) / 2, format: HALVES, suffix: "h" },
+	];
+}
+
 export function formatHalfHours(seconds: number): string {
-	return `${Math.round(seconds / 1800) / 2}h`;
+	return figureText(halfHoursFigure(seconds));
+}
+
+export function roundedDurationFigure(minutes: number | undefined): Figure {
+	if (minutes === undefined) return ["—"];
+	const safeMinutes = Math.max(0, minutes);
+	if (safeMinutes < 1) return [unitFigure(Math.round(safeMinutes * 60), "s")];
+	const roundedMinutes = Math.round(safeMinutes);
+	if (roundedMinutes < 60) return [unitFigure(roundedMinutes, "m")];
+	return halfHoursFigure(safeMinutes * 60);
 }
 
 export function formatRoundedDuration(minutes: number | undefined) {
-	if (minutes === undefined) {
-		return "—";
-	}
-
-	const safeMinutes = Math.max(0, minutes);
-	if (safeMinutes < 1) {
-		return `${Math.round(safeMinutes * 60)}s`;
-	}
-
-	const roundedMinutes = Math.round(safeMinutes);
-	if (roundedMinutes < 60) {
-		return `${roundedMinutes}m`;
-	}
-
-	return formatHalfHours(safeMinutes * 60);
+	return figureText(roundedDurationFigure(minutes));
 }
 
 export function formatShare(share: number): string {
@@ -195,10 +209,28 @@ export function formatShare(share: number): string {
 	return percent < 1 ? "<1%" : `${Math.round(percent)}%`;
 }
 
-export function formatShareOf(part: number, whole: number): string {
+export function shareOfFigure(part: number, whole: number): Figure {
 	const percent = whole > 0 ? (part / whole) * 100 : 0;
-	return percent > 0 && percent < 1 ? "<1%" : `${Math.round(percent)}%`;
+	return percent > 0 && percent < 1
+		? [{ ...unitFigure(1, "%"), prefix: "<" }]
+		: [unitFigure(Math.round(percent), "%")];
 }
+
+export function formatShareOf(part: number, whole: number): string {
+	return figureText(shareOfFigure(part, whole));
+}
+
+export const compactNumberFigure = (value: number): Figure => [
+	{
+		value,
+		format: { notation: "compact", maximumFractionDigits: 1 },
+		visitorLocale: true,
+	},
+];
+
+export const countFigure = (value: number): Figure => [
+	{ value, format: {}, visitorLocale: true },
+];
 
 export function formatPercent(value: number) {
 	return `${percentFormatter.format(value)}%`;

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Locator, test } from "@playwright/test";
 import { CostDashboardInputSchema } from "@rudel/api-routes";
 import { githubOutcomesDashboardFixture } from "../src/features/costs/github-outcomes-dashboard.fixture";
 
@@ -15,17 +15,39 @@ test("stage-1 GitHub dashboard happy path", async ({ page }, testInfo) => {
 	await expect(
 		page.getByRole("button", { name: "Merged PRs", exact: true }),
 	).toBeVisible();
-	await expect(
-		page
-			.locator(".cost-metric")
-			.filter({
-				has: page.getByRole("button", { name: "Merged PRs", exact: true }),
-			})
-			.locator(".cost-metric-value"),
-	).toHaveText("3");
-	await expect(
-		page.getByRole("button", { name: "CI failures per PR" }),
-	).toContainText("2");
+	const spoken = (flows: Locator) =>
+		flows.evaluateAll((all) =>
+			all
+				.map(
+					(flow: Element & { _internals?: ElementInternals }) =>
+						flow._internals?.ariaLabel,
+				)
+				.join(""),
+		);
+	await expect
+		.poll(() =>
+			spoken(
+				page
+					.locator(".cost-metric")
+					.filter({
+						has: page.getByRole("button", {
+							name: "Merged PRs",
+							exact: true,
+						}),
+					})
+					.locator(".cost-metric-value number-flow-react"),
+			),
+		)
+		.toBe("3");
+	await expect
+		.poll(() =>
+			spoken(
+				page
+					.getByRole("button", { name: "CI failures per PR" })
+					.locator("number-flow-react"),
+			),
+		)
+		.toBe("2");
 	await expect(
 		page.getByText("CI history from Sep 1, 2026 · 1 PR excluded"),
 	).toBeVisible();

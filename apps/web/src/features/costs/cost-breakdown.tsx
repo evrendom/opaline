@@ -22,6 +22,7 @@ import {
 	DialogDescription,
 	DialogTitle,
 } from "@/app/ui/dialog";
+import { FlowNumber } from "@/app/ui/flow-number";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import {
@@ -30,6 +31,7 @@ import {
 } from "@/features/dashboard/components/DashboardModelBadges";
 import { getModelBadgeTone } from "@/features/dashboard/components/dashboard-model-brand";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
+import { PLAIN_NUMBER } from "@/lib/figure";
 import { BreakdownEmpty } from "./breakdown-empty";
 import { SERIES_COLORS } from "./chart-colors";
 import { costLabel, formatMetricRatio, METRIC_LABELS } from "./cost-format";
@@ -104,7 +106,8 @@ export function CostBreakdown({
 					<div>
 						{selected.length ? (
 							<span className="cost-breakdown-selected">
-								{selected.length} selected
+								<FlowNumber value={selected.length} format={PLAIN_NUMBER} />{" "}
+								selected
 							</span>
 						) : metric === "cost" ? (
 							<>
@@ -291,7 +294,14 @@ export function CostBreakdown({
 							className="cost-secondary-button"
 							onClick={() => setExpanded(false)}
 						>
-							Done{selected.length ? ` · ${selected.length} selected` : ""}
+							Done
+							{selected.length ? (
+								<>
+									{" · "}
+									<FlowNumber value={selected.length} format={PLAIN_NUMBER} />
+									{" selected"}
+								</>
+							) : null}
 						</button>
 					</div>
 				</DialogContent>

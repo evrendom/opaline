@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
+import { FlowNumber } from "@/app/ui/flow-number";
 import {
 	Card,
 	CardContent,
 	CardHeader,
 	CardTitle,
 } from "@/components/dashboard/card";
+import { PLAIN_NUMBER } from "@/lib/figure";
 import { cn } from "@/lib/utils";
 
 export function SummarySection({
@@ -35,7 +37,7 @@ export function SummarySection({
 				{aside ??
 					(count !== undefined ? (
 						<span className="text-sm text-muted-foreground tabular-nums">
-							{count}
+							<FlowNumber value={count} format={PLAIN_NUMBER} />
 						</span>
 					) : null)}
 			</CardHeader>

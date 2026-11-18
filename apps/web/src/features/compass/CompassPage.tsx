@@ -32,6 +32,8 @@ import { CompassSettingsButton } from "./compass-settings";
 import { useCompassAccess, useCompassEnabled } from "./use-compass-access";
 import "@/features/costs/cost-dashboard.css";
 import "./compass.css";
+import { FlowNumber } from "@/app/ui/flow-number";
+import { PLAIN_NUMBER } from "@/lib/figure";
 
 const PAGE_SIZE = 100;
 
@@ -183,7 +185,9 @@ function CompassView({ observable }: { observable: boolean }) {
 							>
 								Runs
 								{noticeable === undefined ? null : (
-									<span className="compass-tab-count">{noticeable}</span>
+									<span className="compass-tab-count">
+										<FlowNumber value={noticeable} format={PLAIN_NUMBER} />
+									</span>
 								)}
 							</button>
 							<button
@@ -237,8 +241,11 @@ function CompassView({ observable }: { observable: boolean }) {
 						>
 							{() => (
 								<p className="compass-list-summary">
-									{noticeable?.toLocaleString("en-US")} of{" "}
-									{firstPage?.runs.toLocaleString("en-US")} runs noticed
+									{noticeable === undefined ? null : (
+										<FlowNumber value={noticeable} />
+									)}{" "}
+									of {firstPage ? <FlowNumber value={firstPage.runs} /> : null}{" "}
+									runs noticed
 								</p>
 							)}
 						</Reveal>

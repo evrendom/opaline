@@ -9,8 +9,8 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
+import { FlowNumber } from "@/app/ui/flow-number";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
-import { RollingText } from "@/features/costs/cost-rolling-text";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { useLocalDesktopApp } from "@/features/desktop/local-app";
 import {
@@ -25,6 +25,7 @@ import {
 import { getSessionTimestamp } from "@/features/sessions/session-ordering";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { DockedSupportEmailButton } from "@/features/support/SupportEmailButton";
+import { PLAIN_NUMBER } from "@/lib/figure";
 import { orpc } from "@/lib/orpc";
 
 // Sessions upload when they end, so the newest session's end is when the
@@ -183,7 +184,7 @@ export function LastSessionUploadBar() {
 							{running ? (
 								<FooterLabel key="running" direction={direction}>
 									<span className="text-foreground">
-										<RollingText text={String(agentsRunning)} />
+										<FlowNumber value={agentsRunning} format={PLAIN_NUMBER} />
 									</span>
 									{agentsRunning === 1 ? "agent running" : "agents running"}
 								</FooterLabel>

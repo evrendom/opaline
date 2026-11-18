@@ -17,14 +17,15 @@ import {
 	useLayoutEffect,
 	useState,
 } from "react";
+import { FlowFigure } from "@/app/ui/flow-number";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
+import type { Figure } from "@/lib/figure";
 import { orpc } from "@/lib/orpc";
 import { type ChartInterval, groupChartTrend } from "./chart-interval";
-import { formatMetric } from "./cost-format";
+import { metricFigure } from "./cost-format";
 import { useMarkedDate } from "./cost-hover-date";
 import type { MetricBreakdowns } from "./cost-rail-override";
-import { RollingText } from "./cost-rolling-text";
 
 const BARS = 5;
 const SHEET_PAD = 6;
@@ -34,7 +35,7 @@ const DEEP_ROW_PX = 25;
 type DeepView = {
 	title: string;
 	entries: CostBreakdownEntry[];
-	format: (value: number) => string;
+	format: (value: number) => Figure;
 	ordered?: boolean;
 };
 
@@ -75,7 +76,7 @@ function languageView(types: readonly { id: string; value: number }[]) {
 	return {
 		title: "Swearwords vs apologies",
 		entries,
-		format: (value: number) => formatMetric(value, "sessions"),
+		format: (value: number) => metricFigure(value, "sessions"),
 		ordered: true,
 	};
 }
@@ -208,7 +209,7 @@ function rankedView(
 	return {
 		title: pick.title,
 		entries,
-		format: (value) => formatMetric(value, metric),
+		format: (value) => metricFigure(value, metric),
 		ordered: pick.ordered,
 	};
 }
@@ -233,7 +234,7 @@ function DeepTile({ view }: { view: DeepView }) {
 							}
 						>
 							<span className="cost-metric-deep-value">
-								<RollingText text={view.format(entry.value)} />
+								<FlowFigure figure={view.format(entry.value)} />
 							</span>
 						</span>
 					</li>

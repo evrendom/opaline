@@ -1,4 +1,6 @@
+import type { Format } from "@number-flow/react";
 import type { DashboardMetricData } from "@rudel/api-routes";
+import { type Figure, figureText } from "@/lib/figure";
 import { type ChartInterval, groupChartTrend } from "./chart-interval";
 
 const SWEARS = "Negative user";
@@ -13,14 +15,22 @@ export type LanguageRates = {
 
 const rate = (count: number, runs: number) => (runs > 0 ? count / runs : 0);
 
+const WHOLE: Format = { useGrouping: false };
+
+export function perRunFigure(rate: number): Figure {
+	const [count, runs] = !(rate > 0)
+		? [0, 1]
+		: rate >= 1
+			? [Math.round(rate), 1]
+			: [1, Math.round(1 / rate)];
+	return [{ value: count, format: WHOLE }, "/", { value: runs, format: WHOLE }];
+}
+
 export function formatPerRun(rate: number, short = false) {
-	if (!(rate > 0)) return short ? "0/1" : "none";
-	if (rate >= 1) {
-		if (short) return `${Math.round(rate)}/1`;
-		return `${Math.round(rate * 10) / 10} per run`;
-	}
-	const runs = Math.round(1 / rate);
-	return short ? `1/${runs}` : `1 per ${runs} runs`;
+	if (short) return figureText(perRunFigure(rate));
+	if (!(rate > 0)) return "none";
+	if (rate >= 1) return `${Math.round(rate * 10) / 10} per run`;
+	return `1 per ${Math.round(1 / rate)} runs`;
 }
 
 export function perRunTick(rate: number) {

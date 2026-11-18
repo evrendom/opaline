@@ -4,7 +4,7 @@ import { useContext, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useOptionalOrganization } from "@/features/workspace/organization/useOrganization";
 import { orpc } from "@/lib/orpc";
-import { formatReaderCost } from "../model/session-reader-model";
+import { readerCostFigure } from "../model/session-reader-model";
 import {
 	CompactionShareContext,
 	CompactionToggle,
@@ -57,7 +57,11 @@ export function StoredSessionContext({
 	if (!view) return null;
 	const sides = snapshot.views.length > 1;
 	const share = sides
-		? `${formatReaderCost(view.segmentCost)} / ${formatReaderCost(snapshot.sessionCost)}`
+		? [
+				...readerCostFigure(view.segmentCost),
+				" / ",
+				...readerCostFigure(snapshot.sessionCost),
+			]
 		: null;
 	const toggle = sides ? (
 		<CompactionToggle

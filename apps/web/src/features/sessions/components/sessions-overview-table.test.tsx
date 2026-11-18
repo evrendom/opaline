@@ -4,6 +4,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { assert, describe, expect, it, vi } from "vitest";
 import { DotPickContext } from "@/features/costs/cost-hover-date";
+import { elementText } from "@/test/markup-text";
 import { liveSessionRow } from "../live-session-rows";
 import { SessionsOverviewTable } from "./sessions-overview-table";
 
@@ -157,7 +158,7 @@ describe("SessionsOverviewTable", () => {
 		expect(within(liveRow).getByText("branch")).toBeInTheDocument();
 		const activity = liveRow.querySelector("time");
 		assert(activity);
-		expect(activity).toHaveTextContent(/^1[0-9]s ago$/);
+		expect(elementText(activity)).toMatch(/^1[0-9]s ago$/);
 		expect(
 			activity.getAttribute("data-session-overview-date-tooltip-label"),
 		).toMatch(/^Started .+ · active 1[0-9]s ago$/);

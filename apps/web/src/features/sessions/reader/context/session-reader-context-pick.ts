@@ -1,5 +1,6 @@
 import { createContext, useContext } from "react";
-import { formatShareOf } from "@/lib/format";
+import type { Figure } from "@/lib/figure";
+import { shareOfFigure, unitFigure } from "@/lib/format";
 import type { TileGlyph } from "./session-reader-context-bar";
 import { thingKey } from "./session-reader-context-by-run";
 import type {
@@ -13,7 +14,7 @@ import {
 } from "./session-reader-context-measure";
 
 export type PickedBox = {
-	figures: Partial<Record<ContextMeasure, string>>;
+	figures: Partial<Record<ContextMeasure, Figure>>;
 	glyph: TileGlyph;
 	kind: ContextKind;
 	label: string;
@@ -44,7 +45,7 @@ export function pickedFigures(
 		ofPart?: ReadonlyMap<string, ReadonlySet<number>>;
 	},
 	thing?: string | null,
-): Partial<Record<ContextMeasure, string>> {
+): Partial<Record<ContextMeasure, Figure>> {
 	const { key } = part;
 	const run = key.startsWith("run:") ? key.slice("run:".length) : null;
 	const keys = part.folded ?? [key];
@@ -83,15 +84,19 @@ export function pickedFigures(
 	return {
 		...(tokens !== undefined
 			? {
-					context: `${MEASURE_LOOK.context.format(tokens)} · ${formatShareOf(tokens, window)}`,
+					context: [
+						...MEASURE_LOOK.context.figure(tokens),
+						" · ",
+						...shareOfFigure(tokens, window),
+					],
 				}
 			: {}),
 		...(cost !== undefined && cost !== null
-			? { cost: MEASURE_LOOK.cost.format(cost) }
+			? { cost: MEASURE_LOOK.cost.figure(cost) }
 			: {}),
 		...(ms !== undefined && ms !== null
-			? { time: MEASURE_LOOK.time.format(ms) }
+			? { time: MEASURE_LOOK.time.figure(ms) }
 			: {}),
-		...(inRuns !== undefined ? { runs: String(inRuns) } : {}),
+		...(inRuns !== undefined ? { runs: [unitFigure(inRuns, "")] } : {}),
 	};
 }

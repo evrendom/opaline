@@ -1,8 +1,9 @@
 import { IconCalendarEvent, IconX } from "@tabler/icons-react";
 import { format, parseISO } from "date-fns";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { FlowFigure } from "@/app/ui/flow-number";
 import { type DotPick, useDotPick } from "@/features/costs/cost-hover-date";
-import { RollingText } from "@/features/costs/cost-rolling-text";
+import { textFigure } from "@/lib/figure";
 
 const ENTER = { duration: 0.46, ease: [0.22, 1, 0.36, 1] } as const;
 
@@ -33,7 +34,7 @@ export function SessionsFocusedDayTag() {
 					transition={reduceMotion ? { duration: 0 } : ENTER}
 				>
 					<IconCalendarEvent aria-hidden="true" />
-					<RollingText text={dayLabel(picked)} />
+					<FlowFigure figure={textFigure(dayLabel(picked))} />
 					<IconX aria-hidden="true" className="text-muted-foreground" />
 				</motion.button>
 			) : null}

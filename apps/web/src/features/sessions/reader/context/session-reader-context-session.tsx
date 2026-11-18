@@ -17,6 +17,7 @@ import {
 import { createPortal } from "react-dom";
 import { useEffectOnceWhen } from "@/app/hooks/useEffectOnceWhen";
 import { Bones } from "@/app/ui/bones";
+import type { Figure } from "@/lib/figure";
 import type { NormalizedSessionDetailOverview } from "../../components/session-detail-fast-response";
 import { useSessionSetupRuns } from "../../use-session-setup-runs";
 import {
@@ -24,8 +25,8 @@ import {
 	useSessionReaderBodies,
 } from "../detail/use-session-reader-bodies";
 import {
-	formatReaderCost,
 	getReaderMemberText,
+	readerCostFigure,
 } from "../model/session-reader-model";
 import { useRunFlags } from "../rail/session-reader-run-flags";
 import { ContextBar } from "./session-reader-context-bar";
@@ -94,7 +95,11 @@ export function SessionContext({
 		0,
 	);
 	const share = sides
-		? `${formatReaderCost(segmentCost)} / ${formatReaderCost(overview.session.estimatedCost)}`
+		? [
+				...readerCostFigure(segmentCost),
+				" / ",
+				...readerCostFigure(overview.session.estimatedCost),
+			]
 		: null;
 	const later = target ? segment.length - 1 - segment.indexOf(target) : 0;
 	const costOutside = `After its fullest moment${later > 0 ? ` · ${later} ${later === 1 ? "run" : "runs"}` : ""}`;
@@ -152,7 +157,7 @@ function WholeContext({
 	overview: NormalizedSessionDetailOverview;
 	runs: readonly SessionDetailTurnSummary[];
 	segment: readonly SessionDetailTurnSummary[];
-	share: string | null;
+	share: Figure | null;
 	setup: readonly SessionSetupFile[] | undefined;
 	showingWith: boolean;
 	target: SessionDetailTurnSummary;
@@ -281,7 +286,7 @@ function WholeContext({
 		stored.data?.views.find((view) => view.withCompaction === showingWith) ??
 		stored.data?.views[0];
 	const lastShown = useRef<ComponentProps<typeof ContextTiles> | null>(null);
-	const lastShare = useRef<string | null>(null);
+	const lastShare = useRef<Figure | null>(null);
 	if (failed)
 		return <Unmapped>Some of its runs' transcripts couldn't be read.</Unmapped>;
 	if (!done && lastShown.current)

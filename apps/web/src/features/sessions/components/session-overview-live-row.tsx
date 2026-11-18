@@ -1,10 +1,12 @@
 import type { LiveSessionSummary, SessionAnalytics } from "@rudel/api-routes";
+import type { ReactNode } from "react";
+import { FlowFigure } from "@/app/ui/flow-number";
 import { isLiveOnlySessionRow } from "@/features/sessions/live-session-rows";
 import {
 	formatLiveSessionActivity,
-	formatLiveSessionAge,
 	formatLiveSessionSource,
 	type LiveSessionState,
+	liveSessionAgeFigure,
 	readLiveSessionState,
 } from "../live-session-model";
 
@@ -18,7 +20,7 @@ export function describeLiveSessionRow(
 	nowMs: number | undefined,
 ): {
 	/** The row's date cell: how long ago the session last moved. */
-	age: string;
+	age: ReactNode;
 	live: LiveSessionSummary;
 	/** The row shows the agent in place of a model it does not know yet. */
 	sourceLabel: string | undefined;
@@ -30,7 +32,7 @@ export function describeLiveSessionRow(
 	const now = nowMs ?? Date.now();
 	const liveOnly = isLiveOnlySessionRow(session);
 	return {
-		age: formatLiveSessionAge(live.lastActivityAt, now),
+		age: <FlowFigure figure={liveSessionAgeFigure(live.lastActivityAt, now)} />,
 		live,
 		sourceLabel: liveOnly ? formatLiveSessionSource(live.source) : undefined,
 		state: readLiveSessionState(live, now),

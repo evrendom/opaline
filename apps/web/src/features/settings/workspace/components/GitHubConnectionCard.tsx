@@ -15,6 +15,8 @@ import {
 	WorkspaceSettingsRow,
 } from "@/features/settings/workspace/components/workspace-settings-group";
 import "./github-connection-card.css";
+import { FlowNumber } from "@/app/ui/flow-number";
+import { PLAIN_NUMBER } from "@/lib/figure";
 
 export function GitHubConnectionCard({
 	status,
@@ -274,7 +276,9 @@ function SyncProgressRow({
 						style={{ width: `${percent}%` }}
 					/>
 				</div>
-				<span className="github-connection-progress-value">{percent}%</span>
+				<span className="github-connection-progress-value">
+					<FlowNumber value={percent} format={PLAIN_NUMBER} suffix="%" />
+				</span>
 			</div>
 		</WorkspaceSettingsRow>
 	);

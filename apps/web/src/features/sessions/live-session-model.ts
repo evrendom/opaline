@@ -5,6 +5,8 @@ import {
 	type LiveSessionTailOutput,
 	type LiveSessionTailStream,
 } from "@rudel/api-routes";
+import { type Figure, figureText } from "@/lib/figure";
+import { unitFigure } from "@/lib/format";
 
 export { isLiveSessionActive };
 
@@ -117,26 +119,38 @@ export function formatLiveSessionSource(source: LiveSessionSource): string {
 }
 
 /** "now", "12s ago", "3m ago", "2h ago". */
-export function formatLiveSessionAge(
+export function liveSessionAgeFigure(
 	lastActivityAt: string,
 	nowMs: number,
-): string {
+): Figure {
 	const seconds = Math.max(
 		0,
 		Math.floor((nowMs - Date.parse(lastActivityAt)) / 1_000),
 	);
-	if (seconds < 5) return "now";
-	if (seconds < 60) return `${seconds}s ago`;
-	if (seconds < 3_600) return `${Math.floor(seconds / 60)}m ago`;
-	return `${Math.floor(seconds / 3_600)}h ago`;
+	if (seconds < 5) return ["now"];
+	if (seconds < 60) return [unitFigure(seconds, "s"), " ago"];
+	if (seconds < 3_600)
+		return [unitFigure(Math.floor(seconds / 60), "m"), " ago"];
+	return [unitFigure(Math.floor(seconds / 3_600), "h"), " ago"];
+}
+
+export function formatLiveSessionAge(lastActivityAt: string, nowMs: number) {
+	return figureText(liveSessionAgeFigure(lastActivityAt, nowMs));
 }
 
 /** "active now", "active 12s ago", "active 3m ago", "active 2h ago". */
+export function liveSessionActivityFigure(
+	lastActivityAt: string,
+	nowMs: number,
+): Figure {
+	return ["active ", ...liveSessionAgeFigure(lastActivityAt, nowMs)];
+}
+
 export function formatLiveSessionActivity(
 	lastActivityAt: string,
 	nowMs: number,
 ): string {
-	return `active ${formatLiveSessionAge(lastActivityAt, nowMs)}`;
+	return figureText(liveSessionActivityFigure(lastActivityAt, nowMs));
 }
 
 function sameStream(
