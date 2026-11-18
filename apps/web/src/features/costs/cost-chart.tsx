@@ -1235,7 +1235,7 @@ export function CostChart({
 										{metric === "agentRuns" || metric === "ciRuns" ? (
 											<YAxis
 												yAxisId="duration"
-												hide={!showMedian && !showP95}
+												hide={sampled || (!showMedian && !showP95)}
 												orientation="right"
 												tickFormatter={(value) =>
 													formatRunDuration(Number(value))
@@ -1255,7 +1255,7 @@ export function CostChart({
 										) : metric === "mergedPullRequests" ? (
 											<YAxis
 												yAxisId="ci"
-												hide={!showCiFailures || ciData === null}
+												hide={sampled || !showCiFailures || ciData === null}
 												orientation="right"
 												tickFormatter={(value) =>
 													formatMetricRatio(
@@ -1431,7 +1431,7 @@ export function CostChart({
 										) : metric === "mergedPullRequests" ? (
 											<Line
 												yAxisId="ci"
-												hide={!showCiFailures || ciData === null}
+												hide={sampled || !showCiFailures || ciData === null}
 												dataKey="ciFailureRatio"
 												name="CI failures / PR"
 												type="linear"
