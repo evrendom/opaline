@@ -515,13 +515,15 @@ function UsageCanvas({
 	morph?: { current: readonly BarSpan[] | null };
 }) {
 	const [canvasRef, width] = useWidth<HTMLDivElement>();
-	const [morphing, setMorphing] = useState(morph !== undefined);
+	const [morphing] = useState(morph !== undefined);
+	const started = useRef(false);
 	useLayoutEffect(() => {
 		const canvas = canvasRef.current;
-		if (!morphing || !canvas) return;
+		if (!morphing || started.current || !canvas) return;
 		const from = morph?.current;
 		if (!from) {
-			setMorphing(false);
+			started.current = true;
+			canvas.removeAttribute("data-morphing");
 			return;
 		}
 		let frame = 0;
@@ -532,6 +534,7 @@ function UsageCanvas({
 				frame = requestAnimationFrame(start);
 				return;
 			}
+			started.current = true;
 			if (morph) morph.current = null;
 			bars.forEach((bar, index) => {
 				const span = from[index];
@@ -574,7 +577,7 @@ function UsageCanvas({
 					easing: MORPH_EASE,
 					fill: "backwards",
 				});
-			setMorphing(false);
+			canvas.removeAttribute("data-morphing");
 		};
 		frame = requestAnimationFrame(start);
 		return () => cancelAnimationFrame(frame);
