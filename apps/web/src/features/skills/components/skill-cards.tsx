@@ -4,7 +4,13 @@ import {
 	IconFolderFilled,
 	IconUsers,
 } from "@tabler/icons-react";
-import { type ComponentType, memo, type ReactNode } from "react";
+import {
+	type ComponentType,
+	memo,
+	type ReactNode,
+	useLayoutEffect,
+	useRef,
+} from "react";
 import { SkillMark } from "@/components/skill-mark";
 import { getSkillMarkLook } from "@/components/skill-mark-look";
 import {
@@ -105,6 +111,15 @@ export function OverviewCard({
 	pills: ReactNode;
 }) {
 	const { emoji, tint } = getSkillMarkLook(name);
+	const body = useRef<HTMLDivElement>(null);
+	useLayoutEffect(() => markHiddenRows(body.current));
+	useLayoutEffect(() => {
+		const element = body.current;
+		if (!element) return;
+		const observer = new ResizeObserver(() => markHiddenRows(element));
+		observer.observe(element);
+		return () => observer.disconnect();
+	}, []);
 	return (
 		<article
 			className={cn(
@@ -155,12 +170,27 @@ export function OverviewCard({
 						{name}
 					</h2>
 				</div>
-				<div className="relative mx-4 flex min-h-0 flex-1 overflow-hidden [mask-image:linear-gradient(to_bottom,#000_calc(100%-3rem),transparent)]">
+				<div
+					ref={body}
+					className="relative mx-4 flex min-h-0 flex-1 overflow-hidden [mask-image:linear-gradient(to_bottom,#000_calc(100%-3rem),transparent)]"
+				>
 					{children}
 				</div>
 			</div>
 		</article>
 	);
+}
+
+const HALF_FADE = 24;
+
+function markHiddenRows(body: HTMLElement | null) {
+	if (!body) return;
+	const limit = body.getBoundingClientRect().bottom - HALF_FADE;
+	for (const row of body.querySelectorAll<HTMLElement>("[data-card-row]"))
+		row.toggleAttribute(
+			"skullet-ignore",
+			row.getBoundingClientRect().bottom > limit,
+		);
 }
 
 export function StripPill({

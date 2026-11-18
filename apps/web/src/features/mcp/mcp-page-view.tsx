@@ -220,7 +220,11 @@ function McpCard({
 			{server.tools.length > 0 ? (
 				<ul className="flex w-full min-w-0 flex-col gap-1 pt-1.5 text-[13px] leading-5">
 					{server.tools.slice(0, SHOWN_TOOLS).map((tool) => (
-						<li key={tool.name} className="flex min-w-0 items-baseline gap-2">
+						<li
+							key={tool.name}
+							data-card-row=""
+							className="flex min-w-0 items-baseline gap-2"
+						>
 							<span className="min-w-0 truncate text-[color:var(--dashboardy-heading)]/75">
 								{tool.name}
 							</span>
