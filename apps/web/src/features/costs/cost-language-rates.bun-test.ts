@@ -58,6 +58,7 @@ describe("languageRates", () => {
 		expect(formatPerRun(2.34)).toBe("2.3 per run");
 		expect(formatPerRun(0)).toBe("none");
 		expect(formatPerRun(68 / 2452, true)).toBe("1/36");
-		expect(formatPerRun(2.34, true)).toBe("2.3/run");
+		expect(formatPerRun(2.34, true)).toBe("2/1");
+		expect(formatPerRun(0, true)).toBe("0/1");
 	});
 });
