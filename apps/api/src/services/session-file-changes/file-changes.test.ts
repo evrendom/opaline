@@ -189,6 +189,24 @@ describe("collectSessionFileChanges", () => {
 		expect(files.map((file) => file.path)).toEqual(["/r/a.ts"]);
 	});
 
+	test("a shell command read as part of a search still reads its files", () => {
+		const shell = {
+			...call("Bash", { command: "ls; cat health-spec.ts" }),
+			activity: {
+				files: [{ operation: "read" as const, path: "health-spec.ts" }],
+				status: "succeeded" as const,
+				verb: "Ran",
+			},
+		};
+		expect(traceStepOf(shell, "", "/r/health").kind).toBe("search");
+		const { files } = collectSessionFileChanges([
+			{ agentId: "", calls: [shell], directory: "/r/health", turnId: "t1" },
+		]);
+		expect(
+			files.map((file) => ({ path: file.path, reads: file.reads })),
+		).toEqual([{ path: "/r/health/health-spec.ts", reads: 1 }]);
+	});
+
 	test("files only read come after the ones changed", () => {
 		const { files } = collectSessionFileChanges([
 			{

@@ -9,7 +9,7 @@ import {
 	type TraceItem,
 	translateCodexToolCall,
 } from "@rudel/api-routes";
-import { absolutePath } from "@rudel/api-routes/call-paths";
+import { absolutePath, callDirectory } from "@rudel/api-routes/call-paths";
 import type { SessionDetailDerivation } from "../session-detail-derivation.service.js";
 import { shellCommandOf } from "../session-detail-step-kinds.js";
 import { collectRunTraces, traceStepOf } from "./run-trace.js";
@@ -202,10 +202,14 @@ function stepsOf(
 				}));
 			});
 	}
-	if (shellCommandOf(call.toolName, call.input) && !failed) {
+	const command = shellCommandOf(call.toolName, call.input);
+	if (command && !failed) {
 		const step = traceStepOf(call, stream.agentId, directory);
-		if (step.kind !== "read") return [];
-		return step.paths.map((readPath) => ({
+		const readPaths =
+			step.kind === "read"
+				? step.paths
+				: shellReadPaths(call, command, directory);
+		return readPaths.map((readPath) => ({
 			agentId: stream.agentId,
 			at,
 			content: null,
@@ -215,6 +219,23 @@ function stepsOf(
 		}));
 	}
 	return [];
+}
+
+function shellReadPaths(
+	call: SessionToolCall,
+	command: string,
+	directory: string,
+): string[] {
+	const ranIn = callDirectory(command, directory);
+	return [
+		...new Set(
+			(call.activity?.files ?? [])
+				.filter(
+					(file) => file.operation === "read" || file.operation === "viewed",
+				)
+				.map((file) => absolutePath(file.path, ranIn)),
+		),
+	];
 }
 
 function cut(text: string): { text: string; cut: boolean } {
