@@ -165,7 +165,7 @@ export function FileDetail({
 					icon={IconFileCode}
 					title="Never seen whole"
 					description="The session never read or wrote this file in full, or made an edit it couldn't place, so its text isn't known."
-					className="mt-3"
+					className="mt-3 mb-4"
 				/>
 			) : (
 				<ScrollColumn className="-mr-4 -ml-1.5 pr-4 pl-1.5">
