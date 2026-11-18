@@ -14,17 +14,17 @@ export type LanguageRates = {
 const rate = (count: number, runs: number) => (runs > 0 ? count / runs : 0);
 
 export function formatPerRun(rate: number, short = false) {
-	if (!(rate > 0)) return "none";
+	if (!(rate > 0)) return short ? "0/1" : "none";
 	if (rate >= 1) {
-		const each = Math.round(rate * 10) / 10;
-		return short ? `${each}/run` : `${each} per run`;
+		if (short) return `${Math.round(rate)}/1`;
+		return `${Math.round(rate * 10) / 10} per run`;
 	}
 	const runs = Math.round(1 / rate);
 	return short ? `1/${runs}` : `1 per ${runs} runs`;
 }
 
 export function perRunTick(rate: number) {
-	return rate > 0 ? formatPerRun(rate, true) : "0";
+	return formatPerRun(rate, true);
 }
 
 function seriesOf(data: DashboardMetricData, label: string) {
