@@ -19,9 +19,21 @@ import {
 import { Button } from "@/app/ui/button";
 import { Skeleton } from "@/app/ui/skeleton";
 import { CONVERSATION_TRACE_TAG_CLASS_NAME } from "@/components/conversation/conversation-trace-tag";
+import {
+	Empty,
+	EmptyContent,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/dashboard/empty";
 import { SkillMark } from "@/components/skill-mark";
 import { FluidHoverHighlight } from "@/components/ui/fluid-hover-highlight";
 import { SESSION_OVERVIEW_SURFACE_CLASS_NAME } from "@/features/sessions/components/sessions-overview-table-utils";
+import {
+	OpalineShape,
+	restingChipClassName,
+} from "@/features/shell/components/shell-nav-icon";
 import { useShellHeaderPortal } from "@/features/shell/shell-header-portal";
 import { useUserMap } from "@/features/workspace/hooks/useUserMap";
 import {
@@ -573,19 +585,26 @@ export function UsageStateMessage({
 	title: string;
 }) {
 	return (
-		<div className="flex min-h-64 flex-1 flex-col items-center justify-center gap-3 px-6 py-12 text-center">
-			<div className="text-[#8d8d8d] [&_svg]:size-5 [&_svg]:shrink-0 dark:text-[#8c8c8c]">
-				{icon}
-			</div>
-			<div className="flex max-w-md flex-col gap-1">
-				<h2 className="text-base font-medium text-balance text-[color:var(--dashboardy-heading)]">
-					{title}
-				</h2>
-				<p className="text-pretty text-base text-[color:var(--dashboardy-muted)] sm:text-sm">
-					{description}
-				</p>
-			</div>
-			{action}
+		<div className="flex min-h-64 flex-1 flex-col p-6">
+			<Empty className="border border-dashed">
+				<EmptyHeader>
+					<EmptyMedia variant="icon">
+						<OpalineShape
+							className={cn(
+								"absolute inset-0",
+								restingChipClassName,
+								"[--opal-ring:rgb(17_24_39/0.08)]",
+							)}
+						/>
+						<span className="relative grid place-items-center">{icon}</span>
+					</EmptyMedia>
+					<EmptyContent>
+						<EmptyTitle>{title}</EmptyTitle>
+						<EmptyDescription>{description}</EmptyDescription>
+						{action}
+					</EmptyContent>
+				</EmptyHeader>
+			</Empty>
 		</div>
 	);
 }
