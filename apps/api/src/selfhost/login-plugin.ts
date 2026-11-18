@@ -162,7 +162,7 @@ export function selfHostedLoginPlugin(
 					await ctx.context.internalAdapter.deleteVerificationByIdentifier(
 						linkSessionIdentifier(session.id),
 					);
-					await ctx.context.internalAdapter.deleteSessions(user.id);
+					await ctx.context.internalAdapter.deleteUserSessions(user.id);
 					const { activeOrganizationId } = session as {
 						activeOrganizationId?: string | null;
 					};
