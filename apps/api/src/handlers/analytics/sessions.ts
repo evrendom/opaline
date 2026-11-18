@@ -53,6 +53,7 @@ import {
 	getSessionCostMaximum,
 	getSessionFilterCatalog,
 } from "../../services/session-list-filters.js";
+import { sessionMcpServers } from "../../services/session-mcp-servers.service.js";
 import { readNativeSessionRelationships } from "../../services/session-native-lineage.service.js";
 import { getSessionOwner } from "../../services/session-ownership.service.js";
 import {
@@ -211,6 +212,19 @@ const runQuestionTags = os.analytics.sessions.runQuestionTags
 	.handler(({ input, context }) =>
 		sessionRunQuestionTags(
 			sessionAnswersEnv(),
+			{
+				workspaceId: context.organizationId,
+				member: readableSessionOwner(context.sessionReader),
+			},
+			input.sessionIds,
+		),
+	);
+
+const mcpServers = os.analytics.sessions.mcpServers
+	.use(orgMiddleware)
+	.handler(({ input, context }) =>
+		sessionMcpServers(
+			sessionRunCiEnv(),
 			{
 				workspaceId: context.organizationId,
 				member: readableSessionOwner(context.sessionReader),
@@ -695,6 +709,7 @@ export const sessionsRouter = os.analytics.sessions.router({
 	runAnswers,
 	runCi,
 	runQuestionTags,
+	mcpServers,
 	setupRuns,
 	contextSnapshot,
 	setupText,

@@ -2,7 +2,7 @@ import type {
 	SessionAnalytics,
 	SessionRunQuestionTag,
 } from "@rudel/api-routes";
-import { IconAlertCircle, IconBattery2 } from "@tabler/icons-react";
+import { IconAlertCircle } from "@tabler/icons-react";
 import { memo, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -15,6 +15,7 @@ import { ConversationSkillLink } from "@/components/conversation/conversation-sk
 import { ConversationTraceTag } from "@/components/conversation/conversation-trace-tag";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
+import { useLocalDesktopApp } from "@/features/desktop/local-app";
 import { SessionOverviewQuestionTags } from "@/features/sessions/components/run-question-tag";
 import { SessionMemberProfilePreview } from "@/features/sessions/components/session-member-profile-preview";
 import type { SessionMemberProfileSummary } from "@/features/sessions/components/session-member-profile-summary";
@@ -68,7 +69,9 @@ import {
 	SESSION_OVERVIEW_TAG_NUMBER_CLASS_NAME,
 	SessionOverviewLanguageSignals,
 } from "./session-overview-row-elements";
+import { SessionOverviewToolTags } from "./session-overview-tool-tags";
 import { SessionPlaceLabel } from "./session-place";
+import { SessionPlanUsage } from "./session-plan-usage";
 import { SubagentPebble } from "./session-subagent-pebble";
 
 type SessionsOverviewRowProps = {
@@ -100,6 +103,7 @@ type SessionsOverviewRowProps = {
 	userLabel: string;
 	/** Run questions answered yes about the session's runs; shown with the skills. */
 	questionTags?: readonly SessionRunQuestionTag[];
+	mcpServers?: readonly string[];
 	/** Set on a row that folds a panel beneath it: clicking toggles it and
 	 * the model mark shows the disclosure, instead of opening the session. */
 	expanded?: boolean;
@@ -172,12 +176,14 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 	session,
 	userLabel,
 	questionTags,
+	mcpServers,
 	expanded,
 	gridClassName,
 	showPlace,
 	subagentTint,
 }: SessionsOverviewRowProps) {
 	const demo = useDemoRuntime();
+	const localApp = useLocalDesktopApp();
 	const itemRef = useRef<HTMLLIElement>(null);
 	useRegisterFluidHoverItem(registerItem, index, itemRef);
 	const sessionHref = withTranscriptSubagent(
@@ -364,33 +370,11 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 					{sessionCost === null ? (
 						<span className="sr-only">API cost unavailable</span>
 					) : null}
-					{planUsage === undefined && !planUsageLimited ? null : (
-						<span
-							className="ml-1 inline-flex items-center gap-0.5 tabular-nums"
-							data-session-overview-metric-value="plan-usage"
-							data-limited={planUsageLimited || undefined}
-						>
-							<IconBattery2
-								aria-hidden="true"
-								className={cn(
-									"size-3.5",
-									planUsageLimited && "text-[oklch(0.64_0.21_27)]",
-								)}
-							/>
-							{planUsage === undefined ? null : (
-								<span>
-									<span aria-hidden="true">↓</span>
-									{formatPlanShare(planUsage)}
-								</span>
-							)}
-							<span className="sr-only">
-								{planUsage === undefined
-									? ""
-									: planUsageText(planUsage, planUsageOfSession)}
-								{planUsageLimited ? " · hit the usage limit" : ""}
-							</span>
-						</span>
-					)}
+					<SessionPlanUsage
+						points={planUsage}
+						ofSession={planUsageOfSession}
+						limited={planUsageLimited}
+					/>
 				</span>
 			</div>
 			<div
@@ -449,6 +433,10 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 					) : null}
 				</div>
 				<SessionOverviewSubagentCountTag session={session} />
+				<SessionOverviewToolTags
+					skills={showSkillsColumn ? [] : session.skills}
+					mcpServers={mcpServers}
+				/>
 				<SessionOverviewLanguageSignals session={session} speaker="model" />
 				{!failure &&
 				errorCount !== 0 &&
@@ -489,16 +477,18 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 				data-session-overview-column="user"
 			>
 				<SessionOverviewLanguageSignals session={session} speaker="member" />
-				<SessionMemberProfilePreview
-					avatarUrl={avatarUrl}
-					profile={
-						memberProfile ?? {
-							activity: [1],
-							favoriteModel: session.model_used,
+				{localApp ? null : (
+					<SessionMemberProfilePreview
+						avatarUrl={avatarUrl}
+						profile={
+							memberProfile ?? {
+								activity: [1],
+								favoriteModel: session.model_used,
+							}
 						}
-					}
-					userLabel={userLabel}
-				/>
+						userLabel={userLabel}
+					/>
+				)}
 			</div>
 			<div
 				className={cn(cellClassName, "justify-end px-2")}
@@ -608,14 +598,3 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 		</li>
 	);
 });
-
-function formatPlanShare(points: number): string {
-	if (points >= 0.95) return `${Math.round(points)}%`;
-	return `${points >= 0.1 ? points.toFixed(1) : points.toFixed(2)}%`;
-}
-
-function planUsageText(points: number, ofSession: number | undefined): string {
-	return ofSession !== undefined && ofSession >= points
-		? ` of the session’s ${formatPlanShare(ofSession)}`
-		: " of the limit";
-}

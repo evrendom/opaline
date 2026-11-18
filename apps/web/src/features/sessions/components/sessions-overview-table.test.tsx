@@ -23,6 +23,10 @@ vi.mock("@/features/costs/plan-usage/use-session-usage-shares", () => ({
 	useSessionLimitHits: () => new Set(),
 }));
 
+vi.mock("@/features/sessions/use-session-mcp-servers", () => ({
+	useSessionMcpServers: () => new Map(),
+}));
+
 vi.mock("@/features/desktop/local-app", () => ({
 	useLocalDesktopApp: () => false,
 }));

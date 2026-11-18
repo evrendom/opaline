@@ -24,6 +24,7 @@ import { useLocalDesktopApp } from "@/features/desktop/local-app";
 import { useLiveClock } from "@/features/sessions/use-live-sessions";
 import { useLoadSessionPages } from "@/features/sessions/use-load-session-pages";
 import { useSessionRunQuestionTags } from "@/features/sessions/use-run-question-tags";
+import { useSessionMcpServers } from "@/features/sessions/use-session-mcp-servers";
 import { useUserMap } from "@/features/workspace/hooks/useUserMap";
 import { useScrollFade } from "@/hooks/use-scroll-fade";
 import { formatNumber, formatUsername } from "@/lib/format";
@@ -164,6 +165,14 @@ export function SessionsOverviewTable({
 		[sessions, showSkillsColumn],
 	);
 	const questionTags = useSessionRunQuestionTags(taggedSessionIds);
+	const toolSessionIds = useMemo(
+		() =>
+			(sessions ?? [])
+				.filter((session) => !session.upload_failure && !session.live_session)
+				.map((session) => session.session_id),
+		[sessions],
+	);
+	const mcpServers = useSessionMcpServers(toolSessionIds);
 	const limitHits = useSessionLimitHits();
 	const reserveUsageColumn = useLocalDesktopApp() || usageShares !== null;
 	// Live rows read "12s ago"; only they follow the clock.
@@ -441,6 +450,7 @@ export function SessionsOverviewTable({
 															questionTags={questionTags.get(
 																session.session_id,
 															)}
+															mcpServers={mcpServers.get(session.session_id)}
 															session={session}
 															userLabel={formatUsername(
 																session.user_id,
