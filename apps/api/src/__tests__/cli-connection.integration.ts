@@ -195,6 +195,11 @@ describe("CLI/browser connection over real HTTP and PostgreSQL", () => {
 		expect(await authorize.json()).toEqual({
 			returnUrl: `http://localhost/welcome?connect=${fixture.id}`,
 		});
+		const claimed = await fetch(
+			`${base()}/api/auth/device?user_code=${device.user_code}`,
+			{ headers: { cookie: account.cookie, origin } },
+		);
+		expect(claimed.status).toBe(200);
 		const approved = await fetch(`${base()}/api/auth/device/approve`, {
 			method: "POST",
 			headers: {

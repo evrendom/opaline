@@ -82,6 +82,17 @@ describe("auth e2e", () => {
 		expect(userCodeMatch).not.toBeNull();
 		const userCode = userCodeMatch?.[1] ?? "";
 
+		const claimResponse = await fetch(
+			`${server.baseUrl}/api/auth/device?user_code=${userCode}`,
+			{
+				headers: {
+					Authorization: `Bearer ${sessionToken}`,
+					Cookie: `better-auth.session_token=${sessionToken}`,
+				},
+			},
+		);
+		expect(claimResponse.ok).toBe(true);
+
 		const approveResponse = await fetch(
 			`${server.baseUrl}/api/auth/device/approve`,
 			{

@@ -76,6 +76,7 @@ export async function approveCliAuthorization(
 		userCode: authorization.userCode,
 		organizationId,
 	});
+	await claimCliDeviceCode(authorization.userCode);
 	await postCliAuth("/api/auth/device/approve", {
 		userCode: authorization.userCode,
 	});
@@ -85,7 +86,27 @@ export async function submitCliDeviceDecision(
 	userCode: string,
 	action: "approve" | "deny",
 ) {
+	await claimCliDeviceCode(userCode);
 	await postCliAuth(`/api/auth/device/${action}`, { userCode });
+}
+
+async function claimCliDeviceCode(userCode: string) {
+	const response = await fetch(
+		`/api/auth/device?user_code=${encodeURIComponent(userCode)}`,
+		{
+			credentials: "include",
+			redirect: "error",
+			cache: "no-store",
+			signal: AbortSignal.timeout(15_000),
+		},
+	);
+	if (!response.ok) {
+		const result: unknown = await response.json().catch(() => null);
+		throw new Error(
+			AuthErrorSchema.safeParse(result).data?.message ??
+				"Could not complete sign-in. Please try again.",
+		);
+	}
 }
 
 export async function signOutCliSession() {
