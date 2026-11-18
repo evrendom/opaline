@@ -109,9 +109,7 @@ describe("GitHub chart", () => {
 			hasUsage: false,
 		};
 		const view = chart(data);
-		expect(
-			screen.getByText("No merged pull requests"),
-		).toBeInTheDocument();
+		expect(screen.getByText("No merged pull requests")).toBeInTheDocument();
 		view.unmount();
 		data.metrics.mergedPullRequests = null;
 		chart(data);
