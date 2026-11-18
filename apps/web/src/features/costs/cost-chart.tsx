@@ -416,7 +416,6 @@ export function CostChart({
 		!sampled &&
 		!showDots;
 	const ciRange = ciDays ? ciTotals(ciDays) : null;
-	const mergedInRange = ciDays?.reduce((sum, day) => sum + day.merged, 0);
 	const dataTrend = useMemo(() => {
 		// Percentiles are calculated from individual runs for the requested period.
 		// Never regroup daily percentiles by summing or averaging them.
@@ -933,8 +932,7 @@ export function CostChart({
 									<>
 										<div className="cost-legend-item">
 											<i data-ci="runs" />
-											CI runs{" "}
-											<strong>{ciRange.runs.toLocaleString("en-US")}</strong>
+											CI runs
 										</div>
 										<div className="cost-legend-item">
 											<i data-ci="failed" />
@@ -947,7 +945,7 @@ export function CostChart({
 										</div>
 										<div className="cost-legend-item">
 											<i style={{ backgroundColor: PULL_REQUEST_COLOR }} />
-											Merged PRs <strong>{mergedInRange}</strong>
+											Merged PRs
 										</div>
 									</>
 								) : null}
@@ -1025,7 +1023,7 @@ export function CostChart({
 									</button>
 								) : null}
 							</div>
-							{history && !sampled ? (
+							{history && !sampled && !ciChart ? (
 								<GitHubHistoryNotes
 									history={history}
 									metric={metric}
@@ -1038,6 +1036,7 @@ export function CostChart({
 								/>
 							) : null}
 							{!sampled &&
+							!ciChart &&
 							metric === "mergedPullRequests" &&
 							data?.cycleTimeStats ? (
 								<output
@@ -1111,6 +1110,7 @@ export function CostChart({
 							</div>
 						) : null}
 						{mergedGitHub &&
+						!ciChart &&
 						(selectedMetric === "mergedPullRequests" ||
 							selectedMetric === "ciRuns") ? (
 							<fieldset
