@@ -21,16 +21,9 @@ interface Row {
 	readonly label: string;
 	readonly icon: ReactNode;
 	readonly points: number;
-	readonly cost: number | null;
-	readonly estimated: boolean;
 	readonly href?: string;
 	readonly muted?: boolean;
 }
-
-const money = new Intl.NumberFormat("en-US", {
-	style: "currency",
-	currency: "USD",
-});
 
 function repositoryLabel(id: string): string {
 	return id
@@ -72,8 +65,6 @@ export function UsageBreakdowns({
 		label: titles[session.sessionId] ?? session.sessionId.slice(0, 8),
 		icon: <IconMessages size={14} className="shrink-0" />,
 		points: session.points,
-		cost: session.cost,
-		estimated: session.estimated,
 		href: shellPath(appRoutes.sessionDetail(session.sessionId)),
 	}));
 	if (window && window.otherPoints > 0)
@@ -82,8 +73,6 @@ export function UsageBreakdowns({
 			label: "Not from this Mac",
 			icon: <IconDevices size={14} className="shrink-0" />,
 			points: window.otherPoints,
-			cost: null,
-			estimated: false,
 			muted: true,
 		});
 	return (
@@ -97,8 +86,6 @@ export function UsageBreakdowns({
 					label: repositoryLabel(entry.id),
 					icon: <IconGitBranch size={14} className="shrink-0" />,
 					points: entry.points,
-					cost: entry.cost,
-					estimated: entry.estimated,
 				}))}
 			/>
 			<UsageBreakdown
@@ -109,8 +96,6 @@ export function UsageBreakdowns({
 					label: costLabel("models", entry.id),
 					icon: <ModelIcon id={entry.id} />,
 					points: entry.points,
-					cost: entry.cost,
-					estimated: entry.estimated,
 				}))}
 			/>
 		</>
@@ -193,9 +178,6 @@ function UsageRow({
 						}}
 					/>
 				</span>
-				{row.cost !== null ? (
-					<small className="cost-cycle-time">{money.format(row.cost)}</small>
-				) : null}
 			</span>
 		</>
 	);
