@@ -1,5 +1,4 @@
 import type { SessionAnalytics } from "@rudel/api-routes";
-import type { CSSProperties } from "react";
 import { pebbleMasks } from "@/features/costs/cost-dot-pebble";
 import { SessionsOverviewFluidList } from "./sessions-overview-fluid-list";
 import { SessionsOverviewRow } from "./sessions-overview-row";
@@ -101,10 +100,7 @@ const SAMPLE_SESSIONS: SessionAnalytics[] = ROWS.map(
 
 const MARK_SIZE = 28;
 
-export const SAMPLE_MARK_STYLE = {
-	...pebbleMasks(MARK_SIZE),
-	"--skullet-animation": "group-shimmer",
-} as CSSProperties;
+export const SAMPLE_MARK_STYLE = pebbleMasks(MARK_SIZE);
 
 export const sampleMarkBars =
 	typeof CSSStyleSheet !== "undefined" &&
