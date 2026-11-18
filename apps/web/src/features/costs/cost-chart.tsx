@@ -892,7 +892,8 @@ export function CostChart({
 										{entry.label}
 									</div>
 								))}
-								{metric === "agentRuns" || metric === "ciRuns" ? (
+								{sampled ? null : metric === "agentRuns" ||
+									metric === "ciRuns" ? (
 									<>
 										<button
 											type="button"
@@ -971,7 +972,9 @@ export function CostChart({
 									}
 								/>
 							) : null}
-							{metric === "mergedPullRequests" && data?.cycleTimeStats ? (
+							{!sampled &&
+							metric === "mergedPullRequests" &&
+							data?.cycleTimeStats ? (
 								<output
 									className="cost-chart-coverage"
 									aria-label="PR cycle time"
@@ -983,7 +986,7 @@ export function CostChart({
 									</span>
 								</output>
 							) : null}
-							{metric === "ciRuns" && data?.ciMinutes ? (
+							{!sampled && metric === "ciRuns" && data?.ciMinutes ? (
 								<output className="cost-chart-coverage">
 									<span title="Sum of completed run durations; billing multipliers are not included.">
 										CI minutes (approximate billed Actions minutes):{" "}

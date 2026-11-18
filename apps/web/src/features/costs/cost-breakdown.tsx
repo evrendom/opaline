@@ -79,6 +79,8 @@ export function CostBreakdown({
 	const [search, setSearch] = useState("");
 	const label = COST_LABELS[dimension];
 	const maximum = Math.max(0, ...entries.map((entry) => entry.value));
+	const empty =
+		!pending && !onLoadDeferred && entries.every((entry) => entry.value === 0);
 	const filtered = entries.filter((entry) =>
 		`${entry.id} ${costLabel(dimension, entry.label)}`
 			.toLowerCase()
@@ -98,6 +100,7 @@ export function CostBreakdown({
 			<section
 				className="cost-breakdown"
 				data-dimension={dimension}
+				data-empty={empty || undefined}
 				aria-label={label}
 				aria-busy={pending}
 			>
@@ -123,9 +126,7 @@ export function CostBreakdown({
 				<ScrollFade
 					className="cost-breakdown-list"
 					data-many={entries.length > 4 || undefined}
-					data-empty={
-						(!pending && !onLoadDeferred && !entries.length) || undefined
-					}
+					data-empty={empty || undefined}
 				>
 					{!pending && onLoadDeferred ? (
 						<p className="cost-breakdown-empty">
@@ -137,7 +138,7 @@ export function CostBreakdown({
 								Show {label.toLowerCase()}
 							</button>
 						</p>
-					) : !pending && !entries.length ? (
+					) : empty ? (
 						<BreakdownEmpty
 							title={
 								unavailable
@@ -145,7 +146,7 @@ export function CostBreakdown({
 										metric === "ciFailuresPerPullRequest"
 										? "Pull request data unavailable"
 										: "Still being indexed"
-									: `No ${label.toLowerCase()}`
+									: `No ${label.toLowerCase().replace("github", "GitHub")}`
 							}
 						/>
 					) : (

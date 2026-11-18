@@ -128,7 +128,11 @@ function UsageBreakdown({
 }) {
 	const maximum = Math.max(0, ...rows.map((row) => row.points));
 	return (
-		<section className="cost-breakdown" aria-label={title}>
+		<section
+			className="cost-breakdown"
+			data-empty={rows.length === 0 || undefined}
+			aria-label={title}
+		>
 			<div className="cost-breakdown-heading">
 				<h2>{title}</h2>
 				<div>{heading}</div>
