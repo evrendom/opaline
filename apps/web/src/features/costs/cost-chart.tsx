@@ -65,6 +65,7 @@ import { useOptionalOrganization } from "@/features/workspace/organization/useOr
 import { type Figure, figureText, textFigure } from "@/lib/figure";
 import { formatIsoDate } from "@/lib/format";
 import { type AreaShape, morphAreas, readAreaShape } from "./area-morph";
+import { useBalancedColumns } from "./balanced-columns";
 import { PULL_REQUEST_COLOR, SERIES_COLORS } from "./chart-colors";
 import { EdgeTick, edgeTicks, useAxisHover } from "./chart-edge-axis";
 import { ChartEmptyNotice } from "./chart-empty-notice";
@@ -343,6 +344,7 @@ export function CostChart({
 	const [hoverStore] = useState(createHoverDateStore);
 	const axisHover = useAxisHover();
 	const metricsRef = useRef<HTMLFieldSetElement>(null);
+	const metricColumns = useBalancedColumns(metricsRef, ":scope > .cost-metric");
 	const [expanded, setExpanded] = useState<DashboardMetric | null>(null);
 	if (expanded !== null && expanded !== selectedMetric) setExpanded(null);
 	const collapse = useCallback(() => setExpanded(null), []);
@@ -771,6 +773,12 @@ export function CostChart({
 					className="cost-metrics"
 					aria-label="Chart metric"
 					aria-busy={metricsPending}
+					data-balanced={metricColumns === null ? undefined : ""}
+					style={
+						metricColumns === null
+							? undefined
+							: ({ "--metric-columns": metricColumns } as CSSProperties)
+					}
 				>
 					{usage ? (
 						<Metric

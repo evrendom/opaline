@@ -108,6 +108,18 @@
 	padding: 0;
 	border: 0;
 }
+.cost-page:not([data-variant]) .cost-metrics[data-balanced] {
+	display: flex;
+	flex-wrap: wrap;
+}
+.cost-page:not([data-variant]) .cost-metrics[data-balanced] > .cost-metric {
+	flex: 1 1
+		calc(
+			(100% - (var(--metric-columns) - 1) * 16px) /
+			var(--metric-columns) -
+			0.5px
+		);
+}
 /* Holds one row of stat cards while the server decides which metrics this
    workspace gets, so the chart below does not jump when they arrive. */
 .cost-metrics[aria-busy="true"] {
@@ -1133,7 +1145,8 @@
 }
 @container (max-width: 560px) {
 	.cost-metric {
-		padding: 16px 12px;
+		--metric-pad-x: 12px;
+		padding: 16px var(--metric-pad-x) 0;
 	}
 	.cost-metric-value {
 		font-size: 1.375rem;
