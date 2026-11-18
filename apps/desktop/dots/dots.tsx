@@ -6,7 +6,6 @@ import {
 	HoverDateContext,
 	type HoverDateStore,
 } from "@/features/costs/cost-hover-date";
-import { RollingText } from "@/features/costs/cost-rolling-text";
 import { CostDotChart } from "./chart";
 
 type Props = Parameters<typeof CostDotChart>[0];
@@ -22,7 +21,6 @@ declare global {
 		opalineDots: {
 			mount: (element: HTMLElement, props: Props, onHover?: (date: string | null) => void) => Mounted;
 			pebbles: (size: number) => Record<string, string>;
-			rolling: (element: HTMLElement) => { set: (text: string) => void };
 		};
 	}
 }
@@ -139,10 +137,6 @@ function DayLabels({
 
 window.opalineDots = {
 	pebbles: (size) => pebbleMasks(size) as Record<string, string>,
-	rolling(element) {
-		const root = createRoot(element);
-		return { set: (text) => root.render(<RollingText text={text} />) };
-	},
 	mount(element, props, onHover) {
 		const root = createRoot(element);
 		const hover = createHoverDateStore();

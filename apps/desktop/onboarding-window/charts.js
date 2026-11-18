@@ -140,7 +140,14 @@ function lineChart(container, initial) {
 	const beam = node("linearGradient", { id: `${id}-cursor`, gradientUnits: "userSpaceOnUse", x1: 0, y1: top, x2: 0, y2: top + plotHeight }, defs);
 	for (const [offset, opacity] of [[0, 0], [0.3, 1], [0.7, 1], [1, 0]]) node("stop", { offset, style: `stop-color:var(--muted);stop-opacity:${opacity}` }, beam);
 	const grid = [0, 1, 2, 3].map(() => node("line", { class: "grid", x1: left, x2: width - right }, svg));
-	const ticks = [0, 1, 2, 3].map(() => node("text", { x: left - 10, "text-anchor": "end", class: "tick" }, svg));
+	const ticks = [0, 1, 2, 3].map((tick) => {
+		const holder = node("foreignObject", { x: 0, y: top + plotHeight * (1 - tick / 3) - 9, width: left - 10, height: 18, class: "tick" }, svg);
+		const box = document.createElement("div");
+		const flow = Object.assign(document.createElement("number-flow"), { locales: "en-US" });
+		box.append(flow);
+		holder.append(box);
+		return flow;
+	});
 	const path = node("path", { fill: "none", stroke: `url(#${id})`, "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round" }, svg);
 	const cursor = node("line", { class: "beam", y1: top, y2: top + plotHeight, stroke: `url(#${id}-cursor)` }, svg);
 	const dot = node("circle", { r: 4, class: "active-dot" }, svg);
@@ -169,22 +176,11 @@ function lineChart(container, initial) {
 			dot.setAttribute("cy", y(values[shownIndex]));
 		}
 	};
-	const label = (max, step, animate) => {
-		const y = (value) => top + plotHeight * (1 - value / max);
-		ticks.forEach((text, tick) => {
-			const value = state.format(step * tick, true);
-			if (text.textContent === value) return;
-			if (!animate || !text.textContent) {
-				text.setAttribute("y", y(step * tick) + 4);
-				text.textContent = value;
-				return;
-			}
-			const next = node("text", { x: left - 10, y: y(step * tick) + 4, "text-anchor": "end", class: "tick tick-in" }, svg);
-			next.textContent = value;
-			text.classList.remove("tick-in");
-			text.classList.add("tick-out");
-			setTimeout(() => text.remove(), 650);
-			ticks[tick] = next;
+	const label = (step, animate) => {
+		const axis = state.axis ?? { format: { maximumFractionDigits: 0 } };
+		ticks.forEach((flow, tick) => {
+			Object.assign(flow, { animated: animate, format: axis.format, numberPrefix: axis.numberPrefix ?? "", numberSuffix: axis.numberSuffix ?? "" });
+			flow.update(step * tick);
 		});
 	};
 	const dates = () => {
@@ -194,18 +190,18 @@ function lineChart(container, initial) {
 		last.textContent = shortDate(state.points.at(-1).date);
 	};
 
-	const set = ({ points, color, format, onHover }, animate) => {
+	const set = ({ points, color, format, axis, onHover }, animate) => {
 		const from = state.values;
 		const fromMax = state.max;
 		const to = points.map((point) => point.value);
 		const { step, max } = scale(to);
-		state = { ...state, points, format, onHover, values: to, max };
+		state = { ...state, points, format, axis, onHover, values: to, max };
 		svg.style.setProperty("--line-color", color);
 		dates();
 		cancelAnimationFrame(frame);
 		if (!animate || from.length !== to.length) {
 			draw(to, max);
-			label(max, step, false);
+			label(step, false);
 			return;
 		}
 		svg.classList.add("morphing");
@@ -218,7 +214,7 @@ function lineChart(container, initial) {
 			else svg.classList.remove("morphing");
 		};
 		frame = requestAnimationFrame(tick);
-		label(max, step, true);
+		label(step, true);
 	};
 
 	const show = (index) => {

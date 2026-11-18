@@ -9,6 +9,7 @@
 		"package": "./package.sh",
 		"build:glass3d": "./build-glass3d.sh",
 		"build:dots": "./build-dots.sh",
+		"build:number-flow": "./build-number-flow.sh",
 		"previews": "node scripts/grab-previews.mjs",
 		"test": "bun test test"
 	}

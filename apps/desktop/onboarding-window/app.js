@@ -78,7 +78,7 @@ function metricCard(metric, result) {
 	return `<button type="button" class="metric" data-metric="${metric.key}" data-primary="${primary}" style="--metric-color:${metric.color}">
 		<span class="metric-header">
 			<span class="metric-label"><svg class="metric-icon" viewBox="0 0 24 24" data-filled="${primary}" aria-hidden="true">${primary ? metric.filled : metric.outline}</svg>${metric.label}</span>
-			<span class="metric-value" ${metric.format ? `data-figure="${metric.key}" data-value="${value}"` : `data-count="${value}"`}>${formatMetric(metric, metric.format ? value : 0)}</span>
+			<span class="metric-value" data-metric-value="${metric.key}" data-value="${value}">${formatMetric(metric, value)}</span>
 		</span>
 		<svg class="metric-sparkline" viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true" data-spark="${metric.key}"></svg>
 	</button>`;
@@ -143,14 +143,47 @@ function icon(agent, className = "app-icon") {
 	return source ? `<img class="${className}" src="${source}" alt="" />` : "";
 }
 
-function countUp(element, target, duration = 1100, format = number) {
-	const start = performance.now();
-	const frame = (now) => {
-		const progress = Math.min(1, (now - start) / duration);
-		if (element.dataset.rolling === undefined) element.textContent = format(target * (1 - (1 - progress) ** 4));
-		if (progress < 1) requestAnimationFrame(frame);
-	};
-	requestAnimationFrame(frame);
+const FLOW_FORMAT = {
+	cost: { format: { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 } },
+	hours: { format: { minimumFractionDigits: 1, maximumFractionDigits: 1, useGrouping: false }, numberSuffix: " h" },
+};
+const AXIS_FLOW = {
+	cost: { format: { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 } },
+	hours: { format: { maximumFractionDigits: 0, useGrouping: false }, numberSuffix: "h" },
+};
+const flows = new WeakMap();
+
+function flowFor(element) {
+	if (flows.has(element)) return flows.get(element);
+	const flow = Object.assign(document.createElement("number-flow"), { locales: "en-US", ...(FLOW_FORMAT[element.dataset.metricValue] ?? { format: { maximumFractionDigits: 0 } }) });
+	element.replaceChildren(flow);
+	flows.set(element, flow);
+	return flow;
+}
+
+const COUNT_TIMING = { duration: 1100, easing: "cubic-bezier(0.25, 1, 0.5, 1)" };
+
+function integerDigits(value, format) {
+	return new Intl.NumberFormat("en-US", format)
+		.formatToParts(value)
+		.filter((part) => part.type === "integer")
+		.reduce((sum, part) => sum + part.value.length, 0);
+}
+
+function countUp(element) {
+	const flow = flowFor(element);
+	const target = Number(element.dataset.value);
+	const format = flow.format;
+	flow.format = { ...format, minimumIntegerDigits: integerDigits(target, format) };
+	flow.update(0);
+	requestAnimationFrame(() => {
+		flow.spinTiming = COUNT_TIMING;
+		flow.update(target);
+		setTimeout(() => {
+			flow.spinTiming = undefined;
+			flow.format = format;
+		}, COUNT_TIMING.duration + 100);
+	});
 }
 
 function data() {
@@ -428,11 +461,7 @@ function fillStrip(view) {
 	if (strip.dataset.filled !== undefined || !result.ok) return;
 	strip.dataset.filled = "";
 	strip.innerHTML = METRICS.map((metric) => metricCard(metric, result)).join("");
-	for (const element of strip.querySelectorAll("[data-count]")) countUp(element, Number(element.dataset.count || 0));
-	for (const element of strip.querySelectorAll("[data-figure]")) {
-		const metric = METRICS.find((entry) => entry.key === element.dataset.figure);
-		countUp(element, Number(element.dataset.value), 1100, (value) => formatMetric(metric, value));
-	}
+	for (const element of strip.querySelectorAll("[data-metric-value]")) countUp(element);
 	for (const svg of strip.querySelectorAll("[data-spark]")) window.charts.sparkline(svg, result.series[svg.dataset.spark].map((point) => point.value));
 }
 
@@ -615,6 +644,7 @@ function trendProps(result) {
 		points: result.series[metric.key],
 		color: metric.color,
 		format: (value, axis) => formatMetric(metric, value, axis),
+		axis: AXIS_FLOW[metric.key] ?? { format: { maximumFractionDigits: 0 } },
 		onHover: (date) => {
 			dotChart?.focus(date);
 			showDay(date);
@@ -630,101 +660,13 @@ function drawTrend(result) {
 	trendChart = window.charts.lineChart(trend, trendProps(result));
 }
 
-const rollers = new WeakMap();
-const ROLL_MS = 460;
-const ROLL_EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
-const ROLL_SCALE = { k: 1e3, m: 1e6, b: 1e9 };
-
-function amountOf(text) {
-	const match = text.replace(/,/g, "").match(/(-?\d+(?:\.\d+)?)\s*([kmb])?/i);
-	return match ? Number(match[1]) * (ROLL_SCALE[match[2]?.toLowerCase()] ?? 1) : Number.NaN;
-}
-
-function rollGlyph(char) {
-	const glyph = document.createElement("span");
-	glyph.className = "roll-glyph";
-	glyph.textContent = char;
-	return glyph;
-}
-
-function rollSlot(char) {
-	const slot = document.createElement("span");
-	slot.className = "roll-slot";
-	slot.dataset.char = char;
-	slot.append(rollGlyph(char));
-	return slot;
-}
-
-function rollIn(glyph, direction) {
-	glyph.animate([{ opacity: 0, transform: `translateY(${direction * 0.7}em)`, filter: "blur(2px)" }, { opacity: 1, transform: "none", filter: "blur(0px)" }], { duration: ROLL_MS, easing: ROLL_EASE });
-}
-
-function rollOut(glyph, direction) {
-	glyph.dataset.out = "";
-	glyph.animate([{ opacity: 1, transform: "none", filter: "blur(0px)" }, { opacity: 0, transform: `translateY(${-direction * 0.7}em)`, filter: "blur(2px)" }], { duration: ROLL_MS, easing: ROLL_EASE, fill: "forwards" }).finished.then(() => glyph.remove(), () => glyph.remove());
-}
-
-function rolling(element) {
-	let shown = null;
-	element.classList.add("roll");
-	return {
-		set(text) {
-			if (text === shown) return;
-			if (shown === null) {
-				shown = text;
-				element.replaceChildren(...[...text].map(rollSlot));
-				return;
-			}
-			const before = amountOf(shown);
-			const after = amountOf(text);
-			const direction = Number.isFinite(before) && Number.isFinite(after) && before !== after && after < before ? -1 : 1;
-			shown = text;
-			const slots = [...element.querySelectorAll(":scope > .roll-slot:not([data-leaving])")];
-			const chars = [...text];
-			let anchor = slots[0] ?? null;
-			for (let place = 1; place <= Math.max(slots.length, chars.length); place += 1) {
-				const slot = slots[slots.length - place];
-				const char = chars[chars.length - place];
-				if (slot && char === undefined) {
-					const width = slot.offsetWidth;
-					slot.dataset.leaving = "";
-					rollOut(slot.querySelector(".roll-glyph:not([data-out])"), direction);
-					slot.animate([{ width: `${width}px` }, { width: "0px" }], { duration: ROLL_MS, easing: ROLL_EASE, fill: "forwards" }).finished.then(() => slot.remove(), () => slot.remove());
-				} else if (!slot) {
-					const added = rollSlot(char);
-					element.insertBefore(added, anchor);
-					anchor = added;
-					added.animate([{ width: "0px" }, { width: `${added.offsetWidth}px` }], { duration: ROLL_MS, easing: ROLL_EASE });
-					rollIn(added.firstElementChild, direction);
-				} else if (slot.dataset.char !== char) {
-					const from = slot.offsetWidth;
-					slot.dataset.char = char;
-					rollOut(slot.querySelector(".roll-glyph:not([data-out])"), direction);
-					const glyph = rollGlyph(char);
-					slot.append(glyph);
-					rollIn(glyph, direction);
-					const to = slot.offsetWidth;
-					if (Math.abs(from - to) > 0.5) slot.animate([{ width: `${from}px` }, { width: `${to}px` }], { duration: ROLL_MS, easing: ROLL_EASE });
-				}
-			}
-		},
-	};
-}
-
 function showDay(date) {
 	const result = data();
 	if (!result.ok) return;
 	for (const card of content.querySelectorAll(".metric")) {
 		const metric = METRICS.find((entry) => entry.key === card.dataset.metric);
-		const value = card.querySelector(".metric-value");
 		const point = date ? result.series[metric.key].find((each) => each.date === date) : null;
-		const text = formatMetric(metric, point ? point.value : result.totals[metric.key]);
-		if (!rollers.has(value)) {
-			value.dataset.rolling = "";
-			value.textContent = "";
-			rollers.set(value, rolling(value));
-		}
-		rollers.get(value).set(text);
+		flowFor(card.querySelector(".metric-value")).update(point ? point.value : result.totals[metric.key]);
 	}
 }
 
@@ -976,14 +918,7 @@ function render() {
 	content.innerHTML = (views[name] ?? views.reading)();
 	const stageTitle = content.querySelector("[data-stage-title]");
 	if (stageTitle) appear(stageTitle, stageTitle.textContent, { words: true });
-	for (const element of content.querySelectorAll("[data-count]")) {
-		const target = Number(element.dataset.count || 0);
-		if (target) countUp(element, target);
-	}
-	for (const element of content.querySelectorAll("[data-figure]")) {
-		const metric = METRICS.find((entry) => entry.key === element.dataset.figure);
-		countUp(element, Number(element.dataset.value), 1100, (value) => formatMetric(metric, value));
-	}
+	for (const element of content.querySelectorAll("[data-metric-value]")) countUp(element);
 	requestAnimationFrame(drawCharts);
 	footer(name);
 	if (BOX_MEASURES[name]) {
@@ -1208,7 +1143,7 @@ function handoff(reading) {
 	days.dataset.overScene = "";
 	days.style.cssText = "position:relative;z-index:1";
 	content.append(days);
-	for (const element of days.querySelectorAll("[data-count]")) element.textContent = number(Number(element.dataset.count || 0));
+	for (const element of days.querySelectorAll("[data-metric-value]")) flowFor(element).update(Number(element.dataset.value));
 	const strip = days.querySelector(".metrics");
 	const toStrip = strip.getBoundingClientRect();
 	if (fromStrip.width) strip.animate([{ transform: `translate(${fromStrip.left - toStrip.left}px, ${fromStrip.top - toStrip.top}px)` }, { transform: "none" }], { duration: 900, easing: "cubic-bezier(0.25, 0.1, 0.25, 1)" });
