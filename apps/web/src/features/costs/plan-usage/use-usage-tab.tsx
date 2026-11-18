@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useLocalDesktopApp } from "@/features/desktop/local-app";
-import type { ChartInterval } from "../chart-interval";
+import { type ChartInterval, chartPeriodDates } from "../chart-interval";
 import type { UsageTab } from "../cost-chart";
 import { formatPoints, PlanUsageChart, periodsOf } from "./plan-usage-chart";
 import { UsageBreakdowns } from "./usage-breakdowns";
@@ -86,6 +86,10 @@ export function useUsageTab(
 		return carried ?? 0;
 	});
 	const latest = [...periods].reverse().find((period) => period.solid !== null);
+	const flatDates =
+		firstKnown === null && periods.length === 0
+			? chartPeriodDates(range.startDate, range.endDate, interval)
+			: periods.map((period) => period.date);
 	return {
 		deselect,
 		tab: {
@@ -101,8 +105,12 @@ export function useUsageTab(
 					? usedChip(period.usedPoints)
 					: "";
 			},
-			trend: query.isPending || firstKnown === null ? undefined : trend,
-			dates: periods.map((period) => period.date),
+			trend: query.isPending
+				? undefined
+				: firstKnown === null
+					? flatDates.map(() => 0)
+					: trend,
+			dates: flatDates,
 			textAt: (index) => {
 				const period = periods[index];
 				if (!period || period.solid === null) return "—";

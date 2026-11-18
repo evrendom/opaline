@@ -960,7 +960,7 @@ export function CostChart({
 									</button>
 								) : null}
 							</div>
-							{history ? (
+							{history && !sampled ? (
 								<GitHubHistoryNotes
 									history={history}
 									metric={metric}
@@ -998,7 +998,8 @@ export function CostChart({
 									</span>
 								</output>
 							) : null}
-							{coverage && data?.incomplete ? (
+							{sampled && data !== null ? null : coverage &&
+								data?.incomplete ? (
 								<output className="cost-chart-coverage">
 									<button
 										type="button"
