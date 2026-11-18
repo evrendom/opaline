@@ -1326,3 +1326,79 @@
 .cost-metric-trend-secondary {
 	opacity: 0.45;
 }
+.cost-chart-canvas[data-ci-boxes] .cost-chart-flow {
+	visibility: hidden;
+}
+.cost-ci-boxes {
+	position: absolute;
+	inset: 0;
+	--ci-run: color-mix(in oklab, var(--cost-foreground) 16%, transparent);
+	--ci-failed: oklch(0.637 0.208 25.331);
+}
+.cost-ci-boxes svg {
+	display: block;
+	overflow: visible;
+}
+.cost-ci-grid {
+	stroke: var(--cost-border);
+	stroke-dasharray: 3 4;
+}
+.cost-ci-tick {
+	fill: var(--cost-muted);
+	font-size: 11px;
+}
+.cost-ci-day rect:not(.cost-ci-hit) {
+	fill: var(--ci-run);
+	transition: opacity 150ms ease;
+}
+.cost-ci-day rect[data-failed] {
+	fill: var(--ci-failed);
+}
+.cost-ci-day rect[data-merged] {
+	fill: var(--ci-merged);
+}
+.cost-ci-day[data-dim] rect:not(.cost-ci-hit) {
+	opacity: 0.35;
+}
+.cost-ci-hit {
+	fill: transparent;
+}
+.cost-ci-marker {
+	stroke: var(--cost-muted);
+	stroke-dasharray: 3 3;
+	pointer-events: none;
+}
+.cost-ci-tooltip {
+	position: absolute;
+	top: 0;
+	pointer-events: none;
+	z-index: 2;
+}
+.cost-ci-scale {
+	position: absolute;
+	right: 0;
+	bottom: 0;
+	color: var(--cost-muted);
+	font-size: 11px;
+}
+:is(.cost-legend-item, .cost-chart-tooltip) i[data-ci="runs"] {
+	background: color-mix(in oklab, var(--cost-foreground) 35%, transparent);
+}
+:is(.cost-legend-item, .cost-chart-tooltip) i[data-ci="failed"] {
+	background: oklch(0.637 0.208 25.331);
+}
+.cost-ci-ring {
+	width: 15px;
+	height: 15px;
+	align-self: center;
+	flex-shrink: 0;
+}
+.cost-ci-ring path {
+	fill: none;
+	stroke: color-mix(in oklab, var(--cost-foreground) 18%, transparent);
+	stroke-width: 2.6;
+	transition: stroke 200ms ease;
+}
+.cost-ci-ring path[data-failed] {
+	stroke: oklch(0.637 0.208 25.331);
+}

@@ -86,6 +86,13 @@ import {
 import { ChartMorph } from "./chart-morph";
 import { sampleDates, sampleLevels } from "./chart-sample";
 import {
+	CiBoxChart,
+	CiRing,
+	type CiTotals,
+	ciTotals,
+	useCiDays,
+} from "./ci-boxes";
+import {
 	CostDotChart,
 	DotFocusContext,
 	DotFocusDaysContext,
@@ -362,6 +369,23 @@ export function CostChart({
 			(data.trend.at(-1)?.date ?? "") < availableFrom,
 	);
 	const ciData = dashboard?.metrics.ciFailuresPerPullRequest;
+	const ciDays = useCiDays({
+		inputFor,
+		merged: getMetricData(
+			previews ? previews.mergedPullRequests : dashboard,
+			"mergedPullRequests",
+		),
+		interval,
+		enabled: mergedGitHub,
+	});
+	const ciRingAt = useCallback(
+		(date: string | null): CiTotals | undefined => {
+			if (!ciDays) return undefined;
+			if (date === null) return ciTotals(ciDays);
+			return ciDays.find((day) => day.date === date);
+		},
+		[ciDays],
+	);
 	const metricLabel = METRIC_LABELS[metric];
 	const ciHistoryAvailable =
 		metric !== "ciRuns" ||
@@ -385,6 +409,14 @@ export function CostChart({
 	const rangeEnd = dateRange?.state.endDate;
 	const sampled =
 		!loading && (unavailable || noHistory || Boolean(data && !data.hasUsage));
+	const ciBoxes =
+		mergedGitHub &&
+		metric === "mergedPullRequests" &&
+		inputFor !== undefined &&
+		!sampled &&
+		!showDots;
+	const ciRange = ciDays ? ciTotals(ciDays) : null;
+	const mergedInRange = ciDays?.reduce((sum, day) => sum + day.merged, 0);
 	const dataTrend = useMemo(() => {
 		// Percentiles are calculated from individual runs for the requested period.
 		// Never regroup daily percentiles by summing or averaging them.
@@ -714,9 +746,11 @@ export function CostChart({
 						? "CI runs with median and P95 duration over time"
 						: metric === "agentRuns"
 							? "Agent runs with median and P95 duration over time"
-							: metric === "mergedPullRequests"
-								? "Merged pull requests with CI failures per pull request over time"
-								: `${metricLabel} over time`
+							: ciBoxes
+								? "Merged pull requests and CI runs over time"
+								: metric === "mergedPullRequests"
+									? "Merged pull requests with CI failures per pull request over time"
+									: `${metricLabel} over time`
 				}
 				aria-busy={pending}
 			>
@@ -851,6 +885,7 @@ export function CostChart({
 										? undefined
 										: (amount: number) => formatMetric(amount, value)
 								}
+								ring={githubCard ? ciRingAt : undefined}
 								onClick={() => onMetricChange(value)}
 								onIntent={
 									onMetricIntent ? () => onMetricIntent(value) : undefined
@@ -884,7 +919,9 @@ export function CostChart({
 					<div className="cost-chart-key" data-fluid-menu-root="">
 						<FluidMenuHover items=".cost-text-button" />
 						<div className="cost-chart-key-copy">
-							<h2 className="cost-chart-title">{metricLabel} over time</h2>
+							<h2 className="cost-chart-title">
+								{ciBoxes ? "PRs & CI" : metricLabel} over time
+							</h2>
 							<div className="cost-chart-legend">
 								{pending && series.length === 0 ? (
 									<Skeleton
@@ -892,7 +929,29 @@ export function CostChart({
 										style={{ width: metricLabel.length * TICK_CHAR_PX + 14 }}
 									/>
 								) : null}
-								{series.map((entry) => (
+								{ciBoxes && ciRange ? (
+									<>
+										<div className="cost-legend-item">
+											<i data-ci="runs" />
+											CI runs{" "}
+											<strong>{ciRange.runs.toLocaleString("en-US")}</strong>
+										</div>
+										<div className="cost-legend-item">
+											<i data-ci="failed" />
+											Failed{" "}
+											<strong>
+												{ciRange.runs === 0
+													? "—"
+													: `${Math.round((ciRange.failed / ciRange.runs) * 100)}%`}
+											</strong>
+										</div>
+										<div className="cost-legend-item">
+											<i style={{ backgroundColor: PULL_REQUEST_COLOR }} />
+											Merged PRs <strong>{mergedInRange}</strong>
+										</div>
+									</>
+								) : null}
+								{(ciBoxes ? [] : series).map((entry) => (
 									<div key={entry.id} className="cost-legend-item">
 										<i style={{ backgroundColor: entry.color }} />
 										{entry.label}
@@ -940,7 +999,7 @@ export function CostChart({
 											</strong>
 										</button>
 									</>
-								) : metric === "mergedPullRequests" ? (
+								) : metric === "mergedPullRequests" && !ciBoxes ? (
 									<button
 										type="button"
 										className="cost-legend-item cost-duration-legend"
@@ -1096,7 +1155,11 @@ export function CostChart({
 						data-kind={showDots ? "dots" : undefined}
 						data-sample={sampled && !heartbeat ? "" : undefined}
 						data-lines-entering={linesEntering || undefined}
+						data-ci-boxes={ciBoxes || undefined}
 					>
+						{ciBoxes && ciDays && phase === "idle" ? (
+							<CiBoxChart days={ciDays} interval={interval} />
+						) : null}
 						{showDots ? (
 							<CostDotChart
 								color={primaryColor}
@@ -1588,6 +1651,7 @@ function Metric({
 	textAt,
 	chip,
 	chipAt,
+	ring,
 	step = false,
 	onClick,
 	onIntent,
@@ -1613,6 +1677,7 @@ function Metric({
 	textAt?: (index: number) => string;
 	chip?: string;
 	chipAt?: (index: number) => string;
+	ring?: (date: string | null) => CiTotals | undefined;
 	step?: boolean;
 	onClick: () => void;
 	onIntent?: () => void;
@@ -1644,6 +1709,7 @@ function Metric({
 				? format(markedValue)
 				: value;
 	const shownChip = markedIndex >= 0 && chipAt ? chipAt(markedIndex) : chip;
+	const ringTotals = ring?.(markedIndex >= 0 ? markedDate : null);
 	const [roll, setRoll] = useState({ at: markedIndex, direction: 1 as 1 | -1 });
 	if (roll.at !== markedIndex)
 		setRoll({ at: markedIndex, direction: markedIndex >= roll.at ? 1 : -1 });
@@ -1697,6 +1763,7 @@ function Metric({
 						) : (
 							<RollingText text={shown} direction={roll.direction} />
 						)}
+						{ringTotals && !unavailable ? <CiRing totals={ringTotals} /> : null}
 						{shownChip && !unavailable ? (
 							<span className="cost-metric-chip">
 								<RollingText text={shownChip} direction={roll.direction} />
