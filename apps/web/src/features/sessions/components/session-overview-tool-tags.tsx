@@ -11,13 +11,13 @@ const KINDS = {
 		icon: IconBook,
 		label: "Skills",
 		className:
-			"bg-[#ede9fe] text-[#6d28d9] dark:bg-[#2e1f4d] dark:text-[#c4b5fd]",
+			"bg-[color-mix(in_oklch,var(--color-opal-3)_14%,transparent)] text-opal-3 dark:bg-[color-mix(in_oklch,var(--color-opal-3)_24%,transparent)]",
 	},
 	mcp: {
 		icon: IconPlug,
 		label: "MCP servers",
 		className:
-			"bg-[#e0f2fe] text-[#0369a1] dark:bg-[#0c3049] dark:text-[#7dd3fc]",
+			"bg-[color-mix(in_oklch,var(--color-opal-5)_14%,transparent)] text-opal-5 dark:bg-[color-mix(in_oklch,var(--color-opal-5)_24%,transparent)]",
 	},
 } as const;
 
