@@ -1377,7 +1377,7 @@
 .cost-ci-scale {
 	position: absolute;
 	right: 0;
-	bottom: 0;
+	top: -4px;
 	color: var(--cost-muted);
 	font-size: 11px;
 }
