@@ -1774,10 +1774,8 @@ h3 {
 .footer-pill {
 	position: relative;
 	display: inline-flex;
-	justify-content: space-between;
 	align-items: center;
 	gap: 21px;
-	min-width: 309px;
 	margin-left: auto;
 	padding: 7.5px 9px 7.5px 14px;
 	overflow: hidden;
