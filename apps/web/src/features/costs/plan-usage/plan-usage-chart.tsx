@@ -345,13 +345,16 @@ function LoadingSplitBar({
 	height: number;
 	phase: number;
 }) {
+	const [delay] = useState(
+		() => -((performance.now() % WAVE_MS) + (phase * WAVE_MS) / WAVE_BARS),
+	);
 	const usable = Math.max(0, height - SEGMENT_GAP_PX);
 	const solid = usable * LOADING_SOLID_SHARE;
 	const corner = Math.min(SEGMENT_RADIUS_PX, width / 2);
 	return (
 		<g
 			className="plan-usage-loading-bar"
-			style={{ animationDelay: `${(-phase * WAVE_MS) / WAVE_BARS}ms` }}
+			style={{ animationDelay: `${delay}ms` }}
 		>
 			<rect
 				className="plan-usage-loading-used"
