@@ -364,40 +364,6 @@ export function CiChart({
 					</g>
 				</svg>
 			) : null}
-			{layout && hovered ? (
-				<div
-					className="cost-chart-tooltip cost-ci-tooltip"
-					style={{
-						left: Math.min(
-							AXIS_LEFT + (hoveredIndex + 1) * layout.column + 12,
-							width - 196,
-						),
-					}}
-				>
-					<p>{formatChartDate(hovered.date, interval)}</p>
-					<div>
-						<span>
-							<i data-ci="runs" />
-							CI runs
-						</span>
-						<strong>{hovered.runs}</strong>
-					</div>
-					<div>
-						<span>
-							<i data-ci="failed" />
-							Failed
-						</span>
-						<strong>{hovered.failed}</strong>
-					</div>
-					<div>
-						<span>
-							<i style={{ backgroundColor: PULL_REQUEST_COLOR }} />
-							Merged PRs
-						</span>
-						<strong>{hovered.merged}</strong>
-					</div>
-				</div>
-			) : null}
 		</div>
 	);
 }

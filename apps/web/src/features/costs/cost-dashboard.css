@@ -1382,16 +1382,10 @@
 	stroke-dasharray: 3 3;
 	pointer-events: none;
 }
-.cost-ci-tooltip {
-	position: absolute;
-	top: 0;
-	pointer-events: none;
-	z-index: 2;
-}
-:is(.cost-legend-item, .cost-chart-tooltip) i[data-ci="runs"] {
+.cost-legend-item i[data-ci="runs"] {
 	background: color-mix(in oklab, var(--cost-foreground) 35%, transparent);
 }
-:is(.cost-legend-item, .cost-chart-tooltip) i[data-ci="failed"] {
+.cost-legend-item i[data-ci="failed"] {
 	background: oklch(0.637 0.208 25.331);
 }
 .cost-ci-ring {
