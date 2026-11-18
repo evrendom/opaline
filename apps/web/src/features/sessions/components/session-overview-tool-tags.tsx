@@ -60,7 +60,7 @@ function ToolTag({
 		<span
 			className={cn(
 				SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME,
-				"h-[1.1875rem] max-w-44 gap-1 rounded-[7px] py-[2.5px] pr-1.5 pl-[2.5px] text-(--session-overview-text) bg-card shadow-(--custom-shadow) corner-squircle squircle:rounded-[9.5px] dark:bg-muted-foreground/10",
+				"h-[1.1875rem] max-w-44 gap-1 rounded-[9.5px] py-[2.5px] pr-1.5 pl-[2.5px] text-(--session-overview-text) bg-card shadow-(--custom-shadow) [corner-shape:superellipse(1.25)] dark:bg-muted-foreground/10",
 				onOpen && "cursor-pointer hover:bg-(--session-overview-hover)",
 			)}
 			data-session-overview-tool-tag={kind}
