@@ -7,6 +7,7 @@ import {
 	type CSSProperties,
 	type ReactNode,
 	type RefObject,
+	startTransition,
 	useContext,
 	useLayoutEffect,
 	useRef,
@@ -368,8 +369,10 @@ export function CostDashboardView({
 								signalTypes={input.signalTypes}
 								interval={interval}
 								onMetricChange={(next) => {
-									usage.deselect();
-									setMetric(next);
+									startTransition(() => {
+										usage.deselect();
+										setMetric(next);
+									});
 								}}
 								usage={usage.tab}
 								onMetricIntent={onMetricIntent}
