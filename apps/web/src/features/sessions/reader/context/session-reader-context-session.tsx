@@ -344,6 +344,7 @@ function WholeContext({
 		partRuns,
 		problems,
 		runFigures,
+		runs,
 		subagentCosts,
 		whole: true,
 	};

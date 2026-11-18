@@ -335,6 +335,8 @@ function RunContext({
 						measure={measure}
 						memory={`run:${turn.turnId}:${agent ?? ""}`}
 						problems={problems}
+						runs={agent ? [turn] : turns}
+						subagent={agent ?? undefined}
 						whole={whole}
 					/>
 				) : null

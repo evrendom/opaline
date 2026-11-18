@@ -13,6 +13,38 @@ import type {
 export const thingKey = (part: string, label: string) =>
 	`${part}\u0000${label}`;
 
+type RunStart = Pick<SessionDetailTurnSummary, "startedAt" | "turnId">;
+
+const ownKey = (key: string) => key.replace(/^(?:compacted|earlier):/u, "");
+
+export function placeOf(
+	map: Pick<ContextMap, "trail">,
+	runs: readonly RunStart[],
+	part: Pick<ContextPart, "key" | "nested">,
+	label: string | null,
+): { run: string; step: string | null } | null {
+	if (part.key.startsWith("run:")) {
+		const run = part.key.slice("run:".length);
+		const nested = label
+			? part.nested?.find((each) => each.label === label)
+			: undefined;
+		return { run, step: nested?.things[0]?.steps[0] ?? null };
+	}
+	const key = ownKey(part.key);
+	const inPart = map.trail.filter(
+		(step) => step.id && ownKey(step.key) === key,
+	);
+	const step =
+		(label === null
+			? undefined
+			: inPart.find((each) => each.items.includes(label))) ?? inPart[0];
+	if (!step?.id) return null;
+	let at = runs[0];
+	for (const run of runs)
+		if (run.startedAt && Date.parse(run.startedAt) <= step.start) at = run;
+	return at ? { run: at.turnId, step: step.id } : null;
+}
+
 export function runsByPart(
 	map: ContextMap,
 	runs: readonly Pick<SessionDetailTurnSummary, "startedAt" | "turnId">[],

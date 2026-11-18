@@ -21,7 +21,10 @@ const nameOf = (label: string, files: boolean) =>
 	files ? (label.split("/").pop() ?? label) : label;
 
 export type ZoomOpen = {
-	detail: () => void;
+	detail: (
+		part: Pick<ContextPart, "key" | "nested">,
+		label: string | null,
+	) => void;
 	file: (path: string) => void;
 	setup: (setupFile: string) => void;
 	mcpSetupFile?: (server: string) => string | null;
@@ -37,7 +40,7 @@ const isFiles = (part: Pick<ContextPart, "key">) =>
 	part.key.replace(/^(?:compacted|earlier):/u, "").startsWith("files:");
 
 export function thingOpen(
-	part: Pick<ContextPart, "key">,
+	part: Pick<ContextPart, "key" | "nested">,
 	label: string,
 	onOpen: ZoomOpen,
 ): { go: () => void; words: string } {
@@ -56,7 +59,7 @@ export function thingOpen(
 				: onOpen.skillSetupFile?.(label);
 		return { go: () => onOpen.setup(setupFile ?? ""), words: "Setup" };
 	}
-	return { go: onOpen.detail, words: "Detail" };
+	return { go: () => onOpen.detail(part, label), words: "Detail" };
 }
 
 export function thingGlyph(part: ContextPart, label: string) {
@@ -186,7 +189,7 @@ export function ContextZoom({
 							? { go: () => onOpen.file(""), words: "Files" }
 							: isSetupBox(part)
 								? { go: () => onOpen.setup(""), words: "Setup" }
-								: { go: onOpen.detail, words: "Detail" }
+								: { go: () => onOpen.detail(part, null), words: "Detail" }
 						: openOf(item.label);
 					return (
 						<div

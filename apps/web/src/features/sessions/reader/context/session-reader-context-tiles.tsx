@@ -8,13 +8,9 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { useNavigate } from "react-router-dom";
 import { useElementWidth } from "@/components/ui/horizontal-resize-handle";
 import { MOMENT_KINDS_APPEARANCE } from "@/features/compass/moment-labels";
 import { cn } from "@/lib/utils";
-import { useSessionPlaces } from "../session-places";
-import { useSessionReaderTab } from "../session-reader-tabs";
-import { useCallHref } from "../summary/session-reader-summary-errors";
 import {
 	ContextBar,
 	excludedOf,
@@ -47,6 +43,7 @@ import {
 	useRememberedPick,
 } from "./session-reader-context-memory";
 import { GhostTiles, useTileMorph } from "./session-reader-context-morph";
+import { useContextOpen } from "./session-reader-context-open";
 import { PickedBoxContext, pickedFigures } from "./session-reader-context-pick";
 import {
 	AREA_HEIGHT,
@@ -115,11 +112,15 @@ export function ContextTiles({
 	memory,
 	partRuns,
 	problems,
+	runs,
+	subagent,
 	runFigures,
 	subagentCosts,
 	whole,
 }: {
 	partRuns?: ReadonlyMap<string, ReadonlySet<number>>;
+	runs?: readonly Pick<SessionDetailTurnSummary, "startedAt" | "turnId">[];
+	subagent?: string;
 	runFigures?: ReadonlyMap<string, { cost: number | null; ms: number | null }>;
 	problems?: ReadonlyMap<string, BoxProblems>;
 	measure?: ContextMeasure;
@@ -209,9 +210,6 @@ export function ContextTiles({
 		[base, hidden, measureLook.freeWord],
 	);
 	const [picked, setPicked] = useRememberedPick(memory);
-	const { openFiles, openSetup, openTurn, selectTab } = useSessionReaderTab();
-	const navigate = useNavigate();
-	const callHref = useCallHref();
 	const pickedTile = drawn.find((tile) => tile.key === picked);
 	const [lits, setLits] = useRememberedLits<RunLit>(
 		memory ? `${memory}:lits` : undefined,
@@ -245,16 +243,7 @@ export function ContextTiles({
 		(picked !== null
 			? (map.parts.find((part) => part.key === picked) ?? null)
 			: null);
-	const openAt = (run: string, step: string | null) =>
-		step ? navigate(callHref({ run, step })) : openTurn(run);
-	const places = useSessionPlaces();
-	const zoomOpen = {
-		detail: () => selectTab("detail"),
-		file: (path: string) => openFiles(path ? { file: path } : {}),
-		mcpSetupFile: places?.mcpSetupFile,
-		setup: (setupFile: string) => openSetup(setupFile),
-		skillSetupFile: places?.skillSetupFile,
-	};
+	const { openAt, zoomOpen } = useContextOpen({ map, runs, subagent });
 	const pickedProblems = problemsOf(problems, pickedTile?.part);
 	const keepPick = useCallback(
 		(element: HTMLDivElement | null) => {
