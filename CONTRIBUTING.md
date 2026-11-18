@@ -1,70 +1,78 @@
-# Contributing to Opaline CLI
+# Contributing to Opaline
+
+Thanks for your interest in contributing! This guide covers setup, workflow, and expectations.
 
 ## Prerequisites
 
-- Node.js 20 or newer
-- Bun 1.3.10, matching the `packageManager` version in `package.json`
+- [Bun](https://bun.sh) (v1.3+)
+- [Docker](https://docker.com) (or [OrbStack](https://orbstack.dev))
 
 ## Setup
 
 ```bash
-git clone https://github.com/opalinehq/cli.git
-cd cli
+git clone https://github.com/evrendom/opaline.git
+cd athena
 bun install
+bun run dev:local
+```
+
+This starts local Postgres + ClickHouse via Docker Compose, runs migrations, and launches:
+
+- **API** at `http://localhost:4010`
+- **Web app** at `http://localhost:4011`
+
+Sign up with email/password to create a local account. Social login (Google/GitHub) is not available in local mode.
+
+## Development Commands
+
+```bash
+bun run dev:local     # Start everything (infra + API + web)
+bun run infra:up      # Start database containers only
+bun run infra:down    # Stop database containers
+bun run lint          # Run Biome linter
+bun run lint:fix      # Auto-fix lint issues
+bun run format        # Format code with Biome
+bun run check-types   # TypeScript type checking
+bun run test          # Run tests
+```
+
+## Before Submitting a PR
+
+Run the full verification suite:
+
+```bash
 bun run verify
 ```
 
-Run the development CLI with:
+This runs linting, type checking, tests, and builds across the entire monorepo. Do not open a PR if `verify` fails.
 
-```bash
-bun run --cwd apps/cli dev --help
+## Pull Request Guidelines
+
+- **PR titles must use [conventional commit](https://www.conventionalcommits.org/) format**. This is enforced by CI. Use one of:
+  `feat:` | `fix:` | `docs:` | `style:` | `refactor:` | `perf:` | `test:` | `build:` | `ci:` | `chore:` | `revert:`
+- Keep PRs focused — one logical change per PR.
+- Include a description of what changed and why.
+- CLI changes go to `apps/cli`. The CLI is published from this repository; see `RELEASING.md`.
+
+## Project Structure
+
+```
+apps/
+  api/          HTTP API server (Bun)
+  cli/          The published CLI (npm opaline, @opalinehq/cli, rudel)
+  web/          React SPA (Vite + Tailwind + shadcn)
+
+packages/
+  api-routes/   Shared RPC contract
+  ch-schema/    ClickHouse schemas, migrations, codegen
+  sql-schema/   Drizzle ORM schema for Postgres
+  typescript-config/  Shared tsconfig bases
 ```
 
-## Development commands
+## Reporting Bugs
 
-```bash
-bun run lint
-bun run lint:fix
-bun run format
-bun run check-types
-bun run test
-bun run build
-bun run verify
-```
+Open an issue at [github.com/evrendom/opaline/issues](https://github.com/evrendom/opaline/issues) with steps to reproduce.
 
-`bun run verify` must pass before a pull request is opened.
+## Security Issues
 
-## CLI playground
-
-```bash
-bun run dev:cli
-```
-
-Open <http://127.0.0.1:4077> to preview repository selection, review, and upload states using the real CLI renderer with sample data. No sessions are uploaded. Pass another port with `bun run dev:cli 4078` if needed.
-
-The README screenshot uses the repository-selection screen with the default theme and sample repositories, a 96-column × 20-row viewport, and 16 px text. When updating it, capture the terminal window from this playground and keep the sample-data caption.
-
-## Pull requests
-
-- Use a conventional title: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`,
-  `build:`, `ci:`, `chore:`, or another type accepted by the PR-title check.
-- Keep changes focused and describe user-visible compatibility impact.
-- Preserve stdout, stdin, arguments, and exit behavior for the permanent
-  `rudel` compatibility alias.
-- Never include service, dashboard, deployment, or private monorepo code in
-  this public CLI repository.
-
-Release Please versions `opaline`, `@opalinehq/cli`, and `rudel` together.
-Publishing is performed by maintainers; contributors must not publish packages
-from a branch. See [RELEASING.md](RELEASING.md) for npm setup and release recovery.
-
-## Project structure
-
-```text
-apps/cli/              @opalinehq/cli source, tests, and bundled contracts
-packages/opaline/      recommended opaline installation and executable
-packages/rudel-alias/  thin rudel compatibility executable
-```
-
-Report security vulnerabilities privately as described in
-[SECURITY.md](SECURITY.md).
+Please report security vulnerabilities privately. See [SECURITY.md](SECURITY.md) for details.

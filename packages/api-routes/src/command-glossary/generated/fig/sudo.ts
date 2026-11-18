@@ -1,0 +1,4 @@
+// Generated from @withfig/autocomplete (MIT, Hercules Labs Inc.). Do not edit.
+import type { FigSpec } from "../../fig-spec.js";
+
+export default JSON.parse("{\"n\":[\"sudo\"],\"d\":\"Execute a command as the superuser or another user\",\"o\":[{\"n\":[\"-g\",\"--group\"],\"d\":\"Run command as the specified group name or ID\",\"a\":[{\"n\":\"group\",\"d\":\"Group name or ID\"}]},{\"n\":[\"-h\",\"--help\"],\"d\":\"Display help message and exit\"},{\"n\":[\"-u\",\"--user\"],\"d\":\"Run command as specified user name or ID\",\"a\":[{\"n\":\"user\",\"d\":\"User name or ID\"}]}],\"a\":[{\"n\":\"command\",\"d\":\"Command to run with elevated permissions\",\"c\":1}]}") as FigSpec;

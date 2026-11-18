@@ -1,0 +1,62 @@
+{
+	"name": "@rudel/cli-harness",
+	"version": "0.3.0",
+	"private": true,
+	"type": "module",
+	"description": "An older copy of the CLI that the API integration and version-skew tests run against. The published CLI is apps/cli.",
+	"license": "MIT",
+	"engines": {
+		"node": ">=20"
+	},
+	"homepage": "https://opaline.so",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/opalinehq/cli.git",
+		"directory": "apps/cli"
+	},
+	"bugs": {
+		"url": "https://github.com/opalinehq/cli/issues"
+	},
+	"keywords": [
+		"claude",
+		"claude-code",
+		"analytics",
+		"session",
+		"transcript",
+		"coding-agent"
+	],
+	"author": "Opaline",
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"scripts": {
+		"dev": "bun run src/bin/cli.ts",
+		"check-types": "tsc --noEmit",
+		"build": "bun build src/bin/cli.ts --outdir dist --target node",
+		"prepack": "bun run build",
+		"test": "bun test",
+		"test:integration": "bun test ./src/__tests__/api-upload.integration.ts ./src/__tests__/uploader-rate-limit.integration.ts ./src/__tests__/auth-verify.integration.ts ./src/__tests__/auth.e2e.integration.ts ./src/__tests__/release-pressure.integration.ts",
+		"test:integration:skew": "bun test ./src/__tests__/version-skew.integration.ts"
+	},
+	"dependencies": {
+		"@clack/prompts": "^1.0.1",
+		"@logtape/file": "^2.0.4",
+		"@logtape/logtape": "^2.0.4",
+		"@orpc/client": "^1.13.5",
+		"@orpc/contract": "^1.13.5",
+		"@stricli/core": "^1.2.5",
+		"posthog-node": "5.46.1",
+		"p-map": "^7.0.4"
+	},
+	"devDependencies": {
+		"@rudel/agent-adapters": "workspace:*",
+		"@rudel/api-routes": "workspace:*",
+		"@rudel/local-context-source": "workspace:*",
+		"@rudel/secret-filter": "workspace:*",
+		"@rudel/typescript-config": "workspace:*",
+		"@types/node": "^22",
+		"bun-types": "latest",
+		"typescript": "5.9.2"
+	}
+}

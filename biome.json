@@ -1,5 +1,5 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.5.8/schema.json",
+	"$schema": "https://biomejs.dev/schemas/2.4.6/schema.json",
 	"vcs": {
 		"enabled": true,
 		"clientKind": "git",
@@ -7,7 +7,27 @@
 	},
 	"files": {
 		"ignoreUnknown": false,
-		"includes": ["apps/**", "packages/**", "*.json", "!**/generated"]
+		"includes": [
+			"apps/**",
+			"packages/**",
+			"scripts/trends/**",
+			"convex/**",
+			"*.json",
+			"!**/generated",
+			"!design-archive",
+			"!apps/marketing/public/vendor",
+			"!apps/marketing/src/styles/vendor",
+			"!apps/desktop/main.js",
+			"!apps/desktop/analyze.js",
+			"!apps/desktop/preload.js",
+			"!apps/desktop/onboarding-preload.js",
+			"!apps/desktop/onboarding-window",
+			"!apps/desktop/dots",
+			"!apps/desktop/glass3d",
+			"!apps/desktop/onboarding",
+			"!apps/desktop/icon",
+			"!apps/desktop/dmg"
+		]
 	},
 	"formatter": {
 		"enabled": true,
@@ -16,7 +36,13 @@
 	"linter": {
 		"enabled": true,
 		"rules": {
-			"preset": "recommended"
+			"recommended": true
+		}
+	},
+	"css": {
+		"parser": {
+			"cssModules": true,
+			"tailwindDirectives": true
 		}
 	},
 	"javascript": {
@@ -24,6 +50,91 @@
 			"quoteStyle": "double"
 		}
 	},
+	"overrides": [
+		{
+			"includes": [
+				"packages/api-routes/src/session-transcript/transcript-records/codex-source-*.json",
+				"packages/api-routes/src/session-transcript/transcript-records/codex-absence-*.json",
+				"packages/api-routes/src/session-transcript/transcript-records/claude-types-*.json"
+			],
+			"formatter": { "enabled": false }
+		},
+		{
+			"includes": ["**/*.astro"],
+			"linter": {
+				"rules": {
+					"correctness": {
+						"noUnusedImports": "off",
+						"noUnusedVariables": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": [
+				"apps/web/src/components/analytics/**",
+				"apps/web/src/components/conversation/**",
+				"apps/web/src/features/dashboard/DashboardPage.tsx",
+				"apps/web/src/features/sessions/components/**",
+				"apps/web/src/features/sessions/reader/**",
+				"apps/web/src/hooks/useChartTheme.ts"
+			],
+			"linter": {
+				"rules": {
+					"nursery": {
+						"noExcessiveLinesPerFile": {
+							"level": "error",
+							"options": {
+								"maxLines": 500,
+								"skipBlankLines": true
+							}
+						}
+					},
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"paths": {
+									"react": {
+										"importNames": ["useEffect"],
+										"message": "Derive state first, then use dedicated hooks like useMountEffect when an effect is still necessary."
+									}
+								}
+							}
+						}
+					},
+					"suspicious": {
+						"noDoubleEquals": {
+							"level": "error",
+							"options": {
+								"ignoreNull": false
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"includes": ["apps/web/src/features/wrapped/**"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"paths": {
+									"react": {
+										"importNames": ["useEffect"],
+										"message": "Wrapped files must use useMountEffect instead of importing useEffect directly."
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	],
 	"assist": {
 		"enabled": true,
 		"actions": {

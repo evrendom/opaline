@@ -1,0 +1,25 @@
+{
+	"name": "@rudel/local-server",
+	"version": "0.18.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"bin": {
+		"opaline-local": "./src/main.ts"
+	},
+	"scripts": {
+		"check-types": "tsc --noEmit",
+		"test": "bun test",
+		"build": "bun build src/main.ts --target=node --format=esm --outfile dist/local-server.js"
+	},
+	"dependencies": {
+		"zod": "^4.6.5"
+	},
+	"devDependencies": {
+		"@rudel/typescript-config": "workspace:*",
+		"bun-types": "latest",
+		"typescript": "5.9.2"
+	}
+}

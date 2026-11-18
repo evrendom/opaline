@@ -1,0 +1,1 @@
+ALTER TABLE "repository_evidence_capture" ADD COLUMN "saved_outputs" jsonb;

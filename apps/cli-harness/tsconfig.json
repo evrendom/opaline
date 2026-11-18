@@ -1,0 +1,10 @@
+{
+	"extends": "@rudel/typescript-config/node.json",
+	"compilerOptions": {
+		"outDir": "./dist",
+		"rootDir": "./src",
+		"types": ["@types/node"]
+	},
+	"include": ["src"],
+	"exclude": ["src/__tests__"]
+}

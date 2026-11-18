@@ -1,0 +1,15 @@
+{
+	"compilerOptions": {
+		"strict": true,
+		"moduleResolution": "Bundler",
+		"skipLibCheck": true,
+		"target": "ESNext",
+		"lib": ["ES2023", "DOM"],
+		"module": "ESNext",
+		"isolatedModules": true,
+		"noEmit": true,
+		"types": ["bun-types"]
+	},
+	"include": ["./**/*.ts"],
+	"exclude": ["./_generated"]
+}

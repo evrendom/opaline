@@ -1,6 +1,12 @@
 name: CI
 
 on:
+  workflow_dispatch:
+    inputs:
+      migrate_only:
+        description: Apply Postgres migrations without deploying the legacy Fly app
+        type: boolean
+        default: false
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
   push:
@@ -9,37 +15,153 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
+
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Job-level conditions skip drafts before allocating a runner or expanding a matrix.
+  # Job-level conditions skip drafts before allocating a runner.
+  changes:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      integration: ${{ steps.integration.outputs.integration == 'true' || steps.integration.outputs.skill == 'true' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 20
+
+      # Integration exercises the API, CLI, marketing build, packages and
+      # scripts. The web app, the MCP plugin code (no integration test reaches
+      # it) and Markdown outside the plugin skill cannot change its outcome, so
+      # PRs touching only those skip it. Every listed condition must hold for a
+      # changed file of the integration filter; the skill filter runs the
+      # skill's SQL examples.
+      - name: Detect integration changes
+        id: integration
+        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
+        with:
+          base: main
+          predicate-quantifier: every
+          filters: |
+            integration:
+              - "{apps/api/**,apps/cli/**,apps/cli-harness/**,apps/marketing/**,packages/**,scripts/**,.github/actions/setup/**,.github/workflows/ci.yml,bun.lock,package.json,turbo.json,vercel.json}"
+              - "!apps/api/src/mcp/**"
+              - "!apps/api/src/handlers/mcp-http*"
+              - "!**/*.md"
+            skill:
+              - "plugins/opaline/skills/**"
+
   verify:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: ubuntu-24.04
+    # 8vcpu: the api unit suite runs in one bun process whose accumulated heap
+    # OOM-killed (exit 137) the 4vcpu runner even at turbo concurrency 1.
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 20
+          node-version: 24
           package-manager-cache: false
 
       - name: Setup Bun
         uses: ./.github/actions/setup
+
+      - name: Check for local overrides
+        run: bun scripts/check-overrides.ts
+
+      - name: Check for accidental disclosures
+        run: bun run check:disclosure
+
+      - name: Test disclosure checker
+        run: bun test scripts/check-disclosure.test.ts
+
+      - name: Test the self-hosted artifact packer
+        run: bun test ./scripts/selfhost-artifact.test.ts
+
+      - name: Check pull request disclosure channels
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          bun scripts/check-disclosure.ts --commits "${{ github.event.pull_request.base.sha }}"
+          bun scripts/check-disclosure.ts --pull-request "${{ github.event.pull_request.number }}"
 
       - name: Verify
-        run: bun run verify
+        run: |
+          bun run turbo run lint check-types test --concurrency=1
+          bun run check-types:vercel
+
+      # build:site below builds the web and marketing workspaces once.
+      - name: Build API and CLI
+        run: bun run turbo run build --filter='!@rudel/web' --filter='!@rudel/marketing' --concurrency=1
+
+      - name: Build combined marketing, demo, and product
+        run: bun run build:site
+
+      - name: Verify browser resource budgets in Chrome
+        run: bun run --cwd apps/web test:resource-budgets:chrome
 
   integration:
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    # Pushes to main follow the same filter (the production deploy accepts a
+    # skip); manual deploys always run it.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      ((github.event_name == 'push' ||
+      github.event.pull_request.draft == false) &&
+      needs.changes.outputs.integration == 'true')
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17.10-alpine
+        env:
+          POSTGRES_DB: rudel
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready --username postgres --dbname rudel"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    # These credentials are only for the disposable services created above.
+    env:
+      PASSWORD_AUTH_EMAILS: "*"
+      PG_CONNECTION_STRING: postgres://postgres:postgres@localhost:5432/rudel
+      PG_DIRECT_CONNECTION_STRING: postgres://postgres:postgres@localhost:5432/rudel
+      CLICKHOUSE_URL: http://localhost:8123
+      CLICKHOUSE_USER: rudel
+      CLICKHOUSE_USERNAME: rudel
+      CLICKHOUSE_PASSWORD: rudel-ci
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_CREDENTIAL_TEST_URL: http://localhost.:8124
+      CLICKHOUSE_CREDENTIAL_TEST_USERNAME: rudel_app
+      CLICKHOUSE_CREDENTIAL_TEST_PASSWORD: rudel-app-ci
+      CLICKHOUSE_CREDENTIAL_TEST_DEFAULT_PASSWORD: default-ci
+      SKILL_EXTRACTION_ENABLED: "true"
+      SKILL_ANALYTICS_CUTOVER_MODE: all
+      SKILL_ANALYTICS_CANARY_ORG_IDS: ""
+      SKILL_BACKFILL_MAX_SESSIONS: "10000"
+      SKILL_BACKFILL_MAX_SESSION_BYTES: "536870912"
+      SKILL_BACKFILL_BATCH_MAX_ROWS: "64"
+      SKILL_BACKFILL_BATCH_MAX_BYTES: "134217728"
+      TRANSCRIPT_RECORDS_EXTRACTION_ENABLED: "true"
+      GIT_OBSERVATION_EXTRACTION_ENABLED: "true"
+      GITHUB_SWEEP_ENABLED: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -47,14 +169,184 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 20
+          node-version: 24
           package-manager-cache: false
 
       - name: Setup Bun
         uses: ./.github/actions/setup
 
-      - name: Run CLI integration tests
-        run: bun run test:integration
+      - name: Start ClickHouse
+        run: |
+          docker run --detach \
+            --name rudel-ci-clickhouse \
+            --publish 8123:8123 \
+            --env CLICKHOUSE_DB=default \
+            --env CLICKHOUSE_USER=rudel \
+            --env CLICKHOUSE_PASSWORD=rudel-ci \
+            --env CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1 \
+            --volume "${GITHUB_WORKSPACE}/.github/clickhouse/config.d/storage-policy.xml:/etc/clickhouse-server/config.d/storage-policy.xml:ro" \
+            clickhouse/clickhouse-server:26.3.17.56
+
+          docker run --detach \
+            --name rudel-ci-clickhouse-credentials \
+            --publish 8124:8123 \
+            --env CLICKHOUSE_DB=default \
+            --env CLICKHOUSE_PASSWORD=default-ci \
+            --env CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1 \
+            clickhouse/clickhouse-server:26.3.17.56
+
+      - name: Wait for ClickHouse
+        run: |
+          wait_for_clickhouse() {
+            local container="$1"
+            local credentials="$2"
+            local url="$3"
+
+            for attempt in {1..60}; do
+              if curl --fail --silent --user "${credentials}" "${url}/ping" | grep --quiet Ok; then
+                return 0
+              fi
+              sleep 1
+            done
+
+            docker logs "${container}"
+            return 1
+          }
+
+          wait_for_clickhouse \
+            rudel-ci-clickhouse \
+            rudel:rudel-ci \
+            http://localhost:8123
+          wait_for_clickhouse \
+            rudel-ci-clickhouse-credentials \
+            default:default-ci \
+            http://localhost:8124
+
+      - name: Provision ClickHouse credential test user
+        run: |
+          curl --fail --silent --show-error \
+            --user default:default-ci \
+            --data-binary "CREATE USER rudel_app IDENTIFIED WITH sha256_password BY 'rudel-app-ci'" \
+            http://localhost:8124/
+
+      - name: Run Postgres migrations
+        run: bun run --cwd packages/sql-schema migrate
+
+      - name: Bootstrap fresh ClickHouse (original checksums and controlled F16 verification)
+        run: bun run --cwd packages/ch-schema ch:bootstrap
+
+      - name: Run integration tests
+        run: bun run turbo run test:integration --concurrency=1 --log-order=stream
+
+      - name: Verify homepage authentication routing
+        env:
+          APP_URL: http://localhost
+          ALLOWED_ORIGIN: http://localhost
+          BETTER_AUTH_SECRET: test-secret-for-integration-tests
+          NODE_ENV: test
+        run: |
+          bun run --cwd apps/marketing build
+          mkdir -p dist-site
+          cp apps/marketing/dist/index.html dist-site/marketing.html
+          bun test ./apps/api/src/__tests__/vercel-home.integration.ts
+
+      - name: Fetch the published rudel@0.1.17 CLI
+        run: |
+          mkdir -p .tmp/old-cli
+          curl -fsSL -o .tmp/old-cli/rudel-0.1.17.tgz https://registry.npmjs.org/rudel/-/rudel-0.1.17.tgz
+          tar -xzf .tmp/old-cli/rudel-0.1.17.tgz -C .tmp/old-cli
+          node .tmp/old-cli/package/dist/cli.js --version
+
+      - name: Run version-skew tests against the published 0.1.17 CLI
+        run: bun run --cwd apps/cli-harness test:integration:skew
+        env:
+          RUDEL_OLD_CLI_PATH: ${{ github.workspace }}/.tmp/old-cli/package/dist/cli.js
+
+  main-head:
+    if: >-
+      ${{ !cancelled() &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      needs.verify.result == 'success' &&
+      (needs.integration.result == 'success' ||
+      needs.integration.result == 'skipped') }}
+    needs: [verify, integration]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    outputs:
+      current: ${{ steps.head.outputs.current }}
+    steps:
+      # The production deploy lock keeps one pending deploy and cancels any
+      # older pending one, so a superseded commit that finishes CI late would
+      # cancel the deploy of main's HEAD, and then nothing is promoted.
+      - name: Is this commit still main's HEAD
+        id: head
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          head_sha="$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq .sha)"
+          if [[ "${head_sha}" == "${GITHUB_SHA}" ]]; then
+            echo "current=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "current=false" >> "${GITHUB_OUTPUT}"
+            echo "Skipping deploy: main has moved to ${head_sha}, whose run deploys this commit too." >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
+  deploy-vercel:
+    if: >-
+      ${{ !cancelled() &&
+      github.repository == 'opalinehq/athena' &&
+      needs.main-head.outputs.current == 'true' }}
+    needs: [verify, integration, main-head]
+    uses: ./.github/workflows/vercel.yml
+    with:
+      target: production
+    secrets:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      PG_CONNECTION_STRING: ${{ secrets.PG_CONNECTION_STRING }}
+
+  deploy:
+    if: >-
+      github.repository == 'opalinehq/athena' &&
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'workflow_dispatch'
+    needs: [verify, integration]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup
+
+      - name: Run Postgres migrations
+        run: bun run --cwd packages/sql-schema migrate
+        env:
+          PG_CONNECTION_STRING: ${{ secrets.PG_CONNECTION_STRING }}
+
+      - name: Setup Fly.io
+        if: ${{ !inputs.migrate_only }}
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
+
+      - name: Deploy
+        if: ${{ !inputs.migrate_only }}
+        run: |
+          flyctl deploy --remote-only \
+            --build-arg "VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}" \
+            --build-arg "VITE_CHATWOOT_BASE_URL=${{ secrets.VITE_CHATWOOT_BASE_URL }}" \
+            --build-arg "VITE_CHATWOOT_WEBSITE_TOKEN=${{ secrets.VITE_CHATWOOT_WEBSITE_TOKEN }}" \
+            --build-arg "VITE_POSTHOG_KEY=${{ secrets.VITE_POSTHOG_KEY }}" \
+            --build-arg "VITE_POSTHOG_HOST=${{ secrets.VITE_POSTHOG_HOST }}" \
+            --build-arg "VITE_POSTHOG_ENABLED=${{ secrets.VITE_POSTHOG_ENABLED }}" \
+            --build-arg "VITE_ADMIN_ORGANIZATION_ID=${{ secrets.VITE_ADMIN_ORGANIZATION_ID }}" \
+            --build-arg "VITE_SENTRY_DSN=${{ secrets.VITE_SENTRY_DSN }}"
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
   cli-smoke:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false

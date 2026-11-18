@@ -1,0 +1,499 @@
+/* Menu surface (dropdown-menu / popover): a borderless
+   popover on its soft hairline shadow, squircle corners, a 4px list inset and
+   compact 14px rows. Opaline keeps its pebble checks, black accent and fluid
+   hover. These tokens are scoped to session menus. */
+.session-menu-popover,
+.session-menu-surface {
+	--session-menu-hairline: 1px;
+	--session-menu-background: oklch(1 0 0);
+	--session-menu-border: #efefef;
+	--session-menu-label: oklch(0.145 0 0);
+	--session-menu-focused-label: oklch(0.145 0 0);
+	--session-menu-icon: oklch(0.556 0 0);
+	--session-menu-highlight: oklch(0.97 0 0);
+	--session-menu-selected: oklch(0.95 0 0);
+	--session-menu-accent: #000;
+	--session-menu-check: #fff;
+	--session-menu-checkbox-border: lch(54.1 0 282);
+	--session-menu-parent-shadow: var(--custom-shadow);
+	--session-menu-child-shadow: var(--custom-shadow);
+	font-family: "Inter Variable", sans-serif;
+	font-size: 14px;
+	font-weight: 400;
+	line-height: 1.5;
+	letter-spacing: normal;
+	color: var(--session-menu-label);
+	-webkit-font-smoothing: antialiased;
+}
+
+@media (min-resolution: 2dppx) {
+	.session-menu-popover,
+	.session-menu-surface {
+		--session-menu-hairline: 0.5px;
+	}
+}
+
+/* Preserve the app's dark appearance; the captured reference was light. */
+.dark .session-menu-popover,
+.dark .session-menu-surface {
+	--session-menu-background: #1c1c1d;
+	--session-menu-border: #38383a;
+	--session-menu-label: #e2e3e5;
+	--session-menu-focused-label: #f4f4f5;
+	--session-menu-icon: #b8b8ba;
+	--session-menu-highlight: #2b2b2d;
+	--session-menu-selected: #333335;
+	--session-menu-checkbox-border: #77777b;
+	--session-menu-accent: #f4f4f5;
+	--session-menu-check: #1c1c1d;
+}
+
+.session-menu-popover {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	width: calc(206px + 2 * var(--session-menu-hairline));
+	max-height: var(--available-height, calc(100dvh - 16px));
+	padding: 0;
+	margin: 0;
+	outline: none;
+	transform-origin: var(--transform-origin);
+}
+
+.session-menu-surface {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	border: 0;
+	border-radius: 8px;
+	background: var(--session-menu-background);
+	box-shadow: var(--session-menu-parent-shadow);
+	outline: none;
+}
+/* Squircle corners where supported: a dropdown's 16px (rounded-2xl). */
+/* biome-ignore lint/correctness/noUnknownProperty: corner-shape is new (Chromium 139+); Biome does not know it yet. */
+@supports (corner-shape: squircle) {
+	.session-menu-surface {
+		border-radius: 16px;
+		/* biome-ignore lint/correctness/noUnknownProperty: see the @supports note above. */
+		corner-shape: squircle;
+	}
+}
+
+.session-menu-parent {
+	width: calc(206px + 2 * var(--session-menu-hairline));
+}
+.session-menu-list {
+	min-height: 0;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	scrollbar-width: thin;
+	padding: 4px 0;
+}
+.session-menu-list > ul {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.session-menu-search,
+.session-menu-heading {
+	display: flex;
+	flex: none;
+	align-items: center;
+	gap: 14px;
+	height: calc(36px + var(--session-menu-hairline));
+	padding: 0 12px;
+	border-bottom: var(--session-menu-hairline) solid var(--session-menu-border);
+}
+.session-menu-search input {
+	appearance: none;
+	width: 0;
+	min-width: 0;
+	height: 36px;
+	flex: 1;
+	border: 0;
+	border-radius: 0;
+	padding: 10px 0 9px;
+	background: transparent;
+	color: var(--session-menu-label);
+	font:
+		400 14px / normal "Inter Variable",
+		sans-serif;
+	letter-spacing: normal;
+	box-shadow: none;
+	outline: none;
+}
+.session-menu-search input::placeholder {
+	color: var(--session-menu-icon);
+	opacity: 1;
+}
+.session-menu-search input::-webkit-search-cancel-button {
+	display: none;
+}
+.session-menu-search kbd {
+	flex: none;
+	min-width: 18px;
+	padding: 2px;
+	margin-top: -1px;
+	border: var(--session-menu-hairline) solid var(--session-menu-border);
+	border-radius: 4px;
+	font:
+		400 11px / 1.1 "Inter Variable",
+		sans-serif;
+	text-align: center;
+	color: var(--session-menu-icon);
+}
+.session-menu-row {
+	position: relative;
+	isolation: isolate;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	height: 32px;
+	min-height: 32px;
+	flex-shrink: 0;
+	padding: 0 16px 0 12px;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	color: var(--session-menu-label);
+	font:
+		400 14px / normal "Inter Variable",
+		sans-serif;
+	letter-spacing: normal;
+	text-align: left;
+	white-space: nowrap;
+	outline: none;
+	user-select: none;
+	transition: color 100ms ease-in-out;
+}
+.session-menu-row::before {
+	content: "";
+	position: absolute;
+	inset: 0 4px;
+	z-index: -1;
+	border-radius: 6px;
+	pointer-events: none;
+}
+.session-menu-row:is(
+		:hover,
+		:focus-visible,
+		:focus-within,
+		[data-highlighted],
+		[data-previewed="true"]
+	) {
+	color: var(--session-menu-focused-label);
+}
+.session-menu-row:is(
+		:hover,
+		:focus-visible,
+		:focus-within,
+		[data-highlighted],
+		[data-previewed="true"]
+	)::before {
+	background: var(--session-menu-highlight);
+}
+/* A filter that's been changed reads like the toolbar's active Filter button:
+   its icon and label take the accent, with a dot before the chevron. */
+.session-menu-row[data-active="true"] {
+	color: var(--session-menu-focused-label);
+}
+.session-menu-row[data-active="true"] > .session-menu-icon:first-child {
+	color: var(--session-menu-accent);
+}
+.session-menu-active-dot {
+	flex: none;
+	width: 6px;
+	height: 6px;
+	border-radius: 9999px;
+	background: var(--session-menu-accent);
+}
+.session-menu-row:disabled {
+	color: var(--session-menu-icon);
+	pointer-events: none;
+}
+.session-menu-icon {
+	color: var(--session-menu-icon);
+	flex: none;
+}
+.session-menu-surface svg {
+	opacity: 1;
+}
+.session-menu-separator {
+	position: relative;
+	height: 9px;
+	flex: none;
+}
+.session-menu-separator::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 50%;
+	border-top: var(--session-menu-hairline) solid var(--session-menu-border);
+}
+.session-menu-footer {
+	flex: none;
+	padding-bottom: 6px;
+}
+.session-menu-empty {
+	padding: 24px 14px;
+	color: var(--session-menu-icon);
+	text-align: center;
+}
+.session-menu-check-slot {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 14px;
+	flex: none;
+	margin-right: -2px;
+}
+.session-menu-checkbox {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 14px;
+	height: 14px;
+	background: var(--session-menu-checkbox-border);
+	color: var(--session-menu-check);
+	-webkit-mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
+	mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
+	transition: background-color 80ms;
+}
+.session-menu-checkbox::before {
+	content: "";
+	position: absolute;
+	inset: 1px;
+	background: var(--session-menu-background);
+	-webkit-mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
+	mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
+	transition: opacity 80ms;
+}
+.session-menu-checkbox > svg {
+	position: relative;
+}
+.session-menu-checkbox[data-checked="true"] {
+	background: var(--session-menu-accent);
+}
+.session-menu-checkbox[data-checked="true"]::before {
+	opacity: 0;
+}
+.session-menu-row:not(:hover, :focus-within)
+	.session-menu-checkbox[data-checked="false"] {
+	visibility: hidden;
+}
+.session-menu-flyout {
+	position: absolute;
+	z-index: 10;
+	width: max-content;
+	min-width: 175px;
+	max-width: min(340px, calc(100vw - 24px));
+	max-height: min(374px, calc(100dvh - 24px));
+	box-shadow: var(--session-menu-child-shadow);
+	transform-origin: var(--session-menu-flyout-origin, 0 43px);
+}
+.session-menu-flyout[data-kind="options"] {
+	overflow: hidden;
+}
+.session-menu-flyout:not([data-kind="options"]) {
+	width: calc(216px + 2 * var(--session-menu-hairline));
+}
+.session-menu-flyout .session-menu-list {
+	max-height: 338px;
+}
+.session-menu-sort {
+	width: calc(206px + 2 * var(--session-menu-hairline));
+	max-height: var(--available-height);
+	overflow-y: auto;
+	padding: 4px 0;
+	transform-origin: var(--transform-origin);
+}
+.session-menu-sort .session-menu-row {
+	padding-left: 36px;
+}
+.session-menu-sort-check {
+	position: absolute;
+	left: 12px;
+	display: flex;
+	align-items: center;
+	color: var(--session-menu-icon);
+}
+
+/* Sampled from the reference's rendered opacity/scale curve; no layout animation. */
+.session-menu-popover[data-open],
+.session-menu-sort[data-open],
+.session-date-picker[data-open] {
+	animation: session-menu-enter 217ms linear both;
+}
+/* Category changes keep the flyout's icons and text on fixed pixel positions. */
+.session-menu-flyout {
+	animation: session-menu-flyout-enter 100ms ease-out both;
+}
+@keyframes session-menu-flyout-enter {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+.session-menu-popover[data-closed],
+.session-menu-sort[data-closed],
+.session-date-picker[data-closed] {
+	animation: session-menu-exit 170ms linear both;
+}
+@keyframes session-menu-enter {
+	0% {
+		transform: scale(0.98);
+		opacity: 0;
+	}
+	7.65% {
+		transform: scale(0.982753);
+		opacity: 0.275293;
+	}
+	15.3% {
+		transform: scale(0.984423);
+		opacity: 0.442248;
+	}
+	22.6% {
+		transform: scale(0.9849);
+		opacity: 0.489984;
+	}
+	30.7% {
+		transform: scale(0.987402);
+		opacity: 0.740174;
+	}
+	38.1% {
+		transform: scale(0.990805);
+		opacity: 1;
+	}
+	46% {
+		transform: scale(0.993343);
+		opacity: 1;
+	}
+	53.7% {
+		transform: scale(0.995014);
+		opacity: 1;
+	}
+	61.4% {
+		transform: scale(0.996334);
+		opacity: 1;
+	}
+	68.7% {
+		transform: scale(0.997306);
+		opacity: 1;
+	}
+	76.2% {
+		transform: scale(0.997984);
+		opacity: 1;
+	}
+	84.4% {
+		transform: scale(0.998518);
+		opacity: 1;
+	}
+	92.1% {
+		transform: scale(0.998931);
+		opacity: 1;
+	}
+	100% {
+		transform: scale(1);
+		opacity: 1;
+	}
+}
+@keyframes session-menu-exit {
+	0% {
+		transform: scale(1);
+		opacity: 1;
+	}
+	10% {
+		transform: scale(0.98);
+		opacity: 0.900299;
+	}
+	20% {
+		transform: scale(0.98);
+		opacity: 0.56046;
+	}
+	30% {
+		transform: scale(0.98);
+		opacity: 0.363471;
+	}
+	40% {
+		transform: scale(0.98);
+		opacity: 0.191692;
+	}
+	50% {
+		transform: scale(0.98);
+		opacity: 0.103101;
+	}
+	60% {
+		transform: scale(0.98);
+		opacity: 0.0506555;
+	}
+	70% {
+		transform: scale(0.98);
+		opacity: 0.0256828;
+	}
+	80% {
+		transform: scale(0.98);
+		opacity: 0.0129563;
+	}
+	100% {
+		transform: scale(0.98);
+		opacity: 0;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.session-menu-popover[data-open],
+	.session-menu-popover[data-closed],
+	.session-menu-sort[data-open],
+	.session-menu-sort[data-closed],
+	.session-date-picker[data-open],
+	.session-date-picker[data-closed],
+	.session-menu-flyout {
+		animation: none;
+	}
+}
+
+/* Keep Opaline's spring-driven hover, with the reference's inset silhouette. */
+.session-menu-surface .fluid-menu-hover-fill {
+	background: transparent;
+}
+.session-menu-surface .fluid-menu-hover-fill::before {
+	content: "";
+	position: absolute;
+	inset: 0 4px;
+	border-radius: 6px;
+	background: var(--session-menu-highlight);
+}
+.session-menu-row[data-fluid-menu-item]::before {
+	background: transparent;
+}
+.session-menu-picks .session-menu-row {
+	padding-left: 12px;
+}
+.session-menu-picks .session-menu-row::before {
+	background: var(--session-menu-highlight);
+	opacity: 0;
+	transition: opacity 100ms ease-in-out;
+	will-change: opacity;
+}
+.session-menu-picks .session-menu-row[data-checked]::before {
+	opacity: 1;
+}
+.session-menu-picks .session-menu-row[data-join-next]::before {
+	border-bottom-left-radius: 0;
+	border-bottom-right-radius: 0;
+}
+.session-menu-picks .session-menu-row[data-join-previous]::before {
+	border-top-left-radius: 0;
+	border-top-right-radius: 0;
+}
+.session-menu-list:not([data-fluid-hover-active-index])
+	.session-menu-row[data-previewed="true"]::before {
+	background: var(--session-menu-highlight);
+}

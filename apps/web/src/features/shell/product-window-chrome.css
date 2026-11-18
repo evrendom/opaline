@@ -1,0 +1,163 @@
+.product-brand-wordmark {
+	display: inline-flex;
+	align-items: center;
+	color: oklch(0 0 0 / 0.88);
+}
+
+.product-brand-lockup {
+	display: inline-flex;
+	min-width: 0;
+	align-items: center;
+}
+
+.product-brand-wordmark img {
+	display: block;
+	width: 64px;
+	height: 16px;
+	filter: grayscale(1) brightness(0);
+}
+
+/* Dark shows the light wordmark asset, which keeps its own colours. */
+.product-brand-wordmark img[data-theme-asset="dark"],
+.dark .product-brand-wordmark img[data-theme-asset="light"] {
+	display: none;
+}
+.dark .product-brand-wordmark img[data-theme-asset="dark"] {
+	display: block;
+	filter: none;
+}
+.dark .product-brand-wordmark {
+	color: oklch(1 0 0 / 0.88);
+}
+
+/* The same outer glass frame surrounds the demo and personal setup. */
+.product-window-frame {
+	overflow: hidden;
+	border-radius: var(--instant-v2-dashboard-window-radius, 12px);
+	background: rgba(235, 235, 235, 0.7);
+	box-shadow:
+		inset 0 1px 0 oklch(1 0 0 / 0.82),
+		inset 0 -1px 0 oklch(0.18 0.012 275 / 0.1),
+		0 0 0 0.75px oklch(0.18 0.012 275 / 0.16),
+		0 1px 2px oklch(0.18 0.012 275 / 0.2),
+		0 5px 10px -3px oklch(0.18 0.018 275 / 0.2),
+		0 14px 30px -9px oklch(0.18 0.022 275 / 0.18),
+		0 32px 68px -20px oklch(0.18 0.026 275 / 0.16),
+		0 64px 128px -42px oklch(0.18 0.03 275 / 0.14);
+	backdrop-filter: blur(20px);
+	-webkit-backdrop-filter: blur(20px);
+}
+
+/* Dark: the shell's own solid canvas behind a hairline edge (self-contained,
+   since the landing page has none of the app's shadow tokens). */
+.dark .product-window-frame {
+	background: oklch(0.145 0 0);
+	box-shadow:
+		0 0 0 1px rgb(255 255 255 / 0.07),
+		0 24px 48px -12px rgb(0 0 0 / 0.5);
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
+}
+
+.dashboard-01-preview > .product-window-frame {
+	border-bottom-right-radius: 0;
+	border-bottom-left-radius: 0;
+}
+
+.product-window-frame > .dashboard-01-chrome-frame {
+	min-height: 0;
+}
+
+.product-window-frame [data-slot="sidebar"] {
+	height: 100%;
+}
+
+/* Full-bleed in the product; the colours stay the demo's. */
+.product-app-shell.dashboard-01-preview,
+.product-app-shell .dashboard-01-chrome-frame {
+	border-radius: 0;
+	box-shadow: none;
+}
+
+:where(html)[data-app-shell] body > .product-window-backdrop {
+	position: fixed;
+	z-index: 0;
+	inset: -64px -80px;
+	pointer-events: none;
+	border-radius: 300px;
+	filter: blur(50px);
+	background: linear-gradient(115deg, #fff1b9, #fff3c9 48%, #ffe4b2);
+}
+
+/* Dark keeps the wash as a deep ambient glow, like the landing page's: the
+   same hues per connection state at a low lightness. */
+.dark {
+	/* Stronger strands at slightly lowered brightness: a saturated glow on
+	   the dark page rather than pale, near-white light (glimm's advice). */
+	--landing-hero-canvas-strength: 2;
+	--landing-hero-canvas-brightness: 0.85;
+}
+
+:where(html).dark[data-app-shell] body > .product-window-backdrop {
+	background: linear-gradient(
+		115deg,
+		oklch(0.26 0.06 90),
+		oklch(0.24 0.05 95) 48%,
+		oklch(0.26 0.07 75)
+	);
+}
+
+.product-window-backdrop::before,
+.product-window-backdrop::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	opacity: 0;
+	transition: opacity 1800ms ease-in-out;
+}
+.product-window-backdrop::before {
+	background: linear-gradient(115deg, #d5f7eb, #daf4f7 48%, #dce8fb);
+}
+.product-window-backdrop::after {
+	background: linear-gradient(115deg, #ffd3cb, #ffe0ca 48%, #ffcfbf);
+}
+.dark .product-window-backdrop::before {
+	background: linear-gradient(
+		115deg,
+		oklch(0.25 0.05 170),
+		oklch(0.24 0.045 200) 48%,
+		oklch(0.25 0.05 255)
+	);
+}
+.dark .product-window-backdrop::after {
+	background: linear-gradient(
+		115deg,
+		oklch(0.26 0.07 30),
+		oklch(0.25 0.06 50) 48%,
+		oklch(0.26 0.07 35)
+	);
+}
+.product-window-backdrop[data-hero-canvas-palette="connected"]::before,
+.product-window-backdrop[data-hero-canvas-palette="interrupted"]::after {
+	opacity: 1;
+}
+
+.product-window-backdrop canvas {
+	position: relative;
+	z-index: 1;
+	display: block;
+	width: 100%;
+	height: 100%;
+	opacity: 0;
+}
+
+.product-window-backdrop[data-canvas-ready] canvas {
+	opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.product-window-backdrop::before,
+	.product-window-backdrop::after {
+		transition: none;
+	}
+}

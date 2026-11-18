@@ -1,0 +1,423 @@
+{
+	"$schema": "https://openapi.vercel.sh/vercel.json",
+	"buildCommand": "if [ \"$VERCEL_ENV\" = \"production\" ]; then bun run --cwd packages/ch-schema ch:migrate:production; fi && bun run check-types:vercel && bun run build:site",
+	"bunVersion": "1.x",
+	"git": {
+		"deploymentEnabled": false
+	},
+	"framework": "vite",
+	"outputDirectory": "dist-site",
+	"regions": ["fra1"],
+	"functions": {
+		"api/cli-connection.ts": {
+			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
+			"memory": 2048,
+			"maxDuration": 300
+		},
+		"api/rpc.ts": {
+			"includeFiles": "{apps/api/src/**,dist-site/marketing.html,packages/*/src/**}",
+			"memory": 2048,
+			"maxDuration": 300
+		},
+		"api/cron/repair.ts": {
+			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
+			"memory": 2048,
+			"maxDuration": 300
+		},
+		"api/cron/r2-ingest.ts": {
+			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
+			"memory": 1024,
+			"maxDuration": 300
+		},
+		"api/cron/native-lineage.ts": {
+			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
+			"memory": 2048,
+			"maxDuration": 90
+		},
+		"api/cron/billing.ts": {
+			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
+			"memory": 1024,
+			"maxDuration": 60
+		},
+		"api/cron/trends-sources.ts": {
+			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
+			"memory": 2048,
+			"maxDuration": 300
+		},
+		"api/cron/github-evidence.ts": {
+			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
+			"memory": 2048,
+			"maxDuration": 300
+		},
+		"api/cron/l1-edges.ts": {
+			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
+			"memory": 2048,
+			"maxDuration": 300
+		},
+		"api/cron/run-index-heal.ts": {
+			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
+			"memory": 2048,
+			"maxDuration": 300
+		},
+		"api/cron/usage-digest.ts": {
+			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
+			"memory": 1024,
+			"maxDuration": 300
+		},
+		"api/cron/run-questions.ts": {
+			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
+			"memory": 1024,
+			"maxDuration": 300
+		},
+		"api/cron/session-retirement.ts": {
+			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
+			"memory": 1024,
+			"maxDuration": 300
+		},
+		"api/cron/live-sessions.ts": {
+			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
+			"memory": 1024,
+			"maxDuration": 300
+		},
+		"api/cron/history.ts": {
+			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
+			"memory": 2048,
+			"maxDuration": 300
+		},
+		"api/webhooks/github.ts": {
+			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
+			"memory": 1024,
+			"maxDuration": 300
+		},
+		"api/ingest.ts": {
+			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
+			"memory": 2048,
+			"maxDuration": 300
+		},
+		"api/invite.ts": {
+			"includeFiles": "{apps/api/src/**,apps/web/dist/index.html,packages/*/src/**}",
+			"memory": 2048,
+			"maxDuration": 300
+		},
+		"api/demo.ts": {
+			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
+			"memory": 2048,
+			"maxDuration": 300
+		},
+		"api/page.ts": {
+			"includeFiles": "{apps/api/src/**,dist-site/app.html,dist-site/404.html,dist-site/410/index.html,packages/*/src/**}",
+			"memory": 1024,
+			"maxDuration": 30
+		},
+		"api/session-arrivals.ts": {
+			"includeFiles": "{apps/api/src/**,packages/*/src/**}",
+			"memory": 2048,
+			"maxDuration": 300
+		}
+	},
+	"crons": [
+		{
+			"path": "/api/cron/r2-ingest",
+			"schedule": "* * * * *"
+		},
+		{
+			"path": "/api/cron/repair",
+			"schedule": "0 3 * * *"
+		},
+		{
+			"path": "/api/cron/native-lineage",
+			"schedule": "30 3 * * *"
+		},
+		{
+			"path": "/api/cron/billing",
+			"schedule": "15 3 * * *"
+		},
+		{
+			"path": "/api/cron/github-evidence",
+			"schedule": "*/5 * * * *"
+		},
+		{
+			"path": "/api/cron/l1-edges",
+			"schedule": "* * * * *"
+		},
+		{
+			"path": "/api/cron/run-index-heal",
+			"schedule": "*/5 * * * *"
+		},
+		{
+			"path": "/api/cron/run-questions",
+			"schedule": "* * * * *"
+		},
+		{
+			"path": "/api/cron/history",
+			"schedule": "* * * * *"
+		},
+		{
+			"path": "/api/cron/history",
+			"schedule": "*/1 * * * *"
+		},
+		{
+			"path": "/api/cron/history",
+			"schedule": "0-59 * * * *"
+		},
+		{
+			"path": "/api/cron/history",
+			"schedule": "0-59/1 * * * *"
+		},
+		{
+			"path": "/api/cron/live-sessions",
+			"schedule": "10 * * * *"
+		},
+		{
+			"path": "/api/cron/trends-sources",
+			"schedule": "0 4 * * *"
+		},
+		{
+			"path": "/api/cron/usage-digest",
+			"schedule": "10 * * * *"
+		},
+		{
+			"path": "/api/cron/session-retirement",
+			"schedule": "40 * * * *"
+		}
+	],
+	"headers": [
+		{
+			"source": "/plugin/:path*",
+			"headers": [{ "key": "Access-Control-Allow-Origin", "value": "*" }]
+		},
+		{
+			"source": "/plugin/entry.js",
+			"headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+		},
+		{
+			"source": "/plugin/assets/:path*",
+			"headers": [
+				{
+					"key": "Cache-Control",
+					"value": "public, max-age=31536000, immutable"
+				}
+			]
+		},
+		{
+			"source": "/(.*)",
+			"headers": [
+				{
+					"key": "Permissions-Policy",
+					"value": "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
+				},
+				{
+					"key": "Referrer-Policy",
+					"value": "strict-origin-when-cross-origin"
+				},
+				{
+					"key": "Strict-Transport-Security",
+					"value": "max-age=31536000; includeSubDomains"
+				},
+				{
+					"key": "X-Content-Type-Options",
+					"value": "nosniff"
+				}
+			]
+		},
+		{
+			"source": "/((?!product-demo(?:/|$)).*)",
+			"headers": [
+				{
+					"key": "Content-Security-Policy",
+					"value": "default-src 'self'; base-uri 'self'; connect-src 'self' https://api.github.com https://*.posthog.com; font-src 'self' data:; form-action 'self'; frame-ancestors 'none'; frame-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: https:; object-src 'none'; script-src 'self' https://*.posthog.com; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:"
+				},
+				{
+					"key": "X-Frame-Options",
+					"value": "DENY"
+				}
+			]
+		},
+		{
+			"source": "/product-demo/(.*)",
+			"headers": [
+				{
+					"key": "Content-Security-Policy",
+					"value": "default-src 'self'; base-uri 'self'; connect-src 'self' https://api.github.com https://*.posthog.com; font-src 'self' data:; form-action 'self'; frame-ancestors 'self'; frame-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: https:; object-src 'none'; script-src 'self' https://*.posthog.com; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:"
+				},
+				{
+					"key": "X-Frame-Options",
+					"value": "SAMEORIGIN"
+				}
+			]
+		},
+		{
+			"source": "/product-demo/:path*",
+			"headers": [
+				{
+					"key": "X-Robots-Tag",
+					"value": "noindex, nofollow"
+				}
+			]
+		}
+	],
+	"rewrites": [
+		{
+			"source": "/api/demo/:routePath*",
+			"destination": "/api/demo?__opaline_path=/api/demo/:routePath*"
+		},
+		{
+			"source": "/:workspaceSlug/join/:token/og.png",
+			"destination": "/api/invite?__opaline_path=/:workspaceSlug/join/:token/og.png"
+		},
+		{
+			"source": "/:workspaceSlug/join/:token",
+			"destination": "/api/invite?__opaline_path=/:workspaceSlug/join/:token"
+		},
+		{
+			"source": "/team/invite/:token/og.png",
+			"destination": "/api/invite?__opaline_path=/team/invite/:token/og.png"
+		},
+		{
+			"source": "/team/invite/:token",
+			"destination": "/api/invite?__opaline_path=/team/invite/:token"
+		},
+		{
+			"source": "/api/sessions/arrivals/events",
+			"destination": "/api/session-arrivals?__opaline_path=/api/sessions/arrivals/events"
+		},
+		{
+			"source": "/api/cli/connections",
+			"destination": "/api/cli-connection?__opaline_path=/api/cli/connections"
+		},
+		{
+			"source": "/api/cli/connections/:routePath*",
+			"destination": "/api/cli-connection?__opaline_path=/api/cli/connections/:routePath*"
+		},
+		{
+			"source": "/rpc/ingest/init",
+			"destination": "/api/ingest?__opaline_path=/rpc/ingest/init"
+		},
+		{
+			"source": "/rpc/ingest/commit",
+			"destination": "/api/ingest?__opaline_path=/rpc/ingest/commit"
+		},
+		{
+			"source": "/rpc/ingest/status",
+			"destination": "/api/ingest?__opaline_path=/rpc/ingest/status"
+		},
+		{
+			"source": "/rpc",
+			"destination": "/api/rpc?__opaline_path=/rpc"
+		},
+		{
+			"source": "/rpc/:routePath*",
+			"destination": "/api/rpc?__opaline_path=/rpc/:routePath*"
+		},
+		{
+			"source": "/.well-known/:routePath*",
+			"destination": "/api/rpc?__opaline_path=/.well-known/:routePath*"
+		},
+		{
+			"source": "/health",
+			"destination": "/api/rpc?__opaline_path=/health"
+		},
+		{
+			"source": "/health/ready",
+			"destination": "/api/rpc?__opaline_path=/health/ready"
+		},
+		{
+			"source": "/api/:routePath((?!cron/repair$)(?!cron/r2-ingest$)(?!cron/native-lineage$)(?!cron/billing$)(?!cron/github-evidence$)(?!cron/l1-edges$)(?!cron/run-index-heal$)(?!cron/run-questions$)(?!cron/history$)(?!cron/live-sessions$)(?!cron/trends-sources$)(?!cron/usage-digest$)(?!cron/session-retirement$)(?!webhooks/github$).*)",
+			"destination": "/api/rpc?__opaline_path=/api/:routePath"
+		},
+		{
+			"source": "/",
+			"has": [
+				{
+					"type": "query",
+					"key": "redirect"
+				}
+			],
+			"destination": "/app.html"
+		},
+		{
+			"source": "/",
+			"has": [
+				{
+					"type": "query",
+					"key": "user_code"
+				}
+			],
+			"destination": "/app.html"
+		},
+		{
+			"source": "/",
+			"has": [
+				{
+					"type": "query",
+					"key": "error"
+				}
+			],
+			"destination": "/app.html"
+		},
+		{
+			"source": "/",
+			"has": [
+				{
+					"type": "cookie",
+					"key": "__Secure-better-auth.session_token"
+				}
+			],
+			"destination": "/api/rpc?__opaline_path=/api/home"
+		},
+		{
+			"source": "/",
+			"has": [
+				{
+					"type": "cookie",
+					"key": "better-auth.session_token"
+				}
+			],
+			"destination": "/api/rpc?__opaline_path=/api/home"
+		},
+		{
+			"source": "/",
+			"destination": "/marketing.html"
+		},
+		{
+			"source": "/home",
+			"destination": "/api/rpc?__opaline_path=/api/public-home"
+		},
+		{
+			"source": "/:path((?!assets(?:/|$)|_astro(?:/|$)|product-demo(?:/|$)|plugin(?:/|$)|site-scripts(?:/|$)|vendor(?:/|$)|fonts(?:/|$)).*)",
+			"destination": "/api/page?__opaline_path=/:path"
+		}
+	],
+	"redirects": [
+		{
+			"source": "/instant",
+			"destination": "/",
+			"permanent": true
+		},
+		{
+			"source": "/instantv2",
+			"destination": "/",
+			"permanent": true
+		},
+		{
+			"source": "/get-started",
+			"destination": "/welcome",
+			"permanent": true
+		},
+		{
+			"source": "/dashboard/get-started",
+			"destination": "/welcome",
+			"permanent": true
+		},
+		{
+			"source": "/privacy",
+			"destination": "/legal/privacy-policy/",
+			"permanent": true
+		},
+		{
+			"source": "/terms",
+			"destination": "/legal/terms-of-service/",
+			"permanent": true
+		}
+	]
+}

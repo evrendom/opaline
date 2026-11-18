@@ -1,0 +1,58 @@
+export {
+	createGitHubFileSource,
+	type GitHubFileContent,
+	type GitHubFileSource,
+	type GitHubTreeEntry,
+} from "./github-file-source.js";
+export {
+	createGitHubRepositorySource,
+	type GitHubSourceOptions,
+} from "./github-source.js";
+export {
+	createGitHubSweepSource,
+	type SweepCheck,
+	type SweepJob,
+	type SweepPullRequest,
+	type SweepRun,
+	type SweepStatus,
+	sweepCheckSchema,
+	sweepPullRequestSchema,
+	sweepRunSchema,
+	sweepStatusSchema,
+} from "./github-sweep-source.js";
+export {
+	createGitHubAuthorization,
+	type GitHubAuthorization,
+	type GitHubConditionalCache,
+	type GitHubConditionalCacheEntry,
+	GitHubSourceError,
+} from "./github-transport.js";
+export {
+	type CheckAnnotation,
+	type CheckRun,
+	type CheckSuite,
+	type CommitStatus,
+	type CoverageReason,
+	GITHUB_REST_API_VERSION,
+	GITHUB_SOURCE_VERSION,
+	type PageRequest,
+	type PullRequestFile,
+	type PullRequestReview,
+	type PullRequestSummary,
+	REPOSITORY_INTELLIGENCE_SCHEMA_VERSION,
+	type RepositoryActor,
+	type RepositoryComment,
+	type RepositoryCommit,
+	type RepositoryCoordinates,
+	type RepositoryIntelligenceSource,
+	type SourceAvailability,
+	type SourceCoverage,
+	type SourcePage,
+	type SourceProvenance,
+	type SourceResult,
+	type WorkflowArtifact,
+	type WorkflowJob,
+	type WorkflowJobLog,
+	type WorkflowJobStep,
+	type WorkflowRun,
+} from "./types.js";

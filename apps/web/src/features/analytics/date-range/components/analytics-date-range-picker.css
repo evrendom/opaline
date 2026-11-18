@@ -1,0 +1,269 @@
+/* Range picker: a popover-sized squircle, a padded
+   preset column whose pick reads as a secondary chip, hairline dividers, and
+   month captions centred between edge arrows. Opaline keeps its interval
+   column, its Cancel/Apply footer, its fluid hover and its pebble-shaped
+   selected days. */
+.session-date-picker {
+	--ring: var(--session-menu-accent);
+	width: fit-content;
+	max-width: calc(100vw - 32px);
+	max-height: min(var(--available-height, 100svh), calc(100svh - 32px));
+	padding: 0;
+	gap: 0;
+	overflow: hidden;
+	overscroll-behavior: none;
+	transform-origin: var(--transform-origin);
+}
+
+.session-date-picker-presets {
+	display: flex;
+	flex: none;
+	flex-direction: column;
+	gap: 4px;
+	width: 100%;
+}
+
+.session-date-picker-divider {
+	flex: none;
+	height: var(--session-menu-hairline);
+	background: var(--session-menu-border);
+}
+
+.session-date-picker-calendar-panel {
+	min-width: 0;
+	padding: 14px;
+}
+
+.session-date-picker-calendar {
+	--cell-radius: 9999px;
+	--cell-size: 32px;
+	width: 100%;
+	padding: 8px 0 0;
+	font-size: 14px;
+	font-weight: 400;
+	color: var(--session-menu-label);
+}
+
+.session-date-picker-month-label {
+	font-size: 14px;
+	font-weight: 500;
+	line-height: 20px;
+	color: var(--session-menu-label);
+}
+
+.session-date-picker-weekday {
+	flex: 1;
+	font-size: 13px;
+	font-weight: 400;
+	line-height: 16px;
+	color: color-mix(in oklch, var(--session-menu-icon) 60%, transparent);
+}
+
+.session-date-picker-calendar .rdp-day_weekends {
+	color: var(--session-menu-icon);
+}
+
+.session-date-picker-nav-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	border: 0;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--session-menu-icon);
+	outline: none;
+}
+
+.session-date-picker-calendar button[data-day] {
+	border-radius: 9999px;
+	font-size: 14px;
+	font-weight: 400;
+	box-shadow: none;
+	outline: none;
+}
+
+.session-date-picker-calendar :is(.rdp-range_start, .rdp-range_end),
+.session-date-picker-calendar :is(.rdp-range_start, .rdp-range_end)::after,
+.session-date-picker-calendar button[data-range-middle="true"],
+.session-date-picker-calendar td[data-today="true"] {
+	background: var(--session-menu-highlight);
+	color: var(--session-menu-label);
+}
+
+.session-date-picker-calendar button[data-range-middle="true"] {
+	border-radius: 0;
+}
+
+/* Range band: where a week row starts or ends inside the range,
+   the band's outer corners round off (its --radius-md), so each row reads as
+   its own segment rather than running off the grid edge. */
+.session-date-picker-calendar td:first-child[data-selected="true"]
+	button[data-range-middle="true"] {
+	border-top-left-radius: 8px;
+	border-bottom-left-radius: 8px;
+}
+.session-date-picker-calendar
+	td:last-child[data-selected="true"]
+	button[data-range-middle="true"] {
+	border-top-right-radius: 8px;
+	border-bottom-right-radius: 8px;
+}
+
+/* Selected today must keep the same range cap as any other endpoint. */
+.session-date-picker-calendar :is(.rdp-range_start, .rdp-range_end) {
+	border-radius: var(--cell-radius);
+}
+
+/* A single selected day has no range to connect on either side. */
+.session-date-picker-calendar .rdp-range_start.rdp-range_end,
+.session-date-picker-calendar .rdp-range_start.rdp-range_end::after {
+	background: transparent;
+}
+
+.session-date-picker-calendar
+	td[data-today="true"]:not([data-selected="true"]) {
+	background: transparent;
+}
+
+.session-date-picker-calendar
+	button:is(
+		[data-range-start="true"],
+		[data-range-end="true"],
+		[data-selected-single="true"]
+	) {
+	background: transparent;
+	color: var(--session-menu-check);
+}
+
+.session-date-picker-calendar
+	button:is(
+		[data-range-start="true"],
+		[data-range-end="true"],
+		[data-selected-single="true"]
+	)::before,
+.session-date-picker-calendar
+	td[data-today="true"]:not([data-selected="true"])
+	button::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	background: var(--session-menu-accent);
+	-webkit-mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
+	mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
+}
+
+.session-date-picker-calendar
+	td[data-today="true"]:not([data-selected="true"])
+	button::before {
+	background: var(--session-menu-highlight);
+}
+
+.session-date-picker-actions .fluid-menu-hover-fill::before {
+	inset: 0;
+}
+
+/* Override the menu-wide 8px corners regardless of stylesheet load order. */
+.session-menu-surface .session-date-picker-calendar
+	.fluid-menu-hover-fill::before {
+	inset: 0;
+	border-radius: inherit;
+}
+
+/* Day hover follows the same rounded silhouette as the selected dates. */
+.session-date-picker-calendar:has(button[data-day][data-fluid-hover-active])
+.fluid-menu-hover-fill::before {
+	border-radius: 0;
+	-webkit-mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
+	mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
+}
+
+.session-date-picker-footer {
+	display: flex;
+	flex: none;
+	justify-content: flex-end;
+	border-top: var(--session-menu-hairline) solid var(--session-menu-border);
+	padding: 6px;
+}
+
+.session-date-picker-actions {
+	display: flex;
+	gap: 4px;
+}
+
+.session-date-picker-action {
+	height: 32px;
+	padding: 0 12px;
+	border-radius: 8px;
+	font-size: 14px;
+	font-weight: 400;
+	box-shadow: none;
+}
+
+.session-date-picker-cancel {
+	color: var(--session-menu-icon);
+}
+
+.session-date-picker-apply,
+.session-date-picker-apply:hover {
+	background: var(--session-menu-accent);
+	color: var(--session-menu-check);
+}
+
+@media (min-width: 768px) {
+	.session-date-picker-presets {
+		width: 160px;
+	}
+	.session-date-picker-divider {
+		width: var(--session-menu-hairline);
+		height: auto;
+	}
+	.session-date-picker-calendar {
+		height: 298px;
+	}
+}
+
+/* The picker's option columns (presets, interval) pad their rows like
+   Preset buttons: 12px around, rows with their own rounded fill. */
+.session-date-picker .session-menu-list {
+	padding: 12px;
+}
+.session-date-picker .session-menu-list .session-menu-row {
+	padding: 0 12px;
+}
+.session-date-picker .session-menu-list .session-menu-row::before,
+.session-menu-surface.session-date-picker
+	.session-menu-list
+	.fluid-menu-hover-fill::before {
+	inset: 0;
+	border-radius: 6px;
+}
+.session-date-picker
+	.session-menu-list
+	.session-menu-row[aria-pressed="true"]::before,
+.session-date-picker
+	.session-menu-list
+	.session-menu-row:has(:checked)::before {
+	background: var(--session-menu-selected);
+	box-shadow: var(--custom-shadow-secondary);
+}
+
+/* biome-ignore lint/correctness/noUnknownProperty: corner-shape is new (Chromium 139+); Biome does not know it yet. */
+@supports (corner-shape: squircle) {
+	/* A popover's 24px squircle; its rows and buttons sit concentric at 12px. */
+	.session-menu-surface.session-date-picker {
+		border-radius: 24px;
+	}
+	.session-date-picker .session-menu-list .session-menu-row::before,
+	.session-menu-surface.session-date-picker
+		.session-menu-list
+		.fluid-menu-hover-fill::before,
+	.session-date-picker-action {
+		border-radius: 12px;
+		/* biome-ignore lint/correctness/noUnknownProperty: see the @supports note above. */
+		corner-shape: squircle;
+	}
+}

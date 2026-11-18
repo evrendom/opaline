@@ -3,17 +3,17 @@
 	"version": "0.17.1",
 	"type": "module",
 	"description": "Compatibility alias for the Opaline CLI",
-	"license": "MIT",
+	"license": "Apache-2.0",
 	"engines": {
 		"node": ">=20"
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/opalinehq/cli.git",
+		"url": "git+https://github.com/evrendom/opaline.git",
 		"directory": "packages/rudel-alias"
 	},
 	"bugs": {
-		"url": "https://github.com/opalinehq/cli/issues"
+		"url": "https://github.com/evrendom/opaline/issues"
 	},
 	"keywords": [
 		"opaline",

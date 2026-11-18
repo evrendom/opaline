@@ -17,9 +17,9 @@ Both `rudel` and `opaline` keep using the same `~/.rudel` state directory.
 Automatic uploads use a retained CLI bundle under `~/.rudel/runtime` with
 your Node executable, so no separate global `opaline` installation is required.
 
-See the [migration guide](https://github.com/opalinehq/cli/blob/main/docs/usage.md#moving-from-rudel)
+See the [migration guide](https://github.com/evrendom/opaline/blob/main/docs/usage.md#moving-from-rudel)
 for details. Opaline uploads full session transcripts; known-secret filtering
-is best-effort. Read the [data-handling disclosure](https://github.com/opalinehq/cli/blob/main/docs/data-handling.md)
+is best-effort. Read the [data-handling disclosure](https://github.com/evrendom/opaline/blob/main/docs/data-handling.md)
 for transcript contents, usage analytics, and opt-out settings.
 
 ## License

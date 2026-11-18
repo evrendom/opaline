@@ -1,0 +1,14 @@
+{
+	"name": "opaline",
+	"version": "1.4.1",
+	"description": "Team-wide insight into your coding agents: where they waste time and money, and which mistakes keep coming back.",
+	"author": {
+		"name": "Opaline",
+		"email": "evren@opaline.so",
+		"url": "https://opaline.so"
+	},
+	"homepage": "https://opaline.so",
+	"repository": "https://github.com/evrendom/opaline",
+	"license": "MIT",
+	"keywords": ["opaline", "analytics", "coding-agents", "team", "cost"]
+}

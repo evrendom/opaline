@@ -3,18 +3,18 @@
 	"version": "0.17.1",
 	"type": "module",
 	"description": "Opaline CLI for Claude Code and Codex session analytics",
-	"license": "MIT",
+	"license": "Apache-2.0",
 	"engines": {
 		"node": ">=20"
 	},
 	"homepage": "https://opaline.so",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/opalinehq/cli.git",
+		"url": "git+https://github.com/evrendom/opaline.git",
 		"directory": "apps/cli"
 	},
 	"bugs": {
-		"url": "https://github.com/opalinehq/cli/issues"
+		"url": "https://github.com/evrendom/opaline/issues"
 	},
 	"keywords": [
 		"claude",

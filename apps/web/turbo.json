@@ -1,0 +1,12 @@
+{
+	"extends": ["//"],
+	"tasks": {
+		"dev": {
+			"passThroughEnv": [
+				"$TURBO_EXTENDS$",
+				"RUDEL_API_TARGET",
+				"RUDEL_API_BEARER_TOKEN"
+			]
+		}
+	}
+}

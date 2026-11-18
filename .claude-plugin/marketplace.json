@@ -1,0 +1,18 @@
+{
+	"name": "opaline",
+	"owner": {
+		"name": "Opaline",
+		"email": "evren@opaline.so"
+	},
+	"metadata": {
+		"description": "Opaline for Claude Code: find where your coding agents get stuck or waste time and money."
+	},
+	"plugins": [
+		{
+			"name": "opaline",
+			"source": "./plugins/opaline",
+			"description": "Find where your coding agents get stuck or waste time and money, and what to fix in your setup.",
+			"category": "Developer Tools"
+		}
+	]
+}

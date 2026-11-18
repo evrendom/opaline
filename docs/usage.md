@@ -171,7 +171,7 @@ OPALINE_LOG_LEVEL=debug npx opaline@latest doctor
 | Invalid Codex configuration | Follow the file path and error shown by the CLI, fix the setting, then retry. |
 | Rudel rename notice in a script | The alias keeps stdout unchanged and writes its notice only to stderr. |
 
-Still stuck? [Open an issue](https://github.com/opalinehq/cli/issues). Do not include credentials or private session contents.
+Still stuck? [Open an issue](https://github.com/evrendom/opaline/issues). Do not include credentials or private session contents.
 
 ## Moving from Rudel
 

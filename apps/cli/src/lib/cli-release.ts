@@ -27,7 +27,7 @@ export async function getLatestCliRelease(): Promise<string> {
 
 export function getCliReleaseUrl(version: string): string {
 	parseVersion(version);
-	return `https://github.com/opalinehq/cli/releases/tag/${encodeURIComponent(`opaline-cli@${version}`)}`;
+	return `https://github.com/evrendom/opaline/releases/tag/${encodeURIComponent(`opaline-cli@${version}`)}`;
 }
 
 export function compareCliVersions(left: string, right: string): number {

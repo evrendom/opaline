@@ -1,0 +1,187 @@
+import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { CLAUDE_SESSION_ANALYTICS_MV_SQL } from "../mv-sql/claude-session-analytics.js";
+import { CODEX_SESSION_ANALYTICS_MV_SQL } from "../mv-sql/codex-session-analytics.js";
+import { RETIRED_SESSION_ANALYTICS_COLUMNS } from "../session-analytics-mv.js";
+
+const migration = readFileSync(
+	resolve(import.meta.dir, "../../chx/migrations/20260730180016_auto.sql"),
+	"utf8",
+);
+const currentMvMigration = readFileSync(
+	resolve(
+		import.meta.dir,
+		"../../chx/migrations/20261008120000_session_analytics_retired_writes.sql",
+	),
+	"utf8",
+);
+
+const deployedMvMigration = currentMvMigration;
+
+function normalizeSql(sql: string): string {
+	return sql.replace(/\s+/g, " ").trim();
+}
+
+function countOccurrences(value: string, search: string): number {
+	return value.split(search).length - 1;
+}
+
+describe("session_analytics identity migration", () => {
+	test("keeps deployed MVs synchronized and rebuild deduplication narrow", () => {
+		const normalizedCurrentMvMigration = normalizeSql(currentMvMigration);
+
+		expect(
+			countOccurrences(
+				normalizedCurrentMvMigration,
+				normalizeSql(CLAUDE_SESSION_ANALYTICS_MV_SQL),
+			),
+		).toBe(1);
+		expect(
+			countOccurrences(
+				normalizedCurrentMvMigration,
+				normalizeSql(CODEX_SESSION_ANALYTICS_MV_SQL),
+			),
+		).toBe(1);
+
+		expect(countOccurrences(deployedMvMigration, "ROW_NUMBER() OVER")).toBe(2);
+		expect(
+			countOccurrences(deployedMvMigration, "ORDER BY cs.revision DESC"),
+		).toBe(2);
+		expect(normalizedCurrentMvMigration).not.toContain(
+			"ORDER BY cs.ingested_at DESC",
+		);
+	});
+
+	test("rebuilds in resumable session-month chunks", () => {
+		const normalizedMigration = normalizeSql(migration);
+
+		expect(migration).toContain(
+			"CREATE TABLE IF NOT EXISTS rudel.session_analytics_v2",
+		);
+		expect(migration).not.toContain(
+			"DROP TABLE IF EXISTS rudel.session_analytics_v2",
+		);
+		expect(
+			countOccurrences(
+				normalizedMigration,
+				"INSERT INTO rudel.session_analytics_v2",
+			),
+		).toBe(32);
+		expect(countOccurrences(normalizedMigration, "max_block_size=1")).toBe(32);
+		expect(normalizedMigration).not.toContain("max_block_size=64");
+		expect(
+			countOccurrences(
+				normalizedMigration,
+				"SELECT count() FROM rudel.session_analytics_v2 WHERE source =",
+			),
+		).toBe(32);
+		expect(
+			countOccurrences(normalizedMigration, "source = 'claude_code'"),
+		).toBe(16);
+		expect(countOccurrences(normalizedMigration, "source = 'codex'")).toBe(16);
+		expect(migration).toContain(
+			"DROP PARTITION would discard the entire unpartitioned shadow",
+		);
+	});
+
+	test("bounds transcript parsing and error scans", () => {
+		const normalizedMigration = normalizeSql(migration);
+		const cap = normalizeSql(`
+(
+  length(cs.content) > 120000000
+  OR countSubstrings(cs.content, '\\n') > 8000
+) AS _is_capped`);
+
+		expect(countOccurrences(normalizedMigration, cap)).toBe(34);
+		expect(
+			countOccurrences(
+				normalizedMigration,
+				"if(_is_capped, '', cs.content) AS _line_safe_content",
+			),
+		).toBe(34);
+		expect(
+			countOccurrences(
+				normalizedMigration,
+				"substring(cs.content, 1, 20000000) AS _error_sample_content",
+			),
+		).toBe(34);
+		expect(normalizedMigration).not.toContain(
+			"if(_is_capped, substring(cs.content, 1, 20000000), cs.content)",
+		);
+		expect(normalizedMigration).not.toContain(
+			"length(extractAll(cs.content, '\"isApiErrorMessage\":true'))",
+		);
+		expect(normalizedMigration).not.toContain(
+			"length(extractAll(cs.content, '\"is_error\":true'))",
+		);
+		expect(migration).not.toMatch(/extractAll\(cs\.content,[^\n]*exit_code/);
+		expect(normalizedMigration).not.toContain("cs.content ILIKE");
+		expect(
+			countOccurrences(
+				normalizedMigration,
+				normalizeSql(`
+if(
+  _is_capped,
+  length(extractAll(_error_sample_content, '([A-Z][a-zA-Z]+Error):'))
+    + length(extractAll(_error_sample_content, '([A-Z][a-zA-Z]+Exception):')),
+  arrayCount(
+    x -> x ILIKE '%Error:%' OR x ILIKE '%Exception:%',
+    _tool_output_lines
+  )
+)`),
+			),
+		).toBe(17);
+	});
+
+	test("checks physical shadow rows for duplicate identities before cutover", () => {
+		const duplicateGuard = `
+SELECT throwIf(
+  count() != uniqExact(tuple(source, organization_id, user_id, session_id)),
+  'session_analytics rebuild aborted: duplicate full identities in shadow table'
+)
+FROM rudel.session_analytics_v2;`;
+
+		expect(migration).toContain(duplicateGuard);
+		expect(migration.indexOf(duplicateGuard)).toBeLessThan(
+			migration.indexOf(
+				"DROP TABLE IF EXISTS rudel.codex_session_analytics_mv SYNC;",
+			),
+		);
+	});
+
+	test("marks an idempotent recovery tail immediately after the atomic rename", () => {
+		const rename = "RENAME TABLE\n  rudel.session_analytics TO";
+		const recoveryMarker =
+			"-- RECOVERY: If execution stopped after the RENAME, resume here.";
+
+		expect(migration.indexOf(recoveryMarker)).toBeGreaterThan(
+			migration.indexOf(rename),
+		);
+		expect(migration).toContain(
+			"ADD COLUMN IF NOT EXISTS `_backup_expires_at`",
+		);
+		expect(migration).toContain(
+			"CREATE MATERIALIZED VIEW IF NOT EXISTS rudel.codex_session_analytics_mv",
+		);
+		expect(migration).toContain(
+			"CREATE MATERIALIZED VIEW IF NOT EXISTS rudel.session_analytics_mv",
+		);
+	});
+});
+
+describe("session analytics retirement step 3", () => {
+	test("replaces both view queries in place and writes no retired column", () => {
+		expect(countOccurrences(currentMvMigration, "MODIFY QUERY")).toBe(2);
+		expect(currentMvMigration).not.toMatch(/\b(?:DROP|CREATE)\b/u);
+		for (const sql of [
+			CLAUDE_SESSION_ANALYTICS_MV_SQL,
+			CODEX_SESSION_ANALYTICS_MV_SQL,
+		]) {
+			// No `--` comment can hide in a view query (CLAUDE.md known issue).
+			expect(sql).not.toContain("--");
+			for (const column of RETIRED_SESSION_ANALYTICS_COLUMNS)
+				expect(sql).not.toMatch(new RegExp(`\\b${column}\\b`, "u"));
+		}
+	});
+});

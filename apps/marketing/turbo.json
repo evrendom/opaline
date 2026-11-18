@@ -1,0 +1,19 @@
+{
+	"extends": ["//"],
+	"tasks": {
+		"build": {
+			"cache": false,
+			"passThroughEnv": [
+				"TRENDS_SOURCES_FETCH",
+				"TRENDS_SOURCES_API_URL",
+				"TRENDS_AA_FETCH",
+				"TRENDS_BENCHMARK_SOURCE",
+				"TRENDS_T3_FETCH",
+				"TRENDS_HARNESS_SOURCE",
+				"TRENDS_USAGE_FETCH",
+				"TRENDS_USAGE_SOURCE",
+				"TRENDS_USAGE_API_URL"
+			]
+		}
+	}
+}

@@ -1,31 +1,77 @@
 {
-	"name": "opaline-cli-monorepo",
+	"name": "rudel-monorepo",
 	"private": true,
-	"license": "MIT",
+	"type": "module",
+	"license": "Apache-2.0",
 	"scripts": {
+		"trends:fetch-aa": "bun scripts/trends/fetch-artificial-analysis.ts",
+		"trends:fetch-t3": "bun scripts/trends/fetch-t3-usage.ts",
+		"trends:fetch-usage": "bun scripts/trends/fetch-opaline-usage.ts",
+		"trends:test": "bun test scripts/trends/trends-data.test.ts scripts/trends/fetch-artificial-analysis.test.ts scripts/trends/trends-t3.test.ts scripts/trends/trends-opaline.test.ts scripts/trends/trends-refresh.test.ts",
 		"build": "turbo run build",
-		"dev": "bun run --cwd apps/cli dev",
-		"dev:cli": "bun run apps/cli/playground/server.ts",
+		"benchmark:usage-extraction": "bun scripts/benchmark-usage-extraction.ts",
+		"check:disclosure": "bun scripts/check-disclosure.ts",
+		"dev": "turbo run dev",
+		"dev:billing-sandbox": "bun scripts/dev-billing-sandbox.ts",
+		"dev:real": "bun scripts/dev-real-app.ts",
 		"lint": "biome check .",
 		"lint:fix": "biome check --write .",
 		"format": "biome format --write .",
-		"check-types": "turbo run check-types",
+		"pricing:table": "bun ./scripts/generate-model-pricing.ts",
+		"check-types": "turbo run check-types && bun run check-types:vercel && bun run check-types:convex",
 		"test": "turbo run test",
-		"test:integration": "turbo run test:integration",
-		"verify": "bun run check-types && bun run lint && bun run test && bun run build"
+		"test:integration": "turbo run test:integration --concurrency=1",
+		"test:kill-matrix": "bun apps/api/src/scripts/kill-matrix/kill-matrix.ts",
+		"verify": "bun scripts/check-disclosure.ts && bun run check-types && turbo run lint test build",
+		"deploy": "turbo run build",
+		"dev:local": "bash scripts/dev-local.sh",
+		"infra:up": "docker compose up -d",
+		"infra:down": "docker compose down",
+		"chkit:link": "bun scripts/chkit-link.ts link",
+		"chkit:unlink": "bun scripts/chkit-link.ts unlink",
+		"build:site": "bun scripts/build-site.ts",
+		"build:selfhost": "bun scripts/build-selfhost.ts",
+		"plugin:screenshots": "bun scripts/plugin-screenshots.ts",
+		"plugin:zip": "bun scripts/build-plugin-zip.ts",
+		"check-types:vercel": "tsc --project tsconfig.json",
+		"check-types:convex": "tsc --project convex/tsconfig.json",
+		"convex:dev": "convex dev",
+		"convex:deploy": "convex deploy",
+		"test:analysis-convex": "bun test --timeout 120000 ./apps/api/src/services/analysis-log/convex-store.integration.ts"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.0",
+		"@playwright/test": "1.61.1",
 		"bun-types": "1.3.10",
 		"turbo": "^2.8.9",
 		"typescript": "5.9.2"
 	},
 	"engines": {
-		"node": ">=20"
+		"bun": "1.x",
+		"node": ">=18"
 	},
-	"packageManager": "bun@1.3.10",
+	"packageManager": "bun@1.3.14",
 	"workspaces": [
 		"apps/*",
 		"packages/*"
-	]
+	],
+	"overrides": {
+		"chkit": "0.1.0-beta.16",
+		"@chkit/core": "0.1.0-beta.16",
+		"@chkit/clickhouse": "0.1.0-beta.16",
+		"@chkit/codegen": "0.1.0-beta.16",
+		"@chkit/plugin-backfill": "0.1.0-beta.16",
+		"@chkit/plugin-codegen": "0.1.0-beta.16",
+		"@chkit/plugin-obsessiondb": "0.1.0-beta.16",
+		"@chkit/plugin-pull": "0.1.0-beta.16",
+		"bun-types": "1.3.10"
+	},
+	"dependencies": {
+		"convex": "1.46.0",
+		"postgres": "^3.4.8"
+	},
+	"patchedDependencies": {
+		"agentation@2.3.3": "patches/agentation@2.3.3.patch",
+		"skullet@0.0.3": "patches/skullet@0.0.3.patch"
+	}
 }

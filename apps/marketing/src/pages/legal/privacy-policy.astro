@@ -1,0 +1,42 @@
+---
+import LegalPage from "../../components/LegalPage.astro";
+import contentHtml from "../../content/legal/opaline-privacy-policy.html?raw";
+
+const toc = [
+	{ id: "who-we-are", label: "Who we are" },
+	{ id: "scope", label: "Scope" },
+	{ id: "our-role", label: "Our role" },
+	{
+		id: "information-we-collect",
+		label: "Information we collect",
+	},
+	{ id: "sources", label: "Sources of information" },
+	{
+		id: "how-we-use-information",
+		label: "How we use information",
+	},
+	{ id: "ai-processing", label: "AI processing" },
+	{ id: "how-we-disclose-information", label: "How we disclose information" },
+	{ id: "cookies-and-analytics", label: "Cookies and analytics" },
+	{ id: "retention", label: "Retention" },
+	{ id: "privacy-choices", label: "Privacy choices and rights" },
+	{ id: "california", label: "California disclosures" },
+	{ id: "international-transfers", label: "International transfers" },
+	{ id: "security", label: "Security" },
+	{ id: "children", label: "Children" },
+	{ id: "changes", label: "Changes" },
+	{ id: "contact", label: "Contact" },
+	{ id: "chatgpt-and-codex", label: "Opaline in ChatGPT and Codex" },
+];
+---
+
+<LegalPage
+	title="Opaline Privacy"
+	description="How Opaline Labs, Inc. processes personal data in connection with the hosted Opaline service."
+	lastUpdated="12 October 2026"
+	lastUpdatedDate="2026-10-12"
+	dateLabel="Effective date:"
+	active="privacy"
+	{toc}
+	{contentHtml}
+/>

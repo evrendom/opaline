@@ -22,7 +22,7 @@ Run the command again to change which repositories sync. Existing Rudel credenti
 
 Eligible interactive commands may offer one **Update / Skip** prompt with a link to the exact open-source release. Accepting updates a supported existing npm or pnpm global installation and the retained automatic-upload runtime; it does not add a global installation for npx-only users or change repository selections, login, or workspace settings.
 
-Run `npx opaline@latest update` to check explicitly. Ambiguous and Windows global installations stay unchanged; update failures report a manual command or corrective action when available. See [review and install updates](https://github.com/opalinehq/cli/blob/main/docs/usage.md#review-and-install-updates) for the complete behavior.
+Run `npx opaline@latest update` to check explicitly. Ambiguous and Windows global installations stay unchanged; update failures report a manual command or corrective action when available. See [review and install updates](https://github.com/evrendom/opaline/blob/main/docs/usage.md#review-and-install-updates) for the complete behavior.
 
 ## Data and privacy
 
@@ -32,10 +32,10 @@ Official releases also send limited usage analytics, including repository/sessio
 
 ## Learn more
 
-- [CLI guide](https://github.com/opalinehq/cli/blob/main/docs/usage.md) — commands, installation, configuration, troubleshooting, and migration from Rudel.
-- [Data handling](https://github.com/opalinehq/cli/blob/main/docs/data-handling.md) — full transcript and analytics disclosure, including persistent opt-out.
-- [Contributing](https://github.com/opalinehq/cli/blob/main/CONTRIBUTING.md) — local development and the CLI playground.
+- [CLI guide](https://github.com/evrendom/opaline/blob/main/docs/usage.md) — commands, installation, configuration, troubleshooting, and migration from Rudel.
+- [Data handling](https://github.com/evrendom/opaline/blob/main/docs/data-handling.md) — full transcript and analytics disclosure, including persistent opt-out.
+- [Contributing](https://github.com/evrendom/opaline/blob/main/CONTRIBUTING.md) — local development and the CLI playground.
 
 ## License
 
-[MIT](LICENSE)
+[Apache 2.0](../../LICENSE)

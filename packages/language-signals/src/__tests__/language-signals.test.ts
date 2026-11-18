@@ -1,0 +1,567 @@
+import { describe, expect, test } from "bun:test";
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import {
+	MAX_LANGUAGE_SIGNAL_MATCHES,
+	mayContainLanguageSignal,
+	scanLanguageSignals,
+	scanMemberLanguageSignals,
+	scanModelLanguageSignals,
+	splitDisplayTextParts,
+	summarize,
+	summarizeWithMatches,
+} from "../index.js";
+import { LANGUAGE_SIGNAL_RULES } from "../rules.js";
+
+describe("language signal rules", () => {
+	test("has exactly one exported version authority", async () => {
+		const packageRoot = fileURLToPath(new URL("../..", import.meta.url));
+		const sourceFiles = Array.from(
+			new Bun.Glob("src/**/*.ts").scanSync({ cwd: packageRoot }),
+		);
+		const declarations: string[] = [];
+		for (const sourceFile of sourceFiles) {
+			const source = await readFile(`${packageRoot}/${sourceFile}`, "utf8");
+			for (const match of source.matchAll(
+				/export const ([A-Z][A-Z0-9_]*VERSION[A-Z0-9_]*)\s*=/gu,
+			)) {
+				declarations.push(`${sourceFile}:${match[1]}`);
+			}
+		}
+
+		expect(declarations).toEqual(["src/index.ts:SCAN_VERSION"]);
+	});
+
+	for (const rule of LANGUAGE_SIGNAL_RULES) {
+		for (const surface of rule.surfaces) {
+			test(`${rule.ruleId} matches ${surface}`, () => {
+				const [match] = scanLanguageSignals(surface);
+
+				expect(match).toEqual({
+					category: rule.category,
+					ruleId: rule.ruleId,
+					matchedText: surface,
+					start: 0,
+					end: surface.length,
+				});
+			});
+		}
+	}
+
+	test("matches without regard to case", () => {
+		expect(scanLanguageSignals("FUCK. Sorry EXCELLENT")).toEqual([
+			{
+				category: "swear",
+				ruleId: "swear.fuck",
+				matchedText: "FUCK",
+				start: 0,
+				end: 4,
+			},
+			{
+				category: "apology",
+				ruleId: "apology.sorry",
+				matchedText: "Sorry",
+				start: 6,
+				end: 11,
+			},
+			{
+				category: "positive",
+				ruleId: "positive.praise",
+				matchedText: "EXCELLENT",
+				start: 12,
+				end: 21,
+			},
+		]);
+	});
+
+	test("excludes system-instruction blocks while preserving member offsets", () => {
+		const text =
+			"Great <system_instruction>Sorry, this is fishy</system_instruction> fishy";
+
+		expect(
+			scanMemberLanguageSignals(text).map(
+				({ category, matchedText, start, end }) => ({
+					category,
+					matchedText,
+					start,
+					end,
+				}),
+			),
+		).toEqual([
+			{ category: "positive", end: 5, matchedText: "Great", start: 0 },
+			{
+				category: "negative",
+				end: text.length,
+				matchedText: "fishy",
+				start: text.length - "fishy".length,
+			},
+		]);
+	});
+
+	test("keeps only the agent's apologies: its praise, negatives and swears are not tracked", () => {
+		expect(
+			scanModelLanguageSignals("Excellent, sorry, this feels fishy fuck??").map(
+				({ category, matchedText }) => ({ category, matchedText }),
+			),
+		).toEqual([{ category: "apology", matchedText: "sorry" }]);
+	});
+
+	test("treats fishy and consecutive question marks as negative", () => {
+		const text = "Fishy? One? Two?? Three??? Four????";
+
+		expect(scanLanguageSignals(text)).toEqual([
+			{
+				category: "negative",
+				ruleId: "negative.fishy",
+				matchedText: "Fishy",
+				start: 0,
+				end: 5,
+			},
+			{
+				category: "negative",
+				ruleId: "negative.question-run",
+				matchedText: "??",
+				start: 15,
+				end: 17,
+			},
+			{
+				category: "negative",
+				ruleId: "negative.question-run",
+				matchedText: "???",
+				start: 23,
+				end: 26,
+			},
+			{
+				category: "negative",
+				ruleId: "negative.question-run",
+				matchedText: "????",
+				start: 31,
+				end: 35,
+			},
+		]);
+	});
+
+	test("classifies failed-work phrases and unchanged results as negative", () => {
+		const matches = scanLanguageSignals(
+			"Didn't work. didnt work. did not work. Doesn't work. does not work. still not working. won't work. never worked. exactly the same. Exactly.",
+		);
+
+		expect(
+			matches.map(({ category, matchedText }) => ({ category, matchedText })),
+		).toEqual([
+			{ category: "negative", matchedText: "Didn't work" },
+			{ category: "negative", matchedText: "didnt work" },
+			{ category: "negative", matchedText: "did not work" },
+			{ category: "negative", matchedText: "Doesn't work" },
+			{ category: "negative", matchedText: "does not work" },
+			{ category: "negative", matchedText: "still not working" },
+			{ category: "negative", matchedText: "won't work" },
+			{ category: "negative", matchedText: "never worked" },
+			{ category: "negative", matchedText: "exactly the same" },
+		]);
+	});
+
+	test("keeps good positive unless the phrase is not good", () => {
+		const matches = scanLanguageSignals("Good. Not good. not\n good.");
+
+		expect(
+			matches.map(({ category, ruleId, matchedText }) => ({
+				category,
+				ruleId,
+				matchedText,
+			})),
+		).toEqual([
+			{
+				category: "positive",
+				ruleId: "positive.praise",
+				matchedText: "Good",
+			},
+			{
+				category: "negative",
+				ruleId: "negative.not-good",
+				matchedText: "Not good",
+			},
+			{
+				category: "negative",
+				ruleId: "negative.not-good",
+				matchedText: "not\n good",
+			},
+		]);
+	});
+
+	test("classifies directly negated positive surfaces as negative", () => {
+		const positiveSurfaces = LANGUAGE_SIGNAL_RULES.filter(
+			(rule) => rule.category === "positive",
+		).flatMap((rule) => rule.surfaces);
+
+		for (const surface of positiveSurfaces) {
+			for (const prefix of ["don't", "dont", "do not", "not"] as const) {
+				const text = `${prefix} ${surface}`;
+				const matches = scanLanguageSignals(text);
+
+				expect(matches.some((match) => match.category === "negative")).toBe(
+					true,
+				);
+				expect(matches.some((match) => match.category === "positive")).toBe(
+					false,
+				);
+			}
+		}
+	});
+
+	test("counts dislike as a correction and leaves like out of the signals", () => {
+		expect(
+			scanLanguageSignals(
+				"I don't like it. I dont like it. I do not like it. Like this example.",
+			).map(({ category, ruleId }) => `${category}:${ruleId}`),
+		).toEqual([
+			"negative:negative.correction-dislike",
+			"negative:negative.correction-dislike",
+			"negative:negative.correction-dislike",
+		]);
+	});
+
+	test("keeps negative punctuation independent of word boundaries", () => {
+		expect(
+			scanLanguageSignals("what??really fishyish").map(
+				({ matchedText }) => matchedText,
+			),
+		).toEqual(["??"]);
+	});
+
+	test("categorizes researched completion and correction surfaces", () => {
+		const matches = scanLanguageSignals(
+			"Works now. It worked. You were right.",
+		);
+
+		expect(
+			matches.map(({ category, ruleId, matchedText }) => ({
+				category,
+				ruleId,
+				matchedText,
+			})),
+		).toEqual([
+			{
+				category: "positive",
+				ruleId: "positive.looks-good",
+				matchedText: "Works now",
+			},
+			{
+				category: "positive",
+				ruleId: "positive.looks-good",
+				matchedText: "It worked",
+			},
+			{
+				category: "apology",
+				ruleId: "apology.correction",
+				matchedText: "You were right",
+			},
+		]);
+	});
+
+	test("accepts straight and curly apostrophes", () => {
+		const matches = scanLanguageSignals(
+			"I'm sorry. I’m sorry. You're right. You’re absolutely right.",
+		);
+
+		expect(matches.map(({ matchedText }) => matchedText)).toEqual([
+			"I'm sorry",
+			"I’m sorry",
+			"You're right",
+			"You’re absolutely right",
+		]);
+	});
+
+	test("allows flexible whitespace inside phrases", () => {
+		const matches = scanLanguageSignals(
+			"thank \n\t you — we   were wrong — sounds\n good",
+		);
+
+		expect(matches.map(({ ruleId }) => ruleId)).toEqual([
+			"positive.thanks",
+			"apology.mistake",
+			"positive.looks-good",
+		]);
+	});
+
+	test("uses Unicode letter and number boundaries", () => {
+		expect(
+			scanLanguageSignals("class assessment asshole42 shell hellish"),
+		).toEqual([]);
+		expect(scanLanguageSignals("(ass), ‘hell’; 💥fuck!")).toEqual([
+			{
+				category: "swear",
+				ruleId: "swear.ass",
+				matchedText: "ass",
+				start: 1,
+				end: 4,
+			},
+			{
+				category: "swear",
+				ruleId: "swear.hell",
+				matchedText: "hell",
+				start: 8,
+				end: 12,
+			},
+			{
+				category: "swear",
+				ruleId: "swear.fuck",
+				matchedText: "fuck",
+				start: 17,
+				end: 21,
+			},
+		]);
+	});
+
+	test("reports exact end-exclusive UTF-16 positions", () => {
+		const text = "🧭 Well done — I'm sorry.";
+		const matches = scanLanguageSignals(text);
+		const wellDoneStart = text.indexOf("Well done");
+		const apologyStart = text.indexOf("I'm sorry");
+
+		expect(matches).toEqual([
+			{
+				category: "positive",
+				ruleId: "positive.done",
+				matchedText: "Well done",
+				start: wellDoneStart,
+				end: wellDoneStart + "Well done".length,
+			},
+			{
+				category: "apology",
+				ruleId: "apology.sorry",
+				matchedText: "I'm sorry",
+				start: apologyStart,
+				end: apologyStart + "I'm sorry".length,
+			},
+		]);
+	});
+
+	test("prefers the longest alternative at an overlapping position", () => {
+		const matches = scanLanguageSignals(
+			"good job; you're absolutely right; love it",
+		);
+
+		expect(matches.map(({ matchedText }) => matchedText)).toEqual([
+			"good job",
+			"you're absolutely right",
+			"love it",
+		]);
+		expect(matches.map(({ ruleId }) => ruleId)).toEqual([
+			"positive.good-job",
+			"positive.right",
+			"positive.love",
+		]);
+	});
+
+	test("returns source-ordered non-overlapping matches", () => {
+		const matches = scanLanguageSignals(
+			"Absolutely right. My bad. Bullshit. Great work.",
+		);
+
+		expect(matches.map(({ category }) => category)).toEqual([
+			"positive",
+			"apology",
+			"swear",
+			"positive",
+		]);
+		expect(matches.map(({ matchedText }) => matchedText)).toEqual([
+			"Absolutely",
+			"My bad",
+			"Bullshit",
+			"Great work",
+		]);
+	});
+
+	test("caps matches per input string", () => {
+		const matches = scanLanguageSignals(
+			"fuck ".repeat(MAX_LANGUAGE_SIGNAL_MATCHES + 1),
+		);
+
+		expect(matches).toHaveLength(MAX_LANGUAGE_SIGNAL_MATCHES);
+		expect(matches.at(-1)?.start).toBe(
+			(MAX_LANGUAGE_SIGNAL_MATCHES - 1) * "fuck ".length,
+		);
+	});
+});
+
+describe("language signal summaries", () => {
+	test("retains the exact first-seen matched phrases for persistence", () => {
+		expect(
+			summarizeWithMatches({
+				memberText: ["Great work, sorry. GREAT WORK. This is shit."],
+				modelText: ["My bad. Damn."],
+			}),
+		).toEqual({
+			member_apologies: 1,
+			member_positive: 2,
+			member_negative: 0,
+			member_swears: 1,
+			model_apologies: 1,
+			model_positive: 0,
+			model_swears: 0,
+			model_apology_counts: { "My bad": 1 },
+			member_negative_counts: {},
+			member_positive_counts: { "Great work": 1, "GREAT WORK": 1 },
+			member_apology_matches: ["sorry"],
+			member_positive_matches: ["Great work"],
+			member_swear_matches: ["shit"],
+			model_apology_matches: ["My bad"],
+			model_positive_matches: [],
+			model_swear_matches: [],
+		});
+	});
+
+	test("returns only persisted member and model counts", () => {
+		expect(
+			summarize({
+				memberText: ["Great, sorry, this is shit and still fishy??"],
+				modelText: ["Perfect. Sorry. Damn, this did not work."],
+			}),
+		).toEqual({
+			member_negative: 2,
+			member_swears: 1,
+			member_apologies: 1,
+			member_positive: 1,
+			model_swears: 0,
+			model_apologies: 1,
+			model_positive: 0,
+		});
+	});
+
+	test("matches UI display boundaries and keeps turns isolated", () => {
+		expect(
+			summarize({
+				memberText: [
+					"thank `you` **great job** ```text\nfuck\n``` <context>sorry</context>",
+					"you",
+				],
+				modelText: ["Excellent **sorry**", "damn"],
+			}),
+		).toEqual({
+			member_negative: 0,
+			member_swears: 0,
+			member_apologies: 0,
+			member_positive: 1,
+			model_swears: 0,
+			model_apologies: 1,
+			model_positive: 0,
+		});
+	});
+});
+
+describe("display boundary splitting", () => {
+	test("emits ordered prose, strong, code, and XML parts", () => {
+		const input =
+			"Good **great job** `damn`.\n```ts\nconst value = 'fuck';\n```\n<context kind=\"test\">sorry</context> Thanks";
+
+		expect(splitDisplayTextParts(input)).toEqual([
+			{ type: "text", content: "Good " },
+			{ type: "strong", content: "great job" },
+			{ type: "text", content: " " },
+			{ type: "inline-code", content: "damn" },
+			{ type: "text", content: ".\n" },
+			{
+				type: "fenced-code",
+				content: "const value = 'fuck';\n",
+				language: "ts",
+			},
+			{ type: "text", content: "\n" },
+			{ type: "xml", tag: "context", content: "sorry" },
+			{ type: "text", content: " Thanks" },
+		]);
+	});
+
+	test("keeps signal scanning out of inline code, fenced code, and XML", () => {
+		const parts = splitDisplayTextParts(
+			"Good **great job** `damn` ```text\nfuck\n``` <context>sorry</context> Thanks",
+		);
+		const eligibleMatches = parts.flatMap((part) =>
+			part.type === "text" || part.type === "strong"
+				? scanLanguageSignals(part.content)
+				: [],
+		);
+
+		expect(eligibleMatches.map(({ matchedText }) => matchedText)).toEqual([
+			"Good",
+			"great job",
+			"Thanks",
+		]);
+	});
+
+	test("does not let formatting phrases cross display boundaries", () => {
+		const parts = splitDisplayTextParts("great **job** and thank `you`");
+		const eligibleMatches = parts.flatMap((part) =>
+			part.type === "text" || part.type === "strong"
+				? scanLanguageSignals(part.content)
+				: [],
+		);
+
+		expect(eligibleMatches.map(({ matchedText }) => matchedText)).toEqual([
+			"great",
+		]);
+	});
+
+	test("preserves unmatched formatting as plain text", () => {
+		expect(splitDisplayTextParts("before **unfinished and `open")).toEqual([
+			{ type: "text", content: "before **unfinished and `open" },
+		]);
+	});
+
+	test("returns no parts for empty input", () => {
+		expect(splitDisplayTextParts("")).toEqual([]);
+	});
+});
+
+test("verbatim frequencies retain repetitions and sum to category totals", () => {
+	const summary = summarizeWithMatches({
+		memberText: [
+			"Great work! Great work! GREAT WORK! still fishy?? still fishy??",
+		],
+		modelText: ["Sorry. Sorry. My bad. `Sorry`"],
+	});
+	expect(summary.member_positive_counts).toEqual({
+		"Great work": 2,
+		"GREAT WORK": 1,
+	});
+	expect(summary.model_apology_counts).toEqual({ Sorry: 2, "My bad": 1 });
+	expect(summary.member_negative).toBeGreaterThan(0);
+	for (const [counts, total] of [
+		[summary.model_apology_counts, summary.model_apologies],
+		[summary.member_negative_counts, summary.member_negative],
+		[summary.member_positive_counts, summary.member_positive],
+	] as const)
+		expect(Object.values(counts).reduce((sum, count) => sum + count, 0)).toBe(
+			total,
+		);
+});
+
+test("the category prefilter only skips texts the scanner cannot match", () => {
+	const texts = [
+		"Sorry, you are right, I broke it.",
+		"My apologies — I’m sorry for the confusion.",
+		"I apologized already.",
+		"this is fucking broken ??",
+		"why??",
+		"Looks great, thanks!",
+		"Fixed the routing; tests pass.",
+		"unsorry business, apologetics and sorrynot",
+		"",
+	];
+	for (const text of texts)
+		for (const category of [
+			"negative",
+			"swear",
+			"apology",
+			"positive",
+		] as const)
+			if (
+				scanLanguageSignals(text).some((match) => match.category === category)
+			)
+				expect(mayContainLanguageSignal(text, category)).toBe(true);
+	expect(
+		mayContainLanguageSignal("Fixed the routing; tests pass.", "apology"),
+	).toBe(false);
+	expect(mayContainLanguageSignal("I’m sorry", "apology")).toBe(true);
+	expect(mayContainLanguageSignal("why??", "negative")).toBe(true);
+});
