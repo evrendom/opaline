@@ -413,6 +413,11 @@ export function CostDashboardView({
 								// Every row is as tall as the space left under the chart: one row
 								// fits the page exactly, more rows keep that height and scroll.
 								data-sized={breakdownRowHeight ? "" : undefined}
+								data-loading={
+									(usageShown
+										? held || usage.tab?.pending
+										: isPending || held) || undefined
+								}
 								style={
 									breakdownRowHeight
 										? ({

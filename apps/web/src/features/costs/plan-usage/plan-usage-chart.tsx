@@ -25,7 +25,6 @@ import {
 	formatChartDate,
 	groupChartTrend,
 } from "../chart-interval";
-import { ChartSkeleton } from "../cost-chart";
 import { CostDotChart, type DotTone } from "../cost-dot-chart";
 import { useHoverDateStore } from "../cost-hover-date";
 import {
@@ -245,21 +244,15 @@ export function PlanUsageChart({
 			{pending && (dots || repository) ? (
 				<UsageDots window={null} interval={interval} repository={repository} />
 			) : pending ? (
-				<div className="cost-chart-canvas" data-phase="loading">
-					<ChartSkeleton
-						interval={interval}
-						label="Loading usage"
-						leaving={false}
-					/>
-					<UsageLoadingBars
-						count={
-							range
-								? chartPeriodDates(range.startDate, range.endDate, interval)
-										.length
-								: 30
-						}
-					/>
-				</div>
+				<UsageLoadingCanvas
+					interval={interval}
+					count={
+						range
+							? chartPeriodDates(range.startDate, range.endDate, interval)
+									.length
+							: 30
+					}
+				/>
 			) : (
 				<div className="plan-usage-frame" data-sample={sample ? "" : undefined}>
 					{dots || repository ? (
@@ -284,29 +277,152 @@ export function PlanUsageChart({
 
 const WAVE_BARS = 12;
 const WAVE_MS = 1600;
+const BONE_HEIGHT = 8;
+const Y_TICKS = [0, 25, 50, 75, 100];
 
-function UsageLoadingBars({ count }: { count: number }) {
+function barGeometry(width: number, count: number) {
+	const ratio =
+		typeof globalThis.devicePixelRatio === "number"
+			? Math.max(1, globalThis.devicePixelRatio)
+			: 1;
+	const plot = Math.max(0, width - Y_AXIS_WIDTH - MARGIN.left - MARGIN.right);
+	const pitch = Math.max(1 / ratio, Math.floor((plot / count) * ratio) / ratio);
+	const bar = Math.min(
+		MAX_BAR_PX,
+		Math.max(2 / ratio, Math.round(pitch * BAR_SHARE * ratio) / ratio),
+	);
+	return {
+		pitch,
+		spare: Math.max(0, plot - pitch * count),
+		bar,
+		snap: (value: number) => Math.round(value * ratio) / ratio,
+	};
+}
+
+function Bone({ x, y, width }: { x: number; y: number; width: number }) {
 	return (
-		<div
-			aria-hidden="true"
-			className="plan-usage-loading-bars"
-			style={
-				{
-					"--bar-count": Math.max(1, count),
-					"--bar-max": `${MAX_BAR_PX}px`,
-					"--bar-share": BAR_SHARE,
-					"--usage-color": USAGE_COLOR,
-				} as CSSProperties
-			}
+		<rect
+			className="plan-usage-bone"
+			x={x}
+			y={y - BONE_HEIGHT / 2}
+			width={width}
+			height={BONE_HEIGHT}
+			rx={2}
+		/>
+	);
+}
+
+function UsageLoadingCanvas({
+	count,
+	interval,
+}: {
+	count: number;
+	interval: ChartInterval;
+}) {
+	const [canvasRef, width] = useWidth<HTMLOutputElement>();
+	const bars = Math.max(1, count);
+	const { spare, bar } = barGeometry(width, bars);
+	const data = Array.from({ length: bars }, (_, x) => ({ x, full: 100 }));
+	return (
+		<output
+			ref={canvasRef}
+			className="cost-chart-canvas plan-usage-loading"
+			aria-label="Loading usage"
+			style={{ "--usage-color": USAGE_COLOR } as CSSProperties}
 		>
-			{Array.from({ length: Math.max(1, count) }, (_, index) => (
-				<span
-					// biome-ignore lint/suspicious/noArrayIndexKey: bars are placeholders in a fixed order
-					key={index}
-					style={{ animationDelay: `${(-index * WAVE_MS) / WAVE_BARS}ms` }}
-				/>
-			))}
-		</div>
+			{width > 0 ? (
+				<ResponsiveContainer width="100%" height="100%" minWidth={0}>
+					<ComposedChart
+						data={data}
+						margin={{
+							...MARGIN,
+							top:
+								interval === "daily"
+									? RESET_ICON_PX + RESET_ICON_GAP_PX + 4
+									: MARGIN.top,
+							right: MARGIN.right + spare,
+						}}
+					>
+						<CartesianGrid
+							vertical={false}
+							stroke="var(--cost-border)"
+							strokeDasharray="3 4"
+						/>
+						<XAxis
+							type="number"
+							dataKey="x"
+							domain={[-0.5, bars - 0.5]}
+							ticks={edgeTicks(bars, null)}
+							interval={0}
+							axisLine={false}
+							tickLine={false}
+							tickMargin={14}
+							height={40}
+							tick={(props: XAxisTickContentProps) => {
+								const first = Number(props.payload?.value) === 0;
+								const x = Number(props.x ?? 0);
+								const y = Number(props.y ?? 0) + BONE_HEIGHT / 2 + 2;
+								const boneWidth = 36;
+								return (
+									<Bone
+										x={
+											bars === 1
+												? x - boneWidth / 2
+												: first
+													? x - bar / 2
+													: x + bar / 2 - boneWidth
+										}
+										y={y}
+										width={boneWidth}
+									/>
+								);
+							}}
+						/>
+						<YAxis
+							domain={[0, 100]}
+							ticks={Y_TICKS}
+							axisLine={false}
+							tickLine={false}
+							tickMargin={10}
+							width={Y_AXIS_WIDTH}
+							tick={(props: {
+								x?: number | string;
+								y?: number | string;
+								payload?: { value?: number };
+							}) => {
+								const label = `${props.payload?.value ?? 0}%`;
+								const boneWidth = label.length * 6.5;
+								return (
+									<Bone
+										x={Number(props.x ?? 0) - boneWidth}
+										y={Number(props.y ?? 0)}
+										width={boneWidth}
+									/>
+								);
+							}}
+						/>
+						<Bar
+							dataKey="full"
+							barSize={bar}
+							isAnimationActive={false}
+							shape={(props: BarShapeProps) => (
+								<rect
+									className="plan-usage-loading-bar"
+									x={Number(props.x ?? 0)}
+									y={Number(props.y ?? 0)}
+									width={Number(props.width ?? 0)}
+									height={Math.max(0, Number(props.height ?? 0))}
+									rx={3}
+									style={{
+										animationDelay: `${(-(props.payload?.x ?? 0) * WAVE_MS) / WAVE_BARS}ms`,
+									}}
+								/>
+							)}
+						/>
+					</ComposedChart>
+				</ResponsiveContainer>
+			) : null}
+		</output>
 	);
 }
 
@@ -326,18 +442,7 @@ function UsageCanvas({
 	const [canvasRef, width] = useWidth<HTMLDivElement>();
 	const periods = periodsOf(window, interval);
 	const count = Math.max(1, periods.length);
-	const ratio =
-		typeof globalThis.devicePixelRatio === "number"
-			? Math.max(1, globalThis.devicePixelRatio)
-			: 1;
-	const plot = Math.max(0, width - Y_AXIS_WIDTH - MARGIN.left - MARGIN.right);
-	const pitch = Math.max(1 / ratio, Math.floor((plot / count) * ratio) / ratio);
-	const spare = Math.max(0, plot - pitch * count);
-	const bar = Math.min(
-		MAX_BAR_PX,
-		Math.max(2 / ratio, Math.round(pitch * BAR_SHARE * ratio) / ratio),
-	);
-	const snap = (value: number) => Math.round(value * ratio) / ratio;
+	const { pitch, spare, bar, snap } = barGeometry(width, count);
 	const resetDays = new Map<number, string>();
 	let lastReset = Number.NEGATIVE_INFINITY;
 	if (interval === "daily")

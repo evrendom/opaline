@@ -1289,6 +1289,9 @@
 	min-height: 0;
 	max-height: var(--breakdown-row-height);
 }
+.cost-breakdowns[data-sized][data-loading] .cost-breakdown {
+	height: var(--breakdown-row-height);
+}
 .cost-breakdowns[data-sized] .cost-scroll-fade {
 	display: flex;
 	flex: 0 1 auto;
