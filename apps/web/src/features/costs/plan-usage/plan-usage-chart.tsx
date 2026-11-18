@@ -1,5 +1,5 @@
 import { type Icon, IconRefresh } from "@tabler/icons-react";
-import { useLayoutEffect, useRef, useState } from "react";
+import { type CSSProperties, useLayoutEffect, useRef, useState } from "react";
 import {
 	Bar,
 	CartesianGrid,
@@ -10,7 +10,6 @@ import {
 	type XAxisTickContentProps,
 	YAxis,
 } from "recharts";
-import { ChartLoadingWave } from "@/components/ui/chart-loading-wave";
 import { useOptionalDateRange } from "@/features/analytics/date-range/DateRangeProvider";
 import {
 	ClaudeModelIcon,
@@ -19,7 +18,6 @@ import {
 import { PillTabs } from "@/features/repos/pill-tabs";
 import { EdgeTick, edgeTicks, useAxisHover } from "../chart-edge-axis";
 import { ChartEmptyNotice } from "../chart-empty-notice";
-import { DASHBOARD_LOADING_STEPS, LOADING_WAVE_HEIGHT } from "../chart-flow";
 import {
 	bucketDate,
 	type ChartInterval,
@@ -253,12 +251,13 @@ export function PlanUsageChart({
 						label="Loading usage"
 						leaving={false}
 					/>
-					<ChartLoadingWave
-						className="plan-usage-loading-wave"
-						viewBoxHeight={LOADING_WAVE_HEIGHT}
-						color={USAGE_COLOR}
-						linePath={DASHBOARD_LOADING_STEPS}
-						guides={false}
+					<UsageLoadingBars
+						count={
+							range
+								? chartPeriodDates(range.startDate, range.endDate, interval)
+										.length
+								: 30
+						}
 					/>
 				</div>
 			) : (
@@ -279,6 +278,34 @@ export function PlanUsageChart({
 					)}
 				</div>
 			)}
+		</div>
+	);
+}
+
+const WAVE_BARS = 12;
+const WAVE_MS = 1600;
+
+function UsageLoadingBars({ count }: { count: number }) {
+	return (
+		<div
+			aria-hidden="true"
+			className="plan-usage-loading-bars"
+			style={
+				{
+					"--bar-count": Math.max(1, count),
+					"--bar-max": `${MAX_BAR_PX}px`,
+					"--bar-share": BAR_SHARE,
+					"--usage-color": USAGE_COLOR,
+				} as CSSProperties
+			}
+		>
+			{Array.from({ length: Math.max(1, count) }, (_, index) => (
+				<span
+					// biome-ignore lint/suspicious/noArrayIndexKey: bars are placeholders in a fixed order
+					key={index}
+					style={{ animationDelay: `${(-index * WAVE_MS) / WAVE_BARS}ms` }}
+				/>
+			))}
 		</div>
 	);
 }

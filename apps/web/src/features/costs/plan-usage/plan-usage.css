@@ -8,7 +8,33 @@
 	white-space: nowrap;
 }
 
-.plan-usage-loading-wave {
+@keyframes plan-usage-bar-wave {
+	0%,
+	100% {
+		transform: scaleY(0.18);
+	}
+	50% {
+		transform: scaleY(0.78);
+	}
+}
+.plan-usage-loading-bars {
 	position: absolute;
 	inset: 12px 12px 40px 56px;
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-around;
+}
+.plan-usage-loading-bars > span {
+	width: min(var(--bar-max), calc(100% / var(--bar-count) * var(--bar-share)));
+	height: 100%;
+	border-radius: 3px 3px 0 0;
+	background: color-mix(in oklch, var(--usage-color) 30%, transparent);
+	transform-origin: bottom;
+	animation: plan-usage-bar-wave 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+	.plan-usage-loading-bars > span {
+		animation: none;
+		transform: scaleY(0.4);
+	}
 }
