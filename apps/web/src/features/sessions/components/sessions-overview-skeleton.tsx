@@ -112,8 +112,8 @@ sampleMarkBars?.replaceSync(
 		`[skullet-rect][style*="width: ${MARK_SIZE}px; height: ${MARK_SIZE}px; border-radius: 1.67772e+07px"] { corner-shape: round !important; border-radius: 0 !important; mask: var(--pebble-fill, none) center / 100% 100% no-repeat; }`,
 		'[skullet-rect][style*="height: 19px; border-radius: 9.5px"] { height: 14px !important; margin-top: 2.5px; border-radius: 7px !important; corner-shape: superellipse(1.25) !important; }',
 		'[skullet-rect][style*="height: 19px; border-radius: 6px"] { height: 14px !important; margin-top: 2.5px; border-radius: 4px !important; }',
-		'[skullet-rect][style*="left: 12px;"][style*="width: 1"] { width: 58px !important; }',
-		'[skullet-rect][style*="left: 12px;"][style*="width: 2"] { width: 70px !important; }',
+		'[skullet-rect][style*="left: 12px;"][style*="width: 1"] { width: 32px !important; }',
+		'[skullet-rect][style*="left: 12px;"][style*="width: 2"] { width: 40px !important; }',
 	].join("\n"),
 );
 
