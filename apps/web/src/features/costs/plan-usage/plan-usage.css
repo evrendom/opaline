@@ -20,8 +20,17 @@
 .plan-usage-bone {
 	fill: var(--bone);
 }
-.plan-usage-loading-bar {
+.plan-usage-loading-solid {
 	fill: color-mix(in oklch, var(--usage-color) 30%, transparent);
+}
+.plan-usage-loading-used {
+	fill: color-mix(in oklch, var(--usage-color) 13%, transparent);
+}
+.cost-chart-canvas[data-morphing] .recharts-bar-rectangle,
+.cost-chart-canvas[data-morphing] .recharts-cartesian-axis-ticks {
+	opacity: 0;
+}
+.plan-usage-loading-bar {
 	transform-box: fill-box;
 	transform-origin: bottom;
 	animation: plan-usage-bar-wave 1.6s ease-in-out infinite;

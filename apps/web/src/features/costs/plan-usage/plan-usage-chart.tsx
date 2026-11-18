@@ -226,6 +226,13 @@ export function PlanUsageChart({
 				)
 			: null;
 	const shown = sample ?? window;
+	const morph = useRef<readonly BarSpan[] | null>(null);
+	const [wasPending, setWasPending] = useState(pending);
+	const [morphIn, setMorphIn] = useState(false);
+	if (wasPending !== pending) {
+		setWasPending(pending);
+		setMorphIn(!pending);
+	}
 	return (
 		<div className="cost-chart-card">
 			<div className="cost-chart-key">
@@ -246,6 +253,9 @@ export function PlanUsageChart({
 			) : pending ? (
 				<UsageLoadingCanvas
 					interval={interval}
+					onLeave={(spans) => {
+						morph.current = spans;
+					}}
 					count={
 						range
 							? chartPeriodDates(range.startDate, range.endDate, interval)
@@ -262,7 +272,11 @@ export function PlanUsageChart({
 							repository={repository}
 						/>
 					) : shown ? (
-						<UsageCanvas window={shown} interval={interval} />
+						<UsageCanvas
+							window={shown}
+							interval={interval}
+							morph={morphIn ? morph : undefined}
+						/>
 					) : (
 						<div className="cost-chart-canvas" />
 					)}
@@ -312,14 +326,77 @@ function Bone({ x, y, width }: { x: number; y: number; width: number }) {
 	);
 }
 
+const LOADING_SOLID_SHARE = 0.68;
+const MORPH_MS = 520;
+const MORPH_EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
+
+type BarSpan = { readonly bottom: number; readonly height: number };
+
+function LoadingSplitBar({
+	x,
+	y,
+	width,
+	height,
+	phase,
+}: {
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+	phase: number;
+}) {
+	const usable = Math.max(0, height - SEGMENT_GAP_PX);
+	const solid = usable * LOADING_SOLID_SHARE;
+	const corner = Math.min(SEGMENT_RADIUS_PX, width / 2);
+	return (
+		<g
+			className="plan-usage-loading-bar"
+			style={{ animationDelay: `${(-phase * WAVE_MS) / WAVE_BARS}ms` }}
+		>
+			<rect
+				className="plan-usage-loading-used"
+				x={x}
+				y={y}
+				width={width}
+				height={Math.max(0, usable - solid)}
+				rx={corner}
+			/>
+			<rect
+				className="plan-usage-loading-solid"
+				x={x}
+				y={y + height - solid}
+				width={width}
+				height={solid}
+				rx={corner}
+			/>
+		</g>
+	);
+}
+
 function UsageLoadingCanvas({
 	count,
 	interval,
+	onLeave,
 }: {
 	count: number;
 	interval: ChartInterval;
+	onLeave: (spans: readonly BarSpan[]) => void;
 }) {
 	const [canvasRef, width] = useWidth<HTMLOutputElement>();
+	const leave = useRef(onLeave);
+	leave.current = onLeave;
+	useLayoutEffect(() => {
+		const canvas = canvasRef.current;
+		return () => {
+			if (!canvas) return;
+			leave.current(
+				[...canvas.querySelectorAll(".plan-usage-loading-bar")].map((bar) => {
+					const box = bar.getBoundingClientRect();
+					return { bottom: box.bottom, height: box.height };
+				}),
+			);
+		};
+	}, [canvasRef]);
 	const bars = Math.max(1, count);
 	const { spare, bar } = barGeometry(width, bars);
 	const data = Array.from({ length: bars }, (_, x) => ({ x, full: 100 }));
@@ -406,16 +483,12 @@ function UsageLoadingCanvas({
 							barSize={bar}
 							isAnimationActive={false}
 							shape={(props: BarShapeProps) => (
-								<rect
-									className="plan-usage-loading-bar"
+								<LoadingSplitBar
 									x={Number(props.x ?? 0)}
 									y={Number(props.y ?? 0)}
 									width={Number(props.width ?? 0)}
 									height={Math.max(0, Number(props.height ?? 0))}
-									rx={3}
-									style={{
-										animationDelay: `${(-(props.payload?.x ?? 0) * WAVE_MS) / WAVE_BARS}ms`,
-									}}
+									phase={bars - 1 - (props.payload?.x ?? 0)}
 								/>
 							)}
 						/>
@@ -435,11 +508,77 @@ function emptyTitle(usage: ProviderUsage | undefined, failed: boolean) {
 function UsageCanvas({
 	window,
 	interval,
+	morph,
 }: {
 	window: UsageWindow;
 	interval: ChartInterval;
+	morph?: { current: readonly BarSpan[] | null };
 }) {
 	const [canvasRef, width] = useWidth<HTMLDivElement>();
+	const [morphing, setMorphing] = useState(morph !== undefined);
+	useLayoutEffect(() => {
+		const canvas = canvasRef.current;
+		if (!morphing || !canvas) return;
+		const from = morph?.current;
+		if (!from) {
+			setMorphing(false);
+			return;
+		}
+		let frame = 0;
+		let tries = 0;
+		const start = () => {
+			const bars = [...canvas.querySelectorAll(".recharts-bar-rectangle")];
+			if (bars.length === 0 && tries++ < 30) {
+				frame = requestAnimationFrame(start);
+				return;
+			}
+			if (morph) morph.current = null;
+			bars.forEach((bar, index) => {
+				const span = from[index];
+				const rects = [...bar.querySelectorAll("rect")];
+				const box = bar.getBoundingClientRect();
+				const ratio =
+					span && box.height > 0
+						? Math.min(4, Math.max(0.05, span.height / box.height))
+						: 0.2;
+				const bottom = Math.max(
+					...rects.map(
+						(rect) =>
+							Number(rect.getAttribute("y")) +
+							Number(rect.getAttribute("height")),
+					),
+				);
+				for (const rect of rects) {
+					rect.style.transformBox = "view-box";
+					rect.style.transformOrigin = `0 ${bottom}px`;
+					rect.animate(
+						[
+							{ transform: `scaleY(${ratio})`, opacity: 0.45 },
+							{ transform: "scaleY(1)", opacity: 1 },
+						],
+						{ duration: MORPH_MS, easing: MORPH_EASE, fill: "backwards" },
+					);
+				}
+				for (const icon of bar.querySelectorAll("svg"))
+					icon.animate([{ opacity: 0 }, { opacity: 1 }], {
+						duration: MORPH_MS,
+						easing: MORPH_EASE,
+						fill: "backwards",
+					});
+			});
+			for (const ticks of canvas.querySelectorAll(
+				".recharts-cartesian-axis-ticks",
+			))
+				ticks.animate([{ opacity: 0 }, { opacity: 1 }], {
+					duration: MORPH_MS,
+					easing: MORPH_EASE,
+					fill: "backwards",
+				});
+			setMorphing(false);
+		};
+		frame = requestAnimationFrame(start);
+		return () => cancelAnimationFrame(frame);
+	}, [canvasRef, morph, morphing, width]);
 	const periods = periodsOf(window, interval);
 	const count = Math.max(1, periods.length);
 	const { pitch, spare, bar, snap } = barGeometry(width, count);
@@ -458,7 +597,12 @@ function UsageCanvas({
 	const axisHover = useAxisHover();
 	const hoverDates = useHoverDateStore();
 	return (
-		<div ref={canvasRef} className="cost-chart-canvas" skullet-ignore="">
+		<div
+			ref={canvasRef}
+			className="cost-chart-canvas"
+			data-morphing={morphing || undefined}
+			skullet-ignore=""
+		>
 			{width > 0 ? (
 				<ResponsiveContainer width="100%" height="100%" minWidth={0}>
 					<ComposedChart
