@@ -50,6 +50,12 @@ const BASE: SessionAnalytics = {
 	worktree: null,
 };
 
+const PLAN_SHARES = [
+	3, 0.4, 6, 1, 0.2, 9, 2, 4, 0.8, 1, 14, 3, 0.1, 2, 5, 1, 0.3, 2, 3, 4,
+];
+const MCP_SERVERS = [["github"], [], ["linear"], [], [], ["github", "sentry"]];
+const MEMBER_WORDS = [["good"], [], [], ["thanks"], [], ["nice"], [], []];
+
 const ROWS: [string, string, number, number, string[]][] = [
 	["web-app", "feature/session-figures", 7, 2, []],
 	["api-server", "fix/upload-retry", 1, 0, ["code-review"]],
@@ -87,6 +93,8 @@ const SAMPLE_SESSIONS: SessionAnalytics[] = ROWS.map(
 			source: "remote",
 			worktree: null,
 		},
+		member_positive: MEMBER_WORDS[index % MEMBER_WORDS.length]?.length ?? 0,
+		member_positive_matches: MEMBER_WORDS[index % MEMBER_WORDS.length] ?? [],
 		session_id: `sample-${index}`,
 		skills,
 	}),
@@ -94,8 +102,10 @@ const SAMPLE_SESSIONS: SessionAnalytics[] = ROWS.map(
 
 export function SessionsOverviewSample({
 	showSkillsColumn = true,
+	showPlanUsage = false,
 }: {
 	showSkillsColumn?: boolean;
+	showPlanUsage?: boolean;
 }) {
 	return (
 		<SessionsOverviewFluidList fillHeight height={undefined}>
@@ -110,8 +120,12 @@ export function SessionsOverviewSample({
 						getSessionLinkState={undefined}
 						index={index}
 						maximumSessionCost={30}
+						mcpServers={(MCP_SERVERS[index % MCP_SERVERS.length] ?? []).map(
+							(server) => ({ server, at: 0 }),
+						)}
 						memberProfile={undefined}
 						onSessionClick={undefined}
+						planUsage={showPlanUsage ? PLAN_SHARES[index] : undefined}
 						registerItem={registerItem}
 						session={session}
 						setHoverActiveIndex={setActiveIndex}
