@@ -10,7 +10,10 @@ const MARKETPLACE = "opaline-local";
 const LOCAL_PLUGIN = `opaline@${MARKETPLACE}`;
 const CLOUD_PLUGIN = "opaline@opaline";
 const INSTRUCTION_LINE =
-	"For any analysis of coding-agent sessions (Claude Code or Codex), use the Opaline plugin; its answers open in the Opaline app.";
+	"To look up, search or analyse past Claude Code or Codex sessions, use the opaline:opaline skill instead of reading the raw session files; its answers open in the Opaline app.";
+const EARLIER_INSTRUCTION_LINES = [
+	"For any analysis of coding-agent sessions (Claude Code or Codex), use the Opaline plugin; its answers open in the Opaline app.",
+];
 const SHELL_VARIABLES = ["PATH", "CODEX_HOME", "CLAUDE_CONFIG_DIR"];
 let shellEnv;
 
@@ -263,9 +266,36 @@ function hasInstructionLine(text) {
 	return text.split("\n").some((line) => line.trim() === INSTRUCTION_LINE);
 }
 
-function addInstructionLine(file) {
+function isOurLine(line) {
+	const trimmed = line.trim();
+	return (
+		trimmed === INSTRUCTION_LINE || EARLIER_INSTRUCTION_LINES.includes(trimmed)
+	);
+}
+
+function createsInstructionFile(file) {
+	return path.basename(file) !== "CLAUDE.md";
+}
+
+function replaceEarlierInstructionLine(file) {
 	const text = readText(file);
 	if (hasInstructionLine(text)) return false;
+	const lines = text.split("\n");
+	const earlier = lines.findIndex(isOurLine);
+	if (earlier === -1) return false;
+	lines[earlier] = lines[earlier].replace(
+		lines[earlier].trim(),
+		INSTRUCTION_LINE,
+	);
+	fs.writeFileSync(file, lines.join("\n"));
+	return true;
+}
+
+function addInstructionLine(file) {
+	if (replaceEarlierInstructionLine(file)) return true;
+	const text = readText(file);
+	if (hasInstructionLine(text)) return false;
+	if (!fs.existsSync(file) && !createsInstructionFile(file)) return false;
 	const gap = text === "" ? "" : text.endsWith("\n") ? "\n" : "\n\n";
 	fs.mkdirSync(path.dirname(file), { recursive: true });
 	fs.appendFileSync(file, `${gap}${INSTRUCTION_LINE}\n`);
@@ -274,11 +304,11 @@ function addInstructionLine(file) {
 
 function removeInstructionLine(file) {
 	const text = readText(file);
-	if (!hasInstructionLine(text)) return false;
 	const lines = text.split("\n");
+	if (!lines.some(isOurLine)) return false;
 	const kept = [];
 	for (let index = 0; index < lines.length; index += 1) {
-		if (lines[index].trim() !== INSTRUCTION_LINE) {
+		if (!isOurLine(lines[index])) {
 			kept.push(lines[index]);
 			continue;
 		}
@@ -300,17 +330,28 @@ function instructionsAnswer() {
 	return answer === "accepted" || answer === "declined" ? answer : undefined;
 }
 
+function instructionTargets(keys, env) {
+	return keys
+		.map((key) => ({ key, file: instructionFile(key, env) }))
+		.filter(({ file }) => createsInstructionFile(file) || fs.existsSync(file));
+}
+
 async function offerInstructionLine({ keys, env, confirm }) {
-	const files = keys.map((key) => instructionFile(key, env));
+	const targets = instructionTargets(keys, env);
+	const files = targets.map(({ file }) => file);
 	const remembered = instructionsAnswer();
 	if (remembered)
 		return {
 			answer: remembered,
 			added:
 				remembered === "accepted"
-					? files.slice(0, 1).filter(addInstructionLine)
+					? targets
+							.filter(({ key }) => key === keys[0])
+							.map(({ file }) => file)
+							.filter(addInstructionLine)
 					: [],
 		};
+	if (files.length === 0) return { answer: "no file", added: [] };
 	const answer = (await confirm(files)) ? "accepted" : "declined";
 	writeIfChanged(
 		instructionsAnswerFile(),
@@ -320,6 +361,13 @@ async function offerInstructionLine({ keys, env, confirm }) {
 		answer,
 		added: answer === "accepted" ? files.filter(addInstructionLine) : [],
 	};
+}
+
+function updateInstructionLines({ keys, env }) {
+	if (instructionsAnswer() !== "accepted") return [];
+	return keys
+		.map((key) => instructionFile(key, env))
+		.filter(replaceEarlierInstructionLine);
 }
 
 function removeInstructionLines({ keys, env }) {
@@ -340,7 +388,7 @@ async function askInstructionLine(files) {
 		defaultId: 1,
 		cancelId: 1,
 		message: "Use Opaline for all session analysis?",
-		detail: `Opaline can add one line to ${names.join(" and ")}, so your agents use the Opaline plugin whenever you ask about your sessions:\n\n“${INSTRUCTION_LINE}”\n\nNothing else in ${names.length > 1 ? "these files" : "this file"} changes, and you can delete the line at any time.`,
+		detail: `Opaline can add one line to ${names.join(" and ")}, so your agents use Opaline whenever they look into past sessions:\n\n“${INSTRUCTION_LINE}”\n\nNothing else in ${names.length > 1 ? "these files" : "this file"} changes, and you can delete the line at any time.`,
 	};
 	const parent = BrowserWindow.getFocusedWindow();
 	const { response } = await (parent
@@ -620,6 +668,16 @@ function createAgents({ stack, confirmInstructionLine = askInstructionLine }) {
 			log(`instruction line not removed: ${error.message}`);
 		}
 		if (!statuses.some(([, found]) => found.local)) return;
+		try {
+			const updated = updateInstructionLines({
+				keys: statuses.filter(([, found]) => found.local).map(([key]) => key),
+				env: await loginShellEnv(),
+			});
+			if (updated.length)
+				log(`instruction line updated in ${updated.join(", ")}`);
+		} catch (error) {
+			log(`instruction line not updated: ${error.message}`);
+		}
 		const { version } = writeMarketplace({ ...marketplaceSources(), server });
 		for (const [key, found] of statuses) {
 			if (!found.local || found.local.version === version) continue;
@@ -642,7 +700,9 @@ module.exports = {
 	removeInstructionLine,
 	offerInstructionLine,
 	removeInstructionLines,
+	updateInstructionLines,
 	INSTRUCTION_LINE,
+	EARLIER_INSTRUCTION_LINES,
 	LOCAL_PLUGIN,
 	CLOUD_PLUGIN,
 };
