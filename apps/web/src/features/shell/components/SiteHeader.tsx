@@ -110,7 +110,7 @@ export function SiteHeader({
 					? "p-0"
 					: // Page header: no rule underneath, the section chip
 						// beside a larger title, aligned with the page's 32px gutter.
-						"h-14 gap-2 border-b-0 pt-2 pr-6 pl-8"
+						"h-14 gap-2 border-b-0 pt-2 pr-8 pl-8"
 			}
 		>
 			{sessionDetailId !== null ? (
