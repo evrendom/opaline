@@ -28,7 +28,7 @@ export function useContextOpen({
 			: openTurn(run);
 	const zoomOpen: ZoomOpen = {
 		detail: (
-			part: Pick<ContextPart, "key" | "nested">,
+			part: Pick<ContextPart, "folded" | "key" | "nested">,
 			label: string | null,
 		) => {
 			const place = runs ? placeOf(map, runs, part, label) : null;

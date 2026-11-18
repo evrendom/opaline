@@ -22,7 +22,7 @@ const nameOf = (label: string, files: boolean) =>
 
 export type ZoomOpen = {
 	detail: (
-		part: Pick<ContextPart, "key" | "nested">,
+		part: Pick<ContextPart, "folded" | "key" | "nested">,
 		label: string | null,
 	) => void;
 	file: (path: string) => void;
@@ -40,7 +40,7 @@ const isFiles = (part: Pick<ContextPart, "key">) =>
 	part.key.replace(/^(?:compacted|earlier):/u, "").startsWith("files:");
 
 export function thingOpen(
-	part: Pick<ContextPart, "key" | "nested">,
+	part: Pick<ContextPart, "folded" | "key" | "nested">,
 	label: string,
 	onOpen: ZoomOpen,
 ): { go: () => void; words: string } {

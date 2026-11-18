@@ -20,7 +20,7 @@ const ownKey = (key: string) => key.replace(/^(?:compacted|earlier):/u, "");
 export function placeOf(
 	map: Pick<ContextMap, "trail">,
 	runs: readonly RunStart[],
-	part: Pick<ContextPart, "key" | "nested">,
+	part: Pick<ContextPart, "folded" | "key" | "nested">,
 	label: string | null,
 ): { run: string; step: string | null } | null {
 	if (part.key.startsWith("run:")) {
@@ -30,9 +30,9 @@ export function placeOf(
 			: undefined;
 		return { run, step: nested?.things[0]?.steps[0] ?? null };
 	}
-	const key = ownKey(part.key);
+	const keys = new Set((part.folded ?? [part.key]).map(ownKey));
 	const inPart = map.trail.filter(
-		(step) => step.id && ownKey(step.key) === key,
+		(step) => step.id && keys.has(ownKey(step.key)),
 	);
 	const step =
 		(label === null

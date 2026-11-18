@@ -84,6 +84,17 @@ test("a run box opens the step behind the picked part, or the run", () => {
 	});
 });
 
+test("a folded box finds the steps of every part folded into it", () => {
+	expect(
+		placeOf(
+			{ trail },
+			runs,
+			{ folded: ["skills", "thinking"], key: "group:small" },
+			null,
+		),
+	).toEqual({ run: "run-a", step: "s4" });
+});
+
 test("without a trail there is no place to open", () => {
 	expect(placeOf({ trail: [] }, runs, { key: "tools:bash" }, "ls")).toBeNull();
 });
