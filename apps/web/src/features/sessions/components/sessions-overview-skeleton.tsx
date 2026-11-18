@@ -111,7 +111,7 @@ export const sampleMarkBars =
 		? new CSSStyleSheet()
 		: null;
 sampleMarkBars?.replaceSync(
-	`[skullet-rect][style*="width: ${MARK_SIZE}px; height: ${MARK_SIZE}px; border-radius: 1.67772e+07px"] { corner-shape: round; border-radius: 0; mask: var(--pebble-fill, none) center / 100% 100% no-repeat; }`,
+	`[skullet-rect][style*="width: ${MARK_SIZE}px; height: ${MARK_SIZE}px; border-radius: 1.67772e+07px"] { corner-shape: round !important; border-radius: 0 !important; mask: var(--pebble-fill, none) center / 100% 100% no-repeat; }`,
 );
 
 export function SessionsOverviewSample({
