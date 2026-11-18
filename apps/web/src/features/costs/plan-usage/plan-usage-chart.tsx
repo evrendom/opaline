@@ -1,5 +1,11 @@
 import { type Icon, IconRefresh } from "@tabler/icons-react";
-import { type CSSProperties, useLayoutEffect, useRef, useState } from "react";
+import {
+	type CSSProperties,
+	useCallback,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from "react";
 import {
 	Bar,
 	CartesianGrid,
@@ -345,17 +351,19 @@ function LoadingSplitBar({
 	height: number;
 	phase: number;
 }) {
-	const [delay] = useState(
-		() => -((performance.now() % WAVE_MS) + (phase * WAVE_MS) / WAVE_BARS),
+	const offset = (phase * WAVE_MS) / WAVE_BARS;
+	const onTimeline = useCallback(
+		(bar: SVGGElement | null) => {
+			for (const animation of bar?.getAnimations() ?? [])
+				animation.startTime = -offset;
+		},
+		[offset],
 	);
 	const usable = Math.max(0, height - SEGMENT_GAP_PX);
 	const solid = usable * LOADING_SOLID_SHARE;
 	const corner = Math.min(SEGMENT_RADIUS_PX, width / 2);
 	return (
-		<g
-			className="plan-usage-loading-bar"
-			style={{ animationDelay: `${delay}ms` }}
-		>
+		<g className="plan-usage-loading-bar" ref={onTimeline}>
 			<rect
 				className="plan-usage-loading-used"
 				x={x}
