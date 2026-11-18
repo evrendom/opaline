@@ -14,6 +14,7 @@ import type { ClickHouseExecutor } from "../clickhouse.js";
 import { ClickHouseWriteFencedError } from "../lib/clickhouse-write-fence.js";
 import { readBooleanEnv, readPositiveSafeIntegerEnv } from "../lib/env.js";
 import {
+	ingestContentCeiling,
 	isLargeIngestSession,
 	scaleSessionBudget,
 } from "../lib/ingest-size.js";
@@ -73,7 +74,7 @@ export function readTranscriptRecordsExtractionConfig(): TranscriptRecordsExtrac
 		),
 		queueMaxBytes: readPositiveSafeIntegerEnv(
 			"TRANSCRIPT_RECORDS_QUEUE_MAX_BYTES",
-			256 * 1024 * 1024,
+			ingestContentCeiling(),
 		),
 		queueMaxJobs: readPositiveSafeIntegerEnv(
 			"TRANSCRIPT_RECORDS_QUEUE_MAX_JOBS",

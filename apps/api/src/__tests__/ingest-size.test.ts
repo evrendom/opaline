@@ -14,6 +14,7 @@ import {
 	isLargeIngestSession,
 	scaleSessionBudget,
 } from "../lib/ingest-size.js";
+import { readTranscriptRecordsExtractionConfig } from "../services/transcript-records-extraction.service.js";
 
 const validBase = {
 	source: "claude_code" as const,
@@ -142,6 +143,22 @@ describe("the local app's ceiling", () => {
 		expect(
 			clampIngestAggregateContentMaxBytes(LOCAL_INGEST_CONTENT_MAX_BYTES),
 		).toBe(INGEST_AGGREGATE_CONTENT_MAX_BYTES);
+	});
+
+	test("the transcript-record queue takes a session as large as the ceiling allows", () => {
+		const previous = process.env.OPALINE_SELF_HOSTED;
+		process.env.OPALINE_SELF_HOSTED = "1";
+		try {
+			expect(readTranscriptRecordsExtractionConfig().queueMaxBytes).toBe(
+				LOCAL_INGEST_CONTENT_MAX_BYTES,
+			);
+		} finally {
+			if (previous === undefined) delete process.env.OPALINE_SELF_HOSTED;
+			else process.env.OPALINE_SELF_HOSTED = previous;
+		}
+		expect(readTranscriptRecordsExtractionConfig().queueMaxBytes).toBe(
+			INGEST_AGGREGATE_CONTENT_MAX_BYTES,
+		);
 	});
 
 	test("the local session schema admits content the cloud schema rejects", () => {
