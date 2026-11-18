@@ -85,8 +85,23 @@ export function ChartMorph({
 			return;
 		}
 
-		const box = container.getBoundingClientRect();
+		let box = container.getBoundingClientRect();
+		const startHeight = box.height;
+		let shift = 0;
 		svg.setAttribute("viewBox", `0 0 ${box.width} ${box.height}`);
+		const follow = () => {
+			const now = container.getBoundingClientRect();
+			if (
+				now.width === box.width &&
+				now.height === box.height &&
+				now.top === box.top &&
+				now.left === box.left
+			)
+				return;
+			box = now;
+			shift = box.height - startHeight;
+			svg.setAttribute("viewBox", `0 0 ${box.width} ${box.height}`);
+		};
 		const toWave = mapper(waveSvg, box);
 		const start = byX(
 			parsePolyline(waveLine.getAttribute("d") ?? "").map(toWave),
@@ -156,10 +171,10 @@ export function ChartMorph({
 					...extent,
 				]),
 			].sort((a, b) => a - b);
-			const endBase = target?.base ?? startBase;
+			const endBase = target?.base ?? startBase + shift;
 			const shapes = (targets.length > 0 ? targets : [null]).map((curve) =>
 				xs.map((x) => {
-					const from = sampleY(start, x);
+					const from = sampleY(start, x) + shift;
 					const to = !curves
 						? from
 						: curve
@@ -179,7 +194,7 @@ export function ChartMorph({
 			});
 
 			const first = shapes[0] ?? [];
-			const base = lerp(startBase, endBase, shape);
+			const base = lerp(startBase + shift, endBase, shape);
 			const firstX = first[0]?.[0] ?? left;
 			const lastX = first.at(-1)?.[0] ?? right;
 			fillPath.setAttribute(
@@ -191,11 +206,23 @@ export function ChartMorph({
 			const peak = Math.min(...first.map(([, y]) => y));
 			fillGradient.setAttribute(
 				"y1",
-				String(lerp(startFill?.y1 ?? peak, peak, shape)),
+				String(
+					lerp(
+						startFill?.y1 === undefined ? peak : startFill.y1 + shift,
+						peak,
+						shape,
+					),
+				),
 			);
 			fillGradient.setAttribute(
 				"y2",
-				String(lerp(startFill?.y2 ?? base, base, shape)),
+				String(
+					lerp(
+						startFill?.y2 === undefined ? base : startFill.y2 + shift,
+						base,
+						shape,
+					),
+				),
 			);
 			fillStops[0]?.setAttribute(
 				"stop-opacity",
@@ -268,6 +295,20 @@ export function ChartMorph({
 		};
 
 		const tick = (now: number) => {
+			follow();
+			if (curves) {
+				const live = readCurves();
+				if (live.length === curves.length)
+					curves = curves.map((curve, index) => ({
+						...curve,
+						points: live[index]?.points ?? curve.points,
+					}));
+				target =
+					readFill(container.querySelector<SVGPathElement>(fill), box, {
+						top: 0,
+						bottom: 0,
+					}) ?? target;
+			}
 			if (!curves) {
 				// Begin once the lines read the same two frames running.
 				const found = readCurves();
