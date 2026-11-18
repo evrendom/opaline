@@ -35,7 +35,38 @@ function reportBackground() {
 	ipcRenderer.send("app:background", color);
 }
 
+function quietElement(element) {
+	if (element.localName === "title" && element.parentElement instanceof SVGElement) {
+		const owner = element.parentElement;
+		const text = element.textContent?.trim();
+		if (text && !owner.hasAttribute("aria-label")) owner.setAttribute("aria-label", text);
+		element.remove();
+		return;
+	}
+	const title = element.getAttribute("title");
+	if (title === null) return;
+	if (title.trim() && !element.hasAttribute("aria-label") && !element.textContent?.trim()) element.setAttribute("aria-label", title);
+	element.removeAttribute("title");
+}
+
+function quietTree(node) {
+	if (!(node instanceof Element)) return;
+	quietElement(node);
+	for (const element of node.querySelectorAll("[title], svg title")) quietElement(element);
+}
+
+function silenceTooltips() {
+	quietTree(document.documentElement);
+	new MutationObserver((records) => {
+		for (const record of records) {
+			if (record.type === "attributes") quietElement(record.target);
+			else for (const node of record.addedNodes) quietTree(node);
+		}
+	}).observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ["title"] });
+}
+
 window.addEventListener("DOMContentLoaded", () => {
+	silenceTooltips();
 	reportBackground();
 	const watch = { attributes: true, attributeFilter: ["class", "style", "data-app-shell", "data-boot"] };
 	const observer = new MutationObserver(reportBackground);
