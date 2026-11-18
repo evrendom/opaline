@@ -42,7 +42,11 @@ import {
 } from "./sessions-overview-pager";
 import { SessionsOverviewRow } from "./sessions-overview-row";
 import { getContainedWheelScroll } from "./sessions-overview-scroll";
-import { SessionsOverviewSample } from "./sessions-overview-skeleton";
+import {
+	SAMPLE_MARK_STYLE,
+	SessionsOverviewSample,
+	sampleMarkBars,
+} from "./sessions-overview-skeleton";
 import {
 	planUsageKey,
 	SESSION_OVERVIEW_MIN_WIDTH_CLASS_NAME,
@@ -385,6 +389,8 @@ export function SessionsOverviewTable({
 							/>
 						) : (
 							<Reveal
+								bars={sampleMarkBars}
+								barStyle={SAMPLE_MARK_STYLE}
 								fill
 								className="flex-1"
 								label="Loading sessions"

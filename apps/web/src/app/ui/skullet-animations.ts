@@ -9,6 +9,18 @@ function endless(animation: Animation): boolean {
 	return animation.effect?.getTiming().iterations === Number.POSITIVE_INFINITY;
 }
 
+// Each bar's shimmer starts when skullet draws it, so bars redrawn later
+// (a live clock's text) run out of phase. Their sweep is laid out across the
+// viewport, so one start time for all of them makes one wave.
+function onSharedClock(animation: Animation) {
+	const align = () => {
+		if (animation.startTime !== 0 && animation.playState === "running")
+			animation.startTime = 0;
+	};
+	if (animation.pending) void animation.ready.then(align, () => {});
+	else align();
+}
+
 export function cancelSkulletAnimations(host: Element): () => void {
 	const recorded = new Map<Element, Animation[]>();
 	const watched = new WeakSet<Node>();
@@ -28,6 +40,7 @@ export function cancelSkulletAnimations(host: Element): () => void {
 			typeof element.getAnimations === "function"
 				? element.getAnimations().filter(endless)
 				: [];
+		for (const animation of running) onSharedClock(animation);
 		if (running.length > 0) recorded.set(element, running);
 		if (element.shadowRoot && !watched.has(element.shadowRoot)) {
 			watched.add(element.shadowRoot);

@@ -1,4 +1,5 @@
 import type { SessionAnalytics } from "@rudel/api-routes";
+import { pebbleMasks } from "@/features/costs/cost-dot-pebble";
 import { SessionsOverviewFluidList } from "./sessions-overview-fluid-list";
 import { SessionsOverviewRow } from "./sessions-overview-row";
 
@@ -98,6 +99,19 @@ const SAMPLE_SESSIONS: SessionAnalytics[] = ROWS.map(
 		session_id: `sample-${index}`,
 		skills,
 	}),
+);
+
+const MARK_SIZE = 28;
+
+export const SAMPLE_MARK_STYLE = pebbleMasks(MARK_SIZE);
+
+export const sampleMarkBars =
+	typeof CSSStyleSheet !== "undefined" &&
+	"replaceSync" in CSSStyleSheet.prototype
+		? new CSSStyleSheet()
+		: null;
+sampleMarkBars?.replaceSync(
+	`[skullet-rect][style*="width: ${MARK_SIZE}px; height: ${MARK_SIZE}px; border-radius: 1.67772e+07px"] { corner-shape: round; border-radius: 0; mask: var(--pebble-fill, none) center / 100% 100% no-repeat; }`,
 );
 
 export function SessionsOverviewSample({

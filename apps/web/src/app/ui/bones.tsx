@@ -62,14 +62,15 @@ const squircleBars =
 		: null;
 squircleBars?.replaceSync("[skullet-rect] { corner-shape: squircle; }");
 
-function useSquircleBars() {
+function useSquircleBars(bars?: CSSStyleSheet | null) {
 	const host = useRef<HTMLDivElement>(null);
 	useLayoutEffect(() => {
 		if (!squircleBars || !host.current) return;
 		for (const layer of host.current.querySelectorAll("[skullet-layer]")) {
 			const root = layer.shadowRoot ?? layer.attachShadow({ mode: "open" });
-			if (!root.adoptedStyleSheets.includes(squircleBars))
-				root.adoptedStyleSheets = [...root.adoptedStyleSheets, squircleBars];
+			for (const sheet of bars ? [squircleBars, bars] : [squircleBars])
+				if (!root.adoptedStyleSheets.includes(sheet))
+					root.adoptedStyleSheets = [...root.adoptedStyleSheets, sheet];
 		}
 	});
 	useEffect(() => {
@@ -115,6 +116,8 @@ export function Bones({
 }
 
 export function Reveal({
+	bars,
+	barStyle,
 	children,
 	className,
 	fill = false,
@@ -123,6 +126,10 @@ export function Reveal({
 	sample,
 	sampleId,
 }: {
+	/** Extra rules for the drawn bars (they live in skullet's shadow root). */
+	bars?: CSSStyleSheet | null;
+	/** Custom properties those rules read, set where the bars inherit them. */
+	barStyle?: CSSProperties;
 	children: () => ReactNode;
 	className?: string;
 	fill?: boolean;
@@ -131,10 +138,10 @@ export function Reveal({
 	sample: ReactNode;
 	sampleId: string;
 }) {
-	const host = useSquircleBars();
+	const host = useSquircleBars(bars);
 	const skeleton = loading;
 	return (
-		<div ref={host} className="contents">
+		<div ref={host} className="contents" style={barStyle}>
 			<Skeleton
 				className={cn(fill && "bones-fill", className)}
 				id={skeleton ? sampleKey(sampleId) : NO_SNAPSHOT}
