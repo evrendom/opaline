@@ -1,6 +1,4 @@
-import { createContext, useContext } from "react";
 import { MOMENT_KINDS_APPEARANCE } from "@/features/compass/moment-labels";
-import type { Figure } from "@/lib/figure";
 import { ViewToggle } from "../files/session-reader-files-parts";
 
 export * from "@rudel/api-routes/session-context/session-reader-context-compaction";
@@ -13,10 +11,6 @@ const COMPACTION_VIEWS = [
 ] as const;
 
 export const compactionWords = COMPACTION.label.toLowerCase();
-
-export const CompactionShareContext = createContext<Figure | null>(null);
-
-export const useCompactionShare = () => useContext(CompactionShareContext);
 
 export function CompactionMark() {
 	return <COMPACTION.icon aria-hidden="true" className="size-3.5 shrink-0" />;

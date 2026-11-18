@@ -4,7 +4,6 @@ import { FlowFigure } from "@/app/ui/flow-number";
 import { StatCard } from "@/components/dashboard/page-parts";
 import type { Figure } from "@/lib/figure";
 import { cn } from "@/lib/utils";
-import { useCompactionShare } from "../context/session-reader-context-compaction";
 import type { ContextMeasure } from "../context/session-reader-context-measure";
 import { usePickedBox } from "../context/session-reader-context-pick";
 import type { FlagGroup } from "./session-reader-summary-flags";
@@ -44,7 +43,6 @@ export function SummaryFigures({
 	onMeasure: (measure: ContextMeasure) => void;
 }) {
 	const picked = usePickedBox();
-	const share = useCompactionShare();
 	const ordered = [...figures].sort(
 		(a, b) => Number(b.measure === "context") - Number(a.measure === "context"),
 	);
@@ -58,12 +56,7 @@ export function SummaryFigures({
 			>
 				{ordered.map((stat) => {
 					const { measure: picks } = stat;
-					const own =
-						picked && picks
-							? (picked.figures[picks] ?? ["—"])
-							: share && picks === "cost"
-								? share
-								: null;
+					const own = picked && picks ? (picked.figures[picks] ?? ["—"]) : null;
 					return (
 						<div key={stat.label} className="flex min-w-0 flex-col">
 							<div className="relative z-10">

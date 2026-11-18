@@ -4,11 +4,7 @@ import { useContext, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useOptionalOrganization } from "@/features/workspace/organization/useOrganization";
 import { orpc } from "@/lib/orpc";
-import { readerCostFigure } from "../model/session-reader-model";
-import {
-	CompactionShareContext,
-	CompactionToggle,
-} from "./session-reader-context-compaction";
+import { CompactionToggle } from "./session-reader-context-compaction";
 import { ContextToggleSlot } from "./session-reader-context-head";
 import { ContextTiles } from "./session-reader-context-tiles";
 
@@ -56,13 +52,6 @@ export function StoredSessionContext({
 	const toggleSlot = useContext(ContextToggleSlot);
 	if (!view) return null;
 	const sides = snapshot.views.length > 1;
-	const share = sides
-		? [
-				...readerCostFigure(view.segmentCost),
-				" / ",
-				...readerCostFigure(snapshot.sessionCost),
-			]
-		: null;
 	const toggle = sides ? (
 		<CompactionToggle
 			value={view.withCompaction ?? false}
@@ -71,19 +60,17 @@ export function StoredSessionContext({
 	) : null;
 	return (
 		<div className="flex min-w-0 flex-col">
-			<CompactionShareContext.Provider value={share}>
-				<ContextTiles
-					compactedRuns={view.compactedRuns}
-					compacting={compacting}
-					cost={sides ? view.segmentCost : snapshot.sessionCost}
-					costOutside={`After its fullest moment${view.later > 0 ? ` · ${view.later} ${view.later === 1 ? "run" : "runs"}` : ""}`}
-					footer={toggleSlot ? null : toggle}
-					map={view.map}
-					measure="context"
-					memory={`session:${sessionId}`}
-					whole
-				/>
-			</CompactionShareContext.Provider>
+			<ContextTiles
+				compactedRuns={view.compactedRuns}
+				compacting={compacting}
+				cost={sides ? view.segmentCost : snapshot.sessionCost}
+				costOutside={`After its fullest moment${view.later > 0 ? ` · ${view.later} ${view.later === 1 ? "run" : "runs"}` : ""}`}
+				footer={toggleSlot ? null : toggle}
+				map={view.map}
+				measure="context"
+				memory={`session:${sessionId}`}
+				whole
+			/>
 			{toggleSlot && toggle ? createPortal(toggle, toggleSlot) : null}
 		</div>
 	);
