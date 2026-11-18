@@ -41,7 +41,10 @@ export function ReportView({
 	);
 	const findings = report.steps.filter((step) => step.finding);
 	return (
-		<main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-10 text-sm text-foreground">
+		<main
+			data-selectable=""
+			className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-10 text-sm text-foreground"
+		>
 			<header className="flex flex-col gap-2">
 				<p className="text-xs text-muted-foreground">Saved analysis</p>
 				<h1 className="text-xl font-medium text-balance">{report.question}</h1>

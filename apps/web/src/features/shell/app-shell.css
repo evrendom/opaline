@@ -21,6 +21,29 @@
 	display: none;
 }
 
+:root[data-desktop] body {
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+:root[data-desktop]
+	:is(
+		input,
+		textarea,
+		[contenteditable]:not([contenteditable="false"]),
+		pre,
+		code,
+		kbd,
+		samp,
+		.whitespace-pre-wrap,
+		.rich-skill-document,
+		.trace-code-block,
+		[data-selectable]
+	) {
+	-webkit-user-select: text;
+	user-select: text;
+}
+
 :root[data-desktop] .desktop-window-bar {
 	display: flex;
 	height: 32px;

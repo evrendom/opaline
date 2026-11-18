@@ -38,6 +38,7 @@ function createEnvironmentMenu({
 			titleBarStyle: "hiddenInset",
 			show: false,
 			webPreferences: {
+				spellcheck: false,
 				preload: path.join(__dirname, "environment-preload.js"),
 			},
 		});

@@ -7,7 +7,6 @@ import {
 import { type ComponentType, memo, type ReactNode } from "react";
 import { SkillMark } from "@/components/skill-mark";
 import { getSkillMarkLook } from "@/components/skill-mark-look";
-import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import {
 	CARD,
 	ScrollColumn,
@@ -26,24 +25,16 @@ export function SkillCardsGrid({
 }) {
 	return (
 		<ScrollColumn className="min-w-0 overscroll-contain">
-			<div data-fluid-menu-root="">
-				<FluidMenuHover
-					items="[data-overview-card-open]"
-					bridgeGap={20}
-					over
-					fillClassName="corner-squircle"
-				/>
-				<ul
-					aria-label="Skills"
-					className="grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,13.5rem),1fr))] gap-5 p-4 sm:p-5 lg:p-6"
-				>
-					{skills.map((skill) => (
-						<li key={skill.name} className="min-w-0">
-							<SkillCard skill={skill} onSelectSkill={onSelect} />
-						</li>
-					))}
-				</ul>
-			</div>
+			<ul
+				aria-label="Skills"
+				className="grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,13.5rem),1fr))] gap-5 p-4 sm:p-5 lg:p-6"
+			>
+				{skills.map((skill) => (
+					<li key={skill.name} className="min-w-0">
+						<SkillCard skill={skill} onSelectSkill={onSelect} />
+					</li>
+				))}
+			</ul>
 		</ScrollColumn>
 	);
 }
@@ -124,7 +115,6 @@ export function OverviewCard({
 			<button
 				type="button"
 				aria-label={`Open ${name}`}
-				data-overview-card-open=""
 				onClick={() => onSelect(name)}
 				className="absolute inset-0 z-20 rounded-lg corner-squircle squircle:rounded-3xl outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--dashboard-01-metric-button-focus-ring)]"
 			/>

@@ -462,6 +462,7 @@ export function DiffView({
 			ref={setNode}
 			{...focusableScrollRegionProps}
 			aria-label="Diff"
+			data-selectable=""
 			className={cn(
 				"scroll-fade-x -mx-1.5 overflow-x-auto font-mono text-[11px] leading-relaxed outline-none",
 				className,

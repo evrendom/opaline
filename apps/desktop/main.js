@@ -34,6 +34,7 @@ const { createLocalStack, introUrl } = require("./stack/local-stack");
 const { createEnvironmentMenu } = require("./environments");
 const { keepClaudeTranscripts } = require("./stack/transcripts");
 const { createUpdateDialogs, createUpdater } = require("./updates");
+const { createWindowState } = require("./window-state");
 
 app.userAgentFallback = `${app.userAgentFallback
 	.replace(/\sElectron\/\S+/, "")
@@ -127,12 +128,19 @@ function isAppUrl(url) {
 
 const appWindows = new Set();
 let pageBackground;
+const windowState = createWindowState({ file: path.join(app.getPath("userData"), "window-state.json"), screen });
+
+function placement() {
+	const other = mainWindow();
+	return other ? windowState.nextTo(other) : windowState.load();
+}
 
 function createWindow({ url, link, bounds, intro = false } = {}) {
+	const placed = bounds ? { bounds } : placement();
 	const win = new BrowserWindow({
 		width: 1440,
 		height: 900,
-		...bounds,
+		...placed?.bounds,
 		minWidth: 800,
 		minHeight: 520,
 		title: "Opaline",
@@ -140,10 +148,11 @@ function createWindow({ url, link, bounds, intro = false } = {}) {
 		trafficLightPosition: { x: 15, y: 16 },
 		show: false,
 		backgroundColor: pageBackground ?? (nativeTheme.shouldUseDarkColors ? "#0a0a0a" : "#efefef"),
-		webPreferences: { devTools: isDev, preload: path.join(__dirname, "preload.js"), additionalArguments: isDev ? ["--opaline-debug"] : [] },
+		webPreferences: { spellcheck: false, devTools: isDev, preload: path.join(__dirname, "preload.js"), additionalArguments: isDev ? ["--opaline-debug"] : [] },
 	});
 	if (!bounds)
 		win.once("ready-to-show", () => {
+			if (placed?.maximized) win.maximize();
 			win.show();
 			stack.mark("window-shown");
 		});
@@ -171,6 +180,7 @@ function createWindow({ url, link, bounds, intro = false } = {}) {
 		openLink(next);
 	});
 	appWindows.add(win);
+	windowState.track(win);
 	win.on("closed", () => appWindows.delete(win));
 	const target = url ?? (explicitUrl ? (link ?? explicitUrl) : undefined);
 	if (target) win.loadURL(intro ? introUrl(target) : target);
@@ -316,7 +326,7 @@ function createOnboardingWindow(page = "") {
 		show: false,
 		transparent: true,
 		backgroundColor: "#00000000",
-		webPreferences: { devTools: isDev, preload: path.join(__dirname, "onboarding-preload.js"), additionalArguments: isDev ? ["--opaline-debug"] : [] },
+		webPreferences: { spellcheck: false, devTools: isDev, preload: path.join(__dirname, "onboarding-preload.js"), additionalArguments: isDev ? ["--opaline-debug"] : [] },
 	});
 	onboardingWindow.setIgnoreMouseEvents(true, { forward: true });
 	onboardingWindow.on("close", (event) => {
@@ -352,7 +362,7 @@ function createOnboarding() {
 		backgroundColor: "#00000000",
 		vibrancy: "fullscreen-ui",
 		visualEffectState: "active",
-		webPreferences: { devTools: isDev, preload: path.join(__dirname, "onboarding-preload.js") },
+		webPreferences: { spellcheck: false, devTools: isDev, preload: path.join(__dirname, "onboarding-preload.js") },
 	});
 	onboardingWindow.setAlwaysOnTop(true, "screen-saver");
 	onboardingWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });

@@ -134,6 +134,7 @@ export function SetupProse({
 	);
 	return (
 		<div
+			data-selectable=""
 			className={cn(
 				"flex flex-col gap-2.5 text-[13px] leading-relaxed [overflow-wrap:anywhere]",
 				className,

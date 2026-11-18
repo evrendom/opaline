@@ -9,7 +9,6 @@ import { useMemo, useState } from "react";
 import { Reveal } from "@/app/ui/bones";
 import { Button } from "@/app/ui/button";
 import { SearchInput } from "@/components/dashboard/data-table";
-import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { UsageStateMessage } from "@/components/usage-collection-view";
 import {
 	type McpServer,
@@ -170,24 +169,16 @@ function McpCardsGrid({
 }) {
 	return (
 		<ScrollColumn className="min-w-0 overscroll-contain">
-			<div data-fluid-menu-root="">
-				<FluidMenuHover
-					items="[data-overview-card-open]"
-					bridgeGap={20}
-					over
-					fillClassName="corner-squircle"
-				/>
-				<ul
-					aria-label="MCP servers"
-					className="grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,13.5rem),1fr))] gap-5 p-4 sm:p-5 lg:p-6"
-				>
-					{servers.map((server) => (
-						<li key={server.file.setupFile} className="min-w-0">
-							<McpCard server={server} onSelect={onSelect} />
-						</li>
-					))}
-				</ul>
-			</div>
+			<ul
+				aria-label="MCP servers"
+				className="grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,13.5rem),1fr))] gap-5 p-4 sm:p-5 lg:p-6"
+			>
+				{servers.map((server) => (
+					<li key={server.file.setupFile} className="min-w-0">
+						<McpCard server={server} onSelect={onSelect} />
+					</li>
+				))}
+			</ul>
 		</ScrollColumn>
 	);
 }
