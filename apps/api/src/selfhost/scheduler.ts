@@ -196,6 +196,15 @@ export function selfHostedJobs(env: Environment = process.env): SchedulerJob[] {
 					.handleSessionRetirementMaintenanceRequest,
 		},
 		{
+			name: "deleted-rows",
+			everyMs: HOUR,
+			firstAfterMs: 20 * MINUTE,
+			when: true,
+			handler: async () =>
+				(await import("../handlers/deleted-rows-maintenance.js"))
+					.handleDeletedRowsMaintenanceRequest,
+		},
+		{
 			name: "repair",
 			everyMs: DAY,
 			firstAfterMs: 10 * MINUTE,
