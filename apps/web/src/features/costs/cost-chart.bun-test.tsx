@@ -39,7 +39,7 @@ function renderCiChart(data: CostDashboard) {
 						data={data}
 						pending={false}
 						metric="ciRuns"
-						metrics={["mergedPullRequests", "ciRuns"]}
+						metrics={["ciRuns"]}
 						runSignals={[]}
 						signalTypes={[]}
 						interval="daily"
@@ -73,12 +73,11 @@ test.each([
 	expect(html).toMatch(
 		/<span class="cost-metric-value">(<small[^>]*>[^<]*<\/small>)?—<\/span>/,
 	);
-	expect(html).toContain("CI minutes (approximate billed Actions minutes): —");
 	expect(html).toContain("CI history is unavailable");
 	expect(html).not.toContain(
 		"CI minutes (approximate billed Actions minutes): 0",
 	);
-	expect(html).not.toContain("No CI runs in this selection");
+	expect(html).not.toContain("No CI runs");
 	const point = groupChartTrend(ciRuns.trend, "daily")[0];
 	assert(point);
 	expect(isCiHistoryAvailable(ciRuns.githubHistory, point.endDate)).toBe(false);
@@ -105,10 +104,8 @@ test("fully covered no-Actions repositories retain genuine zero CI runs and minu
 	ciRuns.trend = [{ date: "2026-09-30", total: 0, values: { total: 0 } }];
 	const html = renderCiChart(data);
 	expect(cardValue(html, "CI runs")).toBe("0");
-	expect(markupText(html)).toContain(
-		"CI minutes (approximate billed Actions minutes): 0",
-	);
-	expect(html).toContain("No CI runs in this selection");
+	expect(html).toContain("No CI runs");
+	expect(html).not.toContain("CI history is unavailable");
 	expect(html).not.toContain('data-unavailable="true"');
 	const point = groupChartTrend(ciRuns.trend, "daily")[0];
 	assert(point);

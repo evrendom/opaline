@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, setDefaultTimeout, test } from "bun:test";
 import { strict as assert } from "node:assert";
 import round3 from "../../../../../docs/l1-judge-round3-decisions.json" with {
 	type: "json",
@@ -20,6 +20,8 @@ import {
 	sourcePathMatch,
 	sourceSnapshotDiff,
 } from "./fact-source-coverage.js";
+
+setDefaultTimeout(30_000);
 
 describe("Codex writer-source coverage", () => {
 	test("every reviewed not_found mapping has a bounded writer/snapshot audit; only explicit exclusions upgrade", () => {

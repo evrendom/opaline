@@ -532,7 +532,7 @@ function UsageCanvas({
 	const started = useRef(false);
 	useLayoutEffect(() => {
 		const canvas = canvasRef.current;
-		if (!morphing || started.current || !canvas) return;
+		if (!morphing || started.current || !canvas || width === 0) return;
 		const from = morph?.current;
 		if (!from) {
 			started.current = true;

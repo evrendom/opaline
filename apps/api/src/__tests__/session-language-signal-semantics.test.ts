@@ -23,6 +23,8 @@ const fingerprintsByVersion: Readonly<Record<number, string>> = {
 	6: "39adbbfba8621f3129931bb7849bc9df7aaeec6bfa55d81ea41ec8eb7624b29a",
 	7: "e119b29c251eb10484a70ef0a39c00903e040d638e501951212384e31a451dd7",
 	8: "0af806a00b99b63138817c5aeb023e2489ff769fe68cfe412a99d92573908e90",
+	// Two-word swearing window, short-verdict sentences, and agent text counted only as apologies.
+	9: "3a153b7cdb8e773723563ce3cffb28dd66f932cbea29e96892badc8ad128e4ef",
 };
 
 describe("persisted language-signal semantics", () => {

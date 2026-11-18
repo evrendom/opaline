@@ -177,6 +177,7 @@ function create(
 		ingestSession: ingest.ingestSession,
 		backgroundPriority: true,
 		watchFiles: false,
+		freeBytes: async () => Number.MAX_SAFE_INTEGER,
 		settings: {
 			concurrency: 1,
 			quietMs: 1,

@@ -25,4 +25,4 @@ export type {
 	ModelLanguageSignalMatch,
 } from "./types.js";
 
-export const SCAN_VERSION = 8;
+export const SCAN_VERSION = 9;

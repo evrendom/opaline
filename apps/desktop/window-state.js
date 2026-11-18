@@ -16,9 +16,12 @@ function isRect(value) {
 
 function onScreen(bounds, areas) {
 	return areas.some((area) => {
-		const width = Math.min(bounds.x + bounds.width, area.x + area.width) - Math.max(bounds.x, area.x);
+		const width =
+			Math.min(bounds.x + bounds.width, area.x + area.width) -
+			Math.max(bounds.x, area.x);
 		const top = Math.max(bounds.y, area.y);
-		const titleBarVisible = top < Math.min(bounds.y + MIN_VISIBLE_HEIGHT, area.y + area.height);
+		const titleBarVisible =
+			top < Math.min(bounds.y + MIN_VISIBLE_HEIGHT, area.y + area.height);
 		return width >= MIN_VISIBLE_WIDTH && titleBarVisible;
 	});
 }
@@ -26,7 +29,9 @@ function onScreen(bounds, areas) {
 function cascade(bounds, area) {
 	const x = bounds.x + CASCADE_OFFSET;
 	const y = bounds.y + CASCADE_OFFSET;
-	const fits = x + bounds.width <= area.x + area.width && y + bounds.height <= area.y + area.height;
+	const fits =
+		x + bounds.width <= area.x + area.width &&
+		y + bounds.height <= area.y + area.height;
 	return fits ? { ...bounds, x, y } : { ...bounds, x: area.x, y: area.y };
 }
 
@@ -52,7 +57,10 @@ function createWindowState({ file, screen, fsImpl = fs }) {
 
 	function nextTo(win) {
 		const bounds = win.getNormalBounds();
-		return { bounds: cascade(bounds, screen.getDisplayMatching(bounds).workArea), maximized: false };
+		return {
+			bounds: cascade(bounds, screen.getDisplayMatching(bounds).workArea),
+			maximized: false,
+		};
 	}
 
 	function save(win) {
@@ -60,7 +68,13 @@ function createWindowState({ file, screen, fsImpl = fs }) {
 		timer = undefined;
 		if (win.isDestroyed() || win.isFullScreen()) return;
 		try {
-			fsImpl.writeFileSync(file, JSON.stringify({ bounds: win.getNormalBounds(), maximized: win.isMaximized() }));
+			fsImpl.writeFileSync(
+				file,
+				JSON.stringify({
+					bounds: win.getNormalBounds(),
+					maximized: win.isMaximized(),
+				}),
+			);
 		} catch {}
 	}
 
@@ -69,7 +83,8 @@ function createWindowState({ file, screen, fsImpl = fs }) {
 			clearTimeout(timer);
 			timer = setTimeout(() => save(win), SAVE_DELAY_MS);
 		};
-		for (const event of ["resize", "move", "maximize", "unmaximize"]) win.on(event, later);
+		for (const event of ["resize", "move", "maximize", "unmaximize"])
+			win.on(event, later);
 		win.on("close", () => save(win));
 	}
 
