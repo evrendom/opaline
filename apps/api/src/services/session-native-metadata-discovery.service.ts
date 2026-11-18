@@ -1,7 +1,6 @@
 import { getLogger } from "@logtape/logtape";
 import {
 	extractNativeCodexLineageEvidence,
-	INGEST_AGGREGATE_CONTENT_MAX_BYTES,
 	type RawLineageSession,
 } from "@rudel/api-routes";
 import { type ClickHouseExecutor, getClickhouse } from "../clickhouse.js";
@@ -10,6 +9,7 @@ import {
 	hasMaintenanceTimeRemaining,
 	type MaintenanceDeadline,
 } from "../lib/bounded-maintenance.js";
+import { ingestContentCeiling } from "../lib/ingest-size.js";
 import { projectNativeSessionLineage } from "./session-native-lineage.service.js";
 import {
 	recordSessionAgentMetadata,
@@ -321,7 +321,7 @@ export async function readBoundedNativeMetadataContent(
 			if (!sizeFailure) throw sizeError;
 			return { failure: sizeFailure, fallbackAttempted: false };
 		}
-		if (contentBytes > INGEST_AGGREGATE_CONTENT_MAX_BYTES) {
+		if (contentBytes > ingestContentCeiling()) {
 			return {
 				failure: {
 					code: "CONTENT_TOO_LARGE",

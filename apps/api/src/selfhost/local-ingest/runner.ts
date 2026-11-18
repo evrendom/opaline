@@ -1,4 +1,4 @@
-import { INGEST_AGGREGATE_CONTENT_MAX_BYTES } from "@rudel/api-routes";
+import { LOCAL_INGEST_CONTENT_MAX_BYTES } from "@rudel/api-routes";
 import type postgres from "postgres";
 import type { ClickHouseExecutor } from "../../clickhouse.js";
 import { runAsBackgroundWork } from "../../lib/background-work.js";
@@ -93,7 +93,7 @@ export function createSessionRunner(
 			if (prepared.kind === "skipped") return prepared;
 			const { input, files } = prepared;
 			const request = {
-				aggregateContentMaxBytes: INGEST_AGGREGATE_CONTENT_MAX_BYTES,
+				aggregateContentMaxBytes: LOCAL_INGEST_CONTENT_MAX_BYTES,
 				awaitLanguageSignals: true,
 				context: {
 					apiKeyId: null,

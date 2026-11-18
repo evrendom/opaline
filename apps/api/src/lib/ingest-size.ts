@@ -4,7 +4,17 @@ import {
 	INGEST_DIRECT_CONTENT_MAX_BYTES,
 	INGEST_LIMIT_REASONS,
 	type IngestSessionInput,
+	LOCAL_INGEST_CONTENT_MAX_BYTES,
 } from "@rudel/api-routes";
+import { isSelfHosted } from "./self-hosted.js";
+
+type Environment = Readonly<Record<string, string | undefined>>;
+
+export function ingestContentCeiling(env: Environment = process.env): number {
+	return isSelfHosted(env)
+		? LOCAL_INGEST_CONTENT_MAX_BYTES
+		: INGEST_AGGREGATE_CONTENT_MAX_BYTES;
+}
 
 /**
  * Sessions up to this size are "standard": every per-process budget (queues,
@@ -37,7 +47,7 @@ export function scaleSessionBudget(base: number, bytes: number): number {
 	if (!Number.isFinite(bytes)) return base;
 	const boundedBytes = Math.min(
 		Math.max(bytes, STANDARD_SESSION_MAX_BYTES),
-		INGEST_AGGREGATE_CONTENT_MAX_BYTES,
+		ingestContentCeiling(),
 	);
 	return Math.ceil((base * boundedBytes) / STANDARD_SESSION_MAX_BYTES);
 }
@@ -52,9 +62,9 @@ export function clampIngestAggregateContentMaxBytes(
 		!Number.isSafeInteger(override) ||
 		override < 0
 	) {
-		return INGEST_AGGREGATE_CONTENT_MAX_BYTES;
+		return ingestContentCeiling();
 	}
-	return Math.min(override, INGEST_AGGREGATE_CONTENT_MAX_BYTES);
+	return Math.min(override, ingestContentCeiling());
 }
 
 export function enforceIngestAggregateSize(

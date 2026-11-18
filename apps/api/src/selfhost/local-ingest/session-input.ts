@@ -6,7 +6,7 @@ import {
 } from "@rudel/agent-adapters";
 import {
 	type IngestSessionInput,
-	IngestSessionInputSchema,
+	LocalIngestSessionInputSchema,
 } from "@rudel/api-routes";
 import { type GitInfo, getGitInfo } from "./git-info.js";
 import { inferSessionRepository } from "./session-repository.js";
@@ -192,7 +192,7 @@ function parsed(
 	path: string,
 	session: SessionRead,
 ): LocalSessionInput {
-	const result = IngestSessionInputSchema.safeParse(raw);
+	const result = LocalIngestSessionInputSchema.safeParse(raw);
 	if (!result.success)
 		return skipped(
 			`${basename(path)} is not a session Opaline can store: ${result.error.issues

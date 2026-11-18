@@ -1,10 +1,8 @@
 import { getLogger } from "@logtape/logtape";
-import {
-	INGEST_AGGREGATE_CONTENT_MAX_BYTES,
-	INGEST_DIRECT_CONTENT_MAX_BYTES,
-} from "@rudel/api-routes";
+import { INGEST_DIRECT_CONTENT_MAX_BYTES } from "@rudel/api-routes";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
 import {
+	ingestContentCeiling,
 	isLargeIngestSession,
 	scaleSessionBudget,
 } from "../lib/ingest-size.js";
@@ -251,7 +249,7 @@ export class IngestFilterQueue {
 		// the byte budgets then bound whatever queues behind it.
 		if (
 			isLargeIngestSession(request.bytes) &&
-			request.bytes <= INGEST_AGGREGATE_CONTENT_MAX_BYTES
+			request.bytes <= ingestContentCeiling()
 		) {
 			return this.pendingRequests.size === 0 ? undefined : "global-bytes";
 		}

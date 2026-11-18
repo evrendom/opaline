@@ -1,8 +1,5 @@
 import { getLogger } from "@logtape/logtape";
-import {
-	INGEST_AGGREGATE_CONTENT_MAX_BYTES,
-	INGEST_DIRECT_CONTENT_MAX_BYTES,
-} from "@rudel/api-routes";
+import { INGEST_DIRECT_CONTENT_MAX_BYTES } from "@rudel/api-routes";
 import {
 	createIncompleteUsageExtractionResult,
 	extractUsageEvents,
@@ -11,6 +8,7 @@ import {
 } from "@rudel/usage-events";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
 import {
+	ingestContentCeiling,
 	isLargeIngestSession,
 	scaleSessionBudget,
 } from "../lib/ingest-size.js";
@@ -251,7 +249,7 @@ export class UsageExtractionQueue {
 		// the byte budgets then bound whatever queues behind it.
 		if (
 			isLargeIngestSession(request.bytes) &&
-			request.bytes <= INGEST_AGGREGATE_CONTENT_MAX_BYTES
+			request.bytes <= ingestContentCeiling()
 		) {
 			return this.pending.size === 0 ? undefined : "global-bytes";
 		}

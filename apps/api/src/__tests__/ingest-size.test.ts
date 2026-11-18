@@ -3,10 +3,14 @@ import { ORPCError } from "@orpc/server";
 import {
 	INGEST_AGGREGATE_CONTENT_MAX_BYTES,
 	INGEST_LIMIT_REASONS,
+	IngestSessionInputSchema,
+	LOCAL_INGEST_CONTENT_MAX_BYTES,
+	LocalIngestSessionInputSchema,
 } from "@rudel/api-routes";
 import {
 	clampIngestAggregateContentMaxBytes,
 	enforceIngestAggregateSize,
+	ingestContentCeiling,
 	isLargeIngestSession,
 	scaleSessionBudget,
 } from "../lib/ingest-size.js";
@@ -118,3 +122,41 @@ function expectTranscriptTooLargeError(
 		actualBytes,
 	});
 }
+
+describe("the local app's ceiling", () => {
+	test("a server on the user's own Mac accepts sessions up to 1 GiB, the cloud stays at 256 MiB", () => {
+		expect(ingestContentCeiling({})).toBe(INGEST_AGGREGATE_CONTENT_MAX_BYTES);
+		expect(ingestContentCeiling({ OPALINE_SELF_HOSTED: "1" })).toBe(
+			LOCAL_INGEST_CONTENT_MAX_BYTES,
+		);
+		const previous = process.env.OPALINE_SELF_HOSTED;
+		process.env.OPALINE_SELF_HOSTED = "1";
+		try {
+			expect(
+				clampIngestAggregateContentMaxBytes(LOCAL_INGEST_CONTENT_MAX_BYTES),
+			).toBe(LOCAL_INGEST_CONTENT_MAX_BYTES);
+		} finally {
+			if (previous === undefined) delete process.env.OPALINE_SELF_HOSTED;
+			else process.env.OPALINE_SELF_HOSTED = previous;
+		}
+		expect(
+			clampIngestAggregateContentMaxBytes(LOCAL_INGEST_CONTENT_MAX_BYTES),
+		).toBe(INGEST_AGGREGATE_CONTENT_MAX_BYTES);
+	});
+
+	test("the local session schema admits content the cloud schema rejects", () => {
+		const base = {
+			source: "codex",
+			sessionId: "s",
+			projectPath: "/p",
+			subagents: [{ agentId: "a", content: "x" }],
+		};
+		const content = "x".repeat(INGEST_AGGREGATE_CONTENT_MAX_BYTES + 1);
+		expect(
+			IngestSessionInputSchema.safeParse({ ...base, content }).success,
+		).toBe(false);
+		expect(
+			LocalIngestSessionInputSchema.safeParse({ ...base, content }).success,
+		).toBe(true);
+	});
+});

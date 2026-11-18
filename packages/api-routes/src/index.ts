@@ -1,4 +1,6 @@
 export * from "./billing.js";
+
+export const SESSION_MCP_SERVERS_MAX_SESSIONS = 100;
 export {
 	CI_EVENT_LABELS,
 	CI_RUN_CONCLUSIONS,
@@ -866,6 +868,12 @@ export const INGEST_AGGREGATE_CONTENT_MAX_BYTES = 256 * 1024 * 1024;
  * worker with the memory for it.
  */
 export const INGEST_DIRECT_CONTENT_MAX_BYTES = 128 * 1024 * 1024;
+/**
+ * Per-session limit on slimmed content when the server runs on the user's own
+ * Mac and imports their own transcripts: there is no other tenant to protect,
+ * only this machine's memory.
+ */
+export const LOCAL_INGEST_CONTENT_MAX_BYTES = 1024 * 1024 * 1024;
 export const INGEST_MAX_SUBAGENT_COUNT = 512;
 export const INGEST_LIMIT_REASONS = {
 	requestLimit: "request_limit",
@@ -882,50 +890,65 @@ export type IngestLimitReason =
 // the 160 MiB body cap and the 128 MiB direct limit.
 const INGEST_CONTENT_MAX_CODE_UNITS = INGEST_AGGREGATE_CONTENT_MAX_BYTES;
 
-export const SubagentFileSchema = z.object({
-	agentId: z.string().max(200),
-	content: z.string().max(INGEST_CONTENT_MAX_CODE_UNITS),
-});
+function subagentFileSchema(maxCodeUnits: number) {
+	return z.object({
+		agentId: z.string().max(200),
+		content: z.string().max(maxCodeUnits),
+	});
+}
 
-export const IngestSessionInputSchema = z.object({
-	source: SourceSchema.default("claude_code"),
-	sessionId: z.string().max(200),
-	projectPath: z
-		.string()
-		.max(200)
-		.transform((p) => p.replace(/\\/g, "/")),
-	gitRemote: z.string().max(200).optional(),
-	packageName: z.string().max(200).optional(),
-	packageType: z.string().max(200).optional(),
-	gitBranch: z.string().max(200).optional(),
-	gitSha: z.string().max(200).optional(),
-	tag: SessionTagSchema.optional(),
-	content: z.string().max(INGEST_CONTENT_MAX_CODE_UNITS),
-	subagents: z
-		.array(SubagentFileSchema)
-		.max(INGEST_MAX_SUBAGENT_COUNT)
-		.refine(
-			(subagents) =>
-				new Set(subagents.map((subagent) => subagent.agentId)).size ===
-				subagents.length,
-			{ message: "Subagent agentId values must be unique" },
-		)
-		.optional(),
-	organizationId: z.string().max(200).optional(),
-	operationId: z.string().uuid().optional(),
-	client_surface: ProductAnalyticsClientSurfaceSchema.optional(),
-	upload_mode: ProductAnalyticsUploadModeSchema.optional(),
-	cli_version: z.string().max(200).optional(),
-	platform_os: ProductAnalyticsPlatformOsSchema.optional(),
-	filter_version: z.number().int().min(0).max(65_535).optional(),
-	force_replace: z.boolean().optional(),
-	/**
-	 * An analysis in the analysis log this chat belongs to. The upload goes to
-	 * that analysis's workspace (the caller must be a member who can see it)
-	 * and is listed with it.
-	 */
-	analysisId: z.string().trim().min(1).max(40).optional(),
-});
+export const SubagentFileSchema = subagentFileSchema(
+	INGEST_CONTENT_MAX_CODE_UNITS,
+);
+
+const ingestSessionInputSchema = (maxCodeUnits: number) =>
+	z.object({
+		source: SourceSchema.default("claude_code"),
+		sessionId: z.string().max(200),
+		projectPath: z
+			.string()
+			.max(200)
+			.transform((p) => p.replace(/\\/g, "/")),
+		gitRemote: z.string().max(200).optional(),
+		packageName: z.string().max(200).optional(),
+		packageType: z.string().max(200).optional(),
+		gitBranch: z.string().max(200).optional(),
+		gitSha: z.string().max(200).optional(),
+		tag: SessionTagSchema.optional(),
+		content: z.string().max(maxCodeUnits),
+		subagents: z
+			.array(subagentFileSchema(maxCodeUnits))
+			.max(INGEST_MAX_SUBAGENT_COUNT)
+			.refine(
+				(subagents) =>
+					new Set(subagents.map((subagent) => subagent.agentId)).size ===
+					subagents.length,
+				{ message: "Subagent agentId values must be unique" },
+			)
+			.optional(),
+		organizationId: z.string().max(200).optional(),
+		operationId: z.string().uuid().optional(),
+		client_surface: ProductAnalyticsClientSurfaceSchema.optional(),
+		upload_mode: ProductAnalyticsUploadModeSchema.optional(),
+		cli_version: z.string().max(200).optional(),
+		platform_os: ProductAnalyticsPlatformOsSchema.optional(),
+		filter_version: z.number().int().min(0).max(65_535).optional(),
+		force_replace: z.boolean().optional(),
+		/**
+		 * An analysis in the analysis log this chat belongs to. The upload goes to
+		 * that analysis's workspace (the caller must be a member who can see it)
+		 * and is listed with it.
+		 */
+		analysisId: z.string().trim().min(1).max(40).optional(),
+	});
+
+export const IngestSessionInputSchema = ingestSessionInputSchema(
+	INGEST_CONTENT_MAX_CODE_UNITS,
+);
+
+export const LocalIngestSessionInputSchema = ingestSessionInputSchema(
+	LOCAL_INGEST_CONTENT_MAX_BYTES,
+);
 
 export const R2_INGEST_PROTOCOL = "r2_multipart_v1" as const;
 export const IngestUpgradeHintSchema = z.object({
@@ -1427,6 +1450,17 @@ export const contract = {
 			detailTurn: sessionDetailProcedureContracts.detailTurn,
 			detailWindow: sessionDetailProcedureContracts.detailWindow,
 			costMaximum: oc.output(z.number().nonnegative()),
+			/** MCP servers each listed session called, by session id. */
+			mcpServers: oc
+				.input(
+					z.object({
+						sessionIds: z
+							.array(z.string().min(1).max(200))
+							.min(1)
+							.max(SESSION_MCP_SERVERS_MAX_SESSIONS),
+					}),
+				)
+				.output(z.record(z.string(), z.array(z.string()))),
 			filterCatalog: oc
 				.input(SessionFilterCatalogInputSchema)
 				.output(SessionFilterCatalogSchema),
