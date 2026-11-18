@@ -60,6 +60,7 @@ const RAN_OUT_COLOR = "oklch(0.64 0.21 27)";
 const RAN_OUT_AT = 97;
 const FAINTEST_DOT = 0.14;
 const SEGMENT_GAP_PX = 3;
+const X_AXIS_HEIGHT = 40;
 const SEGMENT_RADIUS_PX = 2;
 const TICK_STYLE = { fill: "var(--cost-muted)", fontSize: 11 };
 const DAY_MS = 86_400_000;
@@ -187,17 +188,24 @@ function resetX(periods: readonly Period[], at: string): number | null {
 
 function useWidth<T extends HTMLElement>() {
 	const ref = useRef<T>(null);
-	const [width, setWidth] = useState(0);
+	const [size, setSize] = useState({ width: 0, height: 0 });
 	useLayoutEffect(() => {
 		const element = ref.current;
 		if (!element || typeof ResizeObserver === "undefined") return;
-		const measure = () => setWidth(element.getBoundingClientRect().width);
+		const measure = () => {
+			const box = element.getBoundingClientRect();
+			setSize((current) =>
+				current.width === box.width && current.height === box.height
+					? current
+					: { width: box.width, height: box.height },
+			);
+		};
 		measure();
 		const observer = new ResizeObserver(measure);
 		observer.observe(element);
 		return () => observer.disconnect();
 	}, []);
-	return [ref, width] as const;
+	return [ref, size.width, size.height] as const;
 }
 
 export function PlanUsageChart({
@@ -338,49 +346,46 @@ const MORPH_EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
 
 type BarSpan = { readonly bottom: number; readonly height: number };
 
-function LoadingSplitBar({
-	x,
-	y,
+function LoadingBar({
+	left,
+	top,
 	width,
 	height,
 	phase,
 }: {
-	x: number;
-	y: number;
+	left: number;
+	top: number;
 	width: number;
 	height: number;
 	phase: number;
 }) {
 	const offset = (phase * WAVE_MS) / WAVE_BARS;
 	const onTimeline = useCallback(
-		(bar: SVGGElement | null) => {
+		(bar: HTMLDivElement | null) => {
 			for (const animation of bar?.getAnimations() ?? [])
 				animation.startTime = -offset;
 		},
 		[offset],
 	);
-	const usable = Math.max(0, height - SEGMENT_GAP_PX);
-	const solid = usable * LOADING_SOLID_SHARE;
-	const corner = Math.min(SEGMENT_RADIUS_PX, width / 2);
 	return (
-		<g className="plan-usage-loading-bar" ref={onTimeline}>
-			<rect
-				className="plan-usage-loading-used"
-				x={x}
-				y={y}
-				width={width}
-				height={Math.max(0, usable - solid)}
-				rx={corner}
-			/>
-			<rect
-				className="plan-usage-loading-solid"
-				x={x}
-				y={y + height - solid}
-				width={width}
-				height={solid}
-				rx={corner}
-			/>
-		</g>
+		<div
+			ref={onTimeline}
+			className="plan-usage-loading-bar"
+			style={
+				{
+					left,
+					top,
+					width,
+					height,
+					"--segment-gap": `${SEGMENT_GAP_PX}px`,
+					"--segment-radius": `${Math.min(SEGMENT_RADIUS_PX, width / 2)}px`,
+					"--solid-share": LOADING_SOLID_SHARE,
+				} as CSSProperties
+			}
+		>
+			<span className="plan-usage-loading-used" />
+			<span className="plan-usage-loading-solid" />
+		</div>
 	);
 }
 
@@ -393,7 +398,7 @@ function UsageLoadingCanvas({
 	interval: ChartInterval;
 	onLeave: (spans: readonly BarSpan[]) => void;
 }) {
-	const [canvasRef, width] = useWidth<HTMLOutputElement>();
+	const [canvasRef, width, height] = useWidth<HTMLOutputElement>();
 	const leave = useRef(onLeave);
 	leave.current = onLeave;
 	useLayoutEffect(() => {
@@ -409,8 +414,14 @@ function UsageLoadingCanvas({
 		};
 	}, [canvasRef]);
 	const bars = Math.max(1, count);
-	const { spare, bar } = barGeometry(width, bars);
+	const { pitch, spare, bar } = barGeometry(width, bars);
 	const data = Array.from({ length: bars }, (_, x) => ({ x, full: 100 }));
+	const plotTop =
+		interval === "daily" ? RESET_ICON_PX + RESET_ICON_GAP_PX + 4 : MARGIN.top;
+	const plotHeight = Math.max(
+		0,
+		height - plotTop - X_AXIS_HEIGHT - MARGIN.bottom,
+	);
 	return (
 		<output
 			ref={canvasRef}
@@ -422,14 +433,7 @@ function UsageLoadingCanvas({
 				<ResponsiveContainer width="100%" height="100%" minWidth={0}>
 					<ComposedChart
 						data={data}
-						margin={{
-							...MARGIN,
-							top:
-								interval === "daily"
-									? RESET_ICON_PX + RESET_ICON_GAP_PX + 4
-									: MARGIN.top,
-							right: MARGIN.right + spare,
-						}}
+						margin={{ ...MARGIN, top: plotTop, right: MARGIN.right + spare }}
 					>
 						<CartesianGrid
 							vertical={false}
@@ -445,7 +449,7 @@ function UsageLoadingCanvas({
 							axisLine={false}
 							tickLine={false}
 							tickMargin={14}
-							height={40}
+							height={X_AXIS_HEIGHT}
 							tick={(props: XAxisTickContentProps) => {
 								const first = Number(props.payload?.value) === 0;
 								const x = Number(props.x ?? 0);
@@ -489,23 +493,21 @@ function UsageLoadingCanvas({
 								);
 							}}
 						/>
-						<Bar
-							dataKey="full"
-							barSize={bar}
-							isAnimationActive={false}
-							shape={(props: BarShapeProps) => (
-								<LoadingSplitBar
-									x={Number(props.x ?? 0)}
-									y={Number(props.y ?? 0)}
-									width={Number(props.width ?? 0)}
-									height={Math.max(0, Number(props.height ?? 0))}
-									phase={bars - 1 - (props.payload?.x ?? 0)}
-								/>
-							)}
-						/>
 					</ComposedChart>
 				</ResponsiveContainer>
 			) : null}
+			{width > 0 && plotHeight > 0
+				? data.map(({ x }) => (
+						<LoadingBar
+							key={x}
+							left={MARGIN.left + Y_AXIS_WIDTH + (x + 0.5) * pitch - bar / 2}
+							top={plotTop}
+							width={bar}
+							height={plotHeight}
+							phase={bars - 1 - x}
+						/>
+					))
+				: null}
 		</output>
 	);
 }
