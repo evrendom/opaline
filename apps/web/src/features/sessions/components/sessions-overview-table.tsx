@@ -396,10 +396,7 @@ export function SessionsOverviewTable({
 								label="Loading sessions"
 								loading={isLoading}
 								sample={
-									<SessionsOverviewSample
-										showSkillsColumn={showSkillsColumn}
-										showPlanUsage={reserveUsageColumn}
-									/>
+									<SessionsOverviewSample showSkillsColumn={showSkillsColumn} />
 								}
 								sampleId="sessions"
 							>

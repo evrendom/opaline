@@ -1,4 +1,5 @@
 import type { SessionAnalytics } from "@rudel/api-routes";
+import type { CSSProperties } from "react";
 import { pebbleMasks } from "@/features/costs/cost-dot-pebble";
 import { SessionsOverviewFluidList } from "./sessions-overview-fluid-list";
 import { SessionsOverviewRow } from "./sessions-overview-row";
@@ -51,9 +52,6 @@ const BASE: SessionAnalytics = {
 	worktree: null,
 };
 
-const PLAN_SHARES = [
-	3, 0.4, 6, 1, 0.2, 9, 2, 4, 0.8, 1, 14, 3, 0.1, 2, 5, 1, 0.3, 2, 3, 4,
-];
 const MCP_SERVERS = [["github"], [], ["linear"], [], [], ["github", "sentry"]];
 const MEMBER_WORDS = [["good"], [], [], ["thanks"], [], ["nice"], [], []];
 
@@ -103,7 +101,10 @@ const SAMPLE_SESSIONS: SessionAnalytics[] = ROWS.map(
 
 const MARK_SIZE = 28;
 
-export const SAMPLE_MARK_STYLE = pebbleMasks(MARK_SIZE);
+export const SAMPLE_MARK_STYLE = {
+	...pebbleMasks(MARK_SIZE),
+	"--skullet-animation": "group-shimmer",
+} as CSSProperties;
 
 export const sampleMarkBars =
 	typeof CSSStyleSheet !== "undefined" &&
@@ -111,15 +112,17 @@ export const sampleMarkBars =
 		? new CSSStyleSheet()
 		: null;
 sampleMarkBars?.replaceSync(
-	`[skullet-rect][style*="width: ${MARK_SIZE}px; height: ${MARK_SIZE}px; border-radius: 1.67772e+07px"] { corner-shape: round !important; border-radius: 0 !important; mask: var(--pebble-fill, none) center / 100% 100% no-repeat; }`,
+	[
+		`[skullet-rect][style*="width: ${MARK_SIZE}px; height: ${MARK_SIZE}px; border-radius: 1.67772e+07px"] { corner-shape: round !important; border-radius: 0 !important; mask: var(--pebble-fill, none) center / 100% 100% no-repeat; }`,
+		'[skullet-rect][style*="height: 19px; border-radius: 9.5px"] { height: 14px !important; margin-top: 2.5px; border-radius: 7px !important; corner-shape: superellipse(1.25) !important; }',
+		'[skullet-rect][style*="height: 19px; border-radius: 6px"] { height: 14px !important; margin-top: 2.5px; border-radius: 4px !important; }',
+	].join("\n"),
 );
 
 export function SessionsOverviewSample({
 	showSkillsColumn = true,
-	showPlanUsage = false,
 }: {
 	showSkillsColumn?: boolean;
-	showPlanUsage?: boolean;
 }) {
 	return (
 		<SessionsOverviewFluidList fillHeight height={undefined}>
@@ -139,7 +142,6 @@ export function SessionsOverviewSample({
 						)}
 						memberProfile={undefined}
 						onSessionClick={undefined}
-						planUsage={showPlanUsage ? PLAN_SHARES[index] : undefined}
 						registerItem={registerItem}
 						session={session}
 						setHoverActiveIndex={setActiveIndex}
