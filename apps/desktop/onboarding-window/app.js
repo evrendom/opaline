@@ -147,6 +147,10 @@ const FLOW_FORMAT = {
 	cost: { format: { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 } },
 	hours: { format: { minimumFractionDigits: 1, maximumFractionDigits: 1, useGrouping: false }, numberSuffix: " h" },
 };
+const AXIS_FLOW = {
+	cost: { format: { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 } },
+	hours: { format: { maximumFractionDigits: 0, useGrouping: false }, numberSuffix: "h" },
+};
 const flows = new WeakMap();
 
 function flowFor(element) {
@@ -640,6 +644,7 @@ function trendProps(result) {
 		points: result.series[metric.key],
 		color: metric.color,
 		format: (value, axis) => formatMetric(metric, value, axis),
+		axis: AXIS_FLOW[metric.key] ?? { format: { maximumFractionDigits: 0 } },
 		onHover: (date) => {
 			dotChart?.focus(date);
 			showDay(date);

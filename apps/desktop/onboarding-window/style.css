@@ -475,6 +475,19 @@ h3 {
 	font-variant-numeric: tabular-nums;
 }
 
+.chart-canvas .tick {
+	overflow: visible;
+}
+
+.chart-canvas .tick > div {
+	color: var(--muted);
+	font-size: 11px;
+	line-height: 18px;
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+	white-space: nowrap;
+}
+
 .chart-canvas .grid {
 	stroke: var(--cost-border);
 	stroke-dasharray: 3 4;
@@ -1611,10 +1624,6 @@ h3 {
 	opacity: 0;
 }
 
-.line-chart .tick {
-	transition: opacity 300ms ease;
-}
-
 
 
 .legend-item i {
@@ -1665,34 +1674,6 @@ h3 {
 		opacity: 0;
 		filter: blur(8px);
 		transform: translateY(35%);
-	}
-}
-
-.line-chart .tick {
-	transform-box: fill-box;
-}
-
-.line-chart .tick-out {
-	animation: tick-out 600ms cubic-bezier(0.25, 0.1, 0.25, 1) both;
-}
-
-.line-chart .tick-in {
-	animation: tick-in 700ms cubic-bezier(0.25, 0.1, 0.25, 1) 120ms both;
-}
-
-@keyframes tick-out {
-	to {
-		opacity: 0;
-		filter: blur(4px);
-		transform: translateY(-6px);
-	}
-}
-
-@keyframes tick-in {
-	from {
-		opacity: 0;
-		filter: blur(4px);
-		transform: translateY(6px);
 	}
 }
 
