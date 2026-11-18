@@ -15,6 +15,7 @@ import type {
 	PreparedCodeHighlight,
 	PreparedCodeToken,
 } from "@/components/conversation/code-highlight-types";
+import "@/hooks/scroll-fade.css";
 import { cn } from "@/lib/utils";
 import type { DiffHunk, DiffLine } from "./line-diff";
 
@@ -462,7 +463,7 @@ export function DiffView({
 			{...focusableScrollRegionProps}
 			aria-label="Diff"
 			className={cn(
-				"-mx-1.5 overflow-x-auto font-mono text-[11px] leading-relaxed outline-none",
+				"scroll-fade-x -mx-1.5 overflow-x-auto font-mono text-[11px] leading-relaxed outline-none",
 				className,
 			)}
 		>
