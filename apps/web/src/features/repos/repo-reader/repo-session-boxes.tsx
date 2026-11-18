@@ -15,9 +15,19 @@ import { getModelIconComponent } from "@/components/conversation/conversation-tr
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { useElementWidth } from "@/components/ui/horizontal-resize-handle";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
-import { METRIC_APPEARANCE } from "@/features/costs/cost-chart";
+import {
+	METRIC_APPEARANCE,
+	USAGE_APPEARANCE,
+} from "@/features/costs/cost-chart";
 import { formatMetric, METRIC_LABELS } from "@/features/costs/cost-format";
 import { useDotPick } from "@/features/costs/cost-hover-date";
+import { formatPoints } from "@/features/costs/plan-usage/plan-usage-chart";
+import { useSharedUsageSelected } from "@/features/costs/plan-usage/usage-selection";
+import {
+	sessionUsageShares,
+	usePlanUsage,
+} from "@/features/costs/plan-usage/use-plan-usage";
+import { useLocalDesktopApp } from "@/features/desktop/local-app";
 import { tileLook } from "@/features/sessions/reader/context/session-reader-context-bar";
 import { ContextMapFrame } from "@/features/sessions/reader/context/session-reader-context-frame";
 import { ContextMapSample } from "@/features/sessions/reader/context/session-reader-context-map-sample";
@@ -75,13 +85,26 @@ const dayWords = (start: string, end: string) =>
 
 const shortId = (sessionId: string) => sessionId.split("-")[0] ?? sessionId;
 
-function sizeOf(session: RepositorySessionBox, metric: BoxMetric): number {
-	if (metric === "cost") return session.cost;
-	if (metric === "sessions") return 1;
-	if (metric === "agentRuns") return session.agentRuns;
-	if (metric === "signals") return session.signals;
-	if (metric === "mergedPullRequests") return session.mergedPullRequests;
+type BoxView = BoxMetric | "usage";
+
+function sizeOf(
+	session: RepositorySessionBox,
+	view: BoxView,
+	usage: ReadonlyMap<string, number> | null,
+): number {
+	if (view === "usage") return usage?.get(session.sessionId) ?? 0;
+	if (view === "cost") return session.cost;
+	if (view === "sessions") return 1;
+	if (view === "agentRuns") return session.agentRuns;
+	if (view === "signals") return session.signals;
+	if (view === "mergedPullRequests") return session.mergedPullRequests;
 	return session.ciRuns;
+}
+
+function lookOf(view: BoxView) {
+	return view === "usage"
+		? { ...USAGE_APPEARANCE, label: "Usage" }
+		: { ...METRIC_APPEARANCE[view], label: METRIC_LABELS[view] };
 }
 
 function readMetric(value: string | null): BoxMetric {
@@ -120,6 +143,14 @@ export function RepoSessionBoxes({ fill = false }: { fill?: boolean }) {
 	const range = useRepoRangeInput();
 	const [params] = useSearchParams();
 	const metric = readMetric(params.get("metric"));
+	const desktop = useLocalDesktopApp();
+	const usagePicked = useSharedUsageSelected() && desktop;
+	const plan = usePlanUsage(usagePicked, range);
+	const view: BoxView = usagePicked && plan.data !== null ? "usage" : metric;
+	const usage = useMemo(
+		() => (view === "usage" ? sessionUsageShares(plan.data) : null),
+		[view, plan.data],
+	);
 	const boxes = useAnalyticsQuery({
 		...orpc.analytics.repositories.sessionBoxes.queryOptions({
 			input: { repoKey, range },
@@ -136,6 +167,8 @@ export function RepoSessionBoxes({ fill = false }: { fill?: boolean }) {
 				: undefined,
 		staleTime: 5 * 60_000,
 	});
+	const loaded =
+		boxes.data !== undefined && (view !== "usage" || plan.data !== undefined);
 	const picked = useDotPick()?.picked ?? null;
 	const clamped = picked
 		? {
@@ -159,8 +192,8 @@ export function RepoSessionBoxes({ fill = false }: { fill?: boolean }) {
 	const filled = useElementHeight(area);
 	const height = fill ? Math.max(LEAST_FILL_HEIGHT, filled) : AREA_HEIGHT;
 	const tiles = useMemo(
-		() => placeSessions(sessions, metric, width, height),
-		[sessions, metric, width, height],
+		() => placeSessions(sessions, view, usage, width, height),
+		[sessions, view, usage, width, height],
 	);
 	const drawn = useMemo(() => tiles.map(placedOf), [tiles]);
 	const list = useRef<HTMLUListElement>(null);
@@ -168,7 +201,7 @@ export function RepoSessionBoxes({ fill = false }: { fill?: boolean }) {
 	const [shownRange, setShownRange] = useState(rangeKey);
 	if (boxes.data && !boxes.isPlaceholderData && shownRange !== rangeKey)
 		setShownRange(rangeKey);
-	const morphSource = `${metric} ${dayStart ?? ""} ${dayEnd ?? ""} ${shownRange}`;
+	const morphSource = `${view} ${dayStart ?? ""} ${dayEnd ?? ""} ${shownRange}`;
 	const ghosts = useTileMorph({
 		compactedRuns: undefined,
 		drawn,
@@ -211,7 +244,8 @@ export function RepoSessionBoxes({ fill = false }: { fill?: boolean }) {
 		[pickedSession],
 	);
 	useRailFilter(railFilter);
-	const Icon = METRIC_APPEARANCE[metric].icon;
+	const look = lookOf(view);
+	const Icon = look.icon;
 
 	return (
 		<section
@@ -223,9 +257,9 @@ export function RepoSessionBoxes({ fill = false }: { fill?: boolean }) {
 					<Icon
 						aria-hidden="true"
 						className="size-3.5"
-						style={{ color: METRIC_APPEARANCE[metric].color }}
+						style={{ color: look.color }}
 					/>
-					Sessions by {METRIC_LABELS[metric].toLowerCase()}
+					Sessions by {look.label.toLowerCase()}
 					{day ? (
 						<span className="font-normal text-muted-foreground">
 							{" "}
@@ -239,16 +273,14 @@ export function RepoSessionBoxes({ fill = false }: { fill?: boolean }) {
 					ref={area}
 					className={cn("min-w-0", fill && "relative min-h-0 flex-1")}
 				>
-					{boxes.data !== undefined &&
-					tiles.length === 0 &&
-					ghosts.length === 0 ? (
+					{loaded && tiles.length === 0 && ghosts.length === 0 ? (
 						<div
 							className={fill ? "absolute inset-0" : undefined}
 							style={fill ? undefined : { height }}
 						>
 							<EmptyState
-								icon={METRIC_APPEARANCE[metric].outline}
-								title={`No ${METRIC_LABELS[metric].toLowerCase()} ${day ? "on this day" : "in this period"}`}
+								icon={look.outline}
+								title={`No ${look.label.toLowerCase()} ${day ? "on this day" : "in this period"}`}
 								description="No session of this repo has any. Pick another range or metric in the rail."
 								className="h-full rounded-md corner-squircle squircle:rounded-xl"
 							/>
@@ -256,7 +288,7 @@ export function RepoSessionBoxes({ fill = false }: { fill?: boolean }) {
 					) : (
 						<Reveal
 							label="Loading sessions"
-							loading={boxes.data === undefined}
+							loading={!loaded}
 							sample={
 								<div style={{ height: height - 2 * GAP }}>
 									<ContextMapSample fill />
@@ -271,14 +303,20 @@ export function RepoSessionBoxes({ fill = false }: { fill?: boolean }) {
 									style={
 										{
 											height,
-											"--tint": METRIC_APPEARANCE[metric].color,
+											"--tint": look.color,
 										} as CSSProperties
 									}
 								>
 									{tiles.map((tile) => (
 										<SessionTile
 											key={tile.key}
-											metric={metric}
+											figure={
+												view === "usage"
+													? formatPoints(tile.value)
+													: view === "sessions"
+														? `${tile.session.agentRuns} run${tile.session.agentRuns === 1 ? "" : "s"}`
+														: formatMetric(tile.value, view)
+											}
 											tile={tile}
 											picked={tile.key === pickedKey}
 											dimmed={pickedSession !== null && tile.key !== pickedKey}
@@ -295,16 +333,14 @@ export function RepoSessionBoxes({ fill = false }: { fill?: boolean }) {
 						</Reveal>
 					)}
 				</div>
-				{boxes.data === undefined || tiles.length > 0 || ghosts.length > 0 ? (
+				{!loaded || tiles.length > 0 || ghosts.length > 0 ? (
 					<div
 						data-session-pick=""
 						className={cn(
 							"relative mt-[5px] flex flex-col",
 							fill ? "min-h-0 flex-1" : "h-[420px]",
 						)}
-						style={
-							{ "--tint": METRIC_APPEARANCE[metric].color } as CSSProperties
-						}
+						style={{ "--tint": look.color } as CSSProperties}
 					>
 						{pickedSession ? (
 							<SessionPreview sessionId={pickedSession.sessionId} />
@@ -393,13 +429,14 @@ function usePickedMove(
 
 function placeSessions(
 	sessions: readonly RepositorySessionBox[],
-	metric: BoxMetric,
+	view: BoxView,
+	usage: ReadonlyMap<string, number> | null,
 	width: number,
 	height: number,
 ): Tile[] {
 	if (width <= 0) return [];
 	const ranked = sessions
-		.map((session) => ({ session, value: sizeOf(session, metric) }))
+		.map((session) => ({ session, value: sizeOf(session, view, usage) }))
 		.filter((each) => each.value > 0);
 	const total = ranked.reduce((sum, each) => sum + each.value, 0);
 	if (total <= 0) return [];
@@ -438,13 +475,13 @@ const NAMED_SIDE = { h: 28, w: 56 } as const;
 const GHOST_LOOK = { className: tileLook("model").className };
 
 function SessionTile({
-	metric,
+	figure,
 	tile,
 	picked,
 	dimmed,
 	onPick,
 }: {
-	metric: BoxMetric;
+	figure: string;
 	tile: Tile;
 	picked: boolean;
 	dimmed: boolean;
@@ -459,10 +496,6 @@ function SessionTile({
 	const showGlyph = w >= TILE_ICON_ROOM && h >= TILE_ICON_ROOM;
 	const session = tile.session;
 	const label = shortId(session.sessionId);
-	const figure =
-		metric === "sessions"
-			? `${session.agentRuns} run${session.agentRuns === 1 ? "" : "s"}`
-			: formatMetric(tile.value, metric);
 	const Glyph = getModelIconComponent(session.model ?? undefined);
 	return (
 		<li

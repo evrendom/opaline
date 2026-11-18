@@ -268,6 +268,12 @@ export interface UsageTab {
 
 const USAGE_COLOR = "oklch(0.74 0.17 150)";
 
+export const USAGE_APPEARANCE = {
+	icon: IconBattery3Filled,
+	outline: IconBattery3,
+	color: USAGE_COLOR,
+} as const;
+
 export function CostChart({
 	dots,
 	data: dashboard,
