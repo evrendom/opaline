@@ -13,7 +13,9 @@ import {
 } from "react";
 import "./cost-dot-chart.css";
 import { Reveal } from "@/app/ui/bones";
+import { FlowFigure } from "@/app/ui/flow-number";
 import { OPALINE_OUTLINE } from "@/features/shell/components/shell-nav-icon";
+import { textFigure } from "@/lib/figure";
 import type { ChartInterval, groupChartTrend } from "./chart-interval";
 import {
 	type CalendarFit,
@@ -33,7 +35,6 @@ import {
 } from "./cost-dot-calendar";
 import { pebbleMasks } from "./cost-dot-pebble";
 import { useDotPick, useHoverDateStore } from "./cost-hover-date";
-import { RollingText } from "./cost-rolling-text";
 
 type ChartPoint = ReturnType<typeof groupChartTrend>[number];
 
@@ -283,7 +284,7 @@ function Axis({
 						<span className="cost-dot-axis-note">{mark.note}</span>
 					) : null}
 					{mark.rolling ? (
-						<RollingText text={mark.text} direction={direction} />
+						<FlowFigure figure={textFigure(mark.text)} trend={direction} />
 					) : (
 						mark.text
 					)}

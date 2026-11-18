@@ -46,6 +46,7 @@ import {
 	YAxis,
 } from "recharts";
 import { introRequested } from "@/app/first-open";
+import { FlowFigure, FlowNumber } from "@/app/ui/flow-number";
 import { Skeleton } from "@/app/ui/skeleton";
 import {
 	Tooltip as InfoTooltip,
@@ -58,6 +59,7 @@ import { useOptionalDateRange } from "@/features/analytics/date-range/DateRangeP
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { DemoTrendPreview } from "@/features/demo/demo-trend-preview";
 import { useOptionalOrganization } from "@/features/workspace/organization/useOrganization";
+import { type Figure, figureText } from "@/lib/figure";
 import { formatIsoDate } from "@/lib/format";
 import { type AreaShape, morphAreas, readAreaShape } from "./area-morph";
 import { SERIES_COLORS } from "./chart-colors";
@@ -93,6 +95,10 @@ import {
 	getMetricData,
 	getMetricTotal,
 	METRIC_LABELS,
+	metricFigure,
+	metricRatioFigure,
+	runDurationFigure,
+	TENTHS,
 } from "./cost-format";
 import {
 	createHoverDateStore,
@@ -100,7 +106,12 @@ import {
 	useDotPick,
 	useMarkedDate,
 } from "./cost-hover-date";
-import { formatPerRun, languageRates, perRunTick } from "./cost-language-rates";
+import {
+	formatPerRun,
+	languageRates,
+	perRunFigure,
+	perRunTick,
+} from "./cost-language-rates";
 import {
 	deepViewOf,
 	ExpandButton,
@@ -114,7 +125,6 @@ import {
 	MetricLoadingContext,
 	MetricOverrideContext,
 } from "./cost-rail-override";
-import { RollingText } from "./cost-rolling-text";
 import { COST_LABELS } from "./use-cost-dashboard";
 import type { MetricPreviews } from "./use-metric-previews";
 
@@ -680,13 +690,13 @@ export function CostChart({
 									overridesLoading
 										? undefined
 										: rates
-											? formatPerRun(rates.total.swears, true)
+											? perRunFigure(rates.total.swears)
 											: (overrides?.get(value) ??
 												(total === undefined
 													? undefined
 													: total === null || unknownCi
-														? "—"
-														: formatMetricRatio(
+														? ["—"]
+														: metricRatioFigure(
 																total,
 																value,
 																metricData?.denominator,
@@ -727,15 +737,15 @@ export function CostChart({
 												interval,
 											)
 								}
-								textAt={
+								figureAt={
 									rates
-										? (at: number) => formatPerRun(rates.swears[at] ?? 0, true)
+										? (at: number) => perRunFigure(rates.swears[at] ?? 0)
 										: undefined
 								}
 								format={
 									overrides?.has(value)
 										? undefined
-										: (amount: number) => formatMetric(amount, value)
+										: (amount: number) => metricFigure(amount, value)
 								}
 								onClick={() => onMetricChange(value)}
 								onIntent={
@@ -798,7 +808,11 @@ export function CostChart({
 											<i aria-hidden="true" />
 											Median{" "}
 											<strong>
-												{formatRunDuration(durationStats?.medianSeconds)}
+												<FlowFigure
+													figure={runDurationFigure(
+														durationStats?.medianSeconds,
+													)}
+												/>
 											</strong>
 										</button>
 										<button
@@ -817,7 +831,9 @@ export function CostChart({
 											<i aria-hidden="true" />
 											P95{" "}
 											<strong>
-												{formatRunDuration(durationStats?.p95Seconds)}
+												<FlowFigure
+													figure={runDurationFigure(durationStats?.p95Seconds)}
+												/>
 											</strong>
 										</button>
 									</>
@@ -834,15 +850,19 @@ export function CostChart({
 										<i aria-hidden="true" />
 										CI failures / PR{" "}
 										<strong>
-											{dashboard === undefined
-												? "…"
-												: ciData == null
-													? "—"
-													: formatMetricRatio(
-															ciData.total,
-															"ciFailuresPerPullRequest",
-															ciData.denominator,
-														)}
+											{dashboard === undefined ? (
+												"…"
+											) : ciData == null ? (
+												"—"
+											) : (
+												<FlowFigure
+													figure={metricRatioFigure(
+														ciData.total,
+														"ciFailuresPerPullRequest",
+														ciData.denominator,
+													)}
+												/>
+											)}
 										</strong>
 									</button>
 								) : null}
@@ -866,8 +886,15 @@ export function CostChart({
 								>
 									<span title="Time from pull request creation to merge.">
 										PR cycle time · Median{" "}
-										{formatRunDuration(data.cycleTimeStats.medianSeconds)} · P90{" "}
-										{formatRunDuration(data.cycleTimeStats.p90Seconds)}
+										<FlowFigure
+											figure={runDurationFigure(
+												data.cycleTimeStats.medianSeconds,
+											)}
+										/>{" "}
+										· P90{" "}
+										<FlowFigure
+											figure={runDurationFigure(data.cycleTimeStats.p90Seconds)}
+										/>
 									</span>
 								</output>
 							) : null}
@@ -875,11 +902,14 @@ export function CostChart({
 								<output className="cost-chart-coverage">
 									<span title="Sum of completed run durations; billing multipliers are not included.">
 										CI minutes (approximate billed Actions minutes):{" "}
-										{!ciHistoryAvailable
-											? "—"
-											: new Intl.NumberFormat("en-US", {
-													maximumFractionDigits: 1,
-												}).format(data.ciMinutes.total)}
+										{!ciHistoryAvailable ? (
+											"—"
+										) : (
+											<FlowNumber
+												value={data.ciMinutes.total}
+												format={TENTHS}
+											/>
+										)}
 									</span>
 								</output>
 							) : null}
@@ -1428,7 +1458,7 @@ function Metric({
 	secondary,
 	dates,
 	format,
-	textAt,
+	figureAt,
 	onClick,
 	onIntent,
 }: {
@@ -1437,7 +1467,7 @@ function Metric({
 	outlineIcon: Icon;
 	/** The card's accent: its glyph and sparkline. */
 	color: string;
-	value: string | undefined;
+	value: Figure | undefined;
 	qualifier: string | undefined;
 	primary?: boolean;
 	disabled?: boolean;
@@ -1449,8 +1479,8 @@ function Metric({
 	trend: number[] | undefined;
 	secondary?: number[];
 	dates?: string[];
-	format?: (value: number) => string;
-	textAt?: (index: number) => string;
+	format?: (value: number) => Figure;
+	figureAt?: (index: number) => Figure;
 	onClick: () => void;
 	onIntent?: () => void;
 }) {
@@ -1475,14 +1505,11 @@ function Metric({
 	const pinnedIndex = pinnedDate && dates ? dates.indexOf(pinnedDate) : -1;
 	const markedValue = markedIndex >= 0 ? trend?.[markedIndex] : undefined;
 	const shown =
-		markedIndex >= 0 && textAt
-			? textAt(markedIndex)
+		markedIndex >= 0 && figureAt
+			? figureAt(markedIndex)
 			: markedValue !== undefined && format
 				? format(markedValue)
 				: value;
-	const [roll, setRoll] = useState({ at: markedIndex, direction: 1 as 1 | -1 });
-	if (roll.at !== markedIndex)
-		setRoll({ at: markedIndex, direction: markedIndex >= roll.at ? 1 : -1 });
 	const [wasLoading, setWasLoading] = useState(loading);
 	const [revealing, setRevealing] = useState(false);
 	if (wasLoading !== loading) {
@@ -1528,10 +1555,10 @@ function Metric({
 						{qualifier ? (
 							<small className="cost-metric-qualifier">{qualifier}</small>
 						) : null}
-						{unavailable || shown === undefined ? (
-							value
+						{unavailable ? (
+							figureText(value)
 						) : (
-							<RollingText text={shown} direction={roll.direction} />
+							<FlowFigure figure={shown ?? value} />
 						)}
 					</span>
 				)}

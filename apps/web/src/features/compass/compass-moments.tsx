@@ -25,11 +25,13 @@ import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { SessionMenuPopup } from "@/features/sessions/components/session-menu-popup";
 import { formatReaderCost } from "@/features/sessions/reader/model/session-reader-model";
 import "@/features/sessions/components/session-menu.css";
+import { FlowNumber } from "@/app/ui/flow-number";
 import {
 	ShellNavIcon,
 	type ShellNavTone,
 } from "@/features/shell/components/shell-nav-icon";
 import { useUserMap } from "@/features/workspace/hooks/useUserMap";
+import { PLAIN_NUMBER } from "@/lib/figure";
 import { client } from "@/lib/orpc";
 import {
 	layerGroup,
@@ -157,7 +159,9 @@ export function KindsMenu({
 			>
 				Flags
 				{kinds.length > 0 ? (
-					<span className="compass-filter-count">{kinds.length}</span>
+					<span className="compass-filter-count">
+						<FlowNumber value={kinds.length} format={PLAIN_NUMBER} />
+					</span>
 				) : null}
 				<IconChevronDown aria-hidden="true" className="size-3.5" />
 			</Menu.Trigger>

@@ -1,6 +1,7 @@
 import type { LiveSessionSummary } from "@rudel/api-routes";
+import { FlowFigure } from "@/app/ui/flow-number";
 import {
-	formatLiveSessionActivity,
+	liveSessionActivityFigure,
 	readLiveSessionState,
 } from "../live-session-model";
 import { useLiveClock } from "../use-live-sessions";
@@ -42,7 +43,9 @@ export function LiveSessionStatus({
 						className="whitespace-nowrap text-xs text-muted-foreground"
 						dateTime={session.lastActivityAt}
 					>
-						{formatLiveSessionActivity(session.lastActivityAt, nowMs)}
+						<FlowFigure
+							figure={liveSessionActivityFigure(session.lastActivityAt, nowMs)}
+						/>
 					</time>
 				</span>
 			}

@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
 import { TooltipProvider } from "@/app/ui/tooltip";
 import { WorkspaceStateProvider } from "@/features/workspace/organization/OrganizationProvider";
+import { elementText } from "@/test/markup-text";
 import { CostChart } from "./cost-chart";
 import { githubOutcomesDashboardFixture } from "./github-outcomes-dashboard.fixture";
 
@@ -150,7 +151,9 @@ describe("GitHub chart", () => {
 			screen.getByRole("button", { name: "P95 duration" }),
 		).toHaveAttribute("title", "Duration from run start to its last update.");
 		expect(
-			screen.getByText("CI minutes (approximate billed Actions minutes): 4"),
-		).toBeInTheDocument();
+			elementText(
+				screen.getByText(/^CI minutes \(approximate billed Actions minutes\):/),
+			),
+		).toBe("CI minutes (approximate billed Actions minutes): 4");
 	});
 });

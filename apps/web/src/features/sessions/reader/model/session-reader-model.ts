@@ -1,6 +1,8 @@
+import type { Format } from "@number-flow/react";
 import type { SessionDetailTurnSummary } from "@rudel/api-routes";
 import type { SessionReaderBody } from "@rudel/api-routes/session-context/session-reader-body";
-import { formatHalfHours } from "@/lib/format";
+import { type Figure, figureText } from "@/lib/figure";
+import { halfHoursFigure, unitFigure } from "@/lib/format";
 import type { SessionReaderStep } from "./session-reader-run-steps";
 
 type TraceEvent = NonNullable<SessionReaderStep["toolEvent"]>;
@@ -256,32 +258,38 @@ export function getCostShade(
 	return COST_HEAT_SHADES[Math.min(bucket, COST_HEAT_SHADES.length - 1)];
 }
 
-export function formatReaderDuration(seconds: number | null): string {
-	if (seconds === null) return "—";
-	if (seconds < 1) return "<1s";
+export function readerDurationFigure(seconds: number | null): Figure {
+	if (seconds === null) return ["—"];
+	if (seconds < 1) return [{ ...unitFigure(1, "s"), prefix: "<" }];
 	const whole = Math.round(seconds);
-	if (whole < 60) return `${whole}s`;
+	if (whole < 60) return [unitFigure(whole, "s")];
 	const minutes = Math.floor(whole / 60);
 	if (minutes < 60) {
 		const rest = whole % 60;
-		return rest ? `${minutes}m ${rest}s` : `${minutes}m`;
+		return rest
+			? [unitFigure(minutes, "m"), " ", unitFigure(rest, "s")]
+			: [unitFigure(minutes, "m")];
 	}
-	return formatHalfHours(seconds);
+	return halfHoursFigure(seconds);
 }
 
-const costFormatter = new Intl.NumberFormat("en-US", {
+export function formatReaderDuration(seconds: number | null): string {
+	return figureText(readerDurationFigure(seconds));
+}
+
+const CENTS: Format = {
 	currency: "USD",
 	maximumFractionDigits: 2,
 	minimumFractionDigits: 2,
 	style: "currency",
-});
+};
 
 /** Cents precision: per-turn costs are compared at a glance, not audited. */
-const wholeDollarFormatter = new Intl.NumberFormat("en-US", {
+const WHOLE_DOLLARS: Format = {
 	currency: "USD",
 	maximumFractionDigits: 0,
 	style: "currency",
-});
+};
 
 export function getReaderRunMode(body: SessionReaderBody): {
 	modelSetting: string | undefined;
@@ -298,11 +306,15 @@ export function getReaderRunMode(body: SessionReaderBody): {
 	return { modelSetting, planMode };
 }
 
+export function readerCostFigure(value: number | null): Figure {
+	if (value === null) return ["—"];
+	if (value > 0 && value < 0.01)
+		return [{ value: 0.01, format: CENTS, prefix: "<" }];
+	return [{ value, format: Math.abs(value) >= 10 ? WHOLE_DOLLARS : CENTS }];
+}
+
 export function formatReaderCost(value: number | null): string {
-	if (value === null) return "—";
-	if (value > 0 && value < 0.01) return "<$0.01";
-	if (Math.abs(value) >= 10) return wholeDollarFormatter.format(value);
-	return costFormatter.format(value);
+	return figureText(readerCostFigure(value));
 }
 
 const KIB = 1024;

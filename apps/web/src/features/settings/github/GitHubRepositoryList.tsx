@@ -2,6 +2,8 @@ import type { GitHubRepositoryConnectionStatus } from "@rudel/api-routes";
 import { IconFolder, IconSearch } from "@tabler/icons-react";
 import { useState } from "react";
 import "@/features/settings/sessions/sessions-settings.css";
+import { FlowNumber } from "@/app/ui/flow-number";
+import { PLAIN_NUMBER } from "@/lib/figure";
 
 type GitHubRepository =
 	GitHubRepositoryConnectionStatus["repositories"][number];
@@ -121,9 +123,18 @@ function SyncStatus({
 		: !sync || sync.state === "syncing"
 			? ([
 					"unknown",
-					sync?.progress === undefined
-						? "Syncing"
-						: `Syncing ${Math.floor(sync.progress * 100)}%`,
+					sync?.progress === undefined ? (
+						"Syncing"
+					) : (
+						<>
+							Syncing{" "}
+							<FlowNumber
+								value={Math.floor(sync.progress * 100)}
+								format={PLAIN_NUMBER}
+								suffix="%"
+							/>
+						</>
+					),
 				] as const)
 			: sync.state === "ready"
 				? (["enabled", "Synced"] as const)

@@ -1,3 +1,4 @@
+import type { Format } from "@number-flow/react";
 import {
 	IconArrowDown,
 	IconArrowsSort,
@@ -10,6 +11,7 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
+import { FlowNumber } from "@/app/ui/flow-number";
 import { Button } from "@/components/dashboard/button";
 import {
 	InputGroup,
@@ -24,8 +26,8 @@ import {
 	SelectTrigger,
 } from "@/components/dashboard/select";
 import { TableHead } from "@/components/dashboard/table";
+import { PLAIN_NUMBER } from "@/lib/figure";
 import { cn } from "@/lib/utils";
-import { formatCount } from "./format";
 
 // List-table toolkit, so Opaline's list pages share the same chrome.
 
@@ -355,6 +357,8 @@ export function ClearFiltersButton({
 	);
 }
 
+const COMPACT_COUNT: Format = { notation: "compact" };
+
 /** Minimal pagination footer: "1,240 repos / 1 to 25" in muted text plus two
  * chevrons, right-aligned. The range doubles as a rows-per-page picker when
  * `onPageSizeChange` is provided. No page numbers — lists here are browsed
@@ -387,11 +391,23 @@ export function PaginationFooter({
 }) {
 	const totalPages = Math.max(page + 1, Math.ceil(total / pageSize) || 1);
 	const range =
-		shown === 0 ? "0" : `${page * pageSize + 1} to ${page * pageSize + shown}`;
+		shown === 0 ? (
+			"0"
+		) : (
+			<>
+				<FlowNumber value={page * pageSize + 1} format={PLAIN_NUMBER} /> to{" "}
+				<FlowNumber value={page * pageSize + shown} format={PLAIN_NUMBER} />
+			</>
+		);
+	const count = Math.round(total);
 	return (
 		<div className="flex items-center justify-end gap-1 border-t border-border/50 px-6 pt-4 dark:border-border/40">
 			<span className="text-xs text-muted-foreground/50 tabular-nums">
-				{formatCount(total)} {total === 1 ? noun[0] : noun[1]}
+				<FlowNumber
+					value={count}
+					format={count >= 1000 ? COMPACT_COUNT : undefined}
+				/>{" "}
+				{total === 1 ? noun[0] : noun[1]}
 			</span>
 			<span className="text-xs text-muted-foreground/20 mx-3">/</span>
 			{onPageSizeChange ? (

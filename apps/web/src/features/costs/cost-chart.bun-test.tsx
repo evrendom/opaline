@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import { TooltipProvider } from "@/app/ui/tooltip";
 import { WorkspaceStateProvider } from "@/features/workspace/organization/OrganizationProvider";
+import { markupText } from "@/test/markup-text";
 import {
 	getChartSeriesValue,
 	groupChartTrend,
@@ -20,7 +21,7 @@ function cardValue(html: string, label: string) {
 	const value = card?.match(
 		/<span class="cost-metric-value">([\s\S]*?)<\/span><\/div>/,
 	)?.[1];
-	return value?.replace(/<[^>]+>/g, "");
+	return value === undefined ? undefined : markupText(value);
 }
 
 function renderCiChart(data: CostDashboard) {
@@ -104,7 +105,9 @@ test("fully covered no-Actions repositories retain genuine zero CI runs and minu
 	ciRuns.trend = [{ date: "2026-09-30", total: 0, values: { total: 0 } }];
 	const html = renderCiChart(data);
 	expect(cardValue(html, "CI runs")).toBe("0");
-	expect(html).toContain("CI minutes (approximate billed Actions minutes): 0");
+	expect(markupText(html)).toContain(
+		"CI minutes (approximate billed Actions minutes): 0",
+	);
 	expect(html).toContain("No CI runs in this selection");
 	expect(html).not.toContain('data-unavailable="true"');
 	const point = groupChartTrend(ciRuns.trend, "daily")[0];

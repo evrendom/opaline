@@ -1,3 +1,4 @@
+import type { Format } from "@number-flow/react";
 import type {
 	CostDashboard,
 	CostDashboardRequestedMetric,
@@ -5,6 +6,8 @@ import type {
 	DashboardMetric,
 } from "@rudel/api-routes";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
+import { type Figure, figureText } from "@/lib/figure";
+import { unitFigure } from "@/lib/format";
 
 export const METRIC_LABELS = {
 	cost: "Cost",
@@ -55,18 +58,26 @@ export function getMetricTotal(
 ) {
 	return data === undefined ? undefined : (data.metrics[metric]?.total ?? null);
 }
-export function formatMetric(value: number, metric: DashboardMetric) {
-	if (metric === "ciFailuresPerPullRequest") {
-		return new Intl.NumberFormat("en-US", {
-			maximumFractionDigits: 2,
-			minimumFractionDigits: 0,
-		}).format(value);
-	}
+const RATIO_FORMAT: Format = {
+	maximumFractionDigits: 2,
+	minimumFractionDigits: 0,
+};
+const COUNT_FORMAT: Format = { maximumFractionDigits: 0 };
+const COST_FORMAT: Format = {
+	style: "currency",
+	currency: "USD",
+	minimumFractionDigits: 2,
+	maximumFractionDigits: 2,
+};
+export function metricFigure(value: number, metric: DashboardMetric): Figure {
+	if (metric === "ciFailuresPerPullRequest")
+		return [{ value, format: RATIO_FORMAT }];
 	return metric === "cost"
-		? formatCost(value)
-		: new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(
-				value,
-			);
+		? costFigure(value)
+		: [{ value, format: COUNT_FORMAT }];
+}
+export function formatMetric(value: number, metric: DashboardMetric) {
+	return figureText(metricFigure(value, metric));
 }
 
 const COMPACT_TICK = new Intl.NumberFormat("en-US", {
@@ -78,37 +89,53 @@ export function formatChartValueTick(value: number, metric: DashboardMetric) {
 	return `${metric === "cost" ? "$" : ""}${COMPACT_TICK.format(value)}`;
 }
 
+export function metricRatioFigure(
+	value: number,
+	metric: DashboardMetric,
+	denominator: number | undefined,
+): Figure {
+	return metric === "ciFailuresPerPullRequest" && denominator === 0
+		? ["—"]
+		: metricFigure(value, metric);
+}
 export function formatMetricRatio(
 	value: number,
 	metric: DashboardMetric,
 	denominator: number | undefined,
 ) {
-	return metric === "ciFailuresPerPullRequest" && denominator === 0
-		? "—"
-		: formatMetric(value, metric);
+	return figureText(metricRatioFigure(value, metric, denominator));
+}
+export function costFigure(value: number): Figure {
+	return value > 0 && value < 0.01
+		? [{ value: 0.01, format: COST_FORMAT, prefix: "<" }]
+		: [{ value, format: COST_FORMAT }];
 }
 export function formatCost(value: number) {
-	if (value > 0 && value < 0.01) return "<$0.01";
-	return new Intl.NumberFormat("en-US", {
-		style: "currency",
-		currency: "USD",
-		minimumFractionDigits: 2,
-		maximumFractionDigits: 2,
-	}).format(value);
+	return figureText(costFigure(value));
 }
-export function formatRunDuration(value: number | null | undefined): string {
-	if (value === null || value === undefined) return "—";
+export const TENTHS: Format = { maximumFractionDigits: 1 };
+export function runDurationFigure(value: number | null | undefined): Figure {
+	if (value === null || value === undefined) return ["—"];
 	if (value < 60) {
-		if (value > 0 && value < 0.1) return "<0.1s";
-		return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(value)}s`;
+		if (value > 0 && value < 0.1)
+			return [{ value: 0.1, format: TENTHS, prefix: "<", suffix: "s" }];
+		return [{ value, format: TENTHS, suffix: "s" }];
 	}
 	const seconds = Math.round(value);
 	const hours = Math.floor(seconds / 3600);
 	const minutes = Math.floor((seconds % 3600) / 60);
 	const remainder = seconds % 60;
-	return hours > 0
-		? `${hours}h${minutes ? ` ${minutes}m` : ""}`
-		: `${minutes}m${remainder ? ` ${remainder}s` : ""}`;
+	const [major, minor] =
+		hours > 0
+			? [unitFigure(hours, "h"), minutes ? unitFigure(minutes, "m") : null]
+			: [
+					unitFigure(minutes, "m"),
+					remainder ? unitFigure(remainder, "s") : null,
+				];
+	return minor ? [major, " ", minor] : [major];
+}
+export function formatRunDuration(value: number | null | undefined): string {
+	return figureText(runDurationFigure(value));
 }
 export function costLabel(dimension: CostDimension, label: string) {
 	if (dimension === "signalTypes") {

@@ -1,6 +1,8 @@
 import type { Icon } from "@tabler/icons-react";
 import type { ComponentType, ReactNode } from "react";
+import { FlowFigure } from "@/app/ui/flow-number";
 import { StatCard } from "@/components/dashboard/page-parts";
+import type { Figure } from "@/lib/figure";
 import { cn } from "@/lib/utils";
 import { useCompactionShare } from "../context/session-reader-context-compaction";
 import type { ContextMeasure } from "../context/session-reader-context-measure";
@@ -18,7 +20,7 @@ export type SummaryFigure = {
 	valueTip?: ReactNode;
 	measure?: ContextMeasure;
 	tint: string;
-	value: string;
+	value: Figure;
 };
 
 function groupOf(figure: SummaryFigure): FlagGroup {
@@ -58,7 +60,7 @@ export function SummaryFigures({
 					const { measure: picks } = stat;
 					const own =
 						picked && picks
-							? (picked.figures[picks] ?? "—")
+							? (picked.figures[picks] ?? ["—"])
 							: share && picks === "cost"
 								? share
 								: null;
@@ -78,7 +80,7 @@ export function SummaryFigures({
 									onSelect={picks ? () => onMeasure(picks) : undefined}
 									selected={picks === measure}
 									title={stat.detail || undefined}
-									value={own ?? stat.value}
+									value={<FlowFigure figure={own ?? stat.value} />}
 								/>
 							</div>
 							{flags ? (

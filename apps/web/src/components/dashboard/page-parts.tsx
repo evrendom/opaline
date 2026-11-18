@@ -1,12 +1,7 @@
+import type { Format } from "@number-flow/react";
 import type { Icon } from "@tabler/icons-react";
-import { animate } from "motion/react";
-import {
-	useCallback,
-	useEffect,
-	useLayoutEffect,
-	useRef,
-	useState,
-} from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { FlowNumber } from "@/app/ui/flow-number";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import { Card, CardHeader, CardTitle } from "@/components/dashboard/card";
 import {
@@ -119,46 +114,7 @@ export function TableRowsSkeleton({
 	);
 }
 
-const defaultTickerFormat = (n: number) => Math.round(n).toLocaleString();
-
-/**
- * Animated numeric stat: when `value` changes, the digits tween from the old
- * number to the new one, with every intermediate frame run through `format`
- * so the string stays properly formatted ("$1.23", "87%", "1.2K") the whole
- * way. The first paint is static — only later changes animate.
- */
-function TickerValue({
-	value,
-	format,
-}: {
-	value: number;
-	format: (n: number) => string;
-}) {
-	const [display, setDisplay] = useState(() => format(value));
-	const animatedFrom = useRef(value);
-	// The formatter is often an inline closure — keep the latest without
-	// retriggering the animation effect.
-	const formatRef = useRef(format);
-	formatRef.current = format;
-
-	useEffect(() => {
-		const from = animatedFrom.current;
-		if (from === value) {
-			setDisplay(formatRef.current(value));
-			return;
-		}
-		animatedFrom.current = value;
-		const controls = animate(from, value, {
-			duration: 0.6,
-			ease: "easeOut",
-			onUpdate: (v) => setDisplay(formatRef.current(v)),
-			onComplete: () => setDisplay(formatRef.current(value)),
-		});
-		return () => controls.stop();
-	}, [value]);
-
-	return <span>{display}</span>;
-}
+const WHOLE: Format = { maximumFractionDigits: 0 };
 
 /**
  * A single metric tile for a stat strip: icon + label on the left, the value on
@@ -180,7 +136,7 @@ export function StatCard({
 	value,
 	icon: StatIcon,
 	iconClassName,
-	formatValue,
+	valueFormat,
 	title,
 	loading = false,
 	skeleton = false,
@@ -197,7 +153,7 @@ export function StatCard({
 	value: React.ReactNode;
 	icon?: Icon | React.ComponentType<{ className?: string }>;
 	iconClassName?: string;
-	formatValue?: (n: number) => string;
+	valueFormat?: Format;
 	/** Native tooltip for the value (e.g. the hint the card no longer shows). */
 	title?: string;
 	loading?: boolean;
@@ -285,10 +241,7 @@ export function StatCard({
 									/>
 								</span>
 							) : typeof value === "number" ? (
-								<TickerValue
-									value={value}
-									format={formatValue ?? defaultTickerFormat}
-								/>
+								<FlowNumber value={value} format={valueFormat ?? WHOLE} />
 							) : (
 								value
 							)}

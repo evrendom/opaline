@@ -1,9 +1,10 @@
 import type { RepositoryRunFigures } from "@rudel/api-routes";
 import { createContext, type ReactNode } from "react";
+import type { Figure } from "@/lib/figure";
 
 export const MetricOverrideContext = createContext<ReadonlyMap<
 	string,
-	string
+	Figure
 > | null>(null);
 
 export const RangeLeadContext = createContext<ReactNode>(null);

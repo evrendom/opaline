@@ -2,10 +2,11 @@ import type { SessionDetailTurnSummary } from "@rudel/api-routes";
 import { resolveModelPricing } from "@rudel/api-routes/model-pricing";
 import { createContext, useContext } from "react";
 import { shortSubagentId } from "@/features/sessions/run-id";
-import { formatCompactNumber } from "@/lib/format";
+import { type Figure, figureText } from "@/lib/figure";
+import { compactNumberFigure } from "@/lib/format";
 import {
-	formatReaderCost,
-	formatReaderDuration,
+	readerCostFigure,
+	readerDurationFigure,
 } from "../model/session-reader-model";
 import { SUBAGENTS_PART } from "./session-reader-context-collect";
 import { callContextTokens } from "./session-reader-context-fill";
@@ -23,6 +24,7 @@ export type ContextMeasure = "context" | "cost" | "runs" | "time";
 type UsageCall = SessionDetailTurnSummary["usageCalls"][number];
 
 export type MeasureLook = {
+	figure: (value: number) => Figure;
 	format: (value: number) => string;
 	freeNote: string;
 	freeWord: string;
@@ -30,30 +32,35 @@ export type MeasureLook = {
 	windowed: boolean;
 };
 
+const measured = (figure: (value: number) => Figure) => ({
+	figure,
+	format: (value: number) => figureText(figure(value)),
+});
+
 export const MEASURE_LOOK: Record<ContextMeasure, MeasureLook> = {
 	context: {
-		format: formatCompactNumber,
+		...measured(compactNumberFigure),
 		freeNote: "Room left",
 		freeWord: "Free",
 		label: "Context",
 		windowed: true,
 	},
 	cost: {
-		format: (value) => formatReaderCost(value / 1e6),
+		...measured((value) => readerCostFigure(value / 1e6)),
 		freeNote: "Room left",
 		freeWord: "Free",
 		label: "Cost",
 		windowed: false,
 	},
 	runs: {
-		format: formatCompactNumber,
+		...measured(compactNumberFigure),
 		freeNote: "Room left",
 		freeWord: "Free",
 		label: "Runs",
 		windowed: true,
 	},
 	time: {
-		format: (value) => formatReaderDuration(value / 1000),
+		...measured((value) => readerDurationFigure(value / 1000)),
 		freeNote: "No step running",
 		freeWord: "Idle",
 		label: "Time",

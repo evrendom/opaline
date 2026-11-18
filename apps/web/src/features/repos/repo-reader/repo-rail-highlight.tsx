@@ -15,7 +15,7 @@ import {
 	DotLoadingContext,
 	DotMarkContext,
 } from "@/features/costs/cost-dot-chart";
-import { formatMetric } from "@/features/costs/cost-format";
+import { metricFigure } from "@/features/costs/cost-format";
 import {
 	MetricBreakdownContext,
 	MetricEmptyContext,
@@ -23,6 +23,7 @@ import {
 	MetricOverrideContext,
 	RangeLeadContext,
 } from "@/features/costs/cost-rail-override";
+import type { Figure } from "@/lib/figure";
 import {
 	type RepoReaderTab,
 	repoTabIcon,
@@ -83,9 +84,9 @@ function emptyOf(figures: RailFigures): ReadonlySet<string> {
 function overridesOf(figures: RailFigures) {
 	const shown = (
 		value: number | null,
-		metric: Parameters<typeof formatMetric>[1],
-	) => (value === null ? UNKNOWN : formatMetric(value, metric));
-	return new Map<string, string>([
+		metric: Parameters<typeof metricFigure>[1],
+	) => (value === null ? [UNKNOWN] : metricFigure(value, metric));
+	return new Map<string, Figure>([
 		["cost", shown(figures.cost, "cost")],
 		["sessions", shown(figures.sessions, "sessions")],
 		["agentRuns", shown(figures.agentRuns, "agentRuns")],
