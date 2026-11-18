@@ -361,7 +361,7 @@ export function SessionsOverviewTable({
 					/>
 					<div
 						className={cn(
-							"@container/sessions-overview flex min-h-[calc(100%-var(--scroll-fade-top-offset,3rem))] flex-col",
+							"@container/sessions-overview flex min-h-[calc(100%-var(--scroll-fade-top-offset,3rem))] flex-col in-data-rail-beside:pr-1.5",
 							showSkillsColumn && SESSION_OVERVIEW_MIN_WIDTH_CLASS_NAME,
 						)}
 						data-slot="sessions-overview-canvas"
