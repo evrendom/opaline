@@ -16,17 +16,31 @@ function icon(agent, className = "app-icon") {
 	return source ? `<img class="${className}" src="${source}" alt="" />` : "";
 }
 
-function countUp(element, target, duration = 1200) {
-	const start = performance.now();
+const COUNT_TIMING = { duration: 1100, easing: "cubic-bezier(0.25, 1, 0.5, 1)" };
+const WHOLE = { maximumFractionDigits: 0 };
+
+function countUp(element, target) {
+	let flow = element.querySelector("number-flow");
+	const fresh = !flow;
+	if (fresh) {
+		flow = Object.assign(document.createElement("number-flow"), { locales: "en-US", format: WHOLE });
+		element.replaceChildren(flow);
+	}
 	const from = Number(element.dataset.value ?? 0);
 	element.dataset.value = String(target);
-	const frame = (now) => {
-		const progress = Math.min(1, (now - start) / duration);
-		const eased = 1 - (1 - progress) ** 4;
-		element.textContent = number(from + (target - from) * eased);
-		if (progress < 1) requestAnimationFrame(frame);
-	};
-	requestAnimationFrame(frame);
+	if (fresh) {
+		const digits = new Intl.NumberFormat("en-US", WHOLE).formatToParts(target).filter((part) => part.type === "integer").reduce((sum, part) => sum + part.value.length, 0);
+		flow.format = { ...WHOLE, minimumIntegerDigits: digits };
+		flow.update(from);
+	}
+	requestAnimationFrame(() => {
+		flow.spinTiming = COUNT_TIMING;
+		flow.update(target);
+		setTimeout(() => {
+			flow.spinTiming = undefined;
+			flow.format = WHOLE;
+		}, COUNT_TIMING.duration + 100);
+	});
 }
 
 function totals() {
@@ -136,7 +150,7 @@ function render() {
 	for (const element of body.querySelectorAll("[data-count]"))
 		countUp(element, Number(element.dataset.count || 0));
 	if (name === "reading" && state.scan)
-		countUp(body.querySelector("[data-count]"), state.scan.claude + state.scan.codex, 900);
+		countUp(body.querySelector("[data-count]"), state.scan.claude + state.scan.codex);
 	button.classList.toggle("glow", name === "ready");
 	button.disabled = name === "reading";
 	button.textContent = name === "reading" ? "Reading…" : name === "ready" ? "Open Opaline" : "Continue";
@@ -162,7 +176,7 @@ function start() {
 	state.analysis = (async () => {
 		state.scan = await api.scan();
 		const counter = body.querySelector(".reading [data-count]");
-		if (counter) countUp(counter, state.scan.claude + state.scan.codex, 900);
+		if (counter) countUp(counter, state.scan.claude + state.scan.codex);
 		state.result = await api.analyze();
 	})();
 	go(0);

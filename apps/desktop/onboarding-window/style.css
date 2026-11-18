@@ -2078,27 +2078,6 @@ h3 {
 	outline: none !important;
 }
 
-.roll {
-	display: inline-flex;
-	white-space: pre;
-}
-
-.roll-slot {
-	position: relative;
-	display: inline-flex;
-	justify-content: center;
-}
-
-.roll-glyph {
-	display: inline-block;
-}
-
-.roll-glyph[data-out] {
-	position: absolute;
-	left: 50%;
-	translate: -50% 0;
-}
-
 :root {
 	--shell-chrome: oklch(0.145 0 0);
 	--shell-panel: oklch(0.17 0 0);
