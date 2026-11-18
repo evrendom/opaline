@@ -73,6 +73,12 @@ import {
 	pendingTurnsPx,
 	TURN_GAP_PX,
 } from "./reader-turns-pending";
+import {
+	readUseHint,
+	stepOfHint,
+	turnOfHint,
+	USE_PARAM,
+} from "./reader-use-hint";
 import { FocusedSubagent } from "./session-reader-focused-subagent";
 import { ReaderHiddenContext } from "./session-reader-hidden-steps";
 import { ReaderStepJump } from "./session-reader-step-jump";
@@ -143,8 +149,10 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 		() => matchRunAnswersToTurns(runAnswers?.runs ?? [], turns),
 		[runAnswers, turns],
 	);
+	const [hint] = useState(() => readUseHint(searchParams.get(USE_PARAM)));
+	const [hintTurn] = useState(() => hint && turnOfHint(hint, turns));
 	const opening = useReaderOpening(overview.session.sessionId, {
-		asked: searchParams.get(TURN_PARAM) ?? undefined,
+		asked: searchParams.get(TURN_PARAM) ?? hintTurn ?? undefined,
 		follows: followNewest,
 		subagent: searchParams.has(AGENT_PARAM),
 	});
@@ -175,7 +183,25 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 	);
 	const listRef = useRef<LegendListRef | null>(null);
 	const turnPin = useTurnPin(turnElementsRef);
-	useReaderOpenCall(runUi, searchParams, turnPin, turnElementsRef);
+	const getBodyRef = useRef(getBody);
+	getBodyRef.current = getBody;
+	useReaderOpenCall(
+		runUi,
+		searchParams,
+		turnPin,
+		turnElementsRef,
+		hint && hintTurn
+			? {
+					turn: hintTurn,
+					findStep: () =>
+						stepOfHint(
+							hint,
+							getBodyRef.current(hintTurn),
+							turns.find((turn) => turn.turnId === hintTurn),
+						),
+				}
+			: undefined,
+	);
 	const { focus, focusTurn, laterTurns, pickTurn, setFocus } = useReaderFocus({
 		complete: turns.length >= totalTurns,
 		pendingScrollTurnIdRef,

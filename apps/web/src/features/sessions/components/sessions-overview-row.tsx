@@ -103,7 +103,7 @@ type SessionsOverviewRowProps = {
 	userLabel: string;
 	/** Run questions answered yes about the session's runs; shown with the skills. */
 	questionTags?: readonly SessionRunQuestionTag[];
-	mcpServers?: readonly string[];
+	mcpServers?: readonly { server: string; at: number }[];
 	/** Set on a row that folds a panel beneath it: clicking toggles it and
 	 * the model mark shows the disclosure, instead of opening the session. */
 	expanded?: boolean;
@@ -436,6 +436,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 				<SessionOverviewToolTags
 					skills={showSkillsColumn ? [] : session.skills}
 					mcpServers={mcpServers}
+					sessionHref={isClickable ? sessionHref : undefined}
 				/>
 				<SessionOverviewLanguageSignals session={session} speaker="model" />
 				{!failure &&

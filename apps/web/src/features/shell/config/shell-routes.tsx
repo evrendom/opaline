@@ -60,6 +60,8 @@ const tones = {
 
 /** The Sessions section's colour, for session views that wear its chip. */
 export const sessionsTone = tones.opal2;
+export const skillsTone = tones.opal3;
+export const mcpTone = tones.opal5;
 
 export type ShellRouteDefinition = {
 	id: ShellRouteId;
@@ -119,7 +121,7 @@ export const shellRoutes = [
 		shortcut: "K",
 		icon: IconBook,
 		activeIcon: IconBookFilled,
-		tone: tones.opal3,
+		tone: skillsTone,
 	},
 	{
 		id: "repos",
@@ -141,7 +143,7 @@ export const shellRoutes = [
 		shortcut: "M",
 		icon: IconPlug,
 		activeIcon: IconPlugFilled,
-		tone: tones.opal5,
+		tone: mcpTone,
 	},
 	{
 		id: "settings",

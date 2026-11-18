@@ -13,18 +13,31 @@ export function useReaderOpenCall(
 	searchParams: URLSearchParams,
 	turnPin: ReturnType<typeof useTurnPin>,
 	turnElementsRef: RefObject<Map<string, HTMLElement>>,
+	use?: { turn: string; findStep: () => string | null | undefined },
 ) {
 	useMountEffect(() => {
-		const call = searchParams.get(CALL_PARAM);
-		const turn = searchParams.get(TURN_PARAM);
-		if (!call || !turn) return;
-		runUi.pick(turn, call);
-		const selector = `[data-step-row="${CSS.escape(call)}"]`;
-		const rowOf = () => document.querySelector<HTMLElement>(selector);
+		let call = searchParams.get(CALL_PARAM);
+		const turn = searchParams.get(TURN_PARAM) ?? use?.turn;
+		if (!turn || (!call && !use)) return;
+		if (call) runUi.pick(turn, call);
+		const rowOf = () =>
+			call
+				? document.querySelector<HTMLElement>(
+						`[data-step-row="${CSS.escape(call)}"]`,
+					)
+				: null;
 		let frame = 0;
 		let release = () => {};
 		const until = performance.now() + WAIT_MS;
 		const find = () => {
+			if (!call && use) {
+				const found = use.findStep();
+				if (found === null) return;
+				if (found) {
+					call = found;
+					runUi.pick(turn, call);
+				}
+			}
 			const row = rowOf();
 			const scroller = readerScrollerOf(row);
 			if (!row || !scroller) {

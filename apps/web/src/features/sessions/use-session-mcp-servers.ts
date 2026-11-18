@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useLocalDesktopApp } from "@/features/desktop/local-app";
 import { useOptionalOrganization } from "@/features/workspace/organization/useOrganization";
 import { orpc } from "@/lib/orpc";
+import type { SessionMcpServerUse } from "./components/session-overview-tool-tags";
 
 const MCP_SERVERS_STALE_TIME_MS = 60 * 1000;
 
@@ -16,7 +17,7 @@ function chunk<T>(items: readonly T[], size: number): T[][] {
 
 export function useSessionMcpServers(
 	sessionIds: readonly string[],
-): ReadonlyMap<string, readonly string[]> {
+): ReadonlyMap<string, readonly SessionMcpServerUse[]> {
 	const local = useLocalDesktopApp();
 	const organizationId = useOptionalOrganization()?.state.activeOrg?.id;
 	const pages = useMemo(
@@ -37,7 +38,7 @@ export function useSessionMcpServers(
 			};
 		}),
 		combine: (results) => {
-			const servers = new Map<string, readonly string[]>();
+			const servers = new Map<string, readonly SessionMcpServerUse[]>();
 			for (const result of results)
 				for (const [id, names] of Object.entries(result.data ?? {}))
 					servers.set(id, names);

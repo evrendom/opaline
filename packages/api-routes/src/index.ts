@@ -1460,7 +1460,12 @@ export const contract = {
 							.max(SESSION_MCP_SERVERS_MAX_SESSIONS),
 					}),
 				)
-				.output(z.record(z.string(), z.array(z.string()))),
+				.output(
+					z.record(
+						z.string(),
+						z.array(z.object({ server: z.string(), at: z.number() })),
+					),
+				),
 			filterCatalog: oc
 				.input(SessionFilterCatalogInputSchema)
 				.output(SessionFilterCatalogSchema),
