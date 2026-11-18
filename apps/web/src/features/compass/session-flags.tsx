@@ -21,6 +21,7 @@ import { MOMENT_KINDS_APPEARANCE } from "./moment-labels";
 import { useCompassAccess } from "./use-compass-access";
 
 const MAX_PAGES = 10;
+const MAX_TRIGGER_GLYPHS = 3;
 
 const dayOf = (iso: string) => iso.slice(0, 10);
 
@@ -328,18 +329,27 @@ function SessionFlagFilter({
 					)}
 				>
 					{on ? (
-						FLAG_ORDER.filter((kind) => menuPicks.has(kind)).map((kind) => {
-							const look = MOMENT_KINDS_APPEARANCE[kind];
-							const Glyph = look.icon;
-							return (
-								<Glyph
-									key={kind}
-									aria-hidden="true"
-									className="size-3.5"
-									style={{ color: look.color }}
-								/>
-							);
-						})
+						<>
+							{FLAG_ORDER.filter((kind) => menuPicks.has(kind))
+								.slice(0, MAX_TRIGGER_GLYPHS)
+								.map((kind) => {
+									const look = MOMENT_KINDS_APPEARANCE[kind];
+									const Glyph = look.icon;
+									return (
+										<Glyph
+											key={kind}
+											aria-hidden="true"
+											className="size-3.5"
+											style={{ color: look.color }}
+										/>
+									);
+								})}
+							{menuPicks.size > MAX_TRIGGER_GLYPHS ? (
+								<span aria-hidden="true" className="tabular-nums">
+									+{menuPicks.size - MAX_TRIGGER_GLYPHS}
+								</span>
+							) : null}
+						</>
 					) : (
 						<IconAlertTriangle aria-hidden="true" className="size-3.5" />
 					)}
