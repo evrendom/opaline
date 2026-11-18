@@ -27,3 +27,19 @@
 .scroll-fade[data-fade-bottom] {
 	--scroll-fade-bottom: var(--scroll-fade-bottom-depth, 56px);
 }
+@property --scroll-fade-right {
+	syntax: "<length>";
+	inherits: false;
+	initial-value: 0px;
+}
+.scroll-fade-x {
+	mask-image: linear-gradient(
+		to right,
+		#000 calc(100% - var(--scroll-fade-right)),
+		transparent
+	);
+	transition: --scroll-fade-right 200ms ease;
+}
+.scroll-fade-x[data-fade-right] {
+	--scroll-fade-right: var(--scroll-fade-right-depth, 48px);
+}

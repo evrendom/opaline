@@ -5,6 +5,7 @@
 import {
 	type CSSProperties,
 	type ReactNode,
+	useCallback,
 	useLayoutEffect,
 	useMemo,
 	useState,
@@ -15,6 +16,7 @@ import type {
 	PreparedCodeHighlight,
 	PreparedCodeToken,
 } from "@/components/conversation/code-highlight-types";
+import { useScrollFade } from "@/hooks/use-scroll-fade";
 import { cn } from "@/lib/utils";
 import type { DiffHunk, DiffLine } from "./line-diff";
 
@@ -418,6 +420,14 @@ export function DiffView({
 		return most;
 	}, [hunks]);
 	const [node, setNode] = useState<HTMLElement | null>(null);
+	const { fade, ref: fadeRef } = useScrollFade<HTMLElement>("x");
+	const setScroller = useCallback(
+		(element: HTMLElement | null) => {
+			setNode(element);
+			fadeRef(element);
+		},
+		[fadeRef],
+	);
 	const { from, to } = useRowWindow(node, layout.tops);
 	const rows = useMemo(() => {
 		const numberStyle = { width: `${sources.digits}ch` };
@@ -458,11 +468,12 @@ export function DiffView({
 	const windowed = from > 0 || to < layout.rows.length;
 	return (
 		<section
-			ref={setNode}
+			ref={setScroller}
 			{...focusableScrollRegionProps}
+			{...fade}
 			aria-label="Diff"
 			className={cn(
-				"-mx-1.5 overflow-x-auto font-mono text-[11px] leading-relaxed outline-none",
+				"scroll-fade-x -mx-1.5 overflow-x-auto font-mono text-[11px] leading-relaxed outline-none",
 				className,
 			)}
 		>
