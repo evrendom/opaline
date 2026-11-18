@@ -139,20 +139,32 @@ export function CostDashboardView({
 		orgId: string | undefined;
 		range: string;
 	} | null>(null);
+	const usage = useUsageTab(
+		input,
+		interval,
+		true,
+		scope === "repository"
+			? dashboard.inputFor("cost").repositories
+			: undefined,
+	);
+	const othersPending =
+		metricsPending ||
+		(previews?.pending ?? false) ||
+		(usage.tab?.pending ?? false);
+	const rangeSettled =
+		settled !== null && settled.orgId === orgId && settled.range === range;
+	const held = !isError && !rangeSettled && (isPending || othersPending);
 	if (
 		data &&
 		!isPending &&
+		(rangeSettled || !othersPending) &&
 		(settled?.data !== data ||
 			settled.metric !== metric ||
 			settled.orgId !== orgId ||
 			settled.range !== range)
 	)
 		setSettled({ data, metric, orgId, range });
-	const showSettled =
-		isPending &&
-		settled !== null &&
-		settled.orgId === orgId &&
-		settled.range === range;
+	const showSettled = isPending && rangeSettled;
 	const [focusedFilter, setFocusedFilter] = useState<string | null>(null);
 	const tabbed = variant === "tabs" || variant === "one-card";
 	const [breakdownTab, setBreakdownTab] = useState<string | null>(null);
@@ -269,15 +281,10 @@ export function CostDashboardView({
 	const showToolbar =
 		toolbarStart !== undefined ||
 		(!headerPortal && !rangeInContent && rangeControls !== null);
-	const usage = useUsageTab(
-		input,
-		interval,
-		true,
-		scope === "repository"
-			? dashboard.inputFor("cost").repositories
-			: undefined,
-	);
 	const usageShown = usage.tab?.selected === true;
+	const usageBreakdowns = usageShown
+		? (usage.tab?.breakdowns(held) ?? null)
+		: null;
 	const breakdownsRef = useRef<HTMLDivElement>(null);
 	const breakdownRowHeight = useBreakdownRowHeight(breakdownsRef);
 	return (
@@ -285,7 +292,7 @@ export function CostDashboardView({
 			page
 			label="Dashboard"
 			className="intro-fill"
-			contentReady={isError || (!isPending && !metricsPending)}
+			contentReady={isError || (!isPending && !metricsPending && !held)}
 		>
 			<div
 				className="cost-page isolate antialiased"
@@ -368,7 +375,8 @@ export function CostDashboardView({
 								onMetricIntent={onMetricIntent}
 								onRefresh={() => query.refetch()}
 								refreshing={query.isFetching && !isPending}
-								pending={isPending && !showSettled}
+								pending={(isPending && !showSettled) || held}
+								held={held}
 								splitBy={
 									showSettled
 										? settled.data.splitBy
@@ -379,7 +387,7 @@ export function CostDashboardView({
 						)}
 						<div
 							className="cost-breakdowns-container"
-							hidden={isError || (usageShown && !usage.tab?.breakdowns)}
+							hidden={isError || (usageShown && !usageBreakdowns)}
 						>
 							{tabbed ? (
 								<div className="cost-breakdown-tabs" role="tablist">
@@ -416,7 +424,7 @@ export function CostDashboardView({
 								data-ci-runs={metric === "ciRuns"}
 							>
 								{usageShown
-									? usage.tab?.breakdowns
+									? usageBreakdowns
 									: shownDimensions.map((dimension) => (
 											<CostBreakdown
 												key={dimension}
@@ -431,7 +439,7 @@ export function CostDashboardView({
 														: undefined
 												}
 												selected={input[dimension]}
-												pending={isPending}
+												pending={isPending || held}
 												split={input.splitBy === dimension}
 												onToggle={(id) => toggle(dimension, id)}
 												onClear={() => clear(dimension)}

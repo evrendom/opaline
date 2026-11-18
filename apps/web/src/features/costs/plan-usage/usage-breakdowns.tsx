@@ -2,6 +2,7 @@ import { IconDevices, IconGitBranch, IconMessages } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
+import { Reveal } from "@/app/ui/bones";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import {
 	ClaudeModelIcon,
@@ -49,10 +50,18 @@ function ModelIcon({ id }: { id: string }) {
 	);
 }
 
+const SAMPLE_ROWS: readonly Row[] = [
+	{ id: "a", label: "Sample session title", icon: null, points: 30 },
+	{ id: "b", label: "Another sample", icon: null, points: 18 },
+	{ id: "c", label: "Sample", icon: null, points: 9 },
+];
+
 export function UsageBreakdowns({
+	pending,
 	window,
 	titles,
 }: {
+	pending: boolean;
 	window: UsageWindow | null;
 	titles: Readonly<Record<string, string>>;
 }) {
@@ -77,10 +86,16 @@ export function UsageBreakdowns({
 		});
 	return (
 		<>
-			<UsageBreakdown title="Sessions" heading={heading} rows={sessions} />
+			<UsageBreakdown
+				title="Sessions"
+				heading={heading}
+				pending={pending}
+				rows={sessions}
+			/>
 			<UsageBreakdown
 				title="Repositories"
 				heading={heading}
+				pending={pending}
 				rows={(window?.repositories ?? []).map((entry) => ({
 					id: entry.id || "none",
 					label: repositoryLabel(entry.id),
@@ -91,6 +106,7 @@ export function UsageBreakdowns({
 			<UsageBreakdown
 				title="Models"
 				heading={heading}
+				pending={pending}
 				rows={(window?.models ?? []).map((entry) => ({
 					id: entry.id,
 					label: costLabel("models", entry.id),
@@ -105,18 +121,21 @@ export function UsageBreakdowns({
 function UsageBreakdown({
 	title,
 	heading,
+	pending,
 	rows,
 }: {
 	title: string;
 	heading: string;
+	pending: boolean;
 	rows: readonly Row[];
 }) {
 	const maximum = Math.max(0, ...rows.map((row) => row.points));
 	return (
 		<section
 			className="cost-breakdown"
-			data-empty={rows.length === 0 || undefined}
+			data-empty={(!pending && rows.length === 0) || undefined}
 			aria-label={title}
+			aria-busy={pending}
 		>
 			<div className="cost-breakdown-heading">
 				<h2>{title}</h2>
@@ -124,32 +143,53 @@ function UsageBreakdown({
 			</div>
 			<ScrollFade
 				className="cost-breakdown-list"
-				data-many={rows.length > 4 || undefined}
-				data-empty={rows.length === 0 || undefined}
+				data-many={(!pending && rows.length > 4) || undefined}
+				data-empty={(!pending && rows.length === 0) || undefined}
 			>
-				{rows.length === 0 ? (
+				{!pending && rows.length === 0 ? (
 					<BreakdownEmpty title="No use" />
 				) : (
-					<div data-fluid-menu-root="">
-						<FluidMenuHover items=".cost-breakdown-row" />
-						{rows.map((row, index) => (
-							<UsageRow
-								key={row.id}
-								row={row}
-								maximum={maximum}
-								color={
-									row.muted
-										? "var(--cost-muted)"
-										: (SERIES_COLORS[index % (SERIES_COLORS.length - 1)] ??
-											SERIES_COLORS[0])
-								}
-							/>
-						))}
-					</div>
+					<Reveal
+						label={`Loading ${title.toLowerCase()}`}
+						loading={pending}
+						sample={<UsageSample />}
+						sampleId={`usage-breakdown-${title}`}
+					>
+						{() => (
+							<div data-fluid-menu-root="">
+								<FluidMenuHover items=".cost-breakdown-row" />
+								{rows.map((row, index) => (
+									<UsageRow
+										key={row.id}
+										row={row}
+										maximum={maximum}
+										color={
+											row.muted
+												? "var(--cost-muted)"
+												: (SERIES_COLORS[index % (SERIES_COLORS.length - 1)] ??
+													SERIES_COLORS[0])
+										}
+									/>
+								))}
+							</div>
+						)}
+					</Reveal>
 				)}
 			</ScrollFade>
 		</section>
 	);
+}
+
+function UsageSample() {
+	const maximum = SAMPLE_ROWS[0]?.points ?? 1;
+	return SAMPLE_ROWS.map((row, index) => (
+		<UsageRow
+			key={row.id}
+			row={{ ...row, icon: <IconMessages size={14} className="shrink-0" /> }}
+			maximum={maximum}
+			color={SERIES_COLORS[index] ?? SERIES_COLORS[0]}
+		/>
+	));
 }
 
 function UsageRow({

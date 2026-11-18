@@ -7,3 +7,8 @@
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
+
+.plan-usage-loading-wave {
+	position: absolute;
+	inset: 12px 12px 40px 56px;
+}

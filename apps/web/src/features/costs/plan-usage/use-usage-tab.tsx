@@ -61,8 +61,9 @@ export function useUsageTab(
 				},
 				selected,
 				onSelect: () => setSelected(true),
-				breakdowns: null,
-				chart: (dots) => (
+				pending: query.isPending,
+				breakdowns: () => null,
+				chart: (dots, pending) => (
 					<PlanUsageChart
 						dots={dots}
 						repository
@@ -70,7 +71,7 @@ export function useUsageTab(
 						provider={provider}
 						onProviderChange={setProvider}
 						interval={interval}
-						pending={query.isPending}
+						pending={pending || query.isPending}
 						failed={query.isError}
 					/>
 				),
@@ -117,17 +118,22 @@ export function useUsageTab(
 			},
 			selected,
 			onSelect: () => setSelected(true),
-			breakdowns: query.isPending ? null : (
-				<UsageBreakdowns window={window} titles={query.data?.titles ?? {}} />
+			pending: query.isPending,
+			breakdowns: (pending) => (
+				<UsageBreakdowns
+					pending={pending || query.isPending}
+					window={window}
+					titles={query.data?.titles ?? {}}
+				/>
 			),
-			chart: (dots) => (
+			chart: (dots, pending) => (
 				<PlanUsageChart
 					dots={dots}
 					report={query.data}
 					provider={provider}
 					onProviderChange={setProvider}
 					interval={interval}
-					pending={query.isPending}
+					pending={pending || query.isPending}
 					failed={query.isError}
 				/>
 			),

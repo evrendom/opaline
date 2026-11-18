@@ -10,7 +10,7 @@ import {
 	type XAxisTickContentProps,
 	YAxis,
 } from "recharts";
-import { Skeleton } from "@/app/ui/skeleton";
+import { ChartLoadingWave } from "@/components/ui/chart-loading-wave";
 import { useOptionalDateRange } from "@/features/analytics/date-range/DateRangeProvider";
 import {
 	ClaudeModelIcon,
@@ -19,6 +19,7 @@ import {
 import { PillTabs } from "@/features/repos/pill-tabs";
 import { EdgeTick, edgeTicks, useAxisHover } from "../chart-edge-axis";
 import { ChartEmptyNotice } from "../chart-empty-notice";
+import { DASHBOARD_LOADING_STEPS, LOADING_WAVE_HEIGHT } from "../chart-flow";
 import {
 	bucketDate,
 	type ChartInterval,
@@ -26,6 +27,7 @@ import {
 	formatChartDate,
 	groupChartTrend,
 } from "../chart-interval";
+import { ChartSkeleton } from "../cost-chart";
 import { CostDotChart, type DotTone } from "../cost-dot-chart";
 import { useHoverDateStore } from "../cost-hover-date";
 import {
@@ -245,8 +247,19 @@ export function PlanUsageChart({
 			{pending && (dots || repository) ? (
 				<UsageDots window={null} interval={interval} repository={repository} />
 			) : pending ? (
-				<div className="cost-chart-canvas">
-					<Skeleton className="size-full rounded-[8px]" />
+				<div className="cost-chart-canvas" data-phase="loading">
+					<ChartSkeleton
+						interval={interval}
+						label="Loading usage"
+						leaving={false}
+					/>
+					<ChartLoadingWave
+						className="plan-usage-loading-wave"
+						viewBoxHeight={LOADING_WAVE_HEIGHT}
+						color={USAGE_COLOR}
+						linePath={DASHBOARD_LOADING_STEPS}
+						guides={false}
+					/>
 				</div>
 			) : (
 				<div className="plan-usage-frame" data-sample={sample ? "" : undefined}>

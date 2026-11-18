@@ -258,6 +258,7 @@ type Props = {
 	splitBy: CostDashboardInput["splitBy"];
 	onResetSplit: () => void;
 	usage?: UsageTab;
+	held?: boolean;
 };
 
 export interface UsageTab {
@@ -269,8 +270,9 @@ export interface UsageTab {
 	readonly chipAt?: (index: number) => string;
 	readonly selected: boolean;
 	readonly onSelect: () => void;
-	readonly chart: (dots: boolean) => ReactNode;
-	readonly breakdowns: ReactNode;
+	readonly pending: boolean;
+	readonly chart: (dots: boolean, pending: boolean) => ReactNode;
+	readonly breakdowns: (pending: boolean) => ReactNode;
 }
 
 const USAGE_COLOR = "oklch(0.74 0.17 150)";
@@ -302,6 +304,7 @@ export function CostChart({
 	refreshing,
 	interval,
 	usage,
+	held = false,
 }: Props) {
 	const mergedGitHub =
 		metrics.includes("mergedPullRequests") && metrics.includes("ciRuns");
@@ -765,10 +768,10 @@ export function CostChart({
 							icon={IconBattery3Filled}
 							outlineIcon={IconBattery3}
 							color={USAGE_COLOR}
-							value={usage.value}
+							value={held ? undefined : usage.value}
 							qualifier={undefined}
 							unavailable={false}
-							trend={usage.trend}
+							trend={held ? undefined : usage.trend}
 							dates={usage.dates}
 							textAt={usage.textAt}
 							chip={usage.chip}
@@ -820,7 +823,7 @@ export function CostChart({
 								outlineIcon={METRIC_APPEARANCE[value].outline}
 								color={METRIC_APPEARANCE[value].color}
 								value={
-									overridesLoading
+									held || overridesLoading
 										? undefined
 										: rates
 											? formatPerRun(rates.total.swears, true)
@@ -836,7 +839,9 @@ export function CostChart({
 															)))
 								}
 								unavailable={
-									!overrides?.has(value) && (total === null || unknownCi)
+									!held &&
+									!overrides?.has(value) &&
+									(total === null || unknownCi)
 								}
 								qualifier={
 									metricData?.githubHistory?.preview ? "preview" : undefined
@@ -855,14 +860,16 @@ export function CostChart({
 										: undefined
 								}
 								trend={
-									rates
-										? rates.swears
-										: sparklineTotals(
-												previews || value === metric
-													? metricData?.trend
-													: undefined,
-												interval,
-											)
+									held
+										? undefined
+										: rates
+											? rates.swears
+											: sparklineTotals(
+													previews || value === metric
+														? metricData?.trend
+														: undefined,
+													interval,
+												)
 								}
 								dates={
 									rates
@@ -910,7 +917,7 @@ export function CostChart({
 						/>
 					) : null}
 				</fieldset>
-				{usage?.selected ? usage.chart(showDots) : null}
+				{usage?.selected ? usage.chart(showDots, pending) : null}
 				<div
 					className="cost-chart-card"
 					style={usage?.selected ? { display: "none" } : undefined}
@@ -2018,7 +2025,7 @@ function useChartDateTicks(interval: ChartInterval) {
 	return { ref, ticks };
 }
 
-function ChartSkeleton({
+export function ChartSkeleton({
 	interval,
 	label,
 	leaving,
