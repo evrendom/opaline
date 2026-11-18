@@ -63,7 +63,7 @@ import { DemoTrendPreview } from "@/features/demo/demo-trend-preview";
 import { useOptionalOrganization } from "@/features/workspace/organization/useOrganization";
 import { formatIsoDate } from "@/lib/format";
 import { type AreaShape, morphAreas, readAreaShape } from "./area-morph";
-import { SERIES_COLORS } from "./chart-colors";
+import { PULL_REQUEST_COLOR, SERIES_COLORS } from "./chart-colors";
 import { EdgeTick, edgeTicks, useAxisHover } from "./chart-edge-axis";
 import { ChartEmptyNotice } from "./chart-empty-notice";
 import {
@@ -184,7 +184,7 @@ export const METRIC_APPEARANCE: Record<
 	mergedPullRequests: {
 		icon: IconGitMergeFilled,
 		outline: IconGitMerge,
-		color: SERIES_COLORS[2],
+		color: PULL_REQUEST_COLOR,
 	},
 	ciRuns: {
 		icon: IconCircleCheckFilled,

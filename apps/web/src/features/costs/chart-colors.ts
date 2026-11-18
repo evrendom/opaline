@@ -12,3 +12,5 @@ export const SERIES_COLORS = [
 	"oklch(0.705 0.187 47.604)", // Orange
 	"oklch(0.60 0.02 260)", // Unknown duration
 ];
+
+export const PULL_REQUEST_COLOR = "oklch(0.777 0.152 181.912)";
