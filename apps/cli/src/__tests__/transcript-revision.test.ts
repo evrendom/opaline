@@ -99,29 +99,29 @@ describe("transcript revision planning", () => {
 			nextContent: '{"ordinal":9}\n{"ordinal":1}\n',
 			expectedReason: "prefix-mismatch",
 		},
-	])(
-		"starts a new generation when the source $name",
-		async ({ nextContent, expectedReason }) => {
-			const first = await planTranscriptRevision({
-				content: new TextEncoder().encode('{"ordinal":0}\n{"ordinal":1}\n'),
-				previous: undefined,
-				scope,
-				terminal: false,
-			});
+	])("starts a new generation when the source $name", async ({
+		nextContent,
+		expectedReason,
+	}) => {
+		const first = await planTranscriptRevision({
+			content: new TextEncoder().encode('{"ordinal":0}\n{"ordinal":1}\n'),
+			previous: undefined,
+			scope,
+			terminal: false,
+		});
 
-			const next = await planTranscriptRevision({
-				content: new TextEncoder().encode(nextContent),
-				previous: first.manifest,
-				scope,
-				terminal: false,
-			});
+		const next = await planTranscriptRevision({
+			content: new TextEncoder().encode(nextContent),
+			previous: first.manifest,
+			scope,
+			terminal: false,
+		});
 
-			expect(next.resetReason).toBe(expectedReason);
-			expect(next.manifest.generation).toBe(1);
-			expect(next.manifest.parentRevisionId).toBeUndefined();
-			expect(next.manifest.chunks[0]?.startByte).toBe(0);
-		},
-	);
+		expect(next.resetReason).toBe(expectedReason);
+		expect(next.manifest.generation).toBe(1);
+		expect(next.manifest.parentRevisionId).toBeUndefined();
+		expect(next.manifest.chunks[0]?.startByte).toBe(0);
+	});
 
 	test("does not reuse a watermark across provider or actor scope", async () => {
 		const content = new TextEncoder().encode('{"ordinal":0}\n');

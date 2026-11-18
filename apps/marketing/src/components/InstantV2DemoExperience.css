@@ -1,0 +1,341 @@
+.instant-v2-demo-bar {
+	position: fixed;
+	inset: 0 0 auto;
+	z-index: 80;
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+	width: 100%;
+	height: 42px;
+	align-items: center;
+	gap: 16px;
+	padding-inline: max(24px, 3.375vw);
+	background: transparent;
+	color: var(--landing-ink);
+}
+
+.instant-v2-demo-bar > * {
+	opacity: 1;
+	will-change: opacity;
+}
+
+.instant-v2-demo-bar[data-stage="entering"] > * {
+	animation: instant-v2-demo-bar-item-enter
+		var(--instant-v2-demo-layout-duration, 620ms) cubic-bezier(0.22, 1, 0.36, 1)
+		var(--instant-v2-demo-layout-delay, 180ms) both;
+}
+
+.instant-v2-demo-bar[data-stage="exiting"] > * {
+	animation: instant-v2-demo-bar-item-exit
+		var(--instant-v2-demo-layout-duration, 620ms) cubic-bezier(0.22, 1, 0.36, 1)
+		var(--instant-v2-demo-layout-delay, 180ms) both;
+}
+
+.instant-v2-demo-bar:not([data-stage="visible"]) :is(a, button) {
+	pointer-events: none;
+}
+
+@keyframes instant-v2-demo-bar-item-enter {
+	from {
+		opacity: 0;
+	}
+
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes instant-v2-demo-bar-item-exit {
+	from {
+		opacity: 1;
+	}
+
+	to {
+		opacity: 0;
+	}
+}
+
+.instant-v2-demo-status-group {
+	display: inline-flex;
+	min-width: 0;
+	align-items: center;
+	justify-self: start;
+	gap: 12px;
+}
+
+.instant-v2-demo-actions {
+	display: inline-flex;
+	align-items: center;
+	justify-self: end;
+	gap: 8px;
+}
+
+.instant-v2-demo-download,
+.instant-v2-demo-live,
+.instant-v2-demo-exit {
+	display: inline-flex;
+	height: 28px;
+	align-items: center;
+	justify-content: center;
+	border: 0;
+	border-radius: 6px;
+	color: var(--landing-ink);
+	cursor: pointer;
+	white-space: nowrap;
+	transition:
+		background-color 160ms ease,
+		box-shadow 160ms ease,
+		transform 160ms ease;
+}
+
+.instant-v2-demo-download-group {
+	display: inline-flex;
+	align-items: center;
+	justify-self: center;
+	white-space: nowrap;
+}
+
+.instant-v2-demo-download-context {
+	position: relative;
+	z-index: 0;
+	display: inline-flex;
+	height: 28px;
+	align-items: center;
+	background: var(--landing-callout);
+	box-shadow: var(--landing-callout-edge);
+	color: var(--landing-callout-ink);
+	font-family: "Inter Variable", Inter, sans-serif;
+	font-feature-settings: "ss03";
+	font-size: 11px;
+	font-weight: 500;
+	line-height: 16px;
+}
+
+.instant-v2-demo-download-context-before {
+	margin-right: -8px;
+	padding: 0 18px 0 10px;
+	border-radius: 8px 0 0 8px;
+}
+
+.instant-v2-demo-download {
+	position: relative;
+	text-decoration: none;
+	z-index: 1;
+	isolation: isolate;
+	flex: none;
+	padding: 0 10px;
+	background: var(--landing-control);
+	box-shadow: var(--landing-control-shadow);
+	color: var(--landing-control-ink);
+	font-family: "Inter Variable", Inter, sans-serif;
+	font-feature-settings: "ss03";
+	font-size: 11px;
+	font-weight: 500;
+	line-height: 16px;
+	overflow: hidden;
+	transition:
+		background-color 150ms ease-out,
+		color 150ms ease-out,
+		box-shadow 150ms ease-out;
+	will-change: transform;
+}
+
+.instant-v2-demo-download-opalescence {
+	--instant-v2-nav-glow-width: 48px;
+	--instant-v2-nav-glow-height: 20px;
+	--instant-v2-nav-glow-blur: 6px;
+	position: absolute;
+	z-index: 0;
+	top: 50%;
+	left: 50%;
+	width: var(--instant-v2-nav-glow-width);
+	height: var(--instant-v2-nav-glow-height);
+	border-radius: 999px;
+	background-image: linear-gradient(
+		90deg,
+		oklch(
+				var(--instant-v2-glimm-blue) /
+				calc(0.16 * var(--landing-glimm-strength, 1))
+			)
+			20%,
+		oklch(
+				var(--instant-v2-glimm-indigo) /
+				calc(0.196 * var(--landing-glimm-strength, 1))
+			)
+			40%,
+		oklch(
+				var(--instant-v2-glimm-purple) /
+				calc(0.19 * var(--landing-glimm-strength, 1))
+			)
+			60%,
+		oklch(
+				var(--instant-v2-glimm-pink) /
+				calc(0.196 * var(--landing-glimm-strength, 1))
+			)
+			80%
+	);
+	filter: blur(var(--instant-v2-nav-glow-blur));
+	opacity: 0;
+	transform: translate3d(
+		calc(-50% + var(--instant-v2-glow-x, 0px)),
+		calc(-50% + var(--instant-v2-glow-y, 0px)),
+		0
+	);
+	pointer-events: none;
+	transition: opacity 200ms ease-out;
+}
+
+.instant-v2-demo-download-glass {
+	position: absolute;
+	z-index: 1;
+	inset: 0;
+	border-radius: inherit;
+	background: var(--landing-glass);
+	-webkit-backdrop-filter: blur(5px) saturate(1.45);
+	backdrop-filter: blur(5px) saturate(1.45);
+	box-shadow: var(--landing-glass-edge);
+	pointer-events: none;
+}
+
+.instant-v2-demo-download-content {
+	position: relative;
+	z-index: 2;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.instant-v2-demo-download-icon {
+	display: block;
+	width: 13px;
+	height: 13px;
+	flex: 0 0 13px;
+	transform: translateY(-1px);
+}
+
+.instant-v2-demo-exit {
+	width: fit-content;
+	justify-self: end;
+	gap: 5px;
+	padding-inline: 10px;
+	background: transparent;
+	font: inherit;
+	font-size: 12px;
+	font-weight: 500;
+	line-height: 16px;
+}
+
+.instant-v2-demo-live {
+	gap: 5px;
+	padding-inline: 10px;
+	background: var(--landing-control);
+	box-shadow: var(--landing-callout-edge);
+	font: inherit;
+	font-size: 12px;
+	font-weight: 500;
+	line-height: 16px;
+}
+
+.instant-v2-demo-live:disabled {
+	cursor: default;
+	opacity: 0.72;
+}
+
+.instant-v2-demo-download:focus-visible,
+.instant-v2-demo-live:focus-visible,
+.instant-v2-demo-exit:focus-visible {
+	outline: 2px solid #0070f3;
+	outline-offset: 4px;
+}
+
+@media (any-hover: hover) {
+	.instant-v2-demo-download:hover {
+		background: var(--landing-control);
+	}
+
+	.instant-v2-demo-download:hover .instant-v2-demo-download-opalescence {
+		opacity: 1;
+	}
+
+	.instant-v2-demo-exit:hover {
+		background: var(--landing-glass-hover);
+	}
+
+	.instant-v2-demo-live:not(:disabled):hover {
+		background: var(--landing-control-pressed);
+	}
+}
+
+.instant-v2-demo-download:focus-visible .instant-v2-demo-download-opalescence {
+	opacity: 1;
+}
+
+.instant-v2-demo-download:active {
+	background: var(--landing-control-pressed);
+}
+
+/* biome-ignore lint/correctness/noUnknownProperty: corner-shape is new (Chromium 139+); Biome does not know it yet. */
+@supports (corner-shape: squircle) {
+	.instant-v2-demo-download,
+	.instant-v2-demo-live,
+	.instant-v2-demo-exit {
+		border-radius: 12px;
+		/* biome-ignore lint/correctness/noUnknownProperty: see the @supports note above. */
+		corner-shape: squircle;
+	}
+
+	.instant-v2-demo-download-context-before {
+		border-radius: 14px 0 0 14px;
+		/* biome-ignore lint/correctness/noUnknownProperty: see the @supports note above. */
+		corner-shape: squircle;
+	}
+
+	.instant-v2-demo-download-glass {
+		/* biome-ignore lint/correctness/noUnknownProperty: see the @supports note above. */
+		corner-shape: inherit;
+	}
+}
+
+@media (max-width: 540px) {
+	.instant-v2-demo-bar {
+		gap: 10px;
+		padding-inline: 10px;
+	}
+
+	.instant-v2-demo-download {
+		padding-inline: 10px;
+	}
+
+	.instant-v2-demo-exit {
+		padding-inline: 6px;
+	}
+
+	.instant-v2-demo-actions {
+		gap: 4px;
+	}
+
+	.instant-v2-demo-live {
+		padding-inline: 8px;
+	}
+
+	.instant-v2-demo-status-group {
+		gap: 8px;
+	}
+}
+
+@media (max-width: 760px) {
+	.instant-v2-demo-download-context {
+		display: none;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.instant-v2-demo-bar[data-stage] > *,
+	.instant-v2-demo-download,
+	.instant-v2-demo-download-opalescence,
+	.instant-v2-demo-live,
+	.instant-v2-demo-exit {
+		animation-delay: 0ms;
+		animation-duration: 0.01ms;
+		transition-duration: 0.01ms;
+	}
+}

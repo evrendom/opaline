@@ -1,0 +1,109 @@
+@font-face {
+	font-family: "InterVariable";
+	font-style: normal;
+	font-weight: 100 900;
+	src: url("../onboarding/fonts/InterVariable.woff2") format("woff2");
+}
+
+:root {
+	color-scheme: light dark;
+	--background: #efefef;
+	--foreground: #0a0a0a;
+	--muted: #6b6b6b;
+	--field: #ffffff;
+	--border: rgb(0 0 0 / 0.12);
+	--accent: #0a0a0a;
+	--accent-foreground: #fafafa;
+	font-family: "InterVariable", system-ui, sans-serif;
+	font-size: 13px;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--background: #0a0a0a;
+		--foreground: #fafafa;
+		--muted: #a1a1a1;
+		--field: #171717;
+		--border: rgb(255 255 255 / 0.12);
+		--accent: #fafafa;
+		--accent-foreground: #0a0a0a;
+	}
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	margin: 0;
+	height: 100%;
+	background: var(--background);
+	color: var(--foreground);
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+body {
+	-webkit-app-region: drag;
+	padding: 40px 20px 18px;
+}
+
+form {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	-webkit-app-region: no-drag;
+}
+
+label {
+	font-weight: 550;
+}
+
+input {
+	font: inherit;
+	color: inherit;
+	background: var(--field);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	padding: 8px 10px;
+	outline: none;
+	-webkit-user-select: text;
+	user-select: text;
+}
+
+input:focus {
+	border-color: var(--muted);
+}
+
+.message {
+	min-height: 1.3em;
+	margin: 0;
+	color: var(--muted);
+}
+
+.actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
+button {
+	font: inherit;
+	font-weight: 500;
+	color: inherit;
+	background: transparent;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	padding: 6px 14px;
+}
+
+button.primary {
+	background: var(--accent);
+	color: var(--accent-foreground);
+	border-color: transparent;
+}
+
+button:disabled {
+	opacity: 0.5;
+}

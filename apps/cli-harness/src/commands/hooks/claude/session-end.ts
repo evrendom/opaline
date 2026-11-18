@@ -1,0 +1,158 @@
+import { getLogger } from "@logtape/logtape";
+import {
+	claudeCodeAdapter,
+	ensureClaudeSessionStartHook,
+	type SessionFile,
+} from "@rudel/agent-adapters";
+import { buildCommand } from "@stricli/core";
+import { loadCredentials } from "../../../lib/credentials.js";
+import { removeFailedUpload } from "../../../lib/failed-uploads.js";
+import { getGitInfo } from "../../../lib/git-info.js";
+import { reportHookUploadFailure } from "../../../lib/hook-upload-failure.js";
+import { getProjectOrgId } from "../../../lib/project-config.js";
+import { captureAndUploadSessionEvidence } from "../../../lib/session-evidence.js";
+import { allowsInsecureEndpointFromEnv } from "../../../lib/upload-endpoint.js";
+import {
+	formatRedactionSummary,
+	uploadSession,
+} from "../../../lib/uploader.js";
+import { disposeLogging, setupHookLogging } from "../../../logging.js";
+
+interface HookInput {
+	session_id: string;
+	transcript_path: string;
+	cwd: string;
+}
+
+async function readStdin(): Promise<string> {
+	const chunks: string[] = [];
+	for await (const chunk of process.stdin) {
+		chunks.push(typeof chunk === "string" ? chunk : chunk.toString());
+	}
+	return chunks.join("");
+}
+
+async function runSessionEnd(): Promise<undefined | Error> {
+	await setupHookLogging();
+	const logger = getLogger(["rudel", "cli", "hook"]);
+
+	try {
+		const raw = await readStdin();
+		if (!raw.trim()) return;
+
+		const input = JSON.parse(raw) as HookInput;
+		if (!input.session_id || !input.transcript_path) return;
+
+		try {
+			// Installs made before SessionStart capture only have this hook; add the
+			// missing SessionStart hook so later sessions capture repository context.
+			if (ensureClaudeSessionStartHook()) {
+				logger.info("Added the missing Claude Code SessionStart hook");
+			}
+		} catch (error) {
+			logger.warn("Could not add the SessionStart hook: {error}", {
+				error: error instanceof Error ? error.message : String(error),
+			});
+		}
+
+		const credentials = loadCredentials();
+		if (!credentials) {
+			process.stderr.write(
+				`Opaline hook upload skipped for session ${input.session_id}: not authenticated; run \`rudel login\`.\n`,
+			);
+			return;
+		}
+
+		logger.info("Uploading session {sessionId}", {
+			sessionId: input.session_id,
+		});
+
+		const sessionFile: SessionFile = {
+			sessionId: input.session_id,
+			transcriptPath: input.transcript_path,
+			projectPath: input.cwd,
+		};
+
+		const gitInfo = await getGitInfo(input.cwd);
+		const organizationId = await getProjectOrgId(input.cwd);
+
+		const request = await claudeCodeAdapter.buildUploadRequest(sessionFile, {
+			gitInfo,
+			organizationId,
+			uploadMode: "hook",
+		});
+
+		const apiBase = process.env.RUDEL_API_BASE ?? credentials.apiBaseUrl;
+		const endpoint = `${apiBase}/rpc`;
+		const evidenceOrganizationId = organizationId ?? credentials.user?.id;
+		if (evidenceOrganizationId) {
+			try {
+				const receipt = await captureAndUploadSessionEvidence({
+					credentials,
+					lifecycle: "end",
+					onWarning: (warning) => logger.warn("{warning}", { warning }),
+					organizationId: evidenceOrganizationId,
+					request,
+					terminalTranscript: true,
+				});
+				logger.info("Repository evidence accepted for context {contextId}", {
+					contextId: receipt.contextId,
+				});
+			} catch (error) {
+				logger.warn("Repository evidence capture deferred: {error}", {
+					error: error instanceof Error ? error.message : String(error),
+				});
+			}
+		}
+		const result = await uploadSession(request, {
+			endpoint,
+			token: credentials.token,
+			allowInsecureEndpoint: allowsInsecureEndpointFromEnv(),
+			authType: credentials.authType,
+			onRetry: (attempt, maxAttempts, error) => {
+				logger.warn(
+					"Retrying upload for {sessionId} ({attempt}/{maxAttempts}): {error}",
+					{ sessionId: input.session_id, attempt, maxAttempts, error },
+				);
+			},
+		});
+		if (result.success) {
+			logger.info(
+				"Upload successful for session {sessionId} (attempts: {attempts})",
+				{ sessionId: input.session_id, attempts: result.attempts },
+			);
+			const redactionSummary = formatRedactionSummary(
+				result.redacted,
+				result.redactedBytes,
+			);
+			if (redactionSummary) {
+				logger.info("{redactionSummary}", { redactionSummary });
+			}
+			await removeFailedUpload(input.session_id);
+		} else {
+			const hookError = await reportHookUploadFailure(logger, result, {
+				sessionId: input.session_id,
+				transcriptPath: input.transcript_path,
+				projectPath: input.cwd,
+				source: claudeCodeAdapter.source,
+				organizationId,
+			});
+			return hookError;
+		}
+	} catch (error) {
+		logger.error("Session end hook failed: {error}", { error });
+		process.stderr.write(
+			`Opaline Claude Code hook failed: ${error instanceof Error ? error.message : String(error)}\n`,
+		);
+	} finally {
+		await disposeLogging();
+	}
+}
+
+export const sessionEndCommand = buildCommand({
+	loader: async () => ({ default: runSessionEnd }),
+	parameters: {},
+	docs: {
+		brief: "Handle Claude Code SessionEnd hook",
+	},
+});

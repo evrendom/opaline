@@ -1,0 +1,196 @@
+import { type Implementer, implement, ORPCError } from "@orpc/server";
+import { contract } from "@rudel/api-routes";
+import type { Session } from "./auth.js";
+import { sqlClient } from "./db.js";
+import {
+	type RequestWorkspaceLookups,
+	resolveRequestWorkspace,
+} from "./lib/request-workspace.js";
+import { isSelfHosted, isSelfHostedAdmin } from "./lib/self-hosted.js";
+import {
+	readWorkspaceMember,
+	readWorkspaceMemberBySlug,
+} from "./services/session-reader.service.js";
+
+export interface AppContext {
+	user: Session["user"] | null;
+	session: Session["session"] | null;
+	apiKeyId: string | null;
+	authFailure: ApiKeyAuthFailure | null;
+	ingestOperatorAuthorized: boolean;
+	requestId: string;
+	publicLookupSource: string;
+	requestedWorkspace?: string | null;
+	workspaceLookups?: RequestWorkspaceLookups;
+}
+
+export interface ApiKeyAuthFailure {
+	code: string | null;
+	message: string;
+}
+
+export const os: Implementer<typeof contract, AppContext, AppContext> =
+	implement(contract).$context<AppContext>();
+
+export const authMiddleware = os.middleware(async ({ context, next }) => {
+	if (!context.user || !context.session) {
+		throw new ORPCError("UNAUTHORIZED");
+	}
+	return next({
+		context: {
+			user: context.user,
+			session: context.session,
+			apiKeyId: context.apiKeyId,
+			authFailure: context.authFailure,
+			ingestOperatorAuthorized: context.ingestOperatorAuthorized,
+		},
+	});
+});
+
+export const settingsMutationMiddleware = os.middleware(
+	async ({ context, next }) => {
+		if (!context.user || !context.session) {
+			throw new ORPCError("UNAUTHORIZED");
+		}
+
+		return next({
+			context: {
+				user: context.user,
+				session: context.session,
+				apiKeyId: context.apiKeyId,
+				authFailure: context.authFailure,
+			},
+		});
+	},
+);
+
+const requestWorkspaceLookup = {
+	readMember: (organizationId: string, userId: string) =>
+		readWorkspaceMember(organizationId, userId),
+	readMemberBySlug: (slug: string, userId: string) =>
+		readWorkspaceMemberBySlug(slug, userId),
+};
+
+export const orgMiddleware = os.middleware(async ({ context, next }) => {
+	if (!context.user || !context.session) {
+		throw new ORPCError("UNAUTHORIZED");
+	}
+
+	const { organizationId, member } = await resolveRequestWorkspace(
+		{
+			requestedWorkspace: context.requestedWorkspace,
+			session: context.session,
+			userId: context.user.id,
+			lookups: context.workspaceLookups,
+		},
+		requestWorkspaceLookup,
+	);
+
+	const sessionReader = member.reader;
+	const userRole =
+		(sessionReader.role as "owner" | "admin" | "member") ?? "member";
+	// Managing the workspace; whose sessions the caller reads is `sessionReader`.
+	const isOrgAdmin = userRole === "owner" || userRole === "admin";
+
+	return next({
+		context: {
+			user: context.user,
+			session: context.session,
+			apiKeyId: context.apiKeyId,
+			organizationId,
+			workspaceCreatedAt: member.workspaceCreatedAt,
+			userRole,
+			isOrgAdmin,
+			sessionReader,
+			authFailure: context.authFailure,
+		},
+	});
+});
+
+const ADMIN_ORGANIZATION_ID = process.env.VITE_ADMIN_ORGANIZATION_ID;
+
+export const adminMiddleware = os.middleware(async ({ context, next }) => {
+	if (!context.user || !context.session) {
+		throw new ORPCError("UNAUTHORIZED");
+	}
+
+	if (isSelfHosted()) {
+		if (!(await isSelfHostedAdmin(sqlClient, context.user.id))) {
+			throw new ORPCError("FORBIDDEN", {
+				message: "Admin access required",
+			});
+		}
+	} else {
+		if (!ADMIN_ORGANIZATION_ID) {
+			throw new ORPCError("FORBIDDEN", {
+				message: "Admin panel is not configured",
+			});
+		}
+
+		const membership = await sqlClient<Array<{ id: string }>>`
+			SELECT id
+			FROM member
+			WHERE organization_id = ${ADMIN_ORGANIZATION_ID}
+				AND user_id = ${context.user.id}
+			LIMIT 1
+		`;
+
+		if (membership.length === 0) {
+			throw new ORPCError("FORBIDDEN", {
+				message: "Admin access required",
+			});
+		}
+	}
+
+	return next({
+		context: {
+			user: context.user,
+			session: context.session,
+			apiKeyId: context.apiKeyId,
+			authFailure: context.authFailure,
+			ingestOperatorAuthorized: context.ingestOperatorAuthorized,
+		},
+	});
+});
+
+export const ingestAuthMiddleware = os.middleware(async ({ context, next }) => {
+	if (!context.user) {
+		if (context.authFailure?.code === "RATE_LIMITED") {
+			throw new ORPCError("TOO_MANY_REQUESTS", {
+				message:
+					"API key rate limit exceeded. Log in again to create a fresh ingest key or wait for the key's rate-limit window to reset.",
+				data: {
+					reason: "api_key_rate_limited",
+					code: context.authFailure.code,
+					authMessage: context.authFailure.message,
+				},
+			});
+		}
+
+		if (context.authFailure) {
+			throw new ORPCError("UNAUTHORIZED", {
+				message: context.authFailure.message,
+				data: {
+					reason: "api_key_verification_failed",
+					code: context.authFailure.code,
+				},
+			});
+		}
+
+		throw new ORPCError("UNAUTHORIZED");
+	}
+
+	if (!context.session && !context.apiKeyId) {
+		throw new ORPCError("UNAUTHORIZED");
+	}
+
+	return next({
+		context: {
+			user: context.user,
+			session: context.session,
+			apiKeyId: context.apiKeyId,
+			authFailure: context.authFailure,
+			ingestOperatorAuthorized: context.ingestOperatorAuthorized,
+		},
+	});
+});

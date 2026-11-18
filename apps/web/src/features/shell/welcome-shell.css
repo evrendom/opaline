@@ -1,0 +1,101 @@
+/* These route-critical rules load with the app shell so /welcome never paints
+   as the full dashboard while its lazy route bundle is still loading. */
+html[data-welcome-shell],
+:where(html)[data-welcome-shell] body,
+.cli-welcome-shell,
+.cli-welcome-panel {
+	overscroll-behavior: none;
+}
+
+.cli-welcome-shell {
+	position: relative;
+	isolation: isolate;
+	display: grid;
+	grid-template-columns: 46% minmax(0, 1fr);
+	align-items: center;
+	min-height: 100svh;
+	overflow: clip;
+}
+
+:where(html)[data-welcome-shell] body > .product-window-backdrop {
+	inset: 8px 0 8px auto;
+	width: 1496px;
+	translate: 50% 0;
+	overflow: hidden;
+}
+
+.cli-welcome-panel {
+	position: relative;
+	z-index: 2;
+	min-width: 0;
+	height: 100%;
+	max-height: 100svh;
+	overflow-y: auto;
+	padding: 24px 48px;
+}
+
+.cli-welcome-shell > .product-window-frame {
+	pointer-events: none;
+	user-select: none;
+	width: max(100%, 1164px);
+	/* Open space between the form column and the window; the window runs
+	   off the right edge, so this moves it right without shrinking it. */
+	margin-left: clamp(64px, 11vw, 200px);
+	height: calc(100svh - 176px);
+	min-height: 420px;
+	max-height: 960px;
+	align-self: center;
+	border-radius: var(--instant-v2-dashboard-window-radius, 12px);
+}
+
+@media (max-width: 1100px) and (min-width: 900px) {
+	.cli-welcome-panel {
+		padding-inline: 32px;
+	}
+
+	.cli-welcome-shell {
+		grid-template-columns: 48% minmax(0, 1fr);
+	}
+}
+
+@media (max-width: 899px) {
+	.cli-welcome-shell {
+		display: flex;
+		flex-direction: column;
+		align-items: stretch;
+		gap: 40px;
+		height: auto;
+		min-height: 100svh;
+		padding: 24px 16px 32px;
+		overflow: clip;
+	}
+
+	.cli-welcome-panel {
+		height: auto;
+		max-height: none;
+		padding: 0 8px;
+		overflow: visible;
+	}
+
+	.cli-welcome-shell > .product-window-frame {
+		width: 100%;
+		height: 400px;
+		min-height: 400px;
+		margin-left: 0;
+	}
+}
+
+@media (max-height: 650px) and (min-width: 900px) {
+	.cli-welcome-shell {
+		align-items: start;
+		overflow-y: auto;
+	}
+
+	.cli-welcome-panel {
+		padding-block: 32px;
+	}
+
+	.cli-welcome-shell > .product-window-frame {
+		margin-block: 32px;
+	}
+}

@@ -1,0 +1,634 @@
+---
+import trendsWordmarkSvg from "../assets/opaline-trends-wordmark.svg?raw";
+import opalineWordmarkSvg from "../assets/opaline-wordmark-nav-small.svg?raw";
+import { DOWNLOAD_PAGE_PATH } from "../scripts/desktop-download";
+
+interface Props {
+	active?: "product" | "trends" | "pricing";
+	productHref?: string;
+	enableDemo?: boolean;
+	filled?: boolean;
+	/** The download button on the right (off on Trends). */
+	download?: boolean;
+	/** The Pricing link (off on Trends). */
+	pricing?: boolean;
+	/** Trends leads with the Opaline Trends wordmark, which names the page,
+	 * in place of the Opaline one and the Trends link. */
+	wordmark?: "opaline" | "trends";
+}
+
+const {
+	active,
+	productHref = "#product",
+	filled = false,
+	download = true,
+	pricing = true,
+	wordmark = "opaline",
+} = Astro.props;
+
+// Product navigation stays hidden during the beta launch.
+const showProductLinks = false;
+
+// Flat, in the navigation's ink: the paths take currentColor, so the
+// wordmarks' own gradients (and the Trends one's title) are dropped.
+const flatWordmark = (
+	wordmark === "trends" ? trendsWordmarkSvg : opalineWordmarkSvg
+)
+	.trim()
+	.replace(/<title[^>]*>[\s\S]*?<\/title>\s*/, "")
+	.replace(/<defs>[\s\S]*?<\/defs>\s*/, "")
+	.replace(/\s(?:role|aria-labelledby)="[^"]*"/g, "")
+	.replace(/^<svg\s/, '<svg aria-hidden="true" focusable="false" ');
+---
+
+<header
+	class:list={["instant-v2-nav", { "instant-v2-nav-filled": filled }]}
+	data-instant-v2-nav
+	data-scrolled="true"
+>
+	<div class="instant-v2-nav-inner">
+		<a
+			class="instant-v2-nav-label"
+			href="/"
+			aria-label="Homepage"
+			data-wordmark={wordmark}
+		>
+			<Fragment set:html={flatWordmark} />
+		</a>
+
+		<nav class="instant-v2-nav-links" aria-label="Main navigation">
+			{
+				showProductLinks && (
+					<a
+						class:list={[
+							"instant-v2-nav-link instant-v2-nav-link-product",
+							{ "is-active": active === "product" },
+						]}
+						href={productHref}
+						aria-current={active === "product" ? "page" : undefined}
+						aria-label="Product"
+						data-instant-v2-product-link
+					>
+						<span class="instant-v2-nav-product-pill">Product</span>
+					</a>
+				)
+			}
+			{
+				wordmark === "trends" ? null : active === "trends" ? (
+					<span
+						class="instant-v2-nav-link instant-v2-nav-link-trends instant-v2-nav-link-current"
+						aria-current="page"
+					>
+						<span>Trends</span>
+					</span>
+				) : (
+					<a class="instant-v2-nav-link instant-v2-nav-link-trends" href="/trends">
+						<span>Trends</span>
+					</a>
+				)
+			}
+			<slot name="trail" />
+			{
+				pricing &&
+					(active === "pricing" ? (
+						<span
+							class="instant-v2-nav-link instant-v2-nav-link-pricing instant-v2-nav-link-current"
+							aria-current="page"
+						>
+							<span>Pricing</span>
+						</span>
+					) : (
+						<a class="instant-v2-nav-link instant-v2-nav-link-pricing" href="/pricing">
+							<span>Pricing</span>
+						</a>
+					))
+			}
+		</nav>
+
+		{
+			download && (
+				<a
+					class="instant-v2-nav-download"
+					href={DOWNLOAD_PAGE_PATH}
+					data-instant-v2-pointer-glow
+					data-marketing-download-source="navigation"
+				>
+					<span
+						class="instant-v2-nav-download-opalescence"
+						data-instant-v2-pointer-glow-effect
+						aria-hidden="true"
+					></span>
+					<span
+						class="instant-v2-nav-download-glass"
+						aria-hidden="true"
+					></span>
+					<span class="instant-v2-nav-download-content">
+						<svg
+							class="instant-v2-download-icon"
+							viewBox="0 0 24 24"
+							fill="currentColor"
+							aria-hidden="true"
+						>
+							<path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"></path>
+						</svg>
+						<span class="instant-v2-download-full">Download for Mac</span>
+						<span class="instant-v2-download-short" aria-hidden="true">Download</span>
+					</span>
+				</a>
+			)
+		}
+
+	</div>
+</header>
+
+<style>
+	.instant-v2-nav {
+		--instant-v2-nav-outgoing-opacity: 1;
+		--instant-v2-nav-outgoing-scale: 1;
+		/* Light by default; a page with its own dark mode (Trends) sets
+		 * these. */
+		--instant-v2-nav-ink: #1f1f1f;
+		--instant-v2-nav-ink-muted: #525252;
+		--instant-v2-nav-button: #fff;
+		--instant-v2-nav-button-pressed: #f9f9f9;
+		--instant-v2-nav-button-ink: rgba(0, 0, 0, 0.87);
+		--instant-v2-nav-button-shadow:
+			inset 0 0 0 0.5px transparent,
+			0 0 0 0.5px rgba(0, 0, 0, 0.06),
+			0 1px 1px -1px rgba(0, 0, 0, 0.1),
+			0 1px 2px rgba(0, 0, 0, 0.05);
+		--instant-v2-nav-glass: oklch(1 0 0 / 0.36);
+		--instant-v2-nav-glass-edge:
+			inset 0 0 0 0.5px oklch(1 0 0 / 0.72),
+			inset 0 1px 0 oklch(1 0 0 / 0.62);
+		position: sticky;
+		top: 0;
+		z-index: 40;
+		display: flex;
+		height: 42px;
+		align-items: center;
+		background: transparent;
+	}
+
+	/* Dark: ink and buttons from the landing tokens, hairline
+	 * edges instead of drop shadows. */
+	:global(html.dark) .instant-v2-nav {
+		--instant-v2-nav-ink: var(--landing-ink);
+		--instant-v2-nav-ink-muted: var(--landing-ink-secondary);
+		--instant-v2-nav-button: var(--landing-control);
+		--instant-v2-nav-button-pressed: var(--landing-control-pressed);
+		--instant-v2-nav-button-ink: var(--landing-control-ink);
+		--instant-v2-nav-button-shadow: var(--landing-control-shadow);
+		--instant-v2-nav-glass: var(--landing-glass);
+		--instant-v2-nav-glass-edge: var(--landing-glass-edge);
+	}
+
+	.instant-v2-nav-filled {
+		background: var(--landing-page);
+	}
+
+	.instant-v2-nav-inner,
+	.instant-v2-nav-demo-layer-inner {
+		position: relative;
+		width: min(calc(100% - clamp(48px, 6.75vw, 136px)), 1920px);
+		margin-inline: auto;
+	}
+
+	.instant-v2-nav-inner {
+		display: flex;
+		min-width: 0;
+		align-items: center;
+		gap: 48px;
+		opacity: var(--instant-v2-nav-outgoing-opacity);
+		will-change: opacity;
+	}
+
+	.instant-v2-nav-demo-layer {
+		position: fixed;
+		z-index: 60;
+		inset: 0 0 auto;
+		height: 42px;
+		pointer-events: none;
+	}
+
+	.instant-v2-nav-demo-layer-inner {
+		height: 100%;
+	}
+
+	@supports (width: round(nearest, 1px, 1px)) {
+		.instant-v2-nav-inner,
+		.instant-v2-nav-demo-layer-inner {
+			width: min(
+				calc(100% - round(nearest, clamp(48px, 6.75vw, 136px), 2px)),
+				1920px
+			);
+		}
+	}
+
+	.instant-v2-nav-label {
+		display: inline-flex;
+		flex: none;
+		align-items: center;
+		justify-self: start;
+		color: var(--instant-v2-nav-ink);
+		text-decoration: none;
+		transform: scale(var(--instant-v2-nav-outgoing-scale));
+		transform-origin: center;
+		transition: color 260ms ease;
+		will-change: transform;
+	}
+
+	.instant-v2-nav-label :global(svg) {
+		display: block;
+		width: 64px;
+		height: 16px;
+	}
+
+	/* The Opaline Trends wordmark's proportions (112.191 × 16). */
+	.instant-v2-nav-label[data-wordmark="trends"] :global(svg) {
+		width: 112px;
+	}
+
+	.instant-v2-nav-label :global(svg path) {
+		fill: currentColor;
+	}
+
+	.instant-v2-nav-links {
+		display: flex;
+		min-width: 0;
+		align-items: center;
+		gap: 4px;
+		transform: scale(var(--instant-v2-nav-outgoing-scale));
+		transform-origin: center;
+		transition: gap 260ms ease;
+		will-change: transform;
+	}
+
+	.instant-v2-nav-link {
+		display: inline-flex;
+		flex: none;
+		height: 32px;
+		align-items: center;
+		justify-content: center;
+		border-radius: 6px;
+		color: var(--instant-v2-nav-ink-muted);
+		font-size: 12px;
+		font-weight: 400;
+		line-height: 16px;
+		text-decoration: none;
+		transition:
+			background-color 150ms ease,
+			color 260ms ease,
+			width 360ms cubic-bezier(0.22, 1, 0.36, 1);
+	}
+
+	.instant-v2-nav-link:not(.instant-v2-nav-link-product) > span,
+	.instant-v2-nav-product-pill {
+		display: inline-flex;
+		height: 28px;
+		align-items: center;
+		justify-content: center;
+		padding-inline: 14px;
+		border-radius: inherit;
+	}
+
+	.instant-v2-nav-link.is-active {
+		color: var(--instant-v2-nav-ink);
+		font-weight: 500;
+	}
+
+	.instant-v2-nav-link.is-active > span {
+		background: var(--landing-nav-active);
+	}
+
+	.instant-v2-nav-link-current > span {
+		background: transparent;
+	}
+
+	.instant-v2-nav-link-current {
+		color: var(--instant-v2-nav-ink);
+		font-weight: 500;
+	}
+
+	.instant-v2-nav-link-product {
+		width: 73px;
+	}
+
+	.instant-v2-nav-product-pill {
+		position: relative;
+		width: 100%;
+		overflow: hidden;
+		transition:
+			background-color 260ms ease,
+			box-shadow 260ms ease;
+	}
+
+	.instant-v2-nav-demo {
+		--instant-v2-nav-demo-opacity: 0;
+		--instant-v2-nav-demo-y: 5px;
+		--instant-v2-nav-demo-exit-duration: 260ms;
+		position: absolute;
+		top: 50%;
+		left: 0;
+		display: inline-flex;
+		height: 28px;
+		align-items: center;
+		justify-content: center;
+		padding: 0 10px;
+		border-radius: 6px;
+		background: var(--instant-v2-nav-button);
+		box-shadow: var(--instant-v2-nav-button-shadow);
+		color: var(--instant-v2-nav-button-ink);
+		font-family: "Inter Variable", Inter, sans-serif;
+		font-feature-settings: "ss03";
+		font-size: 13px;
+		font-weight: 500;
+		line-height: 16px;
+		text-decoration: none;
+		opacity: var(--instant-v2-nav-demo-opacity);
+		pointer-events: none;
+		white-space: nowrap;
+		transform: translate3d(0, calc(-50% + var(--instant-v2-nav-demo-y)), 0);
+		transition:
+			background-color 150ms ease-out,
+			box-shadow 150ms ease-out;
+		will-change: opacity, transform;
+	}
+
+	/* ─────────────────────────────────────────────────────────
+	 * NAV DEMO CTA STORYBOARD — click handoff
+	 *
+	 *   0ms   click locks the CTA; dashboard transition begins
+	 * 260ms   CTA fades out at its resting size and position
+	 * ───────────────────────────────────────────────────────── */
+
+	.instant-v2-nav-download {
+		position: relative;
+		isolation: isolate;
+		display: inline-flex;
+		height: 28px;
+		align-items: center;
+		justify-content: center;
+		margin-left: auto;
+		padding: 0 10px;
+		border: 0;
+		border-radius: 6px;
+		background: var(--instant-v2-nav-button);
+		box-shadow: var(--instant-v2-nav-button-shadow);
+		color: var(--instant-v2-nav-button-ink);
+		font-family: "Inter Variable", Inter, sans-serif;
+		font-feature-settings: "ss03";
+		font-size: 11px;
+		font-weight: 500;
+		line-height: 16px;
+		overflow: hidden;
+		white-space: nowrap;
+		text-decoration: none;
+		cursor: pointer;
+		transform: scale(var(--instant-v2-nav-outgoing-scale));
+		transform-origin: center;
+		transition:
+			background-color 150ms ease-out,
+			color 150ms ease-out,
+			box-shadow 150ms ease-out;
+		will-change: transform;
+	}
+
+	.instant-v2-nav-download-opalescence {
+		--instant-v2-nav-glow-width: 48px;
+		--instant-v2-nav-glow-height: 20px;
+		--instant-v2-nav-glow-blur: 6px;
+		position: absolute;
+		z-index: 0;
+		top: 50%;
+		left: 50%;
+		width: var(--instant-v2-nav-glow-width);
+		height: var(--instant-v2-nav-glow-height);
+		border-radius: 999px;
+		background-image: linear-gradient(
+			90deg,
+			oklch(var(--instant-v2-glimm-blue) / calc(0.16 * var(--landing-glimm-strength, 1))) 20%,
+			oklch(var(--instant-v2-glimm-indigo) / calc(0.196 * var(--landing-glimm-strength, 1))) 40%,
+			oklch(var(--instant-v2-glimm-purple) / calc(0.19 * var(--landing-glimm-strength, 1))) 60%,
+			oklch(var(--instant-v2-glimm-pink) / calc(0.196 * var(--landing-glimm-strength, 1))) 80%
+		);
+		filter: blur(var(--instant-v2-nav-glow-blur));
+		opacity: 0;
+		transform: translate3d(
+			calc(-50% + var(--instant-v2-glow-x, 0px)),
+			calc(-50% + var(--instant-v2-glow-y, 0px)),
+			0
+		);
+		pointer-events: none;
+		transition: opacity 200ms ease-out;
+	}
+
+	.instant-v2-nav-download-glass {
+		position: absolute;
+		z-index: 1;
+		inset: 0;
+		border-radius: inherit;
+		background: var(--instant-v2-nav-glass);
+		-webkit-backdrop-filter: blur(5px) saturate(1.45);
+		backdrop-filter: blur(5px) saturate(1.45);
+		box-shadow: var(--instant-v2-nav-glass-edge);
+		pointer-events: none;
+	}
+
+	.instant-v2-nav-download > .instant-v2-nav-download-content {
+		position: relative;
+		z-index: 2;
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	.instant-v2-download-short {
+		display: none;
+	}
+
+	.instant-v2-download-icon {
+		display: block;
+		width: 13px;
+		height: 13px;
+		flex: 0 0 13px;
+		transform: translateY(-1px);
+	}
+
+	@supports (corner-shape: squircle) {
+		.instant-v2-nav-link,
+		.instant-v2-nav-demo,
+		.instant-v2-nav-download {
+			border-radius: 12px;
+			corner-shape: squircle;
+		}
+
+		.instant-v2-nav-product-pill,
+		.instant-v2-nav-download-glass {
+			corner-shape: inherit;
+		}
+	}
+
+	.instant-v2-nav[data-dashboard-docked] .instant-v2-nav-label,
+	.instant-v2-nav[data-dashboard-docked] .instant-v2-nav-link,
+	.instant-v2-nav[data-dashboard-docked] .instant-v2-nav-download {
+		pointer-events: none;
+	}
+
+	.instant-v2-nav-demo[data-instant-v2-demo-available] {
+		pointer-events: auto;
+	}
+
+	:global(html[data-instant-v2-demo]:not([data-instant-v2-demo-exiting]))
+		.instant-v2-nav-demo {
+		opacity: 0;
+		pointer-events: none;
+		transition: opacity var(--instant-v2-nav-demo-exit-duration) ease-out;
+	}
+
+	:global(html[data-instant-v2-demo-exiting]) .instant-v2-nav-demo {
+		opacity: var(--instant-v2-nav-demo-opacity);
+		pointer-events: none;
+		transition: opacity 650ms cubic-bezier(0.22, 1, 0.36, 1);
+	}
+
+	.instant-v2-nav[data-demo-active] {
+		position: fixed;
+		inset: 0 0 auto;
+		width: 100%;
+	}
+
+	.instant-v2-nav-label:focus-visible,
+	.instant-v2-nav-link:focus-visible,
+	.instant-v2-nav-download:focus-visible,
+	.instant-v2-nav-demo:focus-visible {
+		outline: 2px solid #0070f3;
+		outline-offset: 4px;
+	}
+
+	@media (any-hover: hover) {
+		.instant-v2-nav-link:hover {
+			color: var(--instant-v2-nav-ink);
+		}
+
+		.instant-v2-nav-download:hover {
+			background: var(--instant-v2-nav-button);
+		}
+
+		.instant-v2-nav-demo:hover {
+			background: var(--instant-v2-nav-button);
+		}
+
+		.instant-v2-nav-download:hover .instant-v2-nav-download-opalescence {
+			opacity: 1;
+		}
+	}
+
+	.instant-v2-nav-download:focus-visible
+		.instant-v2-nav-download-opalescence {
+		opacity: 1;
+	}
+
+	.instant-v2-nav-download:active {
+		background: var(--instant-v2-nav-button-pressed);
+	}
+
+	.instant-v2-nav-demo:active {
+		background: var(--instant-v2-nav-button-pressed);
+	}
+
+	@media (max-width: 899px) {
+		.instant-v2-nav-inner,
+		.instant-v2-nav-demo-layer-inner {
+			width: min(calc(100% - 40px), 720px);
+		}
+
+		.instant-v2-nav-inner {
+			gap: 24px;
+		}
+	}
+
+	@media (max-width: 540px) {
+		.instant-v2-nav-inner,
+		.instant-v2-nav-demo-layer-inner {
+			width: calc(100% - 20px);
+		}
+
+		.instant-v2-nav-inner {
+			gap: 20px;
+		}
+
+		.instant-v2-nav-link:not(.instant-v2-nav-link-product) > span {
+			padding-inline: 10px;
+		}
+
+		.instant-v2-nav-link-product {
+			width: 69px;
+		}
+
+		.instant-v2-nav-download {
+			padding-inline: 10px;
+		}
+
+		.instant-v2-download-full {
+			display: inline;
+		}
+
+		.instant-v2-download-short {
+			display: none;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.instant-v2-nav,
+		.instant-v2-nav-label,
+		.instant-v2-nav-link,
+		.instant-v2-nav-product-pill,
+		.instant-v2-nav-download,
+		.instant-v2-nav-download-opalescence,
+		.instant-v2-nav-demo {
+			transition-duration: 0.01ms;
+		}
+	}
+</style>
+
+	<script>
+		const DEMO_ENTER_EVENT = "instant-v2:demo-enter";
+
+	const pointerGlowOwners =
+		document.querySelectorAll<HTMLElement>("[data-instant-v2-pointer-glow]");
+	const demoTriggers = document.querySelectorAll<HTMLElement>(
+		"[data-instant-v2-demo-trigger]",
+	);
+	for (const demoTrigger of demoTriggers) {
+		demoTrigger.addEventListener("click", (event) => {
+			event.preventDefault();
+			window.dispatchEvent(new CustomEvent(DEMO_ENTER_EVENT));
+		});
+	}
+
+	for (const pointerGlowOwner of pointerGlowOwners) {
+		const pointerGlow = pointerGlowOwner.querySelector<HTMLElement>(
+			"[data-instant-v2-pointer-glow-effect]",
+		);
+		if (!pointerGlow) continue;
+
+		pointerGlowOwner.addEventListener(
+			"pointermove",
+			(event) => {
+				const bounds = pointerGlowOwner.getBoundingClientRect();
+				const glowX = event.clientX - (bounds.left + bounds.width / 2);
+				const glowY = event.clientY - (bounds.top + bounds.height / 2);
+				pointerGlow.style.setProperty(
+					"--instant-v2-glow-x",
+					`${glowX}px`,
+				);
+				pointerGlow.style.setProperty(
+					"--instant-v2-glow-y",
+					`${glowY}px`,
+				);
+			},
+			{ passive: true },
+		);
+	}
+</script>

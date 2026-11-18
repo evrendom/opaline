@@ -193,30 +193,29 @@ describe("uploadSession against an old-API ingest stub", () => {
 		},
 	];
 
-	test.each(DEGRADED_RESPONSE_CASES)(
-		"degraded response $name fails cleanly after exactly one attempt",
-		async (degradedCase) => {
-			const stub = startIngestStub({ respond: degradedCase.respond });
-			try {
-				const result = await uploadSession(
-					createDirtyClaudeRequest("old-api-degraded-response"),
-					stubUploadConfig(stub),
-				);
+	test.each(
+		DEGRADED_RESPONSE_CASES,
+	)("degraded response $name fails cleanly after exactly one attempt", async (degradedCase) => {
+		const stub = startIngestStub({ respond: degradedCase.respond });
+		try {
+			const result = await uploadSession(
+				createDirtyClaudeRequest("old-api-degraded-response"),
+				stubUploadConfig(stub),
+			);
 
-				// Deterministic responses remain permanent. A generic 500 is retained
-				// for a later retry even though only 502/503/504 retry inline.
-				expect(result).toMatchObject({
-					success: false,
-					attempts: 1,
-					retryable: degradedCase.expectedRetryable,
-				});
-				expect(result.error).toContain(degradedCase.expectedErrorSubstring);
-				expect(stub.requests).toHaveLength(1);
-			} finally {
-				await stub.server.stop(true);
-			}
-		},
-	);
+			// Deterministic responses remain permanent. A generic 500 is retained
+			// for a later retry even though only 502/503/504 retry inline.
+			expect(result).toMatchObject({
+				success: false,
+				attempts: 1,
+				retryable: degradedCase.expectedRetryable,
+			});
+			expect(result.error).toContain(degradedCase.expectedErrorSubstring);
+			expect(stub.requests).toHaveLength(1);
+		} finally {
+			await stub.server.stop(true);
+		}
+	});
 
 	test("recovers from a transient 502 with both wire bodies redacted", async () => {
 		// Empirically pinned: oRPC raises ORPCError(status 502) for the stub's

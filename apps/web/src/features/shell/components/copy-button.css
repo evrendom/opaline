@@ -1,0 +1,87 @@
+/* The marketing site's copy icon (apps/marketing install-command-button.css):
+   the two squares merge into a circle and a check draws inside it.
+
+   Read top-to-bottom. Each value is ms after the copied state changes.
+
+      0ms   squares merge into a circle
+     90ms   check draws
+    190ms   check completes
+   2,000ms  check erases
+   2,130ms  squares begin separating
+   2,250ms  copy icon is restored */
+
+.copy-button {
+	--copy-shape-duration: 120ms;
+	--copy-shape-return-delay: 130ms;
+	--copy-check-duration: 100ms;
+	--copy-check-delay: 90ms;
+}
+
+.copy-button .copy-icon {
+	overflow: visible;
+}
+
+.copy-button .copy-icon-lower,
+.copy-button .copy-icon-upper,
+.copy-button .copy-icon-mask-shape {
+	width: 10.5px;
+	height: 10.5px;
+	rx: 2px;
+	transition:
+		transform var(--copy-shape-duration) ease-out var(--copy-shape-return-delay),
+		width var(--copy-shape-duration) ease-out var(--copy-shape-return-delay),
+		height var(--copy-shape-duration) ease-out var(--copy-shape-return-delay),
+		rx var(--copy-shape-duration) ease-out var(--copy-shape-return-delay);
+}
+
+.copy-button .copy-icon-lower,
+.copy-button .copy-icon-mask-shape {
+	transform-origin: 10px 14px;
+}
+
+.copy-button .copy-icon-upper {
+	transform-origin: 14px 10px;
+}
+
+.copy-button .copy-icon-check {
+	opacity: 0;
+	stroke-dasharray: 0 1;
+	stroke-dashoffset: -1;
+	transition:
+		stroke-dasharray var(--copy-check-duration) ease-out,
+		stroke-dashoffset var(--copy-check-duration) ease-out,
+		opacity 0ms linear var(--copy-check-duration);
+}
+
+.copy-button[data-copied="true"]
+	:is(.copy-icon-lower, .copy-icon-upper, .copy-icon-mask-shape) {
+	width: 14.5px;
+	height: 14.5px;
+	rx: 7.25px;
+	transition-delay: 0ms;
+}
+
+.copy-button[data-copied="true"] :is(.copy-icon-lower, .copy-icon-mask-shape) {
+	transform: translateY(-4px);
+}
+
+.copy-button[data-copied="true"] .copy-icon-upper {
+	transform: translateX(-4px);
+}
+
+.copy-button[data-copied="true"] .copy-icon-check {
+	opacity: 1;
+	stroke-dasharray: 1 1;
+	stroke-dashoffset: 0;
+	transition:
+		stroke-dasharray var(--copy-check-duration) ease-out var(--copy-check-delay),
+		stroke-dashoffset 0ms linear,
+		opacity 0ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.copy-button .copy-icon * {
+		transition-delay: 0ms;
+		transition-duration: 0.01ms;
+	}
+}

@@ -1,0 +1,24 @@
+---
+const enabled = import.meta.env.DEV;
+---
+
+{
+	enabled && (
+		<script is:inline type="module">
+			const reactVersion = "19.2.0";
+			const agentationVersion = "3.0.2";
+			const dependencyQuery = `?deps=react@${reactVersion},react-dom@${reactVersion}`;
+
+			const [{ createElement }, { createRoot }, { Agentation }] = await Promise.all([
+				import(`https://esm.sh/react@${reactVersion}`),
+				import(`https://esm.sh/react-dom@${reactVersion}/client`),
+				import(`https://esm.sh/agentation@${agentationVersion}${dependencyQuery}`),
+			]);
+
+			const mount = document.createElement("div");
+			mount.dataset.agentationDev = "";
+			document.body.append(mount);
+			createRoot(mount).render(createElement(Agentation));
+		</script>
+	)
+}

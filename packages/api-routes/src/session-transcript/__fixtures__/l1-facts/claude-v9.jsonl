@@ -1,0 +1,242 @@
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"query":"literal value"},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":"literal value","message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]},"toolDenialKind":"permission-rule"}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"PreToolUse:Bash hook error: Blocked by policy"}]},"toolDenialKind":"permission-rule"}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","message":{"content":[{"type":"tool_use","name":"Bash","id":"fixture-call","input":{"timeout":"literal value"}}]}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","message":{"content":[{"type":"tool_use","name":"Monitor","id":"fixture-call","input":{"timeout_ms":17}}]}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","message":{"content":[{"type":"tool_use","name":"Bash","id":"fixture-call","input":{"run_in_background":"literal value"}}]}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","message":{"content":[{"type":"tool_use","name":"Agent","id":"fixture-call","input":{"run_in_background":"literal value"}}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"persistedOutputPath":"literal value"},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"contentNotInModelContext":"literal value"},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","attributionPlugin":"literal value","message":{"content":[{"type":"text","text":"literal assistant"}]}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","attributionAgent":"literal value","message":{"content":[{"type":"text","text":"literal assistant"}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"status":"literal value"},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","message":{"content":[{"type":"tool_use","name":"Agent","id":"fixture-call","input":{"model":"literal value"}}]}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","message":{"content":[{"type":"tool_use","name":"Agent","id":"fixture-call","input":{"isolation":"literal value"}}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"resolvedModel":"literal value"},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"agentType":"literal value"},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"totalDurationMs":17},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"totalTokens":17},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"totalToolUseCount":17},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"toolStats":{"literal_field":"literal value"}},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"usage":{"literal_field":"literal value"}},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","cwd":"literal value"}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","gitBranch":"literal value"}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","wireToolInputs":{"entry/value":"literal value"},"message":{"content":[{"type":"text","text":"literal assistant"}]}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","message":{"content":[{"type":"tool_use","name":"Bash","id":"fixture-call","input":{"dangerouslyDisableSandbox":"literal value"}}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","permissionDecision":{"decision":"literal value"}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","permissionDecision":{"source":"literal value"}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","permissionDecision":{"reasonType":"literal value"}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","imagePasteIds":["literal value"]}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"queued_command","prompt":[{"source":{"media_type":"literal value"}}]}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"queued_command","prompt":[{"source":{"type":"literal value"}}]}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"queued_command","prompt":[{"type":"literal value"}]}}
+{"type":"permission-mode","timestamp":"2026-10-09T09:00:00Z","permissionMode":"literal value"}
+{"type":"mode","timestamp":"2026-10-09T09:00:00Z","mode":"literal value"}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"model","identity":{"modelId":"literal value"}}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","advisorModel":"literal value","message":{"content":[{"type":"text","text":"literal assistant"}]}}
+{"type":"system","timestamp":"2026-10-09T09:00:00Z","subtype":"model_refusal_fallback","requestId":"literal value"}
+{"type":"system","timestamp":"2026-10-09T09:00:00Z","subtype":"model_refusal_no_fallback","requestId":"literal value"}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","message":{"usage":{"server_tool_use":{"web_search_requests":"literal value"}}}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","message":{"usage":{"server_tool_use":{"web_fetch_requests":"literal value"}}}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"searchCount":17},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","thinkingDurationMs":17,"message":{"content":[{"type":"text","text":"literal assistant"}]}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","message":{"diagnostics":{"cache_miss_reason":{"type":"literal value"}}}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","message":{"diagnostics":{"cache_miss_reason":{"cache_missed_input_tokens":17}}}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","quotaLimits":{"status":"literal value"},"message":{"content":[{"type":"text","text":"literal assistant"}]}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","quotaLimits":{"rateLimitType":"literal value"},"message":{"content":[{"type":"text","text":"literal assistant"}]}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","quotaLimits":{"resetsAt":"literal value"},"message":{"content":[{"type":"text","text":"literal assistant"}]}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","quotaLimits":{"literal_field":"literal value"},"message":{"content":[{"type":"text","text":"literal assistant"}]}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"deferred_tools_delta","needsAuthMcpServers":["literal value"]}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"deferred_tools_delta","pendingMcpServers":["literal value"]}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"deferred_tools_delta","failedMcpServers":"literal value"}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"mcp_instructions_delta","removedNames":["literal value"]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","message":{"content":[{"type":"text","text":"[Request interrupted by user]"}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","message":{"content":"[Request interrupted by user]"}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","message":{"content":[{"type":"text","text":"[Request interrupted by user]"}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","message":{"content":"[Request interrupted by user]"}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","promptId":"literal value"}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","turnPosition":{"turnIndex":"literal value"}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","turnPosition":{"promptIndex":"literal value"}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","message":{"stop_details":{"literal_field":"literal value"}}}
+{"type":"system","timestamp":"2026-10-09T09:00:00Z","subtype":"api_error","error":{"status":"literal value"}}
+{"type":"system","timestamp":"2026-10-09T09:00:00Z","subtype":"api_error","error":{"connection":{"code":"literal value"}}}
+{"type":"system","timestamp":"2026-10-09T09:00:00Z","subtype":"api_error","error":{"message":"literal value"}}
+{"type":"system","timestamp":"2026-10-09T09:00:00Z","subtype":"api_error","error":{"formatted":"literal value"}}
+{"type":"system","timestamp":"2026-10-09T09:00:00Z","subtype":"api_error","error":{"isNetworkDown":false}}
+{"type":"system","timestamp":"2026-10-09T09:00:00Z","subtype":"api_error","error":{"connection":{"message":"literal value"}}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","message":{"content":[{"type":"fallback","from":{"model":"literal value"}}]}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","message":{"content":[{"type":"fallback","to":{"model":"literal value"}}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","origin":{"producer":"literal value"}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","origin":{"from":"literal value"}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","origin":{"fromMode":"literal value"}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","origin":{"name":"literal value"}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","origin":{"senderTaskId":"literal value"}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","origin":{"runId":"literal value"}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"queued_command","origin":{"kind":"literal value"}}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"queued_command","origin":{"entry/value":"literal value"}}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"queued_command","origin":{"from":"literal value"}}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"queued_command","origin":{"fromMode":"literal value"}}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"queued_command","origin":{"hopChain":["literal value"]}}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"queued_command","origin":{"name":"literal value"}}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"queued_command","origin":{"producer":"literal value"}}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"queued_command","origin":{"senderTaskId":"literal value"}}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"queued_command","origin":{"verifiedPeerPid":"literal value"}}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","origin":{"entry/value":"literal value"}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","origin":{"verifiedPeerPid":"literal value"}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"prompt_snapshot","systemPrompt":["literal value"]}}
+{"type":"queue-operation","timestamp":"2026-10-09T09:00:00Z","operation":"literal value"}
+{"type":"queue-operation","timestamp":"2026-10-09T09:00:00Z","reason":"literal value"}
+{"type":"queue-operation","timestamp":"2026-10-09T09:00:00Z","content":"literal value"}
+{"type":"queue-operation","timestamp":"2026-10-09T09:00:00Z","commandUuid":"literal value"}
+{"type":"queue-operation","timestamp":"2026-10-09T09:00:00Z","deliveryId":"literal value"}
+{"type":"cost-state","timestamp":"2026-10-09T09:00:00Z","modelUsage":"literal value"}
+{"type":"cost-state","timestamp":"2026-10-09T09:00:00Z","modelUsage":{"entry/value":{"literal_field":"literal value"}}}
+{"type":"cost-state","timestamp":"2026-10-09T09:00:00Z","startTime":"literal value"}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","permissionDecision":{"decision":"literal value"}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","permissionDecision":{"source":"literal value"}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"prompt_snapshot","tools":[{"name":"literal value"}]}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"prompt_snapshot","tools":[{"server":"literal value"}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"matches":["literal value"]},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"deferred_tools_delta","addedNames":["literal value"]}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"deferred_tools_delta","readdedNames":["literal value"]}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"deferred_tools_delta","removedNames":["literal value"]}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"deferred_tools_delta","surfacedDefinitions":[{"definition":{"name":"literal value"}}]}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"deferred_tools_delta","surfacedDefinitions":[{"name":"literal value"}]}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"deferred_tools_delta","surfacedNames":["literal value"]}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"deferred_tools_record","entries":[{"name":"literal value"}]}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"deferred_tools_record","nameOnlyAnnouncements":["literal value"]}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"thinking_drop","newlyDropped":{"blockCount":17}}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"thinking_drop","newlyDropped":{"turnCount":17}}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"thinking_drop","thinkingBlocksSent":"literal value"}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"thinking_drop","thinkingTurnsSent":"literal value"}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"structuredPatch":[{"oldStart":17}]},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"structuredPatch":[{"oldLines":17}]},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"structuredPatch":[{"newStart":17}]},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"structuredPatch":[{"newLines":17}]},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"bashEditDiff":{"files":[{"hunks":[{"newLines":17}]}]}},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"bashEditDiff":{"files":[{"hunks":[{"newStart":17}]}]}},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"bashEditDiff":{"files":[{"hunks":[{"oldLines":17}]}]}},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"bashEditDiff":{"files":[{"hunks":[{"oldStart":17}]}]}},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"statusChange":{"from":"literal value"}},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"statusChange":{"to":"literal value"}},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"file":{"totalLines":17}},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"file":{"numLines":17}},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"file":{"startLine":17}},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"file":{"dimensions":{"literal_field":"literal value"}}},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"staleRecovered":"literal value"},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","uuid":"literal value"}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","parentUuid":"literal value"}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","logicalParentUuid":"literal value"}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","sourceToolAssistantUUID":"literal value"}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","refusedUserMessageUuid":"literal value"}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"type":"update","structuredPatch":[{"lines":["+after"]}]},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"structuredPatch":[{"lines":["+after"]}],"type":"update"},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","is_error":false}]},"toolUseResult":{"type":"update","structuredPatch":[{"lines":["+after"]}]}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"environment","snapshot":{"additionalWorkingDirectories":["literal value"]}}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"environment","snapshot":{"workingDirectory":"literal value"}}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","message":{"content":[{"type":"tool_use","name":"SendMessage","id":"fixture-call","input":{"recipient":"literal value"}}]}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","message":{"content":[{"type":"tool_use","name":"SendMessage","id":"fixture-call","input":{"to":"literal value"}}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"pin":{"id":"literal value"}},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"pin":{"name":"literal value"}},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"pin":{"ref":"literal value"}},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","apiErrorStatus":"literal value","message":{"content":[{"type":"text","text":"literal assistant"}]}}
+{"type":"system","timestamp":"2026-10-09T09:00:00Z","subtype":"api_error","error":{"status":"literal value"}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":["literal value"]}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","mcpMeta":{"_meta":"literal value"}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"literal value"}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":[{"type":"text","text":"literal value"}]}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"agentId":"literal value"},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"resumedAgentId":"literal value"},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"pin":{"id":"literal value"}},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","message":{"content":[{"type":"tool_use","name":"Agent","id":"fixture-call","input":{"subagent_type":"literal value"}}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"agentType":"literal value"},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","message":{"content":[{"type":"tool_use","name":"Agent","id":"fixture-call","input":{"name":"literal value"}}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"resolvedModel":"literal value"},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"status":"literal value"},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"message"},"renderedRole":"literal value"}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","message":{"content":[{"type":"tool_use","name":"Bash","id":"fixture-call","input":{"description":"literal value"}}]}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","message":{"input_transformations":[{"path":"literal value"}]}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","message":{"input_transformations":[{"reason":"literal value"}]}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","message":{"input_transformations":[{"type":"literal value"}]}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","slug":"literal value","message":{"content":[{"type":"text","text":"literal assistant"}]}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"agent_listing_delta"},"slug":"literal value"}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"date_change"},"slug":"literal value"}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"deferred_tools_delta"},"slug":"literal value"}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"skill_listing"},"slug":"literal value"}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"task_reminder"},"slug":"literal value"}
+{"type":"system","timestamp":"2026-10-09T09:00:00Z","subtype":"stop_hook_summary","slug":"literal value"}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","slug":"literal value"}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"agent_listing_delta","addedTypes":["literal value"]}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"agent_listing_delta","builtInTypes":["literal value"]}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"batching_reminder_sent","clearAt":"literal value"}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"prompt_snapshot","inlineTools":false}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"skill_listing","isInitial":false}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"batching_reminder_sent","model":"literal value"}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"model","identity":{"knowledgeCutoff":"literal value"}}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"model","identity":{"marketingName":"literal value"}}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"thinking_drop","model":"literal value"}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"credential_org","organizationUuid":"literal value"}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"session_context","context":{"userEmail":"literal value"}}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"date_change","newDate":"literal value"}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"date","date":"literal value"}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"deferred_tools_delta","removedByBlock":["literal value"]}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"deferred_tools_delta","toolSearchAbsent":"literal value"}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"deferred_tools_record","entries":[{"defer_loading":"literal value"}]}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"deferred_tools_record","entries":[{"eager_input_streaming":"literal value"}]}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"skill_listing","names":["literal value"]}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"skill_listing","skillCount":17}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"environment","changes":[{"entry/value":"literal value"}]}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"environment","snapshot":{"additionalWorkingDirectories":["literal value"]}}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"environment","snapshot":{"isGitRepo":"literal value"}}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"environment","snapshot":{"isWorktree":"literal value"}}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"environment","snapshot":{"osVersion":"literal value"}}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"environment","snapshot":{"platform":"literal value"}}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"environment","snapshot":{"shell":"literal value"}}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"session_context","context":{"gitStatus":"literal value"}}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"nested_memory","displayPath":"literal value"}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"remote_session_change","commit":"literal value"}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"queued_command","delivery_id":"literal value"}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"queued_command","runId":"literal value"}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"queued_command","source_uuid":"literal value"}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"queued_command","timestamp":"literal value"}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","queueSkipAttachments":"literal value"}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","queueTranscriptOnly":"literal value"}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"queued_command","usage":{"durationMs":17}}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"queued_command","usage":{"toolUses":"literal value"}}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"queued_command","usage":{"totalTokens":17}}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"read_truncation_notice","toolUseID":"literal value"}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","sourceToolUseID":"literal value"}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"thinking_drop","querySource":"literal value"}}
+{"type":"attachment","timestamp":"2026-10-09T09:00:00Z","attachment":{"type":"thinking_drop","requestId":"literal value"}}
+{"type":"system","timestamp":"2026-10-09T09:00:00Z","subtype":"api_error","level":"literal value"}
+{"type":"system","timestamp":"2026-10-09T09:00:00Z","subtype":"api_error","source":"literal value"}
+{"type":"system","timestamp":"2026-10-09T09:00:00Z","subtype":"informational","level":"literal value"}
+{"type":"system","timestamp":"2026-10-09T09:00:00Z","subtype":"model_refusal_fallback","level":"literal value"}
+{"type":"system","timestamp":"2026-10-09T09:00:00Z","subtype":"model_refusal_fallback","scope":"literal value"}
+{"type":"system","timestamp":"2026-10-09T09:00:00Z","subtype":"model_refusal_no_fallback","level":"literal value"}
+{"type":"system","timestamp":"2026-10-09T09:00:00Z","subtype":"stop_hook_summary","level":"literal value"}
+{"type":"system","timestamp":"2026-10-09T09:00:00Z","subtype":"stop_hook_summary","toolUseID":"literal value"}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","mcpMeta":{"structuredContent":"literal value"}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"allowedTools":["literal value"]},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"bytes":17},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"code":"literal value"},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"codeText":"literal value"},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"cancelledWakeups":"literal value"},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"clampedDelaySeconds":"literal value"},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"scheduledFor":"literal value"},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"wasClamped":false},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"canReadOutputFile":"literal value"},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"persistent":false},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"task_type":"literal value"},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"task":{"id":"literal value"}},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"taskId":"literal value"},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"file":{"originalSize":"literal value"}},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"file":{"truncatedByTokenCap":false}},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"isImage":false},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"type":"literal value"},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"numLines":17},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"totalLines":17},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"success":false},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"updatedFields":["literal value"]},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"user","timestamp":"2026-10-09T09:00:00Z","toolUseResult":{"total_deferred_tools":"literal value"},"message":{"content":[{"type":"tool_result","tool_use_id":"fixture-call","content":"ok","is_error":false}]}}
+{"type":"assistant","timestamp":"2026-10-09T09:00:00Z","message":{"content":[{"type":"text","text":"thinking counter witness"}],"usage":{"output_tokens_details":{"thinking_tokens":0}}}}

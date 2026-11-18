@@ -37,15 +37,18 @@ function rejection(
 }
 
 describe("allowsInsecureEndpoint", () => {
-	test.each(["1", "true", "TRUE", "yes", "on"])(
-		"accepts the endpoint-specific env opt-in %p",
-		(value) => {
-			process.env[ENDPOINT_ENV_VAR] = value;
+	test.each([
+		"1",
+		"true",
+		"TRUE",
+		"yes",
+		"on",
+	])("accepts the endpoint-specific env opt-in %p", (value) => {
+		process.env[ENDPOINT_ENV_VAR] = value;
 
-			expect(allowsInsecureEndpointFromEnv()).toBe(true);
-			expect(allowsInsecureEndpoint(false)).toBe(true);
-		},
-	);
+		expect(allowsInsecureEndpointFromEnv()).toBe(true);
+		expect(allowsInsecureEndpoint(false)).toBe(true);
+	});
 
 	test("accepts the endpoint-specific command flag", () => {
 		delete process.env[ENDPOINT_ENV_VAR];

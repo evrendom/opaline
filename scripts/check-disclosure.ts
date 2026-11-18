@@ -1,0 +1,333 @@
+#!/usr/bin/env bun
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { existsSync, lstatSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import process from "node:process";
+
+interface DisclosureRule {
+	name: string;
+	matches: (line: string) => boolean;
+}
+
+interface DisclosureFinding {
+	source: string;
+	line: number;
+	rule: string;
+}
+
+interface PullRequestMetadata {
+	title: string;
+	body: string | null;
+}
+
+// The checker defines every blocked marker. CONTRIBUTING.md is the policy
+// document and may quote a marker while explaining the boundary. Keep these
+// explicit exclusions narrow and review additions as policy changes.
+const TRACKED_FILE_EXCLUSIONS = new Set([
+	// Synthetic parser corpus intentionally exercises Windows skill paths.
+	"apps/api/src/services/fixtures/skill-transcript-corpus.ts",
+	// The CLI maps the legacy hosted API base to the dashboard for old installs.
+	"apps/cli/src/lib/dashboard-url.ts",
+	"apps/cli/src/__tests__/dashboard-url.test.ts",
+	// Synthetic Windows paths in CLI install and metadata-filter tests.
+	"apps/cli/src/__tests__/alias-hook-config.test.ts",
+	"apps/cli/src/internal/local-context-source/metadata-filter.test.ts",
+	"scripts/check-disclosure.ts",
+	"CONTRIBUTING.md",
+]);
+
+const CUSTOMER_NAME_HASHES = new Set([
+	"32c7b37331f4d8e6e5ff8cc2a04f6106b115ca073ee3cb2d7d274af114d93355",
+]);
+
+const PERSONAL_HOME_HASHES = new Set([
+	"4697c20f8a70fcad6323e007d553cfe05d4433f81be70884ea3b4834b147f4c1",
+	"49944c7c87687b59099629e76d259752e2c89e7947653d806e5562b53c245542",
+]);
+
+function hasPersonalHomePath(line: string): boolean {
+	for (const match of line.matchAll(/\/Users\/([A-Za-z0-9._-]+)/g)) {
+		const name = match[1]?.toLowerCase() ?? "";
+		if (
+			PERSONAL_HOME_HASHES.has(createHash("sha256").update(name).digest("hex"))
+		)
+			return true;
+	}
+	return false;
+}
+
+function hasCustomerNameToken(line: string): boolean {
+	for (const word of line.toLowerCase().match(/[a-z]{5,}/g) ?? []) {
+		for (let at = 0; at + 5 <= word.length; at++) {
+			if (word[at] !== "n") continue;
+			const hash = createHash("sha256")
+				.update(word.slice(at, at + 5))
+				.digest("hex");
+			if (CUSTOMER_NAME_HASHES.has(hash)) return true;
+		}
+	}
+	return false;
+}
+
+const DISCLOSURE_RULES: readonly DisclosureRule[] = [
+	{
+		name: "core-team-secret-injection",
+		matches: (line) => line.includes("doppler run --project"),
+	},
+	{
+		name: "production-config",
+		matches: (line) =>
+			line.includes("--config prd") || line.includes("--config=prd"),
+	},
+	{
+		name: "local-production-config",
+		matches: (line) => line.includes("prd_local"),
+	},
+	{
+		name: "personal-home-path",
+		matches: (line) => hasPersonalHomePath(line),
+	},
+	{
+		name: "windows-absolute-path",
+		matches: (line) =>
+			/[Cc]:[\\/]/.test(line) ||
+			/\/c\/Users\//i.test(line) ||
+			/\/mnt\/c\/Users\//i.test(line),
+	},
+	{
+		name: "customer-ticket",
+		matches: (line) => /NUM-[0-9]/.test(line),
+	},
+	{
+		name: "unrelated-project-path",
+		matches: (line) => line.includes("Trabajo"),
+	},
+	{
+		name: "customer-name",
+		matches: (line) => hasCustomerNameToken(line),
+	},
+	{
+		name: "shared-analytics-email",
+		matches: (line) => line.includes("analytics-test@rudel.ai"),
+	},
+	{
+		name: "shared-analytics-password",
+		matches: (line) => line.includes("analytics-test-password"),
+	},
+	{
+		name: "credential-in-url",
+		matches: (line) =>
+			/\b[a-z][a-z0-9+.-]*:\/\/\S*password=\$\{/i.test(line),
+	},
+	{
+		name: "insecure-curl",
+		matches: hasInsecureCurl,
+	},
+];
+
+export function scanText(
+	source: string,
+	text: string,
+): readonly DisclosureFinding[] {
+	const findings: DisclosureFinding[] = [];
+	const lines = text.split(/\r\n|\n|\r/);
+
+	for (const [index, line] of lines.entries()) {
+		for (const rule of DISCLOSURE_RULES) {
+			if (rule.matches(line)) {
+				findings.push({
+					source,
+					line: index + 1,
+					rule: rule.name,
+				});
+			}
+		}
+	}
+
+	return findings;
+}
+
+export function scanTrackedFiles(
+	cwd = process.cwd(),
+): readonly DisclosureFinding[] {
+	const trackedFiles = runCommand("git", ["ls-files", "-z"], cwd)
+		.split("\0")
+		.filter((path) => path.length > 0);
+	const findings: DisclosureFinding[] = [];
+
+	for (const trackedFile of trackedFiles) {
+		if (TRACKED_FILE_EXCLUSIONS.has(trackedFile)) {
+			continue;
+		}
+
+		const absolutePath = resolve(cwd, trackedFile);
+		if (!existsSync(absolutePath)) {
+			continue;
+		}
+
+		const stat = lstatSync(absolutePath);
+		if (stat.isSymbolicLink() || !stat.isFile()) {
+			continue;
+		}
+
+		const bytes = readFileSync(absolutePath);
+		if (bytes.includes(0)) {
+			continue;
+		}
+
+		findings.push(...scanText(trackedFile, bytes.toString("utf8")));
+	}
+
+	return findings;
+}
+
+function scanCommitMessages(
+	base: string,
+	cwd = process.cwd(),
+): readonly DisclosureFinding[] {
+	const log = runCommand(
+		"git",
+		["log", "-z", "--format=%H%x00%B", `${base}..HEAD`],
+		cwd,
+	);
+	const fields = log.split("\0");
+	const findings: DisclosureFinding[] = [];
+
+	for (let index = 0; index + 1 < fields.length; index += 2) {
+		const commit = fields[index].trim();
+		const message = fields[index + 1];
+		if (commit.length > 0) {
+			findings.push(...scanText(`commit:${commit}`, message));
+		}
+	}
+
+	return findings;
+}
+
+function scanPullRequest(
+	number: string,
+	cwd = process.cwd(),
+): readonly DisclosureFinding[] {
+	const output = runCommand(
+		"gh",
+		["pr", "view", number, "--json", "title,body"],
+		cwd,
+	);
+	const value: unknown = JSON.parse(output);
+	if (!isPullRequestMetadata(value)) {
+		throw new Error("Pull request metadata has an unexpected shape.");
+	}
+
+	return [
+		...scanText("pull-request:title", value.title),
+		...scanText("pull-request:body", value.body ?? ""),
+	];
+}
+
+function runDisclosureCheck(
+	argv: readonly string[],
+	cwd = process.cwd(),
+): number {
+	let findings: readonly DisclosureFinding[];
+	if (argv.length === 0) {
+		findings = scanTrackedFiles(cwd);
+	} else if (argv.length === 2 && argv[0] === "--commits") {
+		findings = scanCommitMessages(argv[1], cwd);
+	} else if (argv.length === 2 && argv[0] === "--pull-request") {
+		findings = scanPullRequest(argv[1], cwd);
+	} else {
+		throw new Error(
+			"Usage: check-disclosure.ts [--commits <base> | --pull-request <number>]",
+		);
+	}
+
+	for (const finding of findings) {
+		process.stderr.write(
+			`${finding.source}:${finding.line} ${finding.rule}\n`,
+		);
+	}
+
+	return findings.length > 0 ? 1 : 0;
+}
+
+function hasInsecureCurl(line: string): boolean {
+	if (!line.includes("curl")) {
+		return false;
+	}
+
+	let scanningCurlArguments = false;
+	for (const rawToken of line.split(/\s+/)) {
+		if (rawToken === "&&" || rawToken === "||" || rawToken === "|") {
+			scanningCurlArguments = false;
+			continue;
+		}
+
+		const token = rawToken
+			.replace(/^[\\"'(`]+/, "")
+			.replace(/[\\)\]}"'`,;]+$/, "");
+
+		if (!scanningCurlArguments) {
+			scanningCurlArguments =
+				token === "curl" ||
+				token.endsWith("/curl") ||
+				token.endsWith('"curl') ||
+				token.endsWith("'curl") ||
+				token.endsWith("`curl");
+			continue;
+		}
+
+		if (
+			token === "--insecure" ||
+			/^-[A-Za-z]*k[A-Za-z]*$/.test(token)
+		) {
+			return true;
+		}
+
+		if (rawToken.includes(";")) {
+			scanningCurlArguments = false;
+		}
+	}
+
+	return false;
+}
+
+function isPullRequestMetadata(value: unknown): value is PullRequestMetadata {
+	if (typeof value !== "object" || value === null) {
+		return false;
+	}
+
+	return (
+		"title" in value &&
+		typeof value.title === "string" &&
+		"body" in value &&
+		(typeof value.body === "string" || value.body === null)
+	);
+}
+
+function runCommand(
+	command: string,
+	args: readonly string[],
+	cwd: string,
+): string {
+	const result = spawnSync(command, args, {
+		cwd,
+		encoding: "utf8",
+		maxBuffer: 64 * 1024 * 1024,
+	});
+
+	if (result.error || result.status !== 0) {
+		throw new Error(`Could not run ${command}.`);
+	}
+
+	return result.stdout;
+}
+
+if (import.meta.main) {
+	try {
+		process.exitCode = runDisclosureCheck(process.argv.slice(2));
+	} catch {
+		process.stderr.write("ERROR: disclosure check could not run.\n");
+		process.exitCode = 2;
+	}
+}

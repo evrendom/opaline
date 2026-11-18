@@ -1,0 +1,54 @@
+::view-transition-group(column-slide) {
+	overflow: clip;
+	mask-image: linear-gradient(
+		to right,
+		transparent,
+		#000 40px,
+		#000 calc(100% - 40px),
+		transparent
+	);
+}
+::view-transition-old(column-slide),
+::view-transition-new(column-slide) {
+	mix-blend-mode: normal;
+	animation-duration: 360ms;
+	animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+	animation-fill-mode: both;
+}
+::view-transition-old(column-slide) {
+	animation-name: column-slide-out;
+}
+::view-transition-new(column-slide) {
+	animation-name: column-slide-in;
+}
+:root[data-column-slide="back"]::view-transition-old(column-slide) {
+	animation-name: column-slide-out-back;
+}
+:root[data-column-slide="back"]::view-transition-new(column-slide) {
+	animation-name: column-slide-in-back;
+}
+:root[data-column-slide]::view-transition-old(root),
+:root[data-column-slide]::view-transition-new(root) {
+	animation: none;
+}
+
+@keyframes column-slide-out {
+	to {
+		transform: translateX(-100%);
+	}
+}
+@keyframes column-slide-in {
+	from {
+		transform: translateX(100%);
+	}
+}
+@keyframes column-slide-out-back {
+	to {
+		transform: translateX(100%);
+	}
+}
+@keyframes column-slide-in-back {
+	from {
+		transform: translateX(-100%);
+	}
+}

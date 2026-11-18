@@ -1,0 +1,4 @@
+{$OPALINE_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy opaline:4100
+}

@@ -1,0 +1,750 @@
+import { describe, expect, test } from "bun:test";
+import { CostDashboardInputSchema } from "@rudel/api-routes";
+import {
+	buildCostDashboard,
+	buildLanguageSplit,
+	type CostAggregateRow,
+	listAvailableDashboardMetrics,
+	listDashboardDates,
+	resolveAvailableDashboardInput,
+} from "../services/cost-dashboard-data.js";
+
+const input = CostDashboardInputSchema.parse({
+	startDate: "2026-09-01",
+	endDate: "2026-09-03",
+});
+const members = new Map([["alice", { label: "Alice", image: null }]]);
+function row(overrides: Partial<CostAggregateRow> = {}): CostAggregateRow {
+	return {
+		metric: "cost",
+		date: "2026-09-01",
+		dimension: "members",
+		id: "alice",
+		value: 10,
+		incomplete: 0,
+		matched_value: 10,
+		matched_rows: 2,
+		matched_incomplete: 0,
+		...overrides,
+	};
+}
+
+test("zero-fills missing UTC days and computes the total without counting all three facets", () => {
+	const result = buildCostDashboard(
+		[
+			row(),
+			row({ dimension: "models", id: "claude-sonnet-4-5" }),
+			row({ dimension: "repositories", id: "github.com/opaline/app" }),
+		],
+		input,
+		members,
+	);
+	expect(result.metrics.cost?.total).toBe(10);
+	expect(result.metrics.cost?.trend.map((point) => point.total)).toEqual([
+		10, 0, 0,
+	]);
+	expect(result.metrics.cost?.breakdowns.members[0]?.label).toBe("Alice");
+	expect(result.metrics.cost?.breakdowns.repositories[0]?.label).toBe(
+		"opaline/app",
+	);
+});
+
+test("uses matched amounts for the chart while keeping alternative selections in the facet", () => {
+	const result = buildCostDashboard(
+		[row(), row({ id: "bob", value: 80, matched_value: 0, matched_rows: 0 })],
+		{ ...input, members: ["alice"] },
+		members,
+	);
+	expect(result.metrics.cost?.total).toBe(10);
+	expect(
+		result.metrics.cost?.breakdowns.members.map((entry) => entry.value),
+	).toEqual([80, 10]);
+	expect(result.metrics.cost?.series).toEqual([
+		{ id: "total", label: "API Cost" },
+	]);
+});
+
+test("every model line adds up to its day and the total, with a bounded Other series", () => {
+	const rows = Array.from({ length: 10 }, (_, index) =>
+		row({
+			dimension: "models",
+			id: `model-${index}`,
+			value: index + 1,
+			matched_value: index + 1,
+		}),
+	);
+	const result = buildCostDashboard(
+		rows,
+		{ ...input, splitBy: "models" },
+		members,
+	);
+	expect(result.metrics.cost?.series).toHaveLength(8);
+	expect(result.metrics.cost?.series.at(-1)?.label).toBe("Other");
+	expect(result.metrics.cost?.total).toBe(55);
+	expect(result.metrics.cost?.trend[0]?.values.other).toBe(6);
+	for (const point of result.metrics.cost?.trend ?? [])
+		expect(
+			Object.values(point.values).reduce((sum, value) => sum + value, 0),
+		).toBe(point.total);
+});
+
+test("distinguishes unpriced usage from an empty selection", () => {
+	const partial = buildCostDashboard(
+		[row({ value: 0, incomplete: 1, matched_value: 0, matched_incomplete: 1 })],
+		input,
+		members,
+	);
+	expect(partial.metrics.cost?.hasUsage).toBe(true);
+	expect(partial.metrics.cost?.incomplete).toBe(true);
+	expect(partial.metrics.cost?.breakdowns.members[0]?.incomplete).toBe(true);
+	const empty = buildCostDashboard([], input, members);
+	expect(empty.metrics.cost?.hasUsage).toBe(false);
+	expect(empty.metrics.cost?.total).toBe(0);
+	expect(empty.metrics.cost?.trend).toHaveLength(3);
+});
+
+test("unpriced usage outside the selection does not mark the chart incomplete", () => {
+	const result = buildCostDashboard(
+		[
+			row(),
+			row({
+				id: "bob",
+				incomplete: 1,
+				matched_incomplete: 0,
+				matched_rows: 0,
+				matched_value: 0,
+			}),
+		],
+		input,
+		members,
+	);
+	expect(result.metrics.cost?.incomplete).toBe(false);
+	expect(
+		result.metrics.cost?.breakdowns.members.find((entry) => entry.id === "bob")
+			?.incomplete,
+	).toBe(true);
+});
+
+test("does not use untrusted dimension values as chart object keys", () => {
+	const result = buildCostDashboard(
+		[row({ dimension: "models", id: "__proto__" })],
+		{ ...input, splitBy: "models" },
+		members,
+	);
+	expect(result.metrics.cost?.trend[0]?.values).toEqual({ "series-0": 10 });
+	expect(result.metrics.cost?.series[0]?.label).toBe("__proto__");
+});
+
+test("session counts stay separate from costs and sum across days and primary models", () => {
+	const result = buildCostDashboard(
+		[
+			row(),
+			row({ metric: "sessions", value: 2, matched_value: 2 }),
+			row({
+				metric: "sessions",
+				date: "2026-09-02",
+				value: 3,
+				matched_value: 3,
+			}),
+			row({
+				metric: "sessions",
+				dimension: "models",
+				id: "model-a",
+				value: 4,
+				matched_value: 4,
+			}),
+			row({
+				metric: "sessions",
+				dimension: "models",
+				id: "model-b",
+				value: 1,
+				matched_value: 1,
+			}),
+		],
+		input,
+		members,
+	);
+	expect(result.metrics.cost?.total).toBe(10);
+	expect(result.metrics.sessions?.total).toBe(5);
+	expect(result.metrics.sessions?.trend.map((day) => day.total)).toEqual([
+		2, 3, 0,
+	]);
+	expect(
+		result.metrics.sessions?.breakdowns.models.map((entry) => entry.value),
+	).toEqual([4, 1]);
+	expect(result.metrics.sessions?.incomplete).toBe(false);
+	expect(result.metrics.commits).toBeNull();
+});
+
+test("session splits preserve integer totals and respect matched filters", () => {
+	const result = buildCostDashboard(
+		[
+			row({
+				metric: "sessions",
+				dimension: "models",
+				id: "model-a",
+				value: 4,
+				matched_value: 4,
+			}),
+			row({
+				metric: "sessions",
+				dimension: "models",
+				id: "model-b",
+				value: 8,
+				matched_value: 0,
+				matched_rows: 0,
+			}),
+		],
+		{ ...input, splitBy: "models", models: ["model-a"] },
+		members,
+	);
+	expect(result.metrics.sessions?.total).toBe(4);
+	expect(result.metrics.sessions?.series).toHaveLength(1);
+	expect(result.metrics.sessions?.trend[0]?.values).toEqual({ "series-0": 4 });
+	expect(
+		result.metrics.sessions?.breakdowns.models.map((entry) => entry.value),
+	).toEqual([8, 4]);
+});
+
+test("language signals default to a combined total without counting facets twice", () => {
+	const result = buildCostDashboard(
+		[
+			row({ metric: "sessions", value: 5, matched_value: 5 }),
+			...[
+				["modelApologies", 12],
+				["userNegative", 3],
+			].map(([id, value]) =>
+				row({
+					metric: "signals",
+					dimension: "signalTypes",
+					id: String(id),
+					value: Number(value),
+					matched_value: Number(value),
+				}),
+			),
+			row({
+				metric: "signals",
+				dimension: "members",
+				value: 15,
+				matched_value: 15,
+			}),
+			row({
+				metric: "signals",
+				dimension: "phrases",
+				id: "Sorry",
+				value: 12,
+				matched_value: 12,
+			}),
+		],
+		input,
+		members,
+	);
+	expect(result.metrics.sessions?.total).toBe(5);
+	expect(result.metrics.signals?.total).toBe(15);
+	expect(result.metrics.signals?.series).toEqual([
+		{ id: "total", label: "Frustrations" },
+	]);
+	const split = buildCostDashboard(
+		[
+			...[
+				["modelApologies", 12],
+				["userNegative", 3],
+			].map(([id, value]) =>
+				row({
+					metric: "signals",
+					dimension: "signalTypes",
+					id: String(id),
+					value: Number(value),
+					matched_value: Number(value),
+				}),
+			),
+		],
+		{ ...input, splitBy: "signalTypes" },
+		members,
+	);
+	expect(split.metrics.signals?.total).toBe(15);
+	expect(split.metrics.signals?.series.map((s) => s.label)).toEqual([
+		"Model apologies",
+		"Negative user",
+	]);
+	expect(result.metrics.signals?.trend[0]?.total).toBe(15);
+	expect(
+		Object.values(result.metrics.signals?.trend[0]?.values ?? {}).reduce(
+			(s, v) => s + v,
+			0,
+		),
+	).toBe(15);
+	expect(result.metrics.signals?.breakdowns.phrases[0]?.value).toBe(12);
+});
+
+test("selected types keep alternatives visible but only selected occurrences reach the chart", () => {
+	const result = buildCostDashboard(
+		[
+			row({
+				metric: "signals",
+				dimension: "signalTypes",
+				id: "modelApologies",
+				value: 7,
+				matched_value: 7,
+			}),
+			row({
+				metric: "signals",
+				dimension: "signalTypes",
+				id: "userNegative",
+				value: 3,
+				matched_value: 0,
+				matched_rows: 0,
+			}),
+		],
+		{ ...input, signalTypes: ["modelApologies"], splitBy: "signalTypes" },
+		members,
+	);
+	expect(result.metrics.signals?.total).toBe(7);
+	expect(result.metrics.signals?.series).toHaveLength(1);
+	expect(result.metrics.signals?.breakdowns.signalTypes).toHaveLength(2);
+});
+
+test("verbatim splits use safe keys, preserve totals and exclude blank sentinels", () => {
+	const result = buildCostDashboard(
+		[
+			row({
+				metric: "signals",
+				dimension: "phrases",
+				id: "__proto__",
+				value: 2,
+				matched_value: 2,
+			}),
+			row({
+				metric: "signals",
+				dimension: "phrases",
+				id: "",
+				value: 0,
+				matched_value: 0,
+			}),
+			row({
+				metric: "signals",
+				dimension: "phrases",
+				id: "Great work",
+				value: 5,
+				matched_value: 0,
+				matched_rows: 0,
+			}),
+			row(),
+		],
+		{ ...input, splitBy: "phrases", phrases: ["__proto__"] },
+		members,
+	);
+	expect(result.metrics.signals?.total).toBe(2);
+	expect(result.metrics.signals?.trend[0]?.values).toEqual({ "series-0": 2 });
+	expect(result.metrics.signals?.series[0]?.label).toBe("__proto__");
+	expect(result.metrics.signals?.breakdowns.phrases.map((p) => p.id)).toEqual([
+		"Great work",
+		"__proto__",
+	]);
+	expect(result.metrics.cost?.total).toBe(10);
+});
+
+test("unscanned language remains unknown, including when a verbatim filter has no stored phrases yet", () => {
+	const result = buildCostDashboard(
+		[
+			row(),
+			row({
+				metric: "signals",
+				dimension: "members",
+				value: 0,
+				matched_value: 0,
+				incomplete: 1,
+				matched_incomplete: 1,
+			}),
+			row({
+				metric: "signals",
+				dimension: "phrases",
+				id: "",
+				value: 0,
+				matched_value: 0,
+				incomplete: 1,
+				matched_incomplete: 1,
+			}),
+		],
+		{ ...input, splitBy: "phrases", phrases: ["Sorry"] },
+		members,
+	);
+	expect(result.metrics.signals).toBeNull();
+	expect(result.metrics.cost?.total).toBe(10);
+});
+
+test("agent runs include no-signal runs once and preserve all fixed duration ranges", () => {
+	const result = buildCostDashboard(
+		[
+			row({
+				metric: "agentRuns",
+				dimension: "members",
+				id: "alice",
+				value: 4,
+				matched_value: 4,
+			}),
+			row({
+				metric: "agentRuns",
+				dimension: "runSignals",
+				id: "none",
+				value: 4,
+				matched_value: 4,
+			}),
+			row({
+				metric: "agentRuns",
+				dimension: "durations",
+				id: "12hPlus",
+				value: 1,
+				matched_value: 1,
+			}),
+			row({
+				metric: "agentRuns",
+				dimension: "durations",
+				id: "under1m",
+				value: 3,
+				matched_value: 3,
+			}),
+		],
+		{ ...input, splitBy: "durations" },
+		members,
+	).metrics.agentRuns;
+	expect(result?.total).toBe(4);
+	expect(result?.breakdowns.durations.map((entry) => entry.value)).toEqual([
+		3, 0, 0, 0, 0, 0, 0, 1, 0,
+	]);
+	expect(result?.series.map((entry) => entry.label)).toEqual([
+		"Under 1 minute",
+		"1–5 minutes",
+		"5–15 minutes",
+		"15–30 minutes",
+		"30–60 minutes",
+		"1–3 hours",
+		"3–12 hours",
+		"12 hours+",
+		"Unknown duration",
+	]);
+	expect(
+		result?.breakdowns.runSignals.find((entry) => entry.id === "none")?.value,
+	).toBe(4);
+	expect(result?.breakdowns.skillsUsed.map((entry) => entry.label)).toEqual([
+		"Yes",
+		"No",
+	]);
+});
+
+test("outdated run summaries remain unknown rather than zero", () => {
+	const result = buildCostDashboard(
+		[
+			row({
+				metric: "agentRuns",
+				value: 0,
+				matched_value: 0,
+				incomplete: 1,
+				matched_incomplete: 1,
+			}),
+		],
+		input,
+		members,
+	);
+	expect(result.metrics.agentRuns).toBeNull();
+	expect(buildCostDashboard([], input, members).metrics.agentRuns?.total).toBe(
+		0,
+	);
+});
+
+test("keeps indexed runs visible with session-level indexing coverage", () => {
+	const result = buildCostDashboard(
+		[
+			row({
+				metric: "agentRuns",
+				dimension: "headline",
+				id: "",
+				value: 3,
+				matched_value: 3,
+			}),
+			row({
+				metric: "agentRuns",
+				dimension: "members",
+				value: 3,
+				matched_value: 3,
+			}),
+			row({
+				metric: "agentRunCoverage",
+				dimension: "coverage",
+				id: "indexed",
+				value: 2,
+				matched_value: 2,
+			}),
+			row({
+				metric: "agentRunCoverage",
+				dimension: "coverage",
+				id: "indexing",
+				value: 1,
+				matched_value: 1,
+			}),
+			row({
+				metric: "agentRunCoverage",
+				dimension: "coverage",
+				id: "unavailable",
+				value: 1,
+				matched_value: 1,
+			}),
+		],
+		{ ...input, requestedMetric: "agentRuns" },
+		members,
+	).metrics.agentRuns;
+
+	expect(result?.total).toBe(3);
+	expect(result?.incomplete).toBe(true);
+	expect(result?.coverage).toEqual({
+		indexedSessions: 2,
+		indexingSessions: 1,
+		unavailableSessions: 1,
+	});
+});
+
+describe("dashboard metric availability", () => {
+	const pullRequests = {
+		mergedPullRequests: buildCostDashboard([row()], input, members).metrics
+			.cost,
+		ciFailuresPerPullRequest: null,
+	};
+
+	test("offers pull request metrics only to workspaces with the GitHub evidence UI enabled", () => {
+		expect(
+			listAvailableDashboardMetrics("organization", {
+				githubEvidenceUiEnabled: false,
+			}),
+		).toEqual(["cost", "sessions", "agentRuns", "signals"]);
+		expect(
+			listAvailableDashboardMetrics("organization", {
+				githubEvidenceUiEnabled: true,
+				githubVisibility: "visible",
+			}),
+		).toEqual([
+			"cost",
+			"sessions",
+			"agentRuns",
+			"signals",
+			"mergedPullRequests",
+			"ciFailuresPerPullRequest",
+			"ciRuns",
+		]);
+		expect(
+			listAvailableDashboardMetrics("allOrganizations", {
+				githubEvidenceUiEnabled: true,
+				githubVisibility: "visible",
+			}),
+		).toEqual(["cost", "sessions", "agentRuns", "signals"]);
+	});
+
+	test("answers a request for a hidden metric as the default cost view", () => {
+		const hidden = listAvailableDashboardMetrics("organization", {
+			githubEvidenceUiEnabled: false,
+		});
+		const visible = listAvailableDashboardMetrics("organization", {
+			githubEvidenceUiEnabled: true,
+			githubVisibility: "visible",
+		});
+		for (const requestedMetric of [
+			"mergedPullRequests",
+			"ciFailuresPerPullRequest",
+		] as const) {
+			expect(
+				resolveAvailableDashboardInput({ ...input, requestedMetric }, hidden)
+					.requestedMetric,
+			).toBe("cost");
+			expect(
+				resolveAvailableDashboardInput({ ...input, requestedMetric }, visible)
+					.requestedMetric,
+			).toBe(requestedMetric);
+		}
+		expect(resolveAvailableDashboardInput(input, hidden)).toBe(input);
+	});
+
+	test("excludes pull request metrics from the payload unless they are available", () => {
+		const hidden = buildCostDashboard([], input, members, undefined, {
+			pullRequests,
+		});
+		const visible = buildCostDashboard([], input, members, undefined, {
+			availableMetrics: listAvailableDashboardMetrics("organization", {
+				githubEvidenceUiEnabled: true,
+				githubVisibility: "visible",
+			}),
+			pullRequests,
+		});
+
+		expect(hidden.availableMetrics).not.toContain("mergedPullRequests");
+		expect(hidden.availableMetrics).not.toContain("ciFailuresPerPullRequest");
+		expect(hidden.metrics.mergedPullRequests).toBeNull();
+		expect(visible.availableMetrics).toContain("mergedPullRequests");
+		expect(visible.availableMetrics).toContain("ciFailuresPerPullRequest");
+		expect(visible.metrics.mergedPullRequests).toBe(
+			pullRequests.mergedPullRequests,
+		);
+	});
+
+	test("keeps the other headline tiles when a pull request metric is selected", () => {
+		const headline = (metric: CostAggregateRow["metric"], value: number) =>
+			row({
+				metric,
+				dimension: "headline",
+				id: "",
+				value,
+				matched_value: value,
+			});
+		const result = buildCostDashboard(
+			[
+				headline("cost", 12.5),
+				headline("sessions", 4),
+				headline("signals", 3),
+				headline("agentRuns", 6),
+			],
+			{ ...input, requestedMetric: "mergedPullRequests" },
+			members,
+			undefined,
+			{
+				availableMetrics: listAvailableDashboardMetrics("organization", {
+					githubEvidenceUiEnabled: true,
+					githubVisibility: "visible",
+				}),
+				pullRequests,
+			},
+		);
+
+		expect(result.metrics.cost?.total).toBe(12.5);
+		expect(result.metrics.sessions?.total).toBe(4);
+		expect(result.metrics.signals?.total).toBe(3);
+		expect(result.metrics.agentRuns?.total).toBe(6);
+		expect(result.metrics.mergedPullRequests).toBe(
+			pullRequests.mergedPullRequests,
+		);
+	});
+});
+
+test("lists every UTC day of an inclusive range, across month and leap boundaries", () => {
+	expect(
+		listDashboardDates({ startDate: "2028-02-28", endDate: "2028-03-01" }),
+	).toEqual(["2028-02-28", "2028-02-29", "2028-03-01"]);
+	expect(
+		listDashboardDates({ startDate: "2026-09-30", endDate: "2026-09-30" }),
+	).toEqual(["2026-09-30"]);
+});
+
+test("metrics other than the requested one take their stat card trend from headline rows", () => {
+	const headline = (overrides: Partial<CostAggregateRow>) =>
+		row({ dimension: "headline", id: "", ...overrides });
+	const result = buildCostDashboard(
+		[
+			headline({ metric: "cost", value: 4, matched_value: 4 }),
+			row({ metric: "cost", value: 4, matched_value: 4 }),
+			headline({ metric: "sessions", value: 2, matched_value: 2 }),
+			headline({
+				metric: "sessions",
+				date: "2026-09-03",
+				value: 1,
+				matched_value: 1,
+			}),
+			headline({ metric: "agentRuns", value: 0, matched_value: 0 }),
+			headline({
+				metric: "agentRuns",
+				date: "2026-09-02",
+				value: 3,
+				matched_value: 3,
+			}),
+		],
+		{ ...input, requestedMetric: "cost", splitBy: "members" },
+		members,
+	);
+	expect(result.metrics.cost?.series).toEqual([
+		{ id: "series-0", label: "Alice" },
+	]);
+	expect(result.metrics.sessions?.total).toBe(3);
+	expect(result.metrics.sessions?.series).toEqual([
+		{ id: "total", label: "Sessions" },
+	]);
+	expect(result.metrics.sessions?.trend.map((day) => day.total)).toEqual([
+		2, 0, 1,
+	]);
+	expect(result.metrics.agentRuns?.total).toBe(3);
+	expect(result.metrics.agentRuns?.trend.map((day) => day.total)).toEqual([
+		0, 3, 0,
+	]);
+});
+
+test("an answer without session rows leaves the session metrics null rather than zero", () => {
+	const result = buildCostDashboard(
+		[],
+		{ ...input, requestedMetric: "mergedPullRequests" },
+		members,
+		undefined,
+		{ sessionMetrics: false },
+	);
+	expect(result.metrics.cost).toBeNull();
+	expect(result.metrics.sessions).toBeNull();
+	expect(result.metrics.signals).toBeNull();
+	expect(result.metrics.agentRuns).toBeNull();
+});
+
+test("the charted answer's language split matches a separate signals request split by type", () => {
+	const rows = [
+		row({ metric: "cost" }),
+		...[
+			["modelApologies", 4, "2026-09-01"],
+			["userNegative", 2, "2026-09-01"],
+			["userNegative", 3, "2026-09-02"],
+		].flatMap(([id, value, date]) => [
+			row({
+				metric: "signals",
+				dimension: "headline",
+				id: "",
+				date: String(date),
+				value: Number(value),
+				matched_value: Number(value),
+			}),
+			row({
+				metric: "signals",
+				dimension: "signalTypes",
+				id: String(id),
+				date: String(date),
+				value: Number(value),
+				matched_value: Number(value),
+			}),
+		]),
+	];
+	const separate = buildCostDashboard(
+		rows,
+		{ ...input, requestedMetric: "signals", splitBy: "signalTypes" },
+		members,
+	).metrics.signals;
+	const split = buildLanguageSplit(
+		rows,
+		{ ...input, requestedMetric: "cost" },
+		members,
+	);
+	expect(split?.trend).toEqual(separate?.trend);
+	expect(split?.series).toEqual(separate?.series);
+	expect(split?.total).toBe(9);
+	expect(split?.breakdowns.signalTypes).toEqual(
+		separate?.breakdowns.signalTypes,
+	);
+	expect(split?.breakdowns.members).toEqual([]);
+});
+
+test("the language split is unknown while a session's signals are indexing", () => {
+	expect(
+		buildLanguageSplit(
+			[
+				row({
+					metric: "signals",
+					dimension: "headline",
+					id: "",
+					incomplete: 1,
+					matched_incomplete: 1,
+				}),
+			],
+			input,
+			members,
+		),
+	).toBeNull();
+});

@@ -1,0 +1,62 @@
+import { IconChevronDown, IconChevronUp } from "@tabler/icons-react";
+import { cn } from "@/lib/utils";
+import type {
+	SessionTurnTableSortKey,
+	SessionTurnTableSortState,
+} from "./session-turn-table-filters";
+
+export function SessionTurnTableSortableHeader({
+	className,
+	columnIndex,
+	label,
+	onSort,
+	sort,
+	sortKey,
+}: {
+	className: string | undefined;
+	columnIndex: number;
+	label: string;
+	onSort: (sortKey: SessionTurnTableSortKey) => void;
+	sort: SessionTurnTableSortState;
+	sortKey: SessionTurnTableSortKey;
+}) {
+	const isActive = sort.key === sortKey;
+
+	return (
+		<button
+			type="button"
+			aria-label={`Sort by ${label}, ${
+				isActive && sort.direction === "asc" ? "descending" : "ascending"
+			}`}
+			className={cn(
+				"relative flex h-full w-full min-w-0 items-center gap-1 text-left text-xs font-medium whitespace-nowrap text-(--session-overview-subtle) outline-none focus-visible:z-10",
+				columnIndex === 0 ? "pr-1.5 pl-3" : "px-1.5",
+				className,
+			)}
+			onClick={() => onSort(sortKey)}
+		>
+			<span className="flex min-w-0 items-center">
+				<span
+					className="flex max-w-full min-w-0 items-center gap-1"
+					data-sort-label-row
+				>
+					<span className="min-w-0 truncate">{label}</span>
+					{isActive ? (
+						sort.direction === "asc" ? (
+							<IconChevronUp aria-hidden="true" className="size-3.5 shrink-0" />
+						) : (
+							<IconChevronDown
+								aria-hidden="true"
+								className="size-3.5 shrink-0"
+							/>
+						)
+					) : null}
+				</span>
+			</span>
+			<span
+				aria-hidden="true"
+				className="pointer-fine:hidden absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2"
+			/>
+		</button>
+	);
+}

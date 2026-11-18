@@ -8,7 +8,7 @@ import { shouldOfferCliUpdate } from "../lib/cli-update.js";
 
 test("release links identify the exact reviewed version and reject URL injection", () => {
 	expect(getCliReleaseUrl("0.9.0")).toBe(
-		"https://github.com/opalinehq/cli/releases/tag/opaline-cli%400.9.0",
+		"https://github.com/evrendom/opaline/releases/tag/opaline-cli%400.9.0",
 	);
 	expect(getCliReleaseUrl("1.0.0-rc.1+build.2")).toEndWith(
 		"opaline-cli%401.0.0-rc.1%2Bbuild.2",

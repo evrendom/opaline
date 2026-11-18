@@ -1,0 +1,27 @@
+export const DEFAULT_SESSION_TURN_TABLE_PANE_WIDTH_PX = 768;
+export const MINIMUM_SESSION_TURN_TABLE_PANE_WIDTH_PX = 320;
+export const MAXIMUM_SESSION_TURN_TABLE_PANE_WIDTH_PX = 800;
+export const DEFAULT_SESSION_TRANSCRIPT_PANE_WIDTH_PX = 576;
+export const MINIMUM_SESSION_TRANSCRIPT_PANE_WIDTH_PX = 320;
+export const SESSION_DETAIL_RESIZE_HANDLE_WIDTH_PX = 2;
+export const SESSION_TURN_TABLE_PANE_STORAGE_KEY =
+	"rudel:session-turn-table-pane-width:v2";
+
+export function getSessionTurnTablePaneMaximum(
+	layoutWidth: number,
+	minimumTranscriptPaneWidth: number,
+) {
+	return layoutWidth > 0
+		? Math.min(
+				MAXIMUM_SESSION_TURN_TABLE_PANE_WIDTH_PX,
+				layoutWidth -
+					minimumTranscriptPaneWidth -
+					SESSION_DETAIL_RESIZE_HANDLE_WIDTH_PX,
+			)
+		: MAXIMUM_SESSION_TURN_TABLE_PANE_WIDTH_PX;
+}
+
+export const MINIMUM_SESSION_DETAIL_PANE_WIDTH_PX =
+	MINIMUM_SESSION_TURN_TABLE_PANE_WIDTH_PX +
+	SESSION_DETAIL_RESIZE_HANDLE_WIDTH_PX +
+	DEFAULT_SESSION_TRANSCRIPT_PANE_WIDTH_PX;

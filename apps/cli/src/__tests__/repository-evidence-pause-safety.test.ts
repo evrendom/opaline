@@ -30,81 +30,79 @@ const cases = [
 ];
 const reader = resolve(import.meta.dir, "../lib/repository-evidence-pause.ts");
 
-test.each(cases)(
-	"rejects and removes a %s marker without blocking",
-	async (kind) => {
-		const directory = await mkdtemp(join(tmpdir(), "opaline-pause-safety-"));
-		try {
-			const marker = await writeMarker(directory, kind);
-			const output = execFileSync(
-				process.execPath,
-				[
-					"--eval",
-					`import { readRepositoryEvidencePauseUntil } from ${JSON.stringify(reader)}; console.log(JSON.stringify(readRepositoryEvidencePauseUntil(${JSON.stringify(directory)}) ?? null));`,
-				],
-				{ encoding: "utf8", timeout: 2_000 },
+test.each(
+	cases,
+)("rejects and removes a %s marker without blocking", async (kind) => {
+	const directory = await mkdtemp(join(tmpdir(), "opaline-pause-safety-"));
+	try {
+		const marker = await writeMarker(directory, kind);
+		const output = execFileSync(
+			process.execPath,
+			[
+				"--eval",
+				`import { readRepositoryEvidencePauseUntil } from ${JSON.stringify(reader)}; console.log(JSON.stringify(readRepositoryEvidencePauseUntil(${JSON.stringify(directory)}) ?? null));`,
+			],
+			{ encoding: "utf8", timeout: 2_000 },
+		);
+		expect(output.trim()).toBe("null");
+		expect(await lstat(marker).catch(() => undefined)).toBeUndefined();
+		if (kind === "symlink")
+			expect(await readFile(join(directory, "target"), "utf8")).toContain(
+				"until",
 			);
-			expect(output.trim()).toBe("null");
-			expect(await lstat(marker).catch(() => undefined)).toBeUndefined();
-			if (kind === "symlink")
-				expect(await readFile(join(directory, "target"), "utf8")).toContain(
-					"until",
-				);
-		} finally {
-			await rm(directory, { recursive: true, force: true });
-		}
-	},
-);
+	} finally {
+		await rm(directory, { recursive: true, force: true });
+	}
+});
 
-test.each(cases)(
-	"doctor handles a %s marker without throwing or blocking",
-	async (kind) => {
-		const directory = await mkdtemp(join(tmpdir(), "opaline-pause-doctor-"));
-		try {
-			await writeMarker(directory, kind);
-			const preload = join(directory, "preload.ts");
-			await writeFile(
+test.each(
+	cases,
+)("doctor handles a %s marker without throwing or blocking", async (kind) => {
+	const directory = await mkdtemp(join(tmpdir(), "opaline-pause-doctor-"));
+	try {
+		await writeMarker(directory, kind);
+		const preload = join(directory, "preload.ts");
+		await writeFile(
+			preload,
+			`globalThis.fetch = async () => Response.json({ version: "0.10.0" });`,
+		);
+		const child = Bun.spawn(
+			[
+				process.execPath,
+				"--preload",
 				preload,
-				`globalThis.fetch = async () => Response.json({ version: "0.10.0" });`,
-			);
-			const child = Bun.spawn(
-				[
-					process.execPath,
-					"--preload",
-					preload,
-					resolve(import.meta.dir, "../bin/cli.ts"),
-					"doctor",
-				],
-				{
-					env: {
-						...process.env,
-						HOME: directory,
-						OPALINE_CONFIG_DIR: directory,
-						POSTHOG_ENABLED: "false",
-					},
-					stdout: "pipe",
-					stderr: "pipe",
+				resolve(import.meta.dir, "../bin/cli.ts"),
+				"doctor",
+			],
+			{
+				env: {
+					...process.env,
+					HOME: directory,
+					OPALINE_CONFIG_DIR: directory,
+					POSTHOG_ENABLED: "false",
 				},
-			);
-			const timeout = setTimeout(() => child.kill(), 3_000);
-			try {
-				const [stdout, stderr] = await Promise.all([
-					new Response(child.stdout).text(),
-					new Response(child.stderr).text(),
-					child.exited,
-				]);
-				expect(child.signalCode ?? null).toBeNull();
-				expect(stdout).toContain("Doctor found");
-				expect(stdout).not.toContain("server-paused");
-				expect(stderr).not.toContain("RangeError");
-			} finally {
-				clearTimeout(timeout);
-			}
+				stdout: "pipe",
+				stderr: "pipe",
+			},
+		);
+		const timeout = setTimeout(() => child.kill(), 3_000);
+		try {
+			const [stdout, stderr] = await Promise.all([
+				new Response(child.stdout).text(),
+				new Response(child.stderr).text(),
+				child.exited,
+			]);
+			expect(child.signalCode ?? null).toBeNull();
+			expect(stdout).toContain("Doctor found");
+			expect(stdout).not.toContain("server-paused");
+			expect(stderr).not.toContain("RangeError");
 		} finally {
-			await rm(directory, { recursive: true, force: true });
+			clearTimeout(timeout);
 		}
-	},
-);
+	} finally {
+		await rm(directory, { recursive: true, force: true });
+	}
+});
 
 test("concurrent pause writers preserve the latest requested expiry", async () => {
 	const directory = await mkdtemp(join(tmpdir(), "opaline-pause-writers-"));

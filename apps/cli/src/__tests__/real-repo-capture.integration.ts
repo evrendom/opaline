@@ -62,445 +62,436 @@ describe("real repository sidecar capture", () => {
 		expect(repositoryPaths.length).toBeGreaterThan(0);
 	});
 
-	test.each(repositoryPaths)(
-		"captures %s completely",
-		async (repositoryPath) => {
-			const configDir = await realpath(
-				await mkdtemp(join(tmpdir(), "opaline-real-repo-")),
+	test.each(
+		repositoryPaths,
+	)("captures %s completely", async (repositoryPath) => {
+		const configDir = await realpath(
+			await mkdtemp(join(tmpdir(), "opaline-real-repo-")),
+		);
+		temporaryDirectories.push(configDir);
+		process.env.OPALINE_CONFIG_DIR = configDir;
+		process.env.RUDEL_CONFIG_DIR = configDir;
+		process.env.POSTHOG_ENABLED = "false";
+		process.env.OPALINE_ALLOW_INSECURE_ENDPOINT = "1";
+		expect(getConfigDir()).toBe(configDir);
+		const stub = startEvidenceProtocolStub();
+		try {
+			const credentials = {
+				apiBaseUrl: stub.base,
+				authType: "api-key" as const,
+				token: "test",
+				user: {
+					id: "real-repo-user",
+					email: "test@example.invalid",
+					name: "Test",
+				},
+			};
+			await writeFile(
+				join(configDir, "credentials.json"),
+				JSON.stringify(credentials),
 			);
-			temporaryDirectories.push(configDir);
-			process.env.OPALINE_CONFIG_DIR = configDir;
-			process.env.RUDEL_CONFIG_DIR = configDir;
-			process.env.POSTHOG_ENABLED = "false";
-			process.env.OPALINE_ALLOW_INSECURE_ENDPOINT = "1";
-			expect(getConfigDir()).toBe(configDir);
-			const stub = startEvidenceProtocolStub();
-			try {
-				const credentials = {
-					apiBaseUrl: stub.base,
-					authType: "api-key" as const,
-					token: "test",
-					user: {
-						id: "real-repo-user",
-						email: "test@example.invalid",
-						name: "Test",
+			const sessionId = randomUUID();
+			const observedPluginSkill = await findInstalledClaudePluginSkill();
+			const content = `${[
+				{
+					type: "session_meta",
+					timestamp: new Date().toISOString(),
+					payload: { id: sessionId, cwd: repositoryPath },
+				},
+				{
+					timestamp: new Date().toISOString(),
+					type: "response_item",
+					payload: {
+						content: [{ text: "Real repository capture", type: "input_text" }],
+						role: "user",
+						type: "message",
 					},
-				};
-				await writeFile(
-					join(configDir, "credentials.json"),
-					JSON.stringify(credentials),
-				);
-				const sessionId = randomUUID();
-				const observedPluginSkill = await findInstalledClaudePluginSkill();
-				const content = `${[
-					{
-						type: "session_meta",
-						timestamp: new Date().toISOString(),
-						payload: { id: sessionId, cwd: repositoryPath },
-					},
-					{
-						timestamp: new Date().toISOString(),
-						type: "response_item",
-						payload: {
-							content: [
-								{ text: "Real repository capture", type: "input_text" },
-							],
-							role: "user",
-							type: "message",
-						},
-					},
-					...(observedPluginSkill === null
-						? []
-						: [
-								{
-									timestamp: new Date().toISOString(),
-									type: "response_item",
-									payload: {
-										type: "function_call",
-										name: "Skill",
-										arguments: JSON.stringify({
-											skill: observedPluginSkill.name,
-										}),
-									},
+				},
+				...(observedPluginSkill === null
+					? []
+					: [
+							{
+								timestamp: new Date().toISOString(),
+								type: "response_item",
+								payload: {
+									type: "function_call",
+									name: "Skill",
+									arguments: JSON.stringify({
+										skill: observedPluginSkill.name,
+									}),
 								},
-							]),
-				]
-					.map((line) => JSON.stringify(line))
-					.join("\n")}\n`;
-				const warnings: string[] = [];
-				const startedAt = performance.now();
-				const receipt = await captureAndUploadSessionEvidence({
-					credentials,
-					hookReceivedAt: new Date().toISOString(),
-					lifecycle: "checkpoint",
-					onWarning: (warning) => warnings.push(warning),
-					organizationId: "real-repo-org",
-					request: {
-						content,
-						projectPath: repositoryPath,
-						sessionId,
-						source: "codex",
-						upload_mode: "hook",
-					},
-					terminalTranscript: false,
-				});
-				const elapsedMs = Math.round(performance.now() - startedAt);
-				assert(receipt);
-				const capture = stub.committed.get(receipt.contextId);
-				assert(capture);
-				expect(await readPendingRepositoryEvidence(configDir)).toEqual([]);
-				expect(
-					await readdir(join(configDir, "repo-context-spool", "v2")),
-				).not.toEqual([]);
+							},
+						]),
+			]
+				.map((line) => JSON.stringify(line))
+				.join("\n")}\n`;
+			const warnings: string[] = [];
+			const startedAt = performance.now();
+			const receipt = await captureAndUploadSessionEvidence({
+				credentials,
+				hookReceivedAt: new Date().toISOString(),
+				lifecycle: "checkpoint",
+				onWarning: (warning) => warnings.push(warning),
+				organizationId: "real-repo-org",
+				request: {
+					content,
+					projectPath: repositoryPath,
+					sessionId,
+					source: "codex",
+					upload_mode: "hook",
+				},
+				terminalTranscript: false,
+			});
+			const elapsedMs = Math.round(performance.now() - startedAt);
+			assert(receipt);
+			const capture = stub.committed.get(receipt.contextId);
+			assert(capture);
+			expect(await readPendingRepositoryEvidence(configDir)).toEqual([]);
+			expect(
+				await readdir(join(configDir, "repo-context-spool", "v2")),
+			).not.toEqual([]);
 
-				const localContext = capture.manifest.localContext;
-				const repositoryRoot = localContext.roots.find(
-					(root) => root.id === "repository",
+			const localContext = capture.manifest.localContext;
+			const repositoryRoot = localContext.roots.find(
+				(root) => root.id === "repository",
+			);
+			assert(repositoryRoot);
+			const instructionFiles = localContext.entries.filter(
+				(entry) =>
+					entry.rootId === "repository" &&
+					entry.kind === "file" &&
+					/^(?:agents|claude)\.md$/iu.test(basename(entry.path)),
+			);
+			const instructionResults = [];
+			for (const entry of instructionFiles) {
+				const onDisk = await readFile(
+					join(repositoryRoot.absolutePath, entry.path),
 				);
-				assert(repositoryRoot);
-				const instructionFiles = localContext.entries.filter(
-					(entry) =>
-						entry.rootId === "repository" &&
-						entry.kind === "file" &&
-						/^(?:agents|claude)\.md$/iu.test(basename(entry.path)),
-				);
-				const instructionResults = [];
-				for (const entry of instructionFiles) {
-					const onDisk = await readFile(
-						join(repositoryRoot.absolutePath, entry.path),
+				const diskHash = sha256(onDisk);
+				if (entry.content?.status === "available") {
+					assert(entry.content?.blobId);
+					const stored = capture.objects.get(entry.content.blobId);
+					assert(stored, `${entry.path} blob was not delivered`);
+					// Stored bytes are the file after the context filter (example
+					// credentials such as postgres://user:pass@ are redacted).
+					const expected = sha256(
+						new TextEncoder().encode(
+							filterContextText(new TextDecoder().decode(onDisk)).text,
+						),
 					);
-					const diskHash = sha256(onDisk);
-					if (entry.content?.status === "available") {
-						assert(entry.content?.blobId);
-						const stored = capture.objects.get(entry.content.blobId);
-						assert(stored, `${entry.path} blob was not delivered`);
-						// Stored bytes are the file after the context filter (example
-						// credentials such as postgres://user:pass@ are redacted).
-						const expected = sha256(
-							new TextEncoder().encode(
-								filterContextText(new TextDecoder().decode(onDisk)).text,
-							),
-						);
-						expect(sha256(stored)).toBe(expected);
-						instructionResults.push({
-							path: entry.path,
-							bytes: onDisk.byteLength,
-							stored: "content",
-							match: sha256(stored) === expected,
-							redactions: entry.content?.secretFilter?.redactedBytes ?? 0,
-						});
-					} else {
-						// Hash-only by capture policy (skill resources, personal files).
-						expect(entry.content?.status).toBe("omitted");
-						expect(entry.content?.reason).toBe("metadata-only");
-						expect(entry.hash).toMatchObject({
-							status: "available",
-							scope: "source",
-						});
-						expect(entry.hash?.value).toBe(diskHash);
-						instructionResults.push({
-							path: entry.path,
-							bytes: onDisk.byteLength,
-							stored: "source-hash",
-							match: entry.hash?.value === diskHash,
-						});
-					}
+					expect(sha256(stored)).toBe(expected);
+					instructionResults.push({
+						path: entry.path,
+						bytes: onDisk.byteLength,
+						stored: "content",
+						match: sha256(stored) === expected,
+						redactions: entry.content?.secretFilter?.redactedBytes ?? 0,
+					});
+				} else {
+					// Hash-only by capture policy (skill resources, personal files).
+					expect(entry.content?.status).toBe("omitted");
+					expect(entry.content?.reason).toBe("metadata-only");
+					expect(entry.hash).toMatchObject({
+						status: "available",
+						scope: "source",
+					});
+					expect(entry.hash?.value).toBe(diskHash);
+					instructionResults.push({
+						path: entry.path,
+						bytes: onDisk.byteLength,
+						stored: "source-hash",
+						match: entry.hash?.value === diskHash,
+					});
 				}
-				expect(
+			}
+			expect(
+				instructionResults.some(
+					(result) =>
+						result.stored === "content" && result.path === "AGENTS.md",
+				) ||
 					instructionResults.some(
 						(result) =>
-							result.stored === "content" && result.path === "AGENTS.md",
-					) ||
-						instructionResults.some(
-							(result) =>
-								result.stored === "content" && result.path === "CLAUDE.md",
-						),
-				).toBe(true);
-				// Every captured file outside the repository (user and parent
-				// instructions and their imports, every skill definition, the
-				// project's auto-memory, user commands, agents and output styles),
-				// and every repository skill definition and personal instruction
-				// file, is stored byte for byte as on disk after the secret filter.
-				const userFiles: string[] = [];
-				const fullContent = (entry: (typeof localContext.entries)[number]) =>
-					entry.rootId !== "repository" ||
-					entry.categories?.includes("skill-definition") ||
-					entry.categories?.includes("skill-resource") ||
-					basename(entry.path).toLowerCase().endsWith(".local.md") ||
-					/(?:^|\/)\.claude\/rules\//u.test(entry.path) ||
-					[".mcp.json", "mcp.json", "mcp-config.json"].includes(
-						basename(entry.path).toLowerCase(),
-					);
-				for (const entry of localContext.entries) {
-					if (!fullContent(entry) || entry.kind !== "file") continue;
-					if (entry.content?.status !== "available" || !entry.content.blobId)
-						continue;
-					const root = localContext.roots.find(
-						(candidate) => candidate.id === entry.rootId,
-					);
-					assert(root);
-					const onDisk = await readFile(join(root.absolutePath, entry.path));
-					// Empty files have no evidence object (objects are non-empty by
-					// protocol); their blob ID is the empty content's hash.
-					if (onDisk.byteLength === 0) {
-						expect(entry.content.blobId).toBe(`sha256:${sha256(onDisk)}`);
-						userFiles.push(`${entry.rootId}:${entry.path} (0 B, empty)`);
-						continue;
-					}
-					const stored = capture.objects.get(entry.content.blobId);
-					assert(stored, `${entry.rootId}:${entry.path} was not delivered`);
-					// What the capture must store: the file on disk after the
-					// structural MCP sanitizer (MCP files) and the context filter.
-					const diskText = new TextDecoder().decode(onDisk);
-					const mcp = [".mcp.json", "mcp.json", "mcp-config.json"].includes(
-						basename(entry.path).toLowerCase(),
-					)
-						? sanitizeMcpText(diskText)
-						: null;
-					const expected = filterContextText(mcp?.text ?? diskText).text;
-					const redacted = expected !== diskText;
-					expect(sha256(stored)).toBe(
-						sha256(new TextEncoder().encode(expected)),
-					);
-					userFiles.push(
-						`${entry.rootId}:${entry.path} (${onDisk.byteLength} B, sha256 ${redacted ? "match after secret filter" : "match"})`,
-					);
+							result.stored === "content" && result.path === "CLAUDE.md",
+					),
+			).toBe(true);
+			// Every captured file outside the repository (user and parent
+			// instructions and their imports, every skill definition, the
+			// project's auto-memory, user commands, agents and output styles),
+			// and every repository skill definition and personal instruction
+			// file, is stored byte for byte as on disk after the secret filter.
+			const userFiles: string[] = [];
+			const fullContent = (entry: (typeof localContext.entries)[number]) =>
+				entry.rootId !== "repository" ||
+				entry.categories?.includes("skill-definition") ||
+				entry.categories?.includes("skill-resource") ||
+				basename(entry.path).toLowerCase().endsWith(".local.md") ||
+				/(?:^|\/)\.claude\/rules\//u.test(entry.path) ||
+				[".mcp.json", "mcp.json", "mcp-config.json"].includes(
+					basename(entry.path).toLowerCase(),
+				);
+			for (const entry of localContext.entries) {
+				if (!fullContent(entry) || entry.kind !== "file") continue;
+				if (entry.content?.status !== "available" || !entry.content.blobId)
+					continue;
+				const root = localContext.roots.find(
+					(candidate) => candidate.id === entry.rootId,
+				);
+				assert(root);
+				const onDisk = await readFile(join(root.absolutePath, entry.path));
+				// Empty files have no evidence object (objects are non-empty by
+				// protocol); their blob ID is the empty content's hash.
+				if (onDisk.byteLength === 0) {
+					expect(entry.content.blobId).toBe(`sha256:${sha256(onDisk)}`);
+					userFiles.push(`${entry.rootId}:${entry.path} (0 B, empty)`);
+					continue;
 				}
-				// Every skill definition (observed or not), memory file and user
-				// command, agent and output style has its content.
-				const contextFiles = localContext.entries.filter(
+				const stored = capture.objects.get(entry.content.blobId);
+				assert(stored, `${entry.rootId}:${entry.path} was not delivered`);
+				// What the capture must store: the file on disk after the
+				// structural MCP sanitizer (MCP files) and the context filter.
+				const diskText = new TextDecoder().decode(onDisk);
+				const mcp = [".mcp.json", "mcp.json", "mcp-config.json"].includes(
+					basename(entry.path).toLowerCase(),
+				)
+					? sanitizeMcpText(diskText)
+					: null;
+				const expected = filterContextText(mcp?.text ?? diskText).text;
+				const redacted = expected !== diskText;
+				expect(sha256(stored)).toBe(sha256(new TextEncoder().encode(expected)));
+				userFiles.push(
+					`${entry.rootId}:${entry.path} (${onDisk.byteLength} B, sha256 ${redacted ? "match after secret filter" : "match"})`,
+				);
+			}
+			// Every skill definition (observed or not), memory file and user
+			// command, agent and output style has its content.
+			const contextFiles = localContext.entries.filter(
+				(entry) =>
+					entry.kind === "file" &&
+					(entry.categories?.includes("skill-definition") ||
+						entry.rootId === "claude-project-memory" ||
+						(entry.rootId === "claude-user-home" &&
+							/^(?:commands|agents|output-styles)\//u.test(entry.path))),
+			);
+			expect(
+				contextFiles
+					.filter((entry) => entry.content?.status !== "available")
+					.map((entry) => `${entry.rootId}:${entry.path}`),
+			).toEqual([]);
+			const countContext = (
+				predicate: (entry: (typeof contextFiles)[number]) => boolean,
+			) => contextFiles.filter(predicate).length;
+			const contextCounts = {
+				skillDefinitions: countContext(
+					(entry) => entry.categories?.includes("skill-definition") ?? false,
+				),
+				memoryFiles: countContext(
+					(entry) => entry.rootId === "claude-project-memory",
+				),
+				userCommandsAgentsStyles: countContext(
+					(entry) => entry.rootId === "claude-user-home",
+				),
+				supportingFiles: localContext.entries.filter(
 					(entry) =>
 						entry.kind === "file" &&
-						(entry.categories?.includes("skill-definition") ||
-							entry.rootId === "claude-project-memory" ||
-							(entry.rootId === "claude-user-home" &&
-								/^(?:commands|agents|output-styles)\//u.test(entry.path))),
-				);
+						entry.content?.status === "available" &&
+						((entry.categories?.includes("skill-resource") &&
+							!entry.categories.includes("skill-definition")) ||
+							/^[^/]+\/[^/]+\/[^/]+\/(?:commands|agents)\//u.test(entry.path)),
+				).length,
+				supportingFilesOverBudget: localContext.entries.filter(
+					(entry) =>
+						entry.kind === "file" &&
+						entry.content?.status === "omitted" &&
+						entry.content.reason === "metadata-only" &&
+						entry.content.detail?.endsWith("-support-budget"),
+				).length,
+				rules: localContext.entries.filter(
+					(entry) =>
+						entry.kind === "file" &&
+						entry.content?.status === "available" &&
+						(/(?:^|\/)\.claude\/rules\//u.test(entry.path) ||
+							(["claude-user-home", "codex-user-home"].includes(entry.rootId) &&
+								entry.path.startsWith("rules/"))),
+				).length,
+				personalInstructions: localContext.entries.filter(
+					(entry) =>
+						entry.kind === "file" &&
+						basename(entry.path).toLowerCase().endsWith(".local.md") &&
+						entry.content?.status === "available",
+				).length,
+			};
+			// Codex exec-policy rules are captured whenever they exist.
+			const codexRules = await readdir(join(codexHome(), "rules")).catch(
+				() => [] as string[],
+			);
+			if (codexRules.length > 0)
 				expect(
-					contextFiles
-						.filter((entry) => entry.content?.status !== "available")
-						.map((entry) => `${entry.rootId}:${entry.path}`),
-				).toEqual([]);
-				const countContext = (
-					predicate: (entry: (typeof contextFiles)[number]) => boolean,
-				) => contextFiles.filter(predicate).length;
-				const contextCounts = {
-					skillDefinitions: countContext(
-						(entry) => entry.categories?.includes("skill-definition") ?? false,
-					),
-					memoryFiles: countContext(
-						(entry) => entry.rootId === "claude-project-memory",
-					),
-					userCommandsAgentsStyles: countContext(
-						(entry) => entry.rootId === "claude-user-home",
-					),
-					supportingFiles: localContext.entries.filter(
+					localContext.entries.some(
 						(entry) =>
-							entry.kind === "file" &&
-							entry.content?.status === "available" &&
-							((entry.categories?.includes("skill-resource") &&
-								!entry.categories.includes("skill-definition")) ||
-								/^[^/]+\/[^/]+\/[^/]+\/(?:commands|agents)\//u.test(
-									entry.path,
-								)),
-					).length,
-					supportingFilesOverBudget: localContext.entries.filter(
-						(entry) =>
-							entry.kind === "file" &&
-							entry.content?.status === "omitted" &&
-							entry.content.reason === "metadata-only" &&
-							entry.content.detail?.endsWith("-support-budget"),
-					).length,
-					rules: localContext.entries.filter(
-						(entry) =>
-							entry.kind === "file" &&
-							entry.content?.status === "available" &&
-							(/(?:^|\/)\.claude\/rules\//u.test(entry.path) ||
-								(["claude-user-home", "codex-user-home"].includes(
-									entry.rootId,
-								) &&
-									entry.path.startsWith("rules/"))),
-					).length,
-					personalInstructions: localContext.entries.filter(
-						(entry) =>
-							entry.kind === "file" &&
-							basename(entry.path).toLowerCase().endsWith(".local.md") &&
+							entry.rootId === "codex-user-home" &&
+							entry.path.startsWith("rules/") &&
 							entry.content?.status === "available",
+					),
+				).toBe(true);
+			const memoryRoot = localContext.roots.find(
+				(root) => root.id === "claude-project-memory",
+			);
+			if (memoryRoot?.status === "collected")
+				expect(contextCounts.memoryFiles).toBeGreaterThan(0);
+			// The protocol's object and aggregate limits hold with every skill.
+			const aggregateBytes = capture.input.objects.reduce(
+				(total, object) => total + object.byteLength,
+				0,
+			);
+			expect(capture.input.objects.length).toBeLessThanOrEqual(
+				REPOSITORY_EVIDENCE_MAX_OBJECTS,
+			);
+			expect(aggregateBytes).toBeLessThanOrEqual(
+				REPOSITORY_EVIDENCE_MAX_AGGREGATE_BYTES,
+			);
+			if (await isFile(join(homedir(), ".claude", "CLAUDE.md")))
+				expect(
+					userFiles.some((file) =>
+						file.startsWith("claude-user-home:CLAUDE.md "),
+					),
+				).toBe(true);
+			if (await isFile(join(codexHome(), "AGENTS.md")))
+				expect(
+					userFiles.some((file) =>
+						file.startsWith("codex-user-home:AGENTS.md "),
+					),
+				).toBe(true);
+			if (observedPluginSkill !== null)
+				expect(
+					userFiles.some((file) =>
+						file.startsWith(`claude-plugins:${observedPluginSkill.path} `),
+					),
+				).toBe(true);
+			// No configured credential reaches any delivered object. Only the
+			// number of checked values is reported.
+			const configuredCredentials = await readConfiguredCredentials();
+			const delivered = [...capture.objects.values()].map((bytes) =>
+				new TextDecoder().decode(bytes),
+			);
+			// Report only the setting's name, never its value.
+			expect(
+				configuredCredentials
+					.filter((credential) =>
+						delivered.some((text) => text.includes(credential.value)),
+					)
+					.map((credential) => credential.name),
+			).toEqual([]);
+			// Only the MCP sections of ~/.claude.json are captured: no account
+			// identifier, prompt history or allowed tool from it is delivered.
+			const statePrivateValues = await readClaudeStatePrivateValues();
+			expect(
+				statePrivateValues.filter((value) =>
+					delivered.some((text) => text.includes(value)),
+				).length,
+			).toBe(0);
+			const userConfiguration = localContext.userConfiguration;
+			assert(userConfiguration);
+			const gitWorktrees = execFileSync(
+				"git",
+				["-C", repositoryPath, "worktree", "list", "--porcelain"],
+				{ encoding: "utf8" },
+			)
+				.split("\n")
+				.filter((line) => line.startsWith("worktree ")).length;
+			const summary = {
+				repository: repositoryPath,
+				elapsedMs,
+				coverage: Object.fromEntries(
+					capture.input.coverage.map((item) => [
+						item.area,
+						item.reason ? `${item.status}: ${item.reason}` : item.status,
+					]),
+				),
+				facets: capture.manifest.contextIndex.facets.map(
+					(facet) =>
+						`${facet.rootId}/${facet.kind}: ${facet.presence}/${facet.coverage}`,
+				),
+				roots: localContext.roots.map((root) => `${root.id}: ${root.status}`),
+				gitTruncatedSections: localContext.git.truncatedSections ?? [],
+				gitWorktrees: {
+					onDisk: gitWorktrees,
+					captured: localContext.git.worktrees?.length ?? 0,
+				},
+				limitsReached: localContext.coverage.limitsReached,
+				truncated: localContext.coverage.truncated ?? null,
+				objects: capture.input.objects.length,
+				aggregateBytes,
+				contextCounts,
+				redactionCounts: localContext.coverage.redactionCounts ?? {},
+				memoryRoot: memoryRoot
+					? `${memoryRoot.status}: ${memoryRoot.absolutePath}`
+					: null,
+				runtime: localContext.runtime ?? null,
+				entries: localContext.entries.length,
+				instructions: instructionResults,
+				userFiles,
+				observedPluginSkill: observedPluginSkill?.name ?? null,
+				userConfiguration: {
+					claudeSettings: userConfiguration.claude.settings.status,
+					claudeHooks: userConfiguration.claude.hooks.length,
+					claudeEnabledPlugins: Object.keys(
+						userConfiguration.claude.enabledPlugins,
 					).length,
-				};
-				// Codex exec-policy rules are captured whenever they exist.
-				const codexRules = await readdir(join(codexHome(), "rules")).catch(
-					() => [] as string[],
-				);
-				if (codexRules.length > 0)
-					expect(
-						localContext.entries.some(
-							(entry) =>
-								entry.rootId === "codex-user-home" &&
-								entry.path.startsWith("rules/") &&
-								entry.content?.status === "available",
-						),
-					).toBe(true);
-				const memoryRoot = localContext.roots.find(
-					(root) => root.id === "claude-project-memory",
-				);
-				if (memoryRoot?.status === "collected")
-					expect(contextCounts.memoryFiles).toBeGreaterThan(0);
-				// The protocol's object and aggregate limits hold with every skill.
-				const aggregateBytes = capture.input.objects.reduce(
-					(total, object) => total + object.byteLength,
-					0,
-				);
-				expect(capture.input.objects.length).toBeLessThanOrEqual(
-					REPOSITORY_EVIDENCE_MAX_OBJECTS,
-				);
-				expect(aggregateBytes).toBeLessThanOrEqual(
-					REPOSITORY_EVIDENCE_MAX_AGGREGATE_BYTES,
-				);
-				if (await isFile(join(homedir(), ".claude", "CLAUDE.md")))
-					expect(
-						userFiles.some((file) =>
-							file.startsWith("claude-user-home:CLAUDE.md "),
-						),
-					).toBe(true);
-				if (await isFile(join(codexHome(), "AGENTS.md")))
-					expect(
-						userFiles.some((file) =>
-							file.startsWith("codex-user-home:AGENTS.md "),
-						),
-					).toBe(true);
-				if (observedPluginSkill !== null)
-					expect(
-						userFiles.some((file) =>
-							file.startsWith(`claude-plugins:${observedPluginSkill.path} `),
-						),
-					).toBe(true);
-				// No configured credential reaches any delivered object. Only the
-				// number of checked values is reported.
-				const configuredCredentials = await readConfiguredCredentials();
-				const delivered = [...capture.objects.values()].map((bytes) =>
-					new TextDecoder().decode(bytes),
-				);
-				// Report only the setting's name, never its value.
-				expect(
-					configuredCredentials
-						.filter((credential) =>
-							delivered.some((text) => text.includes(credential.value)),
-						)
-						.map((credential) => credential.name),
-				).toEqual([]);
-				// Only the MCP sections of ~/.claude.json are captured: no account
-				// identifier, prompt history or allowed tool from it is delivered.
-				const statePrivateValues = await readClaudeStatePrivateValues();
-				expect(
-					statePrivateValues.filter((value) =>
-						delivered.some((text) => text.includes(value)),
-					).length,
-				).toBe(0);
-				const userConfiguration = localContext.userConfiguration;
-				assert(userConfiguration);
-				const gitWorktrees = execFileSync(
-					"git",
-					["-C", repositoryPath, "worktree", "list", "--porcelain"],
-					{ encoding: "utf8" },
-				)
-					.split("\n")
-					.filter((line) => line.startsWith("worktree ")).length;
-				const summary = {
-					repository: repositoryPath,
-					elapsedMs,
-					coverage: Object.fromEntries(
-						capture.input.coverage.map((item) => [
-							item.area,
-							item.reason ? `${item.status}: ${item.reason}` : item.status,
-						]),
+					claudeInstalledPlugins:
+						userConfiguration.claude.installedPlugins.length,
+					codexConfig: userConfiguration.codex.config.status,
+					codexMcpServers: userConfiguration.codex.mcpServers.length,
+					codexHooks: userConfiguration.codex.hooks.length,
+					codexPlugins: Object.keys(userConfiguration.codex.plugins).length,
+					claudeSettingsLayers: userConfiguration.claude.settingsLayers.map(
+						(layer) => `${layer.scope}: ${layer.status}`,
 					),
-					facets: capture.manifest.contextIndex.facets.map(
-						(facet) =>
-							`${facet.rootId}/${facet.kind}: ${facet.presence}/${facet.coverage}`,
+					claudeMcpServers: userConfiguration.claude.mcpServers.map(
+						(server) => `${server.scope}:${server.name}`,
 					),
-					roots: localContext.roots.map((root) => `${root.id}: ${root.status}`),
-					gitTruncatedSections: localContext.git.truncatedSections ?? [],
-					gitWorktrees: {
-						onDisk: gitWorktrees,
-						captured: localContext.git.worktrees?.length ?? 0,
-					},
-					limitsReached: localContext.coverage.limitsReached,
-					truncated: localContext.coverage.truncated ?? null,
-					objects: capture.input.objects.length,
-					aggregateBytes,
-					contextCounts,
-					redactionCounts: localContext.coverage.redactionCounts ?? {},
-					memoryRoot: memoryRoot
-						? `${memoryRoot.status}: ${memoryRoot.absolutePath}`
-						: null,
-					runtime: localContext.runtime ?? null,
-					entries: localContext.entries.length,
-					instructions: instructionResults,
-					userFiles,
-					observedPluginSkill: observedPluginSkill?.name ?? null,
-					userConfiguration: {
-						claudeSettings: userConfiguration.claude.settings.status,
-						claudeHooks: userConfiguration.claude.hooks.length,
-						claudeEnabledPlugins: Object.keys(
-							userConfiguration.claude.enabledPlugins,
-						).length,
-						claudeInstalledPlugins:
-							userConfiguration.claude.installedPlugins.length,
-						codexConfig: userConfiguration.codex.config.status,
-						codexMcpServers: userConfiguration.codex.mcpServers.length,
-						codexHooks: userConfiguration.codex.hooks.length,
-						codexPlugins: Object.keys(userConfiguration.codex.plugins).length,
-						claudeSettingsLayers: userConfiguration.claude.settingsLayers.map(
-							(layer) => `${layer.scope}: ${layer.status}`,
+					codexFeatures: Object.keys(userConfiguration.codex.features).length,
+					codexApps: Object.keys(userConfiguration.codex.apps).length,
+				},
+				credentialsChecked: configuredCredentials.length,
+				claudeStatePrivateValuesChecked: statePrivateValues.length,
+				warnings,
+			};
+			console.log(`REAL_REPO_CAPTURE ${JSON.stringify(summary)}`);
+			if (process.env.OPALINE_REAL_REPO_REPORT)
+				await writeFile(
+					join(
+						process.env.OPALINE_REAL_REPO_REPORT,
+						`${basename(repositoryPath)}.json`,
+					),
+					JSON.stringify(summary, null, 2),
+				);
+			// The one accepted gap: Codex does not persist hook output, so a
+			// machine with Codex hooks reports it on effective-instructions.
+			expect(
+				capture.input.coverage.filter(
+					(item) =>
+						item.status !== "complete" &&
+						!(
+							item.area === "effective-instructions" &&
+							item.reason?.startsWith("Codex does not persist hook output:")
 						),
-						claudeMcpServers: userConfiguration.claude.mcpServers.map(
-							(server) => `${server.scope}:${server.name}`,
-						),
-						codexFeatures: Object.keys(userConfiguration.codex.features).length,
-						codexApps: Object.keys(userConfiguration.codex.apps).length,
-					},
-					credentialsChecked: configuredCredentials.length,
-					claudeStatePrivateValuesChecked: statePrivateValues.length,
-					warnings,
-				};
-				console.log(`REAL_REPO_CAPTURE ${JSON.stringify(summary)}`);
-				if (process.env.OPALINE_REAL_REPO_REPORT)
-					await writeFile(
-						join(
-							process.env.OPALINE_REAL_REPO_REPORT,
-							`${basename(repositoryPath)}.json`,
-						),
-						JSON.stringify(summary, null, 2),
-					);
-				// The one accepted gap: Codex does not persist hook output, so a
-				// machine with Codex hooks reports it on effective-instructions.
-				expect(
-					capture.input.coverage.filter(
-						(item) =>
-							item.status !== "complete" &&
-							!(
-								item.area === "effective-instructions" &&
-								item.reason?.startsWith("Codex does not persist hook output:")
-							),
-					),
-				).toEqual([]);
-				expect(
-					capture.manifest.contextIndex.facets.filter(
-						(facet) => facet.coverage !== "complete",
-					),
-				).toEqual([]);
-				expect(localContext.git.truncatedSections ?? []).toEqual([]);
-				expect(
-					localContext.roots.filter(
-						(root) => root.status !== "collected" && root.status !== "missing",
-					),
-				).toEqual([]);
-			} finally {
-				stub.stop();
-			}
-		},
-	);
+				),
+			).toEqual([]);
+			expect(
+				capture.manifest.contextIndex.facets.filter(
+					(facet) => facet.coverage !== "complete",
+				),
+			).toEqual([]);
+			expect(localContext.git.truncatedSections ?? []).toEqual([]);
+			expect(
+				localContext.roots.filter(
+					(root) => root.status !== "collected" && root.status !== "missing",
+				),
+			).toEqual([]);
+		} finally {
+			stub.stop();
+		}
+	});
 });
 
 /** A skill of a user-scoped Claude Code plugin, observed as `plugin:skill`. */

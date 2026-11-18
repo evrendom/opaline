@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en" data-boot>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <style>
+      html { background-color: #ededed; }
+      html.dark { background-color: oklch(0.145 0 0); }
+      html[data-boot] body { background-color: transparent; }
+    </style>
+    <!-- Apply the saved theme before first paint. Keep in sync with
+         src/app/providers/ThemeProvider.tsx. -->
+    <script src="/theme-boot.js"></script>
+    <meta name="description" content="Ingest, store, and analyze Claude Code / Codex session transcripts" />
+    <link rel="icon" href="/favicon.ico" sizes="any" media="(prefers-color-scheme: light)" />
+    <link rel="icon" type="image/png" href="/favicon-32x32.png" sizes="32x32" media="(prefers-color-scheme: light)" />
+    <link rel="icon" type="image/png" href="/favicon-16x16.png" sizes="16x16" media="(prefers-color-scheme: light)" />
+    <link rel="icon" type="image/png" href="/favicon-dark-32x32.png" sizes="32x32" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" type="image/png" href="/favicon-dark-16x16.png" sizes="16x16" media="(prefers-color-scheme: dark)" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Opaline</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

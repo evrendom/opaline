@@ -205,64 +205,9 @@ describe("repository evidence delivery", () => {
 		{ retry_attempts: "garbage" },
 		{ retry_attempts: -1 },
 		{ retry_attempts: Number.MAX_SAFE_INTEGER },
-	])(
-		"resets invalid scheduling metadata without losing evidence: %j",
-		async (schedule) => {
-			const configDir = await mkdtemp(join(tmpdir(), "opaline-backoff-reset-"));
-			try {
-				const content = '{"ordinal":0}\n';
-				const plan = await planTranscriptRevision({
-					content: new TextEncoder().encode(content),
-					previous: undefined,
-					scope,
-					terminal: true,
-				});
-				const upload = buildUploadFor(makeBundle(), plan, content);
-				const path = await writePendingRepositoryEvidence(
-					{
-						endpoint: "https://opaline.so/rpc",
-						transcriptRevision: plan.manifest,
-						upload,
-					},
-					configDir,
-				);
-				const record = JSON.parse(await readFile(path, "utf8"));
-				const serialized = JSON.stringify({
-					...record,
-					next_attempt_at: Date.now() + 240 * 60_000,
-					retry_attempts: 4,
-					...schedule,
-				});
-				await writeFile(
-					path,
-					schedule.next_attempt_at === Number.POSITIVE_INFINITY
-						? serialized.replace(
-								'"next_attempt_at":null',
-								'"next_attempt_at":1e400',
-							)
-						: serialized,
-				);
-				const restored = await readPendingRepositoryEvidence(configDir, {
-					isEligible: (pending) => (pending.next_attempt_at ?? 0) <= Date.now(),
-				});
-				expect(restored).toHaveLength(1);
-				expect(restored[0]?.next_attempt_at).toBeUndefined();
-				expect(restored[0]?.retry_attempts).toBeUndefined();
-				expect(restored[0]?.upload).toEqual(upload);
-				expect(restored[0]?.transcriptRevision).toEqual(plan.manifest);
-				expect(await readFile(path, "utf8")).toBeTruthy();
-				expect(
-					await readdir(join(configDir, "repository-evidence-pending", "v4")),
-				).toEqual([path.split("/").at(-1)]);
-			} finally {
-				await rm(configDir, { force: true, recursive: true });
-			}
-		},
-	);
-
-	test.each(["http", "etag", "timeout"])(
-		"stops dequeuing and settles in-flight parts before rejecting a %s failure",
-		async (failure) => {
+	])("resets invalid scheduling metadata without losing evidence: %j", async (schedule) => {
+		const configDir = await mkdtemp(join(tmpdir(), "opaline-backoff-reset-"));
+		try {
 			const content = '{"ordinal":0}\n';
 			const plan = await planTranscriptRevision({
 				content: new TextEncoder().encode(content),
@@ -271,96 +216,149 @@ describe("repository evidence delivery", () => {
 				terminal: true,
 			});
 			const upload = buildUploadFor(makeBundle(), plan, content);
-			const object = upload.objects.get(upload.input.manifestObjectId);
-			assert(object);
-			let active = 0;
-			let started = 0;
-			let aborted = 0;
-			let commits = 0;
-			const fetchImplementation = (async (input, init) => {
-				const request = new Request(input, init);
-				if (request.method === "PUT") {
-					active++;
-					started++;
-					try {
-						if (started === 1 && failure !== "timeout") {
-							return new Response(null, {
-								status: failure === "http" ? 503 : 200,
-							});
-						}
-						await new Promise<void>((resolve, reject) => {
-							const timer = setTimeout(
-								resolve,
-								failure === "timeout" ? 1000 : 10,
-							);
-							request.signal.addEventListener(
-								"abort",
-								() => {
-									clearTimeout(timer);
-									aborted++;
-									reject(request.signal.reason);
-								},
-								{ once: true },
-							);
-						});
-						return new Response(null, { headers: { etag: "etag" } });
-					} finally {
-						active--;
-					}
-				}
-				if (new URL(request.url).pathname.endsWith("/init")) {
-					return Response.json({
-						json: {
-							expiresAt: "2027-01-01T00:00:00.000Z",
-							missingObjects: [
-								{
-									...object.descriptor,
-									objectKey: "manifest",
-									uploadId: "manifest",
-									parts: Array.from({ length: 12 }, (_, index) => {
-										const byteLength =
-											index === 11 ? object.bytes.byteLength - 11 : 1;
-										return {
-											byteLength,
-											headers: { "Content-Length": String(byteLength) },
-											partNumber: index + 1,
-											uploadUrl: `https://example.com/parts/${index + 1}`,
-										};
-									}),
-								},
-							],
-							partSizeBytes: 8 * 1024 * 1024,
-							protocol: upload.input.protocol,
-							reusedObjectIds: [],
-							uploadReceiptId: "00000000-0000-4000-8000-000000000010",
-						},
-					});
-				}
-				commits++;
-				return Response.json({ json: evidenceAccepted(upload.input) });
-			}) as typeof fetch;
-			await expect(
-				uploadRepositoryEvidence(upload, {
-					allowInsecureEndpoint: false,
-					authType: "api-key",
-					endpoint: "https://example.com/rpc",
-					fetch: fetchImplementation,
-					operationTimeoutMs: 25,
-					token: "test",
-				}),
-			).rejects.toThrow(
-				failure === "http"
-					? "HTTP 503"
-					: failure === "etag"
-						? "ETag"
-						: "timed out",
+			const path = await writePendingRepositoryEvidence(
+				{
+					endpoint: "https://opaline.so/rpc",
+					transcriptRevision: plan.manifest,
+					upload,
+				},
+				configDir,
 			);
-			expect(started).toBe(6);
-			expect(active).toBe(0);
-			expect(commits).toBe(0);
-			if (failure === "timeout") expect(aborted).toBe(6);
-		},
-	);
+			const record = JSON.parse(await readFile(path, "utf8"));
+			const serialized = JSON.stringify({
+				...record,
+				next_attempt_at: Date.now() + 240 * 60_000,
+				retry_attempts: 4,
+				...schedule,
+			});
+			await writeFile(
+				path,
+				schedule.next_attempt_at === Number.POSITIVE_INFINITY
+					? serialized.replace(
+							'"next_attempt_at":null',
+							'"next_attempt_at":1e400',
+						)
+					: serialized,
+			);
+			const restored = await readPendingRepositoryEvidence(configDir, {
+				isEligible: (pending) => (pending.next_attempt_at ?? 0) <= Date.now(),
+			});
+			expect(restored).toHaveLength(1);
+			expect(restored[0]?.next_attempt_at).toBeUndefined();
+			expect(restored[0]?.retry_attempts).toBeUndefined();
+			expect(restored[0]?.upload).toEqual(upload);
+			expect(restored[0]?.transcriptRevision).toEqual(plan.manifest);
+			expect(await readFile(path, "utf8")).toBeTruthy();
+			expect(
+				await readdir(join(configDir, "repository-evidence-pending", "v4")),
+			).toEqual([path.split("/").at(-1)]);
+		} finally {
+			await rm(configDir, { force: true, recursive: true });
+		}
+	});
+
+	test.each([
+		"http",
+		"etag",
+		"timeout",
+	])("stops dequeuing and settles in-flight parts before rejecting a %s failure", async (failure) => {
+		const content = '{"ordinal":0}\n';
+		const plan = await planTranscriptRevision({
+			content: new TextEncoder().encode(content),
+			previous: undefined,
+			scope,
+			terminal: true,
+		});
+		const upload = buildUploadFor(makeBundle(), plan, content);
+		const object = upload.objects.get(upload.input.manifestObjectId);
+		assert(object);
+		let active = 0;
+		let started = 0;
+		let aborted = 0;
+		let commits = 0;
+		const fetchImplementation = (async (input, init) => {
+			const request = new Request(input, init);
+			if (request.method === "PUT") {
+				active++;
+				started++;
+				try {
+					if (started === 1 && failure !== "timeout") {
+						return new Response(null, {
+							status: failure === "http" ? 503 : 200,
+						});
+					}
+					await new Promise<void>((resolve, reject) => {
+						const timer = setTimeout(
+							resolve,
+							failure === "timeout" ? 1000 : 10,
+						);
+						request.signal.addEventListener(
+							"abort",
+							() => {
+								clearTimeout(timer);
+								aborted++;
+								reject(request.signal.reason);
+							},
+							{ once: true },
+						);
+					});
+					return new Response(null, { headers: { etag: "etag" } });
+				} finally {
+					active--;
+				}
+			}
+			if (new URL(request.url).pathname.endsWith("/init")) {
+				return Response.json({
+					json: {
+						expiresAt: "2027-01-01T00:00:00.000Z",
+						missingObjects: [
+							{
+								...object.descriptor,
+								objectKey: "manifest",
+								uploadId: "manifest",
+								parts: Array.from({ length: 12 }, (_, index) => {
+									const byteLength =
+										index === 11 ? object.bytes.byteLength - 11 : 1;
+									return {
+										byteLength,
+										headers: { "Content-Length": String(byteLength) },
+										partNumber: index + 1,
+										uploadUrl: `https://example.com/parts/${index + 1}`,
+									};
+								}),
+							},
+						],
+						partSizeBytes: 8 * 1024 * 1024,
+						protocol: upload.input.protocol,
+						reusedObjectIds: [],
+						uploadReceiptId: "00000000-0000-4000-8000-000000000010",
+					},
+				});
+			}
+			commits++;
+			return Response.json({ json: evidenceAccepted(upload.input) });
+		}) as typeof fetch;
+		await expect(
+			uploadRepositoryEvidence(upload, {
+				allowInsecureEndpoint: false,
+				authType: "api-key",
+				endpoint: "https://example.com/rpc",
+				fetch: fetchImplementation,
+				operationTimeoutMs: 25,
+				token: "test",
+			}),
+		).rejects.toThrow(
+			failure === "http"
+				? "HTTP 503"
+				: failure === "etag"
+					? "ETag"
+					: "timed out",
+		);
+		expect(started).toBe(6);
+		expect(active).toBe(0);
+		expect(commits).toBe(0);
+		if (failure === "timeout") expect(aborted).toBe(6);
+	});
 
 	test("uploads 72 objects concurrently with at most six parts in flight and ordered commit parts", async () => {
 		const content = Array.from(
@@ -1038,157 +1036,155 @@ describe("repository evidence upload building", () => {
 		}
 	});
 
-	test.each([undefined, "bearer"] as const)(
-		"refuses unsupported evidence auth %s before contacting the API",
-		async (authType) => {
-			const content = '{"ordinal":0}\n';
-			const plan = await planTranscriptRevision({
-				content: new TextEncoder().encode(content),
-				previous: undefined,
-				scope,
-				terminal: true,
-			});
-			let requests = 0;
-			await expect(
-				uploadRepositoryEvidence(buildUploadFor(makeBundle(), plan, content), {
-					allowInsecureEndpoint: false,
-					authType,
-					endpoint: "http://127.0.0.1:1/rpc",
-					fetch: async () => {
-						requests++;
-						throw new Error("Unexpected transport");
-					},
-					token: "legacy-token",
-				}),
-			).rejects.toThrow("requires an ingest API key");
-			expect(requests).toBe(0);
-		},
-	);
+	test.each([
+		undefined,
+		"bearer",
+	] as const)("refuses unsupported evidence auth %s before contacting the API", async (authType) => {
+		const content = '{"ordinal":0}\n';
+		const plan = await planTranscriptRevision({
+			content: new TextEncoder().encode(content),
+			previous: undefined,
+			scope,
+			terminal: true,
+		});
+		let requests = 0;
+		await expect(
+			uploadRepositoryEvidence(buildUploadFor(makeBundle(), plan, content), {
+				allowInsecureEndpoint: false,
+				authType,
+				endpoint: "http://127.0.0.1:1/rpc",
+				fetch: async () => {
+					requests++;
+					throw new Error("Unexpected transport");
+				},
+				token: "legacy-token",
+			}),
+		).rejects.toThrow("requires an ingest API key");
+		expect(requests).toBe(0);
+	});
 	test.each([
 		{ source: "codex", fixture: "codex-skills.jsonl", subagent: false },
 		{ source: "claude_code", fixture: "claude-skills.jsonl", subagent: false },
 		{ source: "codex", fixture: "codex-skills.jsonl", subagent: true },
 		{ source: "claude_code", fixture: "claude-skills.jsonl", subagent: true },
-	] as const)(
-		"matches whole-content skill extraction for $source (subagent: $subagent)",
-		async ({ source, fixture, subagent }) => {
-			const fixtureContent = await readFile(
-				join(import.meta.dir, "fixtures", "repository-evidence", fixture),
-				"utf8",
-			);
-			const content = subagent
-				? `${fixtureContent.split("\n")[0]}\n`
-				: fixtureContent;
-			const subagents = subagent
-				? [{ agentId: "agent-1", content: fixtureContent }]
-				: undefined;
-			const observed = new Set<string>(["code-review", "testing-bun"]);
-			expect([...observed].sort()).toEqual(["code-review", "testing-bun"]);
-			const baseBundle = makeBundle();
-			const bundle: LocalContextBundle = {
-				...baseBundle,
-				manifest: {
-					...baseBundle.manifest,
-					contextIndex: {
-						...baseBundle.manifest.contextIndex,
-						skills: [
-							...baseBundle.manifest.contextIndex.skills,
-							{
-								definitions: [],
-								discovery: "present",
-								name: "code-review",
-								nameSource: "definition-directory",
-							},
-						],
-					},
+	] as const)("matches whole-content skill extraction for $source (subagent: $subagent)", async ({
+		source,
+		fixture,
+		subagent,
+	}) => {
+		const fixtureContent = await readFile(
+			join(import.meta.dir, "fixtures", "repository-evidence", fixture),
+			"utf8",
+		);
+		const content = subagent
+			? `${fixtureContent.split("\n")[0]}\n`
+			: fixtureContent;
+		const subagents = subagent
+			? [{ agentId: "agent-1", content: fixtureContent }]
+			: undefined;
+		const observed = new Set<string>(["code-review", "testing-bun"]);
+		expect([...observed].sort()).toEqual(["code-review", "testing-bun"]);
+		const baseBundle = makeBundle();
+		const bundle: LocalContextBundle = {
+			...baseBundle,
+			manifest: {
+				...baseBundle.manifest,
+				contextIndex: {
+					...baseBundle.manifest.contextIndex,
+					skills: [
+						...baseBundle.manifest.contextIndex.skills,
+						{
+							definitions: [],
+							discovery: "present",
+							name: "code-review",
+							nameSource: "definition-directory",
+						},
+					],
 				},
-			};
-			const plan = await planTranscriptRevision({
-				content: new TextEncoder().encode(content),
-				previous: undefined,
-				scope: { ...scope, provider: source },
-				terminal: true,
-			});
-			const upload = buildRepositoryEvidenceUpload({
-				bundle,
-				captureLifecycle: "end",
-				context: EVIDENCE_CONTEXT,
-				firstActionAt: null,
-				firstActionBasis: "unavailable",
-				firstActionRelationship: "unknown",
-				organizationId: "organization-1",
-				session: { content, sessionId: scope.sessionId, source, subagents },
-				terminalTranscript: true,
-				transcriptLastEventAt: null,
-				transcriptRevision: plan,
-			});
-			const manifest = upload.objects.get(upload.input.manifestObjectId);
-			assert(manifest);
-			expect(
-				JSON.parse(new TextDecoder().decode(manifest.bytes)).contextIndex
-					.skills,
-			).toEqual(
-				assessContextSkillUse(bundle.manifest.contextIndex.skills, {
-					coverage: "partial",
-					observedSkillNames: [...observed],
-					scope: { kind: "session", id: scope.sessionId },
-				}),
-			);
-		},
-	);
+			},
+		};
+		const plan = await planTranscriptRevision({
+			content: new TextEncoder().encode(content),
+			previous: undefined,
+			scope: { ...scope, provider: source },
+			terminal: true,
+		});
+		const upload = buildRepositoryEvidenceUpload({
+			bundle,
+			captureLifecycle: "end",
+			context: EVIDENCE_CONTEXT,
+			firstActionAt: null,
+			firstActionBasis: "unavailable",
+			firstActionRelationship: "unknown",
+			organizationId: "organization-1",
+			session: { content, sessionId: scope.sessionId, source, subagents },
+			terminalTranscript: true,
+			transcriptLastEventAt: null,
+			transcriptRevision: plan,
+		});
+		const manifest = upload.objects.get(upload.input.manifestObjectId);
+		assert(manifest);
+		expect(
+			JSON.parse(new TextDecoder().decode(manifest.bytes)).contextIndex.skills,
+		).toEqual(
+			assessContextSkillUse(bundle.manifest.contextIndex.skills, {
+				coverage: "partial",
+				observedSkillNames: [...observed],
+				scope: { kind: "session", id: scope.sessionId },
+			}),
+		);
+	});
 
-	test.each([FILTER_VERSION - 1, FILTER_VERSION + 1])(
-		"quarantines incompatible filter version %s as a warning, not a failure",
-		async (filterVersion) => {
-			const configDir = await mkdtemp(
-				join(tmpdir(), "opaline-filter-upgrade-"),
-			);
-			const content = '{"ordinal":0}\n';
-			const plan = await planTranscriptRevision({
-				content: new TextEncoder().encode(content),
-				previous: undefined,
-				scope,
-				terminal: true,
-			});
-			const oldBundle = makeBundle();
-			const bundle = {
-				...oldBundle,
-				manifest: {
-					...oldBundle.manifest,
-					transport: {
-						...oldBundle.manifest.transport,
-						secretFilterVersion: filterVersion,
-					},
+	test.each([
+		FILTER_VERSION - 1,
+		FILTER_VERSION + 1,
+	])("quarantines incompatible filter version %s as a warning, not a failure", async (filterVersion) => {
+		const configDir = await mkdtemp(join(tmpdir(), "opaline-filter-upgrade-"));
+		const content = '{"ordinal":0}\n';
+		const plan = await planTranscriptRevision({
+			content: new TextEncoder().encode(content),
+			previous: undefined,
+			scope,
+			terminal: true,
+		});
+		const oldBundle = makeBundle();
+		const bundle = {
+			...oldBundle,
+			manifest: {
+				...oldBundle.manifest,
+				transport: {
+					...oldBundle.manifest.transport,
+					secretFilterVersion: filterVersion,
 				},
-			};
-			await writePendingRepositoryEvidence(
-				{
-					endpoint: "https://opaline.so/rpc",
-					transcriptRevision: plan.manifest,
-					upload: buildUploadFor(bundle, plan, content),
-				},
-				configDir,
-			);
-			const failures: unknown[] = [];
-			const warnings: Error[] = [];
-			expect(
-				await readPendingRepositoryEvidence(configDir, {
-					onError: (error) => failures.push(error),
-					onWarning: (warning) => warnings.push(warning),
-				}),
-			).toEqual([]);
-			expect(failures).toEqual([]);
-			expect(warnings).toHaveLength(1);
-			expect(warnings[0]?.message).toContain("quarantined");
-			expect(warnings[0]?.message).toContain("secret filter");
-			expect(
-				await readdir(
-					join(configDir, "repository-evidence-pending", "v4", "quarantine"),
-				),
-			).toHaveLength(1);
-			await rm(configDir, { recursive: true, force: true });
-		},
-	);
+			},
+		};
+		await writePendingRepositoryEvidence(
+			{
+				endpoint: "https://opaline.so/rpc",
+				transcriptRevision: plan.manifest,
+				upload: buildUploadFor(bundle, plan, content),
+			},
+			configDir,
+		);
+		const failures: unknown[] = [];
+		const warnings: Error[] = [];
+		expect(
+			await readPendingRepositoryEvidence(configDir, {
+				onError: (error) => failures.push(error),
+				onWarning: (warning) => warnings.push(warning),
+			}),
+		).toEqual([]);
+		expect(failures).toEqual([]);
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]?.message).toContain("quarantined");
+		expect(warnings[0]?.message).toContain("secret filter");
+		expect(
+			await readdir(
+				join(configDir, "repository-evidence-pending", "v4", "quarantine"),
+			),
+		).toHaveLength(1);
+		await rm(configDir, { recursive: true, force: true });
+	});
 
 	test("retry reports quarantined evidence distinctly and releases its spool capacity", async () => {
 		const fixture = await createCliFixture("codex");

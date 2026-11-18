@@ -1,0 +1,22 @@
+{
+	"name": "@rudel/repo-intelligence-source-github",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"check-types": "tsc --noEmit",
+		"test": "bun test",
+		"test:integration": "bun test ./src/github-sweep-source.integration.ts"
+	},
+	"dependencies": {
+		"zod": "^4.6.5"
+	},
+	"devDependencies": {
+		"@rudel/typescript-config": "workspace:*",
+		"bun-types": "latest",
+		"typescript": "5.9.2"
+	}
+}

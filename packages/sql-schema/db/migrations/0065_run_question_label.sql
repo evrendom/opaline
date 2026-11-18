@@ -1,0 +1,1 @@
+ALTER TABLE "run_question" ADD COLUMN "label" text;

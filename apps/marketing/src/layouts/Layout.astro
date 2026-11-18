@@ -1,0 +1,149 @@
+---
+// biome-ignore-all lint/correctness/noUnusedVariables: Astro props are referenced from template markup.
+import "../styles/global.css";
+import interVariableFontUrl from "../assets/fonts/inter-variable-latin.woff2";
+import AgentationDev from "../components/AgentationDev.astro";
+
+interface SocialImage {
+	src: string;
+	alt: string;
+	width?: number;
+	height?: number;
+}
+
+interface Props {
+	title?: string;
+	description?: string;
+	canonical?: string | URL;
+	dateModified?: string;
+	noindex?: boolean;
+	socialImage?: SocialImage;
+}
+
+const {
+	title = "Opaline — Clarity for agent sessions",
+	description = "Pull back the curtain on your agent sessions. Understand what happened, why it happened, and what your team should do next.",
+	canonical,
+	dateModified,
+	noindex = false,
+	socialImage = {
+		src: "/images/opaline-social.png",
+		alt: "Team-wide, message-level analytics for coding agents",
+		width: 2732,
+		height: 1434,
+	},
+} = Astro.props;
+
+const siteUrl = Astro.site ?? new URL("https://opaline.so");
+const siteHomepageUrl = new URL("/", siteUrl);
+const canonicalUrl = canonical
+	? new URL(canonical, siteUrl)
+	: new URL(Astro.url.pathname, siteUrl);
+canonicalUrl.search = "";
+canonicalUrl.hash = "";
+
+const shouldNoIndex = noindex || Astro.url.pathname.startsWith("/preview/");
+const robots = shouldNoIndex
+	? "noindex, nofollow"
+	: "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1";
+const socialImageUrl = socialImage
+	? new URL(socialImage.src, siteUrl).href
+	: undefined;
+const structuredData = shouldNoIndex
+	? undefined
+	: {
+			"@context": "https://schema.org",
+			"@graph": [
+				{
+					"@type": "WebSite",
+					"@id": `${siteHomepageUrl.href}#website`,
+					url: siteHomepageUrl.href,
+					name: "Opaline",
+					inLanguage: "en",
+				},
+				{
+					"@type": "WebPage",
+					"@id": `${canonicalUrl.href}#webpage`,
+					url: canonicalUrl.href,
+					name: title,
+					description,
+					inLanguage: "en",
+					isPartOf: { "@id": `${siteHomepageUrl.href}#website` },
+					...(dateModified ? { dateModified } : {}),
+				},
+			],
+		};
+const structuredDataJson = structuredData
+	? JSON.stringify(structuredData).replaceAll("<", "\\u003c")
+	: undefined;
+---
+
+<!doctype html>
+<html lang="en" class="dark" style="color-scheme: dark">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<link
+			rel="preload"
+			href={interVariableFontUrl}
+			as="font"
+			type="font/woff2"
+			crossorigin
+		/>
+		<link rel="icon" href="/favicon.ico" sizes="any" media="(prefers-color-scheme: light)" />
+		<link rel="icon" type="image/png" href="/favicon-32x32.png" sizes="32x32" media="(prefers-color-scheme: light)" />
+		<link rel="icon" type="image/png" href="/favicon-16x16.png" sizes="16x16" media="(prefers-color-scheme: light)" />
+		<link rel="icon" type="image/png" href="/favicon-dark-32x32.png" sizes="32x32" media="(prefers-color-scheme: dark)" />
+		<link rel="icon" type="image/png" href="/favicon-dark-16x16.png" sizes="16x16" media="(prefers-color-scheme: dark)" />
+		<link rel="mask-icon" href="/opaline-icon.svg" color="#2c2d30" />
+		<link rel="canonical" href={canonicalUrl} />
+		<link rel="sitemap" href="/sitemap.xml" />
+		<meta name="theme-color" content="#0b0b0b" />
+		<meta name="generator" content={Astro.generator} />
+		<meta name="description" content={description} />
+		<meta name="robots" content={robots} />
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="Opaline" />
+		<meta property="og:locale" content="en_US" />
+		<meta property="og:title" content={title} />
+		<meta property="og:description" content={description} />
+		<meta property="og:url" content={canonicalUrl} />
+		<meta
+			name="twitter:card"
+			content={socialImageUrl ? "summary_large_image" : "summary"}
+		/>
+		<meta name="twitter:title" content={title} />
+		<meta name="twitter:description" content={description} />
+		{
+			socialImageUrl && socialImage ? (
+				<>
+					<meta property="og:image" content={socialImageUrl} />
+					<meta property="og:image:alt" content={socialImage.alt} />
+					{socialImage.width && (
+						<meta property="og:image:width" content={socialImage.width} />
+					)}
+					{socialImage.height && (
+						<meta property="og:image:height" content={socialImage.height} />
+					)}
+					<meta name="twitter:image" content={socialImageUrl} />
+					<meta name="twitter:image:alt" content={socialImage.alt} />
+				</>
+			) : null
+		}
+		<title>{title}</title>
+		{
+			structuredDataJson && (
+				<script type="application/ld+json" set:html={structuredDataJson} />
+			)
+		}
+		<script is:inline>document.documentElement.dataset.js = "true";</script>
+		<style is:inline>html.dark{background-color:#0b0b0b}</style>
+	</head>
+	<body>
+		<slot />
+		<AgentationDev />
+		<script>
+			import "../scripts/marketing-analytics";
+		</script>
+	</body>
+</html>

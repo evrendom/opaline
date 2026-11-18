@@ -1,0 +1,4 @@
+// Generated from @withfig/autocomplete (MIT, Hercules Labs Inc.). Do not edit.
+import type { FigSpec } from "../../fig-spec.js";
+
+export default JSON.parse("{\"n\":[\"mkdir\"],\"d\":\"Make directories\",\"o\":[{\"n\":[\"-m\",\"--mode\"],\"d\":\"Set file mode (as in chmod), not a=rwx - umask\",\"a\":[{\"n\":\"mode\"}]},{\"n\":[\"-p\",\"--parents\"],\"d\":\"No error if existing, make parent directories as needed\"},{\"n\":[\"-v\",\"--verbose\"],\"d\":\"Print a message for each created directory\"},{\"n\":[\"-Z\",\"--context\"],\"d\":\"Set the SELinux security context of each created directory\",\"a\":[{\"n\":\"context\"}]},{\"n\":[\"--help\"],\"d\":\"Display this help and exit\"},{\"n\":[\"--version\"],\"d\":\"Output version information and exit\"}],\"a\":[{\"n\":\"directory name\"}]}") as FigSpec;

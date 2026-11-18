@@ -1,0 +1,103 @@
+/* The product shell's window. Its canvas keeps the dashboard-01 chrome
+   colours, like the marketing demo. Unlayered, like app-surface.css, so it
+   wins over the older dashboard-01 chrome rules. */
+
+.product-app-shell .dashboard-01-window {
+	box-shadow: var(--custom-shadow);
+}
+
+.dashboard-01-chrome-frame [data-slot="sidebar-inner"] {
+	background: transparent;
+}
+
+[data-slot="sidebar"],
+[data-slot="dashboard-header"] {
+	font-family: var(--font-sans);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+.desktop-window-bar {
+	display: none;
+}
+
+:root[data-desktop] body {
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+:root[data-desktop]
+	:is(
+		input,
+		textarea,
+		[contenteditable]:not([contenteditable="false"]),
+		pre,
+		code,
+		kbd,
+		samp,
+		.whitespace-pre-wrap,
+		.rich-skill-document,
+		.trace-code-block,
+		[data-selectable]
+	) {
+	-webkit-user-select: text;
+	user-select: text;
+}
+
+:root[data-desktop] .desktop-window-bar {
+	display: flex;
+	height: 32px;
+	align-items: center;
+	gap: 2px;
+	padding-left: 72px;
+}
+
+:root[data-desktop][data-fullscreen] .desktop-window-bar {
+	padding-left: 0;
+}
+
+:root[data-desktop]
+	:is([data-slot="sidebar-header"], [data-slot="dashboard-header"]) {
+	-webkit-app-region: drag;
+}
+
+:root[data-desktop] [data-slot="sidebar-wrapper"] {
+	-webkit-app-region: drag;
+}
+
+:root[data-desktop] [data-slot="sidebar-wrapper"] > * {
+	-webkit-app-region: no-drag;
+}
+
+:root[data-desktop]
+	:is([data-slot="sidebar-header"], [data-slot="dashboard-header"])
+	:is(
+		a,
+		button,
+		input,
+		select,
+		textarea,
+		[role="button"],
+		[role="combobox"],
+		[role="tab"],
+		[contenteditable="true"]
+	) {
+	-webkit-app-region: no-drag;
+}
+
+:root[data-desktop]:not([data-fullscreen])
+	[data-slot="sidebar"][data-state="collapsed"]
+	+ *
+	[data-slot="dashboard-header"] {
+	padding-left: 88px;
+}
+
+:root[data-desktop] .product-window-frame .desktop-window-bar {
+	display: none;
+}
+
+:root[data-desktop]
+	.product-window-frame
+	:is([data-slot="sidebar-header"], [data-slot="dashboard-header"]) {
+	-webkit-app-region: no-drag;
+}

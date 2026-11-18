@@ -1,0 +1,167 @@
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import type { ClickHouseExecutor } from "@chkit/clickhouse";
+import {
+	checksumSQL,
+	createJournalStore,
+	extractExecutableStatements,
+} from "chkit/dist/bin/lib.js";
+import { RETIRED_SESSION_ANALYTICS_COLUMNS } from "../src/session-analytics-mv.js";
+import { countReplicas } from "./cluster-replicas.js";
+import {
+	appendJournalEntryWithReconciliation,
+	type MigrationJournalStore,
+} from "./migrate-f16.js";
+import { openMigrationTarget } from "./migration-target.js";
+
+/**
+ * Retirement step 3 (docs/l1-literal-schema.md): both session analytics
+ * views stop writing interpretations no one reads. `MODIFY QUERY` replaces
+ * each view's query in place, so ingestion is never interrupted.
+ * `scripts/migrate-session-analytics-drop-retired.ts` later drops some of the
+ * columns, so every deploy checks the views on every replica.
+ */
+export const SESSION_ANALYTICS_RETIREMENT_MIGRATION =
+	"20261008120000_session_analytics_retired_writes.sql";
+const VIEWS = ["session_analytics_mv", "codex_session_analytics_mv"] as const;
+
+export async function runSessionAnalyticsRetirementMigration(options: {
+	executor: ClickHouseExecutor;
+	journalStore: MigrationJournalStore;
+	migrationSql: string;
+	targetDatabase: string;
+	/**
+	 * ClickHouse Cloud applies DDL to replicas asynchronously, so a read right
+	 * after MODIFY QUERY can see the old view; the check retries this often.
+	 */
+	readBack?: { attempts: number; delayMs: number };
+}): Promise<void> {
+	if (!/^[A-Za-z_][A-Za-z0-9_]*$/u.test(options.targetDatabase))
+		throw new Error("Unsafe ClickHouse database");
+	const checksum = checksumSQL(options.migrationSql);
+	const applied = (await options.journalStore.readJournal()).applied.filter(
+		(entry) => entry.name === SESSION_ANALYTICS_RETIREMENT_MIGRATION,
+	);
+	if (applied.some((entry) => entry.checksum !== checksum))
+		throw new Error("Session analytics retirement migration checksum mismatch");
+	const replicas = await countReplicas(
+		options.executor,
+		"the session analytics view queries",
+	);
+	const apply = async () => {
+		for (const statement of extractExecutableStatements(options.migrationSql))
+			await options.executor.execute(statement);
+	};
+	const journaled = applied.length > 0;
+	if (!journaled) await apply();
+	else {
+		// A journaled migration can still need its statements again: a server
+		// restart on 2026-10-20 reloaded both views with their pre-retirement
+		// queries. The statements are idempotent, so re-apply them rather than
+		// block every deploy on the read-back below.
+		const stale = await staleViews(
+			options.executor,
+			options.targetDatabase,
+			replicas,
+		);
+		if (stale.length > 0) {
+			console.warn(
+				`${SESSION_ANALYTICS_RETIREMENT_MIGRATION}: views reverted since the migration was journaled; re-applying (${stale.join("; ")})`,
+			);
+			await apply();
+		}
+	}
+	const { attempts, delayMs } = options.readBack ?? {
+		attempts: 13,
+		delayMs: 10_000,
+	};
+	for (let attempt = 1; ; attempt++) {
+		const stale = await staleViews(
+			options.executor,
+			options.targetDatabase,
+			replicas,
+		);
+		if (stale.length === 0) break;
+		if (attempt >= attempts)
+			throw new Error(
+				`Session analytics views still write retired columns or lost their revision dedupe after ${attempts} reads: ${stale.join("; ")}`,
+			);
+		// Halfway, apply the idempotent MODIFY QUERY again in case it did not land.
+		if (attempt === Math.ceil(attempts / 2)) await apply();
+		await new Promise((resolve) => setTimeout(resolve, delayMs));
+	}
+	if (!journaled)
+		await appendJournalEntryWithReconciliation(options.journalStore, {
+			name: SESSION_ANALYTICS_RETIREMENT_MIGRATION,
+			checksum,
+			appliedAt: new Date().toISOString().replace("Z", ""),
+		});
+}
+
+/** Views that still name a retired column or lost `_dedupe_rank`, per replica, with why. */
+export async function staleViews(
+	executor: ClickHouseExecutor,
+	database: string,
+	replicas: number,
+): Promise<string[]> {
+	const views = await executor.query<{
+		host: string;
+		name: string;
+		as_select: string;
+	}>(`
+		SELECT hostName() AS host, name, as_select
+		FROM ${replicas > 1 ? "clusterAllReplicas('default', system.tables)" : "system.tables"}
+		WHERE database = '${database}'
+			AND name IN (${VIEWS.map((view) => `'${view}'`).join(", ")})
+		ORDER BY host, name LIMIT 4 BY host
+		SETTINGS max_execution_time = 10, skip_unavailable_shards = 0`);
+	const hosts = [...new Set(views.map((row) => row.host))];
+	if (hosts.length < replicas)
+		return [
+			`session analytics views visible on ${hosts.length} of ${replicas} replicas`,
+		];
+	return hosts.flatMap((host) =>
+		VIEWS.flatMap((view) => {
+			const query = views.find(
+				(row) => row.host === host && row.name === view,
+			)?.as_select;
+			const retired = RETIRED_SESSION_ANALYTICS_COLUMNS.filter((column) =>
+				new RegExp(`\\b${column}\\b`, "u").test(query ?? ""),
+			);
+			return !query?.includes("_dedupe_rank") || retired.length > 0
+				? [
+						`${view}${replicas > 1 ? ` on replica ${host}` : ""}: ${retired.join(", ") || "missing view or dedupe"}`,
+					]
+				: [];
+		}),
+	);
+}
+
+async function main(): Promise<void> {
+	const target = await openMigrationTarget();
+	const { executor } = target;
+	try {
+		await runSessionAnalyticsRetirementMigration({
+			executor,
+			journalStore: createJournalStore(executor),
+			migrationSql: await readFile(
+				resolve(
+					import.meta.dir,
+					"../chx/migrations",
+					SESSION_ANALYTICS_RETIREMENT_MIGRATION,
+				),
+				"utf8",
+			),
+			targetDatabase: "rudel",
+		});
+		console.log(`Applied/validated: ${SESSION_ANALYTICS_RETIREMENT_MIGRATION}`);
+	} finally {
+		await target.close();
+	}
+}
+
+if (import.meta.main)
+	main().catch((error: unknown) => {
+		console.error(error);
+		process.exitCode = 1;
+	});

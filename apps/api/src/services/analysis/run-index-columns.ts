@@ -1,0 +1,501 @@
+import type {
+	TRANSCRIPT_RECORD_FACT_KEYS,
+	TranscriptRecordFacts,
+	TranscriptSource,
+} from "@rudel/api-routes/transcript-records";
+import type { RudelRunIndexRow } from "@rudel/ch-schema/generated";
+
+/**
+ * Which run index fact columns a generation can hold (docs/l1-literal-schema.md,
+ * rule 2: unknown is not false). A column is recordable when the generation's
+ * transcript-records parser version stores every fact it is read from and the
+ * agent writes them. Otherwise its value is unknown: a scalar is NULL and the
+ * column is listed in the row's `unrecorded_facts` (arrays and maps cannot be
+ * NULL, so the list is what tells their emptiness apart). A recordable column
+ * with no value is '' (strings), empty (arrays) or NULL (numbers and flags,
+ * which have no empty value); `unrecorded_facts` says which NULL is which.
+ *
+ * Columns not listed here (spans, call counts, edits, usage) come from record
+ * kinds and usage events every generation has.
+ */
+
+type TypedFact = Exclude<keyof TranscriptRecordFacts, "extra">;
+export type RunIndexFactSource =
+	| TypedFact
+	| keyof typeof TRANSCRIPT_RECORD_FACT_KEYS;
+
+export interface RunIndexColumnGate {
+	/** First parser version that stores everything the column is read from. */
+	readonly since: number;
+	/** A later first version for one agent, whose form of the fact a later parser learned. */
+	readonly sinceBy?: Readonly<Partial<Record<TranscriptSource, number>>>;
+	/** Agents whose transcripts record it. */
+	readonly agents: readonly TranscriptSource[];
+	/**
+	 * Parser facts it is read from; empty for record kinds and text every
+	 * parser version kept (a Skill call's input, a slash command's name).
+	 */
+	readonly facts: readonly RunIndexFactSource[];
+	readonly factsBy?: Readonly<
+		Partial<Record<TranscriptSource, readonly RunIndexFactSource[]>>
+	>;
+	/** Run rows, the receipt (session facts), or both (totals and merged sets). */
+	readonly rows: "run" | "receipt" | "both";
+	/**
+	 * Agents that record it only in their main stream: Claude Code subagent
+	 * transcripts keep no `toolUseResult`, so facts read from it are unknown
+	 * on their runs. (Subagent transcripts of the `cli` entrypoint do keep it,
+	 * those of the desktop app, VS Code and the SDK never; the gate is per
+	 * stream kind, so a `cli` subagent's are unknown too.)
+	 */
+	readonly mainStreamOnly?: readonly TranscriptSource[];
+	/**
+	 * A later first version on an agent's subagent streams, whose form of the
+	 * fact there (a result text, a harness notice) a later parser learned.
+	 */
+	readonly subagentSinceBy?: Readonly<
+		Partial<Record<TranscriptSource, number>>
+	>;
+}
+
+const CLAUDE: readonly TranscriptSource[] = ["claude_code"];
+const CODEX: readonly TranscriptSource[] = ["codex"];
+const BOTH: readonly TranscriptSource[] = ["claude_code", "codex"];
+/** The parser version every generation in storage has; record kinds date from it. */
+const ALWAYS = 1;
+
+const gate = (
+	since: number,
+	agents: readonly TranscriptSource[],
+	facts: readonly RunIndexFactSource[],
+	rows: RunIndexColumnGate["rows"] = "run",
+	sinceBy?: RunIndexColumnGate["sinceBy"],
+	factsBy?: RunIndexColumnGate["factsBy"],
+): RunIndexColumnGate => ({
+	since,
+	agents,
+	facts,
+	rows,
+	...(sinceBy === undefined ? {} : { sinceBy }),
+	...(factsBy === undefined ? {} : { factsBy }),
+});
+
+export const RUN_INDEX_NARROWED_COLUMNS = {
+	duration_ms: {
+		claude_code:
+			"Claude durationMs/durationSeconds time individual tool results, not a turn. Session cost-state totalDuration is cumulative. Neither can be summed or copied as Codex task_complete/turn_aborted run duration.",
+	},
+	turn_origin: {
+		codex:
+			"Codex prompt_origin stores a communication author's identity, not the turnOrigin classification. Keep sender provenance in components; do not invent a classification.",
+	},
+	prompt_source: {
+		codex:
+			"Codex author identifies a sender, not Claude's promptSource classification. There is no equivalent source label to project.",
+	},
+	origin_kind: {
+		codex:
+			"Codex author is a sender path, not an origin.kind enum. Converting every author to 'agent' would fabricate an unrecorded kind.",
+	},
+	compact_pre_tokens: {
+		codex:
+			"Codex latest_token_usage_record is the latest request's usage snapshot, not context tokens immediately before compaction. Cumulative total_tokens/thread_token_usage and last-request input tokens are not this measurement.",
+	},
+	mcp_unavailable: {
+		codex:
+			"Codex writes no list of its MCP servers' state: only _meta._codex_apps.connector_auth_failure on one MCP call's result, an authentication failure of that connector at that call, not the servers unavailable to the run.",
+	},
+	refusals: {
+		codex:
+			"Codex generic terminal errors include cyber_policy/misalignment_policy_violation; these report policy termination, not a recorded model refusal. Counting all errors or policy stops as model refusals changes the meaning.",
+	},
+	approvals_by_user: {
+		codex:
+			"Codex records no per-call permission decision: its approval requests are never written to the rollout, and world_state approved_command_prefixes is the standing list of approved prefixes (production, 60 days to 2026-10-16: one list, the same on all 958 world_state records that carry it), not who approved a call.",
+	},
+	approvals_by_hook: {
+		codex:
+			"Codex records no per-call permission decision: its approval requests are never written to the rollout, and world_state approved_command_prefixes is the standing list of approved prefixes (production, 60 days to 2026-10-16: one list, the same on all 958 world_state records that carry it), not who approved a call.",
+	},
+	approvals_by_config: {
+		codex:
+			"Codex records no per-call permission decision: its approval requests are never written to the rollout, and world_state approved_command_prefixes is the standing list of approved prefixes (production, 60 days to 2026-10-16: one list, the same on all 958 world_state records that carry it), not who approved a call.",
+	},
+	permission_prompts: {
+		codex:
+			"Codex records no per-call permission decision: its approval requests are never written to the rollout, and world_state approved_command_prefixes is the standing list of approved prefixes (production, 60 days to 2026-10-16: one list, the same on all 958 world_state records that carry it), not who approved a call.",
+	},
+	rate_limit_max_used_percent: {
+		claude_code:
+			"Claude Code writes quotaLimits only on a refused request (status rejected, production: 11 records in 60 days, all on rate_limit API errors), with no share of a window used: rate_limited counts that refusal.",
+	},
+} satisfies Partial<
+	Record<keyof RudelRunIndexRow, Partial<Record<TranscriptSource, string>>>
+>;
+
+export const RUN_INDEX_FACT_COLUMNS = {
+	// A queued prompt's subtype is as old as parser 5; a coordinator's message
+	// in a Claude Code subagent read as queued until parser 11 (delegation).
+	prompt_subtype: {
+		...gate(5, BOTH, []),
+		subagentSinceBy: { claude_code: 11 },
+	},
+	failed_edits: gate(9, BOTH, []),
+	refused_edits: gate(9, BOTH, []),
+	agent_version: gate(6, BOTH, ["agentVersion"]),
+	entrypoint: gate(6, BOTH, ["entrypoint"]),
+	// The typed duration is older, but Codex task durations came with parser 7.
+	duration_ms: gate(7, CODEX, ["durationMs"]),
+	time_to_first_token_ms: gate(7, CODEX, ["time_to_first_token_ms"]),
+	turn_origin: gate(8, CLAUDE, ["turn_origin"]),
+	prompt_source: gate(8, CLAUDE, ["prompt_source"]),
+	origin_kind: gate(8, CLAUDE, ["origin_kind"]),
+	trigger_turn: gate(8, CODEX, ["trigger_turn"]),
+	thread_source: gate(8, CODEX, ["thread_source"], "both"),
+	permission_mode: gate(7, CLAUDE, ["permission_mode"]),
+	permission_modes: gate(7, CLAUDE, ["permission_mode"]),
+	auto_mode_bash_first: gate(7, CLAUDE, ["auto_mode_bash_first"]),
+	auto_mode_bash_first_steer: gate(7, CLAUDE, ["auto_mode_bash_first_steer"]),
+	auto_mode_bypass: gate(7, CLAUDE, ["auto_mode_bypass"]),
+	auto_mode_steer_only: gate(7, CLAUDE, ["auto_mode_steer_only"]),
+	auto_mode_consent_flow: gate(7, CLAUDE, ["auto_mode_consent_flow"]),
+	approval_policy: gate(7, CODEX, ["approval_policy"]),
+	approvals_reviewer: gate(7, CODEX, ["approvals_reviewer"]),
+	sandbox_policy: gate(7, CODEX, ["sandbox_policy"]),
+	sandbox_network_access: gate(7, CODEX, ["sandbox_network_access"]),
+	permission_profile: gate(9, CODEX, ["permission_profile"]),
+	collaboration_mode: gate(7, CODEX, ["collaboration_mode"]),
+	model: gate(7, BOTH, ["model"]),
+	models: gate(7, BOTH, ["model"], "both"),
+	effort: gate(7, BOTH, ["effort"]),
+	per_turn_effort: gate(7, BOTH, ["per_turn_effort"], "run", undefined, {
+		codex: ["effort"],
+	}),
+	// Every effort the run recorded; effort is the first of them.
+	efforts: gate(7, BOTH, ["effort"], "both"),
+	context_window: gate(7, CODEX, ["context_window"]),
+	// Codex refusals and stopped calls are read from its output since parser 8.
+	// Claude Code writes toolDenialKind on subagent results too.
+	denied_calls: gate(9, BOTH, ["denialKind"], "both"),
+	// On a Claude Code subagent stream only the interrupt's denial kind and
+	// result text record it (parser 12), not toolUseResult.interrupted.
+	interrupted_calls: {
+		...gate(6, BOTH, ["interrupted"], "run", { codex: 8 }),
+		subagentSinceBy: { claude_code: 12 },
+	},
+	// On a Claude Code subagent stream only the result text records a
+	// timeout, which moves the call to the background (parser 11 reads it).
+	timed_out_calls: {
+		...gate(6, CLAUDE, ["timedOutAfterMs"]),
+		subagentSinceBy: { claude_code: 11 },
+	},
+	// Claude Code permissionDecision on each tool result (written from
+	// 2.1.293; a run none of whose results records one is unknown, see
+	// runPermissionsUnrecorded). Codex persists no per-call decision.
+	approvals_by_user: gate(9, CLAUDE, ["permission_decision_components"]),
+	approvals_by_hook: gate(9, CLAUDE, ["permission_decision_components"]),
+	approvals_by_config: gate(9, CLAUDE, ["permission_decision_components"]),
+	permission_prompts: gate(9, CLAUDE, [
+		"permission_decision_components",
+		"denialKind",
+	]),
+	// Claude Code's deferred_tools_delta server lists; Codex records no
+	// server state, only an auth failure in one MCP result's metadata.
+	mcp_unavailable: gate(9, CLAUDE, ["mcp_server_state_components"]),
+	mcp_calls: gate(6, BOTH, ["mcpServer"], "run", { claude_code: 9 }),
+	mcp_servers: gate(6, BOTH, ["mcpServer"], "run", { claude_code: 9 }),
+	skills: gate(
+		6,
+		BOTH,
+		["attributionSkill"],
+		"both",
+		{ codex: 9 },
+		{
+			codex: ["skill_components"],
+		},
+	),
+	slash_commands: gate(ALWAYS, CLAUDE, [], "both"),
+	subagent_types: gate(
+		ALWAYS,
+		BOTH,
+		[],
+		"both",
+		{ codex: 9 },
+		{
+			codex: ["subagent_type_components"],
+		},
+	),
+	compact_trigger: gate(7, CLAUDE, ["compact_trigger"]),
+	compact_pre_tokens: gate(7, CLAUDE, ["compact_pre_tokens"]),
+	aborted: gate(7, BOTH, ["aborted"]),
+	abort_reason: gate(
+		7,
+		BOTH,
+		["abort_reason"],
+		"run",
+		{ claude_code: 9 },
+		{
+			claude_code: ["abort_reason_components"],
+		},
+	),
+	turn_error: gate(7, CODEX, ["turn_error"]),
+	turn_error_kind: gate(7, CODEX, ["turn_error_kind"]),
+	stop_reason: gate(7, CLAUDE, ["stop_reason"]),
+	hook_stop_reason: gate(7, CLAUDE, ["hook_stop_reason"]),
+	prevented_continuation: gate(7, CLAUDE, ["prevented_continuation"]),
+	hook_count: gate(7, CLAUDE, ["hook_count"]),
+	hook_errors: gate(7, CLAUDE, ["hook_errors"]),
+	hook_runs: gate(7, CLAUDE, ["hook_runs"]),
+	api_errors: gate(
+		7,
+		BOTH,
+		["api_error", "api_error_status"],
+		"both",
+		{ codex: 9 },
+		{
+			codex: ["api_errors_components"],
+		},
+	),
+	api_error: gate(
+		7,
+		BOTH,
+		["api_error"],
+		"run",
+		{ codex: 9 },
+		{
+			codex: ["api_errors_components"],
+		},
+	),
+	api_error_statuses: gate(
+		7,
+		BOTH,
+		["api_error_status"],
+		"run",
+		{ codex: 9 },
+		{
+			codex: ["api_errors_components"],
+		},
+	),
+	retry_attempts: gate(7, CLAUDE, ["retry_attempt"]),
+	// Codex token_count rate_limits windows; Claude Code reports no share used.
+	rate_limit_max_used_percent: gate(9, CODEX, ["rate_limits_components"]),
+	// Claude Code rate_limit API errors and quotaLimits rejections, Codex
+	// usage_limit_exceeded turn errors.
+	rate_limited: gate(
+		9,
+		BOTH,
+		["api_error", "rate_limits_components"],
+		"run",
+		undefined,
+		{ codex: ["api_errors_components"] },
+	),
+	// A Claude Code subagent stream has no model_refusal record: its
+	// safety-classifier notice (parser 11 `safety_recovery`) is the refusal.
+	refusals: {
+		...gate(7, CLAUDE, ["refusal_category"]),
+		subagentSinceBy: { claude_code: 11 },
+	},
+	fallback_model: gate(7, CLAUDE, ["fallback_model"]),
+	goal: gate(7, CODEX, ["goal"]),
+	// Claude: toolUseResult.gitOperation, and the pr-link records of the main
+	// stream. Codex: the git and gh commands it ran and what they printed.
+	git_operations: {
+		...gate(6, BOTH, ["gitOperation"], "run", { codex: ALWAYS }, { codex: [] }),
+		mainStreamOnly: CLAUDE,
+	},
+	pushed_branches: {
+		...gate(
+			6,
+			BOTH,
+			["git.push.branch"],
+			"run",
+			{ codex: ALWAYS },
+			{ codex: [] },
+		),
+		mainStreamOnly: CLAUDE,
+	},
+	commit_shas: {
+		...gate(
+			6,
+			BOTH,
+			["git.commit.sha"],
+			"run",
+			{ codex: ALWAYS },
+			{ codex: [] },
+		),
+		mainStreamOnly: CLAUDE,
+	},
+	pr_urls: {
+		...gate(
+			6,
+			BOTH,
+			["git.pr.url", "pr_url"],
+			"run",
+			{ codex: ALWAYS },
+			{
+				codex: [],
+			},
+		),
+		mainStreamOnly: CLAUDE,
+	},
+	facts_truncated: gate(6, BOTH, ["facts_truncated"], "both"),
+	// Claude Code's own reading of a search's exit code is the only record of
+	// a no-match search that printed something; Codex records exit codes and
+	// output in every version.
+	not_found: {
+		...gate(
+			6,
+			BOTH,
+			["return_code_interpretation"],
+			"run",
+			{ codex: ALWAYS },
+			{ codex: [] },
+		),
+		mainStreamOnly: CLAUDE,
+	},
+	// Leading cd targets are in every parser's command text, but the cwd a
+	// call without one ran in is recorded from parser 9; Codex session_meta
+	// remotes (one basis of cwd_repository) from parser 12.
+	cwd: gate(9, BOTH, ["cwd_components"]),
+	cwd_repository: gate(9, BOTH, ["cwd_components"]),
+	title: gate(8, CLAUDE, ["title"], "receipt"),
+	cost_state: gate(8, CLAUDE, ["cost_usd"], "receipt"),
+} as const satisfies Partial<
+	Record<keyof RudelRunIndexRow, RunIndexColumnGate>
+>;
+
+export type RunIndexFactColumn = keyof typeof RUN_INDEX_FACT_COLUMNS;
+
+/**
+ * The run columns read from Claude Code's permission decisions. A Claude
+ * Code version before 2.1.293, and some subagent streams, write none, so a
+ * run with results of which none records a decision cannot say who approved
+ * its calls: these columns are unknown on it, not 0.
+ */
+export const RUN_PERMISSION_COLUMNS = [
+	"approvals_by_user",
+	"approvals_by_hook",
+	"approvals_by_config",
+	"permission_prompts",
+] as const satisfies readonly RunIndexFactColumn[];
+
+/**
+ * Whether a generation of `parserVersion` from `source` can record the
+ * column, on the stream `agentId` (empty for the main stream).
+ */
+export function isRunIndexColumnRecordable(
+	column: RunIndexFactColumn,
+	parserVersion: number,
+	source: string,
+	agentId = "",
+): boolean {
+	const columnGate: RunIndexColumnGate = RUN_INDEX_FACT_COLUMNS[column];
+	const agent = source as TranscriptSource;
+	const since = columnGate.sinceBy?.[agent] ?? columnGate.since;
+	return (
+		parserVersion >=
+			(agentId === ""
+				? since
+				: Math.max(since, columnGate.subagentSinceBy?.[agent] ?? since)) &&
+		columnGate.agents.includes(agent) &&
+		(agentId === "" || !columnGate.mainStreamOnly?.includes(agent))
+	);
+}
+
+/** The fact columns of a row kind that a generation cannot record on a stream, sorted. */
+export function unrecordedRunIndexColumns(
+	rowKind: "run" | "receipt",
+	parserVersion: number,
+	source: string,
+	agentId = "",
+): RunIndexFactColumn[] {
+	return (Object.keys(RUN_INDEX_FACT_COLUMNS) as RunIndexFactColumn[])
+		.filter((column) => {
+			const { rows } = RUN_INDEX_FACT_COLUMNS[column];
+			return (
+				(rows === "both" || rows === rowKind) &&
+				!isRunIndexColumnRecordable(column, parserVersion, source, agentId)
+			);
+		})
+		.sort();
+}
+
+/**
+ * Usage columns. They are unknown, not zero, when the session's newest usage
+ * extraction is incomplete or inconsistent: the row names them in
+ * `unrecorded_facts`, and the nullable ones are NULL.
+ */
+export const RUN_INDEX_USAGE_COLUMNS = [
+	"usage_observations",
+	"usage_unpriced",
+	"usage_model",
+	"cost_usd",
+	"model_costs",
+	"uncached_input_tokens",
+	"cache_read_input_tokens",
+	"cache_write_5m_input_tokens",
+	"cache_write_1h_input_tokens",
+	"output_tokens",
+	"reasoning_output_tokens",
+	"context_input_tokens_at_start",
+] as const satisfies readonly (keyof RudelRunIndexRow)[];
+
+/**
+ * The row with every column it cannot record set to unknown: scalars NULL,
+ * arrays and maps empty, all of them named in `unrecorded_facts`. With
+ * `usageUnknown`, the usage columns too; `unknown` names fact columns this
+ * row's own records cannot say, though its generation records them.
+ */
+export function gateRunIndexRow(
+	row: RudelRunIndexRow,
+	options: {
+		usageUnknown?: boolean;
+		unknown?: readonly RunIndexFactColumn[];
+	} = {},
+): RudelRunIndexRow {
+	const unrecorded = [
+		...new Set([
+			...unrecordedRunIndexColumns(
+				row.row_kind === "receipt" ? "receipt" : "run",
+				row.parser_version,
+				row.source,
+				row.agent_id,
+			),
+			...(options.unknown ?? []),
+		]),
+	].sort();
+	const gated: Record<string, unknown> = { ...row };
+	for (const column of unrecorded) {
+		const value = gated[column];
+		gated[column] = Array.isArray(value)
+			? []
+			: value !== null && typeof value === "object"
+				? {}
+				: null;
+	}
+	if (options.usageUnknown)
+		Object.assign(gated, {
+			usage_observations: 0,
+			usage_unpriced: 0,
+			usage_model: "",
+			cost_usd: null,
+			model_costs: [],
+			uncached_input_tokens: null,
+			cache_read_input_tokens: null,
+			cache_write_5m_input_tokens: null,
+			cache_write_1h_input_tokens: null,
+			output_tokens: null,
+			reasoning_output_tokens: null,
+			context_input_tokens_at_start: null,
+		} satisfies Pick<
+			RudelRunIndexRow,
+			(typeof RUN_INDEX_USAGE_COLUMNS)[number]
+		>);
+	return {
+		...(gated as RudelRunIndexRow),
+		unrecorded_facts: [
+			...unrecorded,
+			...(options.usageUnknown ? RUN_INDEX_USAGE_COLUMNS : []),
+		].sort(),
+	};
+}

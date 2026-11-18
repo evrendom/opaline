@@ -1,0 +1,33 @@
+.cli-setup-status {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	min-width: 0;
+	font-size: 12px;
+	line-height: 16px;
+}
+.cli-setup-status strong {
+	font-weight: 550;
+}
+.cli-setup-status > span {
+	color: #626963;
+}
+@media (max-width: 760px) {
+	.cli-setup-status > span {
+		font-size: 11px;
+	}
+	.instant-v2-demo-bar:has(.cli-setup-status) {
+		grid-template-columns: auto minmax(0, 1fr) auto;
+	}
+	.instant-v2-demo-bar .cli-setup-status {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0;
+	}
+	.instant-v2-demo-bar .cli-setup-status > * {
+		max-width: 100%;
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+	}
+}

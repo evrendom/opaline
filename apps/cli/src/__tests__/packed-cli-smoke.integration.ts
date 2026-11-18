@@ -312,80 +312,78 @@ test("timestamp-less single upload reports a friendly error", async () => {
 	}
 }, 60_000);
 
-test.each(HOOK_CASES)(
-	"$name uploads a filtered transcript through the packed artifact",
-	async (hookCase) => {
-		const packedCliPath = requirePackedCliPath();
-		const stub = startIngestStub();
-		const secrets =
-			hookCase.source === "codex"
-				? createCodexFixtureSecrets()
-				: createClaudeFixtureSecrets();
-		const fixture = await createCliFixture(hookCase.source);
-		try {
-			if (hookCase.source === "codex") {
-				await writeFile(
-					fixture.transcriptPath,
-					renderFixture(
-						templates.codexSession,
-						fixture.sessionId,
-						secrets,
-						false,
-					),
-				);
-			} else {
-				const subagentDir = join(
-					fixture.projectPath,
+test.each(
+	HOOK_CASES,
+)("$name uploads a filtered transcript through the packed artifact", async (hookCase) => {
+	const packedCliPath = requirePackedCliPath();
+	const stub = startIngestStub();
+	const secrets =
+		hookCase.source === "codex"
+			? createCodexFixtureSecrets()
+			: createClaudeFixtureSecrets();
+	const fixture = await createCliFixture(hookCase.source);
+	try {
+		if (hookCase.source === "codex") {
+			await writeFile(
+				fixture.transcriptPath,
+				renderFixture(
+					templates.codexSession,
 					fixture.sessionId,
-					"subagents",
-				);
-				await mkdir(subagentDir, { recursive: true });
-				await writeFile(
-					fixture.transcriptPath,
-					renderFixture(
-						templates.claudeSession,
-						fixture.sessionId,
-						secrets,
-						false,
-					),
-				);
-				await writeFile(
-					join(subagentDir, "agent-nested-agent-001.jsonl"),
-					renderFixture(
-						templates.claudeSubagent,
-						fixture.sessionId,
-						secrets,
-						false,
-					),
-				);
-			}
-
-			const invocation = hookCase.buildInvocation(fixture);
-			const result = await runBuiltCli(invocation.command, {
-				home: fixture.home,
-				configDir: fixtureConfigDir(fixture),
-				cliPath: packedCliPath,
-				stdin: invocation.stdin,
-				env: {
-					RUDEL_API_BASE: stub.loopbackBase,
-					RUDEL_ALLOW_INSECURE_ENDPOINT: "",
-				},
-			});
-
-			expect(result.exitCode).toBe(0);
-			expect(containsAnyCanary(result.stdout, secrets)).toBe(false);
-			expect(containsAnyCanary(result.stderr, secrets)).toBe(false);
-			expect(stub.requests).toEqual([
-				{ apiKey: INGEST_STUB_TEST_TOKEN, pathname: "/rpc/ingestSession" },
-			]);
-			assertFilteredWireBody(stub.bodies[0] ?? "", secrets);
-		} finally {
-			await stub.server.stop(true);
-			await rm(fixture.home, { recursive: true, force: true });
+					secrets,
+					false,
+				),
+			);
+		} else {
+			const subagentDir = join(
+				fixture.projectPath,
+				fixture.sessionId,
+				"subagents",
+			);
+			await mkdir(subagentDir, { recursive: true });
+			await writeFile(
+				fixture.transcriptPath,
+				renderFixture(
+					templates.claudeSession,
+					fixture.sessionId,
+					secrets,
+					false,
+				),
+			);
+			await writeFile(
+				join(subagentDir, "agent-nested-agent-001.jsonl"),
+				renderFixture(
+					templates.claudeSubagent,
+					fixture.sessionId,
+					secrets,
+					false,
+				),
+			);
 		}
-	},
-	60_000,
-);
+
+		const invocation = hookCase.buildInvocation(fixture);
+		const result = await runBuiltCli(invocation.command, {
+			home: fixture.home,
+			configDir: fixtureConfigDir(fixture),
+			cliPath: packedCliPath,
+			stdin: invocation.stdin,
+			env: {
+				RUDEL_API_BASE: stub.loopbackBase,
+				RUDEL_ALLOW_INSECURE_ENDPOINT: "",
+			},
+		});
+
+		expect(result.exitCode).toBe(0);
+		expect(containsAnyCanary(result.stdout, secrets)).toBe(false);
+		expect(containsAnyCanary(result.stderr, secrets)).toBe(false);
+		expect(stub.requests).toEqual([
+			{ apiKey: INGEST_STUB_TEST_TOKEN, pathname: "/rpc/ingestSession" },
+		]);
+		assertFilteredWireBody(stub.bodies[0] ?? "", secrets);
+	} finally {
+		await stub.server.stop(true);
+		await rm(fixture.home, { recursive: true, force: true });
+	}
+}, 60_000);
 
 test("plaintext non-loopback endpoint is refused before any request", async () => {
 	const packedCliPath = requirePackedCliPath();

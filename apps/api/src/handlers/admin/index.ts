@@ -1,0 +1,16 @@
+import { os } from "../../middleware.js";
+import { dashboard } from "./dashboard.js";
+import { deleteUser } from "./delete-user.js";
+import { listUsers } from "./list-users.js";
+import { runIndexHealAdminRouter } from "./run-index-heal.js";
+import { runQuestionsAdminRouter } from "./run-questions.js";
+import { workspaceFeaturesAdminRouter } from "./workspace-features.js";
+
+export const adminRouter = os.admin.router({
+	listUsers,
+	deleteUser,
+	dashboard,
+	runQuestions: runQuestionsAdminRouter,
+	runIndexHeal: runIndexHealAdminRouter,
+	workspaceFeatures: workspaceFeaturesAdminRouter,
+});

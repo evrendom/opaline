@@ -1,0 +1,4 @@
+// Generated from @withfig/autocomplete (MIT, Hercules Labs Inc.). Do not edit.
+import type { FigSpec } from "../../fig-spec.js";
+
+export default JSON.parse("{\"n\":[\"tr\"],\"d\":\"Translate characters\",\"o\":[{\"n\":[\"-C\"],\"d\":\"Complement the set of characters in string1, that is '-C ab' includes every character except for 'a' and 'b'\"},{\"n\":[\"-c\"],\"d\":\"Same as '-C' but complement the set of values in string1\"},{\"n\":[\"-d\"],\"d\":\"Delete characters in string1 from the input\"},{\"n\":[\"-s\"],\"d\":\"Squeeze multiple occurrences of the characters listed in the last operand (either string1 or string2) in the input into a single instance of the character. This occurs after all deletion and translation is completed\"},{\"n\":[\"-u\"],\"d\":\"Guarantee that any output is unbuffered\"}],\"a\":[{\"n\":\"string1\",\"d\":\"Candidate string\"},{\"n\":\"string2\",\"d\":\"Replacment string\",\"o\":1}],\"pd\":{\"first\":1}}") as FigSpec;

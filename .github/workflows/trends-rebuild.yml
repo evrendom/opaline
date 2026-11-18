@@ -1,0 +1,49 @@
+name: Trends rebuild
+
+# /trends is static: its data is baked in when the site builds, which only a
+# production deploy does. Redeploy main every day after the 04:00 UTC
+# trends-sources cron stores fresh sources, so the page updates even on days
+# nothing merges.
+on:
+  schedule:
+    - cron: "30 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  gate:
+    if: github.repository == 'opalinehq/athena'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      deploy: ${{ steps.ci.outputs.deploy }}
+    steps:
+      # Only redeploy a commit whose own CI passed, as the push deploy does. A
+      # commit still in CI deploys itself (with fresh trends) when it passes.
+      - name: Require a green CI run on main's head
+        id: ci
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          conclusion="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?event=push&branch=main&head_sha=${GITHUB_SHA}&per_page=1" \
+            --jq '.workflow_runs[0].conclusion // "none"')"
+          if [[ "${conclusion}" == "success" ]]; then
+            echo "deploy=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "deploy=false" >> "${GITHUB_OUTPUT}"
+            echo "Skipping Trends rebuild: CI on ${GITHUB_SHA} is ${conclusion}." >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
+  deploy:
+    needs: gate
+    if: needs.gate.outputs.deploy == 'true'
+    uses: ./.github/workflows/vercel.yml
+    with:
+      target: production
+    secrets:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      PG_CONNECTION_STRING: ${{ secrets.PG_CONNECTION_STRING }}

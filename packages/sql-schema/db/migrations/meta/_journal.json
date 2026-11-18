@@ -1,0 +1,545 @@
+{
+	"version": "7",
+	"dialect": "postgresql",
+	"entries": [
+		{
+			"idx": 0,
+			"version": "7",
+			"when": 1771644519976,
+			"tag": "0000_supreme_texas_twister",
+			"breakpoints": true
+		},
+		{
+			"idx": 1,
+			"version": "7",
+			"when": 1771904565586,
+			"tag": "0001_flippant_sharon_ventura",
+			"breakpoints": true
+		},
+		{
+			"idx": 2,
+			"version": "7",
+			"when": 1771906427711,
+			"tag": "0002_migrate-users-to-orgs",
+			"breakpoints": true
+		},
+		{
+			"idx": 3,
+			"version": "7",
+			"when": 1772081558270,
+			"tag": "0003_complete_madripoor",
+			"breakpoints": true
+		},
+		{
+			"idx": 4,
+			"version": "7",
+			"when": 1773225959526,
+			"tag": "0004_supreme_malcolm_colcord",
+			"breakpoints": true
+		},
+		{
+			"idx": 5,
+			"version": "7",
+			"when": 1773500000000,
+			"tag": "0005_better-auth-api-key",
+			"breakpoints": true
+		},
+		{
+			"idx": 6,
+			"version": "7",
+			"when": 1776800205232,
+			"tag": "0006_purple_lady_deathstrike",
+			"breakpoints": true
+		},
+		{
+			"idx": 7,
+			"version": "7",
+			"when": 1776802353804,
+			"tag": "0007_spooky_forge",
+			"breakpoints": true
+		},
+		{
+			"idx": 8,
+			"version": "7",
+			"when": 1776806310870,
+			"tag": "0008_wrapped_resume",
+			"breakpoints": true
+		},
+		{
+			"idx": 9,
+			"version": "7",
+			"when": 1777816100000,
+			"tag": "0009_wrapped_share_user_unique",
+			"breakpoints": true
+		},
+		{
+			"idx": 10,
+			"version": "7",
+			"when": 1777824484305,
+			"tag": "0010_add_user_avatar",
+			"breakpoints": true
+		},
+		{
+			"idx": 11,
+			"version": "7",
+			"when": 1777876185261,
+			"tag": "0011_decimal_wrapped_claims",
+			"breakpoints": true
+		},
+		{
+			"idx": 12,
+			"version": "7",
+			"when": 1777929079000,
+			"tag": "0012_yc_review_sessions",
+			"breakpoints": true
+		},
+		{
+			"idx": 13,
+			"version": "7",
+			"when": 1784808255000,
+			"tag": "0013_remove_yc_review_sessions",
+			"breakpoints": true
+		},
+		{
+			"idx": 14,
+			"version": "7",
+			"when": 1784824445931,
+			"tag": "0014_session_ownership",
+			"breakpoints": true
+		},
+		{
+			"idx": 15,
+			"version": "7",
+			"when": 1784824638910,
+			"tag": "0015_session_ownership_user_index",
+			"breakpoints": true
+		},
+		{
+			"idx": 16,
+			"version": "7",
+			"when": 1784832000000,
+			"tag": "0016_session_ownership_backfill_state",
+			"breakpoints": true
+		},
+		{
+			"idx": 17,
+			"version": "7",
+			"when": 1784901786000,
+			"tag": "0017_session_ownership_content_hash",
+			"breakpoints": true
+		},
+		{
+			"idx": 18,
+			"version": "7",
+			"when": 1785240000000,
+			"tag": "0018_team_invite_links",
+			"breakpoints": true
+		},
+		{
+			"idx": 19,
+			"version": "7",
+			"when": 1785426102000,
+			"tag": "0019_wrapped_share_social_image",
+			"breakpoints": true
+		},
+		{
+			"idx": 20,
+			"version": "7",
+			"when": 1785480272000,
+			"tag": "0020_durable_clickhouse_purge",
+			"breakpoints": true
+		},
+		{
+			"idx": 21,
+			"version": "7",
+			"when": 1785686400000,
+			"tag": "0021_session_ownership_ingest_shape",
+			"breakpoints": true
+		},
+		{
+			"idx": 22,
+			"version": "7",
+			"when": 1785772800000,
+			"tag": "0022_session_ownership_component_shape",
+			"breakpoints": true
+		},
+		{
+			"idx": 23,
+			"version": "7",
+			"when": 1785776400000,
+			"tag": "0023_usage_event_receipt",
+			"breakpoints": true
+		},
+		{
+			"idx": 24,
+			"version": "7",
+			"when": 1785780000000,
+			"tag": "0024_usage_event_identity_receipt",
+			"breakpoints": true
+		},
+		{
+			"idx": 25,
+			"version": "7",
+			"when": 1787636737198,
+			"tag": "0025_ingest_job",
+			"breakpoints": true
+		},
+		{
+			"idx": 26,
+			"version": "7",
+			"when": 1787666400000,
+			"tag": "0026_ingest_job_expiry",
+			"breakpoints": true
+		},
+		{
+			"idx": 27,
+			"version": "7",
+			"when": 1787666460000,
+			"tag": "0027_ingest_processing_ledger",
+			"breakpoints": true
+		},
+		{
+			"idx": 28,
+			"version": "7",
+			"when": 1787731200000,
+			"tag": "0028_postgres_ingest_rate_limit",
+			"breakpoints": true
+		},
+		{
+			"idx": 29,
+			"version": "7",
+			"when": 1787735109151,
+			"tag": "0029_tidy_human_fly",
+			"breakpoints": true
+		},
+		{
+			"idx": 30,
+			"version": "7",
+			"when": 1789234113357,
+			"tag": "0030_cli_connection",
+			"breakpoints": true
+		},
+		{
+			"idx": 31,
+			"version": "7",
+			"when": 1789310800782,
+			"tag": "0031_user_job_title",
+			"breakpoints": true
+		},
+		{
+			"idx": 32,
+			"version": "7",
+			"when": 1789554031591,
+			"tag": "0032_dependency_health_probe",
+			"breakpoints": true
+		},
+		{
+			"idx": 33,
+			"version": "7",
+			"when": 1789708718686,
+			"tag": "0033_repository_upload_report",
+			"breakpoints": true
+		},
+		{
+			"idx": 34,
+			"version": "7",
+			"when": 1789718160105,
+			"tag": "0034_session_arrivals_index",
+			"breakpoints": true
+		},
+		{
+			"idx": 35,
+			"version": "7",
+			"when": 1789719000000,
+			"tag": "0035_native_codex_lineage",
+			"breakpoints": true
+		},
+		{
+			"idx": 36,
+			"version": "7",
+			"when": 1789721000000,
+			"tag": "0036_native_codex_lineage_state",
+			"breakpoints": true
+		},
+		{
+			"idx": 37,
+			"version": "7",
+			"when": 1789723000000,
+			"tag": "0037_agent_metadata_scan",
+			"breakpoints": true
+		},
+		{
+			"idx": 38,
+			"version": "7",
+			"when": 1790050367003,
+			"tag": "0038_solid_nightcrawler",
+			"breakpoints": true
+		},
+		{
+			"idx": 39,
+			"version": "7",
+			"when": 1790056780817,
+			"tag": "0039_free_monthly_agent_runs",
+			"breakpoints": true
+		},
+		{
+			"idx": 40,
+			"version": "7",
+			"when": 1790057656388,
+			"tag": "0040_billing_checkout_idempotency",
+			"breakpoints": true
+		},
+		{
+			"idx": 41,
+			"version": "7",
+			"when": 1790058953161,
+			"tag": "0041_colossal_corsair",
+			"breakpoints": true
+		},
+		{
+			"idx": 42,
+			"version": "7",
+			"when": 1790248718000,
+			"tag": "0042_customer_account_snapshot",
+			"breakpoints": true
+		},
+		{
+			"idx": 43,
+			"version": "7",
+			"when": 1790766126841,
+			"tag": "0043_purge_followup_pass",
+			"breakpoints": true
+		},
+		{
+			"idx": 44,
+			"version": "7",
+			"when": 1790776186712,
+			"tag": "0044_repository_evidence_capture",
+			"breakpoints": true
+		},
+		{
+			"idx": 45,
+			"version": "7",
+			"when": 1790776418138,
+			"tag": "0045_github_repository_evidence",
+			"breakpoints": true
+		},
+		{
+			"idx": 46,
+			"version": "7",
+			"when": 1790779379729,
+			"tag": "0046_github_webhook_delivery",
+			"breakpoints": true
+		},
+		{
+			"idx": 47,
+			"version": "7",
+			"when": 1790858606696,
+			"tag": "0047_mcp_oauth",
+			"breakpoints": true
+		},
+		{
+			"idx": 48,
+			"version": "7",
+			"when": 1790865150289,
+			"tag": "0048_repository_evidence_index_publication",
+			"breakpoints": true
+		},
+		{
+			"idx": 49,
+			"version": "7",
+			"when": 1790869625797,
+			"tag": "0049_github_outcomes",
+			"breakpoints": true
+		},
+		{
+			"idx": 50,
+			"version": "7",
+			"when": 1790869713038,
+			"tag": "0050_organization_feature_readiness",
+			"breakpoints": true
+		},
+		{
+			"idx": 51,
+			"version": "7",
+			"when": 1790872604294,
+			"tag": "0051_user_cli_version",
+			"breakpoints": true
+		},
+		{
+			"idx": 52,
+			"version": "7",
+			"when": 1791101265137,
+			"tag": "0052_coordination_lease",
+			"breakpoints": true
+		},
+		{
+			"idx": 53,
+			"version": "7",
+			"when": 1791109217981,
+			"tag": "0053_ingest_job_256_mib",
+			"breakpoints": true
+		},
+		{
+			"idx": 54,
+			"version": "7",
+			"when": 1791126526414,
+			"tag": "0054_trends_source",
+			"breakpoints": true
+		},
+		{
+			"idx": 55,
+			"version": "7",
+			"when": 1791453945408,
+			"tag": "0055_l1_edges",
+			"breakpoints": true
+		},
+		{
+			"idx": 56,
+			"version": "7",
+			"when": 1791540345408,
+			"tag": "0056_run_index_scope",
+			"breakpoints": true
+		},
+		{
+			"idx": 57,
+			"version": "7",
+			"when": 1791800655124,
+			"tag": "0057_organization_own_sessions_only",
+			"breakpoints": true
+		},
+		{
+			"idx": 58,
+			"version": "7",
+			"when": 1791811108043,
+			"tag": "0058_analysis_sql",
+			"breakpoints": true
+		},
+		{
+			"idx": 59,
+			"version": "7",
+			"when": 1791823886576,
+			"tag": "0059_agent_query_slot",
+			"breakpoints": true
+		},
+		{
+			"idx": 60,
+			"version": "7",
+			"when": 1791829181479,
+			"tag": "0060_analysis_log",
+			"breakpoints": true
+		},
+		{
+			"idx": 61,
+			"version": "7",
+			"when": 1791830639694,
+			"tag": "0061_search_and_run_questions",
+			"breakpoints": true
+		},
+		{
+			"idx": 62,
+			"version": "7",
+			"when": 1791874758867,
+			"tag": "0062_run_question_precompute",
+			"breakpoints": true
+		},
+		{
+			"idx": 63,
+			"version": "7",
+			"when": 1791889206468,
+			"tag": "0063_live_sessions",
+			"breakpoints": true
+		},
+		{
+			"idx": 64,
+			"version": "7",
+			"when": 1791908708796,
+			"tag": "0064_usage_digest",
+			"breakpoints": true
+		},
+		{
+			"idx": 65,
+			"version": "7",
+			"when": 1791960430555,
+			"tag": "0065_run_question_label",
+			"breakpoints": true
+		},
+		{
+			"idx": 66,
+			"version": "7",
+			"when": 1792008537181,
+			"tag": "0066_workspace_feature",
+			"breakpoints": true
+		},
+		{
+			"idx": 67,
+			"version": "7",
+			"when": 1792040127324,
+			"tag": "0067_moments",
+			"breakpoints": true
+		},
+		{
+			"idx": 68,
+			"version": "7",
+			"when": 1792047087218,
+			"tag": "0068_compass_settings_prompt_frustration",
+			"breakpoints": true
+		},
+		{
+			"idx": 69,
+			"version": "7",
+			"when": 1792072631258,
+			"tag": "0069_drop_free_workspace_member_limit",
+			"breakpoints": true
+		},
+		{
+			"idx": 70,
+			"version": "7",
+			"when": 1792146583678,
+			"tag": "0070_repository_evidence_saved_outputs",
+			"breakpoints": true
+		},
+		{
+			"idx": 71,
+			"version": "7",
+			"when": 1792163899122,
+			"tag": "0071_repository_evidence_images",
+			"breakpoints": true
+		},
+		{
+			"idx": 72,
+			"version": "7",
+			"when": 1793801129168,
+			"tag": "0072_analysis_check",
+			"breakpoints": true
+		},
+		{
+			"idx": 73,
+			"version": "7",
+			"when": 1794169227393,
+			"tag": "0073_self_hosted_agent_run_limit",
+			"breakpoints": true
+		},
+		{
+			"idx": 74,
+			"version": "7",
+			"when": 1794175444681,
+			"tag": "0074_analysis_log_store",
+			"breakpoints": true
+		},
+		{
+			"idx": 75,
+			"version": "7",
+			"when": 1794251010071,
+			"tag": "0075_local_ingest_files",
+			"breakpoints": true
+		},
+		{
+			"idx": 76,
+			"version": "7",
+			"when": 1794905678810,
+			"tag": "0076_local_ingest_milestone",
+			"breakpoints": true
+		}
+	]
+}

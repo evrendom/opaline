@@ -531,28 +531,29 @@ describe("full upload pipeline (dry-run)", () => {
 			name: "Codex",
 			error: "Codex transcript contains no valid timestamp",
 		},
-	])(
-		"rejects a timestamp-less $name transcript before upload",
-		async ({ adapter, error, name }) => {
-			const sessionId = `timestamp-less-${name.toLowerCase().replaceAll(" ", "-")}`;
-			const sessionFile = join(tempDir, `${sessionId}.jsonl`);
-			await writeFile(sessionFile, '{"type":"result","result":{"ok":true}}');
+	])("rejects a timestamp-less $name transcript before upload", async ({
+		adapter,
+		error,
+		name,
+	}) => {
+		const sessionId = `timestamp-less-${name.toLowerCase().replaceAll(" ", "-")}`;
+		const sessionFile = join(tempDir, `${sessionId}.jsonl`);
+		await writeFile(sessionFile, '{"type":"result","result":{"ok":true}}');
 
-			await expect(
-				adapter.buildUploadRequest(
-					{
-						sessionId,
-						transcriptPath: sessionFile,
-						projectPath: tempDir,
-					},
-					{
-						gitInfo: {},
-						uploadMode: "manual",
-					},
-				),
-			).rejects.toThrow(error);
-		},
-	);
+		await expect(
+			adapter.buildUploadRequest(
+				{
+					sessionId,
+					transcriptPath: sessionFile,
+					projectPath: tempDir,
+				},
+				{
+					gitInfo: {},
+					uploadMode: "manual",
+				},
+			),
+		).rejects.toThrow(error);
+	});
 
 	test.each([
 		{
@@ -568,28 +569,28 @@ describe("full upload pipeline (dry-run)", () => {
 			})}\n`,
 			name: "Codex",
 		},
-	])(
-		"builds a file-backed $name upload request",
-		async ({ adapter, content }) => {
-			const sessionId = `file-backed-${adapter.source}`;
-			const sessionFile = join(tempDir, `${sessionId}.jsonl`);
-			await writeFile(sessionFile, content);
+	])("builds a file-backed $name upload request", async ({
+		adapter,
+		content,
+	}) => {
+		const sessionId = `file-backed-${adapter.source}`;
+		const sessionFile = join(tempDir, `${sessionId}.jsonl`);
+		await writeFile(sessionFile, content);
 
-			const request = await adapter.buildUploadRequest(
-				{
-					projectPath: tempDir,
-					sessionId,
-					transcriptPath: sessionFile,
-				},
-				{ gitInfo: {}, uploadMode: "manual" },
-			);
+		const request = await adapter.buildUploadRequest(
+			{
+				projectPath: tempDir,
+				sessionId,
+				transcriptPath: sessionFile,
+			},
+			{ gitInfo: {}, uploadMode: "manual" },
+		);
 
-			expect(request.kind).toBe("file");
-			expect(request.transcriptPath).toBe(sessionFile);
-			expect(request.metadata.sessionId).toBe(sessionId);
-			expect("content" in request).toBe(false);
-		},
-	);
+		expect(request.kind).toBe("file");
+		expect(request.transcriptPath).toBe(sessionFile);
+		expect(request.metadata.sessionId).toBe(sessionId);
+		expect("content" in request).toBe(false);
+	});
 
 	test("resolves session by path, reads transcript, extracts subagents, and builds request", async () => {
 		// Set up a realistic session directory

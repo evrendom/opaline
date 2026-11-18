@@ -127,80 +127,77 @@ function sessionStart(
 	});
 }
 
-test.each([false, true])(
-	"SessionStart registers sessions with one detached follower and keeps its evidence behaviour (evidence paused: %s)",
-	async (evidencePaused) => {
-		const { claudeProjects, configDir, fixture, stub, transcriptPath } =
-			await setup("claude_code", { evidencePaused });
-		const first = startAgent();
-		const second = startAgent();
-		const secondPath = join(claudeProjects, "second-session.jsonl");
-		await writeFile(secondPath, '{"type":"user","n":1}\n');
-		const startedAt = performance.now();
-		const result = await sessionStart(
-			fixture,
-			fixture.sessionId,
-			transcriptPath,
-			first.pid,
-		);
-		expect(result.exitCode).toBe(0);
-		expect(performance.now() - startedAt).toBeLessThan(10_000);
-		await waitFor(async () => (await followerPid(configDir)) !== undefined);
-		const follower = await followerPid(configDir);
+test.each([
+	false,
+	true,
+])("SessionStart registers sessions with one detached follower and keeps its evidence behaviour (evidence paused: %s)", async (evidencePaused) => {
+	const { claudeProjects, configDir, fixture, stub, transcriptPath } =
+		await setup("claude_code", { evidencePaused });
+	const first = startAgent();
+	const second = startAgent();
+	const secondPath = join(claudeProjects, "second-session.jsonl");
+	await writeFile(secondPath, '{"type":"user","n":1}\n');
+	const startedAt = performance.now();
+	const result = await sessionStart(
+		fixture,
+		fixture.sessionId,
+		transcriptPath,
+		first.pid,
+	);
+	expect(result.exitCode).toBe(0);
+	expect(performance.now() - startedAt).toBeLessThan(10_000);
+	await waitFor(async () => (await followerPid(configDir)) !== undefined);
+	const follower = await followerPid(configDir);
+	expect(
+		(await sessionStart(fixture, "second-session", secondPath, second.pid))
+			.exitCode,
+	).toBe(0);
+	// The fixture transcript's second line has no newline yet.
+	await waitFor(
+		() =>
+			stub.lines(fixture.sessionId).length === 1 &&
+			stub.lines("second-session").length === 1,
+	);
+	expect(await followerPid(configDir)).toBe(follower);
+	const registrations = await listLiveSessionRegistrations(configDir);
+	expect(
+		registrations.map((registration) => [
+			registration.sessionId,
+			registration.agentPid,
+			registration.agentPidSource,
+			registration.hookSource,
+		]),
+	).toEqual(
+		expect.arrayContaining([
+			[fixture.sessionId, first.pid, "env", "startup"],
+			["second-session", second.pid, "env", "startup"],
+		]),
+	);
+	if (evidencePaused)
 		expect(
-			(await sessionStart(fixture, "second-session", secondPath, second.pid))
-				.exitCode,
-		).toBe(0);
-		// The fixture transcript's second line has no newline yet.
-		await waitFor(
-			() =>
-				stub.lines(fixture.sessionId).length === 1 &&
-				stub.lines("second-session").length === 1,
-		);
-		expect(await followerPid(configDir)).toBe(follower);
-		const registrations = await listLiveSessionRegistrations(configDir);
-		expect(
-			registrations.map((registration) => [
-				registration.sessionId,
-				registration.agentPid,
-				registration.agentPidSource,
-				registration.hookSource,
-			]),
-		).toEqual(
-			expect.arrayContaining([
-				[fixture.sessionId, first.pid, "env", "startup"],
-				["second-session", second.pid, "env", "startup"],
-			]),
-		);
-		if (evidencePaused)
-			expect(
-				stub.paths.filter((path) =>
-					path.startsWith("/rpc/repositoryEvidence/"),
-				),
-			).toEqual([]);
+			stub.paths.filter((path) => path.startsWith("/rpc/repositoryEvidence/")),
+		).toEqual([]);
 
-		first.kill();
-		await waitFor(() => stub.session(fixture.sessionId).ended);
-		expect(stub.lines(fixture.sessionId)).toHaveLength(2);
-		expect(stub.session("second-session").ended).toBe(false);
-		second.kill();
-		await waitFor(() => stub.session("second-session").ended);
-		const log = await readFile(
-			join(configDir, "logs", "hook-upload.log"),
-			"utf8",
-		);
-		expect(log.match(/Live session follower started/gu)).toHaveLength(1);
-		expect(log).toContain(
-			`Live session '${fixture.sessionId}' ('claude_code') stopped: 'agent-exited'`,
-		);
-		// The repository evidence capture still runs (here it fails: the project
-		// is not a Git repository) unless evidence capture is paused.
-		expect(log.includes("Claude start context capture deferred")).toBe(
-			!evidencePaused,
-		);
-	},
-	60_000,
-);
+	first.kill();
+	await waitFor(() => stub.session(fixture.sessionId).ended);
+	expect(stub.lines(fixture.sessionId)).toHaveLength(2);
+	expect(stub.session("second-session").ended).toBe(false);
+	second.kill();
+	await waitFor(() => stub.session("second-session").ended);
+	const log = await readFile(
+		join(configDir, "logs", "hook-upload.log"),
+		"utf8",
+	);
+	expect(log.match(/Live session follower started/gu)).toHaveLength(1);
+	expect(log).toContain(
+		`Live session '${fixture.sessionId}' ('claude_code') stopped: 'agent-exited'`,
+	);
+	// The repository evidence capture still runs (here it fails: the project
+	// is not a Git repository) unless evidence capture is paused.
+	expect(log.includes("Claude start context capture deferred")).toBe(
+		!evidencePaused,
+	);
+}, 60_000);
 
 test("SessionStart does not register when live updates are turned off locally", async () => {
 	const { configDir, fixture, stub, transcriptPath } =

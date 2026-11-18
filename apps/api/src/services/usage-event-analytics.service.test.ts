@@ -1,0 +1,405 @@
+import { describe, expect, test } from "bun:test";
+import {
+	buildEstimatedCostSql,
+	getModelPricingCatalog,
+	getModelPricingModifierCatalog,
+	MODEL_UNPRICED_IDENTITIES,
+} from "@rudel/api-routes";
+import {
+	buildCanonicalPricingModelSql,
+	buildLegacyUsageAnalyticsCte,
+	buildPricedUsageEventsCte,
+	buildUsageCostSubtotalSql,
+	buildUsageEventAnalyticsCte,
+	getUsageAnalyticsQueryContext,
+	UsageEventAnalyticsReadinessGate,
+} from "./usage-event-analytics.service.js";
+
+describe("usage-event analytics query contract", () => {
+	test("configured thread tiers are priced and keep their configured provenance flag", () => {
+		const sql = buildPricedUsageEventsCte("1");
+		expect(sql).toContain("SELECT e.*");
+		expect(sql).not.toContain("service_tier_configured");
+		// Conflicting or unrecognized tiers stay unpriced.
+		expect(sql).toContain(
+			"AND NOT has(e.quality_flags, 'service_tier_conflict')",
+		);
+		expect(sql).toContain(
+			"AND NOT has(e.quality_flags, 'unrecognized_service_tier')",
+		);
+		expect(sql).toContain("AS is_priceable");
+	});
+	test("resolves exact latest state and admits only consistent complete receipts", () => {
+		const sql = buildUsageEventAnalyticsCte();
+
+		expect(sql).toContain("FROM rudel.usage_events FINAL");
+		expect(sql.match(/FROM rudel\.usage_events/gu)).toHaveLength(1);
+		expect(sql).toContain(
+			"argMaxIf(event_version, event_version, record_kind = 'receipt') AS receipt_generation",
+		);
+		// Per-session state is grouped and joined back, never a window over every event.
+		expect(sql).not.toContain(" OVER ");
+		expect(sql).toContain(
+			"HAVING active_event_count = latest_receipt_event_count",
+		);
+		expect(sql).toContain("latest_receipt_is_complete = 1");
+		expect(sql).toContain("active_event_count = latest_receipt_event_count");
+		expect(sql).toContain("e.event_version = s.receipt_generation");
+		expect(sql).toContain("record_kind IN ('event', 'receipt')");
+		expect(sql).toContain("ANY INNER JOIN usage_event_session_rollups AS r");
+		expect(sql).toContain("sa.organization_id AS organization_id");
+		expect(sql).toContain("sa.user_id AS user_id");
+		expect(sql).toContain("sa.subagent_count AS subagent_count");
+	});
+
+	test("keeps the tenant prefix and adds available key filters", () => {
+		const sql = buildUsageEventAnalyticsCte({
+			sessionIdParam: "sessionId",
+			sourceParam: "source",
+			userIdParam: "userId",
+		});
+
+		expect(sql).toContain("organization_id = {orgId:String}");
+		expect(sql).toContain("user_id = {userId:String}");
+		expect(sql).toContain("source = {source:String}");
+		expect(sql).toContain("session_id = {sessionId:String}");
+		expect(sql.indexOf("WHERE organization_id = {orgId:String}")).toBeLessThan(
+			sql.indexOf("ANY INNER JOIN usage_event_session_rollups"),
+		);
+	});
+
+	test("preserves cache-inclusive display totals but prices every class once", () => {
+		const sql = buildUsageEventAnalyticsCte();
+
+		expect(sql).toContain(
+			"sum(p.group_uncached_input_tokens + p.group_cache_read_input_tokens + p.group_cache_write_5m_input_tokens + p.group_cache_write_1h_input_tokens) AS input_tokens",
+		);
+		for (const tokenClass of [
+			"uncached_input_tokens",
+			"cache_read_input_tokens",
+			"cache_write_5m_input_tokens",
+			"cache_write_1h_input_tokens",
+			"output_tokens",
+		]) {
+			expect(sql).toContain(`sum(e.${tokenClass}) AS group_${tokenClass}`);
+			expect(sql).toContain(`g.group_${tokenClass}`);
+		}
+	});
+
+	test("groups equivalent events before joining the typed rate card", () => {
+		const sql = buildUsageEventAnalyticsCte();
+
+		expect(sql).toContain("usage_event_pricing_candidates AS");
+		expect(sql).toContain("usage_event_pricing_groups AS");
+		expect(sql).toContain("usage_event_pricing_rate_card AS");
+		expect(sql).toContain(
+			"extractGroups(lowerUTF8(trimBoth(c.pricing_identity))",
+		);
+		expect(sql).toContain("ON g.pricing_model = r.model");
+		expect(sql).toContain("ANY LEFT JOIN usage_event_pricing_rate_card AS r");
+		expect(sql.indexOf("usage_event_pricing_candidates AS")).toBeLessThan(
+			sql.indexOf("extractGroups(lowerUTF8(trimBoth(c.pricing_identity))"),
+		);
+		expect(
+			sql.indexOf("extractGroups(lowerUTF8(trimBoth(c.pricing_identity))"),
+		).toBeLessThan(
+			sql.indexOf("ANY LEFT JOIN usage_event_pricing_rate_card AS r"),
+		);
+		expect(sql).not.toContain("match(lowerUTF8(e.resolved_model)");
+	});
+
+	test("never prices from the session display model", () => {
+		const sql = buildUsageEventAnalyticsCte();
+
+		expect(sql).toContain("e.resolved_model");
+		expect(sql).toContain("e.model_status IN ('resolved', 'unresolved')");
+		expect(sql).not.toMatch(/match\(lowerUTF8\(sa\.model_used\)/u);
+	});
+
+	test("uses recorded main model identity independently of pricing", () => {
+		const sql = buildUsageEventAnalyticsCte();
+
+		expect(sql).toContain("argMaxIf(");
+		expect(sql).toContain("agent_id = 'main'");
+		expect(sql).toContain("AS latest_main_model");
+		expect(sql).toContain("AS latest_event_model");
+		expect(
+			sql.match(
+				/if\(r\.latest_main_model != '', r\.latest_main_model, r\.latest_event_model\) AS model_used/gu,
+			),
+		).toHaveLength(2);
+		expect(sql).not.toContain("resolved_model_count");
+		expect(sql).not.toContain("single_resolved_model");
+		expect(sql).not.toContain("lowerUTF8(trimBoth(sa.model_used))");
+	});
+
+	test("prices exact provenance and fails closed for unsupported dimensions", () => {
+		const sql = buildUsageEventAnalyticsCte();
+
+		expect(sql).toContain("lowerUTF8(trimBoth(g.service_tier))");
+		expect(sql).toContain(
+			"lowerUTF8(trimBoth(g.model_provider)) IN ('', r.provider)",
+		);
+		expect(sql).toContain("lowerUTF8(trimBoth(g.inference_speed))");
+		expect(sql).toContain("lowerUTF8(trimBoth(g.inference_geo))");
+		expect(sql).toContain("['fast', 'priority']");
+		expect(sql).toContain("service_tier_conflict");
+		expect(sql).toContain("unrecognized_service_tier");
+		expect(sql).toContain("provider_model_mismatch");
+		expect(sql).toContain("e.has_valid_timestamp = 1");
+	});
+
+	test("keeps the known cost subtotal while completeness remains internal", () => {
+		const sql = buildUsageEventAnalyticsCte();
+
+		expect(sql).toContain(
+			"toNullable(sum(ifNull(p.group_estimated_cost, 0))) AS estimated_cost",
+		);
+		expect(sql).toContain("AS cost_uses_default_region");
+		expect(sql).not.toContain("OR p.has_geo_gap = 1");
+		expect(buildUsageCostSubtotalSql("sa.estimated_cost", 4)).toBe(
+			"toNullable(round(sum(ifNull(sa.estimated_cost, 0)), 4))",
+		);
+	});
+
+	test("keeps the legacy branch source-compatible", () => {
+		const sql = buildLegacyUsageAnalyticsCte();
+
+		expect(sql).toContain("FROM rudel.session_analytics FINAL");
+		expect(sql).toContain("FROM usage_analytics_metadata AS sa");
+		expect(sql).toContain("AS estimated_cost");
+		expect(sql).toContain("toUInt8(1) AS cost_is_complete");
+		expect(sql).toContain("AS usage_date");
+	});
+
+	test("enriches both legacy and events metadata from the same lineage selector", () => {
+		const legacySql = buildLegacyUsageAnalyticsCte(true);
+		const eventsSql = buildUsageEventAnalyticsCte({}, true);
+
+		for (const sql of [legacySql, eventsSql]) {
+			expect(sql).toContain("FROM rudel.session_lineage");
+			expect(sql).toContain(
+				"ifNull(lineage.linked_subagent_count, 0) AS linked_subagent_count",
+			);
+			expect(sql).toContain("lineage.linked_subagents");
+		}
+		expect(eventsSql).toContain(
+			"sa.linked_subagent_count AS linked_subagent_count",
+		);
+		expect(eventsSql).toContain("sa.linked_subagents AS linked_subagents");
+	});
+
+	test("drops every tenant binding for all-organization reads", () => {
+		const legacySql = buildLegacyUsageAnalyticsCte(true, "allOrganizations");
+		const eventsSql = buildUsageEventAnalyticsCte(
+			{ tenant: "allOrganizations" },
+			true,
+		);
+
+		for (const sql of [legacySql, eventsSql]) {
+			expect(sql).not.toContain("{orgId:String}");
+			expect(sql).toContain("FROM rudel.session_lineage");
+		}
+		expect(buildLegacyUsageAnalyticsCte(true)).toContain(
+			"WHERE organization_id = {orgId:String}",
+		);
+	});
+
+	test("prices legacy cache writes at the 1-hour tier", () => {
+		const sql = buildLegacyUsageAnalyticsCte();
+		const oneHourTierSql = buildEstimatedCostSql({
+			modelExpr: "sa.model_used",
+			dateExpr: "sa.session_date",
+			inputExpr:
+				"(ifNull(sa.input_tokens, 0) - ifNull(sa.cache_read_input_tokens, 0) - ifNull(sa.cache_creation_input_tokens, 0))",
+			outputExpr: "ifNull(sa.output_tokens, 0)",
+			cacheReadInputExpr: "ifNull(sa.cache_read_input_tokens, 0)",
+			cacheCreation1hInputExpr: "ifNull(sa.cache_creation_input_tokens, 0)",
+		});
+		const fiveMinuteTierSql = buildEstimatedCostSql({
+			modelExpr: "sa.model_used",
+			dateExpr: "sa.session_date",
+			inputExpr:
+				"(ifNull(sa.input_tokens, 0) - ifNull(sa.cache_read_input_tokens, 0) - ifNull(sa.cache_creation_input_tokens, 0))",
+			outputExpr: "ifNull(sa.output_tokens, 0)",
+			cacheReadInputExpr: "ifNull(sa.cache_read_input_tokens, 0)",
+			cacheCreationInputExpr: "ifNull(sa.cache_creation_input_tokens, 0)",
+		});
+
+		// session_analytics has no 5m/1h split; ~89% of Claude Code write
+		// tokens are 1-hour tier and Codex reports no cache writes, so the
+		// legacy path bills the undivided total at the 1-hour rate.
+		expect(sql).toContain(oneHourTierSql);
+		expect(sql).not.toContain(fiveMinuteTierSql);
+	});
+
+	test("keeps explicit off mode as a source rollback without probing events", async () => {
+		const previousMode = process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE;
+		process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE = "off";
+
+		try {
+			const context = await getUsageAnalyticsQueryContext("org-rollback");
+			expect(context.mode).toBe("legacy");
+			expect(context.cteDefinitions).toContain("rudel.session_analytics");
+			expect(context.cteDefinitions).not.toContain("rudel.usage_events");
+		} finally {
+			if (previousMode === undefined) {
+				delete process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE;
+			} else {
+				process.env.USAGE_EVENT_ANALYTICS_CUTOVER_MODE = previousMode;
+			}
+		}
+	});
+
+	test("picks each event's context band at its model's own threshold", () => {
+		const expected =
+			"multiIf(match(lowerUTF8(trimBoth(if(e.model_status = 'unresolved', e.raw_model, e.resolved_model))), '^claude-haiku-5-5(?:-\\\\d{8})?$'), 100000, 272000)";
+
+		for (const sql of [
+			buildPricedUsageEventsCte("1"),
+			buildUsageEventAnalyticsCte(),
+		]) {
+			expect(sql).toContain(`e.context_input_tokens > ${expected}`);
+			expect(sql).not.toContain("e.context_input_tokens > 272000");
+		}
+	});
+});
+
+function unquoteSqlString(literal: string): string {
+	return literal.slice(1, -1).replace(/\\(.)/gu, "$1");
+}
+
+function firstMatchingModel(model: string): string {
+	const normalized = model.trim().toLowerCase();
+	return (
+		getModelPricingCatalog().find((entry) =>
+			entry.match.some((pattern) => new RegExp(pattern, "u").test(normalized)),
+		)?.model ?? ""
+	);
+}
+
+describe("pricing SQL size", () => {
+	test("resolves a model through one alternation exactly as the first matching pattern", () => {
+		const sql = buildCanonicalPricingModelSql("m");
+		const parsed = sql.match(
+			/^arrayElement\(\[(.*)\], arrayFirstIndex\(group -> group != '', extractGroups\(lowerUTF8\(trimBoth\(m\)\), ('.*')\)\)\)$/u,
+		);
+		expect(parsed).not.toBeNull();
+		const models = (parsed?.[1] ?? "").split(", ").map(unquoteSqlString);
+		const alternation = new RegExp(unquoteSqlString(parsed?.[2] ?? "''"), "u");
+		const resolve = (model: string) => {
+			const groups = alternation.exec(model.trim().toLowerCase());
+			const index = groups?.slice(1).findIndex((group) => !!group) ?? -1;
+			return index < 0 ? "" : (models[index] ?? "");
+		};
+
+		const names = [
+			...getModelPricingCatalog().map((entry) => entry.model),
+			...MODEL_UNPRICED_IDENTITIES.map((entry) => entry.model),
+			"o3",
+			"claude-3-opus-latest",
+			"claude-haiku-3-5-20241022",
+			"gpt-5.6",
+		];
+		const corpus = names.flatMap((name) => [
+			name,
+			name.toUpperCase(),
+			` ${name} `,
+			`${name}-20260101`,
+			`${name}-2026-01-01`,
+			`${name}-2025-04-16`,
+			`${name}-latest`,
+			`${name}-preview`,
+			`${name}[1m]`,
+			`x-${name}`,
+		]);
+		expect(
+			corpus.filter((model) => firstMatchingModel(model) !== ""),
+		).not.toHaveLength(0);
+		for (const model of [...corpus, "", "unknown", "<synthetic>"]) {
+			expect([model, resolve(model)]).toEqual([
+				model,
+				firstMatchingModel(model),
+			]);
+		}
+	});
+
+	test("prices from one literal per table instead of a clause per rule", () => {
+		const sql = buildUsageEventAnalyticsCte();
+
+		expect(sql).not.toContain(
+			"multiIf(match(lowerUTF8(trimBoth(c.pricing_identity))",
+		);
+		expect(sql).not.toContain("toFloat64(");
+		expect(sql.match(/arrayJoin\(CAST\(/gu)).toHaveLength(1);
+		expect(sql.match(/arrayFirstIndex\(\s*rule ->/gu)).toHaveLength(3);
+		for (const rule of getModelPricingModifierCatalog()) {
+			expect(sql).toContain(
+				`('${rule.model}', [${rule.values.map((value) => `'${value}'`).join(", ")}], '${rule.effectiveFrom}', '${rule.effectiveTo ?? "2299-12-31"}', '${rule.contextBand ?? ""}')`,
+			);
+		}
+		for (const dimension of [
+			"service_tier",
+			"inference_speed",
+			"inference_geo",
+		] as const) {
+			const multipliers = getModelPricingModifierCatalog()
+				.filter((rule) => rule.dimension === dimension)
+				.map((rule) => rule.multiplier)
+				.join(", ");
+			expect(sql).toContain(
+				`CAST([${multipliers}], 'Array(Nullable(Float64))')`,
+			);
+		}
+	});
+});
+
+describe("usage-event analytics readiness gate", () => {
+	test("keeps degraded analytics isolated and re-probes after the short TTL", async () => {
+		let now = 1_000;
+		let probeAttempts = 0;
+		let schemaReady = false;
+		const gate = new UsageEventAnalyticsReadinessGate({
+			degradedTtlMs: 50,
+			now: () => now,
+			probe: () => {
+				probeAttempts += 1;
+				return schemaReady
+					? Promise.resolve()
+					: Promise.reject(new Error("schema unavailable"));
+			},
+			readyTtlMs: 1_000,
+			timeoutMs: 20,
+		});
+
+		await expect(gate.assertReady()).rejects.toMatchObject({
+			code: "SERVICE_UNAVAILABLE",
+			message: "Request-level usage analytics is temporarily unavailable",
+		});
+		expect(probeAttempts).toBe(1);
+
+		now += 49;
+		await expect(gate.assertReady()).rejects.toMatchObject({
+			code: "SERVICE_UNAVAILABLE",
+		});
+		expect(probeAttempts).toBe(1);
+
+		now += 1;
+		schemaReady = true;
+		await expect(gate.assertReady()).resolves.toBeUndefined();
+		expect(probeAttempts).toBe(2);
+	});
+
+	test("enforces its own short timeout", async () => {
+		const gate = new UsageEventAnalyticsReadinessGate({
+			degradedTtlMs: 5,
+			probe: () => new Promise(() => {}),
+			readyTtlMs: 50,
+			timeoutMs: 5,
+		});
+
+		await expect(gate.assertReady()).rejects.toMatchObject({
+			code: "SERVICE_UNAVAILABLE",
+		});
+	});
+});

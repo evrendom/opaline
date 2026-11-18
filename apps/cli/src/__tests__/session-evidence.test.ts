@@ -25,35 +25,35 @@ import {
 import { startEvidenceProtocolStub } from "./helpers/evidence-protocol-stub.js";
 import { createCliFixture, runCli } from "./helpers/ingest-stub.js";
 
-test.each([false, true])(
-	"rejects aggregate transcript redaction anomalies before collecting or persisting evidence (child: %s)",
-	async (child) => {
-		await expect(
-			captureAndUploadSessionEvidence({
-				credentials: {
-					authType: "api-key",
-					token: "test",
-					apiBaseUrl: "https://example.invalid",
-					user: { id: "user", email: "test@example.invalid", name: "Test" },
-				},
-				hookReceivedAt: new Date().toISOString(),
-				lifecycle: "end",
-				organizationId: "org",
-				request: {
-					content: child ? "" : `token=ghp_${"a".repeat(36)}\n`,
-					subagents: child
-						? [{ agentId: "child", content: `token=ghp_${"a".repeat(36)}\n` }]
-						: undefined,
-					projectPath: "/missing-evidence-repository",
-					sessionId: "session",
-					source: "claude_code",
-					upload_mode: "hook",
-				},
-				terminalTranscript: true,
-			}),
-		).rejects.toThrow(/redaction.*budget/iu);
-	},
-);
+test.each([
+	false,
+	true,
+])("rejects aggregate transcript redaction anomalies before collecting or persisting evidence (child: %s)", async (child) => {
+	await expect(
+		captureAndUploadSessionEvidence({
+			credentials: {
+				authType: "api-key",
+				token: "test",
+				apiBaseUrl: "https://example.invalid",
+				user: { id: "user", email: "test@example.invalid", name: "Test" },
+			},
+			hookReceivedAt: new Date().toISOString(),
+			lifecycle: "end",
+			organizationId: "org",
+			request: {
+				content: child ? "" : `token=ghp_${"a".repeat(36)}\n`,
+				subagents: child
+					? [{ agentId: "child", content: `token=ghp_${"a".repeat(36)}\n` }]
+					: undefined,
+				projectPath: "/missing-evidence-repository",
+				sessionId: "session",
+				source: "claude_code",
+				upload_mode: "hook",
+			},
+			terminalTranscript: true,
+		}),
+	).rejects.toThrow(/redaction.*budget/iu);
+});
 
 test("rejects oversized file-backed evidence before reading the root or children", async () => {
 	const directory = await mkdtemp(join(tmpdir(), "opaline-evidence-size-"));

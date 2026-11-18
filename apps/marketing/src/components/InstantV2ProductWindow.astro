@@ -1,0 +1,605 @@
+---
+import HeroCanvas from "./HeroCanvas.astro";
+import "../../../web/src/features/shell/product-window-chrome.css";
+
+const demoAppUrl =
+	import.meta.env.PUBLIC_DEMO_APP_URL || "/product-demo/demo.html";
+---
+
+<div
+	class="instant-v2-product-window"
+	data-instant-v2-product-window
+>
+	<div class="instant-v2-hero-gradient" aria-hidden="true">
+		<div class="instant-v2-hero-gradient-motion">
+			<div class="instant-v2-hero-gradient-surface">
+				<HeroCanvas opacity={0.3} />
+			</div>
+		</div>
+	</div>
+	<div class="instant-v2-dashboard-window product-window-frame" data-instant-v2-window>
+		<!-- Real prerendered product DOM. Explore hydrates this same document. -->
+		<iframe
+			class="instant-v2-product-iframe"
+			data-instant-v2-product-iframe
+			src={demoAppUrl}
+			title="Opaline product demo"
+			loading="eager"
+			tabindex="-1"
+		></iframe>
+	</div>
+	<div
+		class="instant-v2-dashboard-fade instant-v2-dashboard-fade-corner"
+		aria-hidden="true"
+	></div>
+	<div class="instant-v2-dashboard-demo-cta">
+		<button
+			class="instant-v2-dashboard-demo-button"
+			type="button"
+			data-instant-v2-demo-trigger
+			data-instant-v2-dashboard-demo
+			data-instant-v2-pointer-glow
+		>
+			<span
+				class="instant-v2-dashboard-demo-opalescence"
+				data-instant-v2-pointer-glow-effect
+				aria-hidden="true"
+			></span>
+			<span
+				class="instant-v2-dashboard-demo-glass"
+				aria-hidden="true"
+			></span>
+			<span class="instant-v2-dashboard-demo-label"
+				>Explore the product demo →</span
+			>
+		</button>
+	</div>
+</div>
+
+<style>
+	/* ─────────────────────────────────────────────────────────
+	 * GRADIENT BACKDROP STORYBOARD — distance before docking
+	 *
+	 * 180px   gradient begins revealing at its resting geometry
+	 *  90px   gradient reaches peak vertical stretch during travel
+	 *   0px   gradient lands at full opacity and resting geometry
+	 * ───────────────────────────────────────────────────────── */
+	.instant-v2-product-window {
+		--instant-v2-app-window-inset: 4px;
+		--instant-v2-app-window-radius: 8px;
+		--instant-v2-dashboard-component-color: var(--landing-window-component);
+		--instant-v2-dashboard-page-color: var(--landing-page);
+		--instant-v2-dashboard-shadow-fade-overhang: calc(
+			var(--instant-v2-showcase-gutter, 0px) +
+				var(--instant-v2-company-strip-height, 0px)
+		);
+		--instant-v2-gradient-reveal-progress: 0;
+		--instant-v2-gradient-motion-scale: 1;
+		--instant-v2-dashboard-window-radius: calc(
+			var(--instant-v2-app-window-radius) +
+				var(--instant-v2-app-window-inset)
+		);
+		position: sticky;
+		top: 42px;
+		z-index: 50;
+		isolation: isolate;
+		width: 100%;
+	}
+
+	.instant-v2-hero-gradient {
+		position: absolute;
+		z-index: 0;
+		top: 50%;
+		left: -176px;
+		width: 1496px;
+		height: max(640px, 100%);
+		translate: 0 calc(-50% - 48px);
+		opacity: var(--instant-v2-gradient-reveal-progress);
+		pointer-events: none;
+		will-change: opacity;
+	}
+
+	.instant-v2-hero-gradient-motion {
+		position: absolute;
+		inset: 0;
+		transform: translateZ(0) scaleY(var(--instant-v2-gradient-motion-scale));
+		transform-origin: 50% 0;
+		will-change: transform;
+	}
+
+	/* GPU blur keeps the scrolling layer free of live CSS filters. */
+	.instant-v2-hero-gradient-surface {
+		--canvas-blur-radius: 50;
+		--canvas-shape-radius: 300;
+		--canvas-blur-padding: 150px;
+		position: absolute;
+		inset: 0;
+		transform: translateZ(0);
+	}
+
+	.instant-v2-hero-gradient :global(.hero-canvas) {
+		inset: calc(-1 * var(--canvas-blur-padding));
+		width: calc(100% + 2 * var(--canvas-blur-padding));
+		height: calc(100% + 2 * var(--canvas-blur-padding));
+	}
+
+	.instant-v2-hero-gradient :global(.hero-canvas-stage),
+	.instant-v2-hero-gradient :global(.hero-canvas-viewport) {
+		width: 100%;
+		height: 100%;
+	}
+
+	.instant-v2-hero-gradient :global(.hero-canvas-stage),
+	.instant-v2-hero-gradient :global(.hero-canvas-viewport) {
+		position: absolute;
+		inset: 0;
+	}
+
+	:global(html[data-instant-v2-dashboard-docked])
+		.instant-v2-hero-gradient {
+		opacity: 1;
+	}
+
+	.instant-v2-dashboard-window {
+		position: relative;
+		z-index: 1;
+		width: 100%;
+		height: calc(
+			100svh - 42px - var(--instant-v2-showcase-gutter, 0px) -
+				var(--instant-v2-company-strip-height, 0px)
+		);
+		overflow: hidden;
+		will-change: transform;
+	}
+
+	/* Safari can route wheel input past pointer-events:none on an iframe.
+	 * Keep preview gestures in the landing document, where Lenis handles them. */
+	:global(html[data-instant-v2-safari-scroll]:not([data-instant-v2-demo]):not([data-instant-v2-demo-exiting]))
+		.instant-v2-dashboard-window::after {
+		content: "";
+		position: absolute;
+		inset: 0;
+		z-index: 1;
+		pointer-events: auto;
+	}
+
+	.instant-v2-product-iframe {
+		display: block;
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		border: 0;
+		border-radius: inherit;
+		background: var(--instant-v2-dashboard-component-color);
+		pointer-events: none;
+	}
+
+	.instant-v2-dashboard-fade {
+		position: absolute;
+		z-index: 10;
+		opacity: 1;
+		visibility: visible;
+		pointer-events: none;
+		transition:
+			opacity 260ms cubic-bezier(0.22, 1, 0.36, 1),
+			visibility 0s linear 0s;
+		will-change: opacity;
+	}
+
+	.instant-v2-dashboard-fade-corner {
+		top: 0;
+		right: calc(-1 * var(--instant-v2-showcase-gutter, 0px));
+		bottom: calc(
+			-1 * var(--instant-v2-dashboard-shadow-fade-overhang)
+		);
+		left: 0;
+		background: radial-gradient(
+			ellipse 68% 66% at
+				calc(100% - var(--instant-v2-showcase-gutter, 0px))
+				calc(100% - var(--instant-v2-dashboard-shadow-fade-overhang)),
+			var(--instant-v2-dashboard-page-color) 0%,
+			color-mix(in oklab, var(--instant-v2-dashboard-page-color) 50%, transparent) 50%,
+			transparent 100%
+		);
+	}
+
+	@supports (color: color-mix(in lab, red, red)) {
+		.instant-v2-dashboard-fade-corner {
+			background: radial-gradient(
+				ellipse 68% 66% at
+					calc(100% - var(--instant-v2-showcase-gutter, 0px))
+					calc(100% - var(--instant-v2-dashboard-shadow-fade-overhang)),
+				var(--instant-v2-dashboard-page-color) 0%,
+				oklch(
+					from color-mix(
+						in oklch,
+						var(--instant-v2-dashboard-page-color) 98.03%,
+						transparent
+					) l c h / alpha
+				) 9.99%,
+				oklch(
+					from color-mix(
+						in oklch,
+						var(--instant-v2-dashboard-page-color) 92.59%,
+						transparent
+					) l c h / alpha
+				) 19.07%,
+				oklch(
+					from color-mix(
+						in oklch,
+						var(--instant-v2-dashboard-page-color) 84.38%,
+						transparent
+					) l c h / alpha
+				) 27.44%,
+				oklch(
+					from color-mix(
+						in oklch,
+						var(--instant-v2-dashboard-page-color) 74.07%,
+						transparent
+					) l c h / alpha
+				) 35.26%,
+				oklch(
+					from color-mix(
+						in oklch,
+						var(--instant-v2-dashboard-page-color) 62.38%,
+						transparent
+					) l c h / alpha
+				) 42.72%,
+				oklch(
+					from color-mix(
+						in oklch,
+						var(--instant-v2-dashboard-page-color) 50%,
+						transparent
+					) l c h / alpha
+				) 50%,
+				oklch(
+					from color-mix(
+						in oklch,
+						var(--instant-v2-dashboard-page-color) 37.62%,
+						transparent
+					) l c h / alpha
+				) 57.28%,
+				oklch(
+					from color-mix(
+						in oklch,
+						var(--instant-v2-dashboard-page-color) 25.93%,
+						transparent
+					) l c h / alpha
+				) 64.74%,
+				oklch(
+					from color-mix(
+						in oklch,
+						var(--instant-v2-dashboard-page-color) 15.63%,
+						transparent
+					) l c h / alpha
+				) 72.56%,
+				oklch(
+					from color-mix(
+						in oklch,
+						var(--instant-v2-dashboard-page-color) 7.41%,
+						transparent
+					) l c h / alpha
+				) 80.93%,
+				oklch(
+					from color-mix(
+						in oklch,
+						var(--instant-v2-dashboard-page-color) 1.97%,
+						transparent
+					) l c h / alpha
+				) 90.01%,
+				transparent 100%
+			);
+		}
+	}
+
+	.instant-v2-dashboard-demo-cta {
+		position: absolute;
+		z-index: 11;
+		right: 28px;
+		bottom: 28px;
+		display: flex;
+		align-items: center;
+		gap: 14px;
+		opacity: 1;
+		visibility: visible;
+		pointer-events: none;
+		transition:
+			opacity 260ms cubic-bezier(0.22, 1, 0.36, 1),
+			visibility 0s linear 0s;
+		will-change: opacity;
+	}
+
+	.instant-v2-dashboard-demo-button {
+		position: relative;
+		isolation: isolate;
+		display: inline-flex;
+		height: 36px;
+		align-items: center;
+		justify-content: center;
+		padding-inline: 12px;
+		border: 0;
+		border-radius: 8px;
+		background: var(--landing-primary);
+		color: var(--landing-primary-ink);
+		font-family: "Inter Variable", Inter, sans-serif;
+		font-feature-settings: "ss03";
+		font-size: 13px;
+		font-weight: 500;
+		letter-spacing: normal;
+		line-height: 20px;
+		overflow: hidden;
+		white-space: nowrap;
+		cursor: pointer;
+		pointer-events: auto;
+	}
+
+	.instant-v2-dashboard-demo-opalescence {
+		position: absolute;
+		z-index: 0;
+		top: 50%;
+		left: 50%;
+		width: 62px;
+		height: 26px;
+		border-radius: 999px;
+		background-image: linear-gradient(
+			90deg,
+			oklch(var(--instant-v2-glimm-blue) / 0.44) 20%,
+			oklch(var(--instant-v2-glimm-indigo) / 0.5) 40%,
+			oklch(var(--instant-v2-glimm-purple) / 0.47) 60%,
+			oklch(var(--instant-v2-glimm-pink) / 0.5) 80%
+		);
+		filter: blur(8px);
+		opacity: 0;
+		transform: translate3d(
+			calc(-50% + var(--instant-v2-glow-x, 0px)),
+			calc(-50% + var(--instant-v2-glow-y, 0px)),
+			0
+		);
+		pointer-events: none;
+		transition: opacity 200ms ease-out;
+	}
+
+	@supports (corner-shape: squircle) {
+		.instant-v2-dashboard-demo-button {
+			border-radius: 16px;
+			corner-shape: squircle;
+		}
+
+		.instant-v2-dashboard-demo-glass {
+			corner-shape: inherit;
+		}
+	}
+
+	.instant-v2-dashboard-demo-glass {
+		position: absolute;
+		z-index: 1;
+		inset: 0;
+		border-radius: inherit;
+		background: var(--landing-primary-glass);
+		-webkit-backdrop-filter: blur(6px) saturate(1.6);
+		backdrop-filter: blur(6px) saturate(1.6);
+		box-shadow: var(--landing-primary-glass-edge);
+		pointer-events: none;
+	}
+
+	.instant-v2-dashboard-demo-label {
+		position: relative;
+		z-index: 2;
+	}
+
+	@media (any-hover: hover) {
+		.instant-v2-dashboard-demo-button:hover
+			.instant-v2-dashboard-demo-opalescence {
+			opacity: 1;
+		}
+	}
+
+	.instant-v2-dashboard-demo-button:focus-visible
+		.instant-v2-dashboard-demo-opalescence {
+		opacity: 1;
+	}
+
+	.instant-v2-dashboard-demo-button:focus-visible {
+		outline: 2px solid var(--landing-focus);
+		outline-offset: 3px;
+	}
+
+	:global(html[data-instant-v2-demo]) .instant-v2-product-iframe {
+		display: block;
+		pointer-events: auto;
+	}
+
+
+	:global(html[data-instant-v2-demo]) .instant-v2-dashboard-fade,
+	:global(html[data-instant-v2-demo-exiting])
+		.instant-v2-dashboard-fade {
+		position: fixed;
+		top: var(--instant-v2-demo-overlay-top);
+		right: auto;
+		bottom: auto;
+		left: var(--instant-v2-demo-overlay-left);
+		width: var(--instant-v2-demo-overlay-width);
+		height: var(--instant-v2-demo-overlay-height);
+	}
+
+	:global(html[data-instant-v2-demo]) .instant-v2-dashboard-demo-cta,
+	:global(html[data-instant-v2-demo-exiting])
+		.instant-v2-dashboard-demo-cta {
+		position: fixed;
+		top: var(--instant-v2-demo-cta-top);
+		right: auto;
+		bottom: auto;
+		left: var(--instant-v2-demo-cta-left);
+		width: var(--instant-v2-demo-cta-width);
+		height: var(--instant-v2-demo-cta-height);
+	}
+
+	:global(html[data-instant-v2-demo]:not([data-instant-v2-demo-exiting]))
+		.instant-v2-dashboard-fade,
+	:global(html[data-instant-v2-demo]:not([data-instant-v2-demo-exiting]))
+		.instant-v2-dashboard-demo-cta {
+		opacity: 0;
+		visibility: hidden;
+		pointer-events: none;
+		transition:
+			opacity var(--instant-v2-demo-layout-duration, 620ms)
+				cubic-bezier(0.22, 1, 0.36, 1)
+				var(--instant-v2-demo-layout-delay, 180ms),
+			visibility 0s linear
+				calc(
+					var(--instant-v2-demo-layout-delay, 180ms) +
+						var(--instant-v2-demo-layout-duration, 620ms)
+				);
+	}
+
+	:global(html[data-instant-v2-demo-exiting])
+		.instant-v2-dashboard-fade,
+	:global(html[data-instant-v2-demo-exiting])
+		.instant-v2-dashboard-demo-cta {
+		opacity: 1;
+		visibility: visible;
+		pointer-events: none;
+		transition:
+			opacity var(--instant-v2-demo-layout-duration, 620ms)
+				cubic-bezier(0.22, 1, 0.36, 1)
+				var(--instant-v2-demo-layout-delay, 180ms),
+			visibility 0s linear 0s;
+	}
+
+	:global(html[data-instant-v2-demo])
+		.instant-v2-dashboard-demo-button,
+	:global(html[data-instant-v2-demo-exiting])
+		.instant-v2-dashboard-demo-button {
+		pointer-events: none;
+	}
+
+	:global(html[data-instant-v2-demo]) .instant-v2-product-window {
+		position: fixed;
+		top: 0;
+		left: 0;
+		z-index: 50;
+		width: 100%;
+		height: 100dvh;
+		border-radius: var(--instant-v2-dashboard-window-radius);
+		overflow: visible;
+		background: transparent;
+		overscroll-behavior: contain;
+		pointer-events: none;
+		will-change: top, left, width, height, border-radius;
+	}
+
+	:global(html[data-instant-v2-demo]) .instant-v2-hero-gradient {
+		position: fixed;
+		top: var(--instant-v2-demo-gradient-top);
+		left: var(--instant-v2-demo-gradient-left);
+		width: var(--instant-v2-demo-gradient-width);
+		height: var(--instant-v2-demo-gradient-height);
+		translate: none;
+	}
+
+	:global(html[data-instant-v2-demo])
+		.instant-v2-hero-gradient-motion {
+		transform: scaleY(1);
+		transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+	}
+
+	:global(html[data-instant-v2-demo]) .instant-v2-dashboard-window {
+		position: absolute;
+		top: var(--instant-v2-demo-dashboard-top);
+		right: 0;
+		left: 0;
+		width: auto;
+		height: var(--instant-v2-demo-dashboard-height);
+		min-height: 0;
+		border-radius: inherit;
+		will-change: top, left, width, height;
+	}
+
+	:global(html[data-instant-v2-demo][data-instant-v2-demo-layout-settled])
+		.instant-v2-dashboard-window {
+		border-bottom-right-radius: 0;
+		border-bottom-left-radius: 0;
+	}
+
+	@media (min-width: 768px) {
+		.instant-v2-hero-gradient {
+			left: 50%;
+			height: calc(100% + 56px);
+			translate: calc(-50% - 144px) calc(-50% - 72px);
+		}
+	}
+
+	@media (max-width: 540px) {
+		.instant-v2-hero-gradient-surface {
+			--canvas-blur-radius: 16.666667;
+			--canvas-shape-radius: 100;
+			--canvas-blur-padding: 50px;
+		}
+
+		:global(html:not([data-instant-v2-demo])) .instant-v2-hero-gradient {
+			/* Safari's toolbar changes dvh during the first scroll. Keep the
+			 * WebGL buffer stable while the surrounding preview changes height. */
+			height: max(
+				640px,
+				calc(
+					100svh - 42px - var(--instant-v2-showcase-gutter, 0px) -
+						var(--instant-v2-company-strip-height, 0px)
+				)
+			);
+		}
+
+		/* Keep the accepted phone surface geometry. The GPU blur chooses its
+		 * working and presentation resolutions independently of this transform. */
+		:global(html:not([data-instant-v2-demo]))
+			.instant-v2-hero-gradient-surface {
+			inset: 0 auto auto 0;
+			width: calc(100% / 3);
+			height: calc(100% / 3);
+			transform: scale3d(3, 3, 1);
+			transform-origin: 0 0;
+		}
+
+		.instant-v2-product-window {
+			--instant-v2-mobile-preview-scale: 0.85;
+			height: calc(
+				100dvh - 42px - var(--instant-v2-showcase-gutter, 0px) -
+					var(--instant-v2-company-strip-height, 0px)
+			);
+		}
+
+		.instant-v2-dashboard-window {
+			position: absolute;
+			/* The opaque iframe covers the glass; blurring behind it only adds
+			 * a full preview-sized render pass on every mobile scroll frame. */
+			-webkit-backdrop-filter: none;
+			backdrop-filter: none;
+			top: 0;
+			right: auto;
+			left: 6px;
+			width: 1080px;
+			height: calc(100% / var(--instant-v2-mobile-preview-scale));
+			transform: scale(var(--instant-v2-mobile-preview-scale));
+			transform-origin: top left;
+		}
+
+		.instant-v2-dashboard-fade,
+		.instant-v2-dashboard-demo-cta {
+			display: none;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.instant-v2-product-window {
+			--instant-v2-demo-layout-delay: 0ms;
+			--instant-v2-demo-layout-duration: 0.01ms;
+		}
+
+		.instant-v2-dashboard-fade,
+		.instant-v2-dashboard-demo-cta,
+		.instant-v2-dashboard-demo-opalescence {
+			transition-duration: 0.01ms;
+		}
+	}
+
+</style>

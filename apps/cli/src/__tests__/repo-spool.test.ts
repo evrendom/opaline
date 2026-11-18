@@ -333,32 +333,33 @@ describe("repository spool", () => {
 		await expect(stat(lockPath)).rejects.toThrow();
 	});
 
-	test.each(["SIGTERM", "SIGINT", "SIGHUP"] as const)(
-		"a writer stopped by %s releases its spool lock",
-		async (signal) => {
-			const spoolRoot = await mkdtemp(join(tempRoot, "signal-"));
-			const child = Bun.spawn(
-				[
-					process.execPath,
-					join(import.meta.dir, "helpers/spool-lock-holder.ts"),
-					spoolRoot,
-				],
-				{ stdout: "pipe", stderr: "pipe" },
-			);
-			const reader = child.stdout.getReader();
-			const { value } = await reader.read();
-			expect(new TextDecoder().decode(value)).toContain("locked");
-			const lockPath = join(spoolRoot, ".write-lock");
-			expect((await stat(lockPath)).isDirectory()).toBe(true);
+	test.each([
+		"SIGTERM",
+		"SIGINT",
+		"SIGHUP",
+	] as const)("a writer stopped by %s releases its spool lock", async (signal) => {
+		const spoolRoot = await mkdtemp(join(tempRoot, "signal-"));
+		const child = Bun.spawn(
+			[
+				process.execPath,
+				join(import.meta.dir, "helpers/spool-lock-holder.ts"),
+				spoolRoot,
+			],
+			{ stdout: "pipe", stderr: "pipe" },
+		);
+		const reader = child.stdout.getReader();
+		const { value } = await reader.read();
+		expect(new TextDecoder().decode(value)).toContain("locked");
+		const lockPath = join(spoolRoot, ".write-lock");
+		expect((await stat(lockPath)).isDirectory()).toBe(true);
 
-			child.kill(signal);
-			await child.exited;
+		child.kill(signal);
+		await child.exited;
 
-			await expect(stat(lockPath)).rejects.toThrow();
-			// The default action still ends the process.
-			expect(child.signalCode).toBe(signal);
-		},
-	);
+		await expect(stat(lockPath)).rejects.toThrow();
+		// The default action still ends the process.
+		expect(child.signalCode).toBe(signal);
+	});
 
 	test("takes over a fresh lock whose holder process is gone at once", async () => {
 		const spoolRoot = await mkdtemp(join(tempRoot, "dead-holder-"));
