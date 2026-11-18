@@ -158,6 +158,13 @@
 	html {
 		@apply font-sans;
 	}
+	/* NumberFlow pads its digits by twice this inside its shadow root; cancel it so the line box matches plain text. */
+	number-flow-react {
+		margin-block: calc(
+			-2 *
+			round(nearest, calc(var(--number-flow-mask-height, 0.25em) / 2), 1px)
+		);
+	}
 	@media (min-resolution: 2dppx) {
 		html {
 			-webkit-font-smoothing: antialiased;
