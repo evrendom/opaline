@@ -67,12 +67,12 @@ describe("getRepositoryLabel", () => {
 		expect(
 			getRepositoryLabel({
 				...session,
-				git_remote: "github.com/numiadata/flick",
+				git_remote: "github.com/acme/flick",
 				project_path: "/opt/flick",
-				repository: "numiadata/flick",
+				repository: "acme/flick",
 				repository_identity: {
-					repoKey: "remote:github.com/numiadata/flick",
-					repoLabel: "numiadata/flick",
+					repoKey: "remote:github.com/acme/flick",
+					repoLabel: "acme/flick",
 					repoName: "flick",
 					source: "remote",
 					worktree: null,

@@ -54,7 +54,7 @@ describe("GitHub App authentication", () => {
 			organizationId: "organization-1",
 			stateSecret: secret,
 			userId: "user-1",
-			workspaceSlug: "numia",
+			workspaceSlug: "acme",
 		});
 		expect(
 			verifyGitHubInstallState({ now, state, stateSecret: secret }),
@@ -62,7 +62,7 @@ describe("GitHub App authentication", () => {
 			organizationId: "organization-1",
 			returnTo: "settings",
 			userId: "user-1",
-			workspaceSlug: "numia",
+			workspaceSlug: "acme",
 		});
 	});
 
@@ -74,7 +74,7 @@ describe("GitHub App authentication", () => {
 			returnTo: "onboarding",
 			stateSecret: secret,
 			userId: "user-1",
-			workspaceSlug: "numia",
+			workspaceSlug: "acme",
 		});
 		expect(
 			verifyGitHubInstallState({ now, state, stateSecret: secret }).returnTo,
@@ -100,7 +100,7 @@ describe("GitHub App authentication", () => {
 			organizationId: "organization-1",
 			stateSecret: secret,
 			userId: "user-1",
-			workspaceSlug: "numia",
+			workspaceSlug: "acme",
 		});
 		expect(() =>
 			verifyGitHubInstallState({
@@ -127,7 +127,7 @@ describe("GitHub App authentication", () => {
 				organizationId: "organization-1",
 				stateSecret: secret,
 				userId: "user-1",
-				workspaceSlug: "numia",
+				workspaceSlug: "acme",
 			}),
 		);
 		expect(url.origin).toBe("https://github.com");
@@ -149,7 +149,7 @@ describe("GitHub App authentication", () => {
 				organizationId: "organization-1",
 				stateSecret: secret,
 				userId: "user-1",
-				workspaceSlug: "numia",
+				workspaceSlug: "acme",
 			}),
 		);
 		expect(url.origin).toBe("https://github.com");
@@ -171,7 +171,7 @@ describe("GitHub App authentication", () => {
 			returnTo: "settings",
 			organizationId: "organization-1",
 			userId: "user-1",
-			workspaceSlug: "numia",
+			workspaceSlug: "acme",
 		});
 		expect(() =>
 			verifyGitHubInstallState({

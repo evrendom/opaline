@@ -125,8 +125,8 @@ test("skill links preserve the session and turn and safely encode skill names", 
 		"session-123",
 		"turn-7",
 	);
-	const url = new URL(getWorkspaceAppPath("numia", path), "http://localhost");
-	expect(url.pathname).toBe("/numia/skills");
+	const url = new URL(getWorkspaceAppPath("acme", path), "http://localhost");
+	expect(url.pathname).toBe("/acme/skills");
 	expect(url.searchParams.get("skill")).toBe("team:review / C++");
 	expect(url.searchParams.get("session")).toBe("session-123");
 	expect(url.searchParams.get("turn")).toBe("turn-7");

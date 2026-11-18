@@ -100,10 +100,10 @@ describe("resolveRepoIdentity", () => {
 
 	test("canonicalizes normalized, HTTPS, SSH, and scp-style remotes", () => {
 		const remotes = [
-			"github.com/numiadata/flick",
-			"https://GitHub.COM/numiadata/flick.git",
-			"ssh://git@github.com/numiadata/flick.git",
-			"git@github.com:numiadata/flick.git",
+			"github.com/acme/flick",
+			"https://GitHub.COM/acme/flick.git",
+			"ssh://git@github.com/acme/flick.git",
+			"git@github.com:acme/flick.git",
 		];
 
 		for (const gitRemote of remotes) {
@@ -114,8 +114,8 @@ describe("resolveRepoIdentity", () => {
 					packageName: null,
 				}),
 			).toEqual({
-				repoKey: "remote:github.com/numiadata/flick",
-				repoLabel: "numiadata/flick",
+				repoKey: "remote:github.com/acme/flick",
+				repoLabel: "acme/flick",
 				repoName: "flick",
 				source: "remote",
 				worktree: null,

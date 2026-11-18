@@ -95,7 +95,7 @@ Modules:
 17. **Capacity.** Measure storage and query speed per 1,000 runs on our own two workspaces, then size the ClickHouse plan. Backfills in order: received setup and requests, GitHub and capture evidence, embeddings of history; each detached and within ClickHouse limits.
 18. **Search UI.** A search box in the app over module 8.
 
-Prerequisites already known: `repository` is empty and `not_found` reads 0 on recent runs of our own data workspace, which has no edges yet (OPL-378); Claude Code skill listings were not found in recent numia records.
+Prerequisites already known: `repository` is empty and `not_found` reads 0 on recent runs of our own data workspace, which has no edges yet (OPL-378); Claude Code skill listings were not found in recent records of a customer workspace.
 
 The privacy policy and the subprocessors page are updated for OpenAI embeddings of session text. ADR 0001 is amended accordingly.
 

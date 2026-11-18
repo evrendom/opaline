@@ -9,7 +9,6 @@
 			"Bash(where:*)",
 			"Bash(npm root:*)",
 			"Bash(sqlite3:*)"
-		],
-		"deny": ["Read(./.entire/metadata/**)"]
+		]
 	}
 }

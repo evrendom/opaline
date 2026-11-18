@@ -26,6 +26,9 @@ interface PullRequestMetadata {
 const TRACKED_FILE_EXCLUSIONS = new Set([
 	// Synthetic parser corpus intentionally exercises Windows skill paths.
 	"apps/api/src/services/fixtures/skill-transcript-corpus.ts",
+	// The CLI maps the legacy hosted API base to the dashboard for old installs.
+	"apps/cli/src/lib/dashboard-url.ts",
+	"apps/cli/src/__tests__/dashboard-url.test.ts",
 	// Synthetic Windows paths in CLI install and metadata-filter tests.
 	"apps/cli/src/__tests__/alias-hook-config.test.ts",
 	"apps/cli/src/internal/local-context-source/metadata-filter.test.ts",
@@ -69,7 +72,7 @@ const DISCLOSURE_RULES: readonly DisclosureRule[] = [
 	},
 	{
 		name: "customer-name",
-		matches: (line) => line.includes("Numia"),
+		matches: (line) => /numia/i.test(line),
 	},
 	{
 		name: "shared-analytics-email",

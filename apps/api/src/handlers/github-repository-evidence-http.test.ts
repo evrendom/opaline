@@ -6,13 +6,13 @@ test("returns GitHub setup results to the GitHub settings page without caching",
 	const response = createGitHubSettingsRedirect({
 		frontendOrigin: "https://opaline.so",
 		result: "connected",
-		workspaceSlug: "numia",
+		workspaceSlug: "acme",
 	});
 
 	expect(response.status).toBe(302);
 	expect(response.headers.get("Cache-Control")).toBe("private, no-store");
 	expect(response.headers.get("Location")).toBe(
-		"https://opaline.so/numia/settings/github?github=connected",
+		"https://opaline.so/acme/settings/github?github=connected",
 	);
 });
 
@@ -21,7 +21,7 @@ test("returns onboarding setup results to the welcome flow", () => {
 		frontendOrigin: "https://opaline.so",
 		result: "already-connected",
 		returnTo: "onboarding",
-		workspaceSlug: "numia",
+		workspaceSlug: "acme",
 	});
 
 	expect(response.headers.get("Location")).toBe(
@@ -35,7 +35,7 @@ test("every GitHub setup redirect lands on a page the server serves", () => {
 			frontendOrigin: "https://opaline.so",
 			result: "connected",
 			returnTo,
-			workspaceSlug: "numia",
+			workspaceSlug: "acme",
 		}).headers.get("Location");
 		const route = getSitePageRoute(new URL(location ?? "").pathname);
 		expect(route.kind === "app" || route.kind === "workspace").toBe(true);
