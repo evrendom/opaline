@@ -146,7 +146,10 @@ export function CostBreakdown({
 										metric === "ciFailuresPerPullRequest"
 										? "Pull request data unavailable"
 										: "Still being indexed"
-									: `No ${label.toLowerCase().replace("github", "GitHub")}`
+									: `No ${label
+											.toLowerCase()
+											.replace("github", "GitHub")
+											.replace(/\bci\b/u, "CI")}`
 							}
 						/>
 					) : (
