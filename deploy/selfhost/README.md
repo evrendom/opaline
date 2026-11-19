@@ -114,6 +114,6 @@ the `repo` scope, or a fine-grained one).
 
 ## Building the image from source
 
-The repository's root `Dockerfile` builds the same image from a checkout of this repository
-(`docker build -t opaline-server .`); it compiles the artifact with Bun 1.3.14, so build it on a
+`source.Dockerfile` in this directory builds the same image from a checkout of this repository
+(`docker build -f deploy/selfhost/source.Dockerfile -t opaline-server .`, run from the repository root); it compiles the artifact with Bun 1.3.14, so build it on a
 machine with AVX2 or arm64. The image it produces runs anywhere this stack does.

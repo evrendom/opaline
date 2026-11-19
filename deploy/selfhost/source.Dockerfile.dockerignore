@@ -6,7 +6,7 @@ node_modules
 data
 dist
 *.md
-Dockerfile
+deploy/selfhost/source.Dockerfile*
 dist-site
 dist-selfhost
 apps/*/dist

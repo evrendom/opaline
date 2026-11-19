@@ -5,5 +5,5 @@ packages/sql-schema/db/migrations/meta/*.json linguist-generated=true
 packages/ch-schema/chx/meta/*.json linguist-generated=true
 packages/ch-schema/src/generated/** linguist-generated=true
 
-# Byte-exact transcript-slim parity fixtures (shared with opalinehq/cli; one line is CRLF).
+# Byte-exact transcript-slim parity fixtures (shared with apps/cli; one line is CRLF).
 packages/api-routes/src/__fixtures__/transcript-slim/*.jsonl -text
