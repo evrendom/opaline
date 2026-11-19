@@ -25,6 +25,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       integration: ${{ steps.integration.outputs.integration == 'true' || steps.integration.outputs.skill == 'true' }}
+      code: ${{ steps.code.outputs.code == 'true' || steps.code.outputs.pricing == 'true' }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -52,8 +53,34 @@ jobs:
             skill:
               - "plugin/skills/**"
 
+      # PRs that only touch the README, docs and legal files skip verify and
+      # the CLI smoke tests. A skipped job still satisfies a required check.
+      # docs/model-pricing.md is generated and checked by a test, so it counts
+      # as code.
+      - name: Detect code changes
+        id: code
+        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
+        with:
+          base: main
+          predicate-quantifier: every
+          filters: |
+            code:
+              - "**"
+              - "!*.md"
+              - "!.github/*.md"
+              - "!docs/**"
+              - "!LICENSE"
+              - "!NOTICE"
+            pricing:
+              - "docs/model-pricing.md"
+
   verify:
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      ((github.event_name == 'push' ||
+      github.event.pull_request.draft == false) &&
+      needs.changes.outputs.code == 'true')
+    needs: changes
     # 8vcpu: the api unit suite runs in one bun process whose accumulated heap
     # OOM-killed (exit 137) the 4vcpu runner even at turbo concurrency 1.
     runs-on: ubuntu-latest
@@ -240,7 +267,12 @@ jobs:
           RUDEL_OLD_CLI_PATH: ${{ github.workspace }}/.tmp/old-cli/package/dist/cli.js
 
   cli-smoke:
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      ((github.event_name == 'push' ||
+      github.event.pull_request.draft == false) &&
+      needs.changes.outputs.code == 'true')
+    needs: changes
     strategy:
       fail-fast: false
       matrix:
@@ -362,16 +394,25 @@ jobs:
         run: bun test ./apps/cli/src/__tests__/browser-opener.windows.integration.ts
 
   cli-smoke-required:
-    if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
+    if: >-
+      always() &&
+      (github.event_name != 'pull_request' || github.event.pull_request.draft == false) &&
+      !(needs.changes.result == 'success' && needs.changes.outputs.code != 'true' && github.event_name != 'workflow_dispatch')
     needs:
+      - changes
       - cli-smoke
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Require successful CLI smoke tests when applicable
         env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
           CLI_SMOKE_RESULT: ${{ needs.cli-smoke.result }}
         run: |
+          if [[ "${CHANGES_RESULT}" != "success" ]]; then
+            echo "Change detection did not succeed: ${CHANGES_RESULT}"
+            exit 1
+          fi
           if [[ "${CLI_SMOKE_RESULT}" != "success" && "${CLI_SMOKE_RESULT}" != "skipped" ]]; then
             echo "CLI smoke tests did not succeed: ${CLI_SMOKE_RESULT}"
             exit 1
