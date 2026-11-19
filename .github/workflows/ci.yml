@@ -45,7 +45,7 @@ jobs:
           predicate-quantifier: every
           filters: |
             integration:
-              - "{apps/desktop/server/**,cli/**,packages/cli-harness/**,packages/**,scripts/**,.github/actions/setup/**,.github/workflows/ci.yml,bun.lock,package.json,turbo.json}"
+              - "{apps/desktop/server/**,apps/cli/**,packages/cli-harness/**,packages/**,scripts/**,.github/actions/setup/**,.github/workflows/ci.yml,bun.lock,package.json,turbo.json}"
               - "!apps/desktop/server/src/mcp/**"
               - "!apps/desktop/server/src/handlers/mcp-http*"
               - "!**/*.md"
@@ -280,7 +280,7 @@ jobs:
         run: |
           rm -rf .tmp/cli-smoke
           mkdir -p .tmp/cli-smoke/package .tmp/cli-smoke/install
-          opaline_tarball="$(npm pack ./cli --pack-destination .tmp/cli-smoke/package | tail -n 1)"
+          opaline_tarball="$(npm pack ./apps/cli --pack-destination .tmp/cli-smoke/package | tail -n 1)"
           primary_tarball="$(npm pack ./packages/opaline --pack-destination .tmp/cli-smoke/package | tail -n 1)"
           rudel_tarball="$(npm pack ./packages/rudel-alias --pack-destination .tmp/cli-smoke/package | tail -n 1)"
           npm install \
@@ -299,7 +299,7 @@ jobs:
           primary_cli=".tmp/cli-smoke/install/node_modules/opaline/bin/opaline.js"
           rudel_cli=".tmp/cli-smoke/install/node_modules/rudel/bin/rudel.js"
 
-          version="$(node -p "require('./cli/package.json').version")"
+          version="$(node -p "require('./apps/cli/package.json').version")"
           for package_dir in packages/opaline packages/rudel-alias; do
             test "$(node -p "require('./${package_dir}/package.json').version")" = "${version}"
             test "$(node -p "require('./${package_dir}/package.json').dependencies['@opalinehq/cli']")" = "${version}"
@@ -360,7 +360,7 @@ jobs:
       - name: Verify Windows browser opening
         if: runner.os == 'Windows'
         shell: bash
-        run: bun test ./cli/src/__tests__/browser-opener.windows.integration.ts
+        run: bun test ./apps/cli/src/__tests__/browser-opener.windows.integration.ts
 
   cli-smoke-required:
     if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
