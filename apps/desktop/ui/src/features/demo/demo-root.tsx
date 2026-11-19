@@ -15,29 +15,41 @@ import { AppRouter } from "@/app/AppRouter";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
 import { ThemeProvider } from "@/app/providers/ThemeProvider";
 import { DateRangeProvider } from "@/features/analytics/date-range/DateRangeProvider";
+import { planUsageQueryKey } from "@/features/costs/plan-usage/use-plan-usage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
+import { SelfHostContext } from "@/features/self-hosted/self-host-info";
 import { SessionsPage } from "@/features/sessions/sessions-page";
-import { toLastSessionUpload } from "@/features/shell/components/last-session-upload-bar";
 import { WorkspaceStateProvider } from "@/features/workspace/organization/OrganizationProvider";
 import { orpc } from "@/lib/orpc";
-import { ensureLiveDemoSession } from "../../site/scripts/live-demo";
 import {
 	getDemoActive,
 	getDemoServerActive,
 	subscribeDemoActive,
 } from "./demo-activation";
-import { DemoRuntimeContext, type DemoSeed } from "./demo-runtime";
+import { prepareDemoBackend } from "./demo-backend";
+import { setDemoLiveSessions } from "./demo-live";
+import { DEMO_RANGE, DemoRuntimeContext, type DemoSeed } from "./demo-runtime";
 
-export function DemoRoot({ seed }: { seed: DemoSeed }) {
+export function createDemoQueryClient() {
+	return new QueryClient({
+		defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
+	});
+}
+
+export function DemoRoot({
+	seed,
+	client: givenClient,
+}: {
+	seed: DemoSeed;
+	client?: QueryClient;
+}) {
 	const active = useSyncExternalStore(
 		subscribeDemoActive,
 		getDemoActive,
 		getDemoServerActive,
 	);
 	const [{ client, seeded }] = useState(() => {
-		const client = new QueryClient({
-			defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
-		});
+		const client = givenClient ?? createDemoQueryClient();
 		// Render the actual dashboard and its stat card trends before activation.
 		// The stat cards read every session metric from one answer, so each
 		// seeded answer carries every seeded metric.
@@ -51,6 +63,7 @@ export function DemoRoot({ seed }: { seed: DemoSeed }) {
 				}),
 		);
 		const seeded: Array<[QueryKey, unknown]> = [
+			...(seed.queries ?? []),
 			...answers.map(({ input, data }): [QueryKey, unknown] => [
 				[
 					"org",
@@ -75,17 +88,17 @@ export function DemoRoot({ seed }: { seed: DemoSeed }) {
 					seed.organization.id,
 					...orpc.analytics.repositories.navigation.queryOptions({}).queryKey,
 				],
-				seed.repositories,
+				seed.navigation,
 			],
-			// Seed rows are newest first: the last upload bar's session.
 			[
 				[
 					"org",
 					seed.organization.id,
 					...orpc.analytics.sessions.lastUpload.queryOptions().queryKey,
 				],
-				toLastSessionUpload(seed.sessions[0]),
+				seed.lastUpload,
 			],
+			[planUsageQueryKey(DEMO_RANGE), seed.planUsage],
 		];
 		for (const [queryKey, data] of seeded)
 			client.setQueryData(queryKey, data, { updatedAt: 0 });
@@ -94,7 +107,7 @@ export function DemoRoot({ seed }: { seed: DemoSeed }) {
 	const [connection, setConnection] = useState<
 		"idle" | "connecting" | "live" | "error"
 	>("idle");
-	const live = active && connection === "live";
+	const live = connection === "live";
 	useLayoutEffect(() => {
 		// Focus once on entry, never when a later network response arrives.
 		// Preserve a control the visitor has already focused themselves.
@@ -108,9 +121,8 @@ export function DemoRoot({ seed }: { seed: DemoSeed }) {
 	const connect = useCallback(async () => {
 		setConnection("connecting");
 		try {
-			await ensureLiveDemoSession();
-			// The seed is the live demo's answer (tools/export-demo-seed.ts). Keep
-			// it fresh on Explore rather than reload what is already on screen.
+			setDemoLiveSessions(seed.sessions);
+			await prepareDemoBackend();
 			for (const [queryKey, data] of seeded)
 				client.setQueryData(queryKey, data);
 			setConnection("live");
@@ -118,56 +130,58 @@ export function DemoRoot({ seed }: { seed: DemoSeed }) {
 		} catch {
 			setConnection("error");
 		}
-	}, [client, seeded]);
+	}, [client, seeded, seed.sessions]);
 	useEffect(() => {
-		if (active && connection === "idle") void connect();
-	}, [active, connection, connect]);
+		if (connection === "idle") void connect();
+	}, [connection, connect]);
 	useMountEffect(() => {
 		document.documentElement.dataset.demoHydrated = "";
 	});
 	return (
 		<DemoRuntimeContext.Provider value={{ seed, live }}>
-			<ThemeProvider pageTheme="dark">
-				<QueryClientProvider client={client}>
-					<MemoryRouter
-						initialEntries={[
-							`/dashboard?from=${seed.dashboard.input.startDate}&to=${seed.dashboard.input.endDate}`,
-						]}
-					>
-						<WorkspaceStateProvider
-							value={{
-								state: {
-									activeOrg: seed.organization,
-									organizations: [seed.organization],
-									isLoading: false,
-								},
-								meta: { isOrgAdmin: true, readsEverySession: true },
-								actions: {
-									switchOrganization: async () => {
-										throw new Error("This demo uses the showcase workspace.");
-									},
-								},
-							}}
+			<SelfHostContext.Provider value={seed.selfHost}>
+				<ThemeProvider pageTheme="dark">
+					<QueryClientProvider client={client}>
+						<MemoryRouter
+							initialEntries={[
+								`/dashboard?from=${DEMO_RANGE.startDate}&to=${DEMO_RANGE.endDate}`,
+							]}
 						>
-							<DateRangeProvider storageKey="demoDateRange">
-								<div className="h-full" inert={!active} data-demo-surface>
-									<AppRouter
-										rootRedirectTarget="/dashboard"
-										dashboardComponent={DashboardPage}
-										sessionComponent={SessionsPage}
-									/>
-								</div>
-							</DateRangeProvider>
-						</WorkspaceStateProvider>
-					</MemoryRouter>
-				</QueryClientProvider>
-			</ThemeProvider>
+							<WorkspaceStateProvider
+								value={{
+									state: {
+										activeOrg: seed.organization,
+										organizations: [seed.organization],
+										isLoading: false,
+									},
+									meta: { isOrgAdmin: true, readsEverySession: true },
+									actions: {
+										switchOrganization: async () => {
+											throw new Error("The demo has one workspace.");
+										},
+									},
+								}}
+							>
+								<DateRangeProvider storageKey="demoDateRange">
+									<div className="h-full" inert={!active} data-demo-surface>
+										<AppRouter
+											rootRedirectTarget="/dashboard"
+											dashboardComponent={DashboardPage}
+											sessionComponent={SessionsPage}
+										/>
+									</div>
+								</DateRangeProvider>
+							</WorkspaceStateProvider>
+						</MemoryRouter>
+					</QueryClientProvider>
+				</ThemeProvider>
+			</SelfHostContext.Provider>
 			{active && connection === "error" ? (
 				<div
 					role="alert"
 					className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-popover p-4 text-popover-foreground shadow-lg dark:shadow-(--custom-shadow)"
 				>
-					The live demo could not connect.{" "}
+					The demo data could not load.{" "}
 					<button type="button" onClick={() => void connect()}>
 						Try again
 					</button>

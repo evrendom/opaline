@@ -20,12 +20,14 @@ import { useSessionArrivalsLive } from "./session-arrivals-live";
 /** How often a view's "active 12s ago" and running state are re-read. */
 const LIVE_STATE_CLOCK_MS = 30_000;
 
-// The plugin app reaches only the procedures it serves as tools, and the
-// product demo has no live sessions: both leave live views out.
+// The plugin app reaches only the procedures it serves as tools, so it
+// leaves live views out; the product demo reads them once explored.
 function useLiveSessionsAvailable(): boolean {
 	const demo = useDemoRuntime();
-	return import.meta.env.MODE !== "plugin" && demo === null;
+	return import.meta.env.MODE !== "plugin" && (demo === null || demo.live);
 }
+
+const NO_LIVE_SESSIONS: readonly never[] = [];
 
 export function useLiveSessionList({
 	enabled = true,
@@ -53,7 +55,7 @@ export function useLiveSessionList({
 		retry: false,
 	});
 	return {
-		sessions: query.data?.sessions ?? [],
+		sessions: query.data?.sessions ?? NO_LIVE_SESSIONS,
 		updatedAt: query.dataUpdatedAt,
 	};
 }

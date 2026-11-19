@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import {
 	pickedAgentOf,
 	pickedRunOf,
@@ -8,24 +8,13 @@ import {
 	syncPick,
 	writePick,
 } from "./reader-params";
-import { SESSION_VIEW_HREFS } from "./session-reader-tabs";
+import { sessionViewHrefs } from "./session-reader-tabs";
 
 const sorted = (params: URLSearchParams | string) =>
 	[...new URLSearchParams(params).entries()]
 		.sort(([a], [b]) => a.localeCompare(b))
 		.map(([key, value]) => `${key}=${value}`)
 		.join("&");
-
-const globals = globalThis as { window?: unknown };
-const hadWindow = "window" in globals;
-const originalWindow = globals.window;
-function at(search: string) {
-	globals.window = { location: { search } };
-}
-afterEach(() => {
-	if (hadWindow) globals.window = originalWindow;
-	else delete globals.window;
-});
 
 describe("writePick", () => {
 	test("a run: its turn follows it, no subagent", () => {
@@ -69,50 +58,48 @@ describe("syncPick", () => {
 	});
 });
 
-describe("SESSION_VIEW_HREFS", () => {
+describe("sessionViewHrefs", () => {
 	const page =
 		"sessionTab=files&file=a.ts&read=c1&run=r1&turn=r1&subagent=s1&agent=s1&call=e1&setup=CLAUDE.md&pr=o%2Fn%2312&ci=9";
 
 	test("ci: the whole session's CI, the other views' picks let go", () => {
-		at(`?${page}`);
-		expect(sorted(SESSION_VIEW_HREFS.ci({ pr: "o/n#3" }).slice(1))).toBe(
+		const hrefs = sessionViewHrefs(new URLSearchParams(page));
+		expect(sorted(hrefs.ci({ pr: "o/n#3" }).slice(1))).toBe(
 			"pr=o/n#3&sessionTab=ci",
 		);
-		expect(sorted(SESSION_VIEW_HREFS.ci({ ci: "77" }).slice(1))).toBe(
-			"ci=77&sessionTab=ci",
-		);
+		expect(sorted(hrefs.ci({ ci: "77" }).slice(1))).toBe("ci=77&sessionTab=ci");
 	});
 
 	test("file: on a file, under a run when given", () => {
-		at(`?${page}`);
-		expect(
-			sorted(SESSION_VIEW_HREFS.file({ file: "b.ts", run: "r9" }).slice(1)),
-		).toBe("file=b.ts&run=r9&sessionTab=files&turn=r9");
-		expect(sorted(SESSION_VIEW_HREFS.file({ file: "b.ts" }).slice(1))).toBe(
+		const hrefs = sessionViewHrefs(new URLSearchParams(page));
+		expect(sorted(hrefs.file({ file: "b.ts", run: "r9" }).slice(1))).toBe(
+			"file=b.ts&run=r9&sessionTab=files&turn=r9",
+		);
+		expect(sorted(hrefs.file({ file: "b.ts" }).slice(1))).toBe(
 			"file=b.ts&sessionTab=files",
 		);
 	});
 
 	test("setup: the whole session's setup, on a file", () => {
-		at(`?${page}`);
-		expect(sorted(SESSION_VIEW_HREFS.setup("AGENTS.md").slice(1))).toBe(
+		const hrefs = sessionViewHrefs(new URLSearchParams(page));
+		expect(sorted(hrefs.setup("AGENTS.md").slice(1))).toBe(
 			"sessionTab=setup&setup=AGENTS.md",
 		);
-		expect(sorted(SESSION_VIEW_HREFS.setup().slice(1))).toBe(
-			"sessionTab=setup",
-		);
+		expect(sorted(hrefs.setup().slice(1))).toBe("sessionTab=setup");
 	});
 
 	test("subagent: the detail, reading it with no run", () => {
-		at(`?${page}`);
-		expect(sorted(SESSION_VIEW_HREFS.subagent("s7").slice(1))).toBe(
+		const hrefs = sessionViewHrefs(new URLSearchParams(page));
+		expect(sorted(hrefs.subagent("s7").slice(1))).toBe(
 			"agent=s7&call=e1&sessionTab=detail&subagent=s7",
 		);
 	});
 
 	test("the summary is the view with no sessionTab", () => {
-		at("?sessionTab=summary&run=r1&turn=r1");
-		expect(SESSION_VIEW_HREFS.subagent("s1")).toBe(
+		const hrefs = sessionViewHrefs(
+			new URLSearchParams("sessionTab=summary&run=r1&turn=r1"),
+		);
+		expect(hrefs.subagent("s1")).toBe(
 			"?sessionTab=detail&agent=s1&subagent=s1",
 		);
 	});

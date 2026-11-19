@@ -26,6 +26,7 @@ export function isLocalDesktopApp(
 
 export function useLocalDesktopApp(): boolean {
 	const selfHost = useSelfHost();
+	if (import.meta.env.MODE === "product-demo") return selfHost !== null;
 	return isLocalDesktopApp(
 		Boolean(selfHost),
 		typeof navigator === "undefined" ? "" : navigator.userAgent,

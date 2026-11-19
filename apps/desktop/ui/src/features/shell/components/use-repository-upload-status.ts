@@ -21,7 +21,7 @@ export function useRepositoryUploadStatus() {
 	const demo = useDemoRuntime();
 	const settings = useAnalyticsQuery({
 		...orpc.repositorySettings.list.queryOptions({ staleTime: 5 * 60_000 }),
-		enabled: demo === null,
+		enabled: demo === null || demo.live,
 	});
 	const { sessions } = useLiveSessionList({ poll: LIVE_POLL_MS });
 	const now = useLiveClock(LIVE_POLL_MS);

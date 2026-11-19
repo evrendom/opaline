@@ -1,20 +1,19 @@
-import { afterEach, expect, test } from "bun:test";
+import { expect, test } from "bun:test";
 import { updateReaderParams, writeAgent, writePick } from "./reader-params";
 
-const originalWindow = globalThis.window;
-afterEach(() => {
-	globalThis.window = originalWindow;
-});
-
+let current = new URLSearchParams();
 function at(search: string) {
-	globalThis.window = { location: { search } } as typeof globalThis.window;
+	current = new URLSearchParams(search);
 }
 
 function run(update: (params: URLSearchParams) => void, replace?: boolean) {
 	const calls: { params: string; replace: boolean }[] = [];
 	updateReaderParams(
-		(params, options) =>
-			calls.push({ params: params.toString(), replace: options.replace }),
+		Object.assign(
+			(params: URLSearchParams, options: { replace: boolean }) =>
+				calls.push({ params: params.toString(), replace: options.replace }),
+			{ current: () => current },
+		),
 		update,
 		replace === undefined ? undefined : { replace },
 	);

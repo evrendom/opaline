@@ -1,0 +1,49 @@
+name: Product demo
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/desktop/ui/**"
+      - "packages/api-routes/**"
+      - ".github/workflows/product-demo.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: product-demo
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    name: Build and publish the product demo
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup
+
+      - name: Build the demo
+        run: bun run --cwd apps/desktop/ui build:demo
+
+      - name: Publish as release product-demo-latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tar -czf product-demo.tar.gz -C apps/desktop/ui/dist-demo .
+          gh release view product-demo-latest >/dev/null 2>&1 || gh release create product-demo-latest \
+            --title "Product demo" \
+            --notes "The landing page's product demo, rebuilt from main." \
+            --latest=false
+          gh release upload product-demo-latest product-demo.tar.gz --clobber

@@ -1,3 +1,7 @@
+import { useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useLatestValueRef } from "@/app/hooks/useLatestValueRef";
+
 export type SessionReaderTab = "summary" | "detail" | "files" | "setup" | "ci";
 
 export const SESSION_TAB_PARAM = "sessionTab";
@@ -35,17 +39,34 @@ export const SUBAGENT_PARAM = "subagent";
 export const AGENT_PARAM = "agent";
 export const TURN_PARAM = "turn";
 
-type SetReaderParams = (
+type SetReaderParams = ((
 	params: URLSearchParams,
 	options: { replace: boolean },
-) => void;
+) => void) & { current: () => URLSearchParams };
+
+export function useReaderSearchParams(): [URLSearchParams, SetReaderParams] {
+	const [searchParams, setSearchParams] = useSearchParams();
+	const latest = useLatestValueRef(searchParams);
+	const setReaderParams = useMemo(
+		() =>
+			Object.assign(
+				(params: URLSearchParams, options: { replace: boolean }) => {
+					latest.current = params;
+					setSearchParams(params, options);
+				},
+				{ current: () => latest.current },
+			),
+		[latest, setSearchParams],
+	);
+	return [searchParams, setReaderParams];
+}
 
 export function updateReaderParams(
 	setSearchParams: SetReaderParams,
 	update: (params: URLSearchParams) => void,
 	options?: { replace?: boolean },
 ) {
-	const before = new URLSearchParams(window.location.search);
+	const before = new URLSearchParams(setSearchParams.current());
 	const next = new URLSearchParams(before);
 	update(next);
 	const sameView =

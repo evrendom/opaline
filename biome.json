@@ -12,6 +12,7 @@
 			"packages/**",
 			"*.json",
 			"!**/generated",
+			"!apps/desktop/ui/demo-public/fixtures",
 			"!apps/desktop/shell/main.js",
 			"!apps/desktop/shell/analyze.js",
 			"!apps/desktop/shell/preload.js",

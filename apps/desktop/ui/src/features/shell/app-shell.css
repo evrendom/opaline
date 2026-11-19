@@ -52,6 +52,30 @@
 	padding-left: 72px;
 }
 
+:root[data-desktop] .desktop-window-lights {
+	position: fixed;
+	z-index: 60;
+	top: 16px;
+	left: 15px;
+	display: flex;
+	gap: 9px;
+}
+
+:root[data-desktop] .desktop-window-lights > span {
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: rgb(255 92 96);
+}
+
+:root[data-desktop] .desktop-window-lights > span:nth-child(2) {
+	background: rgb(250 200 0);
+}
+
+:root[data-desktop] .desktop-window-lights > span:nth-child(3) {
+	background: rgb(53 199 89);
+}
+
 :root[data-desktop][data-fullscreen] .desktop-window-bar {
 	padding-left: 0;
 }

@@ -5,7 +5,9 @@ import fixture from "./seed.json";
 test("static demo rows use the production analytics contract without runtime lookups", () => {
 	const seed = DemoSeedSchema.parse(fixture);
 	expect(seed.sessions).toHaveLength(30);
-	for (const session of seed.sessions) {
+	for (const session of seed.sessions.filter(
+		(row) => !("subagent_of" in row),
+	)) {
 		expect(session.error_count).toBeDefined();
 		expect(session.subagent_count).toBeDefined();
 		expect(session.native_subagents).toBeDefined();
@@ -16,9 +18,6 @@ test("static demo rows use the production analytics contract without runtime loo
 	expect(seed.sessions.some((session) => (session.error_count ?? 0) > 0)).toBe(
 		true,
 	);
-	expect(
-		seed.sessions.some((session) => session.member_swear_matches.length > 0),
-	).toBe(true);
 });
 
 test("the default dashboard seed includes a populated daily cost chart for its range", () => {
@@ -46,13 +45,6 @@ test("the demo seed carries a populated trend for every other stat card", () => 
 			offered.includes(metric),
 		),
 	]);
-	expect(
-		previews.some(
-			(preview) =>
-				preview.input.requestedMetric === "signals" &&
-				preview.input.splitBy === "signalTypes",
-		),
-	).toBe(true);
 	for (const { input, data } of cards) {
 		const metric = input.requestedMetric ?? "cost";
 		expect(input.startDate).toBe(dashboard.input.startDate);

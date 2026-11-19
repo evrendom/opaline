@@ -9,6 +9,13 @@ export function DesktopWindowBar() {
 
 	return (
 		<div className="desktop-window-bar">
+			{import.meta.env.MODE === "product-demo" ? (
+				<span className="desktop-window-lights" aria-hidden="true">
+					<span />
+					<span />
+					<span />
+				</span>
+			) : null}
 			<button
 				type="button"
 				aria-label="Back"

@@ -12,7 +12,6 @@ import {
 	IconSettingsFilled,
 } from "@tabler/icons-react";
 import { useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
 import { useLatestValueRef } from "@/app/hooks/useLatestValueRef";
 import { PillTabs } from "@/features/repos/pill-tabs";
 import { cn } from "@/lib/utils";
@@ -35,13 +34,14 @@ import {
 	SUBAGENT_PARAM,
 	TURN_PARAM,
 	updateReaderParams,
+	useReaderSearchParams,
 	writeAgent,
 	writePick,
 	writeView,
 } from "./reader-params";
 
 export function useWholeSessionLine() {
-	const [searchParams, setSearchParams] = useSearchParams();
+	const [searchParams, setSearchParams] = useReaderSearchParams();
 	const picked = searchParams.get(RUN_PARAM) === null;
 	const setSearchParamsRef = useLatestValueRef(setSearchParams);
 	return useMemo(
@@ -57,7 +57,7 @@ export function useWholeSessionLine() {
 }
 
 export function useReaderPick() {
-	const [searchParams, setSearchParams] = useSearchParams();
+	const [searchParams, setSearchParams] = useReaderSearchParams();
 	const address = readPick(searchParams);
 	const pick = (turnId: string | null, subagentId: string | null = null) =>
 		updateReaderParams(setSearchParams, (params) => {
@@ -113,10 +113,11 @@ const isTab = (value: string | null): value is SessionReaderTab =>
 	SESSION_VIEWS.some((view) => view.id === value);
 
 function hrefTo(
+	current: URLSearchParams,
 	view: SessionReaderTab,
 	picks: Record<string, string | undefined>,
 ): string {
-	const params = new URLSearchParams(window.location.search);
+	const params = new URLSearchParams(current);
 	writeView(params, view);
 	for (const [key, value] of Object.entries(picks)) {
 		if (value) params.set(key, value);
@@ -125,36 +126,38 @@ function hrefTo(
 	return `?${params.toString()}`;
 }
 
-export const SESSION_VIEW_HREFS = {
-	ci: (picks: { ci?: string; pr?: string }) =>
-		hrefTo("ci", {
-			[CI_PARAM]: picks.ci,
-			[PR_PARAM]: picks.pr,
-			...NO_PICK,
-		}),
-	file: (picks: { file?: string; run?: string }) =>
-		hrefTo("files", {
-			...NO_PICK,
-			[FILE_PARAM]: picks.file,
-			[READ_PARAM]: undefined,
-			[RUN_PARAM]: picks.run,
-			[TURN_PARAM]: picks.run,
-		}),
-	setup: (setupFile?: string) =>
-		hrefTo("setup", {
-			...NO_PICK,
-			[SETUP_PARAM]: setupFile,
-		}),
-	subagent: (subagentId?: string) =>
-		hrefTo("detail", {
-			...NO_PICK,
-			[AGENT_PARAM]: subagentId,
-			[SUBAGENT_PARAM]: subagentId,
-		}),
-};
+export function sessionViewHrefs(current: URLSearchParams) {
+	return {
+		ci: (picks: { ci?: string; pr?: string }) =>
+			hrefTo(current, "ci", {
+				[CI_PARAM]: picks.ci,
+				[PR_PARAM]: picks.pr,
+				...NO_PICK,
+			}),
+		file: (picks: { file?: string; run?: string }) =>
+			hrefTo(current, "files", {
+				...NO_PICK,
+				[FILE_PARAM]: picks.file,
+				[READ_PARAM]: undefined,
+				[RUN_PARAM]: picks.run,
+				[TURN_PARAM]: picks.run,
+			}),
+		setup: (setupFile?: string) =>
+			hrefTo(current, "setup", {
+				...NO_PICK,
+				[SETUP_PARAM]: setupFile,
+			}),
+		subagent: (subagentId?: string) =>
+			hrefTo(current, "detail", {
+				...NO_PICK,
+				[AGENT_PARAM]: subagentId,
+				[SUBAGENT_PARAM]: subagentId,
+			}),
+	};
+}
 
 export function useSessionReaderTab() {
-	const [searchParams, setSearchParams] = useSearchParams();
+	const [searchParams, setSearchParams] = useReaderSearchParams();
 	const param = searchParams.get(SESSION_TAB_PARAM);
 	const tab: SessionReaderTab = isTab(param) ? param : "summary";
 
@@ -213,6 +216,7 @@ export function useSessionReaderTab() {
 		});
 	}
 
+	const hrefs = useMemo(() => sessionViewHrefs(searchParams), [searchParams]);
 	const setupFile = searchParams.get(SETUP_PARAM);
 	const ciPicks = {
 		ci: searchParams.get(CI_PARAM),
@@ -221,7 +225,7 @@ export function useSessionReaderTab() {
 
 	return {
 		ciPicks,
-		hrefs: SESSION_VIEW_HREFS,
+		hrefs,
 		openCi,
 		openFiles,
 		openSetup,

@@ -1,138 +1,147 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { SessionOverviewAnalyticsSchema } from "@rudel/api-routes";
+import { readFile, writeFile } from "node:fs/promises";
+import { gunzipSync } from "node:zlib";
+import { SessionOverviewListRowSchema } from "@rudel/api-routes";
 import { z } from "zod";
-import { DemoSeedSchema } from "../src/features/demo/demo-runtime";
+import type { DemoFixtureIndex } from "../src/features/demo/demo-fixtures";
+import {
+	DEMO_RANGE,
+	DemoSeedSchema,
+	demoPlanUsageSearch,
+} from "../src/features/demo/demo-runtime";
 import { getSessionOverviewCost } from "../src/features/sessions/components/sessions-overview-table-utils";
 
-// The public, read-only demo API: the seed must show what Explore loads live.
-const base = process.env.DEMO_SEED_ORIGIN ?? "https://opaline.so";
-const organizationSchema = z.object({
-	id: z.literal("1zKtWzbRInKT6uNOqgXdcEGinGo2rXuW"),
-	name: z.string(),
-	slug: z.string(),
-	members: z.array(
-		z.object({
-			userId: z.string(),
-			user: z.object({ name: z.string(), image: z.string().nullable() }),
+const fixtures = new URL("../demo-public/fixtures/", import.meta.url);
+const index = JSON.parse(
+	await readFile(new URL("index.json", fixtures), "utf8"),
+) as DemoFixtureIndex;
+
+async function answer(
+	path: string,
+	matches: (input: Record<string, unknown>, search: string) => boolean = () =>
+		true,
+) {
+	const found = index.filter((fixture) => {
+		if (fixture.path !== path) return false;
+		const body = fixture.body ? JSON.parse(fixture.body) : {};
+		return matches(body.json ?? {}, fixture.search);
+	});
+	if (found.length === 0) throw new Error(`No recorded answer for ${path}`);
+	return Promise.all(
+		found.map(async (fixture) => {
+			const text = gunzipSync(
+				await readFile(new URL(fixture.file, fixtures)),
+			).toString("utf8");
+			const parsed = JSON.parse(text);
+			return {
+				input: (fixture.body ? JSON.parse(fixture.body).json : {}) ?? {},
+				data: path.startsWith("/rpc/") ? parsed.json : parsed,
+			};
 		}),
-	),
-});
-async function read(path: string, input?: unknown) {
-	const response = await fetch(
-		`${base}/api/demo${path}`,
-		input
-			? {
-					method: "POST",
-					headers: { "content-type": "application/json" },
-					body: JSON.stringify({ json: input }),
-				}
-			: undefined,
 	);
-	if (!response.ok)
-		throw new Error(`Seed read failed: ${path} (${response.status})`);
-	return response.json();
 }
-const dashboardInput = {
-	startDate: "2026-08-01",
-	endDate: "2026-08-31",
-	requestedMetric: "cost",
+
+const first = async (...args: Parameters<typeof answer>) => {
+	const [found] = await answer(...args);
+	if (!found) throw new Error(`No recorded answer for ${args[0]}`);
+	return found.data;
 };
-// The other stat cards, as the dashboard requests them for their sparklines.
-const previewInputs = [
-	{ ...dashboardInput, requestedMetric: "sessions" },
-	{
-		...dashboardInput,
-		requestedMetric: "agentRuns",
-		durationInterval: "daily",
-	},
-	{ ...dashboardInput, requestedMetric: "signals" },
-	...(["mergedPullRequests", "ciRuns"] as const).map((requestedMetric) => ({
-		...dashboardInput,
-		requestedMetric,
-		durationInterval: "daily",
-		sessionMetrics: false,
-	})),
-	{ ...dashboardInput, requestedMetric: "signals", splitBy: "signalTypes" },
-];
-const [
-	organizationData,
-	sessionData,
-	sessionsData,
-	repositoriesData,
-	dashboardData,
-	...previewData
-] = await Promise.all([
-	read("/auth/organization/get-full-organization"),
-	read("/auth/get-session"),
-	read("/rpc/analytics/sessions/list", {
-		startDate: "2026-08-01",
-		endDate: "2026-08-31",
-		limit: 1000,
-		sortBy: "session_date",
-		sortOrder: "desc",
-	}),
-	read("/rpc/analytics/repositories/list", {}),
-	read("/rpc/analytics/overview/costs", dashboardInput),
-	...previewInputs.map((input) => read("/rpc/analytics/overview/costs", input)),
-]);
-const organization = organizationSchema.parse(organizationData);
-const sessions = z
-	.object({
-		// Refuse an outdated deployment before overwriting the static preview.
-		// The demo must consume the same complete contract as the live product.
-		json: z.array(SessionOverviewAnalyticsSchema),
-	})
-	.parse(sessionsData).json;
-if (sessions.length !== 85)
-	throw new Error("Expected the approved 85-session demo");
-const members = [];
-await mkdir(new URL("../demo-public/demo-avatars/", import.meta.url), {
-	recursive: true,
-});
-for (const member of organization.members.filter(
-	(member) => member.user.image,
-)) {
-	const response = await fetch(new URL(member.user.image ?? "", base));
-	if (
-		!response.ok ||
-		!response.headers.get("content-type")?.startsWith("image/")
-	)
-		throw new Error("Avatar unavailable");
-	const extension = response.headers.get("content-type")?.includes("png")
-		? "png"
-		: "jpg";
-	const filename = `${member.userId}.${extension}`;
-	await writeFile(
-		new URL(`../demo-public/demo-avatars/${filename}`, import.meta.url),
-		Buffer.from(await response.arrayBuffer()),
+
+const inRange = (input: Record<string, unknown>) =>
+	input.startDate === DEMO_RANGE.startDate &&
+	input.endDate === DEMO_RANGE.endDate;
+const unfiltered = (input: Record<string, unknown>) =>
+	Object.values(input).every(
+		(value) => !Array.isArray(value) || value.length === 0,
 	);
-	members.push({
+
+const organization = z
+	.object({
+		id: z.string(),
+		name: z.string(),
+		slug: z.string(),
+		members: z.array(
+			z.object({ userId: z.string(), user: z.object({ name: z.string() }) }),
+		),
+	})
+	.parse(await first("/api/auth/organization/get-full-organization"));
+const session = z
+	.object({ user: z.object({ id: z.string() }) })
+	.parse(await first("/api/auth/get-session"));
+const sessions = z
+	.array(SessionOverviewListRowSchema)
+	.parse(
+		await first(
+			"/rpc/analytics/sessions/list",
+			(input) => inRange(input) && input.offset === 0,
+		),
+	);
+const costs = (
+	await answer(
+		"/rpc/analytics/overview/costs",
+		(input) => inRange(input) && unfiltered(input),
+	)
+).filter(
+	(entry, position, all) =>
+		all.findIndex(
+			(other) => JSON.stringify(other.input) === JSON.stringify(entry.input),
+		) === position,
+);
+const dashboard = costs.find(
+	({ input }) => input.requestedMetric === "cost" && input.splitBy === "none",
+);
+if (!dashboard) throw new Error("No recorded cost dashboard");
+const offered = new Set<string>(dashboard.data.availableMetrics);
+const CARD_ORDER = [
+	"sessions",
+	"agentRuns",
+	"signals",
+	"mergedPullRequests",
+	"ciRuns",
+];
+const GITHUB_CARDS = new Set(["mergedPullRequests", "ciRuns"]);
+const cardRank = (input: Record<string, unknown>) =>
+	CARD_ORDER.indexOf(String(input.requestedMetric)) +
+	(input.splitBy === "none" ? 0 : CARD_ORDER.length);
+const previews = costs
+	.filter(
+		(entry) =>
+			entry !== dashboard &&
+			CARD_ORDER.includes(String(entry.input.requestedMetric)) &&
+			offered.has(String(entry.input.requestedMetric)),
+	)
+	.sort((a, b) => cardRank(a.input) - cardRank(b.input))
+	.filter((entry, position, all) => {
+		const github = GITHUB_CARDS.has(String(entry.input.requestedMetric));
+		const preview = github === (entry.input.sessionMetrics === false);
+		const twin = all.find(
+			(other, at) =>
+				at !== position &&
+				other.input.requestedMetric === entry.input.requestedMetric &&
+				other.input.splitBy === entry.input.splitBy,
+		);
+		return preview || !twin;
+	});
+
+const seed = DemoSeedSchema.parse({
+	organization: {
+		id: organization.id,
+		name: organization.name,
+		slug: organization.slug,
+		logo: "",
+	},
+	members: organization.members.map((member) => ({
 		userId: member.userId,
 		name: member.user.name,
-		image: `/product-demo/demo-avatars/${filename}`,
-	});
-}
-const seed = DemoSeedSchema.parse({
-	// The showcase workspace's mark is bundled with the demo, not stored upstream.
-	organization: {
-		...organization,
-		logo: "/product-demo/demo-workspace-logo.png",
-	},
-	members,
-	viewerUserId: z
-		.object({ user: z.object({ id: z.string() }) })
-		.parse(sessionData).user.id,
-	sessions: sessions.slice(0, 30),
-	repositories: z.object({ json: z.unknown() }).parse(repositoriesData).json,
-	totalSessionCount: sessions.length,
-	dashboard: {
-		input: dashboardInput,
-		data: z.object({ json: z.unknown() }).parse(dashboardData).json,
-	},
-	previews: previewInputs.map((input, index) => ({
-		input,
-		data: z.object({ json: z.unknown() }).parse(previewData[index]).json,
+		image: "",
 	})),
+	viewerUserId: session.user.id,
+	sessions: sessions.slice(0, 30),
+	totalSessionCount: sessions.length,
+	repositories: await first("/rpc/analytics/repositories/list"),
+	navigation: await first("/rpc/analytics/repositories/navigation"),
+	lastUpload: await first("/rpc/analytics/sessions/lastUpload"),
+	dashboard,
+	previews,
 	maxima: {
 		input: Math.max(...sessions.map((row) => row.input_tokens)),
 		output: Math.max(...sessions.map((row) => row.output_tokens)),
@@ -141,11 +150,16 @@ const seed = DemoSeedSchema.parse({
 		),
 		cost: Math.max(...sessions.map((row) => getSessionOverviewCost(row) ?? 0)),
 	},
+	selfHost: await first("/api/selfhost/info"),
+	planUsage: await first(
+		"/api/selfhost/plan-usage",
+		(_input, search) => search === `?${demoPlanUsageSearch()}`,
+	),
 });
 await writeFile(
 	new URL("../src/features/demo/seed.json", import.meta.url),
 	JSON.stringify(seed),
 );
 console.log(
-	`Saved ${seed.sessions.length} preview rows and ${members.length} local avatars; no transcripts or credentials.`,
+	`Saved the first screen of ${seed.totalSessionCount} recorded sessions; no transcripts or credentials.`,
 );

@@ -10,13 +10,18 @@ import {
 	setDemoActive,
 	subscribeDemoActive,
 } from "./demo-activation";
+import { installDemoBackend } from "./demo-backend";
+import { installDemoClock } from "./demo-clock";
+
+installDemoClock();
+installDemoBackend();
 
 if (usesSafariDemoMotion(navigator.userAgent)) {
 	document.documentElement.setAttribute("data-demo-webkit", "");
 }
 
 // Only this listener runs during landing-page load. The parent prepares React
-// after its load/paint/idle boundary; activation and live data still need Explore.
+// after its load/paint/idle boundary; activation still needs Explore.
 const parentOrigin = document.referrer
 	? new URL(document.referrer).origin
 	: window.location.origin;

@@ -1,11 +1,23 @@
 import {
 	CostDashboardInputSchema,
 	CostDashboardSchema,
+	LastSessionUploadSchema,
 	RepositorySummarySchema,
-	SessionOverviewAnalyticsSchema,
+	SessionOverviewListRowSchema,
 } from "@rudel/api-routes";
 import { createContext, useContext } from "react";
 import { z } from "zod";
+import { planUsageSearch } from "@/features/costs/plan-usage/use-plan-usage";
+import { parseSelfHostInfo } from "@/features/self-hosted/self-host-info";
+
+export const DEMO_RANGE = {
+	startDate: "2026-08-01",
+	endDate: "2026-08-31",
+} as const;
+
+export function demoPlanUsageSearch(): string {
+	return planUsageSearch(DEMO_RANGE);
+}
 
 export const DemoSeedSchema = z.object({
 	organization: z.object({
@@ -17,11 +29,18 @@ export const DemoSeedSchema = z.object({
 	members: z.array(
 		z.object({ userId: z.string(), name: z.string(), image: z.string() }),
 	),
-	// The showcase account's member, shown as the signed-in user before Explore.
 	viewerUserId: z.string(),
-	sessions: z.array(SessionOverviewAnalyticsSchema).max(30),
+	sessions: z.array(SessionOverviewListRowSchema).max(30),
 	totalSessionCount: z.number(),
 	repositories: z.array(RepositorySummarySchema),
+	navigation: z.array(
+		RepositorySummarySchema.pick({
+			identity: true,
+			sessionCount: true,
+			lastActiveAt: true,
+		}),
+	),
+	lastUpload: LastSessionUploadSchema.nullable(),
 	dashboard: z.object({
 		input: CostDashboardInputSchema,
 		data: CostDashboardSchema,
@@ -40,6 +59,16 @@ export const DemoSeedSchema = z.object({
 		tokens: z.number().optional(),
 		cost: z.number(),
 	}),
+	selfHost: z.unknown().transform((value, context) => {
+		const info = parseSelfHostInfo(value);
+		if (!info) {
+			context.addIssue({ code: "custom", message: "Not a self-host info" });
+			return z.NEVER;
+		}
+		return info;
+	}),
+	planUsage: z.unknown(),
+	queries: z.array(z.tuple([z.array(z.unknown()), z.unknown()])).optional(),
 });
 export type DemoSeed = z.infer<typeof DemoSeedSchema>;
 export interface DemoRuntime {

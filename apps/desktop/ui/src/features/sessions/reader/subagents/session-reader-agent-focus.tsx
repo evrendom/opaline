@@ -11,7 +11,6 @@ import {
 	useLayoutEffect,
 	useMemo,
 } from "react";
-import { useSearchParams } from "react-router-dom";
 import { useLatestValueRef } from "@/app/hooks/useLatestValueRef";
 import { cn } from "@/lib/utils";
 import { ReaderMinimap } from "../minimap/session-reader-minimap";
@@ -21,6 +20,7 @@ import {
 	AGENT_PARAM,
 	pickOf,
 	updateReaderParams,
+	useReaderSearchParams,
 	writeAgent,
 	writePick,
 } from "../reader-params";
@@ -36,7 +36,7 @@ export function useAgentFocus(): {
 		options?: { replace?: boolean },
 	) => void;
 } {
-	const [searchParams, setSearchParams] = useSearchParams();
+	const [searchParams, setSearchParams] = useReaderSearchParams();
 	const setSearchParamsRef = useLatestValueRef(setSearchParams);
 	return {
 		focus: searchParams.get(AGENT_PARAM),

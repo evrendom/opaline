@@ -1,5 +1,5 @@
 // Shared by the tiny boot listener and the lazily loaded React app.
-// Preparing the app must not activate it or start live-data requests.
+// Preparing the app must not activate it.
 let active = false;
 const listeners = new Set<() => void>();
 

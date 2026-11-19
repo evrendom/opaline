@@ -74,10 +74,10 @@ export interface UsageRange {
 const DAY_MS = 86_400_000;
 const POLL_MS = 60_000;
 
-async function readPlanUsage(
+export function planUsageSearch(
 	range: UsageRange,
-	repositories: readonly string[],
-): Promise<PlanUsageReport | null> {
+	repositories: readonly string[] = [],
+): string {
 	const from = Date.parse(`${range.startDate}T00:00:00Z`);
 	const to = Date.parse(`${range.endDate}T00:00:00Z`) + DAY_MS;
 	const params = new URLSearchParams({
@@ -87,6 +87,27 @@ async function readPlanUsage(
 	});
 	for (const repository of repositories)
 		params.append("repository", repository);
+	return params.toString();
+}
+
+export function planUsageQueryKey(
+	range: UsageRange,
+	repositories: readonly string[] = [],
+) {
+	return [
+		"selfhost",
+		"plan-usage",
+		range.startDate,
+		range.endDate,
+		...repositories,
+	] as const;
+}
+
+async function readPlanUsage(
+	range: UsageRange,
+	repositories: readonly string[],
+): Promise<PlanUsageReport | null> {
+	const params = planUsageSearch(range, repositories);
 	const response = await fetch(`/api/selfhost/plan-usage?${params}`, {
 		credentials: "include",
 	});
@@ -101,13 +122,7 @@ export function usePlanUsage(
 	repositories: readonly string[] = [],
 ) {
 	return useQuery({
-		queryKey: [
-			"selfhost",
-			"plan-usage",
-			range.startDate,
-			range.endDate,
-			...repositories,
-		],
+		queryKey: planUsageQueryKey(range, repositories),
 		queryFn: () => readPlanUsage(range, repositories),
 		enabled,
 		refetchInterval: POLL_MS,
