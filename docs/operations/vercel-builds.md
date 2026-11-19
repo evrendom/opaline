@@ -6,7 +6,7 @@ site build owns the product, demo, and marketing assets; CI does not build the
 product and marketing a second time through Turbo.
 
 `bun run check-types:vercel` checks every `api/**/*.ts` entrypoint and its imported
-code using the root `tsconfig.json`, with `noCheck: false`. Vercel also runs this
+code using `deploy/cloud/tsconfig.json`, with `noCheck: false`. Vercel also runs this
 command once before building, so manual preview builds retain the same check.
 
 `api/tsconfig.json` is the configuration Vercel's function compiler discovers.

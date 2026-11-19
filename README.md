@@ -31,7 +31,7 @@ bun install
 bash apps/desktop/package.sh
 ```
 
-`package.sh` builds the server and web app from your checkout and writes `Opaline.app` and `Opaline.dmg` to `~/.cache/opaline-desktop/package`. For day-to-day development, see [CONTRIBUTING.md](CONTRIBUTING.md).
+`package.sh` builds the server and web app from your checkout and writes `Opaline.app` and `Opaline.dmg` to `~/.cache/opaline-desktop/package`. For day-to-day development, see [CONTRIBUTING.md](.github/CONTRIBUTING.md).
 
 ## Run a server for your team
 
@@ -54,7 +54,7 @@ npx opaline@latest login --api-base https://opaline.example.com
 npx opaline@latest
 ```
 
-See [docs/usage.md](docs/usage.md) and [docs/data-handling.md](docs/data-handling.md). Releases are listed under `opaline-cli@*` in this repository's releases; see [RELEASING.md](RELEASING.md).
+See [docs/usage.md](docs/usage.md) and [docs/data-handling.md](docs/data-handling.md). Releases are listed under `opaline-cli@*` in this repository's releases; see [docs/releasing.md](docs/releasing.md).
 
 ## Privacy and secrets
 
@@ -73,11 +73,13 @@ Session transcripts contain whatever your agents saw: source code, prompts, comm
 | `apps/cli-harness` | An older CLI copy that the API integration and version-skew tests run against; not published |
 | `plugins/opaline` | The Claude Code and Codex plugin |
 | `deploy/selfhost` | The Docker Compose stack for a team server |
+| `deploy/dev` | Postgres and ClickHouse for local development (`bun run infra:up`) |
+| `deploy/cloud` | The hosted service's Vercel functions, Convex functions and load tests; not used by the Mac app or a self-hosted server |
 | `packages/*` | Shared packages: schemas, transcript parsing, secret filter |
 
 ## Contributing and security
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). To report a vulnerability, see [SECURITY.md](SECURITY.md); please do not open public issues for security problems.
+See [CONTRIBUTING.md](.github/CONTRIBUTING.md). To report a vulnerability, see [SECURITY.md](.github/SECURITY.md); please do not open public issues for security problems.
 
 ## License
 

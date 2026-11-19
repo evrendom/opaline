@@ -34,7 +34,7 @@ Official releases also send limited usage analytics, including repository/sessio
 
 - [CLI guide](https://github.com/evrendom/opaline/blob/main/docs/usage.md) — commands, installation, configuration, troubleshooting, and migration from Rudel.
 - [Data handling](https://github.com/evrendom/opaline/blob/main/docs/data-handling.md) — full transcript and analytics disclosure, including persistent opt-out.
-- [Contributing](https://github.com/evrendom/opaline/blob/main/CONTRIBUTING.md) — local development and the CLI playground.
+- [Contributing](https://github.com/evrendom/opaline/blob/main/.github/CONTRIBUTING.md) — local development and the CLI playground.
 
 ## License
 

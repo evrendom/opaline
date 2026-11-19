@@ -865,7 +865,7 @@ describe("model rate card", () => {
 
 	it("keeps the generated pricing sheet in sync", async () => {
 		const pricingSheet = Bun.file(
-			new URL("../../../../MODEL_PRICING.md", import.meta.url),
+			new URL("../../../../docs/model-pricing.md", import.meta.url),
 		);
 
 		expect(await pricingSheet.text()).toBe(renderModelPricingTable());

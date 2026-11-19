@@ -11,7 +11,7 @@ import {
 	createR2MultipartUploadClient,
 	R2_INGEST_BUCKET,
 } from "../apps/api/src/services/r2-ingest-storage.service.js";
-import { createGitHubWebhookVercelHandler } from "../api/webhooks/github.js";
+import { createGitHubWebhookVercelHandler } from "../deploy/cloud/api/webhooks/github.js";
 
 const secret = "integration-webhook-secret".repeat(3);
 const suffix = randomUUID();

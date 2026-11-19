@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import vercelConfig from "../../../../deploy/cloud/vercel.json" with {
+	type: "json",
+};
 import chSchemaPackage from "../../../../packages/ch-schema/package.json" with {
 	type: "json",
 };
-import vercelConfig from "../../../../vercel.json" with { type: "json" };
 import { PRODUCTION_SECURITY_HEADERS } from "../lib/http-response-policy.js";
 import {
 	VERCEL_INGEST_PUBLIC_PATH_PATTERN,
@@ -19,24 +21,33 @@ const headerRuleBySource = new Map(
 	vercelConfig.headers.map((rule) => [rule.source, rule.headers]),
 );
 const nativeLineageEntrypointSource = readFileSync(
-	resolve(import.meta.dir, "../../../../api/cron/native-lineage.ts"),
+	resolve(
+		import.meta.dir,
+		"../../../../deploy/cloud/api/cron/native-lineage.ts",
+	),
 	"utf8",
 );
 const billingEntrypointSource = readFileSync(
-	resolve(import.meta.dir, "../../../../api/cron/billing.ts"),
+	resolve(import.meta.dir, "../../../../deploy/cloud/api/cron/billing.ts"),
 	"utf8",
 );
 const trendsSourcesEntrypointSource = readFileSync(
-	resolve(import.meta.dir, "../../../../api/cron/trends-sources.ts"),
+	resolve(
+		import.meta.dir,
+		"../../../../deploy/cloud/api/cron/trends-sources.ts",
+	),
 	"utf8",
 );
 
 const usageDigestEntrypointSource = readFileSync(
-	resolve(import.meta.dir, "../../../../api/cron/usage-digest.ts"),
+	resolve(import.meta.dir, "../../../../deploy/cloud/api/cron/usage-digest.ts"),
 	"utf8",
 );
 const sessionRetirementEntrypointSource = readFileSync(
-	resolve(import.meta.dir, "../../../../api/cron/session-retirement.ts"),
+	resolve(
+		import.meta.dir,
+		"../../../../deploy/cloud/api/cron/session-retirement.ts",
+	),
 	"utf8",
 );
 
@@ -73,7 +84,7 @@ describe("Vercel deployment configuration", () => {
 			),
 		).toBe("/api/rpc?__opaline_path=/api/:routePath");
 		expect(nativeLineageEntrypointSource).toContain(
-			'from "../../apps/api/src/handlers/native-session-lineage-maintenance.js"',
+			'from "../../../../apps/api/src/handlers/native-session-lineage-maintenance.js"',
 		);
 		expect(nativeLineageEntrypointSource).not.toContain("api-maintenance");
 		expect(nativeLineageEntrypointSource).toContain(
@@ -106,7 +117,7 @@ describe("Vercel deployment configuration", () => {
 			expect(cron.schedule).toMatch(/^\d{1,2} \d{1,2} \* \* \*$/u);
 		}
 		expect(billingEntrypointSource).toContain(
-			'from "../../apps/api/src/handlers/billing-reconciliation-maintenance.js"',
+			'from "../../../../apps/api/src/handlers/billing-reconciliation-maintenance.js"',
 		);
 		expect(billingEntrypointSource).toContain(
 			"publicPathPattern: /^\\/api\\/cron\\/billing$/u",
@@ -128,7 +139,10 @@ describe("Vercel deployment configuration", () => {
 		);
 		expect(apiCatchAll?.source).toContain("(?!cron/r2-ingest$)");
 		const entrypoint = readFileSync(
-			resolve(import.meta.dir, "../../../../api/cron/r2-ingest.ts"),
+			resolve(
+				import.meta.dir,
+				"../../../../deploy/cloud/api/cron/r2-ingest.ts",
+			),
 			"utf8",
 		);
 		expect(entrypoint).toContain("fetch: handleR2IngestMaintenanceRequest");
@@ -172,7 +186,10 @@ describe("Vercel deployment configuration", () => {
 		);
 		expect(apiCatchAll?.source).toContain("(?!cron/run-index-heal$)");
 		const entrypoint = readFileSync(
-			resolve(import.meta.dir, "../../../../api/cron/run-index-heal.ts"),
+			resolve(
+				import.meta.dir,
+				"../../../../deploy/cloud/api/cron/run-index-heal.ts",
+			),
 			"utf8",
 		);
 		expect(entrypoint).toContain("fetch: handleRunIndexHealMaintenanceRequest");
@@ -231,7 +248,10 @@ describe("Vercel deployment configuration", () => {
 		);
 		expect(apiCatchAll?.source).toContain("(?!cron/live-sessions$)");
 		const entrypoint = readFileSync(
-			resolve(import.meta.dir, "../../../../api/cron/live-sessions.ts"),
+			resolve(
+				import.meta.dir,
+				"../../../../deploy/cloud/api/cron/live-sessions.ts",
+			),
 			"utf8",
 		);
 		expect(entrypoint).toContain("fetch: handleLiveSessionsMaintenanceRequest");
@@ -305,7 +325,7 @@ describe("Vercel deployment configuration", () => {
 		);
 		expect(apiCatchAll?.source).toContain("(?!cron/session-retirement$)");
 		expect(sessionRetirementEntrypointSource).toContain(
-			'from "../../apps/api/src/handlers/session-retirement-maintenance.js"',
+			'from "../../../../apps/api/src/handlers/session-retirement-maintenance.js"',
 		);
 		expect(sessionRetirementEntrypointSource).toContain(
 			"publicPathPattern: /^\\/api\\/cron\\/session-retirement$/u",

@@ -2,11 +2,6 @@ name: CI
 
 on:
   workflow_dispatch:
-    inputs:
-      migrate_only:
-        description: Apply Postgres migrations without deploying the legacy Fly app
-        type: boolean
-        default: false
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
   push:
@@ -50,7 +45,7 @@ jobs:
           predicate-quantifier: every
           filters: |
             integration:
-              - "{apps/api/**,apps/cli/**,apps/cli-harness/**,apps/marketing/**,packages/**,scripts/**,.github/actions/setup/**,.github/workflows/ci.yml,bun.lock,package.json,turbo.json,vercel.json}"
+              - "{apps/api/**,apps/cli/**,apps/cli-harness/**,apps/marketing/**,packages/**,scripts/**,.github/actions/setup/**,.github/workflows/ci.yml,bun.lock,package.json,turbo.json,deploy/cloud/vercel.json}"
               - "!apps/api/src/mcp/**"
               - "!apps/api/src/handlers/mcp-http*"
               - "!**/*.md"
@@ -304,49 +299,6 @@ jobs:
     secrets:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       PG_CONNECTION_STRING: ${{ secrets.PG_CONNECTION_STRING }}
-
-  deploy:
-    if: >-
-      github.repository == 'opalinehq/athena' &&
-      github.ref == 'refs/heads/main' &&
-      github.event_name == 'workflow_dispatch'
-    needs: [verify, integration]
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    environment: production
-    concurrency:
-      group: production-deploy
-      cancel-in-progress: false
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup Bun
-        uses: ./.github/actions/setup
-
-      - name: Run Postgres migrations
-        run: bun run --cwd packages/sql-schema migrate
-        env:
-          PG_CONNECTION_STRING: ${{ secrets.PG_CONNECTION_STRING }}
-
-      - name: Setup Fly.io
-        if: ${{ !inputs.migrate_only }}
-        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
-
-      - name: Deploy
-        if: ${{ !inputs.migrate_only }}
-        run: |
-          flyctl deploy --remote-only \
-            --build-arg "VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}" \
-            --build-arg "VITE_CHATWOOT_BASE_URL=${{ secrets.VITE_CHATWOOT_BASE_URL }}" \
-            --build-arg "VITE_CHATWOOT_WEBSITE_TOKEN=${{ secrets.VITE_CHATWOOT_WEBSITE_TOKEN }}" \
-            --build-arg "VITE_POSTHOG_KEY=${{ secrets.VITE_POSTHOG_KEY }}" \
-            --build-arg "VITE_POSTHOG_HOST=${{ secrets.VITE_POSTHOG_HOST }}" \
-            --build-arg "VITE_POSTHOG_ENABLED=${{ secrets.VITE_POSTHOG_ENABLED }}" \
-            --build-arg "VITE_ADMIN_ORGANIZATION_ID=${{ secrets.VITE_ADMIN_ORGANIZATION_ID }}" \
-            --build-arg "VITE_SENTRY_DSN=${{ secrets.VITE_SENTRY_DSN }}"
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
   cli-smoke:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false

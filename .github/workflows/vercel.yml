@@ -204,7 +204,7 @@ jobs:
           vercel promote "${DEPLOYMENT_URL}" --yes --scope=opalinehq
 
   # Second, small Vercel project that only materializes R2 sessions above
-  # 128 MiB on 4 GB functions (deploy/large-ingest). Production only, after the
+  # 128 MiB on 4 GB functions (deploy/cloud/large-ingest). Production only, after the
   # main deploy (which applied the Postgres migrations), and skipped while the
   # project id variable is unset.
   deploy-large-ingest:
@@ -235,7 +235,7 @@ jobs:
         shell: bash
         run: |
           [[ -n "${VERCEL_TOKEN}" && -n "${VERCEL_ORG_ID}" ]]
-          # The project's Root Directory is deploy/large-ingest; deploying from
+          # The project's Root Directory is deploy/cloud/large-ingest; deploying from
           # the repository root uploads the API source it imports.
           deployment_url="$(vercel deploy --archive=tgz --yes --prod --skip-domain --scope=opalinehq)"
           if [[ ! "${deployment_url}" =~ ^https://[a-zA-Z0-9.-]+\.vercel\.app$ ]]; then

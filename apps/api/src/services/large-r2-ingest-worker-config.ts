@@ -3,7 +3,7 @@ import { totalmem } from "node:os";
 
 /**
  * Must equal `maxDuration` of `api/cron/large-r2-ingest.ts` in
- * `deploy/large-ingest/vercel.json` (the Pro plan's generally available
+ * `deploy/cloud/large-ingest/vercel.json` (the Pro plan's generally available
  * maximum on fluid compute).
  */
 export const LARGE_R2_INGEST_WORKER_MAX_DURATION_MS = 800_000;

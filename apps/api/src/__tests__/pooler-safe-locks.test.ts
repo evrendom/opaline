@@ -13,7 +13,7 @@ import { join, relative } from "node:path";
 
 const API_SOURCE_ROOT = join(import.meta.dir, "..");
 const REPOSITORY_ROOT = join(API_SOURCE_ROOT, "..", "..", "..");
-const FUNCTION_SOURCE_ROOT = join(REPOSITORY_ROOT, "api");
+const FUNCTION_SOURCE_ROOT = join(REPOSITORY_ROOT, "deploy", "cloud", "api");
 
 test("no API source depends on Postgres session state", () => {
 	const files = [

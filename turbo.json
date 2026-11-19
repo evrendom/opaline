@@ -34,5 +34,5 @@
 			]
 		}
 	},
-	"globalDependencies": ["vercel.json"]
+	"globalDependencies": ["deploy/cloud/vercel.json"]
 }

@@ -16,7 +16,7 @@ const url = process.env.CONVEX_URL?.trim();
 const signingKey = parseSigningKey(process.env.ANALYSIS_LOG_SIGNING_KEY ?? "");
 if (!url || !signingKey)
 	throw new Error(
-		"The Convex integration test needs CONVEX_URL and ANALYSIS_LOG_SIGNING_KEY for a deployment whose ANALYSIS_LOG_JWKS holds the matching public key (see convex/README.md).",
+		"The Convex integration test needs CONVEX_URL and ANALYSIS_LOG_SIGNING_KEY for a deployment whose ANALYSIS_LOG_JWKS holds the matching public key (see deploy/cloud/convex/README.md).",
 	);
 
 const deploymentUrl: string = url;

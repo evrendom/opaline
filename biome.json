@@ -14,7 +14,6 @@
 			"convex/**",
 			"*.json",
 			"!**/generated",
-			"!design-archive",
 			"!apps/marketing/public/vendor",
 			"!apps/marketing/src/styles/vendor",
 			"!apps/desktop/main.js",

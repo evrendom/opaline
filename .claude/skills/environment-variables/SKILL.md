@@ -38,9 +38,9 @@ jobs:
 
 Secrets must exist in repository settings → Secrets → Actions first.
 
-### 3. Frontend `VITE_*` Variables (Dockerfile + CI Deploy)
+### 3. Frontend `VITE_*` Variables (Dockerfile)
 
-Frontend variables prefixed with `VITE_` are baked into the web app at build time by Vite. They must be declared in **two places**:
+Frontend variables prefixed with `VITE_` are baked into the web app at build time by Vite. They must be declared in the `Dockerfile`:
 
 **A) `Dockerfile`** — Add an `ARG` declaration so Docker receives the value:
 
@@ -48,16 +48,7 @@ Frontend variables prefixed with `VITE_` are baked into the web app at build tim
 ARG VITE_ADMIN_ORGANIZATION_ID=""
 ```
 
-**B) `.github/workflows/ci.yml` deploy step** — Pass the value as a `--build-arg`:
-
-```yaml
-- name: Deploy
-  run: |
-    flyctl deploy --remote-only \
-      --build-arg "VITE_ADMIN_ORGANIZATION_ID=${{ secrets.VITE_ADMIN_ORGANIZATION_ID }}"
-```
-
-If either is missing, the variable will be empty in the deployed frontend.
+If it is missing, the variable will be empty in the built frontend.
 
 ### 4. Package-Specific turbo.json
 

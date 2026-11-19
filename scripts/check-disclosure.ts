@@ -21,7 +21,7 @@ interface PullRequestMetadata {
 	body: string | null;
 }
 
-// The checker defines every blocked marker. CONTRIBUTING.md is the policy
+// The checker defines every blocked marker. .github/CONTRIBUTING.md is the policy
 // document and may quote a marker while explaining the boundary. Keep these
 // explicit exclusions narrow and review additions as policy changes.
 const TRACKED_FILE_EXCLUSIONS = new Set([
@@ -34,7 +34,7 @@ const TRACKED_FILE_EXCLUSIONS = new Set([
 	"apps/cli/src/__tests__/alias-hook-config.test.ts",
 	"apps/cli/src/internal/local-context-source/metadata-filter.test.ts",
 	"scripts/check-disclosure.ts",
-	"CONTRIBUTING.md",
+	".github/CONTRIBUTING.md",
 ]);
 
 const CUSTOMER_NAME_HASHES = new Set([

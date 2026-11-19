@@ -1,11 +1,11 @@
 import { getLogger } from "@logtape/logtape";
-import { startFlyApiLifecycle } from "./fly-lifecycle.js";
-import { createFlyStaticFallback } from "./fly-static.js";
 import { fetchHandler, MAX_REQUEST_BODY_BYTES } from "./handler.js";
+import { startServerLifecycle } from "./server-lifecycle.js";
+import { createServerStaticFallback } from "./server-static.js";
 
 const logger = getLogger(["rudel", "api", "http"]);
 const port = process.env.PORT ?? "4010";
-const staticFallback = createFlyStaticFallback();
+const staticFallback = createServerStaticFallback();
 const server = Bun.serve({
 	fetch(request, server) {
 		return fetchHandler(request, {
@@ -16,7 +16,7 @@ const server = Bun.serve({
 	maxRequestBodySize: MAX_REQUEST_BODY_BYTES,
 	port,
 });
-const lifecycle = startFlyApiLifecycle();
+const lifecycle = startServerLifecycle();
 let isShuttingDown = false;
 
 async function shutdown(signal?: string): Promise<void> {

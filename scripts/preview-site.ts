@@ -1,7 +1,7 @@
 import { resolve, extname } from "node:path";
 import { createDemoHandler } from "../apps/api/src/handlers/demo-http.js";
 import { handleSitePageRequest } from "../apps/api/src/handlers/site-page-http.js";
-import config from "../vercel.json";
+import config from "../deploy/cloud/vercel.json";
 
 const root = resolve(import.meta.dir, "../dist-site");
 const api = process.env.PREVIEW_API_URL ?? "http://localhost:4031";

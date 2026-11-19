@@ -11,7 +11,7 @@
 
 ## CLI
 
-- The published CLI (npm `opaline`, `@opalinehq/cli` and `rudel`) lives in `apps/cli`, with its npm launchers in `packages/opaline` and `packages/rudel-alias`, and is released from this repository by `.github/workflows/release.yml` (see `RELEASING.md`).
+- The published CLI (npm `opaline`, `@opalinehq/cli` and `rudel`) lives in `apps/cli`, with its npm launchers in `packages/opaline` and `packages/rudel-alias`, and is released from this repository by `.github/workflows/release.yml` (see `docs/releasing.md`).
 - `apps/cli-harness` is an older copy of the CLI that the API integration and version-skew tests run against. It is not published.
 
 ## Web UI

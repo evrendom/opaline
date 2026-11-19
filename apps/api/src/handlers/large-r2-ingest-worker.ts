@@ -16,7 +16,7 @@ import {
 const logger = getLogger(["rudel", "api", "large-r2-ingest-worker"]);
 
 /**
- * Cron entry of the large-ingest deployment (`deploy/large-ingest`): it alone
+ * Cron entry of the large-ingest deployment (`deploy/cloud/large-ingest`): it alone
  * materializes R2 sessions above 128 MiB, in a project whose functions have
  * 4 GB. Answers 503 without touching any job unless worker mode is enabled
  * and the function has the memory for it.
