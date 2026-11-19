@@ -18,7 +18,7 @@ Not changed: the GitHub links keep their own retention; the weekly totals (`week
 | `packages/ch-schema/scripts/migrate-run-index.ts:45-48,218-230` | read-back required the table TTL and the eight column TTLs, so it would fail once they are removed | does not check TTLs or the nine reworded comments; the retention runner owns them |
 | `apps/api/src/services/analysis/run-index-reader.ts:45-72,93` | `isRunIndexTextExpired`, `expireRunIndexText`, and an `if(... <= today(), NULL, col)` per text column on every read | removed; text is read as stored |
 | `apps/api/src/services/l1-edges/run-index.service.ts:268-274` | nulled text of sessions older than 365 days before writing | removed |
-| `apps/api/src/clickhouse.ts:128-131`, `docs/l1-literal-schema.md:9,165,175`, `docs/adr/0002-literal-l1-for-analysis.md:17`, `CLAUDE.md` (run index and new L1 retention sections) | stated the expiry | state "kept until a deletion request" |
+| `apps/api/src/clickhouse.ts:128-131`, `docs/l1-literal-schema.md:9,165,175`, `docs/adr/0002-literal-l1-for-analysis.md:17`, `AGENTS.md` (run index and new L1 retention sections) | stated the expiry | state "kept until a deletion request" |
 
 No scheduled job deletes these tables by age. The maintenance steps that delete rows (`retire:transcript-records`, the hourly session retirement, session revision receipts, expired purge jobs, expired ingest jobs) remove superseded generations or operational rows, never a session's data by age. The `l1-edge-census` and `run-index-census` steps look back 14 days only to find sessions to queue, not to expire anything.
 
