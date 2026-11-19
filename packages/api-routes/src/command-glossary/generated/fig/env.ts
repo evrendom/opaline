@@ -1,0 +1,4 @@
+// Generated from @withfig/autocomplete (MIT, Hercules Labs Inc.). Do not edit.
+import type { FigSpec } from "../../fig-spec.js";
+
+export default JSON.parse("{\"n\":[\"env\"],\"d\":\"Set environment and execute command, or print environment\",\"o\":[{\"n\":[\"-0\"],\"d\":\"End each output line with NUL, not newline\"},{\"n\":[\"-i\",\"-\"],\"d\":\"Start with an empty environment\"},{\"n\":[\"-v\"],\"d\":\"Print verbose logs\"},{\"n\":[\"-u\"],\"d\":\"Remove variable from the environment\",\"a\":[{\"n\":\"name\"}]},{\"n\":[\"-P\"],\"d\":\"Search the given directories for the utility, rather than the PATH\",\"a\":[{\"n\":\"altpath\"}]},{\"n\":[\"-S\"],\"d\":\"Split the given string into separate arguments\",\"a\":[{\"n\":\"string\"}]}],\"a\":[{\"n\":\"name=value ...\",\"d\":\"Set environment variables\",\"o\":1},{\"n\":\"utility\",\"d\":\"Utility to run\",\"o\":1,\"c\":1}]}") as FigSpec;

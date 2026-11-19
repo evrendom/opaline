@@ -1,0 +1,4 @@
+ALTER TABLE "repository_evidence_capture" ADD COLUMN "index_row" jsonb;--> statement-breakpoint
+ALTER TABLE "repository_evidence_capture" ADD COLUMN "index_published_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "repository_evidence_capture" ADD COLUMN "index_next_attempt_at" timestamp with time zone DEFAULT now() NOT NULL;--> statement-breakpoint
+CREATE INDEX "repository_evidence_capture_index_pending_idx" ON "repository_evidence_capture" USING btree ("created_at") WHERE "repository_evidence_capture"."index_published_at" IS NULL AND "repository_evidence_capture"."index_row" IS NOT NULL;

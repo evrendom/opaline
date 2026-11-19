@@ -439,66 +439,60 @@ describe("local context collection from a real Git worktree", () => {
 		{ observedSkillNames: [] },
 		{ observedSkillNames: ["demo"] },
 		{ observedSkillNames: ["DEMO"] },
-	])(
-		"session evidence materializes every skill definition and nothing else outside instructions (%j)",
-		async ({ observedSkillNames }) => {
-			const fixture = await createRepositoryFixture();
-			const options = {
-				...getFixtureOptions(fixture),
-				capturePolicy: "session-evidence" as const,
-				observedSkillNames,
-			};
-			const bundle = await collectLocalContextBundle(
-				fixture.repository,
-				options,
-				fixedEnvironment(),
-			);
+	])("session evidence materializes every skill definition and nothing else outside instructions (%j)", async ({
+		observedSkillNames,
+	}) => {
+		const fixture = await createRepositoryFixture();
+		const options = {
+			...getFixtureOptions(fixture),
+			capturePolicy: "session-evidence" as const,
+			observedSkillNames,
+		};
+		const bundle = await collectLocalContextBundle(
+			fixture.repository,
+			options,
+			fixedEnvironment(),
+		);
 
-			const agents = getFile(bundle, "repository", "AGENTS.md");
-			const skill = getFile(
-				bundle,
-				"repository",
-				".claude/skills/demo/SKILL.md",
-			);
-			const packageContext = getFile(bundle, "repository", "package.json");
-			const unrelated = getFile(bundle, "repository", "README.md");
+		const agents = getFile(bundle, "repository", "AGENTS.md");
+		const skill = getFile(bundle, "repository", ".claude/skills/demo/SKILL.md");
+		const packageContext = getFile(bundle, "repository", "package.json");
+		const unrelated = getFile(bundle, "repository", "README.md");
 
-			expect(agents.content.status).toBe("available");
-			// Every available skill's definition is captured, observed or not.
-			for (const definition of [
-				skill,
-				getFile(bundle, "user-skills", "demo/SKILL.md"),
-				getFile(bundle, "user-skills", "cached-plugin/skill/SKILL.md"),
-			]) {
-				expect(definition.content.status).toBe("available");
-				expect(definition.hash).toMatchObject({
-					status: "available",
-					algorithm: "sha256",
-					scope: "stored",
-				});
-			}
-			expect(packageContext.content).toMatchObject({
-				status: "omitted",
-				reason: "metadata-only",
-			});
-			expect(unrelated.content).toMatchObject({
-				status: "omitted",
-				reason: "metadata-only",
-			});
-			expect(unrelated.hash).toMatchObject({
+		expect(agents.content.status).toBe("available");
+		// Every available skill's definition is captured, observed or not.
+		for (const definition of [
+			skill,
+			getFile(bundle, "user-skills", "demo/SKILL.md"),
+			getFile(bundle, "user-skills", "cached-plugin/skill/SKILL.md"),
+		]) {
+			expect(definition.content.status).toBe("available");
+			expect(definition.hash).toMatchObject({
 				status: "available",
 				algorithm: "sha256",
-				scope: "source",
+				scope: "stored",
 			});
-			expect(
-				bundle.manifest.contextIndex.facets.find(
-					(facet) =>
-						facet.rootId === "repository" &&
-						facet.kind === "agents-instructions",
-				)?.resources[0]?.access,
-			).toEqual({ status: "readable" });
-		},
-	);
+		}
+		expect(packageContext.content).toMatchObject({
+			status: "omitted",
+			reason: "metadata-only",
+		});
+		expect(unrelated.content).toMatchObject({
+			status: "omitted",
+			reason: "metadata-only",
+		});
+		expect(unrelated.hash).toMatchObject({
+			status: "available",
+			algorithm: "sha256",
+			scope: "source",
+		});
+		expect(
+			bundle.manifest.contextIndex.facets.find(
+				(facet) =>
+					facet.rootId === "repository" && facet.kind === "agents-instructions",
+			)?.resources[0]?.access,
+		).toEqual({ status: "readable" });
+	});
 
 	test("reuses parent blobs across incremental captures", async () => {
 		const fixture = await createRepositoryFixture();
@@ -716,93 +710,94 @@ describe("local context collection from a real Git worktree", () => {
 		);
 	});
 
-	test.each(["delta", "session-evidence"] as const)(
-		"applies the same credential-path policy to %s filesystem content and both Git patches",
-		async (capturePolicy) => {
-			const repository = await createEmptyRepository();
-			await mkdir(join(repository, "nested"));
-			const credentialNames = [
-				".env",
-				".env.local",
-				".env.example",
-				".env.sample",
-				".env.template",
-				".npmrc",
-				".netrc",
-				".pypirc",
-				"credentials.json",
-				"service-account.json",
-				"id_rsa",
-				"id_ed25519",
-				"private.pem",
-				"private.key",
-				"private.p12",
-				"private.pfx",
-			];
-			const credentialPaths = credentialNames.flatMap((name) => [
-				name,
-				`nested/${name.toUpperCase()}`,
-			]);
-			const safePaths = [
-				"environment.example",
-				"nested/credentials.json.bak",
-				"nested/private.pem.txt",
-				"nested/.env-example",
-			];
-			const allPaths = [...credentialPaths, ...safePaths];
-			for (const path of allPaths) {
-				await writeFile(join(repository, path), "original content\n");
-			}
-			git(repository, ["add", "."]);
-			git(repository, ["commit", "--no-gpg-sign", "-m", "initial"]);
-			for (const path of allPaths) {
-				await writeFile(join(repository, path), `staged edit for ${path}\n`);
-			}
-			git(repository, ["add", "."]);
-			for (const path of allPaths) {
-				await writeFile(join(repository, path), `working edit for ${path}\n`);
-			}
-			const bundle = await collectLocalContextBundle(
-				repository,
-				{ ...getDefaultLocalContextCollectionOptions(), capturePolicy },
-				fixedEnvironment(),
-			);
+	test.each([
+		"delta",
+		"session-evidence",
+	] as const)("applies the same credential-path policy to %s filesystem content and both Git patches", async (capturePolicy) => {
+		const repository = await createEmptyRepository();
+		await mkdir(join(repository, "nested"));
+		const credentialNames = [
+			".env",
+			".env.local",
+			".env.example",
+			".env.sample",
+			".env.template",
+			".npmrc",
+			".netrc",
+			".pypirc",
+			"credentials.json",
+			"service-account.json",
+			"id_rsa",
+			"id_ed25519",
+			"private.pem",
+			"private.key",
+			"private.p12",
+			"private.pfx",
+		];
+		const credentialPaths = credentialNames.flatMap((name) => [
+			name,
+			`nested/${name.toUpperCase()}`,
+		]);
+		const safePaths = [
+			"environment.example",
+			"nested/credentials.json.bak",
+			"nested/private.pem.txt",
+			"nested/.env-example",
+		];
+		const allPaths = [...credentialPaths, ...safePaths];
+		for (const path of allPaths) {
+			await writeFile(join(repository, path), "original content\n");
+		}
+		git(repository, ["add", "."]);
+		git(repository, ["commit", "--no-gpg-sign", "-m", "initial"]);
+		for (const path of allPaths) {
+			await writeFile(join(repository, path), `staged edit for ${path}\n`);
+		}
+		git(repository, ["add", "."]);
+		for (const path of allPaths) {
+			await writeFile(join(repository, path), `working edit for ${path}\n`);
+		}
+		const bundle = await collectLocalContextBundle(
+			repository,
+			{ ...getDefaultLocalContextCollectionOptions(), capturePolicy },
+			fixedEnvironment(),
+		);
 
-			assert(bundle.manifest.git.status === "available");
-			expect(bundle.manifest.git.diffs.map((diff) => diff.kind).sort()).toEqual(
-				["staged", "working-tree"],
-			);
-			for (const diff of bundle.manifest.git.diffs) {
-				assert(diff.blobId);
-				const patch = getBlob(bundle, diff.blobId).content;
-				for (const path of credentialPaths) {
-					expect(patch).not.toContain(`diff --git a/${path} b/${path}\n`);
-				}
-				for (const path of safePaths) {
-					expect(patch).toContain(path);
-				}
-			}
-			const allBlobText = bundle.blobs.map((blob) => blob.content).join("\n");
+		assert(bundle.manifest.git.status === "available");
+		expect(bundle.manifest.git.diffs.map((diff) => diff.kind).sort()).toEqual([
+			"staged",
+			"working-tree",
+		]);
+		for (const diff of bundle.manifest.git.diffs) {
+			assert(diff.blobId);
+			const patch = getBlob(bundle, diff.blobId).content;
 			for (const path of credentialPaths) {
-				const file = getFile(bundle, "repository", path);
-				expect(file.content).toEqual({
-					status: "omitted",
-					reason: "high-risk-path",
-					detail: null,
-				});
-				expect(file.hash).toEqual({
-					status: "omitted",
-					reason: "high-risk-path",
-				});
-				expect(allBlobText).not.toContain(`edit for ${path}\n`);
+				expect(patch).not.toContain(`diff --git a/${path} b/${path}\n`);
 			}
 			for (const path of safePaths) {
-				expect(getFile(bundle, "repository", path).content.status).toBe(
-					capturePolicy === "delta" ? "available" : "omitted",
-				);
+				expect(patch).toContain(path);
 			}
-		},
-	);
+		}
+		const allBlobText = bundle.blobs.map((blob) => blob.content).join("\n");
+		for (const path of credentialPaths) {
+			const file = getFile(bundle, "repository", path);
+			expect(file.content).toEqual({
+				status: "omitted",
+				reason: "high-risk-path",
+				detail: null,
+			});
+			expect(file.hash).toEqual({
+				status: "omitted",
+				reason: "high-risk-path",
+			});
+			expect(allBlobText).not.toContain(`edit for ${path}\n`);
+		}
+		for (const path of safePaths) {
+			expect(getFile(bundle, "repository", path).content.status).toBe(
+				capturePolicy === "delta" ? "available" : "omitted",
+			);
+		}
+	});
 
 	test("applies explicit path exclusions to staged and working-tree patches", async () => {
 		const repository = await createEmptyRepository();

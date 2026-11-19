@@ -101,4 +101,4 @@ This disables CLI usage analytics. It does not disable the transcript uploads yo
 
 ## Report a security issue
 
-Use the private reporting process in [SECURITY.md](../SECURITY.md). Do not post credentials, private transcripts, or security vulnerabilities in a public issue.
+Use the private reporting process in [SECURITY.md](../.github/SECURITY.md). Do not post credentials, private transcripts, or security vulnerabilities in a public issue.

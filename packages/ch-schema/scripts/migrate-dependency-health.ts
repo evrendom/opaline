@@ -1,0 +1,42 @@
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import {
+	checksumSQL,
+	createJournalStore,
+	extractExecutableStatements,
+} from "chkit/dist/bin/lib.js";
+import { appendJournalEntryWithReconciliation } from "./migrate-f16.js";
+import { openMigrationTarget } from "./migration-target.js";
+
+// Apply only this forward migration: the merged history contains older schema
+// experiments that must never be replayed against an existing production DB.
+const name = "20260916120000_dependency_health_probes.sql";
+const target = await openMigrationTarget();
+const { executor } = target;
+try {
+	const sql = await readFile(
+		resolve(import.meta.dir, "../chx/migrations", name),
+		"utf8",
+	);
+	const checksum = checksumSQL(sql);
+	const journal = createJournalStore(executor);
+	const applied = (await journal.readJournal()).applied.find(
+		(entry) => entry.name === name,
+	);
+	if (applied) {
+		if (applied.checksum !== checksum)
+			throw new Error("Dependency health migration checksum mismatch");
+		console.log(`Already applied: ${name}`);
+	} else {
+		for (const statement of extractExecutableStatements(sql))
+			await executor.execute(statement);
+		await appendJournalEntryWithReconciliation(journal, {
+			name,
+			checksum,
+			appliedAt: new Date().toISOString().replace("Z", ""),
+		});
+		console.log(`Applied: ${name}`);
+	}
+} finally {
+	await target.close();
+}

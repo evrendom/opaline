@@ -1,0 +1,14 @@
+{"timestamp":"2026-08-01T10:00:00.000Z","type":"session_meta","payload":{"id":"custom-exec-era"}}
+{"timestamp":"2026-08-01T10:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"inspect current cells"}]}}
+{"timestamp":"2026-08-01T10:00:02.000Z","type":"response_item","payload":{"type":"custom_tool_call","name":"exec","input":"const result = await tools.exec_command({cmd: \"sed -n '1,220p' src/app.ts\", workdir: \"/repo\"});\ntext(result.output);","call_id":"literal-read"}}
+{"timestamp":"2026-08-01T10:00:03.000Z","type":"response_item","payload":{"type":"custom_tool_call_output","call_id":"literal-read","output":"source"}}
+{"timestamp":"2026-08-01T10:00:04.000Z","type":"response_item","payload":{"type":"custom_tool_call","name":"exec","input":"const commands = [\"pwd\", \"ls\"];\nconst results = await Promise.all(commands.map((cmd) => tools.exec_command({cmd})));\nresults.forEach((result) => text(result.output));","call_id":"script"}}
+{"timestamp":"2026-08-01T10:00:05.000Z","type":"response_item","payload":{"type":"custom_tool_call_output","call_id":"script","output":"done"}}
+{"timestamp":"2026-08-01T10:00:06.000Z","type":"response_item","payload":{"type":"custom_tool_call","name":"exec","input":"const result = await tools.apply_patch(\"*** Begin Patch\\n*** Add File: src/current.ts\\n+current\\n*** End Patch\");\ntext(result);","call_id":"literal-patch"}}
+{"timestamp":"2026-08-01T10:00:07.000Z","type":"event_msg","payload":{"type":"patch_apply_end","call_id":"literal-patch","success":true,"changes":{"/repo/src/current.ts":{"type":"add","unified_diff":"+current","move_path":null}},"status":"completed"}}
+{"timestamp":"2026-08-01T10:00:08.000Z","type":"response_item","payload":{"type":"custom_tool_call_output","call_id":"literal-patch","output":"Success"}}
+{"timestamp":"2026-08-01T10:00:09.000Z","type":"response_item","payload":{"type":"custom_tool_call","name":"exec","input":"const image = await tools.view_image({path: \"art/current.png\", detail: \"original\"});\nimage(image.image_url);","call_id":"literal-image"}}
+{"timestamp":"2026-08-01T10:00:10.000Z","type":"response_item","payload":{"type":"function_call","name":"wait","arguments":"{\"cell_id\":\"cell-1\",\"yield_time_ms\":10000}","call_id":"wait"}}
+{"timestamp":"2026-08-01T10:00:11.000Z","type":"event_msg","payload":{"type":"web_search_end","call_id":"ws-1","query":"official docs","action":{"type":"search","query":"official docs"}}}
+{"timestamp":"2026-08-01T10:00:12.000Z","type":"response_item","payload":{"type":"web_search_call","status":"completed","action":{"type":"search","query":"official docs","queries":["official docs"]}}}
+{"timestamp":"2026-08-01T10:00:13.000Z","type":"event_msg","payload":{"type":"context_compacted"}}

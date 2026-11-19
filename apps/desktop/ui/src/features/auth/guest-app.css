@@ -1,0 +1,238 @@
+html[data-auth-shell] {
+	--auth-surface: #fff;
+	--auth-text: #171717;
+	--auth-muted: #737373;
+	--auth-control: #fff;
+	--auth-control-hover: #f9f9f9;
+	--auth-input-border: rgb(23 23 23 / 15%);
+	--auth-control-shadow:
+		inset 0 0 0 0.5px rgb(0 0 0 / 0%), 0 0 0 0.5px rgb(0 0 0 / 6%),
+		0 1px 1px -1px rgb(0 0 0 / 10%), 0 1px 2px rgb(0 0 0 / 5%);
+	--auth-code-shadow:
+		inset 0 0 0 1px rgb(23 23 23 / 15%), 0 1px 2px rgb(0 0 0 / 4%);
+}
+
+/* Dark: the app's window surface, with controls one step up like cards. */
+html.dark[data-auth-shell] {
+	--auth-surface: var(--background);
+	--auth-text: var(--foreground);
+	--auth-muted: var(--muted-foreground);
+	--auth-control: var(--card);
+	--auth-control-hover: oklch(0.235 0 0);
+	--auth-input-border: rgb(255 255 255 / 15%);
+	--auth-control-shadow: var(--custom-outline-shadow);
+	--auth-code-shadow: inset 0 0 0 1px rgb(255 255 255 / 15%);
+}
+
+html[data-auth-shell],
+:where(html)[data-auth-shell] body {
+	min-height: 100%;
+	background: var(--auth-surface);
+	overscroll-behavior: none;
+}
+
+.opaline-auth-shell {
+	display: flex;
+	min-height: 100svh;
+	background: var(--auth-surface);
+	color: var(--auth-text);
+	font-family: "Inter Variable", Inter, system-ui, sans-serif;
+}
+
+.opaline-auth-main {
+	display: flex;
+	width: 100%;
+	min-height: 100svh;
+	align-items: center;
+	justify-content: center;
+	padding: 48px 24px;
+}
+
+.opaline-auth-content {
+	width: 100%;
+	max-width: 400px;
+}
+
+.opaline-auth-intro {
+	margin-bottom: 32px;
+	text-align: center;
+}
+
+.opaline-auth-mark {
+	display: block;
+	width: 40px;
+	height: 40px;
+	margin: 0 auto 24px;
+}
+
+.opaline-auth-intro h1 {
+	margin: 0 0 12px;
+	font-size: 20px;
+	font-weight: 600;
+	letter-spacing: -0.025em;
+	line-height: 1.35;
+	text-wrap: balance;
+}
+
+.opaline-auth-intro p {
+	margin: 0;
+	color: var(--auth-muted);
+	font-size: 14px;
+	line-height: 1.6;
+	text-wrap: pretty;
+}
+
+.opaline-auth-intro .opaline-auth-eyebrow {
+	margin-bottom: 8px;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.14em;
+	line-height: 1.4;
+	text-transform: uppercase;
+}
+
+.opaline-auth-content [data-slot="button"] {
+	min-height: 42px;
+	border-radius: 8px;
+	font: inherit;
+	transition:
+		background-color 140ms ease,
+		border-color 140ms ease,
+		color 140ms ease;
+}
+
+.opaline-auth-content [data-slot="button"][data-variant="outline"] {
+	border-color: transparent;
+	padding: 10px 14px;
+	background: var(--auth-control);
+	box-shadow: var(--auth-control-shadow);
+}
+
+.opaline-auth-content
+	[data-slot="button"][data-variant="outline"]:hover:not(:disabled) {
+	background: var(--auth-control-hover);
+}
+
+.opaline-auth-content [data-slot="input"] {
+	min-height: 44px;
+	border: 1px solid var(--auth-input-border);
+	border-radius: 8px;
+	background: var(--auth-control);
+}
+
+.opaline-auth-stage {
+	animation: opaline-auth-stage-enter 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.opaline-email-verification {
+	display: flex;
+	flex-direction: column;
+	gap: 24px;
+}
+
+.opaline-email-verification-intro {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	align-items: center;
+	gap: 6px;
+	text-align: center;
+}
+
+.opaline-email-verification-intro p {
+	max-width: 36ch;
+	margin: 0;
+	color: var(--auth-muted);
+	font-size: 14px;
+	line-height: 1.6;
+	overflow-wrap: anywhere;
+	text-wrap: pretty;
+}
+
+.opaline-auth-email-switch {
+	position: relative;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: var(--auth-muted);
+	font: inherit;
+	font-size: 13px;
+	line-height: 1.5;
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}
+
+.opaline-auth-email-switch:hover:not(:disabled) {
+	color: var(--auth-text);
+}
+
+.opaline-auth-email-switch:disabled {
+	opacity: 0.55;
+	cursor: default;
+}
+
+.opaline-auth-email-switch > span {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: max(100%, 48px);
+	height: max(100%, 48px);
+	pointer-events: none;
+	transform: translate(-50%, -50%);
+}
+
+.opaline-auth-content [data-slot="input"].opaline-auth-code-input {
+	min-height: 56px;
+	border: 0;
+	padding-inline: 18px;
+	background: var(--auth-control);
+	box-shadow: var(--auth-code-shadow);
+	color: var(--auth-text);
+	font-size: 18px;
+	font-variant-numeric: tabular-nums;
+	font-weight: 500;
+	letter-spacing: 0.22em;
+	text-align: center;
+}
+
+@keyframes opaline-auth-stage-enter {
+	from {
+		opacity: 0;
+		transform: translateY(8px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@media (max-width: 899px) {
+	.opaline-auth-main {
+		padding-block: 40px;
+	}
+
+	.opaline-auth-content [data-slot="button"],
+	.opaline-auth-content [data-slot="input"] {
+		font-size: 16px;
+	}
+
+	.opaline-email-verification-intro p {
+		font-size: 16px;
+	}
+}
+
+@media (max-height: 700px) and (min-width: 900px) {
+	.opaline-auth-main {
+		padding-block: 32px;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.opaline-auth-content [data-slot="button"] {
+		transition: none;
+	}
+
+	.opaline-auth-stage {
+		animation: none;
+	}
+}

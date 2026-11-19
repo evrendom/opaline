@@ -1,0 +1,978 @@
+import { expect, type Locator, type Page, test } from "@playwright/test";
+
+const FIXTURE_ROUTE = "/dev/trace-tree-fixture";
+const ROW_SELECTOR = "[data-transcript-row-id]";
+
+test.describe.configure({ mode: "serial" });
+
+async function waitForFrames(page: Page, count = 2) {
+	await page.evaluate(async (frames) => {
+		for (let index = 0; index < frames; index += 1) {
+			await new Promise<void>((resolve) =>
+				requestAnimationFrame(() => resolve()),
+			);
+		}
+	}, count);
+}
+
+async function openVirtualFixture(
+	page: Page,
+	query = "turns=18&profile=scroll",
+) {
+	await page.goto(
+		`${FIXTURE_ROUTE}?mode=continuous&transcript=virtual&${query}`,
+	);
+	const scroller = page.locator("[data-trace-fixture-continuous-scroller]");
+	await expect(scroller).toBeVisible({ timeout: 15_000 });
+	await expect(
+		scroller.locator("[data-transcript-virtual-list]"),
+	).toBeVisible();
+	await expect(scroller.locator(ROW_SELECTOR).first()).toBeVisible();
+	await expect(scroller).toHaveAttribute(
+		"data-transcript-true-blank-frames",
+		"0",
+	);
+	await waitForFrames(page);
+	return scroller;
+}
+
+async function sampleRows(scroller: Locator) {
+	return scroller.evaluate((element, selector) => {
+		if (!(element instanceof HTMLElement)) {
+			throw new Error("Transcript fixture scroller must be an HTMLElement");
+		}
+		const bounds = element.getBoundingClientRect();
+		return {
+			clientHeight: element.clientHeight,
+			rows: Array.from(element.querySelectorAll(selector))
+				.map((candidate) => {
+					if (!(candidate instanceof HTMLElement)) {
+						throw new Error("Transcript row must be an HTMLElement");
+					}
+					const rect = candidate.getBoundingClientRect();
+					return {
+						bottom: rect.bottom - bounds.top + element.scrollTop,
+						id: candidate.dataset.transcriptRowId ?? "",
+						top: rect.top - bounds.top + element.scrollTop,
+					};
+				})
+				.sort((left, right) => left.top - right.top),
+			scrollHeight: element.scrollHeight,
+			scrollTop: element.scrollTop,
+		};
+	}, ROW_SELECTOR);
+}
+
+async function scrollSweep(scroller: Locator, page: Page, steps = 24) {
+	const maximum = await scroller.evaluate((element) => {
+		if (!(element instanceof HTMLElement)) {
+			throw new Error("Transcript fixture scroller must be an HTMLElement");
+		}
+		return element.scrollHeight - element.clientHeight;
+	});
+	let previousTop = -1;
+	for (let step = 0; step <= steps; step += 1) {
+		const requested = Math.round((maximum * step) / steps);
+		await scroller.evaluate((element, scrollTop) => {
+			if (element instanceof HTMLElement) {
+				element.scrollTop = scrollTop;
+			}
+		}, requested);
+		await waitForFrames(page, 1);
+		const sample = await sampleRows(scroller);
+		expect(sample.scrollTop).toBeGreaterThanOrEqual(previousTop);
+		previousTop = sample.scrollTop;
+		for (let index = 1; index < sample.rows.length; index += 1) {
+			const previous = sample.rows[index - 1];
+			const current = sample.rows[index];
+			if (previous && current) {
+				expect(
+					current.top,
+					`${previous.id} must not overlap ${current.id}`,
+				).toBeGreaterThanOrEqual(previous.bottom - 2);
+			}
+		}
+	}
+}
+
+async function profileScrollSweep(scroller: Locator, steps = 60) {
+	await scroller.evaluate(async (element, sweepSteps) => {
+		if (!(element instanceof HTMLElement)) {
+			throw new Error("Transcript fixture scroller must be an HTMLElement");
+		}
+		const maximum = element.scrollHeight - element.clientHeight;
+		for (let step = 0; step <= sweepSteps; step += 1) {
+			element.scrollTop = Math.round((maximum * step) / sweepSteps);
+			await new Promise<void>((resolve) =>
+				requestAnimationFrame(() => resolve()),
+			);
+		}
+	}, steps);
+}
+
+async function getTurnSectionRange(scroller: Locator, turnId: string) {
+	return scroller.evaluate((element, targetTurnId) => {
+		const bounds = element.getBoundingClientRect();
+		const rows = Array.from(
+			element.querySelectorAll<HTMLElement>(
+				`[data-transcript-turn-id="${targetTurnId}"][data-transcript-row-kind="section"]`,
+			),
+		).map((row) => {
+			const rect = row.getBoundingClientRect();
+			return {
+				end: rect.bottom - bounds.top + element.scrollTop,
+				id: row.dataset.transcriptRowId ?? "",
+				start: rect.top - bounds.top + element.scrollTop,
+			};
+		});
+		if (rows.length === 0) {
+			throw new Error(`No measured section rows found for ${targetTurnId}`);
+		}
+		return {
+			end: Math.max(...rows.map((row) => row.end)),
+			rowIds: rows.map((row) => row.id),
+			start: Math.min(...rows.map((row) => row.start)),
+		};
+	}, turnId);
+}
+
+async function getTurnRowRange(
+	scroller: Locator,
+	turnId: string,
+	kind: string,
+) {
+	return scroller.evaluate(
+		(element, input) => {
+			const bounds = element.getBoundingClientRect();
+			const row = element.querySelector<HTMLElement>(
+				`[data-transcript-turn-id="${input.turnId}"][data-transcript-row-kind="${input.kind}"]`,
+			);
+			if (!row) {
+				throw new Error(`No ${input.kind} row found for ${input.turnId}`);
+			}
+			const rect = row.getBoundingClientRect();
+			return {
+				end: rect.bottom - bounds.top + element.scrollTop,
+				start: rect.top - bounds.top + element.scrollTop,
+			};
+		},
+		{ kind, turnId },
+	);
+}
+
+async function sampleStickyHeaderAtTop(scroller: Locator) {
+	return scroller.evaluate((element) => {
+		const bounds = element.getBoundingClientRect();
+		const header = Array.from(
+			element.querySelectorAll<HTMLElement>("[data-transcript-sticky-header]"),
+		).find((candidate) => {
+			const rect = candidate.getBoundingClientRect();
+			return rect.top <= bounds.top + 1 && rect.bottom > bounds.top;
+		});
+		if (!header) {
+			throw new Error("Expected a native sticky transcript header at the top");
+		}
+		const rect = header.getBoundingClientRect();
+		return {
+			absoluteX: rect.x,
+			absoluteY: rect.y,
+			atTop: rect.top <= bounds.top + 1 && rect.bottom > bounds.top,
+			bottom: rect.bottom - bounds.top,
+			height: rect.height,
+			label:
+				header.querySelector("[data-trace-model-label]")?.textContent?.trim() ??
+				"",
+			kind: header.dataset.transcriptStickyHeaderKind,
+			owner: header.dataset.transcriptStickyHeaderOwner,
+			top: rect.top - bounds.top,
+			translateY: rect.top - bounds.top,
+			visible: getComputedStyle(header).visibility === "visible",
+			userLabel:
+				header.querySelector("[data-trace-user-label]")?.textContent?.trim() ??
+				"",
+			width: rect.width,
+		};
+	});
+}
+
+async function assertNativeStickyPinned(input: {
+	page: Page;
+	scroller: Locator;
+	turnId: string;
+}) {
+	const range = await getTurnSectionRange(input.scroller, input.turnId);
+	const firstScrollTop = range.start + 80;
+	await input.scroller.evaluate((element, scrollTop) => {
+		element.scrollTop = scrollTop;
+	}, firstScrollTop);
+	await waitForFrames(input.page, 2);
+	const before = await sampleStickyHeaderAtTop(input.scroller);
+	const styles = await input.scroller.evaluate((element) => {
+		const bounds = element.getBoundingClientRect();
+		const header = Array.from(
+			element.querySelectorAll<HTMLElement>("[data-transcript-sticky-header]"),
+		).find((candidate) => {
+			const rect = candidate.getBoundingClientRect();
+			return rect.top <= bounds.top + 1 && rect.bottom > bounds.top;
+		});
+		const wrapper = header?.closest<HTMLElement>(
+			"[data-transcript-sticky-header-wrapper]",
+		);
+		const container = header?.closest<HTMLElement>(
+			"[data-transcript-virtual-list]",
+		);
+		if (!(header && wrapper && container)) {
+			throw new Error("Expected the native sticky wrapper ancestry");
+		}
+		return {
+			containerContain: getComputedStyle(container).contain,
+			containerTransform: getComputedStyle(container).transform,
+			headerPosition: getComputedStyle(header).position,
+			wrapperPosition: getComputedStyle(wrapper).position,
+		};
+	});
+	expect(styles).toEqual({
+		containerContain: "none",
+		containerTransform: "none",
+		headerPosition: "sticky",
+		wrapperPosition: "absolute",
+	});
+	await input.scroller.evaluate((element, scrollTop) => {
+		element.scrollTop = scrollTop;
+	}, firstScrollTop + 24);
+	await waitForFrames(input.page, 1);
+	const after = await sampleStickyHeaderAtTop(input.scroller);
+	expect(after.owner).toBe(before.owner);
+	expect(after.kind).toBe(before.kind);
+	expect(Math.abs(after.top - before.top)).toBeLessThanOrEqual(1);
+}
+
+type SplitSectionEventGeometry = {
+	continues: boolean;
+	depth: number;
+	descends: boolean;
+	id: string;
+};
+
+async function captureSplitSectionGeometry(input: {
+	display: "normal" | "request";
+	page: Page;
+	scroller: Locator;
+}) {
+	const geometryByEventId = new Map<string, SplitSectionEventGeometry>();
+	const continuationRowIds = new Set<string>();
+	let continuationScreenshot: Buffer | undefined;
+	const maximum = await input.scroller.evaluate(
+		(element) => element.scrollHeight - element.clientHeight,
+	);
+	for (let step = 0; step <= 28; step += 1) {
+		await input.scroller.evaluate(
+			(element, scrollTop) => {
+				element.scrollTop = scrollTop;
+			},
+			Math.round((maximum * step) / 28),
+		);
+		await waitForFrames(input.page, 1);
+		const samples = await input.scroller.evaluate(() =>
+			Array.from(
+				document.querySelectorAll<HTMLElement>(
+					'[data-transcript-turn-id="fixture-turn-1"][data-transcript-row-kind="section"]',
+				),
+			).map((sectionRow) => ({
+				events: Array.from(
+					sectionRow.querySelectorAll<HTMLElement>("[data-trace-expansion-id]"),
+				).map((eventRow) => {
+					const treeItem = eventRow.closest<HTMLElement>(
+						"[data-trace-tree-item-depth]",
+					);
+					if (!treeItem) {
+						throw new Error("Expected every trace event to own tree geometry");
+					}
+					const expansionId = eventRow.dataset.traceExpansionId ?? "";
+					return {
+						continues: treeItem.dataset.traceTreeContinues === "true",
+						depth: Number(treeItem.dataset.traceTreeItemDepth),
+						descends: treeItem.dataset.traceTreeDescends === "true",
+						id: expansionId.slice(expansionId.lastIndexOf("::") + 2),
+					};
+				}),
+				hasIncomingModelRail:
+					sectionRow.querySelector('[data-trace-tree-line-depth="1"]') !== null,
+				id: sectionRow.dataset.transcriptRowId ?? "",
+			})),
+		);
+		for (const sample of samples) {
+			if (/s\d+b\d+$/u.test(sample.id)) {
+				continuationRowIds.add(sample.id);
+				expect(
+					sample.hasIncomingModelRail,
+					`${sample.id} must retain the incoming model rail`,
+				).toBe(true);
+				continuationScreenshot ??= await input.scroller.screenshot();
+			}
+			for (const geometry of sample.events) {
+				geometryByEventId.set(geometry.id, geometry);
+			}
+		}
+	}
+
+	expect(continuationRowIds.size).toBeGreaterThan(0);
+	expect(continuationScreenshot).toBeDefined();
+	for (const request of [1, 2]) {
+		const reasoning = geometryByEventId.get(`fx-t1-r${request}-reasoning`);
+		const message = geometryByEventId.get(`fx-t1-r${request}-message`);
+		expect(reasoning, `${input.display} reasoning geometry`).toBeDefined();
+		expect(message, `${input.display} message geometry`).toBeDefined();
+		for (let tool = 1; tool <= 12; tool += 1) {
+			const toolGeometry = geometryByEventId.get(
+				`fx-t1-r${request}-tool-${tool}`,
+			);
+			expect(
+				toolGeometry,
+				`${input.display} tool ${tool} geometry`,
+			).toBeDefined();
+			expect(toolGeometry?.depth).toBe((message?.depth ?? 0) + 1);
+		}
+	}
+	return continuationScreenshot;
+}
+
+test("budget-split agent sections preserve nesting and rail continuity in both levels", async ({
+	page,
+}, testInfo) => {
+	await page.setViewportSize({ height: 1_200, width: 1_200 });
+	for (const display of ["request", "normal"] as const) {
+		const scroller = await openVirtualFixture(
+			page,
+			`turns=1&display=${display}`,
+		);
+		const fold = scroller.locator("[data-transcript-fold-turn-id]").first();
+		await expect(fold).toHaveAttribute("aria-expanded", "false");
+		const turnId = await fold.getAttribute("data-transcript-fold-turn-id");
+		if (!turnId) {
+			throw new Error("Expected the fixture fold to identify its turn");
+		}
+		await scroller
+			.locator(`[data-transcript-sticky-fold-turn-id="${turnId}"]`)
+			.click();
+		await expect(fold).toHaveAttribute("aria-expanded", "true");
+		const screenshot = await captureSplitSectionGeometry({
+			display,
+			page,
+			scroller,
+		});
+		if (!screenshot) {
+			throw new Error(`Expected a ${display} continuation screenshot`);
+		}
+		await testInfo.attach(`budget-split-${display}.png`, {
+			body: screenshot,
+			contentType: "image/png",
+		});
+	}
+});
+
+test("native sticky headers continuously cover every offset in a split section and track pane width", async ({
+	page,
+}) => {
+	await page.setViewportSize({ height: 1_200, width: 1_200 });
+	const scroller = await openVirtualFixture(page, "turns=2&modelHeader=split");
+	const memberHeader = await sampleStickyHeaderAtTop(scroller);
+	expect(memberHeader.visible).toBe(true);
+	expect(memberHeader.atTop).toBe(true);
+	expect(memberHeader.kind).toBe("member");
+	expect(memberHeader.owner).toBe("fixture-turn-1");
+	expect(memberHeader.userLabel).toBe("Evren");
+	const firstRange = await getTurnSectionRange(scroller, "fixture-turn-1");
+	expect(
+		firstRange.rowIds.filter((id) => /b\d+$/u.test(id)).length,
+	).toBeGreaterThanOrEqual(2);
+	for (
+		let scrollTop = firstRange.start;
+		scrollTop < firstRange.end;
+		scrollTop = Math.min(firstRange.end, scrollTop + 20)
+	) {
+		await scroller.evaluate((element, nextScrollTop) => {
+			element.scrollTop = nextScrollTop;
+		}, scrollTop);
+		await waitForFrames(page, 1);
+		const sample = await sampleStickyHeaderAtTop(scroller);
+		expect(sample.visible, `visibility at scrollTop ${scrollTop}`).toBe(true);
+		expect(sample.atTop, `coverage at scrollTop ${scrollTop}`).toBe(true);
+		expect(sample.owner).toBe("fixture-turn-1");
+		expect(sample.label).toBe("Fable 5");
+		if (scrollTop + 20 >= firstRange.end) {
+			break;
+		}
+	}
+
+	await scroller.evaluate((element, scrollTop) => {
+		element.scrollTop = scrollTop;
+	}, firstRange.start + 200);
+	await waitForFrames(page, 2);
+	const widthBefore = (await sampleStickyHeaderAtTop(scroller)).width;
+	const rowWidthBefore = await scroller
+		.locator("[data-transcript-row-id]")
+		.first()
+		.evaluate((element) => element.getBoundingClientRect().width);
+	expect(Math.abs(widthBefore - rowWidthBefore)).toBeLessThanOrEqual(1);
+	await page.setViewportSize({ height: 1_200, width: 760 });
+	await waitForFrames(page, 3);
+	const widthAfter = (await sampleStickyHeaderAtTop(scroller)).width;
+	const rowWidthAfter = await scroller
+		.locator("[data-transcript-row-id]")
+		.first()
+		.evaluate((element) => element.getBoundingClientRect().width);
+	expect(widthAfter).toBeLessThan(widthBefore);
+	expect(Math.abs(widthAfter - rowWidthAfter)).toBeLessThanOrEqual(1);
+	expect(
+		await scroller.locator("[data-transcript-sticky-header]").count(),
+	).toBeGreaterThan(0);
+});
+
+test("the native sticky clone is pixel-stable as the real header slides underneath", async ({
+	page,
+}) => {
+	await page.setViewportSize({ height: 1_200, width: 1_200 });
+	const scroller = await openVirtualFixture(page, "turns=2&modelHeader=split");
+	const firstRange = await getTurnSectionRange(scroller, "fixture-turn-1");
+	await scroller.evaluate((element, scrollTop) => {
+		element.scrollTop = scrollTop;
+	}, firstRange.start + 39);
+	await waitForFrames(page, 2);
+	const box = await sampleStickyHeaderAtTop(scroller);
+	const clip = {
+		height: Math.floor(box.height),
+		width: Math.min(500, Math.floor(box.width)),
+		x: Math.floor(box.absoluteX),
+		y: Math.floor(box.absoluteY),
+	};
+	const screenshotOptions = {
+		animations: "disabled" as const,
+		clip,
+	};
+	const before = await page.screenshot(screenshotOptions);
+	await scroller.evaluate((element, scrollTop) => {
+		element.scrollTop = scrollTop;
+	}, firstRange.start + 40);
+	await waitForFrames(page, 1);
+	const after = await page.screenshot(screenshotOptions);
+	expect(after.equals(before)).toBe(true);
+});
+
+test("native sticky wrappers push off and swap owners without an uncovered boundary frame", async ({
+	page,
+}) => {
+	await page.setViewportSize({ height: 1_200, width: 1_200 });
+	const scroller = await openVirtualFixture(page, "turns=2&modelHeader=split");
+	const firstRange = await getTurnSectionRange(scroller, "fixture-turn-1");
+	const secondMemberRange = await getTurnRowRange(
+		scroller,
+		"fixture-turn-2",
+		"member",
+	);
+	const secondModelRange = await getTurnSectionRange(
+		scroller,
+		"fixture-turn-2",
+	);
+	const sampleHandoff = async (boundary: number) => {
+		const samples: Array<
+			Awaited<ReturnType<typeof sampleStickyHeaderAtTop>> & {
+				frameGapMs: number;
+				scrollTop: number;
+			}
+		> = [];
+		for (let scrollTop = boundary - 32; scrollTop <= boundary; scrollTop += 4) {
+			const frameGapMs = await scroller.evaluate(
+				async (element, nextScrollTop) =>
+					new Promise<number>((resolve) => {
+						requestAnimationFrame((startedAt) => {
+							element.scrollTop = nextScrollTop;
+							requestAnimationFrame((endedAt) => resolve(endedAt - startedAt));
+						});
+					}),
+				scrollTop,
+			);
+			samples.push({
+				...(await sampleStickyHeaderAtTop(scroller)),
+				frameGapMs,
+				scrollTop,
+			});
+		}
+		for (let index = 1; index < samples.length - 1; index += 1) {
+			const previous = samples[index - 1];
+			const current = samples[index];
+			if (!(previous && current)) {
+				continue;
+			}
+			expect(current.visible).toBe(true);
+			expect(current.atTop).toBe(true);
+			expect(current.translateY).toBeLessThanOrEqual(previous.translateY);
+			expect(
+				Math.abs(current.top - previous.top),
+				`header pop at ${current.scrollTop}`,
+			).toBeLessThanOrEqual(current.scrollTop - previous.scrollTop + 1);
+		}
+		const normalFrameMax = Math.max(
+			...samples.slice(0, -1).map((sample) => sample.frameGapMs),
+		);
+		const handoverFrame = samples.at(-1);
+		if (!handoverFrame) {
+			throw new Error("Expected a sticky handover frame sample");
+		}
+		expect(
+			handoverFrame.frameGapMs,
+			`handover frame at ${boundary}`,
+		).toBeLessThanOrEqual(normalFrameMax + 2);
+		return samples;
+	};
+	const modelToMemberSamples = await sampleHandoff(firstRange.end);
+	const outgoing = modelToMemberSamples.at(-2);
+	if (!outgoing) {
+		throw new Error("Expected an outgoing model-header sample");
+	}
+	expect(outgoing.visible).toBe(true);
+	expect(outgoing.atTop).toBe(true);
+	expect(outgoing.owner).toBe("fixture-turn-1");
+	expect(outgoing.translateY).toBeLessThan(0);
+
+	const incoming = modelToMemberSamples.at(-1);
+	if (!incoming) {
+		throw new Error("Expected an incoming member-header sample");
+	}
+	expect(incoming.visible).toBe(true);
+	expect(incoming.atTop).toBe(true);
+	expect(incoming.owner).toBe("fixture-turn-2");
+	expect(incoming.kind).toBe("member");
+	expect(incoming.userLabel).toBe("Evren");
+	expect(incoming.height).toBe(56);
+
+	const memberToModelSamples = await sampleHandoff(secondMemberRange.end);
+	const incomingModel = memberToModelSamples.at(-1);
+	if (!incomingModel) {
+		throw new Error("Expected an incoming model-header sample");
+	}
+	expect(secondModelRange.start).toBeCloseTo(secondMemberRange.end, 0);
+	expect(incomingModel.visible).toBe(true);
+	expect(incomingModel.atTop).toBe(true);
+	expect(incomingModel.owner).toBe("fixture-turn-2");
+	expect(incomingModel.kind).toBe("model");
+	expect(incomingModel.label).toBe("GPT 5.2");
+	expect(incomingModel.height).toBe(40);
+});
+
+test("a no-response turn keeps member-header coverage across its complete extent", async ({
+	page,
+}) => {
+	await page.setViewportSize({ height: 240, width: 900 });
+	const scroller = await openVirtualFixture(
+		page,
+		"turns=3&profile=scroll&modelHeader=no-response",
+	);
+	const memberRange = await getTurnRowRange(
+		scroller,
+		"fixture-turn-2:streamed:1",
+		"member",
+	);
+	const noResponseRange = await getTurnRowRange(
+		scroller,
+		"fixture-turn-2:streamed:1",
+		"no-response",
+	);
+	for (
+		let scrollTop = memberRange.start;
+		scrollTop < noResponseRange.end;
+		scrollTop += 8
+	) {
+		await scroller.evaluate((element, nextScrollTop) => {
+			element.scrollTop = nextScrollTop;
+		}, scrollTop);
+		await waitForFrames(page, 1);
+		const sample = await sampleStickyHeaderAtTop(scroller);
+		expect(sample.visible, `visibility at ${scrollTop}`).toBe(true);
+		expect(sample.atTop, `coverage at ${scrollTop}`).toBe(true);
+		expect(sample.owner).toBe("fixture-turn-2:streamed:1");
+		expect(sample.kind).toBe("member");
+	}
+});
+
+test("native sticky headers add no scroll-driven React commits", async ({
+	browserName,
+	page,
+}) => {
+	const scroller = await openVirtualFixture(page, "turns=18&profile=scroll");
+	await scroller.evaluate((element) => {
+		element.scrollTop = Math.round(
+			(element.scrollHeight - element.clientHeight) * 0.72,
+		);
+	});
+	await waitForFrames(page, 8);
+	await page.evaluate(() => window.__transcriptTrace?.reset());
+	await scroller
+		.locator("[data-trace-fixture-reset-profile]")
+		.dispatchEvent("click");
+	let runFrameCount: number | undefined;
+	if (browserName === "chromium") {
+		const bounds = await scroller.boundingBox();
+		if (!bounds) {
+			throw new Error("Expected transcript scroller bounds");
+		}
+		await page.evaluate(() =>
+			window.__transcriptTrace?.beginRun("sticky-header-fling", -1),
+		);
+		const cdp = await page.context().newCDPSession(page);
+		await cdp.send("Input.synthesizeScrollGesture", {
+			gestureSourceType: "mouse",
+			interactionMarkerName: "rudel-sticky-header-upward-fling",
+			preventFling: false,
+			speed: 3_500,
+			x: Math.round(bounds.x + bounds.width / 2),
+			xDistance: 0,
+			y: Math.round(bounds.y + bounds.height / 2),
+			yDistance: 5_000,
+		});
+		await page.waitForTimeout(750);
+		runFrameCount = await page.evaluate(
+			() => window.__transcriptTrace?.endRun().frameCount,
+		);
+	} else {
+		await profileScrollSweep(scroller);
+	}
+	const profile = await scroller.evaluate((element) => ({
+		blankFrames: Number(element.dataset.transcriptTrueBlankFrames ?? "0"),
+		maxUpdateDuration: Number(
+			element.dataset.traceFixtureProfileMaxUpdateDuration ?? "0",
+		),
+		rowUpdates: JSON.parse(
+			element.dataset.traceFixtureProfileRowUpdates ?? "{}",
+		) as Record<string, number>,
+	}));
+	expect(profile.blankFrames).toBe(0);
+	expect(profile.maxUpdateDuration).toBeLessThanOrEqual(8);
+	expect(
+		Object.keys(profile.rowUpdates).some((id) => id.includes("model-header")),
+	).toBe(false);
+	expect(runFrameCount ?? 1).toBeGreaterThan(0);
+});
+
+test("virtual transcript sweeps without gaps or overlapping measured rows", async ({
+	page,
+}) => {
+	const scroller = await openVirtualFixture(page);
+	await scrollSweep(scroller, page);
+	await scroller.evaluate((element) => {
+		if (element instanceof HTMLElement) {
+			element.scrollTop = 0;
+		}
+	});
+	await waitForFrames(page, 10);
+	await scroller
+		.locator("[data-trace-fixture-reset-profile]")
+		.dispatchEvent("click");
+	await profileScrollSweep(scroller);
+	await expect(scroller).toHaveAttribute(
+		"data-transcript-true-blank-frames",
+		"0",
+	);
+	await expect(scroller).toHaveAttribute(
+		"data-trace-fixture-long-tasks",
+		/^\d+$/,
+	);
+	const maxUpdateDuration = Number(
+		await scroller.getAttribute(
+			"data-trace-fixture-profile-max-update-duration",
+		),
+	);
+	expect(maxUpdateDuration).toBeLessThanOrEqual(8);
+});
+
+test("native keyed anchoring keeps an oversized visible row fixed on prepend", async ({
+	page,
+}) => {
+	const scroller = await openVirtualFixture(page, "turns=12");
+	await scroller.evaluate((element) => {
+		if (element instanceof HTMLElement) {
+			element.scrollTop = Math.round(element.scrollHeight * 0.45);
+		}
+	});
+	await waitForFrames(page, 3);
+	const anchor = await scroller.evaluate((element, selector) => {
+		if (!(element instanceof HTMLElement)) {
+			throw new Error("Transcript fixture scroller must be an HTMLElement");
+		}
+		const bounds = element.getBoundingClientRect();
+		const rows = Array.from(element.querySelectorAll(selector)).filter(
+			(candidate): candidate is HTMLElement => candidate instanceof HTMLElement,
+		);
+		const visible = rows.find((row) => {
+			const rect = row.getBoundingClientRect();
+			return (
+				rect.top <= bounds.top + bounds.height * 0.5 && rect.bottom > bounds.top
+			);
+		});
+		if (!visible?.dataset.transcriptRowId) {
+			throw new Error("Expected a visible keyed transcript row");
+		}
+		return {
+			id: visible.dataset.transcriptRowId,
+			offset: visible.getBoundingClientRect().top - bounds.top,
+			scrollTop: element.scrollTop,
+		};
+	}, ROW_SELECTOR);
+	await scroller.locator("[data-trace-fixture-prepend]").dispatchEvent("click");
+	await waitForFrames(page, 5);
+	const after = await scroller.evaluate((element, anchorId) => {
+		if (!(element instanceof HTMLElement)) {
+			throw new Error("Transcript fixture scroller must be an HTMLElement");
+		}
+		const row = Array.from(
+			element.querySelectorAll<HTMLElement>("[data-transcript-row-id]"),
+		).find((candidate) => candidate.dataset.transcriptRowId === anchorId);
+		if (!row) {
+			throw new Error(`Anchor row ${anchorId} was not retained after prepend`);
+		}
+		return {
+			offset:
+				row.getBoundingClientRect().top - element.getBoundingClientRect().top,
+			scrollTop: element.scrollTop,
+		};
+	}, anchor.id);
+	expect(after.scrollTop).toBeGreaterThan(anchor.scrollTop);
+	expect(Math.abs(after.offset - anchor.offset)).toBeLessThanOrEqual(2);
+	await expect(scroller).toHaveAttribute(
+		"data-transcript-true-blank-frames",
+		"0",
+	);
+});
+
+test("jump settling, level remeasurement, and viewport resize remain covered", async ({
+	page,
+}) => {
+	const scroller = await openVirtualFixture(page, "turns=18&profile=scroll");
+	await scroller
+		.locator("[data-trace-fixture-jump-last]")
+		.dispatchEvent("click");
+	await expect
+		.poll(
+			async () =>
+				await scroller.getAttribute("data-transcript-anchor-settle-ms"),
+		)
+		.toMatch(/^\d+$/);
+	await expect(scroller).toHaveAttribute(
+		"data-trace-fixture-active-turn",
+		"18",
+	);
+	const target = scroller
+		.locator('[data-transcript-row-id="fixture-turn-2:streamed:17:member"]')
+		.first();
+	await expect(target).toHaveAttribute("aria-current", "true");
+	await scroller
+		.locator("[data-trace-fixture-toggle-level]")
+		.dispatchEvent("click");
+	await waitForFrames(page, 5);
+	await page.setViewportSize({ height: 640, width: 900 });
+	await waitForFrames(page, 5);
+	await expect(scroller).toHaveAttribute(
+		"data-transcript-true-blank-frames",
+		"0",
+	);
+});
+
+test("wheel input cancels an in-flight programmatic anchor", async ({
+	page,
+}) => {
+	const scroller = await openVirtualFixture(page, "turns=18&profile=scroll");
+	await scroller.evaluate((element) => {
+		if (!(element instanceof HTMLElement)) {
+			throw new Error("Transcript fixture scroller must be an HTMLElement");
+		}
+		const button = element.querySelector<HTMLButtonElement>(
+			"[data-trace-fixture-jump-last]",
+		);
+		button?.click();
+		element.dispatchEvent(new WheelEvent("wheel", { deltaY: -120 }));
+	});
+	await expect(scroller).toHaveAttribute(
+		"data-transcript-scroll-mode",
+		"free-scrolling",
+	);
+});
+
+test("pending rows and incremental body replacement never expose a blank frame", async ({
+	page,
+}) => {
+	const scroller = await openVirtualFixture(
+		page,
+		"hydrate=manual&turns=18&profile=scroll",
+	);
+	await scrollSweep(scroller, page, 12);
+	await scroller.locator("[data-trace-fixture-hydrate]").dispatchEvent("click");
+	await scrollSweep(scroller, page, 20);
+	await expect(scroller).toHaveAttribute(
+		"data-trace-fixture-hydrated-turns",
+		"18",
+		{ timeout: 10_000 },
+	);
+	await scrollSweep(scroller, page, 12);
+	await expect(scroller).toHaveAttribute(
+		"data-transcript-true-blank-frames",
+		"0",
+	);
+});
+
+test("semantic folds expand in place and survive keyed prepends", async ({
+	page,
+}) => {
+	const scroller = await openVirtualFixture(page, "folds=1&turns=8");
+	const fold = scroller.locator("[data-transcript-fold-turn-id]").first();
+	await expect(fold).toBeVisible();
+	await expect(fold).toHaveAttribute("aria-expanded", "false");
+	const modelHeader = fold.locator(
+		"xpath=ancestor::*[@data-transcript-model-header-source='row'][1]",
+	);
+	await expect(modelHeader).toHaveCount(1);
+	await expect(modelHeader.locator(":scope > button")).toHaveCount(0);
+	const foldTreeItem = fold.locator(
+		"xpath=ancestor::*[@data-trace-tree-item-depth][1]",
+	);
+	await expect(foldTreeItem).toHaveAttribute("data-trace-tree-item-depth", "1");
+	const summaryTags = fold.locator("[data-transcript-fold-summary-tag]");
+	await expect(summaryTags).toHaveCount(7);
+	await expect(fold.locator("[data-transcript-fold-summary-tags]")).toHaveCSS(
+		"overflow-y",
+		"visible",
+	);
+	await expect(summaryTags.first()).toHaveCSS("font-size", "11px");
+	await expect(summaryTags.first()).toHaveCSS("height", "20px");
+	for (const label of [
+		"Reasoning",
+		"Messages",
+		"Skills",
+		"Subagents",
+		"Files Read",
+		"written",
+		"edited",
+	]) {
+		await expect(
+			summaryTags.filter({ hasText: new RegExp(`^\\d+ ${label}$`) }),
+		).toHaveCount(1);
+	}
+	const turnId = await fold.getAttribute("data-transcript-fold-turn-id");
+	if (!turnId) {
+		throw new Error("Expected the fixture fold to identify its turn");
+	}
+	const foldRow = scroller.locator(`[data-transcript-row-id="${turnId}:fold"]`);
+	const stickyFold = scroller.locator(
+		`[data-transcript-sticky-fold-turn-id="${turnId}"]`,
+	);
+	await expect(stickyFold).toBeVisible();
+	await expect(
+		stickyFold.locator("[data-transcript-fold-summary-tag]"),
+	).toHaveCount(7);
+	const offsetBefore = await foldRow.evaluate(
+		(element) =>
+			element.getBoundingClientRect().top -
+			(element.parentElement?.parentElement?.getBoundingClientRect().top ?? 0),
+	);
+	await stickyFold.click();
+	await expect(fold).toHaveAttribute("aria-expanded", "true");
+	await stickyFold.click();
+	await expect(fold).toHaveAttribute("aria-expanded", "false");
+	await stickyFold.click();
+	await expect(fold).toHaveAttribute("aria-expanded", "true");
+	await waitForFrames(page, 5);
+	const offsetAfter = await foldRow.evaluate(
+		(element) =>
+			element.getBoundingClientRect().top -
+			(element.parentElement?.parentElement?.getBoundingClientRect().top ?? 0),
+	);
+	expect(Math.abs(offsetAfter - offsetBefore)).toBeLessThanOrEqual(2);
+
+	await scroller.locator("[data-trace-fixture-prepend]").dispatchEvent("click");
+	await waitForFrames(page, 5);
+	await expect(
+		scroller.locator(`[data-transcript-fold-turn-id="${turnId}"]`),
+	).toHaveAttribute("aria-expanded", "true");
+	await expect(scroller).toHaveAttribute(
+		"data-transcript-true-blank-frames",
+		"0",
+	);
+});
+
+test("semantic fold tags fit at a split-pane width", async ({ page }) => {
+	await page.setViewportSize({ width: 570, height: 800 });
+	const scroller = await openVirtualFixture(page, "folds=1&turns=8");
+	const fold = scroller.locator("[data-transcript-fold-turn-id]").first();
+	const modelHeader = fold.locator(
+		"xpath=ancestor::*[@data-transcript-model-header-source='row'][1]",
+	);
+	const summaryTags = fold.locator("[data-transcript-fold-summary-tags]");
+	const lastTag = fold.locator("[data-transcript-fold-summary-tag]").last();
+
+	await expect(summaryTags).toBeVisible();
+	await expect(lastTag).toBeVisible();
+	const [modelHeaderBox, lastTagBox] = await Promise.all([
+		modelHeader.boundingBox(),
+		lastTag.boundingBox(),
+	]);
+	expect(modelHeaderBox).not.toBeNull();
+	expect(lastTagBox).not.toBeNull();
+	expect((lastTagBox?.x ?? 0) + (lastTagBox?.width ?? 0)).toBeLessThanOrEqual(
+		(modelHeaderBox?.x ?? 0) + (modelHeaderBox?.width ?? 0),
+	);
+});
+
+test("a programmatic hit expands its fold before anchoring", async ({
+	page,
+}) => {
+	const scroller = await openVirtualFixture(page, "folds=1&turns=8");
+	const fold = scroller.locator("[data-transcript-fold-turn-id]").first();
+	await expect(fold).toHaveAttribute("aria-expanded", "false");
+	const turnId = await fold.getAttribute("data-transcript-fold-turn-id");
+	if (!turnId) {
+		throw new Error("Expected the fixture fold to identify its turn");
+	}
+	await scroller
+		.locator("[data-trace-fixture-jump-first]")
+		.dispatchEvent("click");
+	await expect
+		.poll(
+			async () =>
+				await scroller.getAttribute("data-transcript-anchor-settle-ms"),
+		)
+		.toMatch(/^\d+$/);
+	await expect(
+		scroller.locator(`[data-transcript-fold-turn-id="${turnId}"]`),
+	).toHaveAttribute("aria-expanded", "true");
+	const target = scroller
+		.locator(`[data-transcript-row-id="${turnId}:member"]`)
+		.first();
+	await expect(target).toHaveAttribute("aria-current", "true");
+});
+
+for (const mode of [
+	"default",
+	"direct-position",
+	"direct-transform",
+] as const) {
+	test(`keeps native sticky wrappers pinned in ${mode} positioning`, async ({
+		page,
+	}) => {
+		const scroller = await openVirtualFixture(
+			page,
+			`turns=2&modelHeader=split&virtualMode=${mode}`,
+		);
+		await scrollSweep(scroller, page, mode === "default" ? 3 : 12);
+		await assertNativeStickyPinned({
+			page,
+			scroller,
+			turnId: "fixture-turn-1",
+		});
+		await expect(
+			scroller.locator("[data-trace-tree-row-owner]").first(),
+		).toBeVisible();
+		await expect(scroller).toHaveAttribute(
+			"data-transcript-true-blank-frames",
+			"0",
+		);
+	});
+}

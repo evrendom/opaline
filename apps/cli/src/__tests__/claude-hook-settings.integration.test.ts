@@ -128,69 +128,67 @@ test("upgrades a legacy user hook and preserves neighboring hooks on removal", a
 	});
 });
 
-test.each(["opaline", "rudel"])(
-	"heals a %s SessionEnd-only install once without touching neighboring hooks or its command",
-	async (command) => {
-		const home = await mkdtemp(join(tmpdir(), "opaline-heal-hook-"));
-		fixtureHomes.push(home);
-		const settingsPath = join(home, ".claude", "settings.json");
-		await mkdir(join(home, ".claude"));
-		const endHooks = [
-			{
-				matcher: "",
-				hooks: [
-					otherHook,
-					{ type: "command", command: `${command} hooks claude session-end` },
-				],
-			},
-		];
-		await writeFile(
-			settingsPath,
-			JSON.stringify({ hooks: { SessionEnd: endHooks } }),
-		);
-		expect(await runProbe("status", home, home)).toEqual({
-			path: settingsPath,
-			enabled: true,
-		});
-		expect(await runProbe("heal", home, home)).toEqual({
-			path: settingsPath,
-			enabled: true,
-			healed: true,
-		});
-		const healed = await readFile(settingsPath, "utf8");
-		expect(JSON.parse(healed)).toEqual({
-			hooks: {
-				SessionEnd: [
-					{
-						matcher: "",
-						hooks: [
-							otherHook,
-							{
-								type: "command",
-								command: `${command} hooks claude session-end`,
-								timeout: 60,
-							},
-						],
-					},
-				],
-				SessionStart: [
-					{
-						matcher: "",
-						hooks: [
-							{ type: "command", command: startHookCommand, async: true },
-						],
-					},
-				],
-			},
-		});
-		expect(await runProbe("heal", home, home)).toEqual({
-			path: settingsPath,
-			enabled: true,
-			healed: false,
-		});
-		expect(await readFile(settingsPath, "utf8")).toBe(healed);
-	},
-);
+test.each([
+	"opaline",
+	"rudel",
+])("heals a %s SessionEnd-only install once without touching neighboring hooks or its command", async (command) => {
+	const home = await mkdtemp(join(tmpdir(), "opaline-heal-hook-"));
+	fixtureHomes.push(home);
+	const settingsPath = join(home, ".claude", "settings.json");
+	await mkdir(join(home, ".claude"));
+	const endHooks = [
+		{
+			matcher: "",
+			hooks: [
+				otherHook,
+				{ type: "command", command: `${command} hooks claude session-end` },
+			],
+		},
+	];
+	await writeFile(
+		settingsPath,
+		JSON.stringify({ hooks: { SessionEnd: endHooks } }),
+	);
+	expect(await runProbe("status", home, home)).toEqual({
+		path: settingsPath,
+		enabled: true,
+	});
+	expect(await runProbe("heal", home, home)).toEqual({
+		path: settingsPath,
+		enabled: true,
+		healed: true,
+	});
+	const healed = await readFile(settingsPath, "utf8");
+	expect(JSON.parse(healed)).toEqual({
+		hooks: {
+			SessionEnd: [
+				{
+					matcher: "",
+					hooks: [
+						otherHook,
+						{
+							type: "command",
+							command: `${command} hooks claude session-end`,
+							timeout: 60,
+						},
+					],
+				},
+			],
+			SessionStart: [
+				{
+					matcher: "",
+					hooks: [{ type: "command", command: startHookCommand, async: true }],
+				},
+			],
+		},
+	});
+	expect(await runProbe("heal", home, home)).toEqual({
+		path: settingsPath,
+		enabled: true,
+		healed: false,
+	});
+	expect(await readFile(settingsPath, "utf8")).toBe(healed);
+});
 
 test("repairs a synchronous SessionStart hook without enabling opted-out installs", async () => {
 	const home = await mkdtemp(join(tmpdir(), "opaline-async-hook-"));

@@ -43,31 +43,29 @@ test("filters every nested metadata string without changing references or non-st
 	expect(filterContextMetadata(filtered)).toEqual(filtered);
 });
 
-test.each(["/", "\\"])(
-	"filters npm tokens in every path segment while preserving references (%s)",
-	(separator) => {
-		const token = `npm_${"a".repeat(36)}`;
-		const parentPath = [".claude", "skills", token].join(separator);
-		const path = [parentPath, "SKILL.md"].join(separator);
-		const filtered = filterContextMetadata({
-			path,
-			parentPath,
-			name: token,
-			reference: { path },
-		});
-		const marker = `[REDACTED:npm-access-token:${createHash("sha256").update(token).digest("hex").slice(0, 12)}]`;
-		expect(JSON.stringify(filtered)).not.toContain(token);
-		expect(filtered.name).toBe(marker);
-		expect(filtered.parentPath).toBe(
-			[".claude", "skills", marker].join(separator),
-		);
-		expect(filtered.path).toBe(
-			[filtered.parentPath, "SKILL.md"].join(separator),
-		);
-		expect(filtered.reference.path).toBe(filtered.path);
-		expect(filterContextMetadata(filtered)).toEqual(filtered);
-	},
-);
+test.each([
+	"/",
+	"\\",
+])("filters npm tokens in every path segment while preserving references (%s)", (separator) => {
+	const token = `npm_${"a".repeat(36)}`;
+	const parentPath = [".claude", "skills", token].join(separator);
+	const path = [parentPath, "SKILL.md"].join(separator);
+	const filtered = filterContextMetadata({
+		path,
+		parentPath,
+		name: token,
+		reference: { path },
+	});
+	const marker = `[REDACTED:npm-access-token:${createHash("sha256").update(token).digest("hex").slice(0, 12)}]`;
+	expect(JSON.stringify(filtered)).not.toContain(token);
+	expect(filtered.name).toBe(marker);
+	expect(filtered.parentPath).toBe(
+		[".claude", "skills", marker].join(separator),
+	);
+	expect(filtered.path).toBe([filtered.parentPath, "SKILL.md"].join(separator));
+	expect(filtered.reference.path).toBe(filtered.path);
+	expect(filterContextMetadata(filtered)).toEqual(filtered);
+});
 
 test("uses the matched secret hash consistently without collapsing distinct names", () => {
 	const tokens = [`ghp_${"A".repeat(36)}`, `ghp_${"B".repeat(36)}`];

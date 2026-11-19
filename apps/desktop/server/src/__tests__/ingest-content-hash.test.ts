@@ -1,0 +1,155 @@
+import { describe, expect, test } from "bun:test";
+import type { IngestSessionInput } from "@rudel/api-routes";
+import {
+	computeIngestContentHash,
+	computeIngestContentHashes,
+} from "../lib/ingest-content-hash.js";
+import { hashTranscriptContent } from "../lib/transcript-content-hash.js";
+
+const baseInput: IngestSessionInput = {
+	content: "main transcript",
+	gitBranch: "main",
+	gitRemote: "git@example.com:rudel/repo.git",
+	gitSha: "abc123",
+	packageName: "rudel",
+	packageType: "bun",
+	projectPath: "/test/project",
+	sessionId: "session-1",
+	source: "claude_code",
+	subagents: [{ agentId: "agent-1", content: "subagent transcript" }],
+	tag: "tests",
+};
+
+describe("computeIngestContentHash", () => {
+	test("returns the same hash for identical input", () => {
+		expect(computeIngestContentHash(baseInput)).toBe(
+			computeIngestContentHash(baseInput),
+		);
+	});
+
+	test("distinguishes adapter source", () => {
+		expect(computeIngestContentHash(baseInput)).not.toBe(
+			computeIngestContentHash({ ...baseInput, source: "codex" }),
+		);
+	});
+
+	test("distinguishes persisted content and tag changes", () => {
+		const baseline = computeIngestContentHash(baseInput);
+		expect(
+			computeIngestContentHash({ ...baseInput, content: "changed" }),
+		).not.toBe(baseline);
+		expect(computeIngestContentHash({ ...baseInput, tag: "bug_fix" })).not.toBe(
+			baseline,
+		);
+	});
+
+	test("distinguishes filter versions so remediation can target old rows", () => {
+		// filter_version is the only way to tell which filter produced a stored
+		// row. If it stopped feeding the hash, an old-CLI reupload of an already
+		// stored session would dedupe against the leaky-filter row instead of
+		// writing a corrected one.
+		const versionThree = computeIngestContentHash({
+			...baseInput,
+			filter_version: 3,
+		});
+		expect(
+			computeIngestContentHash({ ...baseInput, filter_version: 4 }),
+		).not.toBe(versionThree);
+	});
+
+	test("treats absent filter_version as version 0", () => {
+		expect(computeIngestContentHash(baseInput)).toBe(
+			computeIngestContentHash({ ...baseInput, filter_version: 0 }),
+		);
+	});
+
+	test("includes Claude Code subagent content", () => {
+		expect(computeIngestContentHash(baseInput)).not.toBe(
+			computeIngestContentHash({
+				...baseInput,
+				subagents: [{ agentId: "agent-1", content: "changed" }],
+			}),
+		);
+	});
+
+	test("ignores Codex subagents because the adapter does not persist them", () => {
+		const codexInput = { ...baseInput, source: "codex" as const };
+		expect(computeIngestContentHash(codexInput)).toBe(
+			computeIngestContentHash({
+				...codexInput,
+				subagents: [{ agentId: "different", content: "changed" }],
+			}),
+		);
+	});
+
+	test("treats absent and empty gitRemote identically", () => {
+		const { gitRemote: _gitRemote, ...withoutGitRemote } = baseInput;
+		expect(computeIngestContentHash(withoutGitRemote)).toBe(
+			computeIngestContentHash({ ...withoutGitRemote, gitRemote: "" }),
+		);
+	});
+
+	test("distinguishes absent and empty nullable gitBranch", () => {
+		const { gitBranch: _gitBranch, ...withoutGitBranch } = baseInput;
+		expect(computeIngestContentHash(withoutGitBranch)).not.toBe(
+			computeIngestContentHash({ ...withoutGitBranch, gitBranch: "" }),
+		);
+	});
+
+	test("treats absent and empty Claude Code subagent maps identically", () => {
+		const { subagents: _subagents, ...withoutSubagents } = baseInput;
+		expect(computeIngestContentHash(withoutSubagents)).toBe(
+			computeIngestContentHash({ ...withoutSubagents, subagents: [] }),
+		);
+	});
+
+	test("is order-insensitive for Claude Code subagents", () => {
+		const subagents = [
+			{ agentId: "agent-a", content: "first" },
+			{ agentId: "agent-b", content: "second" },
+		];
+		expect(computeIngestContentHash({ ...baseInput, subagents })).toBe(
+			computeIngestContentHash({
+				...baseInput,
+				subagents: [...subagents].reverse(),
+			}),
+		);
+	});
+
+	test("a session import computes one hash and reuses it for compare and record", async () => {
+		const directory = new URL("../services/session-import/", import.meta.url);
+		const sources = await Promise.all(
+			[...new Bun.Glob("*.ts").scanSync(directory.pathname)]
+				.filter((name) => !name.endsWith(".test.ts"))
+				.map((name) => Bun.file(new URL(name, directory)).text()),
+		);
+		const source = sources.join("\n");
+		expect(source.match(/computeIngestContentHash\(/gu)).toBeNull();
+		expect(source.match(/computeIngestContentHashes\(/gu)).toHaveLength(1);
+		expect(source).toContain("contentHash: hashes.contentSha256,");
+		expect(source).toContain("ownership.lastContentSha256 !== contentHash");
+	});
+});
+
+describe("computeIngestContentHashes", () => {
+	test("one walk gives the content hash and the transcript hash, across chunk boundaries and surrogates", () => {
+		const straddling = `${"a".repeat((1 << 20) - 1)}\u{1F600}b\ud800x\udc00${"\u00e9".repeat(1 << 20)}`;
+		for (const input of [
+			baseInput,
+			{ ...baseInput, source: "codex" as const },
+			{ ...baseInput, content: straddling },
+			{ ...baseInput, content: "" },
+		]) {
+			const subagents = Object.fromEntries(
+				(input.subagents ?? []).map((subagent) => [
+					subagent.agentId,
+					subagent.content,
+				]),
+			);
+			expect(computeIngestContentHashes(input, subagents)).toEqual({
+				contentSha256: computeIngestContentHash(input),
+				transcriptSha256: hashTranscriptContent(input.content, subagents),
+			});
+		}
+	});
+});

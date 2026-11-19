@@ -1,0 +1,20 @@
+{
+	"name": "opaline",
+	"version": "1.4.1",
+	"description": "Analyse your Claude Code and Codex sessions on this Mac: where your agents get stuck or waste time and money, and what to fix in your setup. Nothing leaves this Mac.",
+	"author": {
+		"name": "Opaline",
+		"url": "https://opaline.so"
+	},
+	"homepage": "https://opaline.so",
+	"repository": "https://github.com/evrendom/opaline",
+	"license": "Apache-2.0",
+	"keywords": [
+		"opaline",
+		"analytics",
+		"coding-agents",
+		"claude-code",
+		"codex",
+		"local"
+	]
+}

@@ -1,0 +1,4 @@
+// Generated from @withfig/autocomplete (MIT, Hercules Labs Inc.). Do not edit.
+import type { FigSpec } from "../../fig-spec.js";
+
+export default JSON.parse("{\"n\":[\"zip\"],\"d\":\"Package and compress (archive) files into zip file\",\"o\":[{\"n\":[\"-r\"],\"d\":\"Package and compress a directory and its contents, recursively\"},{\"n\":[\"-e\"]},{\"n\":[\"-s\"],\"a\":[{\"n\":\"split size\"}]},{\"n\":[\"-d\"],\"a\":[{\"n\":\"file\"}]},{\"n\":[\"-9\"],\"d\":\"Archive a directory and its contents with the highest level [9] of compression\"}],\"a\":[{\"n\":\"name\",\"d\":\"Name of archive\"},{\"n\":\"dir\"}]}") as FigSpec;

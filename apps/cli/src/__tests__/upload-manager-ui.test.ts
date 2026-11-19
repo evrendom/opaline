@@ -25,7 +25,7 @@ const TEST_THEME = {
 };
 
 test("setup errors show the cause, full path and recovery at every terminal size", () => {
-	const path = `/Users/evrendombak/${"long workspace path/".repeat(18)}.codex/config.toml`;
+	const path = `/Users/example/${"long workspace path/".repeat(18)}.codex/config.toml`;
 	const message = `Couldn't enable Codex auto upload.\nThe global notify setting is invalid. This setting applies to all repositories.\nConfig: ${path}\nFix notify in this file, then retry. Existing notifications were left unchanged.`;
 	for (const [columns, height] of [
 		[38, 13],

@@ -1,0 +1,54 @@
+{
+	"name": "@rudel/api-routes",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"sideEffects": false,
+	"exports": {
+		".": "./src/index.ts",
+		"./billing": "./src/billing.ts",
+		"./cli-data": "./src/cli-data.ts",
+		"./call-paths": "./src/call-paths.ts",
+		"./command-identity": "./src/command-identity.ts",
+		"./command-glossary": "./src/command-glossary/index.ts",
+		"./codex-usage-replay": "./src/codex-usage-replay.ts",
+		"./transcript-slim": "./src/transcript-slim.ts",
+		"./model-pricing": "./src/model-pricing.ts",
+		"./model-registry": "./src/model-registry.ts",
+		"./trends-aa-release": "./src/trends-aa-release.ts",
+		"./trends-source-fetch": "./src/trends-source-fetch.ts",
+		"./trends-sources": "./src/trends-sources.ts",
+		"./trends-t3-usage": "./src/trends-t3-usage.ts",
+		"./trends-usage": "./src/trends-usage.ts",
+		"./organization-paths": "./src/organization-paths.ts",
+		"./reserved-slugs": "./src/reserved-slugs.ts",
+		"./rpc-batch": "./src/rpc-batch.ts",
+		"./skill-icon": "./src/skill-icon.ts",
+		"./usage-digest-email": "./src/usage-digest-email.ts",
+		"./transcript-records": "./src/session-transcript/transcript-records/index.ts",
+		"./fact-catalog": "./src/session-transcript/transcript-records/fact-catalog.ts",
+		"./session-saved-outputs": "./src/session-saved-outputs.ts",
+		"./session-images": "./src/session-images.ts",
+		"./session-context/*": "./src/session-context/*.ts",
+		"./session-context-snapshot": "./src/session-context-snapshot.ts"
+	},
+	"scripts": {
+		"check-types": "tsc --noEmit",
+		"facts:census": "bun src/scripts/facts-census.ts",
+		"facts:codex-source": "bun src/scripts/facts-codex-source.ts",
+		"facts:claude-types": "bun src/scripts/facts-claude-types.ts",
+		"facts:matrix": "bun src/scripts/facts-matrix.ts",
+		"facts:review": "bun src/scripts/facts-review.ts",
+		"test": "bun test"
+	},
+	"dependencies": {
+		"@orpc/contract": "latest",
+		"zod": "^4.6.5"
+	},
+	"devDependencies": {
+		"@rudel/secret-filter": "workspace:*",
+		"@rudel/typescript-config": "workspace:*",
+		"bun-types": "latest",
+		"typescript": "5.9.2"
+	}
+}

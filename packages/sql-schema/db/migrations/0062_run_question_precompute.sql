@@ -1,0 +1,2 @@
+ALTER TABLE "run_question_job" DROP CONSTRAINT "run_question_job_purpose_check";--> statement-breakpoint
+ALTER TABLE "run_question_job" ADD CONSTRAINT "run_question_job_purpose_check" CHECK ("run_question_job"."purpose" IN ('analysis', 'test', 'precompute'));

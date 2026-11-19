@@ -1,0 +1,4706 @@
+[
+	{
+		"agent": "codex",
+		"key": "request_usage_components",
+		"source": "token_usage_record/.response_id",
+		"line": 1
+	},
+	{
+		"agent": "codex",
+		"key": "request_usage_components",
+		"source": "token_usage_record/.turn_id",
+		"line": 2
+	},
+	{
+		"agent": "codex",
+		"key": "request_usage_components",
+		"source": "token_usage_record/.root_turn_id",
+		"line": 3
+	},
+	{
+		"agent": "codex",
+		"key": "request_usage_components",
+		"source": "token_usage_record/.thread_id",
+		"line": 4
+	},
+	{
+		"agent": "codex",
+		"key": "request_usage_components",
+		"source": "token_usage_record/.usage.*",
+		"line": 5
+	},
+	{
+		"agent": "codex",
+		"key": "request_usage_components",
+		"source": "token_usage_record/.turn_token_usage.*",
+		"line": 6
+	},
+	{
+		"agent": "codex",
+		"key": "request_usage_components",
+		"source": "token_usage_record/.thread_token_usage.*",
+		"line": 7
+	},
+	{
+		"agent": "codex",
+		"key": "tool_name_components",
+		"source": "event_msg/item_completed:FunctionCallOutput.name",
+		"line": 8
+	},
+	{
+		"agent": "codex",
+		"key": "tool_name_components",
+		"source": "response_item/function_call_output.name",
+		"line": 9
+	},
+	{
+		"agent": "codex",
+		"key": "tool_name_components",
+		"source": "response_item/custom_tool_call_output.name",
+		"line": 10
+	},
+	{
+		"agent": "codex",
+		"key": "call_id_components",
+		"source": "event_msg/image_generation_end.call_id",
+		"line": 11
+	},
+	{
+		"agent": "codex",
+		"key": "call_id_components",
+		"source": "event_msg/mcp_tool_call_end.call_id",
+		"line": 12
+	},
+	{
+		"agent": "codex",
+		"key": "call_id_components",
+		"source": "response_item/local_shell_call.call_id",
+		"line": 13
+	},
+	{
+		"agent": "codex",
+		"key": "call_id_components",
+		"source": "security_risk_score/.call_id",
+		"line": 14
+	},
+	{
+		"agent": "codex",
+		"key": "call_id_components",
+		"source": "retained_context/verified_answer.call_id",
+		"line": 15
+	},
+	{
+		"agent": "codex",
+		"key": "call_id_components",
+		"source": "event_msg/item_completed:CollabAgentToolCall.id",
+		"line": 16
+	},
+	{
+		"agent": "codex",
+		"key": "call_id_components",
+		"source": "event_msg/web_search_end.call_id",
+		"line": 17
+	},
+	{
+		"agent": "claude_code",
+		"key": "input_text_components",
+		"source": "user.toolUseResult.query",
+		"line": 1
+	},
+	{
+		"agent": "codex",
+		"key": "input_text_components",
+		"source": "response_item/local_shell_call.action.command[]",
+		"line": 18
+	},
+	{
+		"agent": "codex",
+		"key": "input_text_components",
+		"source": "event_msg/item_completed:CommandExecution.interaction_input",
+		"line": 19
+	},
+	{
+		"agent": "codex",
+		"key": "input_text_components",
+		"source": "event_msg/mcp_tool_call_end.invocation.arguments",
+		"line": 20
+	},
+	{
+		"agent": "codex",
+		"key": "input_text_components",
+		"source": "response_item/function_call:spawn_agent.arguments.items",
+		"line": 21
+	},
+	{
+		"agent": "codex",
+		"key": "input_text_components",
+		"source": "response_item/function_call:exec_command.arguments.chars",
+		"line": 22
+	},
+	{
+		"agent": "codex",
+		"key": "is_error_components",
+		"source": "event_msg/item_completed:DynamicToolCall.success",
+		"line": 23
+	},
+	{
+		"agent": "codex",
+		"key": "exit_code_components",
+		"source": "event_msg/item_completed:CommandExecution.exit_code",
+		"line": 24
+	},
+	{
+		"agent": "claude_code",
+		"key": "denial_reason_components",
+		"source": "user.toolUseResult",
+		"line": 2
+	},
+	{
+		"agent": "claude_code",
+		"key": "denial_reason_components",
+		"source": "user.message.content[tool_result].content~hook error",
+		"line": 3
+	},
+	{
+		"agent": "codex",
+		"key": "duration_ms_components",
+		"source": "event_msg/item_completed:DynamicToolCall.duration.*",
+		"line": 25
+	},
+	{
+		"agent": "codex",
+		"key": "duration_ms_components",
+		"source": "event_msg/mcp_tool_call_end.duration.nanos",
+		"line": 26
+	},
+	{
+		"agent": "codex",
+		"key": "duration_ms_components",
+		"source": "event_msg/mcp_tool_call_end.duration.secs",
+		"line": 27
+	},
+	{
+		"agent": "codex",
+		"key": "wall_time_ms_components",
+		"source": "response_item/function_call_output.output~Wall time",
+		"line": 28
+	},
+	{
+		"agent": "codex",
+		"key": "wall_time_ms_components",
+		"source": "response_item/function_call_output.output[input_text].text~Wall time",
+		"line": 29
+	},
+	{
+		"agent": "codex",
+		"key": "wall_time_ms_components",
+		"source": "response_item/custom_tool_call_output.output~Wall time",
+		"line": 30
+	},
+	{
+		"agent": "codex",
+		"key": "wall_time_ms_components",
+		"source": "response_item/custom_tool_call_output.output[input_text].text~Wall time",
+		"line": 31
+	},
+	{
+		"agent": "codex",
+		"key": "wall_time_ms_components",
+		"source": "response_item/custom_tool_call_output.output.metadata.duration_seconds",
+		"line": 32
+	},
+	{
+		"agent": "codex",
+		"key": "wall_time_ms_components",
+		"source": "response_item/function_call_output.output.metadata.duration_seconds",
+		"line": 33
+	},
+	{
+		"agent": "codex",
+		"key": "call_started_at_components",
+		"source": "event_msg/item_completed.started_at_ms",
+		"line": 34
+	},
+	{
+		"agent": "codex",
+		"key": "call_started_at_components",
+		"source": "event_msg/item_completed.completed_at_ms",
+		"line": 35
+	},
+	{
+		"agent": "claude_code",
+		"key": "timeout_ms_components",
+		"source": "assistant.message.content[tool_use:Bash].input.timeout",
+		"line": 4
+	},
+	{
+		"agent": "claude_code",
+		"key": "timeout_ms_components",
+		"source": "assistant.message.content[tool_use:Monitor].input.timeout_ms",
+		"line": 5
+	},
+	{
+		"agent": "codex",
+		"key": "timeout_ms_components",
+		"source": "response_item/local_shell_call.action.timeout_ms",
+		"line": 36
+	},
+	{
+		"agent": "codex",
+		"key": "background_task_id_components",
+		"source": "response_item/function_call_output.output~Process running with session ID",
+		"line": 37
+	},
+	{
+		"agent": "codex",
+		"key": "background_task_id_components",
+		"source": "response_item/custom_tool_call_output.output~Script running with cell ID",
+		"line": 38
+	},
+	{
+		"agent": "codex",
+		"key": "background_task_id_components",
+		"source": "response_item/function_call:write_stdin.arguments.session_id",
+		"line": 39
+	},
+	{
+		"agent": "codex",
+		"key": "background_task_id_components",
+		"source": "response_item/function_call:wait.arguments.cell_id",
+		"line": 40
+	},
+	{
+		"agent": "codex",
+		"key": "background_task_id_components",
+		"source": "event_msg/exec_command_end.process_id",
+		"line": 41
+	},
+	{
+		"agent": "codex",
+		"key": "background_task_id_components",
+		"source": "event_msg/item_completed:CommandExecution.process_id",
+		"line": 42
+	},
+	{
+		"agent": "codex",
+		"key": "background_task_id_components",
+		"source": "response_item/function_call_output.output[input_text].text~Script running with cell ID",
+		"line": 43
+	},
+	{
+		"agent": "codex",
+		"key": "background_task_id_components",
+		"source": "response_item/function_call:exec_command.arguments.session_id",
+		"line": 44
+	},
+	{
+		"agent": "claude_code",
+		"key": "run_in_background_components",
+		"source": "assistant.message.content[tool_use:Bash].input.run_in_background",
+		"line": 6
+	},
+	{
+		"agent": "claude_code",
+		"key": "run_in_background_components",
+		"source": "assistant.message.content[tool_use:Agent].input.run_in_background",
+		"line": 7
+	},
+	{
+		"agent": "codex",
+		"key": "stdout_chars_components",
+		"source": "event_msg/item_completed:CommandExecution.stdout",
+		"line": 45
+	},
+	{
+		"agent": "codex",
+		"key": "stdout_chars_components",
+		"source": "event_msg/item_completed:CommandExecution.stderr",
+		"line": 46
+	},
+	{
+		"agent": "codex",
+		"key": "stdout_chars_components",
+		"source": "event_msg/exec_command_end.stdout",
+		"line": 47
+	},
+	{
+		"agent": "codex",
+		"key": "stdout_chars_components",
+		"source": "event_msg/exec_command_end.stderr",
+		"line": 48
+	},
+	{
+		"agent": "claude_code",
+		"key": "persisted_output_path_components",
+		"source": "user.toolUseResult.persistedOutputPath",
+		"line": 8
+	},
+	{
+		"agent": "claude_code",
+		"key": "content_not_in_model_context_components",
+		"source": "user.toolUseResult.contentNotInModelContext",
+		"line": 9
+	},
+	{
+		"agent": "codex",
+		"key": "result_chars_components",
+		"source": "event_msg/item_completed:FunctionCallOutput.output",
+		"line": 49
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_server_components",
+		"source": "response_item/custom_tool_call_output@metadata.mcp_attribution.sources[].server_name",
+		"line": 50
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_server_components",
+		"source": "response_item/function_call_output@metadata.mcp_attribution.sources[].server_name",
+		"line": 51
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_server_components",
+		"source": "event_msg/mcp_tool_call_end.invocation.server",
+		"line": 52
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_server_components",
+		"source": "response_item/function_call:list_mcp_resources.arguments.server",
+		"line": 53
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_tool_components",
+		"source": "response_item/custom_tool_call_output@metadata.mcp_attribution.sources[].tool_name",
+		"line": 54
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_tool_components",
+		"source": "response_item/function_call_output@metadata.mcp_attribution.sources[].tool_name",
+		"line": 55
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_tool_components",
+		"source": "event_msg/mcp_tool_call_end.invocation.tool",
+		"line": 56
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_read_only_components",
+		"source": "event_msg/mcp_tool_call_end.read_only_hint",
+		"line": 57
+	},
+	{
+		"agent": "claude_code",
+		"key": "attribution_plugin_components",
+		"source": "assistant.attributionPlugin",
+		"line": 10
+	},
+	{
+		"agent": "codex",
+		"key": "attribution_plugin_components",
+		"source": "event_msg/item_completed:CommandExecution.plugin_id",
+		"line": 58
+	},
+	{
+		"agent": "codex",
+		"key": "attribution_plugin_components",
+		"source": "event_msg/mcp_tool_call_end.plugin_id",
+		"line": 59
+	},
+	{
+		"agent": "claude_code",
+		"key": "attribution_agent_components",
+		"source": "assistant.attributionAgent",
+		"line": 11
+	},
+	{
+		"agent": "codex",
+		"key": "attribution_agent_components",
+		"source": "session_meta/.agent_role",
+		"line": 60
+	},
+	{
+		"agent": "codex",
+		"key": "attribution_agent_components",
+		"source": "session_meta/.agent_nickname",
+		"line": 61
+	},
+	{
+		"agent": "codex",
+		"key": "attribution_agent_components",
+		"source": "session_meta/.source.subagent.thread_spawn.agent_role",
+		"line": 62
+	},
+	{
+		"agent": "codex",
+		"key": "attribution_agent_components",
+		"source": "session_meta/.source.subagent.thread_spawn.agent_nickname",
+		"line": 63
+	},
+	{
+		"agent": "codex",
+		"key": "file_path_components",
+		"source": "event_msg/item_completed:ImageView.path",
+		"line": 64
+	},
+	{
+		"agent": "codex",
+		"key": "file_path_components",
+		"source": "response_item/function_call:view_image.arguments.path",
+		"line": 65
+	},
+	{
+		"agent": "codex",
+		"key": "patch_lines_added_components",
+		"source": "event_msg/item_completed:FileChange.changes.{*}.unified_diff",
+		"line": 66
+	},
+	{
+		"agent": "codex",
+		"key": "patch_lines_added_components",
+		"source": "event_msg/patch_apply_end.changes.{*}.unified_diff",
+		"line": 67
+	},
+	{
+		"agent": "codex",
+		"key": "search_query_components",
+		"source": "event_msg/item_completed:CommandExecution.parsed_cmd[].query",
+		"line": 68
+	},
+	{
+		"agent": "codex",
+		"key": "search_query_components",
+		"source": "event_msg/exec_command_end.parsed_cmd[].query",
+		"line": 69
+	},
+	{
+		"agent": "codex",
+		"key": "search_query_components",
+		"source": "event_msg/item_completed:Extension.action.queries[]",
+		"line": 70
+	},
+	{
+		"agent": "codex",
+		"key": "search_query_components",
+		"source": "event_msg/item_completed:WebSearch.action.queries[]",
+		"line": 71
+	},
+	{
+		"agent": "codex",
+		"key": "search_query_components",
+		"source": "response_item/web_search_call.action.queries[]",
+		"line": 72
+	},
+	{
+		"agent": "claude_code",
+		"key": "subagent_activity_components",
+		"source": "user.toolUseResult.status",
+		"line": 12
+	},
+	{
+		"agent": "codex",
+		"key": "subagent_activity_components",
+		"source": "event_msg/item_completed:SubAgentActivity.kind",
+		"line": 73
+	},
+	{
+		"agent": "codex",
+		"key": "subagent_activity_components",
+		"source": "event_msg/item_completed:SubAgentActivity.agent_thread_id",
+		"line": 74
+	},
+	{
+		"agent": "claude_code",
+		"key": "subagent_type_components",
+		"source": "assistant.message.content[tool_use:Agent].input.model",
+		"line": 13
+	},
+	{
+		"agent": "claude_code",
+		"key": "subagent_type_components",
+		"source": "assistant.message.content[tool_use:Agent].input.isolation",
+		"line": 14
+	},
+	{
+		"agent": "claude_code",
+		"key": "subagent_type_components",
+		"source": "user.toolUseResult.resolvedModel",
+		"line": 15
+	},
+	{
+		"agent": "claude_code",
+		"key": "subagent_type_components",
+		"source": "user.toolUseResult.agentType",
+		"line": 16
+	},
+	{
+		"agent": "codex",
+		"key": "subagent_type_components",
+		"source": "response_item/function_call:spawn_agent.arguments.agent_type",
+		"line": 75
+	},
+	{
+		"agent": "codex",
+		"key": "subagent_type_components",
+		"source": "response_item/function_call:spawn_agent.arguments.model",
+		"line": 76
+	},
+	{
+		"agent": "codex",
+		"key": "subagent_type_components",
+		"source": "response_item/function_call:spawn_agent.arguments.reasoning_effort",
+		"line": 77
+	},
+	{
+		"agent": "claude_code",
+		"key": "subagent_totals_components",
+		"source": "user.toolUseResult.totalDurationMs",
+		"line": 17
+	},
+	{
+		"agent": "claude_code",
+		"key": "subagent_totals_components",
+		"source": "user.toolUseResult.totalTokens",
+		"line": 18
+	},
+	{
+		"agent": "claude_code",
+		"key": "subagent_totals_components",
+		"source": "user.toolUseResult.totalToolUseCount",
+		"line": 19
+	},
+	{
+		"agent": "claude_code",
+		"key": "subagent_totals_components",
+		"source": "user.toolUseResult.toolStats.*",
+		"line": 20
+	},
+	{
+		"agent": "claude_code",
+		"key": "subagent_totals_components",
+		"source": "user.toolUseResult.usage.**",
+		"line": 21
+	},
+	{
+		"agent": "codex",
+		"key": "skill_components",
+		"source": "event_msg/item_completed:UserMessage.content[skill].name",
+		"line": 78
+	},
+	{
+		"agent": "codex",
+		"key": "skill_components",
+		"source": "event_msg/item_completed:UserMessage.content[skill].path",
+		"line": 79
+	},
+	{
+		"agent": "codex",
+		"key": "skill_components",
+		"source": "event_msg/item_completed:CommandExecution.parsed_cmd[].path",
+		"line": 80
+	},
+	{
+		"agent": "codex",
+		"key": "parsed_cmd_types_components",
+		"source": "event_msg/exec_command_end.parsed_cmd[].type",
+		"line": 81
+	},
+	{
+		"agent": "codex",
+		"key": "parsed_cmd_types_components",
+		"source": "event_msg/exec_command_end.parsed_cmd[].cmd",
+		"line": 82
+	},
+	{
+		"agent": "codex",
+		"key": "parsed_cmd_types_components",
+		"source": "event_msg/exec_command_end.parsed_cmd[].name",
+		"line": 83
+	},
+	{
+		"agent": "codex",
+		"key": "parsed_cmd_read_paths_components",
+		"source": "event_msg/exec_command_end.parsed_cmd[].path",
+		"line": 84
+	},
+	{
+		"agent": "claude_code",
+		"key": "cwd_components",
+		"source": "*.cwd",
+		"line": 22
+	},
+	{
+		"agent": "codex",
+		"key": "cwd_components",
+		"source": "event_msg/item_completed:CommandExecution.cwd",
+		"line": 85
+	},
+	{
+		"agent": "codex",
+		"key": "cwd_components",
+		"source": "event_msg/exec_command_end.cwd",
+		"line": 86
+	},
+	{
+		"agent": "codex",
+		"key": "cwd_components",
+		"source": "response_item/local_shell_call.action.working_directory",
+		"line": 87
+	},
+	{
+		"agent": "claude_code",
+		"key": "git_branch_components",
+		"source": "*.gitBranch",
+		"line": 23
+	},
+	{
+		"agent": "claude_code",
+		"key": "wire_input_components",
+		"source": "assistant.wireToolInputs.{*}",
+		"line": 24
+	},
+	{
+		"agent": "claude_code",
+		"key": "sandbox_escalation_components",
+		"source": "assistant.message.content[tool_use:Bash].input.dangerouslyDisableSandbox",
+		"line": 25
+	},
+	{
+		"agent": "codex",
+		"key": "sandbox_escalation_components",
+		"source": "response_item/function_call:exec_command.arguments.sandbox_permissions",
+		"line": 88
+	},
+	{
+		"agent": "codex",
+		"key": "sandbox_escalation_components",
+		"source": "response_item/function_call:exec_command.arguments.justification",
+		"line": 89
+	},
+	{
+		"agent": "claude_code",
+		"key": "permission_decision_components",
+		"source": "user.permissionDecision.decision",
+		"line": 26
+	},
+	{
+		"agent": "claude_code",
+		"key": "permission_decision_components",
+		"source": "user.permissionDecision.source",
+		"line": 27
+	},
+	{
+		"agent": "claude_code",
+		"key": "permission_decision_components",
+		"source": "user.permissionDecision.reasonType",
+		"line": 28
+	},
+	{
+		"agent": "codex",
+		"key": "permission_decision_components",
+		"source": "response_item/function_call:exec_command.arguments.prefix_rule[]",
+		"line": 90
+	},
+	{
+		"agent": "codex",
+		"key": "permission_decision_components",
+		"source": "world_state/.state.permissions.approved_command_prefixes[][]",
+		"line": 91
+	},
+	{
+		"agent": "codex",
+		"key": "permission_decision_components",
+		"source": "event_msg/item_completed:FileChange.auto_approved",
+		"line": 92
+	},
+	{
+		"agent": "codex",
+		"key": "auto_review_decision_components",
+		"source": "response_item/message:assistant.content[output_text].text~auto-review decision",
+		"line": 93
+	},
+	{
+		"agent": "codex",
+		"key": "auto_review_decision_components",
+		"source": "session_meta/.thread_source",
+		"line": 94
+	},
+	{
+		"agent": "codex",
+		"key": "auto_review_decision_components",
+		"source": "session_meta/.source.subagent.other",
+		"line": 95
+	},
+	{
+		"agent": "codex",
+		"key": "tool_namespace_components",
+		"source": "response_item/function_call:*.namespace",
+		"line": 96
+	},
+	{
+		"agent": "codex",
+		"key": "tool_namespace_components",
+		"source": "event_msg/item_completed:DynamicToolCall.namespace",
+		"line": 97
+	},
+	{
+		"agent": "codex",
+		"key": "tool_namespace_components",
+		"source": "event_msg/item_completed:McpToolCall.connectorId",
+		"line": 98
+	},
+	{
+		"agent": "codex",
+		"key": "tool_namespace_components",
+		"source": "event_msg/item_completed:McpToolCall.appName",
+		"line": 99
+	},
+	{
+		"agent": "codex",
+		"key": "tool_namespace_components",
+		"source": "event_msg/mcp_tool_call_end.app_name",
+		"line": 100
+	},
+	{
+		"agent": "codex",
+		"key": "tool_namespace_components",
+		"source": "event_msg/mcp_tool_call_end.connector_id",
+		"line": 101
+	},
+	{
+		"agent": "codex",
+		"key": "tool_namespace_components",
+		"source": "response_item/custom_tool_call:*.namespace",
+		"line": 102
+	},
+	{
+		"agent": "codex",
+		"key": "tool_namespace_components",
+		"source": "event_msg/item_completed:FunctionCallOutput.namespace",
+		"line": 103
+	},
+	{
+		"agent": "codex",
+		"key": "tool_namespace_components",
+		"source": "response_item/function_call_output.namespace",
+		"line": 104
+	},
+	{
+		"agent": "codex",
+		"key": "extension_item_components",
+		"source": "event_msg/item_completed:Extension.kind",
+		"line": 105
+	},
+	{
+		"agent": "codex",
+		"key": "extension_item_components",
+		"source": "event_msg/item_completed:Extension.durationMs",
+		"line": 106
+	},
+	{
+		"agent": "codex",
+		"key": "extension_item_components",
+		"source": "event_msg/item_completed:Extension.savedPath",
+		"line": 107
+	},
+	{
+		"agent": "codex",
+		"key": "extension_item_components",
+		"source": "event_msg/image_generation_end.saved_path",
+		"line": 108
+	},
+	{
+		"agent": "codex",
+		"key": "extension_item_components",
+		"source": "event_msg/item_completed:ImageGeneration.saved_path",
+		"line": 109
+	},
+	{
+		"agent": "claude_code",
+		"key": "image_input_components",
+		"source": "user.imagePasteIds[]",
+		"line": 29
+	},
+	{
+		"agent": "claude_code",
+		"key": "image_input_components",
+		"source": "attachment/queued_command.attachment.prompt[].source.media_type",
+		"line": 30
+	},
+	{
+		"agent": "claude_code",
+		"key": "image_input_components",
+		"source": "attachment/queued_command.attachment.prompt[].source.type",
+		"line": 31
+	},
+	{
+		"agent": "claude_code",
+		"key": "image_input_components",
+		"source": "attachment/queued_command.attachment.prompt[].type",
+		"line": 32
+	},
+	{
+		"agent": "codex",
+		"key": "image_input_components",
+		"source": "response_item/message:user.content[input_image].image_url",
+		"line": 110
+	},
+	{
+		"agent": "codex",
+		"key": "image_input_components",
+		"source": "response_item/message:user.content[input_image].detail",
+		"line": 111
+	},
+	{
+		"agent": "codex",
+		"key": "image_input_components",
+		"source": "event_msg/item_completed:UserMessage.content[image].image_url",
+		"line": 112
+	},
+	{
+		"agent": "codex",
+		"key": "image_input_components",
+		"source": "event_msg/item_completed:UserMessage.content[local_image].path",
+		"line": 113
+	},
+	{
+		"agent": "codex",
+		"key": "image_input_components",
+		"source": "event_msg/user_message.images",
+		"line": 114
+	},
+	{
+		"agent": "codex",
+		"key": "image_input_components",
+		"source": "event_msg/user_message.images[]",
+		"line": 115
+	},
+	{
+		"agent": "codex",
+		"key": "image_input_components",
+		"source": "event_msg/user_message.local_images",
+		"line": 116
+	},
+	{
+		"agent": "codex",
+		"key": "image_input_components",
+		"source": "event_msg/item_completed:UserMessage.content[image].detail",
+		"line": 117
+	},
+	{
+		"agent": "codex",
+		"key": "image_input_components",
+		"source": "event_msg/item_completed:UserMessage.content[local_image].detail",
+		"line": 118
+	},
+	{
+		"agent": "codex",
+		"key": "image_input_components",
+		"source": "event_msg/user_message.local_images[]",
+		"line": 119
+	},
+	{
+		"agent": "codex",
+		"key": "image_input_components",
+		"source": "event_msg/user_message.file_id_details",
+		"line": 120
+	},
+	{
+		"agent": "codex",
+		"key": "image_input_components",
+		"source": "event_msg/user_message.file_ids",
+		"line": 121
+	},
+	{
+		"agent": "codex",
+		"key": "image_input_components",
+		"source": "event_msg/user_message.image_details",
+		"line": 122
+	},
+	{
+		"agent": "codex",
+		"key": "image_input_components",
+		"source": "event_msg/user_message.local_image_details",
+		"line": 123
+	},
+	{
+		"agent": "codex",
+		"key": "started_at_components",
+		"source": "event_msg/task_started.started_at",
+		"line": 124
+	},
+	{
+		"agent": "codex",
+		"key": "started_at_components",
+		"source": "event_msg/task_complete.started_at",
+		"line": 125
+	},
+	{
+		"agent": "codex",
+		"key": "started_at_components",
+		"source": "event_msg/task_complete.completed_at",
+		"line": 126
+	},
+	{
+		"agent": "codex",
+		"key": "started_at_components",
+		"source": "event_msg/turn_aborted.started_at",
+		"line": 127
+	},
+	{
+		"agent": "codex",
+		"key": "started_at_components",
+		"source": "event_msg/turn_aborted.completed_at",
+		"line": 128
+	},
+	{
+		"agent": "claude_code",
+		"key": "permission_mode_components",
+		"source": "permission-mode.permissionMode",
+		"line": 33
+	},
+	{
+		"agent": "claude_code",
+		"key": "mode_components",
+		"source": "mode.mode",
+		"line": 34
+	},
+	{
+		"agent": "codex",
+		"key": "approval_policy_components",
+		"source": "event_msg/thread_settings_applied.thread_settings.approval_policy",
+		"line": 129
+	},
+	{
+		"agent": "codex",
+		"key": "approval_policy_components",
+		"source": "turn_context/.approval_policy.granular.mcp_elicitations",
+		"line": 130
+	},
+	{
+		"agent": "codex",
+		"key": "approval_policy_components",
+		"source": "turn_context/.approval_policy.granular.request_permissions",
+		"line": 131
+	},
+	{
+		"agent": "codex",
+		"key": "approval_policy_components",
+		"source": "turn_context/.approval_policy.granular.rules",
+		"line": 132
+	},
+	{
+		"agent": "codex",
+		"key": "approval_policy_components",
+		"source": "turn_context/.approval_policy.granular.sandbox_approval",
+		"line": 133
+	},
+	{
+		"agent": "codex",
+		"key": "approval_policy_components",
+		"source": "turn_context/.approval_policy.granular.skill_approval",
+		"line": 134
+	},
+	{
+		"agent": "codex",
+		"key": "approvals_reviewer_components",
+		"source": "event_msg/thread_settings_applied.thread_settings.approvals_reviewer",
+		"line": 135
+	},
+	{
+		"agent": "codex",
+		"key": "sandbox_policy_components",
+		"source": "turn_context/.sandbox_policy.network_access",
+		"line": 136
+	},
+	{
+		"agent": "codex",
+		"key": "sandbox_policy_components",
+		"source": "turn_context/.file_system_sandbox_policy.entries[].access",
+		"line": 137
+	},
+	{
+		"agent": "codex",
+		"key": "sandbox_policy_components",
+		"source": "event_msg/thread_settings_applied.thread_settings.permission_profile.file_system.entries[].access",
+		"line": 138
+	},
+	{
+		"agent": "codex",
+		"key": "sandbox_policy_components",
+		"source": "event_msg/thread_settings_applied.thread_settings.permission_profile.network",
+		"line": 139
+	},
+	{
+		"agent": "codex",
+		"key": "sandbox_policy_components",
+		"source": "turn_context/.permission_profile.file_system.entries[].access",
+		"line": 140
+	},
+	{
+		"agent": "codex",
+		"key": "sandbox_policy_components",
+		"source": "turn_context/.permission_profile.network",
+		"line": 141
+	},
+	{
+		"agent": "codex",
+		"key": "permission_profile_components",
+		"source": "turn_context/.active_permission_profile.id",
+		"line": 142
+	},
+	{
+		"agent": "codex",
+		"key": "permission_profile_components",
+		"source": "event_msg/thread_settings_applied.thread_settings.permission_profile.type",
+		"line": 143
+	},
+	{
+		"agent": "codex",
+		"key": "permission_profile_components",
+		"source": "event_msg/thread_settings_applied.thread_settings.active_permission_profile.id",
+		"line": 144
+	},
+	{
+		"agent": "codex",
+		"key": "collaboration_mode_components",
+		"source": "world_state/.state.collaboration_mode",
+		"line": 145
+	},
+	{
+		"agent": "codex",
+		"key": "collaboration_mode_components",
+		"source": "world_state/.state.collaboration_mode.mode",
+		"line": 146
+	},
+	{
+		"agent": "claude_code",
+		"key": "model_components",
+		"source": "attachment/model.attachment.identity.modelId",
+		"line": 35
+	},
+	{
+		"agent": "codex",
+		"key": "model_components",
+		"source": "event_msg/thread_settings_applied.thread_settings.model",
+		"line": 147
+	},
+	{
+		"agent": "codex",
+		"key": "model_components",
+		"source": "turn_context/.collaboration_mode.settings.model",
+		"line": 148
+	},
+	{
+		"agent": "codex",
+		"key": "model_components",
+		"source": "response_item/message:developer.content[input_text].text~<model_switch>",
+		"line": 149
+	},
+	{
+		"agent": "codex",
+		"key": "effort_components",
+		"source": "event_msg/thread_settings_applied.thread_settings.reasoning_effort",
+		"line": 150
+	},
+	{
+		"agent": "codex",
+		"key": "effort_components",
+		"source": "turn_context/.collaboration_mode.settings.reasoning_effort",
+		"line": 151
+	},
+	{
+		"agent": "codex",
+		"key": "effort_components",
+		"source": "response_item/configuration_update.reasoning.effort",
+		"line": 152
+	},
+	{
+		"agent": "codex",
+		"key": "effort_components",
+		"source": "event_msg/thread_settings_applied.thread_settings.collaboration_mode.settings.reasoning_effort",
+		"line": 153
+	},
+	{
+		"agent": "claude_code",
+		"key": "advisor_model_components",
+		"source": "assistant.advisorModel",
+		"line": 36
+	},
+	{
+		"agent": "codex",
+		"key": "entrypoint_components",
+		"source": "session_meta/.source",
+		"line": 154
+	},
+	{
+		"agent": "codex",
+		"key": "entrypoint_components",
+		"source": "session_meta/.source.custom",
+		"line": 155
+	},
+	{
+		"agent": "codex",
+		"key": "entrypoint_components",
+		"source": "session_meta/.source.internal",
+		"line": 156
+	},
+	{
+		"agent": "codex",
+		"key": "entrypoint_components",
+		"source": "session_meta/.source.subagent",
+		"line": 157
+	},
+	{
+		"agent": "codex",
+		"key": "entrypoint_components",
+		"source": "session_meta/.thread_source",
+		"line": 158
+	},
+	{
+		"agent": "claude_code",
+		"key": "request_usage_components",
+		"source": "system/model_refusal_fallback.requestId",
+		"line": 37
+	},
+	{
+		"agent": "claude_code",
+		"key": "request_usage_components",
+		"source": "system/model_refusal_no_fallback.requestId",
+		"line": 38
+	},
+	{
+		"agent": "claude_code",
+		"key": "server_tool_requests_components",
+		"source": "assistant.message.usage.server_tool_use.web_search_requests",
+		"line": 39
+	},
+	{
+		"agent": "claude_code",
+		"key": "server_tool_requests_components",
+		"source": "assistant.message.usage.server_tool_use.web_fetch_requests",
+		"line": 40
+	},
+	{
+		"agent": "claude_code",
+		"key": "server_tool_requests_components",
+		"source": "user.toolUseResult.searchCount",
+		"line": 41
+	},
+	{
+		"agent": "claude_code",
+		"key": "thinking_duration_ms_components",
+		"source": "assistant.thinkingDurationMs",
+		"line": 42
+	},
+	{
+		"agent": "codex",
+		"key": "thinking_duration_ms_components",
+		"source": "event_msg/item_completed.started_at_ms",
+		"line": 159
+	},
+	{
+		"agent": "codex",
+		"key": "thinking_duration_ms_components",
+		"source": "event_msg/item_completed.completed_at_ms",
+		"line": 160
+	},
+	{
+		"agent": "claude_code",
+		"key": "cache_miss_reason_components",
+		"source": "assistant.message.diagnostics.cache_miss_reason.type",
+		"line": 43
+	},
+	{
+		"agent": "claude_code",
+		"key": "cache_miss_reason_components",
+		"source": "assistant.message.diagnostics.cache_miss_reason.cache_missed_input_tokens",
+		"line": 44
+	},
+	{
+		"agent": "claude_code",
+		"key": "rate_limits_components",
+		"source": "assistant.quotaLimits.status",
+		"line": 45
+	},
+	{
+		"agent": "claude_code",
+		"key": "rate_limits_components",
+		"source": "assistant.quotaLimits.rateLimitType",
+		"line": 46
+	},
+	{
+		"agent": "claude_code",
+		"key": "rate_limits_components",
+		"source": "assistant.quotaLimits.resetsAt",
+		"line": 47
+	},
+	{
+		"agent": "claude_code",
+		"key": "rate_limits_components",
+		"source": "assistant.quotaLimits.*",
+		"line": 48
+	},
+	{
+		"agent": "codex",
+		"key": "rate_limits_components",
+		"source": "event_msg/token_count.rate_limits.**",
+		"line": 161
+	},
+	{
+		"agent": "claude_code",
+		"key": "mcp_server_state_components",
+		"source": "attachment/deferred_tools_delta.attachment.needsAuthMcpServers[]",
+		"line": 49
+	},
+	{
+		"agent": "claude_code",
+		"key": "mcp_server_state_components",
+		"source": "attachment/deferred_tools_delta.attachment.pendingMcpServers[]",
+		"line": 50
+	},
+	{
+		"agent": "claude_code",
+		"key": "mcp_server_state_components",
+		"source": "attachment/deferred_tools_delta.attachment.failedMcpServers",
+		"line": 51
+	},
+	{
+		"agent": "claude_code",
+		"key": "mcp_server_state_components",
+		"source": "attachment/mcp_instructions_delta.attachment.removedNames[]",
+		"line": 52
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_server_state_components",
+		"source": "event_msg/mcp_tool_call_end.result._meta._codex_apps.connector_auth_failure",
+		"line": 162
+	},
+	{
+		"agent": "codex",
+		"key": "context_window_components",
+		"source": "event_msg/token_count.info.model_context_window",
+		"line": 163
+	},
+	{
+		"agent": "codex",
+		"key": "compacted_components",
+		"source": "event_msg/item_completed:ContextCompaction.id",
+		"line": 164
+	},
+	{
+		"agent": "codex",
+		"key": "compacted_components",
+		"source": "compacted/.window_id",
+		"line": 165
+	},
+	{
+		"agent": "codex",
+		"key": "compacted_components",
+		"source": "compacted/.previous_window_id",
+		"line": 166
+	},
+	{
+		"agent": "codex",
+		"key": "compacted_components",
+		"source": "compacted/.window_number",
+		"line": 167
+	},
+	{
+		"agent": "codex",
+		"key": "compacted_components",
+		"source": "compacted/.first_window_id",
+		"line": 168
+	},
+	{
+		"agent": "codex",
+		"key": "compacted_components",
+		"source": "response_item/context_compaction.encrypted_content",
+		"line": 169
+	},
+	{
+		"agent": "codex",
+		"key": "compact_pre_tokens_components",
+		"source": "compacted/.latest_token_usage_record.**",
+		"line": 170
+	},
+	{
+		"agent": "claude_code",
+		"key": "aborted_components",
+		"source": "user.message.content[text].text~Request interrupted by user",
+		"line": 53
+	},
+	{
+		"agent": "claude_code",
+		"key": "aborted_components",
+		"source": "user.message.content~Request interrupted by user",
+		"line": 54
+	},
+	{
+		"agent": "claude_code",
+		"key": "abort_reason_components",
+		"source": "user.message.content[text].text~Request interrupted by user",
+		"line": 55
+	},
+	{
+		"agent": "claude_code",
+		"key": "abort_reason_components",
+		"source": "user.message.content~Request interrupted by user",
+		"line": 56
+	},
+	{
+		"agent": "codex",
+		"key": "turn_error_components",
+		"source": "event_msg/turn_aborted.error.message",
+		"line": 171
+	},
+	{
+		"agent": "codex",
+		"key": "turn_error_kind_components",
+		"source": "event_msg/turn_aborted.error.codex_error_info",
+		"line": 172
+	},
+	{
+		"agent": "claude_code",
+		"key": "turn_id_components",
+		"source": "user.promptId",
+		"line": 57
+	},
+	{
+		"agent": "claude_code",
+		"key": "turn_id_components",
+		"source": "user.turnPosition.turnIndex",
+		"line": 58
+	},
+	{
+		"agent": "claude_code",
+		"key": "turn_id_components",
+		"source": "user.turnPosition.promptIndex",
+		"line": 59
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "event_msg/thread_goal_updated.turnId",
+		"line": 173
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "event_msg/item_completed.turn_id",
+		"line": 174
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "event_msg/item_completed.thread_id",
+		"line": 175
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "event_msg/task_started.root_turn_id",
+		"line": 176
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "turn_context/.root_turn_id",
+		"line": 177
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "event_msg/task_started.turn_attribution.turn_id",
+		"line": 178
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "event_msg/entered_review_mode.turn_id",
+		"line": 179
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "event_msg/exited_review_mode.turn_id",
+		"line": 180
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "event_msg/mcp_tool_call_end.turn_id",
+		"line": 181
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "realtime_item/.turn_id",
+		"line": 182
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "retained_context/delivered_assistant_message.turn_id",
+		"line": 183
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "retained_context/verified_answer.turn_id",
+		"line": 184
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/agent_message.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 185
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/compaction.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 186
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/custom_tool_call_output.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 187
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/custom_tool_call:apply_patch.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 188
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/custom_tool_call:exec.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 189
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call_output.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 190
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:_{*}.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 191
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:analyses.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 192
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:create_goal.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 193
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:exec_command.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 194
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:exec.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 195
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:fetch_openai_doc.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 196
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:find.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 197
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:followup_task.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 198
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:get_goal.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 199
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:get_openapi_spec.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 200
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:imagegen.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 201
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:interrupt_agent.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 202
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:js_add_node_module_dir.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 203
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:js_reset.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 204
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:js.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 205
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:list_agents.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 206
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:load_workspace_dependencies.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 207
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:read.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 208
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:request_user_input_async.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 209
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:request_user_input.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 210
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:run.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 211
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:search_openai_docs.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 212
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:send_message.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 213
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:sleep.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 214
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:spawn_agent.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 215
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:uidotsh_fetch.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 216
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:untrusted_input.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 217
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:update_goal.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 218
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:update_plan.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 219
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:view_image.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 220
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:wait_agent.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 221
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:wait.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 222
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/function_call:write_stdin.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 223
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/message:assistant.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 224
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/message:developer.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 225
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/message:user.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 226
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/reasoning.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 227
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/tool_search_call.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 228
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/tool_search_output.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 229
+	},
+	{
+		"agent": "codex",
+		"key": "turn_id_components",
+		"source": "response_item/web_search_call.internal_chat_message_metadata_passthrough.turn_id",
+		"line": 230
+	},
+	{
+		"agent": "claude_code",
+		"key": "stop_reason_components",
+		"source": "assistant.message.stop_details.*",
+		"line": 60
+	},
+	{
+		"agent": "codex",
+		"key": "message_phase_components",
+		"source": "response_item/message:assistant.phase",
+		"line": 231
+	},
+	{
+		"agent": "codex",
+		"key": "message_phase_components",
+		"source": "event_msg/item_completed:AgentMessage.phase",
+		"line": 232
+	},
+	{
+		"agent": "codex",
+		"key": "message_phase_components",
+		"source": "event_msg/agent_message.phase",
+		"line": 233
+	},
+	{
+		"agent": "codex",
+		"key": "message_phase_components",
+		"source": "retained_context/delivered_assistant_message.phase",
+		"line": 234
+	},
+	{
+		"agent": "claude_code",
+		"key": "api_errors_components",
+		"source": "system/api_error.error.status",
+		"line": 61
+	},
+	{
+		"agent": "claude_code",
+		"key": "api_errors_components",
+		"source": "system/api_error.error.connection.code",
+		"line": 62
+	},
+	{
+		"agent": "claude_code",
+		"key": "api_errors_components",
+		"source": "system/api_error.error.message",
+		"line": 63
+	},
+	{
+		"agent": "claude_code",
+		"key": "api_errors_components",
+		"source": "system/api_error.error.formatted",
+		"line": 64
+	},
+	{
+		"agent": "claude_code",
+		"key": "api_errors_components",
+		"source": "system/api_error.error.isNetworkDown",
+		"line": 65
+	},
+	{
+		"agent": "claude_code",
+		"key": "api_errors_components",
+		"source": "system/api_error.error.connection.message",
+		"line": 66
+	},
+	{
+		"agent": "codex",
+		"key": "api_errors_components",
+		"source": "event_msg/task_complete.error.codex_error_info",
+		"line": 235
+	},
+	{
+		"agent": "codex",
+		"key": "api_errors_components",
+		"source": "event_msg/task_complete.error.codex_error_info.**",
+		"line": 236
+	},
+	{
+		"agent": "codex",
+		"key": "api_errors_components",
+		"source": "event_msg/task_complete.error.message",
+		"line": 237
+	},
+	{
+		"agent": "codex",
+		"key": "refusals_components",
+		"source": "event_msg/task_complete.error.codex_error_info",
+		"line": 238
+	},
+	{
+		"agent": "codex",
+		"key": "refusals_components",
+		"source": "event_msg/task_complete.error.message",
+		"line": 239
+	},
+	{
+		"agent": "claude_code",
+		"key": "fallback_model_components",
+		"source": "assistant.message.content[fallback].from.model",
+		"line": 67
+	},
+	{
+		"agent": "claude_code",
+		"key": "fallback_model_components",
+		"source": "assistant.message.content[fallback].to.model",
+		"line": 68
+	},
+	{
+		"agent": "claude_code",
+		"key": "prompt_origin_components",
+		"source": "user.origin.producer",
+		"line": 69
+	},
+	{
+		"agent": "claude_code",
+		"key": "prompt_origin_components",
+		"source": "user.origin.from",
+		"line": 70
+	},
+	{
+		"agent": "claude_code",
+		"key": "prompt_origin_components",
+		"source": "user.origin.fromMode",
+		"line": 71
+	},
+	{
+		"agent": "claude_code",
+		"key": "prompt_origin_components",
+		"source": "user.origin.name",
+		"line": 72
+	},
+	{
+		"agent": "claude_code",
+		"key": "prompt_origin_components",
+		"source": "user.origin.senderTaskId",
+		"line": 73
+	},
+	{
+		"agent": "claude_code",
+		"key": "prompt_origin_components",
+		"source": "user.origin.runId",
+		"line": 74
+	},
+	{
+		"agent": "claude_code",
+		"key": "prompt_origin_components",
+		"source": "attachment/queued_command.attachment.origin.kind",
+		"line": 75
+	},
+	{
+		"agent": "claude_code",
+		"key": "prompt_origin_components",
+		"source": "attachment/queued_command.attachment.origin.{*}",
+		"line": 76
+	},
+	{
+		"agent": "claude_code",
+		"key": "prompt_origin_components",
+		"source": "attachment/queued_command.attachment.origin.from",
+		"line": 77
+	},
+	{
+		"agent": "claude_code",
+		"key": "prompt_origin_components",
+		"source": "attachment/queued_command.attachment.origin.fromMode",
+		"line": 78
+	},
+	{
+		"agent": "claude_code",
+		"key": "prompt_origin_components",
+		"source": "attachment/queued_command.attachment.origin.hopChain[]",
+		"line": 79
+	},
+	{
+		"agent": "claude_code",
+		"key": "prompt_origin_components",
+		"source": "attachment/queued_command.attachment.origin.name",
+		"line": 80
+	},
+	{
+		"agent": "claude_code",
+		"key": "prompt_origin_components",
+		"source": "attachment/queued_command.attachment.origin.producer",
+		"line": 81
+	},
+	{
+		"agent": "claude_code",
+		"key": "prompt_origin_components",
+		"source": "attachment/queued_command.attachment.origin.senderTaskId",
+		"line": 82
+	},
+	{
+		"agent": "claude_code",
+		"key": "prompt_origin_components",
+		"source": "attachment/queued_command.attachment.origin.verifiedPeerPid",
+		"line": 83
+	},
+	{
+		"agent": "claude_code",
+		"key": "prompt_origin_components",
+		"source": "user.origin.{*}",
+		"line": 84
+	},
+	{
+		"agent": "claude_code",
+		"key": "prompt_origin_components",
+		"source": "user.origin.verifiedPeerPid",
+		"line": 85
+	},
+	{
+		"agent": "codex",
+		"key": "prompt_origin_components",
+		"source": "inter_agent_communication/.author",
+		"line": 240
+	},
+	{
+		"agent": "codex",
+		"key": "text_components",
+		"source": "inter_agent_communication/.content",
+		"line": 241
+	},
+	{
+		"agent": "codex",
+		"key": "instruction_path_components",
+		"source": "response_item/message:user.content[input_text].text~AGENTS.md instructions",
+		"line": 242
+	},
+	{
+		"agent": "codex",
+		"key": "instruction_path_components",
+		"source": "world_state/.state.agents_md.directory",
+		"line": 243
+	},
+	{
+		"agent": "claude_code",
+		"key": "instruction_text_components",
+		"source": "attachment/prompt_snapshot.attachment.systemPrompt[]",
+		"line": 86
+	},
+	{
+		"agent": "codex",
+		"key": "instruction_text_components",
+		"source": "session_meta/.base_instructions.text",
+		"line": 244
+	},
+	{
+		"agent": "codex",
+		"key": "instruction_text_components",
+		"source": "turn_context/.user_instructions",
+		"line": 245
+	},
+	{
+		"agent": "codex",
+		"key": "instruction_text_components",
+		"source": "world_state/.state.agents_md.text",
+		"line": 246
+	},
+	{
+		"agent": "codex",
+		"key": "instruction_text_components",
+		"source": "event_msg/item_completed:HookPrompt.fragments[].text",
+		"line": 247
+	},
+	{
+		"agent": "claude_code",
+		"key": "queue_operation_components",
+		"source": "queue-operation.operation",
+		"line": 87
+	},
+	{
+		"agent": "claude_code",
+		"key": "queue_operation_components",
+		"source": "queue-operation.reason",
+		"line": 88
+	},
+	{
+		"agent": "claude_code",
+		"key": "queue_operation_components",
+		"source": "queue-operation.content",
+		"line": 89
+	},
+	{
+		"agent": "claude_code",
+		"key": "queue_operation_components",
+		"source": "queue-operation.commandUuid",
+		"line": 90
+	},
+	{
+		"agent": "claude_code",
+		"key": "queue_operation_components",
+		"source": "queue-operation.deliveryId",
+		"line": 91
+	},
+	{
+		"agent": "claude_code",
+		"key": "cost_state_components",
+		"source": "cost-state.modelUsage",
+		"line": 92
+	},
+	{
+		"agent": "claude_code",
+		"key": "cost_state_components",
+		"source": "cost-state.modelUsage.{*}.*",
+		"line": 93
+	},
+	{
+		"agent": "claude_code",
+		"key": "cost_state_components",
+		"source": "cost-state.startTime",
+		"line": 94
+	},
+	{
+		"agent": "claude_code",
+		"key": "approved_permission_prompts_components",
+		"source": "user.permissionDecision.decision",
+		"line": 95
+	},
+	{
+		"agent": "claude_code",
+		"key": "approved_permission_prompts_components",
+		"source": "user.permissionDecision.source",
+		"line": 96
+	},
+	{
+		"agent": "codex",
+		"key": "parent_session_components",
+		"source": "session_meta/.parent_thread_id",
+		"line": 248
+	},
+	{
+		"agent": "codex",
+		"key": "parent_session_components",
+		"source": "session_meta/.forked_from_id",
+		"line": 249
+	},
+	{
+		"agent": "codex",
+		"key": "parent_session_components",
+		"source": "session_meta/.source.subagent.thread_spawn.parent_thread_id",
+		"line": 250
+	},
+	{
+		"agent": "codex",
+		"key": "memory_citation_location_components",
+		"source": "event_msg/agent_message.memory_citation.entries[].lineEnd",
+		"line": 251
+	},
+	{
+		"agent": "codex",
+		"key": "memory_citation_location_components",
+		"source": "event_msg/agent_message.memory_citation.entries[].lineStart",
+		"line": 252
+	},
+	{
+		"agent": "codex",
+		"key": "memory_citation_location_components",
+		"source": "event_msg/agent_message.memory_citation.entries[].path",
+		"line": 253
+	},
+	{
+		"agent": "codex",
+		"key": "memory_citation_location_components",
+		"source": "event_msg/item_completed:AgentMessage.memory_citation.entries[].lineEnd",
+		"line": 254
+	},
+	{
+		"agent": "codex",
+		"key": "memory_citation_location_components",
+		"source": "event_msg/item_completed:AgentMessage.memory_citation.entries[].lineStart",
+		"line": 255
+	},
+	{
+		"agent": "codex",
+		"key": "memory_citation_location_components",
+		"source": "event_msg/item_completed:AgentMessage.memory_citation.entries[].path",
+		"line": 256
+	},
+	{
+		"agent": "codex",
+		"key": "memory_citation_rollout_id_components",
+		"source": "event_msg/agent_message.memory_citation.rolloutIds[]",
+		"line": 257
+	},
+	{
+		"agent": "codex",
+		"key": "memory_citation_rollout_id_components",
+		"source": "event_msg/item_completed:AgentMessage.memory_citation.rolloutIds[]",
+		"line": 258
+	},
+	{
+		"agent": "codex",
+		"key": "review_target_components",
+		"source": "event_msg/entered_review_mode.target.branch",
+		"line": 259
+	},
+	{
+		"agent": "codex",
+		"key": "review_target_components",
+		"source": "event_msg/entered_review_mode.target.sha",
+		"line": 260
+	},
+	{
+		"agent": "codex",
+		"key": "review_target_components",
+		"source": "event_msg/entered_review_mode.target.type",
+		"line": 261
+	},
+	{
+		"agent": "codex",
+		"key": "review_target_components",
+		"source": "event_msg/item_completed:EnteredReviewMode.target.branch",
+		"line": 262
+	},
+	{
+		"agent": "codex",
+		"key": "review_target_components",
+		"source": "event_msg/item_completed:EnteredReviewMode.target.sha",
+		"line": 263
+	},
+	{
+		"agent": "codex",
+		"key": "review_target_components",
+		"source": "event_msg/item_completed:EnteredReviewMode.target.type",
+		"line": 264
+	},
+	{
+		"agent": "codex",
+		"key": "review_target_components",
+		"source": "event_msg/entered_review_mode.target.title",
+		"line": 265
+	},
+	{
+		"agent": "codex",
+		"key": "review_target_components",
+		"source": "event_msg/item_completed:EnteredReviewMode.target.title",
+		"line": 266
+	},
+	{
+		"agent": "codex",
+		"key": "review_finding_location_components",
+		"source": "event_msg/exited_review_mode.review_output.findings[].code_location.absolute_file_path",
+		"line": 267
+	},
+	{
+		"agent": "codex",
+		"key": "review_finding_location_components",
+		"source": "event_msg/exited_review_mode.review_output.findings[].code_location.line_range.end",
+		"line": 268
+	},
+	{
+		"agent": "codex",
+		"key": "review_finding_location_components",
+		"source": "event_msg/exited_review_mode.review_output.findings[].code_location.line_range.start",
+		"line": 269
+	},
+	{
+		"agent": "codex",
+		"key": "review_finding_location_components",
+		"source": "event_msg/item_completed:ExitedReviewMode.review_output.findings[].code_location.absolute_file_path",
+		"line": 270
+	},
+	{
+		"agent": "codex",
+		"key": "review_finding_location_components",
+		"source": "event_msg/item_completed:ExitedReviewMode.review_output.findings[].code_location.line_range.end",
+		"line": 271
+	},
+	{
+		"agent": "codex",
+		"key": "review_finding_location_components",
+		"source": "event_msg/item_completed:ExitedReviewMode.review_output.findings[].code_location.line_range.start",
+		"line": 272
+	},
+	{
+		"agent": "codex",
+		"key": "review_finding_confidence_components",
+		"source": "event_msg/exited_review_mode.review_output.findings[].confidence_score",
+		"line": 273
+	},
+	{
+		"agent": "codex",
+		"key": "review_finding_confidence_components",
+		"source": "event_msg/item_completed:ExitedReviewMode.review_output.findings[].confidence_score",
+		"line": 274
+	},
+	{
+		"agent": "codex",
+		"key": "review_finding_priority_components",
+		"source": "event_msg/exited_review_mode.review_output.findings[].priority",
+		"line": 275
+	},
+	{
+		"agent": "codex",
+		"key": "review_finding_priority_components",
+		"source": "event_msg/item_completed:ExitedReviewMode.review_output.findings[].priority",
+		"line": 276
+	},
+	{
+		"agent": "codex",
+		"key": "review_overall_confidence_components",
+		"source": "event_msg/exited_review_mode.review_output.overall_confidence_score",
+		"line": 277
+	},
+	{
+		"agent": "codex",
+		"key": "review_overall_confidence_components",
+		"source": "event_msg/item_completed:ExitedReviewMode.review_output.overall_confidence_score",
+		"line": 278
+	},
+	{
+		"agent": "codex",
+		"key": "review_correctness_components",
+		"source": "event_msg/exited_review_mode.review_output.overall_correctness",
+		"line": 279
+	},
+	{
+		"agent": "codex",
+		"key": "review_correctness_components",
+		"source": "event_msg/item_completed:ExitedReviewMode.review_output.overall_correctness",
+		"line": 280
+	},
+	{
+		"agent": "codex",
+		"key": "audio_input_components",
+		"source": "event_msg/item_completed:UserMessage.content[audio].audio_url",
+		"line": 281
+	},
+	{
+		"agent": "codex",
+		"key": "audio_input_components",
+		"source": "event_msg/item_completed:UserMessage.content[local_audio].path",
+		"line": 282
+	},
+	{
+		"agent": "codex",
+		"key": "audio_input_components",
+		"source": "event_msg/user_message.audio[]",
+		"line": 283
+	},
+	{
+		"agent": "codex",
+		"key": "audio_input_components",
+		"source": "event_msg/user_message.local_audio[]",
+		"line": 284
+	},
+	{
+		"agent": "codex",
+		"key": "audio_input_components",
+		"source": "response_item/message:*.content[input_audio].audio_url",
+		"line": 285
+	},
+	{
+		"agent": "codex",
+		"key": "audio_input_components",
+		"source": "event_msg/user_message.audio",
+		"line": 286
+	},
+	{
+		"agent": "codex",
+		"key": "audio_input_components",
+		"source": "event_msg/user_message.local_audio",
+		"line": 287
+	},
+	{
+		"agent": "codex",
+		"key": "rolled_back_turns_components",
+		"source": "event_msg/thread_rolled_back.num_turns",
+		"line": 288
+	},
+	{
+		"agent": "codex",
+		"key": "file_input_components",
+		"source": "event_msg/user_message.file_id_details[]",
+		"line": 289
+	},
+	{
+		"agent": "codex",
+		"key": "file_input_components",
+		"source": "event_msg/user_message.file_ids[]",
+		"line": 290
+	},
+	{
+		"agent": "codex",
+		"key": "realtime_session_outcome_components",
+		"source": "realtime_item/.outcome",
+		"line": 291
+	},
+	{
+		"agent": "codex",
+		"key": "realtime_transcript_role_components",
+		"source": "realtime_item/.role",
+		"line": 292
+	},
+	{
+		"agent": "codex",
+		"key": "realtime_event_kind_components",
+		"source": "realtime_item/.type",
+		"line": 293
+	},
+	{
+		"agent": "codex",
+		"key": "security_risk_score_components",
+		"source": "security_risk_score/.scores.{*}",
+		"line": 294
+	},
+	{
+		"agent": "codex",
+		"key": "session_memory_mode_components",
+		"source": "session_meta/.memory_mode",
+		"line": 295
+	},
+	{
+		"agent": "codex",
+		"key": "selected_capability_roots_components",
+		"source": "session_meta/.selected_capability_roots[].id",
+		"line": 296
+	},
+	{
+		"agent": "codex",
+		"key": "selected_capability_roots_components",
+		"source": "session_meta/.selected_capability_roots[].location.path",
+		"line": 297
+	},
+	{
+		"agent": "codex",
+		"key": "selected_capability_roots_components",
+		"source": "session_meta/.selected_capability_roots",
+		"line": 298
+	},
+	{
+		"agent": "codex",
+		"key": "selected_capability_roots_components",
+		"source": "session_meta/.selected_capability_roots[].location.environmentId",
+		"line": 299
+	},
+	{
+		"agent": "codex",
+		"key": "selected_capability_roots_components",
+		"source": "session_meta/.selected_capability_roots[].location.type",
+		"line": 300
+	},
+	{
+		"agent": "codex",
+		"key": "model_provider_components",
+		"source": "session_meta/.model_provider",
+		"line": 301
+	},
+	{
+		"agent": "codex",
+		"key": "model_provider_components",
+		"source": "event_msg/thread_settings_applied.thread_settings.model_provider_id",
+		"line": 302
+	},
+	{
+		"agent": "codex",
+		"key": "command_source_components",
+		"source": "event_msg/item_completed:CommandExecution.source",
+		"line": 303
+	},
+	{
+		"agent": "codex",
+		"key": "command_source_components",
+		"source": "event_msg/exec_command_end.source",
+		"line": 304
+	},
+	{
+		"agent": "codex",
+		"key": "message_created_at_components",
+		"source": "response_item/*.internal_chat_message_metadata_passthrough.create_time",
+		"line": 305
+	},
+	{
+		"agent": "codex",
+		"key": "message_provenance_components",
+		"source": "response_item/message:*@metadata.retained_source.id.turn_id",
+		"line": 306
+	},
+	{
+		"agent": "codex",
+		"key": "message_provenance_components",
+		"source": "response_item/message:user@metadata.inherited_user_message",
+		"line": 307
+	},
+	{
+		"agent": "codex",
+		"key": "message_provenance_components",
+		"source": "response_item/message:*@metadata.client_authored",
+		"line": 308
+	},
+	{
+		"agent": "codex",
+		"key": "message_provenance_components",
+		"source": "response_item/message:assistant@metadata.inherited_user_message",
+		"line": 309
+	},
+	{
+		"agent": "claude_code",
+		"key": "offered_tools_components",
+		"source": "attachment/prompt_snapshot.attachment.tools[].name",
+		"line": 97
+	},
+	{
+		"agent": "claude_code",
+		"key": "offered_tools_components",
+		"source": "attachment/prompt_snapshot.attachment.tools[].server",
+		"line": 98
+	},
+	{
+		"agent": "claude_code",
+		"key": "offered_tools_components",
+		"source": "user.toolUseResult.matches[]",
+		"line": 99
+	},
+	{
+		"agent": "claude_code",
+		"key": "offered_tools_components",
+		"source": "attachment/deferred_tools_delta.attachment.addedNames[]",
+		"line": 100
+	},
+	{
+		"agent": "claude_code",
+		"key": "offered_tools_components",
+		"source": "attachment/deferred_tools_delta.attachment.readdedNames[]",
+		"line": 101
+	},
+	{
+		"agent": "claude_code",
+		"key": "offered_tools_components",
+		"source": "attachment/deferred_tools_delta.attachment.removedNames[]",
+		"line": 102
+	},
+	{
+		"agent": "claude_code",
+		"key": "offered_tools_components",
+		"source": "attachment/deferred_tools_delta.attachment.surfacedDefinitions[].definition.name",
+		"line": 103
+	},
+	{
+		"agent": "claude_code",
+		"key": "offered_tools_components",
+		"source": "attachment/deferred_tools_delta.attachment.surfacedDefinitions[].name",
+		"line": 104
+	},
+	{
+		"agent": "claude_code",
+		"key": "offered_tools_components",
+		"source": "attachment/deferred_tools_delta.attachment.surfacedNames[]",
+		"line": 105
+	},
+	{
+		"agent": "claude_code",
+		"key": "offered_tools_components",
+		"source": "attachment/deferred_tools_record.attachment.entries[].name",
+		"line": 106
+	},
+	{
+		"agent": "claude_code",
+		"key": "offered_tools_components",
+		"source": "attachment/deferred_tools_record.attachment.nameOnlyAnnouncements[]",
+		"line": 107
+	},
+	{
+		"agent": "codex",
+		"key": "offered_tools_components",
+		"source": "response_item/tool_search_output.tools[].tools[].name",
+		"line": 310
+	},
+	{
+		"agent": "codex",
+		"key": "offered_tools_components",
+		"source": "session_meta/.dynamic_tools[].tools[].name",
+		"line": 311
+	},
+	{
+		"agent": "codex",
+		"key": "offered_tools_components",
+		"source": "session_meta/.dynamic_tools[].name",
+		"line": 312
+	},
+	{
+		"agent": "claude_code",
+		"key": "thinking_drop_components",
+		"source": "attachment/thinking_drop.attachment.newlyDropped.blockCount",
+		"line": 108
+	},
+	{
+		"agent": "claude_code",
+		"key": "thinking_drop_components",
+		"source": "attachment/thinking_drop.attachment.newlyDropped.turnCount",
+		"line": 109
+	},
+	{
+		"agent": "claude_code",
+		"key": "thinking_drop_components",
+		"source": "attachment/thinking_drop.attachment.thinkingBlocksSent",
+		"line": 110
+	},
+	{
+		"agent": "claude_code",
+		"key": "thinking_drop_components",
+		"source": "attachment/thinking_drop.attachment.thinkingTurnsSent",
+		"line": 111
+	},
+	{
+		"agent": "claude_code",
+		"key": "patch_hunks_components",
+		"source": "user.toolUseResult.structuredPatch[].oldStart",
+		"line": 112
+	},
+	{
+		"agent": "claude_code",
+		"key": "patch_hunks_components",
+		"source": "user.toolUseResult.structuredPatch[].oldLines",
+		"line": 113
+	},
+	{
+		"agent": "claude_code",
+		"key": "patch_hunks_components",
+		"source": "user.toolUseResult.structuredPatch[].newStart",
+		"line": 114
+	},
+	{
+		"agent": "claude_code",
+		"key": "patch_hunks_components",
+		"source": "user.toolUseResult.structuredPatch[].newLines",
+		"line": 115
+	},
+	{
+		"agent": "claude_code",
+		"key": "patch_hunks_components",
+		"source": "user.toolUseResult.bashEditDiff.files[].hunks[].newLines",
+		"line": 116
+	},
+	{
+		"agent": "claude_code",
+		"key": "patch_hunks_components",
+		"source": "user.toolUseResult.bashEditDiff.files[].hunks[].newStart",
+		"line": 117
+	},
+	{
+		"agent": "claude_code",
+		"key": "patch_hunks_components",
+		"source": "user.toolUseResult.bashEditDiff.files[].hunks[].oldLines",
+		"line": 118
+	},
+	{
+		"agent": "claude_code",
+		"key": "patch_hunks_components",
+		"source": "user.toolUseResult.bashEditDiff.files[].hunks[].oldStart",
+		"line": 119
+	},
+	{
+		"agent": "codex",
+		"key": "patch_hunks_components",
+		"source": "event_msg/item_completed:FileChange.changes.{*}.unified_diff",
+		"line": 313
+	},
+	{
+		"agent": "claude_code",
+		"key": "task_status_change_components",
+		"source": "user.toolUseResult.statusChange.from",
+		"line": 120
+	},
+	{
+		"agent": "claude_code",
+		"key": "task_status_change_components",
+		"source": "user.toolUseResult.statusChange.to",
+		"line": 121
+	},
+	{
+		"agent": "claude_code",
+		"key": "read_extent_components",
+		"source": "user.toolUseResult.file.totalLines",
+		"line": 122
+	},
+	{
+		"agent": "claude_code",
+		"key": "read_extent_components",
+		"source": "user.toolUseResult.file.numLines",
+		"line": 123
+	},
+	{
+		"agent": "claude_code",
+		"key": "read_extent_components",
+		"source": "user.toolUseResult.file.startLine",
+		"line": 124
+	},
+	{
+		"agent": "claude_code",
+		"key": "read_extent_components",
+		"source": "user.toolUseResult.file.dimensions.**",
+		"line": 125
+	},
+	{
+		"agent": "claude_code",
+		"key": "stale_read_recovered_components",
+		"source": "user.toolUseResult.staleRecovered",
+		"line": 126
+	},
+	{
+		"agent": "claude_code",
+		"key": "record_uuid_components",
+		"source": "*.uuid",
+		"line": 127
+	},
+	{
+		"agent": "claude_code",
+		"key": "record_uuid_components",
+		"source": "*.parentUuid",
+		"line": 128
+	},
+	{
+		"agent": "claude_code",
+		"key": "record_uuid_components",
+		"source": "*.logicalParentUuid",
+		"line": 129
+	},
+	{
+		"agent": "claude_code",
+		"key": "record_uuid_components",
+		"source": "user.sourceToolAssistantUUID",
+		"line": 130
+	},
+	{
+		"agent": "claude_code",
+		"key": "record_uuid_components",
+		"source": "*.refusedUserMessageUuid",
+		"line": 131
+	},
+	{
+		"agent": "claude_code",
+		"key": "applied_file_changes_components",
+		"source": "user.toolUseResult.type",
+		"line": 132
+	},
+	{
+		"agent": "claude_code",
+		"key": "applied_file_changes_components",
+		"source": "user.toolUseResult.structuredPatch[]",
+		"line": 133
+	},
+	{
+		"agent": "claude_code",
+		"key": "applied_file_changes_components",
+		"source": "user.message.content[tool_result].is_error",
+		"line": 134
+	},
+	{
+		"agent": "codex",
+		"key": "applied_file_changes_components",
+		"source": "event_msg/item_completed:FileChange.changes.{*}.type",
+		"line": 314
+	},
+	{
+		"agent": "codex",
+		"key": "applied_file_changes_components",
+		"source": "event_msg/item_completed:FileChange.status",
+		"line": 315
+	},
+	{
+		"agent": "codex",
+		"key": "disabled_plugin_ids_components",
+		"source": "turn_context/.disabled_plugin_ids[]",
+		"line": 316
+	},
+	{
+		"agent": "codex",
+		"key": "disabled_plugin_ids_components",
+		"source": "event_msg/thread_settings_applied.thread_settings.disabled_plugin_ids[]",
+		"line": 317
+	},
+	{
+		"agent": "codex",
+		"key": "permission_profile_parent_components",
+		"source": "turn_context/.active_permission_profile.extends",
+		"line": 318
+	},
+	{
+		"agent": "claude_code",
+		"key": "runtime_workspace_roots_components",
+		"source": "attachment/environment.attachment.snapshot.additionalWorkingDirectories[]",
+		"line": 135
+	},
+	{
+		"agent": "claude_code",
+		"key": "runtime_workspace_roots_components",
+		"source": "attachment/environment.attachment.snapshot.workingDirectory",
+		"line": 136
+	},
+	{
+		"agent": "codex",
+		"key": "runtime_workspace_roots_components",
+		"source": "session_meta/.runtime_workspace_roots",
+		"line": 319
+	},
+	{
+		"agent": "codex",
+		"key": "runtime_workspace_roots_components",
+		"source": "session_meta/.runtime_workspace_roots[]",
+		"line": 320
+	},
+	{
+		"agent": "codex",
+		"key": "fork_point_components",
+		"source": "session_meta/.forked_from_ordinal_exclusive",
+		"line": 321
+	},
+	{
+		"agent": "codex",
+		"key": "creator_user_id_components",
+		"source": "session_meta/.creator_user_id",
+		"line": 322
+	},
+	{
+		"agent": "codex",
+		"key": "creator_account_id_components",
+		"source": "session_meta/.creator_account_id",
+		"line": 323
+	},
+	{
+		"agent": "codex",
+		"key": "assistant_delivery_origin_components",
+		"source": "retained_context/delivered_assistant_message.origin",
+		"line": 324
+	},
+	{
+		"agent": "codex",
+		"key": "local_shell_status_components",
+		"source": "response_item/local_shell_call.status",
+		"line": 325
+	},
+	{
+		"agent": "codex",
+		"key": "execution_user_components",
+		"source": "response_item/local_shell_call.action.user",
+		"line": 326
+	},
+	{
+		"agent": "codex",
+		"key": "execution_environment_id_components",
+		"source": "response_item/function_call:exec_command.arguments.environment_id",
+		"line": 327
+	},
+	{
+		"agent": "codex",
+		"key": "requested_additional_permissions_components",
+		"source": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.entries[].access",
+		"line": 328
+	},
+	{
+		"agent": "codex",
+		"key": "requested_additional_permissions_components",
+		"source": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.entries[].missing_path_behavior",
+		"line": 329
+	},
+	{
+		"agent": "codex",
+		"key": "requested_additional_permissions_components",
+		"source": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.entries[].path.path",
+		"line": 330
+	},
+	{
+		"agent": "codex",
+		"key": "requested_additional_permissions_components",
+		"source": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.entries[].path.pattern",
+		"line": 331
+	},
+	{
+		"agent": "codex",
+		"key": "requested_additional_permissions_components",
+		"source": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.entries[].path.type",
+		"line": 332
+	},
+	{
+		"agent": "codex",
+		"key": "requested_additional_permissions_components",
+		"source": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.entries[].path.value.kind",
+		"line": 333
+	},
+	{
+		"agent": "codex",
+		"key": "requested_additional_permissions_components",
+		"source": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.entries[].path.value.path",
+		"line": 334
+	},
+	{
+		"agent": "codex",
+		"key": "requested_additional_permissions_components",
+		"source": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.entries[].path.value.subpath",
+		"line": 335
+	},
+	{
+		"agent": "codex",
+		"key": "requested_additional_permissions_components",
+		"source": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.glob_scan_max_depth",
+		"line": 336
+	},
+	{
+		"agent": "codex",
+		"key": "requested_additional_permissions_components",
+		"source": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.read[]",
+		"line": 337
+	},
+	{
+		"agent": "codex",
+		"key": "requested_additional_permissions_components",
+		"source": "response_item/function_call:exec_command.arguments.additional_permissions.file_system.write[]",
+		"line": 338
+	},
+	{
+		"agent": "codex",
+		"key": "requested_additional_permissions_components",
+		"source": "response_item/function_call:exec_command.arguments.additional_permissions.network.enabled",
+		"line": 339
+	},
+	{
+		"agent": "codex",
+		"key": "prompt_triggers_turn_components",
+		"source": "inter_agent_communication/.trigger_turn",
+		"line": 340
+	},
+	{
+		"agent": "claude_code",
+		"key": "communication_recipient_components",
+		"source": "assistant.message.content[tool_use:SendMessage].input.recipient",
+		"line": 137
+	},
+	{
+		"agent": "claude_code",
+		"key": "communication_recipient_components",
+		"source": "assistant.message.content[tool_use:SendMessage].input.to",
+		"line": 138
+	},
+	{
+		"agent": "claude_code",
+		"key": "communication_recipient_components",
+		"source": "user.toolUseResult.pin.id",
+		"line": 139
+	},
+	{
+		"agent": "claude_code",
+		"key": "communication_recipient_components",
+		"source": "user.toolUseResult.pin.name",
+		"line": 140
+	},
+	{
+		"agent": "claude_code",
+		"key": "communication_recipient_components",
+		"source": "user.toolUseResult.pin.ref",
+		"line": 141
+	},
+	{
+		"agent": "codex",
+		"key": "communication_recipient_components",
+		"source": "inter_agent_communication/.recipient",
+		"line": 341
+	},
+	{
+		"agent": "codex",
+		"key": "communication_other_recipients_components",
+		"source": "inter_agent_communication/.other_recipients[]",
+		"line": 342
+	},
+	{
+		"agent": "claude_code",
+		"key": "turn_error_http_status_components",
+		"source": "assistant.apiErrorStatus",
+		"line": 142
+	},
+	{
+		"agent": "claude_code",
+		"key": "turn_error_http_status_components",
+		"source": "system/api_error.error.status",
+		"line": 143
+	},
+	{
+		"agent": "codex",
+		"key": "turn_error_http_status_components",
+		"source": "event_msg/turn_aborted.error.codex_error_info.http_connection_failed.http_status_code",
+		"line": 343
+	},
+	{
+		"agent": "codex",
+		"key": "turn_error_http_status_components",
+		"source": "event_msg/turn_aborted.error.codex_error_info.response_stream_connection_failed.http_status_code",
+		"line": 344
+	},
+	{
+		"agent": "codex",
+		"key": "turn_error_http_status_components",
+		"source": "event_msg/turn_aborted.error.codex_error_info.response_stream_disconnected.http_status_code",
+		"line": 345
+	},
+	{
+		"agent": "codex",
+		"key": "turn_error_http_status_components",
+		"source": "event_msg/turn_aborted.error.codex_error_info.response_too_many_failed_attempts.http_status_code",
+		"line": 346
+	},
+	{
+		"agent": "codex",
+		"key": "turn_error_http_status_components",
+		"source": "event_msg/task_complete.error.codex_error_info.http_connection_failed.http_status_code",
+		"line": 347
+	},
+	{
+		"agent": "codex",
+		"key": "non_steerable_turn_kind_components",
+		"source": "event_msg/turn_aborted.error.codex_error_info.active_turn_not_steerable.turn_kind",
+		"line": 348
+	},
+	{
+		"agent": "codex",
+		"key": "goal_token_budget_components",
+		"source": "event_msg/thread_goal_updated.goal.tokenBudget",
+		"line": 349
+	},
+	{
+		"agent": "codex",
+		"key": "turn_attribution_components",
+		"source": "event_msg/task_complete.root_turn_id",
+		"line": 350
+	},
+	{
+		"agent": "codex",
+		"key": "turn_attribution_components",
+		"source": "event_msg/task_started.turn_attribution.initiating_agent_path",
+		"line": 351
+	},
+	{
+		"agent": "codex",
+		"key": "turn_attribution_components",
+		"source": "event_msg/task_started.turn_attribution.parent_turn_id",
+		"line": 352
+	},
+	{
+		"agent": "codex",
+		"key": "turn_attribution_components",
+		"source": "event_msg/task_started.turn_attribution.root_turn_id",
+		"line": 353
+	},
+	{
+		"agent": "codex",
+		"key": "turn_attribution_components",
+		"source": "event_msg/task_started.turn_attribution.turn_trigger",
+		"line": 354
+	},
+	{
+		"agent": "codex",
+		"key": "turn_attribution_components",
+		"source": "event_msg/turn_aborted.root_turn_id",
+		"line": 355
+	},
+	{
+		"agent": "codex",
+		"key": "subagent_activity_at_ms_components",
+		"source": "event_msg/sub_agent_activity.occurred_at_ms",
+		"line": 356
+	},
+	{
+		"agent": "claude_code",
+		"key": "tool_result_content_components",
+		"source": "user.message.content[tool_result].content[*]",
+		"line": 144
+	},
+	{
+		"agent": "codex",
+		"key": "tool_result_content_components",
+		"source": "event_msg/mcp_tool_call_end.result.content",
+		"line": 357
+	},
+	{
+		"agent": "codex",
+		"key": "tool_result_content_components",
+		"source": "event_msg/item_completed:McpToolCall.result.content[*]",
+		"line": 358
+	},
+	{
+		"agent": "codex",
+		"key": "tool_result_content_components",
+		"source": "event_msg/item_completed:McpToolCall.result.content[resource_link].mimeType",
+		"line": 359
+	},
+	{
+		"agent": "codex",
+		"key": "tool_result_content_components",
+		"source": "event_msg/item_completed:McpToolCall.result.content[resource_link].name",
+		"line": 360
+	},
+	{
+		"agent": "codex",
+		"key": "tool_result_content_components",
+		"source": "event_msg/item_completed:McpToolCall.result.content[resource_link].uri",
+		"line": 361
+	},
+	{
+		"agent": "claude_code",
+		"key": "mcp_result_metadata_components",
+		"source": "user.mcpMeta._meta",
+		"line": 145
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_result_metadata_components",
+		"source": "event_msg/mcp_tool_call_end.result._meta",
+		"line": 362
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_result_metadata_components",
+		"source": "event_msg/item_completed:McpToolCall.result._meta",
+		"line": 363
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_result_metadata_components",
+		"source": "event_msg/item_completed:McpToolCall.result.content[image]._meta",
+		"line": 364
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_result_metadata_components",
+		"source": "event_msg/item_completed:McpToolCall.result.content[resource_link]._meta",
+		"line": 365
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_app_resource_uri_components",
+		"source": "event_msg/item_completed:McpToolCall.mcpAppUi.resourceUri",
+		"line": 366
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_app_resource_uri_components",
+		"source": "event_msg/mcp_tool_call_end.mcp_app_resource_uri",
+		"line": 367
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_app_resource_uri_components",
+		"source": "event_msg/mcp_tool_call_end.mcp_app_ui.resourceUri",
+		"line": 368
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_app_resource_uri_components",
+		"source": "event_msg/item_completed:McpToolCall.mcpAppResourceUri",
+		"line": 369
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_app_display_mode_components",
+		"source": "event_msg/item_completed:McpToolCall.mcpAppUi.preferredModelDisplayMode",
+		"line": 370
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_app_display_mode_components",
+		"source": "event_msg/mcp_tool_call_end.mcp_app_ui.preferredModelDisplayMode",
+		"line": 371
+	},
+	{
+		"agent": "claude_code",
+		"key": "tool_result_text_components",
+		"source": "user.message.content[tool_result].content",
+		"line": 146
+	},
+	{
+		"agent": "claude_code",
+		"key": "tool_result_text_components",
+		"source": "user.message.content[tool_result].content[text].text",
+		"line": 147
+	},
+	{
+		"agent": "codex",
+		"key": "tool_result_text_components",
+		"source": "event_msg/item_completed:FunctionCallOutput.output[input_text].text",
+		"line": 372
+	},
+	{
+		"agent": "codex",
+		"key": "tool_result_text_components",
+		"source": "response_item/function_call_output.output",
+		"line": 373
+	},
+	{
+		"agent": "codex",
+		"key": "tool_result_text_components",
+		"source": "response_item/custom_tool_call_output.output",
+		"line": 374
+	},
+	{
+		"agent": "codex",
+		"key": "dynamic_tool_error_components",
+		"source": "event_msg/item_completed:DynamicToolCall.error",
+		"line": 375
+	},
+	{
+		"agent": "claude_code",
+		"key": "subagent_thread_ids_components",
+		"source": "user.toolUseResult.agentId",
+		"line": 148
+	},
+	{
+		"agent": "claude_code",
+		"key": "subagent_thread_ids_components",
+		"source": "user.toolUseResult.resumedAgentId",
+		"line": 149
+	},
+	{
+		"agent": "claude_code",
+		"key": "subagent_thread_ids_components",
+		"source": "user.toolUseResult.pin.id",
+		"line": 150
+	},
+	{
+		"agent": "codex",
+		"key": "subagent_thread_ids_components",
+		"source": "event_msg/item_completed:CollabAgentToolCall.receiver_agents[].thread_id",
+		"line": 376
+	},
+	{
+		"agent": "codex",
+		"key": "subagent_thread_ids_components",
+		"source": "event_msg/sub_agent_activity.agent_thread_id",
+		"line": 377
+	},
+	{
+		"agent": "codex",
+		"key": "subagent_thread_ids_components",
+		"source": "event_msg/item_completed:CollabAgentToolCall.receiver_agents",
+		"line": 378
+	},
+	{
+		"agent": "claude_code",
+		"key": "subagent_role_components",
+		"source": "assistant.message.content[tool_use:Agent].input.subagent_type",
+		"line": 151
+	},
+	{
+		"agent": "claude_code",
+		"key": "subagent_role_components",
+		"source": "user.toolUseResult.agentType",
+		"line": 152
+	},
+	{
+		"agent": "codex",
+		"key": "subagent_role_components",
+		"source": "event_msg/item_completed:CollabAgentToolCall.receiver_agents[].agent_role",
+		"line": 379
+	},
+	{
+		"agent": "claude_code",
+		"key": "subagent_nickname_components",
+		"source": "assistant.message.content[tool_use:Agent].input.name",
+		"line": 153
+	},
+	{
+		"agent": "codex",
+		"key": "subagent_nickname_components",
+		"source": "event_msg/item_completed:CollabAgentToolCall.receiver_agents[].agent_nickname",
+		"line": 380
+	},
+	{
+		"agent": "codex",
+		"key": "subagent_resolved_effort_components",
+		"source": "event_msg/item_completed:CollabAgentToolCall.reasoning_effort",
+		"line": 381
+	},
+	{
+		"agent": "codex",
+		"key": "subagent_resolved_effort_components",
+		"source": "event_msg/item_completed:SubAgentActivity.reasoning_effort",
+		"line": 382
+	},
+	{
+		"agent": "codex",
+		"key": "subagent_resolved_effort_components",
+		"source": "event_msg/sub_agent_activity.reasoning_effort",
+		"line": 383
+	},
+	{
+		"agent": "claude_code",
+		"key": "subagent_resolved_model_components",
+		"source": "user.toolUseResult.resolvedModel",
+		"line": 154
+	},
+	{
+		"agent": "codex",
+		"key": "subagent_resolved_model_components",
+		"source": "event_msg/item_completed:CollabAgentToolCall.model",
+		"line": 384
+	},
+	{
+		"agent": "codex",
+		"key": "subagent_resolved_model_components",
+		"source": "event_msg/item_completed:SubAgentActivity.model",
+		"line": 385
+	},
+	{
+		"agent": "codex",
+		"key": "subagent_resolved_model_components",
+		"source": "event_msg/sub_agent_activity.model",
+		"line": 386
+	},
+	{
+		"agent": "claude_code",
+		"key": "subagent_states_components",
+		"source": "user.toolUseResult.status",
+		"line": 155
+	},
+	{
+		"agent": "codex",
+		"key": "subagent_states_components",
+		"source": "event_msg/item_completed:CollabAgentToolCall.agents_states.{*}",
+		"line": 387
+	},
+	{
+		"agent": "codex",
+		"key": "subagent_states_components",
+		"source": "event_msg/item_completed:CollabAgentToolCall.agents_states.{*}.completed",
+		"line": 388
+	},
+	{
+		"agent": "codex",
+		"key": "subagent_states_components",
+		"source": "event_msg/item_completed:CollabAgentToolCall.agents_states.{*}.errored",
+		"line": 389
+	},
+	{
+		"agent": "codex",
+		"key": "subagent_states_components",
+		"source": "event_msg/item_completed:CollabAgentToolCall.agents_states",
+		"line": 390
+	},
+	{
+		"agent": "codex",
+		"key": "image_generation_components",
+		"source": "event_msg/image_generation_end.failure.type",
+		"line": 391
+	},
+	{
+		"agent": "codex",
+		"key": "image_generation_components",
+		"source": "event_msg/image_generation_end.status",
+		"line": 392
+	},
+	{
+		"agent": "codex",
+		"key": "image_generation_components",
+		"source": "event_msg/image_generation_end.transparent_background",
+		"line": 393
+	},
+	{
+		"agent": "codex",
+		"key": "image_generation_components",
+		"source": "response_item/image_generation_call.status",
+		"line": 394
+	},
+	{
+		"agent": "codex",
+		"key": "image_generation_components",
+		"source": "event_msg/item_completed:Extension.failure",
+		"line": 395
+	},
+	{
+		"agent": "codex",
+		"key": "image_generation_components",
+		"source": "event_msg/item_completed:Extension.transparentBackground",
+		"line": 396
+	},
+	{
+		"agent": "codex",
+		"key": "review_finding_title_components",
+		"source": "event_msg/exited_review_mode.review_output.findings[].title",
+		"line": 397
+	},
+	{
+		"agent": "codex",
+		"key": "review_finding_title_components",
+		"source": "event_msg/item_completed:ExitedReviewMode.review_output.findings[].title",
+		"line": 398
+	},
+	{
+		"agent": "codex",
+		"key": "memory_citation_note_components",
+		"source": "event_msg/agent_message.memory_citation.entries[].note",
+		"line": 399
+	},
+	{
+		"agent": "codex",
+		"key": "memory_citation_note_components",
+		"source": "event_msg/item_completed:AgentMessage.memory_citation.entries[].note",
+		"line": 400
+	},
+	{
+		"agent": "codex",
+		"key": "assistant_message_delivery_components",
+		"source": "event_msg/agent_message.delivery",
+		"line": 401
+	},
+	{
+		"agent": "codex",
+		"key": "assistant_message_delivery_components",
+		"source": "event_msg/item_completed:AgentMessage.delivery",
+		"line": 402
+	},
+	{
+		"agent": "claude_code",
+		"key": "attachment_rendered_role_components",
+		"source": "attachment/*.renderedRole",
+		"line": 156
+	},
+	{
+		"agent": "codex",
+		"key": "message_content_kinds_components",
+		"source": "response_item/*.internal_chat_message_metadata_passthrough.content_item_kinds[]",
+		"line": 403
+	},
+	{
+		"agent": "claude_code",
+		"key": "command_description_components",
+		"source": "assistant.message.content[tool_use:Bash].input.description",
+		"line": 157
+	},
+	{
+		"agent": "claude_code",
+		"key": "input_transformations_components",
+		"source": "assistant.message.input_transformations[].path",
+		"line": 158
+	},
+	{
+		"agent": "claude_code",
+		"key": "input_transformations_components",
+		"source": "assistant.message.input_transformations[].reason",
+		"line": 159
+	},
+	{
+		"agent": "claude_code",
+		"key": "input_transformations_components",
+		"source": "assistant.message.input_transformations[].type",
+		"line": 160
+	},
+	{
+		"agent": "claude_code",
+		"key": "session_slug_components",
+		"source": "assistant.slug",
+		"line": 161
+	},
+	{
+		"agent": "claude_code",
+		"key": "session_slug_components",
+		"source": "attachment/agent_listing_delta.slug",
+		"line": 162
+	},
+	{
+		"agent": "claude_code",
+		"key": "session_slug_components",
+		"source": "attachment/date_change.slug",
+		"line": 163
+	},
+	{
+		"agent": "claude_code",
+		"key": "session_slug_components",
+		"source": "attachment/deferred_tools_delta.slug",
+		"line": 164
+	},
+	{
+		"agent": "claude_code",
+		"key": "session_slug_components",
+		"source": "attachment/skill_listing.slug",
+		"line": 165
+	},
+	{
+		"agent": "claude_code",
+		"key": "session_slug_components",
+		"source": "attachment/task_reminder.slug",
+		"line": 166
+	},
+	{
+		"agent": "claude_code",
+		"key": "session_slug_components",
+		"source": "system/stop_hook_summary.slug",
+		"line": 167
+	},
+	{
+		"agent": "claude_code",
+		"key": "session_slug_components",
+		"source": "user.slug",
+		"line": 168
+	},
+	{
+		"agent": "claude_code",
+		"key": "offered_agent_types_components",
+		"source": "attachment/agent_listing_delta.attachment.addedTypes[]",
+		"line": 169
+	},
+	{
+		"agent": "claude_code",
+		"key": "offered_agent_types_components",
+		"source": "attachment/agent_listing_delta.attachment.builtInTypes[]",
+		"line": 170
+	},
+	{
+		"agent": "claude_code",
+		"key": "context_configuration_components",
+		"source": "attachment/batching_reminder_sent.attachment.clearAt",
+		"line": 171
+	},
+	{
+		"agent": "claude_code",
+		"key": "context_configuration_components",
+		"source": "attachment/prompt_snapshot.attachment.inlineTools",
+		"line": 172
+	},
+	{
+		"agent": "claude_code",
+		"key": "context_configuration_components",
+		"source": "attachment/skill_listing.attachment.isInitial",
+		"line": 173
+	},
+	{
+		"agent": "codex",
+		"key": "context_configuration_components",
+		"source": "event_msg/thread_settings_applied.thread_settings.collaboration_mode.settings.developer_instructions",
+		"line": 404
+	},
+	{
+		"agent": "codex",
+		"key": "context_configuration_components",
+		"source": "event_msg/thread_settings_applied.thread_settings.personality",
+		"line": 405
+	},
+	{
+		"agent": "codex",
+		"key": "context_configuration_components",
+		"source": "event_msg/thread_settings_applied.thread_settings.reasoning_summary",
+		"line": 406
+	},
+	{
+		"agent": "codex",
+		"key": "context_configuration_components",
+		"source": "session_meta/.history_mode",
+		"line": 407
+	},
+	{
+		"agent": "codex",
+		"key": "context_configuration_components",
+		"source": "session_meta/.multi_agent_version",
+		"line": 408
+	},
+	{
+		"agent": "codex",
+		"key": "context_configuration_components",
+		"source": "turn_context/.collaboration_mode.settings.developer_instructions",
+		"line": 409
+	},
+	{
+		"agent": "codex",
+		"key": "context_configuration_components",
+		"source": "turn_context/.cyber_access_program",
+		"line": 410
+	},
+	{
+		"agent": "codex",
+		"key": "context_configuration_components",
+		"source": "turn_context/.multi_agent_mode",
+		"line": 411
+	},
+	{
+		"agent": "codex",
+		"key": "context_configuration_components",
+		"source": "turn_context/.multi_agent_version",
+		"line": 412
+	},
+	{
+		"agent": "codex",
+		"key": "context_configuration_components",
+		"source": "turn_context/.personality",
+		"line": 413
+	},
+	{
+		"agent": "codex",
+		"key": "context_configuration_components",
+		"source": "turn_context/.realtime_active",
+		"line": 414
+	},
+	{
+		"agent": "codex",
+		"key": "context_configuration_components",
+		"source": "turn_context/.sandbox_policy.exclude_slash_tmp",
+		"line": 415
+	},
+	{
+		"agent": "codex",
+		"key": "context_configuration_components",
+		"source": "turn_context/.sandbox_policy.exclude_tmpdir_env_var",
+		"line": 416
+	},
+	{
+		"agent": "codex",
+		"key": "context_configuration_components",
+		"source": "turn_context/.summary",
+		"line": 417
+	},
+	{
+		"agent": "codex",
+		"key": "context_configuration_components",
+		"source": "world_state/.state.apps_instructions",
+		"line": 418
+	},
+	{
+		"agent": "codex",
+		"key": "context_configuration_components",
+		"source": "world_state/.state.environments_instructions",
+		"line": 419
+	},
+	{
+		"agent": "codex",
+		"key": "context_configuration_components",
+		"source": "world_state/.state.git_attribution",
+		"line": 420
+	},
+	{
+		"agent": "codex",
+		"key": "context_configuration_components",
+		"source": "world_state/.state.host_skills.includeInstructions",
+		"line": 421
+	},
+	{
+		"agent": "codex",
+		"key": "context_configuration_components",
+		"source": "world_state/.state.multi_agent_mode.mode",
+		"line": 422
+	},
+	{
+		"agent": "codex",
+		"key": "context_configuration_components",
+		"source": "world_state/.state.orchestrator_skills.enabled",
+		"line": 423
+	},
+	{
+		"agent": "codex",
+		"key": "context_configuration_components",
+		"source": "world_state/.state.orchestrator_skills.includeInstructions",
+		"line": 424
+	},
+	{
+		"agent": "codex",
+		"key": "context_configuration_components",
+		"source": "world_state/.state.personality.personality",
+		"line": 425
+	},
+	{
+		"agent": "codex",
+		"key": "context_configuration_components",
+		"source": "world_state/.state.plugins_instructions",
+		"line": 426
+	},
+	{
+		"agent": "codex",
+		"key": "context_configuration_components",
+		"source": "world_state/.state.realtime.active",
+		"line": 427
+	},
+	{
+		"agent": "codex",
+		"key": "context_configuration_components",
+		"source": "world_state/.state.skills.includeInstructions",
+		"line": 428
+	},
+	{
+		"agent": "claude_code",
+		"key": "context_model_identity_components",
+		"source": "attachment/batching_reminder_sent.attachment.model",
+		"line": 174
+	},
+	{
+		"agent": "claude_code",
+		"key": "context_model_identity_components",
+		"source": "attachment/model.attachment.identity.knowledgeCutoff",
+		"line": 175
+	},
+	{
+		"agent": "claude_code",
+		"key": "context_model_identity_components",
+		"source": "attachment/model.attachment.identity.marketingName",
+		"line": 176
+	},
+	{
+		"agent": "claude_code",
+		"key": "context_model_identity_components",
+		"source": "attachment/thinking_drop.attachment.model",
+		"line": 177
+	},
+	{
+		"agent": "codex",
+		"key": "context_model_identity_components",
+		"source": "world_state/.state.collaboration_mode.model",
+		"line": 429
+	},
+	{
+		"agent": "claude_code",
+		"key": "account_context_components",
+		"source": "attachment/credential_org.attachment.organizationUuid",
+		"line": 178
+	},
+	{
+		"agent": "claude_code",
+		"key": "account_context_components",
+		"source": "attachment/session_context.attachment.context.userEmail",
+		"line": 179
+	},
+	{
+		"agent": "claude_code",
+		"key": "current_date_components",
+		"source": "attachment/date_change.attachment.newDate",
+		"line": 180
+	},
+	{
+		"agent": "claude_code",
+		"key": "current_date_components",
+		"source": "attachment/date.attachment.date",
+		"line": 181
+	},
+	{
+		"agent": "codex",
+		"key": "current_date_components",
+		"source": "turn_context/.current_date",
+		"line": 430
+	},
+	{
+		"agent": "codex",
+		"key": "current_date_components",
+		"source": "world_state/.state.environments.current_date",
+		"line": 431
+	},
+	{
+		"agent": "claude_code",
+		"key": "offered_tool_options_components",
+		"source": "attachment/deferred_tools_delta.attachment.removedByBlock[]",
+		"line": 182
+	},
+	{
+		"agent": "claude_code",
+		"key": "offered_tool_options_components",
+		"source": "attachment/deferred_tools_delta.attachment.toolSearchAbsent",
+		"line": 183
+	},
+	{
+		"agent": "claude_code",
+		"key": "offered_tool_options_components",
+		"source": "attachment/deferred_tools_record.attachment.entries[].defer_loading",
+		"line": 184
+	},
+	{
+		"agent": "claude_code",
+		"key": "offered_tool_options_components",
+		"source": "attachment/deferred_tools_record.attachment.entries[].eager_input_streaming",
+		"line": 185
+	},
+	{
+		"agent": "claude_code",
+		"key": "offered_tool_options_components",
+		"source": "attachment/skill_listing.attachment.names[]",
+		"line": 186
+	},
+	{
+		"agent": "claude_code",
+		"key": "offered_tool_options_components",
+		"source": "attachment/skill_listing.attachment.skillCount",
+		"line": 187
+	},
+	{
+		"agent": "codex",
+		"key": "offered_tool_options_components",
+		"source": "response_item/tool_search_output.tools[].tools[].defer_loading",
+		"line": 432
+	},
+	{
+		"agent": "codex",
+		"key": "offered_tool_options_components",
+		"source": "response_item/tool_search_output.tools[].tools[].strict",
+		"line": 433
+	},
+	{
+		"agent": "codex",
+		"key": "offered_tool_options_components",
+		"source": "session_meta/.dynamic_tools[].tools[].deferLoading",
+		"line": 434
+	},
+	{
+		"agent": "codex",
+		"key": "offered_tool_options_components",
+		"source": "session_meta/.dynamic_tools[].type",
+		"line": 435
+	},
+	{
+		"agent": "claude_code",
+		"key": "environment_changes_components",
+		"source": "attachment/environment.attachment.changes[].{*}",
+		"line": 188
+	},
+	{
+		"agent": "claude_code",
+		"key": "environment_snapshot_components",
+		"source": "attachment/environment.attachment.snapshot.additionalWorkingDirectories[]",
+		"line": 189
+	},
+	{
+		"agent": "claude_code",
+		"key": "environment_snapshot_components",
+		"source": "attachment/environment.attachment.snapshot.isGitRepo",
+		"line": 190
+	},
+	{
+		"agent": "claude_code",
+		"key": "environment_snapshot_components",
+		"source": "attachment/environment.attachment.snapshot.isWorktree",
+		"line": 191
+	},
+	{
+		"agent": "claude_code",
+		"key": "environment_snapshot_components",
+		"source": "attachment/environment.attachment.snapshot.osVersion",
+		"line": 192
+	},
+	{
+		"agent": "claude_code",
+		"key": "environment_snapshot_components",
+		"source": "attachment/environment.attachment.snapshot.platform",
+		"line": 193
+	},
+	{
+		"agent": "claude_code",
+		"key": "environment_snapshot_components",
+		"source": "attachment/environment.attachment.snapshot.shell",
+		"line": 194
+	},
+	{
+		"agent": "claude_code",
+		"key": "environment_snapshot_components",
+		"source": "attachment/session_context.attachment.context.gitStatus",
+		"line": 195
+	},
+	{
+		"agent": "codex",
+		"key": "environment_snapshot_components",
+		"source": "turn_context/.timezone",
+		"line": 436
+	},
+	{
+		"agent": "codex",
+		"key": "environment_snapshot_components",
+		"source": "world_state/.state.environments.environments.local.shell",
+		"line": 437
+	},
+	{
+		"agent": "codex",
+		"key": "environment_snapshot_components",
+		"source": "world_state/.state.environments.environments.local.status",
+		"line": 438
+	},
+	{
+		"agent": "codex",
+		"key": "environment_snapshot_components",
+		"source": "world_state/.state.environments.timezone",
+		"line": 439
+	},
+	{
+		"agent": "claude_code",
+		"key": "context_source_details_components",
+		"source": "attachment/nested_memory.attachment.displayPath",
+		"line": 196
+	},
+	{
+		"agent": "claude_code",
+		"key": "context_source_details_components",
+		"source": "attachment/remote_session_change.attachment.commit",
+		"line": 197
+	},
+	{
+		"agent": "claude_code",
+		"key": "prompt_delivery_options_components",
+		"source": "attachment/queued_command.attachment.delivery_id",
+		"line": 198
+	},
+	{
+		"agent": "claude_code",
+		"key": "prompt_delivery_options_components",
+		"source": "attachment/queued_command.attachment.runId",
+		"line": 199
+	},
+	{
+		"agent": "claude_code",
+		"key": "prompt_delivery_options_components",
+		"source": "attachment/queued_command.attachment.source_uuid",
+		"line": 200
+	},
+	{
+		"agent": "claude_code",
+		"key": "prompt_delivery_options_components",
+		"source": "attachment/queued_command.attachment.timestamp",
+		"line": 201
+	},
+	{
+		"agent": "claude_code",
+		"key": "prompt_delivery_options_components",
+		"source": "user.queueSkipAttachments",
+		"line": 202
+	},
+	{
+		"agent": "claude_code",
+		"key": "prompt_delivery_options_components",
+		"source": "user.queueTranscriptOnly",
+		"line": 203
+	},
+	{
+		"agent": "claude_code",
+		"key": "queued_producer_usage_components",
+		"source": "attachment/queued_command.attachment.usage.durationMs",
+		"line": 204
+	},
+	{
+		"agent": "claude_code",
+		"key": "queued_producer_usage_components",
+		"source": "attachment/queued_command.attachment.usage.toolUses",
+		"line": 205
+	},
+	{
+		"agent": "claude_code",
+		"key": "queued_producer_usage_components",
+		"source": "attachment/queued_command.attachment.usage.totalTokens",
+		"line": 206
+	},
+	{
+		"agent": "claude_code",
+		"key": "source_call_id_components",
+		"source": "attachment/read_truncation_notice.attachment.toolUseID",
+		"line": 207
+	},
+	{
+		"agent": "claude_code",
+		"key": "source_call_id_components",
+		"source": "user.sourceToolUseID",
+		"line": 208
+	},
+	{
+		"agent": "claude_code",
+		"key": "system_event_details_components",
+		"source": "attachment/thinking_drop.attachment.querySource",
+		"line": 209
+	},
+	{
+		"agent": "claude_code",
+		"key": "system_event_details_components",
+		"source": "attachment/thinking_drop.attachment.requestId",
+		"line": 210
+	},
+	{
+		"agent": "claude_code",
+		"key": "system_event_details_components",
+		"source": "system/api_error.level",
+		"line": 211
+	},
+	{
+		"agent": "claude_code",
+		"key": "system_event_details_components",
+		"source": "system/api_error.source",
+		"line": 212
+	},
+	{
+		"agent": "claude_code",
+		"key": "system_event_details_components",
+		"source": "system/informational.level",
+		"line": 213
+	},
+	{
+		"agent": "claude_code",
+		"key": "system_event_details_components",
+		"source": "system/model_refusal_fallback.level",
+		"line": 214
+	},
+	{
+		"agent": "claude_code",
+		"key": "system_event_details_components",
+		"source": "system/model_refusal_fallback.scope",
+		"line": 215
+	},
+	{
+		"agent": "claude_code",
+		"key": "system_event_details_components",
+		"source": "system/model_refusal_no_fallback.level",
+		"line": 216
+	},
+	{
+		"agent": "claude_code",
+		"key": "system_event_details_components",
+		"source": "system/stop_hook_summary.level",
+		"line": 217
+	},
+	{
+		"agent": "claude_code",
+		"key": "system_event_details_components",
+		"source": "system/stop_hook_summary.toolUseID",
+		"line": 218
+	},
+	{
+		"agent": "claude_code",
+		"key": "mcp_structured_content_components",
+		"source": "user.mcpMeta.structuredContent",
+		"line": 219
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_structured_content_components",
+		"source": "event_msg/item_completed:McpToolCall.result.structuredContent",
+		"line": 440
+	},
+	{
+		"agent": "claude_code",
+		"key": "skill_allowed_tools_components",
+		"source": "user.toolUseResult.allowedTools[]",
+		"line": 220
+	},
+	{
+		"agent": "claude_code",
+		"key": "fetch_response_details_components",
+		"source": "user.toolUseResult.bytes",
+		"line": 221
+	},
+	{
+		"agent": "claude_code",
+		"key": "fetch_response_details_components",
+		"source": "user.toolUseResult.code",
+		"line": 222
+	},
+	{
+		"agent": "claude_code",
+		"key": "fetch_response_details_components",
+		"source": "user.toolUseResult.codeText",
+		"line": 223
+	},
+	{
+		"agent": "claude_code",
+		"key": "wakeup_details_components",
+		"source": "user.toolUseResult.cancelledWakeups",
+		"line": 224
+	},
+	{
+		"agent": "claude_code",
+		"key": "wakeup_details_components",
+		"source": "user.toolUseResult.clampedDelaySeconds",
+		"line": 225
+	},
+	{
+		"agent": "claude_code",
+		"key": "wakeup_details_components",
+		"source": "user.toolUseResult.scheduledFor",
+		"line": 226
+	},
+	{
+		"agent": "claude_code",
+		"key": "wakeup_details_components",
+		"source": "user.toolUseResult.wasClamped",
+		"line": 227
+	},
+	{
+		"agent": "claude_code",
+		"key": "background_task_details_components",
+		"source": "user.toolUseResult.canReadOutputFile",
+		"line": 228
+	},
+	{
+		"agent": "claude_code",
+		"key": "background_task_details_components",
+		"source": "user.toolUseResult.persistent",
+		"line": 229
+	},
+	{
+		"agent": "claude_code",
+		"key": "background_task_details_components",
+		"source": "user.toolUseResult.task_type",
+		"line": 230
+	},
+	{
+		"agent": "claude_code",
+		"key": "background_task_details_components",
+		"source": "user.toolUseResult.task.id",
+		"line": 231
+	},
+	{
+		"agent": "claude_code",
+		"key": "background_task_details_components",
+		"source": "user.toolUseResult.taskId",
+		"line": 232
+	},
+	{
+		"agent": "claude_code",
+		"key": "file_result_details_components",
+		"source": "user.toolUseResult.file.originalSize",
+		"line": 233
+	},
+	{
+		"agent": "claude_code",
+		"key": "file_result_details_components",
+		"source": "user.toolUseResult.file.truncatedByTokenCap",
+		"line": 234
+	},
+	{
+		"agent": "claude_code",
+		"key": "file_result_details_components",
+		"source": "user.toolUseResult.isImage",
+		"line": 235
+	},
+	{
+		"agent": "claude_code",
+		"key": "file_result_details_components",
+		"source": "user.toolUseResult.type",
+		"line": 236
+	},
+	{
+		"agent": "codex",
+		"key": "file_result_details_components",
+		"source": "event_msg/item_completed:McpToolCall.result.content[image].mimeType",
+		"line": 441
+	},
+	{
+		"agent": "codex",
+		"key": "file_result_details_components",
+		"source": "response_item/custom_tool_call_output.output[input_image].detail",
+		"line": 442
+	},
+	{
+		"agent": "codex",
+		"key": "file_result_details_components",
+		"source": "response_item/function_call_output.output[input_image].detail",
+		"line": 443
+	},
+	{
+		"agent": "claude_code",
+		"key": "search_result_lines_components",
+		"source": "user.toolUseResult.numLines",
+		"line": 237
+	},
+	{
+		"agent": "claude_code",
+		"key": "search_result_lines_components",
+		"source": "user.toolUseResult.totalLines",
+		"line": 238
+	},
+	{
+		"agent": "claude_code",
+		"key": "tool_result_details_components",
+		"source": "user.toolUseResult.success",
+		"line": 239
+	},
+	{
+		"agent": "claude_code",
+		"key": "tool_result_details_components",
+		"source": "user.toolUseResult.updatedFields[]",
+		"line": 240
+	},
+	{
+		"agent": "claude_code",
+		"key": "tool_inventory_counts_components",
+		"source": "user.toolUseResult.total_deferred_tools",
+		"line": 241
+	},
+	{
+		"agent": "codex",
+		"key": "tool_lifecycle_components",
+		"source": "event_msg/exec_command_end.status",
+		"line": 444
+	},
+	{
+		"agent": "codex",
+		"key": "tool_lifecycle_components",
+		"source": "event_msg/patch_apply_end.status",
+		"line": 445
+	},
+	{
+		"agent": "codex",
+		"key": "tool_lifecycle_components",
+		"source": "response_item/custom_tool_call:apply_patch.status",
+		"line": 446
+	},
+	{
+		"agent": "codex",
+		"key": "tool_lifecycle_components",
+		"source": "response_item/custom_tool_call:exec.status",
+		"line": 447
+	},
+	{
+		"agent": "codex",
+		"key": "tool_lifecycle_components",
+		"source": "response_item/tool_search_call.execution",
+		"line": 448
+	},
+	{
+		"agent": "codex",
+		"key": "tool_lifecycle_components",
+		"source": "response_item/tool_search_call.status",
+		"line": 449
+	},
+	{
+		"agent": "codex",
+		"key": "tool_lifecycle_components",
+		"source": "response_item/tool_search_output.execution",
+		"line": 450
+	},
+	{
+		"agent": "codex",
+		"key": "tool_lifecycle_components",
+		"source": "response_item/tool_search_output.status",
+		"line": 451
+	},
+	{
+		"agent": "codex",
+		"key": "tool_lifecycle_components",
+		"source": "response_item/web_search_call.status",
+		"line": 452
+	},
+	{
+		"agent": "codex",
+		"key": "command_script_path_components",
+		"source": "event_msg/item_completed:CommandExecution.script_path",
+		"line": 453
+	},
+	{
+		"agent": "codex",
+		"key": "web_action_details_components",
+		"source": "event_msg/item_completed:Extension.action.type",
+		"line": 454
+	},
+	{
+		"agent": "codex",
+		"key": "web_action_details_components",
+		"source": "event_msg/item_completed:WebSearch.action.type",
+		"line": 455
+	},
+	{
+		"agent": "codex",
+		"key": "web_action_details_components",
+		"source": "event_msg/web_search_end.action.type",
+		"line": 456
+	},
+	{
+		"agent": "codex",
+		"key": "web_result_details_components",
+		"source": "event_msg/item_completed:Extension.results[].domain",
+		"line": 457
+	},
+	{
+		"agent": "codex",
+		"key": "web_result_details_components",
+		"source": "event_msg/item_completed:Extension.results[].ref_id",
+		"line": 458
+	},
+	{
+		"agent": "codex",
+		"key": "web_result_details_components",
+		"source": "event_msg/item_completed:Extension.results[].thumbnail_url",
+		"line": 459
+	},
+	{
+		"agent": "codex",
+		"key": "web_result_details_components",
+		"source": "event_msg/item_completed:WebSearch.results[].domain",
+		"line": 460
+	},
+	{
+		"agent": "codex",
+		"key": "web_result_details_components",
+		"source": "event_msg/item_completed:WebSearch.results[].ref_id",
+		"line": 461
+	},
+	{
+		"agent": "codex",
+		"key": "web_result_details_components",
+		"source": "event_msg/item_completed:WebSearch.results[].thumbnail_url",
+		"line": 462
+	},
+	{
+		"agent": "codex",
+		"key": "image_generation_prompt_components",
+		"source": "event_msg/item_completed:Extension.revisedPrompt",
+		"line": 463
+	},
+	{
+		"agent": "codex",
+		"key": "connector_link_id_components",
+		"source": "event_msg/item_completed:McpToolCall.linkId",
+		"line": 464
+	},
+	{
+		"agent": "codex",
+		"key": "prompt_mentions_components",
+		"source": "event_msg/item_completed:UserMessage.content[mention].name",
+		"line": 465
+	},
+	{
+		"agent": "codex",
+		"key": "prompt_mentions_components",
+		"source": "event_msg/item_completed:UserMessage.content[mention].path",
+		"line": 466
+	},
+	{
+		"agent": "codex",
+		"key": "goal_timestamps_components",
+		"source": "event_msg/thread_goal_updated.goal.createdAt",
+		"line": 467
+	},
+	{
+		"agent": "codex",
+		"key": "goal_timestamps_components",
+		"source": "event_msg/thread_goal_updated.goal.updatedAt",
+		"line": 468
+	},
+	{
+		"agent": "codex",
+		"key": "filesystem_policy_components",
+		"source": "event_msg/thread_settings_applied.thread_settings.permission_profile.file_system.entries[].missing_path_behavior",
+		"line": 469
+	},
+	{
+		"agent": "codex",
+		"key": "filesystem_policy_components",
+		"source": "event_msg/thread_settings_applied.thread_settings.permission_profile.file_system.entries[].path.path",
+		"line": 470
+	},
+	{
+		"agent": "codex",
+		"key": "filesystem_policy_components",
+		"source": "event_msg/thread_settings_applied.thread_settings.permission_profile.file_system.entries[].path.type",
+		"line": 471
+	},
+	{
+		"agent": "codex",
+		"key": "filesystem_policy_components",
+		"source": "event_msg/thread_settings_applied.thread_settings.permission_profile.file_system.entries[].path.value.kind",
+		"line": 472
+	},
+	{
+		"agent": "codex",
+		"key": "filesystem_policy_components",
+		"source": "turn_context/.file_system_sandbox_policy.entries[].missing_path_behavior",
+		"line": 473
+	},
+	{
+		"agent": "codex",
+		"key": "filesystem_policy_components",
+		"source": "turn_context/.file_system_sandbox_policy.entries[].path.path",
+		"line": 474
+	},
+	{
+		"agent": "codex",
+		"key": "filesystem_policy_components",
+		"source": "turn_context/.file_system_sandbox_policy.entries[].path.type",
+		"line": 475
+	},
+	{
+		"agent": "codex",
+		"key": "filesystem_policy_components",
+		"source": "turn_context/.file_system_sandbox_policy.entries[].path.value.kind",
+		"line": 476
+	},
+	{
+		"agent": "codex",
+		"key": "filesystem_policy_components",
+		"source": "turn_context/.file_system_sandbox_policy.entries[].path.value.subpath",
+		"line": 477
+	},
+	{
+		"agent": "codex",
+		"key": "filesystem_policy_components",
+		"source": "turn_context/.file_system_sandbox_policy.kind",
+		"line": 478
+	},
+	{
+		"agent": "codex",
+		"key": "filesystem_policy_components",
+		"source": "turn_context/.permission_profile.file_system.entries[].missing_path_behavior",
+		"line": 479
+	},
+	{
+		"agent": "codex",
+		"key": "filesystem_policy_components",
+		"source": "turn_context/.permission_profile.file_system.entries[].path.path",
+		"line": 480
+	},
+	{
+		"agent": "codex",
+		"key": "filesystem_policy_components",
+		"source": "turn_context/.permission_profile.file_system.entries[].path.type",
+		"line": 481
+	},
+	{
+		"agent": "codex",
+		"key": "filesystem_policy_components",
+		"source": "turn_context/.permission_profile.file_system.entries[].path.value.kind",
+		"line": 482
+	},
+	{
+		"agent": "codex",
+		"key": "filesystem_policy_components",
+		"source": "turn_context/.permission_profile.file_system.entries[].path.value.subpath",
+		"line": 483
+	},
+	{
+		"agent": "codex",
+		"key": "filesystem_policy_components",
+		"source": "turn_context/.permission_profile.file_system.type",
+		"line": 484
+	},
+	{
+		"agent": "codex",
+		"key": "workspace_roots_components",
+		"source": "event_msg/thread_settings_applied.thread_settings.runtime_workspace_roots[]",
+		"line": 485
+	},
+	{
+		"agent": "codex",
+		"key": "workspace_roots_components",
+		"source": "turn_context/.sandbox_policy.writable_roots[]",
+		"line": 486
+	},
+	{
+		"agent": "codex",
+		"key": "workspace_roots_components",
+		"source": "turn_context/.workspace_roots[]",
+		"line": 487
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/agent_message@metadata.mcp_attribution.error_reason",
+		"line": 488
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/agent_message@metadata.mcp_attribution.status",
+		"line": 489
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/custom_tool_call_output@metadata.mcp_attribution.error_reason",
+		"line": 490
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/custom_tool_call_output@metadata.mcp_attribution.sources[].first_turn_id",
+		"line": 491
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/custom_tool_call_output@metadata.mcp_attribution.sources[].plugin_id",
+		"line": 492
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/custom_tool_call_output@metadata.mcp_attribution.status",
+		"line": 493
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/custom_tool_call:exec@metadata.mcp_attribution.sources[].first_turn_id",
+		"line": 494
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/custom_tool_call:exec@metadata.mcp_attribution.sources[].plugin_id",
+		"line": 495
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/custom_tool_call:exec@metadata.mcp_attribution.sources[].server_name",
+		"line": 496
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/custom_tool_call:exec@metadata.mcp_attribution.sources[].tool_name",
+		"line": 497
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/custom_tool_call:exec@metadata.mcp_attribution.status",
+		"line": 498
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/function_call_output@metadata.mcp_attribution.error_reason",
+		"line": 499
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/function_call_output@metadata.mcp_attribution.sources[].first_turn_id",
+		"line": 500
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/function_call_output@metadata.mcp_attribution.sources[].plugin_id",
+		"line": 501
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/function_call_output@metadata.mcp_attribution.status",
+		"line": 502
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/function_call:untrusted_input@metadata.mcp_attribution.sources[].first_turn_id",
+		"line": 503
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/function_call:untrusted_input@metadata.mcp_attribution.sources[].plugin_id",
+		"line": 504
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/function_call:untrusted_input@metadata.mcp_attribution.sources[].server_name",
+		"line": 505
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/function_call:untrusted_input@metadata.mcp_attribution.sources[].tool_name",
+		"line": 506
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/function_call:untrusted_input@metadata.mcp_attribution.status",
+		"line": 507
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/message:developer@metadata.mcp_attribution.error_reason",
+		"line": 508
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/message:developer@metadata.mcp_attribution.sources[].first_turn_id",
+		"line": 509
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/message:developer@metadata.mcp_attribution.sources[].plugin_id",
+		"line": 510
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/message:developer@metadata.mcp_attribution.sources[].server_name",
+		"line": 511
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/message:developer@metadata.mcp_attribution.sources[].tool_name",
+		"line": 512
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/message:developer@metadata.mcp_attribution.status",
+		"line": 513
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/message:user@metadata.mcp_attribution.error_reason",
+		"line": 514
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/message:user@metadata.mcp_attribution.sources[].first_turn_id",
+		"line": 515
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/message:user@metadata.mcp_attribution.sources[].plugin_id",
+		"line": 516
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/message:user@metadata.mcp_attribution.sources[].server_name",
+		"line": 517
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/message:user@metadata.mcp_attribution.sources[].tool_name",
+		"line": 518
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/message:user@metadata.mcp_attribution.status",
+		"line": 519
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/reasoning@metadata.mcp_attribution.sources[].first_turn_id",
+		"line": 520
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/reasoning@metadata.mcp_attribution.sources[].plugin_id",
+		"line": 521
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/reasoning@metadata.mcp_attribution.sources[].server_name",
+		"line": 522
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/reasoning@metadata.mcp_attribution.sources[].tool_name",
+		"line": 523
+	},
+	{
+		"agent": "codex",
+		"key": "mcp_attribution_components",
+		"source": "response_item/reasoning@metadata.mcp_attribution.status",
+		"line": 524
+	},
+	{
+		"agent": "codex",
+		"key": "output_truncation_components",
+		"source": "response_item/custom_tool_call_output@metadata.fallback_token_limit_override",
+		"line": 525
+	},
+	{
+		"agent": "codex",
+		"key": "output_truncation_components",
+		"source": "response_item/function_call_output.output~Original token count",
+		"line": 526
+	},
+	{
+		"agent": "codex",
+		"key": "output_truncation_components",
+		"source": "response_item/function_call_output@metadata.fallback_token_limit_override",
+		"line": 527
+	},
+	{
+		"agent": "codex",
+		"key": "output_truncation_components",
+		"source": "turn_context/.truncation_policy.limit",
+		"line": 528
+	},
+	{
+		"agent": "codex",
+		"key": "output_truncation_components",
+		"source": "turn_context/.truncation_policy.mode",
+		"line": 529
+	},
+	{
+		"agent": "codex",
+		"key": "call_exec_options_components",
+		"source": "response_item/function_call:exec_command.arguments.login",
+		"line": 530
+	},
+	{
+		"agent": "codex",
+		"key": "call_exec_options_components",
+		"source": "response_item/function_call:exec_command.arguments.max_output_tokens",
+		"line": 531
+	},
+	{
+		"agent": "codex",
+		"key": "call_exec_options_components",
+		"source": "response_item/function_call:exec_command.arguments.shell",
+		"line": 532
+	},
+	{
+		"agent": "codex",
+		"key": "call_exec_options_components",
+		"source": "response_item/function_call:exec_command.arguments.tty",
+		"line": 533
+	},
+	{
+		"agent": "codex",
+		"key": "call_exec_options_components",
+		"source": "response_item/function_call:exec_command.arguments.yield_time_ms",
+		"line": 534
+	},
+	{
+		"agent": "codex",
+		"key": "call_exec_options_components",
+		"source": "response_item/function_call:exec_command.arguments.prefix_rule[]",
+		"line": 535
+	},
+	{
+		"agent": "codex",
+		"key": "base_instruction_provenance_components",
+		"source": "session_meta/.base_instructions.provenance.model",
+		"line": 536
+	},
+	{
+		"agent": "codex",
+		"key": "base_instruction_provenance_components",
+		"source": "session_meta/.base_instructions.provenance.type",
+		"line": 537
+	},
+	{
+		"agent": "codex",
+		"key": "lineage_session_id_components",
+		"source": "session_meta/.session_id",
+		"line": 538
+	},
+	{
+		"agent": "codex",
+		"key": "lineage_session_id_components",
+		"source": "token_usage_record/.session_id",
+		"line": 539
+	},
+	{
+		"agent": "codex",
+		"key": "subagent_history_start_ordinal_components",
+		"source": "session_meta/.subagent_history_start_ordinal",
+		"line": 540
+	},
+	{
+		"agent": "codex",
+		"key": "session_created_at_components",
+		"source": "session_meta/.timestamp",
+		"line": 541
+	},
+	{
+		"agent": "claude_code",
+		"key": "reasoning_output_tokens_components",
+		"source": "assistant.message.usage.output_tokens_details.thinking_tokens",
+		"line": 242
+	},
+	{
+		"agent": "codex",
+		"key": "service_tier_components",
+		"source": "event_msg/thread_settings_applied.thread_settings.service_tier",
+		"line": 542
+	}
+]

@@ -22,7 +22,7 @@ Run the command again to change which repositories sync. If you start setup in y
 
 Eligible interactive commands may offer one **Update / Skip** prompt linked to the exact open-source release. Accepting updates a supported existing global installation and the retained automatic-upload runtime without changing repository selections. It never adds a global installation for npx-only users.
 
-Run `npx opaline@latest update` to check explicitly. See the [update guide](https://github.com/opalinehq/cli/blob/main/docs/usage.md#review-and-install-updates) for supported installations and fallback instructions.
+Run `npx opaline@latest update` to check explicitly. See the [update guide](https://github.com/evrendom/opaline/blob/main/docs/usage.md#review-and-install-updates) for supported installations and fallback instructions.
 
 ## Data and privacy
 
@@ -32,9 +32,9 @@ Official releases also send limited usage analytics, including repository/sessio
 
 ## Learn more
 
-- [CLI guide](https://github.com/opalinehq/cli/blob/main/docs/usage.md) — commands, global installation, configuration, troubleshooting, and migration from Rudel.
-- [Data handling](https://github.com/opalinehq/cli/blob/main/docs/data-handling.md) — full disclosure and persistent analytics opt-out.
-- [GitHub](https://github.com/opalinehq/cli) — source code and contributions.
+- [CLI guide](https://github.com/evrendom/opaline/blob/main/docs/usage.md) — commands, global installation, configuration, troubleshooting, and migration from Rudel.
+- [Data handling](https://github.com/evrendom/opaline/blob/main/docs/data-handling.md) — full disclosure and persistent analytics opt-out.
+- [GitHub](https://github.com/evrendom/opaline) — source code and contributions.
 
 Use `opaline` for new installations. Existing credentials and settings remain in `~/.rudel`.
 

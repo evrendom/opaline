@@ -1,94 +1,71 @@
-<h1 align="center">Opaline CLI</h1>
+# Opaline
 
-<p align="center"><strong>Pull back the curtain on your team's coding sessions.</strong></p>
+See where your coding agents get stuck, and what to fix in your setup.
 
-<p align="center">
-  Analytics for your team's Claude Code and Codex sessions.<br>
-  Understand what happened, how agents worked, and where the effort went.
-</p>
+Opaline is a Mac app for Claude Code and Codex. It reads the sessions your agents leave on your Mac and shows what they cost, where they loop or fail, which mistakes keep coming back, and what to change in your `CLAUDE.md`, `AGENTS.md`, skills, hooks, scripts or CI. Everything runs on your Mac: the app brings its own server, Postgres and ClickHouse, and nothing leaves the machine.
 
-<p align="center">
-  <a href="https://www.npmjs.com/package/opaline"><img src="https://img.shields.io/npm/v/opaline?color=397568&label=npm" alt="npm version"></a>
-  <a href="https://www.producthunt.com/products/rudel/launches/claude-code-codex-usage-trading-cards-by-rudel" title="Rudel trading cards launch — May 4, 2026"><img src="https://img.shields.io/badge/Product%20Hunt-%235-DA552F" alt="Product Hunt: #5 — May 4, 2026 launch"></a>
-  <a href="https://news.ycombinator.com/item?id=47350416" title="Show HN: Rudel — posted by keks0r"><img src="https://img.shields.io/badge/Hacker%20News-144%20%20%C2%B7%2086%20-ff6600?logo=ycombinator&amp;logoColor=white" alt="Hacker News: 144 points and 86 comments on Show HN: Rudel by keks0r"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-64748b" alt="MIT license"></a>
-</p>
+**[Download Opaline for Mac](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-macOS-arm64.dmg)** (Apple silicon) · [evren.opaline.so](https://evren.opaline.so)
 
-<p align="center">
-  <a href="https://opaline.so">Open Opaline</a> ·
-  <a href="#see-opaline-in-action">The product</a> ·
-  <a href="#get-started">Get started</a> ·
-  <a href="docs/usage.md">CLI guide</a>
-</p>
+> **Coming from the Opaline CLI?** This repository used to be `opalinehq/cli`. It now holds all of
+> Opaline: the Mac app, the server, the dashboard and the CLI. The CLI still lives here, in
+> [`apps/cli`](apps/cli), and is still published to npm as `opaline`, `@opalinehq/cli` and `rudel`;
+> `npx opaline@latest` keeps working. See [The CLI](#the-cli).
 
-## See Opaline in action
+## What you get
 
-Opaline brings your team's coding sessions into a shared workspace. Browse sessions across repositories, follow conversations and tool calls, and see model usage, tokens, and API costs in context.
+- **Usage and cost** for Claude Code and Codex by day, repository and model, including your plan usage.
+- **Every session, readable**: turns, tool calls, files, context, subagents, pull requests and CI.
+- **Flags** for runs that looped, failed or got corrected, so the problems that repeat stand out.
+- **Your agents can ask too**: "Connect your agents" adds the Opaline plugin to Claude Code and Codex, so they can look up past sessions and answer questions about them through the local MCP server.
 
-https://github.com/user-attachments/assets/0df4c0b9-bb41-44af-b104-050aa9ae0756
+The app keeps itself up to date from this repository's releases.
 
-This repository contains the **open-source CLI** that connects your local sessions to [the Opaline app](https://opaline.so).
+## Build from source
 
-<p align="center">
-  <img src="docs/assets/repository-picker.png" alt="Opaline repository picker showing per-repository upload switches, local session counts, and uploaded session counts." width="880">
-  <br><sub>Choose which repositories sync with Opaline. Sample data shown.</sub>
-</p>
+You need [Bun](https://bun.sh) and macOS.
 
-## Get started
+```bash
+git clone https://github.com/evrendom/opaline.git
+cd opaline
+bun install
+bash apps/desktop/shell/package.sh
+```
 
-Requires **Node.js 20 or newer**. Run from any directory; no global installation needed.
+`package.sh` builds the server and web app from your checkout and writes `Opaline.app` and `Opaline.dmg` to `~/.cache/opaline-desktop/package`. For day-to-day development, see [CONTRIBUTING.md](.github/CONTRIBUTING.md).
+
+## The CLI
+
+The `opaline` command (`apps/cli`, published to npm as `opaline`, `@opalinehq/cli` and `rudel`) finds saved Claude Code and Codex sessions on a computer, uploads them to Opaline at [opaline.so](https://opaline.so), and keeps new ones in sync. The Mac app does not need it: it reads the sessions on your Mac directly.
 
 ```bash
 npx opaline@latest
 ```
 
-1. **Choose repositories.** Opaline finds local Claude Code and Codex sessions. Use ↑↓ to move and Space to toggle a repository.
-2. **Review and confirm.** Press Enter to review, then Enter to confirm. Sign in through your browser when prompted and choose a workspace if needed.
-3. **Continue in Opaline.** Existing sessions upload, and future sessions sync automatically. New users finish setup in the browser; returning users open their workspace's Sessions page.
+See [docs/usage.md](docs/usage.md) and [docs/data-handling.md](docs/data-handling.md). Releases are listed under `opaline-cli@*` in this repository's releases; see [docs/releasing.md](docs/releasing.md).
 
-Already started in the browser? Run the command Opaline gives you, including its `--code` value, and approve sign-in in that same browser. This keeps your terminal connected to your setup page.
+## Privacy and secrets
 
-## How it works
+Session transcripts contain whatever your agents saw: source code, prompts, command output, file contents, URLs, and sometimes secrets. In the Mac app they stay on your Mac. When sessions are sent to a server, the CLI removes known secret formats first and the server applies the same filter again before storing anything. The filter catches known formats only; it does not catch values such as `DB_PASSWORD=hunter2`, custom tokens without a recognizable prefix, or secrets split across lines. Keep secrets out of agent sessions where you can.
 
-- **One view across both agents.** The picker groups sessions by repository, including sessions from Git worktrees, and shows local and uploaded counts.
-- **Automatic uploads for your selections.** Opaline sets up Claude Code and Codex hooks for enabled repositories. Sessions already uploaded to the destination are skipped. Running Claude Code and Codex sessions also stream new transcript lines within seconds; the regular uploads are unchanged.
-- **Change your mind anytime.** Run the command again to turn repositories ON or OFF. OFF stops future uploads; it does not delete sessions already uploaded. An upload already running may finish.
+## Repository layout
 
-Type to filter the list. Press Esc to go back from review or leave the picker without saving.
-
-## Data and privacy
-
-**Opaline uploads full session transcripts**, including prompts, responses, source code, tool output, and related metadata. Only enable repositories whose session data you are allowed to share with Opaline.
-
-Known secret patterns are filtered before upload, but **filtering cannot guarantee that every secret is removed**. Keep sensitive data out of agent sessions.
-
-The CLI also sends limited usage analytics, including version, operating system, setup results, and repository/session counts. These events exclude transcript content, repository names, and local paths. Anonymous activity is linked to your account after sign-in.
-
-To let answers say which sessions they miss, the CLI also sends the workspace a session inventory: for each session it would upload under your settings, the session id, agent, line counts, byte sizes and start and change times, never content, paths or repository names. Set `OPALINE_SESSION_INVENTORY=0` to turn it off.
-
-See [data handling](docs/data-handling.md) for the full disclosure and persistent opt-out settings.
-
-The server can temporarily pause repository-evidence capture without pausing session uploads or changing their project identity and workspace binding. Normal Git metadata lookups continue; only repository-context collection, spool writes and evidence delivery stop. The CLI stores the pause in `repository-evidence-pause.json` under its config directory, leaves other pending captures untouched, and resumes after expiry (24 hours by default, bounded to 1 hour–7 days). Invalid markers are ignored and removed; persistence failures warn without preventing rejected-capture cleanup. `opaline doctor` reports an active pause.
-
-## Common commands
-
-| Command | What it does |
+| Path | What it is |
 | --- | --- |
-| `npx opaline@latest` | Manage repositories and upload sessions. |
-| `npx opaline@latest whoami` | Show your account and upload failures. |
-| `npx opaline@latest doctor` | Check authentication, connection, and hooks. |
-| `npx opaline@latest update` | Review and update supported persistent installations. |
-| `npx opaline@latest pull --repo <repo> --from <day> --to <day>` | Copy sessions to local files for an agent to compute on (also `sql`, `count`). |
-| `npx opaline@latest --help` | Show available commands and options. |
+| `apps/desktop` | The Mac app, the thing you download |
+| `apps/desktop/shell` | The native app (Electron): windows, menus, onboarding, the updater and packaging |
+| `apps/desktop/server` | The local server the app starts: imports, analysis and the MCP endpoint your agents use |
+| `apps/desktop/ui` | The screens the app's window shows (React) |
+| `apps/cli` | The CLI (npm `opaline`, `@opalinehq/cli`, `rudel`), with its launchers in `packages/opaline` and `packages/rudel-alias` |
+| `plugin` | The Claude Code and Codex plugin the app installs from "Connect your agents" |
+| `packages/local-server` | Starts the server, Postgres and ClickHouse on the Mac for the app |
+| `packages/cli-harness` | An older CLI copy the server's integration and version-skew tests run against; not published |
+| `packages/*` | Shared code: schemas, transcript parsing, the secret filter |
+| `scripts` | Build and development scripts; `scripts/dev-compose.yml` starts Postgres and ClickHouse for local development (`bun run infra:up`) |
 
-Prefer a shorter command? [Install globally](docs/usage.md#optional-global-install) to use `opaline` directly.
+## Contributing and security
 
-## Documentation and contributing
+See [CONTRIBUTING.md](.github/CONTRIBUTING.md). To report a vulnerability, see [SECURITY.md](.github/SECURITY.md); please do not open public issues for security problems.
 
-- [CLI guide](docs/usage.md) — setup, commands, configuration, troubleshooting, and migration from Rudel.
-- [Data handling](docs/data-handling.md) — transcript uploads, secret filtering, and usage analytics.
-- [Contributing](CONTRIBUTING.md) — local development and the CLI playground.
-- [Report a bug](https://github.com/opalinehq/cli/issues) · [Report a security issue privately](SECURITY.md).
-- [Contact](mailto:evren@opaline.so).
+## License
 
-Licensed under [MIT](LICENSE).
+Opaline is created by Evren Dombak and licensed under the [Apache License 2.0](LICENSE). If you redistribute it or build on it, keep the [NOTICE](NOTICE) file with it.

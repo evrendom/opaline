@@ -1,4 +1,9 @@
 * text=auto eol=lf
 
-# Byte-exact transcript-slim parity fixtures (shared with the Opaline API; one line is CRLF).
-apps/cli/src/__tests__/fixtures/transcript-slim/*.jsonl -text
+# Generated migration snapshots and codegen; collapsed in GitHub diffs.
+packages/sql-schema/db/migrations/meta/*.json linguist-generated=true
+packages/ch-schema/chx/meta/*.json linguist-generated=true
+packages/ch-schema/src/generated/** linguist-generated=true
+
+# Byte-exact transcript-slim parity fixtures (shared with cli; one line is CRLF).
+packages/api-routes/src/__fixtures__/transcript-slim/*.jsonl -text

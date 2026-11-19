@@ -1,0 +1,50 @@
+{
+	"name": "opaline",
+	"version": "1.4.1",
+	"description": "Analyse your Claude Code and Codex sessions on this Mac: where your agents get stuck or waste time and money, and what to fix in your setup. Nothing leaves this Mac.",
+	"author": {
+		"name": "Opaline",
+		"url": "https://opaline.so"
+	},
+	"homepage": "https://opaline.so",
+	"repository": "https://github.com/evrendom/opaline",
+	"license": "Apache-2.0",
+	"keywords": [
+		"opaline",
+		"analytics",
+		"coding-agents",
+		"claude-code",
+		"codex",
+		"local"
+	],
+	"skills": "./skills/",
+	"mcpServers": "./.mcp.json",
+	"interface": {
+		"displayName": "Opaline",
+		"shortDescription": "Analyse your agent sessions on this Mac",
+		"longDescription": "Opaline analyses the Claude Code and Codex sessions on this Mac. It finds where your agents get stuck, loop or waste time and money, reads the runs that show why, and suggests the fix in your setup: instructions, skills, docs, scripts, hooks or CI.\n\nAsk in plain words: \"Where did my agents get stuck this week?\", \"Why was that run so slow?\", \"Compare my Claude Code and Codex runs\", \"What did my sessions cost this month?\". Answers are saved in the Opaline app, so the next question on the same topic updates the last answer instead of starting over.\n\nThe Opaline app imports the sessions and runs the analysis on this Mac. Nothing leaves this Mac. If there are no sessions yet, open the Opaline app and connect your agents there.",
+		"developerName": "Opaline",
+		"category": "Developer Tools",
+		"capabilities": [
+			"Find where your Claude Code and Codex agents get stuck or waste time and money",
+			"Explain why a run was slow or expensive, and compare Claude Code with Codex",
+			"Get a concrete fix for your setup: instructions, docs, scripts, hooks or CI",
+			"Save answers in the Opaline app and update them later"
+		],
+		"websiteURL": "https://opaline.so",
+		"defaultPrompt": [
+			"Where did my coding agents get stuck or waste the most time this week?",
+			"Why were my most expensive runs this month so expensive?",
+			"Compare my Claude Code and Codex runs over the last 30 days."
+		],
+		"brandColor": "#1F1F1F",
+		"brandColorDark": "#ECECEC",
+		"composerIcon": "./assets/opaline.png",
+		"logo": "./assets/opaline.png"
+	},
+	"extensions": {
+		"com.openai": {
+			"onboardingSkill": "./skills/setup/SKILL.md"
+		}
+	}
+}

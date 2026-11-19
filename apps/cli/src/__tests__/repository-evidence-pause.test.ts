@@ -35,165 +35,159 @@ test.each([
 	[99999999, 604_800],
 	[3600.5, 3_600],
 	[Number.NaN, 86_400],
-])(
-	"pause duration %s is clamped to %s and expires",
-	async (pauseSeconds, seconds) => {
-		const directory = await mkdtemp(join(tmpdir(), "opaline-pause-"));
-		try {
-			await pauseRepositoryEvidenceCapture(
-				new ORPCError("EVIDENCE_CAPTURE_DISABLED", {
-					status: 403,
-					data: { pauseSeconds },
-				}),
-				directory,
-				1_000,
-			);
-			expect(readRepositoryEvidencePauseUntil(directory, 1_000)).toBe(
-				1_000 + seconds * 1_000,
-			);
-			expect(
-				(await stat(join(directory, "repository-evidence-pause.json"))).mode &
-					0o777,
-			).toBe(0o600);
-			expect(
-				readRepositoryEvidencePauseUntil(directory, 1_000 + seconds * 1_000),
-			).toBeUndefined();
-		} finally {
-			await rm(directory, { recursive: true, force: true });
-		}
-	},
-);
+])("pause duration %s is clamped to %s and expires", async (pauseSeconds, seconds) => {
+	const directory = await mkdtemp(join(tmpdir(), "opaline-pause-"));
+	try {
+		await pauseRepositoryEvidenceCapture(
+			new ORPCError("EVIDENCE_CAPTURE_DISABLED", {
+				status: 403,
+				data: { pauseSeconds },
+			}),
+			directory,
+			1_000,
+		);
+		expect(readRepositoryEvidencePauseUntil(directory, 1_000)).toBe(
+			1_000 + seconds * 1_000,
+		);
+		expect(
+			(await stat(join(directory, "repository-evidence-pause.json"))).mode &
+				0o777,
+		).toBe(0o600);
+		expect(
+			readRepositoryEvidencePauseUntil(directory, 1_000 + seconds * 1_000),
+		).toBeUndefined();
+	} finally {
+		await rm(directory, { recursive: true, force: true });
+	}
+});
 
-test.each(["init", "commit"])(
-	"disabled %s removes the pending capture, source and spool without interrupting transcript upload",
-	async (stage) => {
-		const fixture = await createCliFixture("claude_code");
-		const stub = startEvidenceStub("EVIDENCE_CAPTURE_DISABLED", stage);
-		try {
-			await prepareEvidenceFixture(fixture, stub.loopbackBase);
-			const before = Date.now();
-			const result = await runHook(fixture);
-			expect(result.exitCode).toBe(0);
-			expect(
-				stub.requests.filter((request) =>
-					request.pathname.endsWith(`repositoryEvidence/${stage}`),
+test.each([
+	"init",
+	"commit",
+])("disabled %s removes the pending capture, source and spool without interrupting transcript upload", async (stage) => {
+	const fixture = await createCliFixture("claude_code");
+	const stub = startEvidenceStub("EVIDENCE_CAPTURE_DISABLED", stage);
+	try {
+		await prepareEvidenceFixture(fixture, stub.loopbackBase);
+		const before = Date.now();
+		const result = await runHook(fixture);
+		expect(result.exitCode).toBe(0);
+		expect(
+			stub.requests.filter((request) =>
+				request.pathname.endsWith(`repositoryEvidence/${stage}`),
+			),
+		).toHaveLength(1);
+		expect(
+			stub.requests.some(
+				(request) => request.pathname === "/rpc/ingestSession",
+			),
+		).toBe(true);
+		const config = join(fixture.home, ".rudel");
+		expect(
+			await readdir(join(config, "repository-evidence-pending", "v4")),
+		).toEqual([]);
+		expect(await readdir(join(config, "repository-evidence-sources"))).toEqual(
+			[],
+		);
+		const spoolFiles = await readdir(join(config, "repo-context-spool"), {
+			recursive: true,
+		});
+		expect(
+			spoolFiles.filter(
+				(name) => name.endsWith(".capture.json") || name.endsWith(".blob"),
+			),
+		).toEqual([]);
+		expect(
+			JSON.parse(
+				await readFile(
+					join(config, "repo-context-spool", "accounting.v2.json"),
+					"utf8",
 				),
-			).toHaveLength(1);
-			expect(
-				stub.requests.some(
-					(request) => request.pathname === "/rpc/ingestSession",
-				),
-			).toBe(true);
-			const config = join(fixture.home, ".rudel");
-			expect(
-				await readdir(join(config, "repository-evidence-pending", "v4")),
-			).toEqual([]);
-			expect(
-				await readdir(join(config, "repository-evidence-sources")),
-			).toEqual([]);
-			const spoolFiles = await readdir(join(config, "repo-context-spool"), {
-				recursive: true,
-			});
-			expect(
-				spoolFiles.filter(
-					(name) => name.endsWith(".capture.json") || name.endsWith(".blob"),
-				),
-			).toEqual([]);
-			expect(
-				JSON.parse(
-					await readFile(
-						join(config, "repo-context-spool", "accounting.v2.json"),
-						"utf8",
-					),
-				),
-			).toMatchObject({ captureCount: 0, blobCount: 0, state: "clean" });
-			const until = readRepositoryEvidencePauseUntil(config);
-			expect(until).toBeGreaterThanOrEqual(before + 86_400_000);
-			expect(until).toBeLessThanOrEqual(Date.now() + 86_400_000);
-		} finally {
-			stub.server.stop(true);
-			await rm(fixture.home, { recursive: true, force: true });
-		}
-	},
-);
+			),
+		).toMatchObject({ captureCount: 0, blobCount: 0, state: "clean" });
+		const until = readRepositoryEvidencePauseUntil(config);
+		expect(until).toBeGreaterThanOrEqual(before + 86_400_000);
+		expect(until).toBeLessThanOrEqual(Date.now() + 86_400_000);
+	} finally {
+		stub.server.stop(true);
+		await rm(fixture.home, { recursive: true, force: true });
+	}
+});
 
-test.each(HOOK_CASES)(
-	"$name uploads transcripts while paused without repository capture commands or evidence writes",
-	async (hook) => {
-		const fixture = await createCliFixture(hook.source);
-		const stub = startEvidenceStub("EVIDENCE_CAPTURE_DISABLED");
-		try {
-			await prepareEvidenceFixture(fixture, stub.loopbackBase);
-			const config = join(fixture.home, ".rudel");
-			await pauseRepositoryEvidenceCapture(
-				new ORPCError("EVIDENCE_CAPTURE_DISABLED", { status: 403 }),
-				config,
+test.each(
+	HOOK_CASES,
+)("$name uploads transcripts while paused without repository capture commands or evidence writes", async (hook) => {
+	const fixture = await createCliFixture(hook.source);
+	const stub = startEvidenceStub("EVIDENCE_CAPTURE_DISABLED");
+	try {
+		await prepareEvidenceFixture(fixture, stub.loopbackBase);
+		const config = join(fixture.home, ".rudel");
+		await pauseRepositoryEvidenceCapture(
+			new ORPCError("EVIDENCE_CAPTURE_DISABLED", { status: 403 }),
+			config,
+		);
+		const bin = join(fixture.home, "bin");
+		const calls = join(fixture.home, "git-calls");
+		await mkdir(bin);
+		await writeFile(calls, "");
+		await writeFile(
+			join(bin, "git"),
+			`#!/bin/sh\nprintf '%s\\n' "$*" >> '${calls}'\nexec '${execFileSync("which", ["git"], { encoding: "utf8" }).trim()}' "$@"\n`,
+		);
+		await chmod(join(bin, "git"), 0o700);
+		const invocation = hook.buildInvocation(fixture);
+		const result = await runCli(invocation.command, fixture, {
+			stdin: invocation.stdin,
+			env: { PATH: `${bin}:${process.env.PATH}` },
+		});
+		expect(result.exitCode).toBe(0);
+		const commands = await readFile(calls, "utf8");
+		expect(commands).toContain("remote get-url origin");
+		expect(commands).not.toMatch(/\b(diff|ls-files|status)\b/u);
+		expect(
+			stub.requests.some(
+				(request) => request.pathname === "/rpc/ingestSession",
+			),
+		).toBe(true);
+		expect(
+			stub.requests.some((request) =>
+				request.pathname.includes("repositoryEvidence"),
+			),
+		).toBe(false);
+		expect(await readdir(config)).not.toContain("repo-context-spool");
+		expect(await readdir(config)).not.toContain("repository-evidence-sources");
+		if (hook.source === "claude_code") {
+			const start = await runCli(
+				["hooks", "claude", "session-start"],
+				fixture,
+				{
+					stdin: JSON.stringify({
+						cwd: fixture.projectPath,
+						session_id: fixture.sessionId,
+						transcript_path: fixture.transcriptPath,
+					}),
+					env: { PATH: `${bin}:${process.env.PATH}` },
+				},
 			);
-			const bin = join(fixture.home, "bin");
-			const calls = join(fixture.home, "git-calls");
-			await mkdir(bin);
-			await writeFile(calls, "");
-			await writeFile(
-				join(bin, "git"),
-				`#!/bin/sh\nprintf '%s\\n' "$*" >> '${calls}'\nexec '${execFileSync("which", ["git"], { encoding: "utf8" }).trim()}' "$@"\n`,
+			expect(start.exitCode).toBe(0);
+			// SessionStart still resolves the repository's allowlist entry and
+			// workspace (live session updates do not follow the evidence
+			// pause), but runs no repository capture commands.
+			const startCommands = (await readFile(calls, "utf8")).slice(
+				commands.length,
 			);
-			await chmod(join(bin, "git"), 0o700);
-			const invocation = hook.buildInvocation(fixture);
-			const result = await runCli(invocation.command, fixture, {
-				stdin: invocation.stdin,
-				env: { PATH: `${bin}:${process.env.PATH}` },
-			});
-			expect(result.exitCode).toBe(0);
-			const commands = await readFile(calls, "utf8");
-			expect(commands).toContain("remote get-url origin");
-			expect(commands).not.toMatch(/\b(diff|ls-files|status)\b/u);
-			expect(
-				stub.requests.some(
-					(request) => request.pathname === "/rpc/ingestSession",
-				),
-			).toBe(true);
+			expect(startCommands).not.toMatch(/\b(diff|ls-files|status)\b/u);
 			expect(
 				stub.requests.some((request) =>
 					request.pathname.includes("repositoryEvidence"),
 				),
 			).toBe(false);
-			expect(await readdir(config)).not.toContain("repo-context-spool");
-			expect(await readdir(config)).not.toContain(
-				"repository-evidence-sources",
-			);
-			if (hook.source === "claude_code") {
-				const start = await runCli(
-					["hooks", "claude", "session-start"],
-					fixture,
-					{
-						stdin: JSON.stringify({
-							cwd: fixture.projectPath,
-							session_id: fixture.sessionId,
-							transcript_path: fixture.transcriptPath,
-						}),
-						env: { PATH: `${bin}:${process.env.PATH}` },
-					},
-				);
-				expect(start.exitCode).toBe(0);
-				// SessionStart still resolves the repository's allowlist entry and
-				// workspace (live session updates do not follow the evidence
-				// pause), but runs no repository capture commands.
-				const startCommands = (await readFile(calls, "utf8")).slice(
-					commands.length,
-				);
-				expect(startCommands).not.toMatch(/\b(diff|ls-files|status)\b/u);
-				expect(
-					stub.requests.some((request) =>
-						request.pathname.includes("repositoryEvidence"),
-					),
-				).toBe(false);
-			}
-		} finally {
-			stub.server.stop(true);
-			await rm(fixture.home, { recursive: true, force: true });
 		}
-	},
-);
+	} finally {
+		stub.server.stop(true);
+		await rm(fixture.home, { recursive: true, force: true });
+	}
+});
 
 test.each(
 	HOOK_CASES.flatMap((hook) =>
@@ -203,174 +197,172 @@ test.each(
 			name: `${hook.name}: ${kind}`,
 		})),
 	),
-)(
-	"$name preserves identical transcript identity and workspace binding while paused",
-	async ({ hook, kind }) => {
-		const original = await createCliFixture(hook.source);
-		let fixture = original;
-		const stub = startEvidenceStub("");
-		try {
-			await prepareEvidenceFixture(fixture, stub.loopbackBase);
-			let repoKey = "remote:github.com/opaline-test/pause";
-			let projectKey = "github.com/opaline-test/pause";
-			if (kind === "non-git") {
-				await rm(join(fixture.projectPath, ".git"), { recursive: true });
-				await writeFile(
-					join(fixture.projectPath, "package.json"),
-					JSON.stringify({ name: "my-project" }),
-				);
-				repoKey = "pkg:my-project";
-				projectKey = fixture.projectPath;
-			} else if (kind === "rewritten-remote") {
-				execFileSync("git", [
-					"-C",
-					fixture.projectPath,
-					"remote",
-					"set-url",
-					"origin",
-					"pause:opaline-test/pause.git",
-				]);
-				execFileSync("git", [
-					"-C",
-					fixture.projectPath,
-					"config",
-					"url.https://github.com/.insteadOf",
-					"pause:",
-				]);
-			} else {
-				execFileSync("git", [
-					"-C",
-					fixture.projectPath,
-					"remote",
-					"remove",
-					"origin",
-				]);
-				execFileSync("git", [
-					"-C",
-					fixture.projectPath,
-					"-c",
-					"user.name=Test",
-					"-c",
-					"user.email=test@example.test",
-					"commit",
-					"--quiet",
-					"--allow-empty",
-					"-m",
-					"fixture",
-				]);
-				const worktree = join(fixture.home, "linked");
-				execFileSync("git", [
-					"-C",
-					fixture.projectPath,
-					"worktree",
-					"add",
-					"--quiet",
-					"-b",
-					"linked",
-					worktree,
-				]);
-				repoKey = `path-raw:${await realpath(fixture.projectPath)}`;
-				projectKey = await realpath(worktree);
-				fixture = { ...fixture, projectPath: projectKey };
-			}
-			const config = join(fixture.home, ".rudel");
+)("$name preserves identical transcript identity and workspace binding while paused", async ({
+	hook,
+	kind,
+}) => {
+	const original = await createCliFixture(hook.source);
+	let fixture = original;
+	const stub = startEvidenceStub("");
+	try {
+		await prepareEvidenceFixture(fixture, stub.loopbackBase);
+		let repoKey = "remote:github.com/opaline-test/pause";
+		let projectKey = "github.com/opaline-test/pause";
+		if (kind === "non-git") {
+			await rm(join(fixture.projectPath, ".git"), { recursive: true });
 			await writeFile(
-				join(config, "projects.json"),
-				JSON.stringify({
-					projects: { [projectKey]: { organizationId: "org" } },
-				}),
+				join(fixture.projectPath, "package.json"),
+				JSON.stringify({ name: "my-project" }),
 			);
-			await writeFile(
-				join(config, "auto-upload.json"),
-				JSON.stringify({
-					version: 1,
-					repositories: { [repoKey]: { label: kind, sources: [hook.source] } },
-				}),
-			);
-			const invocation = hook.buildInvocation(fixture);
-			expect(
-				(await runCli(invocation.command, fixture, { stdin: invocation.stdin }))
-					.exitCode,
-			).toBe(0);
-			const transcripts = () =>
-				stub.bodies.filter(
-					(_, index) => stub.requests[index]?.pathname === "/rpc/ingestSession",
-				);
-			expect(transcripts()).toHaveLength(1);
-			expect(JSON.parse(transcripts()[0] ?? "").json.organizationId).toBe(
-				"org",
-			);
-			await pauseRepositoryEvidenceCapture(
-				new ORPCError("EVIDENCE_CAPTURE_DISABLED", { status: 403 }),
-				config,
-			);
-			const evidenceCount = stub.requests.filter((request) =>
-				request.pathname.includes("repositoryEvidence"),
-			).length;
-			expect(
-				(await runCli(invocation.command, fixture, { stdin: invocation.stdin }))
-					.exitCode,
-			).toBe(0);
-			expect(transcripts()).toHaveLength(2);
-			expect(transcripts()[1]).toBe(transcripts()[0]);
-			expect(
-				stub.requests.filter((request) =>
-					request.pathname.includes("repositoryEvidence"),
-				),
-			).toHaveLength(evidenceCount);
-		} finally {
-			stub.server.stop(true);
-			await rm(original.home, { recursive: true, force: true });
+			repoKey = "pkg:my-project";
+			projectKey = fixture.projectPath;
+		} else if (kind === "rewritten-remote") {
+			execFileSync("git", [
+				"-C",
+				fixture.projectPath,
+				"remote",
+				"set-url",
+				"origin",
+				"pause:opaline-test/pause.git",
+			]);
+			execFileSync("git", [
+				"-C",
+				fixture.projectPath,
+				"config",
+				"url.https://github.com/.insteadOf",
+				"pause:",
+			]);
+		} else {
+			execFileSync("git", [
+				"-C",
+				fixture.projectPath,
+				"remote",
+				"remove",
+				"origin",
+			]);
+			execFileSync("git", [
+				"-C",
+				fixture.projectPath,
+				"-c",
+				"user.name=Test",
+				"-c",
+				"user.email=test@example.test",
+				"commit",
+				"--quiet",
+				"--allow-empty",
+				"-m",
+				"fixture",
+			]);
+			const worktree = join(fixture.home, "linked");
+			execFileSync("git", [
+				"-C",
+				fixture.projectPath,
+				"worktree",
+				"add",
+				"--quiet",
+				"-b",
+				"linked",
+				worktree,
+			]);
+			repoKey = `path-raw:${await realpath(fixture.projectPath)}`;
+			projectKey = await realpath(worktree);
+			fixture = { ...fixture, projectPath: projectKey };
 		}
-	},
-);
-
-test.each(["init", "commit"])(
-	"an unwritable config directory warns but still discards disabled %s evidence",
-	async (stage) => {
-		const fixture = await createCliFixture("claude_code");
 		const config = join(fixture.home, ".rudel");
-		const stub = startEvidenceStub("EVIDENCE_CAPTURE_DISABLED", stage, () =>
-			chmod(config, 0o500),
+		await writeFile(
+			join(config, "projects.json"),
+			JSON.stringify({
+				projects: { [projectKey]: { organizationId: "org" } },
+			}),
 		);
-		try {
-			await prepareEvidenceFixture(fixture, stub.loopbackBase);
-			expect((await runHook(fixture)).exitCode).toBe(0);
-			expect(
-				stub.requests.filter((request) =>
-					request.pathname.endsWith(`repositoryEvidence/${stage}`),
-				),
-			).toHaveLength(1);
-			expect(
-				stub.requests.some(
-					(request) => request.pathname === "/rpc/ingestSession",
-				),
-			).toBe(true);
-			expect(
-				await readdir(join(config, "repository-evidence-pending", "v4")),
-			).toEqual([]);
-			expect(
-				await readdir(join(config, "repository-evidence-sources")),
-			).toEqual([]);
-			const spool = await readdir(join(config, "repo-context-spool"), {
-				recursive: true,
-			});
-			expect(
-				spool.filter(
-					(name) => name.endsWith(".capture.json") || name.endsWith(".blob"),
-				),
-			).toEqual([]);
-			expect(
-				await readFile(join(config, "logs", "hook-upload.log"), "utf8"),
-			).toContain("Could not persist repository evidence pause");
-			expect(readRepositoryEvidencePauseUntil(config)).toBeUndefined();
-		} finally {
-			await chmod(config, 0o700);
-			stub.server.stop(true);
-			await rm(fixture.home, { recursive: true, force: true });
-		}
-	},
-);
+		await writeFile(
+			join(config, "auto-upload.json"),
+			JSON.stringify({
+				version: 1,
+				repositories: { [repoKey]: { label: kind, sources: [hook.source] } },
+			}),
+		);
+		const invocation = hook.buildInvocation(fixture);
+		expect(
+			(await runCli(invocation.command, fixture, { stdin: invocation.stdin }))
+				.exitCode,
+		).toBe(0);
+		const transcripts = () =>
+			stub.bodies.filter(
+				(_, index) => stub.requests[index]?.pathname === "/rpc/ingestSession",
+			);
+		expect(transcripts()).toHaveLength(1);
+		expect(JSON.parse(transcripts()[0] ?? "").json.organizationId).toBe("org");
+		await pauseRepositoryEvidenceCapture(
+			new ORPCError("EVIDENCE_CAPTURE_DISABLED", { status: 403 }),
+			config,
+		);
+		const evidenceCount = stub.requests.filter((request) =>
+			request.pathname.includes("repositoryEvidence"),
+		).length;
+		expect(
+			(await runCli(invocation.command, fixture, { stdin: invocation.stdin }))
+				.exitCode,
+		).toBe(0);
+		expect(transcripts()).toHaveLength(2);
+		expect(transcripts()[1]).toBe(transcripts()[0]);
+		expect(
+			stub.requests.filter((request) =>
+				request.pathname.includes("repositoryEvidence"),
+			),
+		).toHaveLength(evidenceCount);
+	} finally {
+		stub.server.stop(true);
+		await rm(original.home, { recursive: true, force: true });
+	}
+});
+
+test.each([
+	"init",
+	"commit",
+])("an unwritable config directory warns but still discards disabled %s evidence", async (stage) => {
+	const fixture = await createCliFixture("claude_code");
+	const config = join(fixture.home, ".rudel");
+	const stub = startEvidenceStub("EVIDENCE_CAPTURE_DISABLED", stage, () =>
+		chmod(config, 0o500),
+	);
+	try {
+		await prepareEvidenceFixture(fixture, stub.loopbackBase);
+		expect((await runHook(fixture)).exitCode).toBe(0);
+		expect(
+			stub.requests.filter((request) =>
+				request.pathname.endsWith(`repositoryEvidence/${stage}`),
+			),
+		).toHaveLength(1);
+		expect(
+			stub.requests.some(
+				(request) => request.pathname === "/rpc/ingestSession",
+			),
+		).toBe(true);
+		expect(
+			await readdir(join(config, "repository-evidence-pending", "v4")),
+		).toEqual([]);
+		expect(await readdir(join(config, "repository-evidence-sources"))).toEqual(
+			[],
+		);
+		const spool = await readdir(join(config, "repo-context-spool"), {
+			recursive: true,
+		});
+		expect(
+			spool.filter(
+				(name) => name.endsWith(".capture.json") || name.endsWith(".blob"),
+			),
+		).toEqual([]);
+		expect(
+			await readFile(join(config, "logs", "hook-upload.log"), "utf8"),
+		).toContain("Could not persist repository evidence pause");
+		expect(readRepositoryEvidencePauseUntil(config)).toBeUndefined();
+	} finally {
+		await chmod(config, 0o700);
+		stub.server.stop(true);
+		await rm(fixture.home, { recursive: true, force: true });
+	}
+});
 
 test("a disabled pending retry still discards its evidence when the config directory becomes unwritable", async () => {
 	const fixture = await createCliFixture("claude_code");

@@ -612,7 +612,7 @@ describe("filter provenance", () => {
 	 *
 	 * This fingerprint covers the filter's observable output over a fixed corpus.
 	 * If it changes, the filter behaves differently: bump FILTER_VERSION, update
-	 * the filter_version assertions in apps/cli's integration suite, then update
+	 * the filter_version assertions in cli's integration suite, then update
 	 * this constant.
 	 */
 	const OUTPUT_FINGERPRINT =

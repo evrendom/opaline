@@ -1,0 +1,16 @@
+{
+	"extends": "@rudel/typescript-config/base.json",
+	"compilerOptions": {
+		"noEmit": true,
+		"types": ["bun-types"]
+	},
+	"include": [
+		"src",
+		"scripts/chcli-connect.ts",
+		"scripts/bootstrap.ts",
+		"scripts/migrate-f16.ts",
+		"scripts/migrate-f16-ci-prerequisites.ts",
+		"scripts/backfill-subagent-metrics.ts"
+	],
+	"exclude": ["src/generated"]
+}

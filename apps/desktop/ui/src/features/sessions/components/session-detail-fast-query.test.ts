@@ -1,0 +1,295 @@
+import {
+	SessionDetailOverviewSchema,
+	SessionDetailWindowSchema,
+} from "@rudel/api-routes";
+import { SCAN_VERSION } from "@rudel/language-signals";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+	SESSION_DETAIL_BODY_CACHE_TIME_MS,
+	SESSION_DETAIL_OVERVIEW_STALE_TIME_MS,
+	sessionDetailOverviewPageQueryKey,
+	sessionDetailSpineQueryKey,
+	sessionDetailSubagentQueryKey,
+	sessionDetailTurnQueryKey,
+	sessionDetailWindowQueryKey,
+	sessionDetailWindowQueryPrefix,
+	shouldRetrySessionDetailFastQuery,
+} from "./session-detail-fast-query";
+import {
+	parseSessionDetailOverviewResponse,
+	parseSessionDetailWindowResponse,
+} from "./session-detail-fast-response";
+
+const revision = "2026-08-16T08:30:00.123Z";
+
+function overviewFixture() {
+	return SessionDetailOverviewSchema.parse({
+		activityTotals: {
+			edit: 0,
+			error: 0,
+			read: 0,
+			signal: 0,
+			signalScanVersion: 1,
+			skill: 0,
+			subagent: 0,
+			write: 0,
+		},
+		revision,
+		session: {
+			durationMinutes: 90,
+			estimatedCost: 470.945,
+			gitBranch: "main",
+			gitSha: "abc",
+			inputTokens: 1_000,
+			lastInteractionDate: "2026-08-16T09:30:00.123Z",
+			modelUsed: "gpt-5.6-sol",
+			outputTokens: 200,
+			projectPath: "/src/rudel",
+			repository: "rudel/rudel",
+			sessionDate: "2026-08-16T08:00:00.123Z",
+			sessionId: "session-1",
+			skills: ["testing-bun"],
+			slashCommands: [],
+			source: "codex",
+			totalTokens: 1_200,
+			userId: "owner-1",
+		},
+		subagents: [],
+		turnPage: {
+			items: [
+				{
+					activityResolution: "exact",
+					durationSeconds: 60,
+					editedFiles: ["src/index.ts"],
+					endedAt: "2026-08-16T08:01:00.123Z",
+					errorCount: 0,
+					errorEvents: [],
+					estimatedCost: 11.6278,
+					hasBody: true,
+					index: 0,
+					inputTokens: 900,
+					modelSignalCount: 0,
+					outputTokens: 50,
+					responsePreview: "Done",
+					signalCount: 0,
+					signalOccurrences: [],
+					signalOccurrencesOmittedCount: 0,
+					signalOccurrencesTruncated: false,
+					skills: [],
+					skillCount: 0,
+					skillEvents: [],
+					slashCommands: [],
+					startedAt: "2026-08-16T08:00:00.123Z",
+					toolCallCount: 1,
+					turnId: "codex-stable-turn",
+					usageCalls: [],
+					userPreview: "Do the work",
+				},
+			],
+			nextCursor: null,
+			total: 1,
+		},
+	});
+}
+
+describe("session detail fast-path query boundaries", () => {
+	afterEach(() => vi.restoreAllMocks());
+
+	it("keeps the server signal total and logs a client scan-version skew", () => {
+		const fixture = overviewFixture();
+		const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+		const parsed = parseSessionDetailOverviewResponse(
+			{
+				...fixture,
+				activityTotals: {
+					...fixture.activityTotals,
+					signal: 7,
+					signalScanVersion: SCAN_VERSION + 1,
+				},
+			},
+			"session-1",
+		);
+
+		expect(parsed.overview.activityTotals.signal).toBe(7);
+		expect(warn).toHaveBeenCalledWith(
+			"[SessionDetailView] Language signal scan version skew",
+			{
+				clientSignalScanVersion: SCAN_VERSION,
+				serverSignalScanVersion: SCAN_VERSION + 1,
+				sessionId: "session-1",
+			},
+		);
+	});
+
+	it("marks activity totals synthesized for an older API as page-local", () => {
+		vi.spyOn(console, "warn").mockImplementation(() => undefined);
+		const { activityTotals: _activityTotals, ...legacyFixture } =
+			overviewFixture();
+		const parsed = parseSessionDetailOverviewResponse(
+			legacyFixture,
+			"session-1",
+		);
+
+		expect(parsed.overview.activityTotalsScope).toBe("page");
+	});
+
+	it("keeps revision and body identity in every immutable query key", () => {
+		expect(
+			sessionDetailOverviewPageQueryKey({
+				revision,
+				sessionId: "session-1",
+				turnCursor: "cursor-2",
+			}),
+		).toEqual([
+			"session-detail-v2",
+			"overview",
+			"session-1",
+			revision,
+			"cursor-2",
+		]);
+		expect(
+			sessionDetailTurnQueryKey({
+				revision,
+				sessionId: "session-1",
+				turnId: "turn-1",
+			}),
+		).toContain(revision);
+		expect(
+			sessionDetailSubagentQueryKey({
+				revision,
+				sessionId: "session-1",
+				subagentId: "agent-1",
+			}),
+		).toContain("agent-1");
+		expect(
+			sessionDetailSpineQueryKey({ revision, sessionId: "session-1" }),
+		).toEqual(["session-detail-v2", "spine", "session-1", revision]);
+		expect(
+			sessionDetailWindowQueryKey(
+				{
+					anchorTurnId: "turn-20",
+					includeBodies: true,
+					mode: "anchor",
+					revision,
+					sessionId: "session-1",
+				},
+				"skeletons:delay:100",
+			),
+		).toEqual([
+			"session-detail-v2",
+			"window",
+			"session-1",
+			"skeletons:delay:100",
+			expect.objectContaining({
+				anchorTurnId: "turn-20",
+				mode: "anchor",
+				revision,
+			}),
+		]);
+		expect(SESSION_DETAIL_OVERVIEW_STALE_TIME_MS).toBe(60_000);
+		expect(SESSION_DETAIL_BODY_CACHE_TIME_MS).toBe(600_000);
+		expect(sessionDetailWindowQueryPrefix("session-1")).toEqual([
+			"session-detail-v2",
+			"window",
+			"session-1",
+		]);
+	});
+
+	it("retains valid bodies while recovering drifted window summary fields", () => {
+		const summary = overviewFixture().turnPage.items[0];
+		const fixture = SessionDetailWindowSchema.parse({
+			newerCursor: null,
+			olderCursor: null,
+			revision,
+			total: 1,
+			turns: [
+				{
+					...summary,
+					body: {
+						responseItems: [
+							{
+								id: "summary-1",
+								kind: "summary",
+								text: "Finished",
+							},
+						],
+						userItems: [],
+					},
+					bodyOmitted: null,
+				},
+			],
+		});
+		const parsed = parseSessionDetailWindowResponse({
+			...fixture,
+			turns: [{ ...fixture.turns[0], responsePreview: 42 }],
+		});
+
+		expect(parsed.window.turns[0]?.responsePreview).toBeNull();
+		expect(parsed.window.turns[0]?.body?.responseItems[0]).toMatchObject({
+			kind: "summary",
+			text: "Finished",
+		});
+		expect(parsed.shapeIssueFields).toContain("turns.0.responsePreview");
+	});
+
+	it("keeps an oversized turn's chunk totals through a recovered window", () => {
+		const summary = overviewFixture().turnPage.items[0];
+		const bodyChunks = { sha256: "b".repeat(64), totalCodeUnits: 700_000 };
+		const parsed = parseSessionDetailWindowResponse({
+			newerCursor: null,
+			olderCursor: null,
+			revision,
+			total: 1,
+			turns: [
+				{
+					...summary,
+					body: null,
+					bodyChunks,
+					bodyOmitted: "oversized",
+					responsePreview: 42,
+				},
+			],
+		});
+		expect(parsed.window.turns[0]?.bodyChunks).toEqual(bodyChunks);
+		expect(parsed.window.turns[0]?.bodyOmitted).toBe("oversized");
+	});
+
+	it("recovers safe overview fields without retaining invalid drifted values", () => {
+		const fixture = overviewFixture();
+		const parsed = parseSessionDetailOverviewResponse(
+			{
+				...fixture,
+				session: { ...fixture.session, estimatedCost: "stale-cost" },
+				turnPage: {
+					...fixture.turnPage,
+					items: [
+						{
+							...fixture.turnPage.items[0],
+							responsePreview: "x".repeat(200),
+						},
+					],
+				},
+			},
+			"session-1",
+		);
+
+		expect(parsed.overview.session.estimatedCost).toBeNull();
+		expect(parsed.overview.turnPage.items[0]?.responsePreview).toBeNull();
+		expect(parsed.overview.turnPage.items[0]?.turnId).toBe("codex-stable-turn");
+		expect(parsed.shapeIssueFields).toContain("session.estimatedCost");
+		expect(parsed.shapeIssueFields).toContain(
+			"turnPage.items.0.responsePreview",
+		);
+	});
+
+	it("does not retry shape, revision, or typed stale-revision failures", () => {
+		expect(
+			shouldRetrySessionDetailFastQuery(0, {
+				code: "STALE_REVISION",
+			}),
+		).toBe(false);
+		expect(shouldRetrySessionDetailFastQuery(1, new Error("network"))).toBe(
+			false,
+		);
+	});
+});

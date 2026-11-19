@@ -1,0 +1,66 @@
+# September 2026 model identity and pricing update
+
+Verified against first-party documentation on September 30, 2026. These are USD per million tokens for standard first-party API processing, not subscription charges or an invoice reconciliation.
+
+| Model / request date | Uncached input | Cache read | Cache write | Output |
+| --- | ---: | ---: | ---: | ---: |
+| GPT-5.6 Sol, June 26–August 20 | 5 | 0.50 | 6.25 | 30 |
+| GPT-5.6 Sol, August 21 onward | 4 | 0.40 | 5 | 20 |
+| GPT-6 Astra, September 3 onward | 10 | 1 | 12.50 | 50 |
+| GPT-6 Sol, September 22 onward | 2 | 0.20 | 2.50 | 10 |
+| GPT-6 Luna, September 22 onward | 0.10 | 0.01 | 0.125 | 0.50 |
+| GPT-6.1 Sol, September 29 onward | 2 | 0.10 | 2.50 | 10 |
+| Claude Fable 5.1, September 1 onward | 10 | 0.25 | 12.50 (5m) / 20 (1h) | 50 |
+| Claude Mythos 5.1, September 1 onward | 10 | 0.25 | 12.50 (5m) / 20 (1h) | 50 |
+| Claude Opus 5.5, September 22 onward | 4 | 0.20 | 5 (5m) / 8 (1h) | 20 |
+| Claude Sonnet 5.5, September 28 onward | 2 | 0.20 | 2.50 (5m) / 4 (1h) | 10 |
+| Claude Sonnet 5, June 30 onward | 2 | 0.20 | 2.50 (5m) / 4 (1h) | 10 |
+
+GPT-5.6 Sol and the GPT-6 family use 2× input/cache rates and 1.5× output rates above 272,000 input-context tokens. Exactly 272,000 stays in the base band. GPT-6.1 Sol keeps GPT-6 Sol's input, cache-write and output rates but halves cached input to $0.10 ($0.20 long); `gpt-6-sol` and `gpt-6.1-sol` are separate identities. The implementation supports GPT-6 Astra, Sol, 6.1 Sol and Luna Fast/Priority at 2× in either band and the current GPT-5.6 Sol long-context Fast/Priority rates. GPT-6 Astra Ultrafast (`service_tier: "ultrafast"`, from September 29) is 6× every token class in either band ($60/$300 base, $120/$450 long); no other model publishes an Ultrafast rate, so Ultrafast on any other model stays unpriced. Fable 5.1 has no long-context surcharge; US-only inference adds 10% to every token class. Original Fable 5 continues to use its own $1 cache-read rate; a 5.1 model ID never matches the Fable 5 pattern. Mythos 5.1 shares Fable 5.1's rates. Opus 5.5 cache reads are 0.05× input; its Fast mode is 2× ($8/$40) in every token class. Mythos 5.1, Opus 5.5 and Sonnet 5.5 bill the full 1M context at the base rate and take the 10% US-only inference premium. Sonnet 5's launch rate became its standard price: Anthropic cancelled the scheduled September 1 increase to $3/$15 before it took effect, so no Sonnet 5 request is priced at $3/$15.
+
+## Sources and date precision
+
+- [OpenAI API changelog](https://developers.openai.com/api/docs/changelog): GPT-5.6 Sol's reduction announced August 21, Astra released September 3, GPT-6 Sol and Luna released September 22, and GPT-6.1 Sol and Astra Ultrafast released September 29, 2026.
+- [OpenAI pricing](https://developers.openai.com/api/docs/pricing): current GPT-5.6 Sol and GPT-6 family standard, long-context, caching, Fast and Astra Ultrafast rates.
+- [Astra model documentation](https://developers.openai.com/api/docs/models/gpt-6-astra): token rates and context threshold.
+- [GPT-6 Sol documentation](https://developers.openai.com/api/docs/models/gpt-6-sol): model identity, context window and token rates.
+- [GPT-6 Luna documentation](https://developers.openai.com/api/docs/models/gpt-6-luna): model identity, context window and token rates.
+- [GPT-6.1 Sol documentation](https://developers.openai.com/api/docs/models/gpt-6.1-sol): model identity, context window, token rates and Fast multiplier.
+- [Fable 5.1 documentation](https://platform.claude.com/docs/en/models/fable-5-1/overview): September 1 release and token rates.
+- [Mythos 5.1 documentation](https://platform.claude.com/docs/en/models/mythos-5-1/overview): September 1 release, model identity and token rates.
+- [Opus 5.5 documentation](https://platform.claude.com/docs/en/models/opus-5-5/overview): September 22 release, model identity and token rates.
+- [Sonnet 5.5 documentation](https://platform.claude.com/docs/en/models/sonnet-5-5/overview): September 28 release, model identity and token rates.
+- [Anthropic Fast mode](https://platform.claude.com/docs/en/build-with-claude/fast-mode): Opus 5.5 Fast rates.
+- [Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing): Fable 5 versus 5.1 and Opus 5.5 cache rates, full-context pricing, US inference premium and the cancelled Sonnet 5 increase.
+
+The providers publish calendar dates, not an exact intraday billing cutover time in these sources. The existing pricing engine normalizes each request timestamp to a UTC date; tests pin this convention at midnight and with timezone offsets. Do not claim sub-day invoice accuracy from these announcements. Sol's promotion is available **at least through November 21**, not confirmed to end that day. The catalog therefore does not invent a November 22 price increase; reverify when the provider announces another change.
+
+Prices are selected by each usage event's date, never the session's start, upload, or viewing date. Sessions spanning August 20–21 sum old-rate and new-rate requests independently. No price is inferred before a model's release, from another model, or from a session display label. Existing Sol periods remain in the catalog through August 20.
+
+## Required request information
+
+To estimate correctly, retain the provider/model ID, timestamp, uncached input, cached input, separate cache-write classes, output tokens (reasoning tokens must not be counted again), full input-context size, processing tier, inference speed, and billing geography. Unsupported rates, conflicting model/provider evidence or unsupported billing dimensions remain unknown, not zero. Missing dimensions retain the existing standard-processing/default-region assumptions; these estimates do not include subscription billing, negotiated discounts or tool fees. Published Batch/Flex discounts and OpenAI regional-processing rules are not added by this scoped update; explicit unsupported dimensions continue to return unknown.
+
+## Request-level Fast billing
+
+Both overview and detail estimates apply the recorded billing dimensions for each request. Codex reads `info.service_tier`, falling back to the token-count payload's `service_tier`; `default` on the response wins over a requested Fast setting. The tier is not carried forward to a later request that lacks it. [OpenAI renamed Priority processing to Fast mode on July 30, 2026](https://developers.openai.com/api/docs/guides/fast-mode); both `priority` and `fast` identify the same premium, applied once. Codex extraction also accepts `ultrafast`, which is priced only for GPT-6 Astra. Astra and current Sol Fast rates are 2× standard in each supported context band, with the base rate still selected by the request's UTC date.
+
+Claude uses `usage.speed` to identify Fast mode. Its `service_tier: priority` does not itself apply the OpenAI premium. Detail calculations also preserve Claude's inference geography and Codex's recorded model provider, so those dimensions are no longer silently lost. Unsupported Fast rates (including Fable 5.1), unknown tiers, malformed billing fields and unsupported providers remain unpriced in detail. Claude's documented `not_available` geography sentinel retains the existing default-region estimate.
+
+A transcript without billing metadata still produces a standard-rate estimate. It is not proof that Fast was disabled, and current account settings cannot establish the tier used by old requests. The reported September 12 Astra example contains no recorded tier or speed, so its $791.94 estimate remains based on standard rates.
+
+## Existing sessions and display
+
+The overview now displays a recorded main model even if its price is unknown. Synthetic, missing and conflicting usage records do not provide a model identity. Detail summaries recover a recorded primary model when analytics metadata contains a blank or `unknown`/`<synthetic>` placeholder.
+
+For stored `unresolved` events, the read query resolves the preserved raw model against the current dated catalog, then applies the existing timestamp, provider, billing-quality and receipt-consistency checks. This makes existing Astra and Fable 5.1 events priceable without rewriting transcripts, re-uploading sessions or running a database backfill. New ingestion also recognizes those models through the updated catalog version. An unknown future model still displays its recorded identity and remains unpriced.
+
+The daily rollup uses a left ANY metadata join plus a tenant-match filter. This preserves each usage date on the left while retaining one metadata match; the previous inner ANY join could collapse multiple usage dates for one session. Tests cover the two sides of Sol's price change both in a session total and as separate daily rows.
+
+## Forked history and provider display
+
+Codex forks can replay parent token-count records as a dense burst at snapshot creation. Ingestion and detail parsing now use the same replay detector. Excluded records contribute neither new tokens nor cost; a fork with only replayed usage has a known $0 total. Subsequent child requests still use their recorded tier, model and date. Detail totals for those forks come from the surviving request usage rather than legacy cumulative snapshot totals. A copied parent model is not used as proof that a replay-only child ran that model.
+
+When the model identity is absent, the UI uses the session source for display only: Codex shows the OpenAI/Codex icon and `Codex`; Claude sessions with errors and zero recorded tokens show the Claude icon and `Claude (failed start)`. Other Claude sessions without a model use `Claude Code`. These labels are not written into model metadata or used for pricing.
+
+Verified against the five reported local sessions: the three authentication/access failures have no model usage; both August 28 Codex forks have only copied usage, and now show $0 and zero new tokens in detail as well as overview. Regression coverage also checks a fork that continues with a new Fast request and a normal non-fork with closely spaced usage records.

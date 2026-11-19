@@ -1,0 +1,21 @@
+{"timestamp":"2026-03-01T10:00:00.000Z","type":"session_meta","payload":{"id":"direct-era"}}
+{"timestamp":"2026-03-01T10:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<environment_context><cwd>/repo</cwd></environment_context>"}]}}
+{"timestamp":"2026-03-01T10:00:02.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<system_instruction>workspace rules</system_instruction>\n\ninspect the session"}]}}
+{"timestamp":"2026-03-01T10:00:03.000Z","type":"response_item","payload":{"type":"reasoning","summary":[],"encrypted_content":"opaque"}}
+{"timestamp":"2026-03-01T10:00:04.000Z","type":"response_item","payload":{"type":"reasoning","summary":[{"type":"summary_text","text":"Checking the parser"}]}}
+{"timestamp":"2026-03-01T10:00:05.000Z","type":"response_item","payload":{"type":"function_call","name":"exec_command","arguments":"{\"cmd\":\"sed -n '1,220p' src/app.ts\"}","call_id":"direct-read"}}
+{"timestamp":"2026-03-01T10:00:06.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"direct-read","output":"Process exited with code 0\nsource"}}
+{"timestamp":"2026-03-01T10:00:07.000Z","type":"response_item","payload":{"type":"function_call","name":"exec_command","arguments":"{\"cmd\":\"sed -n '1,20p' a.ts | head\"}","call_id":"direct-compound"}}
+{"timestamp":"2026-03-01T10:00:08.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"direct-compound","output":"Process exited with code 0"}}
+{"timestamp":"2026-03-01T10:00:09.000Z","type":"response_item","payload":{"type":"function_call","name":"exec_command","arguments":"{\"cmd\":\"sed -n '1,20p' a.ts b.ts\"}","call_id":"direct-multi"}}
+{"timestamp":"2026-03-01T10:00:10.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"direct-multi","output":"Process exited with code 0"}}
+{"timestamp":"2026-03-01T10:00:11.000Z","type":"response_item","payload":{"type":"function_call","name":"write_stdin","arguments":"{\"session_id\":12,\"chars\":\"\"}","call_id":"poll"}}
+{"timestamp":"2026-03-01T10:00:12.000Z","type":"response_item","payload":{"type":"function_call","name":"write_stdin","arguments":"{\"session_id\":12,\"chars\":\"\\u0003\"}","call_id":"input"}}
+{"timestamp":"2026-03-01T10:00:13.000Z","type":"response_item","payload":{"type":"custom_tool_call","name":"apply_patch","input":"*** Begin Patch\n*** Add File: src/new.ts\n+new\n*** Update File: src/old.ts\n*** Move to: src/moved.ts\n@@\n-old\n+new\n*** Delete File: src/gone.ts\n-gone\n*** End Patch","call_id":"direct-patch"}}
+{"timestamp":"2026-03-01T10:00:14.000Z","type":"response_item","payload":{"type":"custom_tool_call_output","call_id":"direct-patch","output":"Success"}}
+{"timestamp":"2026-03-01T10:00:15.000Z","type":"response_item","payload":{"type":"function_call","name":"view_image","arguments":"{\"path\":\"art/shot.png\",\"detail\":\"original\"}","call_id":"view"}}
+{"timestamp":"2026-03-01T10:00:16.000Z","type":"response_item","payload":{"type":"function_call","name":"update_plan","arguments":"{\"explanation\":\"Work in order\",\"plan\":[{\"step\":\"Parse\",\"status\":\"completed\"},{\"step\":\"Render\",\"status\":\"in_progress\"}]}","call_id":"plan"}}
+{"timestamp":"2026-03-01T10:00:17.000Z","type":"response_item","payload":{"type":"function_call","name":"exec_command","arguments":"{\"cmd\":\"missing-command\"}","call_id":"failure"}}
+{"timestamp":"2026-03-01T10:00:18.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"failure","output":[{"type":"input_text","text":"Process exited with code 127\ncommand not found"}]}}
+{"timestamp":"2026-03-01T10:00:19.000Z","type":"response_item","payload":{"type":"function_call","name":"spawn_agent","arguments":"{\"task_name\":\"review\",\"message\":\"Review it\"}","call_id":"spawn"}}
+{"timestamp":"2026-03-01T10:00:20.000Z","type":"response_item","payload":{"type":"function_call","name":"send_message","arguments":"{\"target\":\"review\",\"message\":\"Status?\"}","call_id":"send"}}

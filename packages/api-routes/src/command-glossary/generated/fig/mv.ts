@@ -1,0 +1,4 @@
+// Generated from @withfig/autocomplete (MIT, Hercules Labs Inc.). Do not edit.
+import type { FigSpec } from "../../fig-spec.js";
+
+export default JSON.parse("{\"n\":[\"mv\"],\"d\":\"Move & rename files and folders\",\"o\":[{\"n\":[\"-f\"],\"d\":\"Do not prompt for confirmation before overwriting the destination path\"},{\"n\":[\"-i\"],\"d\":\"Cause mv to write a prompt to standard error before moving a file that would overwrite an existing file\"},{\"n\":[\"-n\"],\"d\":\"Do not overwrite existing file\"},{\"n\":[\"-v\"],\"d\":\"Cause mv to be verbose, showing files after they are moved\"}],\"a\":[{\"n\":\"source\",\"v\":1},{\"n\":\"target\"}]}") as FigSpec;

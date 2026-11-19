@@ -1,0 +1,68 @@
+CREATE TABLE "organization_monthly_usage" (
+	"organization_id" text NOT NULL,
+	"month_start" date NOT NULL,
+	"agent_runs" integer DEFAULT 0 NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "organization_monthly_usage_pkey" PRIMARY KEY("organization_id","month_start"),
+	CONSTRAINT "organization_monthly_usage_agent_runs_check" CHECK ("organization_monthly_usage"."agent_runs" >= 0)
+);
+--> statement-breakpoint
+ALTER TABLE "organization_monthly_usage" ADD CONSTRAINT "organization_monthly_usage_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;
+--> statement-breakpoint
+INSERT INTO organization_monthly_usage (organization_id, month_start, agent_runs)
+SELECT
+	organization_id,
+	date_trunc('month', created_at AT TIME ZONE 'UTC')::date,
+	COUNT(*)::integer
+FROM session_ownership
+GROUP BY organization_id, date_trunc('month', created_at AT TIME ZONE 'UTC')::date
+ON CONFLICT (organization_id, month_start) DO UPDATE
+SET agent_runs = EXCLUDED.agent_runs, updated_at = NOW();
+--> statement-breakpoint
+CREATE OR REPLACE FUNCTION enforce_free_workspace_agent_run_limit()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+	usage_count integer;
+	usage_month date := date_trunc('month', CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date;
+BEGIN
+	PERFORM pg_advisory_xact_lock(731826, hashtext(NEW.organization_id));
+	IF EXISTS (
+		SELECT 1
+		FROM session_ownership
+		WHERE organization_id = NEW.organization_id
+			AND session_id = NEW.session_id
+	) THEN
+		RETURN NEW;
+	END IF;
+	IF EXISTS (
+		SELECT 1
+		FROM billing_subscription
+		WHERE organization_id = NEW.organization_id
+			AND status IN ('active', 'trialing')
+	) THEN
+		RETURN NEW;
+	END IF;
+	INSERT INTO organization_monthly_usage (
+		organization_id, month_start, agent_runs, updated_at
+	) VALUES (
+		NEW.organization_id, usage_month, 1, NOW()
+	)
+	ON CONFLICT (organization_id, month_start) DO UPDATE
+	SET agent_runs = organization_monthly_usage.agent_runs + 1,
+		updated_at = NOW()
+	WHERE organization_monthly_usage.agent_runs < 50000
+	RETURNING agent_runs INTO usage_count;
+	IF usage_count IS NULL THEN
+		RAISE EXCEPTION 'Free workspaces support up to 50000 agent runs per month'
+			USING ERRCODE = '23514';
+	END IF;
+	RETURN NEW;
+END;
+$$;
+--> statement-breakpoint
+CREATE TRIGGER session_ownership_free_workspace_agent_run_limit
+BEFORE INSERT ON session_ownership
+FOR EACH ROW
+EXECUTE FUNCTION enforce_free_workspace_agent_run_limit();
