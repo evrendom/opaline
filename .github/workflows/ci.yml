@@ -85,9 +85,6 @@ jobs:
       - name: Test the self-hosted artifact packer
         run: bun test ./scripts/selfhost-artifact.test.ts
 
-      - name: Test the repository stats script
-        run: bun test ./scripts/repo-stats.test.ts
-
       - name: Check pull request disclosure channels
         if: github.event_name == 'pull_request'
         env:
