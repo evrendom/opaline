@@ -291,7 +291,7 @@ export function createR2IngestMaterializationGate(input: {
  * only a resident Bun server (self-hosted, local, or a Fly-style worker).
  * Vercel functions of the main project never do, whatever their environment
  * says (fail closed); production runs large sessions in the separate
- * large-ingest deployment (`deploy/cloud/large-ingest`), whose worker builds its
+ * large-ingest deployment (the hosted service's large-ingest project), whose worker builds its
  * own gate after checking `R2_LARGE_INGEST_WORKER` and its memory.
  */
 export function canMaterializeLargeR2IngestJobs(

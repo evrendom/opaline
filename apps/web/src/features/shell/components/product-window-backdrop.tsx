@@ -11,7 +11,7 @@ import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import { getCanonicalAppPath } from "@/app/routes";
 import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
-import { initializeHeroCanvas } from "../../../../../marketing/src/scripts/hero-canvas";
+import { initializeHeroCanvas } from "../../../site/scripts/hero-canvas";
 import type { CliConnectionTone } from "../../cli-onboarding/cli-connection-state";
 import { useDesktop } from "../../desktop/desktop-bridge";
 import "../product-window-chrome.css";

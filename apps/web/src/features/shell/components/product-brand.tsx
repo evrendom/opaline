@@ -1,5 +1,5 @@
-import opalineWordmarkUrl from "../../../../../marketing/src/assets/opaline-wordmark-nav-small.svg?url";
-import opalineWordmarkDarkUrl from "../../../../../marketing/src/assets/opaline-wordmark-nav-small-dark.svg?url";
+import opalineWordmarkUrl from "../../../site/assets/opaline-wordmark-nav-small.svg?url";
+import opalineWordmarkDarkUrl from "../../../site/assets/opaline-wordmark-nav-small-dark.svg?url";
 import "../product-window-chrome.css";
 
 // Both wordmarks render and CSS shows the one for the current theme, so the

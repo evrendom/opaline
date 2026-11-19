@@ -373,7 +373,7 @@ C = Claude Code; X = Codex. Versions below are the first readable representation
 
 ## Order of work
 
-Existing data is brought up to each step with the backfills, in the order and with the checks of the [backfill runbook](l1-backfill-runbook.md).
+Existing data is brought up to each step with the backfills, in the order and with the checks of the backfill runbook.
 
 1. This spec and step 1 of the retirement. Done.
 2. Retirement step 2. Done.

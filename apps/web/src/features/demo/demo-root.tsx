@@ -20,7 +20,7 @@ import { SessionsPage } from "@/features/sessions/sessions-page";
 import { toLastSessionUpload } from "@/features/shell/components/last-session-upload-bar";
 import { WorkspaceStateProvider } from "@/features/workspace/organization/OrganizationProvider";
 import { orpc } from "@/lib/orpc";
-import { ensureLiveDemoSession } from "../../../../marketing/src/scripts/live-demo";
+import { ensureLiveDemoSession } from "../../site/scripts/live-demo";
 import {
 	getDemoActive,
 	getDemoServerActive,

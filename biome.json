@@ -10,12 +10,9 @@
 		"includes": [
 			"apps/**",
 			"packages/**",
-			"scripts/trends/**",
 			"convex/**",
 			"*.json",
 			"!**/generated",
-			"!apps/marketing/public/vendor",
-			"!apps/marketing/src/styles/vendor",
 			"!apps/desktop/main.js",
 			"!apps/desktop/analyze.js",
 			"!apps/desktop/preload.js",

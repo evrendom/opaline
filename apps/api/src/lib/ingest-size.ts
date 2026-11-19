@@ -26,7 +26,7 @@ export const STANDARD_SESSION_MAX_BYTES = INGEST_DIRECT_CONTENT_MAX_BYTES;
 
 /**
  * R2 sessions above this size are materialized in production only by the
- * large-ingest worker (`deploy/cloud/large-ingest`, 4 GB, one job per process). The
+ * large-ingest worker (the hosted service's large-ingest project, 4 GB, one job per process). The
  * main Vercel project's functions (2 GB commit with several requests per
  * instance, 1 GB recovery cron) never materialize them: peak memory is about
  * ten times the session size. Per-session budgets still scale from

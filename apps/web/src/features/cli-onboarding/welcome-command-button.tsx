@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { InstallCommandButton } from "../../../../marketing/src/components/install-command-button";
+import { InstallCommandButton } from "../../site/components/install-command-button";
 
 export function WelcomeCommandButton({
 	displayCommand,

@@ -17,7 +17,7 @@
 	corner-shape: round;
 }
 
-/* Opaline's sheen: the marketing gradient's stops (apps/marketing tokens.css,
+/* Opaline's sheen: the marketing gradient's stops (the website's tokens.css,
    --instant-v2-glimm-*) run blue → indigo → purple → pink. opal-1…opal-5 are
    five evenly spaced stops along it, interpolated in OKLCH; each -tint keeps
    the hue at a pale lightness for fills (a deep one in dark mode, below). */

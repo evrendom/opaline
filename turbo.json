@@ -33,6 +33,5 @@
 				"SESSION_LINEAGE_RECONCILE_BATCH_SIZE"
 			]
 		}
-	},
-	"globalDependencies": ["deploy/cloud/vercel.json"]
+	}
 }

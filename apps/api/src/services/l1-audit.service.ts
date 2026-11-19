@@ -25,7 +25,7 @@ import {
 import { TRANSCRIPT_RECORDS_TABLE } from "./transcript-records-ingest.service.js";
 
 /**
- * The L1 audit behind `audit:l1` (docs/l1-backfill-runbook.md): a read-only
+ * The L1 audit behind `audit:l1`: a read-only
  * report of where an organization (or every one) stands on the L1 layers,
  * taken before and after each backfill step and compared.
  *

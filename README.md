@@ -33,24 +33,11 @@ bash apps/desktop/package.sh
 
 `package.sh` builds the server and web app from your checkout and writes `Opaline.app` and `Opaline.dmg` to `~/.cache/opaline-desktop/package`. For day-to-day development, see [CONTRIBUTING.md](.github/CONTRIBUTING.md).
 
-## Run a server for your team
-
-The Mac app is for one person. For a team, run the same server, dashboard and MCP endpoint with Postgres and ClickHouse on a NAS, VM or small server using the Docker Compose stack in [`deploy/selfhost`](deploy/selfhost/README.md):
-
-```bash
-bun install
-bun run build:selfhost --version 0.18.0
-deploy/selfhost/install.sh --artifact dist-selfhost/opaline-server-0.18.0.tgz --email you@example.com
-```
-
-Each teammate then connects with `npx opaline@latest login --api-base <your server>`. See [docs/self-hosting.md](docs/self-hosting.md) for HTTPS, your own ClickHouse, GitHub pull requests and CI, and backups.
-
 ## The CLI
 
-The `opaline` command (`apps/cli`, published to npm as `opaline`, `@opalinehq/cli` and `rudel`) finds saved Claude Code and Codex sessions on a computer, uploads them to an Opaline server, and keeps new ones in sync. You need it to send sessions from other computers to a team server; the Mac app reads the sessions on your Mac without it.
+The `opaline` command (`apps/cli`, published to npm as `opaline`, `@opalinehq/cli` and `rudel`) finds saved Claude Code and Codex sessions on a computer, uploads them to Opaline at [opaline.so](https://opaline.so), and keeps new ones in sync. The Mac app does not need it: it reads the sessions on your Mac directly.
 
 ```bash
-npx opaline@latest login --api-base https://opaline.example.com
 npx opaline@latest
 ```
 
@@ -68,13 +55,10 @@ Session transcripts contain whatever your agents saw: source code, prompts, comm
 | `packages/local-server` | Runs the local server, Postgres and ClickHouse for the app |
 | `apps/api` | The server: ingest, analysis, MCP |
 | `apps/web` | The dashboard |
-| `apps/marketing` | The website |
 | `apps/cli` | The CLI (npm `opaline`, `@opalinehq/cli`, `rudel`), with its launchers in `packages/opaline` and `packages/rudel-alias` |
 | `apps/cli-harness` | An older CLI copy that the API integration and version-skew tests run against; not published |
 | `plugin` | The Claude Code and Codex plugin; the Mac app installs it from "Connect your agents" |
-| `deploy/selfhost` | The Docker Compose stack for a team server |
-| `deploy/dev` | Postgres and ClickHouse for local development (`bun run infra:up`) |
-| `deploy/cloud` | The hosted service's Vercel functions, Convex functions and load tests; not used by the Mac app or a self-hosted server |
+| `scripts` | Build and development scripts; `scripts/dev-compose.yml` starts Postgres and ClickHouse for local development (`bun run infra:up`) |
 | `packages/*` | Shared packages: schemas, transcript parsing, secret filter |
 
 ## Contributing and security

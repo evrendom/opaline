@@ -17,7 +17,7 @@ import { getCliConnectionTone } from "./cli-connection-state";
 import { CliOnboardingContent } from "./cli-onboarding-content";
 import { getInvitedWorkspaceId } from "./invited-workspace-onboarding";
 import { useCliOnboarding } from "./use-cli-onboarding";
-import "../../../../marketing/src/components/InstantV2DemoExperience.css";
+import "../../site/components/InstantV2DemoExperience.css";
 
 export function CliOnboardingPage() {
 	const selfHost = useSelfHost();

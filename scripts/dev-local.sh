@@ -2,7 +2,7 @@
 set -e
 
 # 1. Start Postgres + ClickHouse (idempotent)
-docker compose -f deploy/dev/compose.yml up -d --wait
+docker compose -f scripts/dev-compose.yml up -d --wait
 
 # 2. Run Postgres migrations (idempotent — skips already-applied)
 PG_CONNECTION_STRING=postgres://postgres:postgres@localhost:5432/rudel \

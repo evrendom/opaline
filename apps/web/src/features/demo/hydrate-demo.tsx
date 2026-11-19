@@ -1,6 +1,6 @@
 import { flushSync } from "react-dom";
 import { hydrateRoot } from "react-dom/client";
-import { usesSafariDemoMotion } from "../../../../marketing/src/scripts/demo-browser";
+import { usesSafariDemoMotion } from "../../site/scripts/demo-browser";
 import { DemoRoot } from "./demo-root";
 import { DemoSeedSchema } from "./demo-runtime";
 

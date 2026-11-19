@@ -12,14 +12,9 @@ import { join, relative } from "node:path";
 // `withPostgresLease` (services/postgres-lease.service.ts) for longer work.
 
 const API_SOURCE_ROOT = join(import.meta.dir, "..");
-const REPOSITORY_ROOT = join(API_SOURCE_ROOT, "..", "..", "..");
-const FUNCTION_SOURCE_ROOT = join(REPOSITORY_ROOT, "deploy", "cloud", "api");
 
 test("no API source depends on Postgres session state", () => {
-	const files = [
-		...sourceFiles(API_SOURCE_ROOT),
-		...sourceFiles(FUNCTION_SOURCE_ROOT),
-	];
+	const files = sourceFiles(API_SOURCE_ROOT);
 	expect(files).toContain(
 		join(API_SOURCE_ROOT, "services/github-repository-sweep.service.ts"),
 	);

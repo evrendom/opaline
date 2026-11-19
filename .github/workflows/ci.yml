@@ -45,7 +45,7 @@ jobs:
           predicate-quantifier: every
           filters: |
             integration:
-              - "{apps/api/**,apps/cli/**,apps/cli-harness/**,apps/marketing/**,packages/**,scripts/**,.github/actions/setup/**,.github/workflows/ci.yml,bun.lock,package.json,turbo.json,deploy/cloud/vercel.json}"
+              - "{apps/api/**,apps/cli/**,apps/cli-harness/**,packages/**,scripts/**,.github/actions/setup/**,.github/workflows/ci.yml,bun.lock,package.json,turbo.json}"
               - "!apps/api/src/mcp/**"
               - "!apps/api/src/handlers/mcp-http*"
               - "!**/*.md"
@@ -96,21 +96,15 @@ jobs:
       - name: Verify
         run: |
           bun run turbo run lint check-types test --concurrency=1
-          bun run check-types:vercel
 
-      # build:site below builds the web and marketing workspaces once.
-      - name: Build API and CLI
-        run: bun run turbo run build --filter='!@rudel/web' --filter='!@rudel/marketing' --concurrency=1
-
-      - name: Build combined marketing, demo, and product
-        run: bun run build:site
+      - name: Build
+        run: bun run turbo run build --concurrency=1
 
       - name: Verify browser resource budgets in Chrome
         run: bun run --cwd apps/web test:resource-budgets:chrome
 
   integration:
-    # Pushes to main follow the same filter (the production deploy accepts a
-    # skip); manual deploys always run it.
+    # Pushes to main follow the same filter; manual runs always run it.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       ((github.event_name == 'push' ||
@@ -233,18 +227,6 @@ jobs:
       - name: Run integration tests
         run: bun run turbo run test:integration --concurrency=1 --log-order=stream
 
-      - name: Verify homepage authentication routing
-        env:
-          APP_URL: http://localhost
-          ALLOWED_ORIGIN: http://localhost
-          BETTER_AUTH_SECRET: test-secret-for-integration-tests
-          NODE_ENV: test
-        run: |
-          bun run --cwd apps/marketing build
-          mkdir -p dist-site
-          cp apps/marketing/dist/index.html dist-site/marketing.html
-          bun test ./apps/api/src/__tests__/vercel-home.integration.ts
-
       - name: Fetch the published rudel@0.1.17 CLI
         run: |
           mkdir -p .tmp/old-cli
@@ -256,49 +238,6 @@ jobs:
         run: bun run --cwd apps/cli-harness test:integration:skew
         env:
           RUDEL_OLD_CLI_PATH: ${{ github.workspace }}/.tmp/old-cli/package/dist/cli.js
-
-  main-head:
-    if: >-
-      ${{ !cancelled() &&
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/main' &&
-      needs.verify.result == 'success' &&
-      (needs.integration.result == 'success' ||
-      needs.integration.result == 'skipped') }}
-    needs: [verify, integration]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 2
-    outputs:
-      current: ${{ steps.head.outputs.current }}
-    steps:
-      # The production deploy lock keeps one pending deploy and cancels any
-      # older pending one, so a superseded commit that finishes CI late would
-      # cancel the deploy of main's HEAD, and then nothing is promoted.
-      - name: Is this commit still main's HEAD
-        id: head
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          head_sha="$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq .sha)"
-          if [[ "${head_sha}" == "${GITHUB_SHA}" ]]; then
-            echo "current=true" >> "${GITHUB_OUTPUT}"
-          else
-            echo "current=false" >> "${GITHUB_OUTPUT}"
-            echo "Skipping deploy: main has moved to ${head_sha}, whose run deploys this commit too." >> "${GITHUB_STEP_SUMMARY}"
-          fi
-
-  deploy-vercel:
-    if: >-
-      ${{ !cancelled() &&
-      github.repository == 'opalinehq/athena' &&
-      needs.main-head.outputs.current == 'true' }}
-    needs: [verify, integration, main-head]
-    uses: ./.github/workflows/vercel.yml
-    with:
-      target: production
-    secrets:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      PG_CONNECTION_STRING: ${{ secrets.PG_CONNECTION_STRING }}
 
   cli-smoke:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false

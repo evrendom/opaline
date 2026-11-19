@@ -25,13 +25,7 @@ A platform for ingesting, storing, and analyzing Claude Code / Codex session tra
 | `packages/sql-schema` (`@rudel/sql-schema`) | Drizzle ORM schema for Postgres auth tables (`user`, `session`, `account`, `verification`, `user_avatar`). |
 | `packages/typescript-config` (`@rudel/typescript-config`) | Shared `tsconfig` base files (`base.json`, `node.json`, `react-library.json`). |
 
-### Deploy
-
-| Directory | Description |
-|-----------|-------------|
-| `deploy/selfhost` | Docker Compose stack for a self-hosted team server. |
-| `deploy/dev` | `compose.yml` with Postgres and ClickHouse for local development (`bun run infra:up`). |
-| `deploy/cloud` | The hosted service: Vercel functions (`api/`, `vercel.json`, `large-ingest/`), Convex functions (`convex/`), load tests (`load-test/`). It deploys from the original private repository, not from this one. |
+Local development databases: `scripts/dev-compose.yml` starts Postgres and ClickHouse (`bun run infra:up`).
 
 ### Dependency Graph
 
@@ -56,7 +50,7 @@ A platform for ingesting, storing, and analyzing Claude Code / Codex session tra
 | `R2_ACCOUNT_ID` | No | Cloudflare account ID for the EU-jurisdiction `opaline-ingest-prod` bucket. Direct-to-R2 ingest is disabled unless all three R2 variables are set. |
 | `R2_ACCESS_KEY_ID` | No | Bucket-scoped R2 S3 access key ID. |
 | `R2_SECRET_ACCESS_KEY` | No | Bucket-scoped R2 S3 secret access key. |
-| `R2_LARGE_INGEST_WORKER` | Large-ingest project only | Set to exactly `true` only on the separate large-ingest Vercel project (`deploy/cloud/large-ingest`, Function CPU Performance, 4 GB). Its cron then claims and materializes R2 sessions above 48 MiB (`LARGE_INGEST_MIN_BYTES`), one per process. The worker refuses to run with any other value or below 3,500 MB of function memory. The main project never runs the large path, even if this is set there (fail closed). Resident Bun servers (self-hosted, local) materialize large sessions without it. |
+| `R2_LARGE_INGEST_WORKER` | Large-ingest project only | Set to exactly `true` only on the separate large-ingest Vercel project (the hosted service's large-ingest project, Function CPU Performance, 4 GB). Its cron then claims and materializes R2 sessions above 48 MiB (`LARGE_INGEST_MIN_BYTES`), one per process. The worker refuses to run with any other value or below 3,500 MB of function memory. The main project never runs the large path, even if this is set there (fail closed). Resident Bun servers (self-hosted, local) materialize large sessions without it. |
 | `REPOSITORY_EVIDENCE_CAPTURE_ENABLED` | No | Server-controlled repository-evidence capture off switch. Only the exact value `false` disables `repositoryEvidence.init` and `commit`; missing and other values keep capture enabled. Transcript ingest is unaffected. |
 | `REPOSITORY_EVIDENCE_CAPTURE_PAUSE_SECONDS` | No | CLI pause duration returned when repository-evidence capture is disabled (default: 86,400 seconds; clamped to 3,600–604,800). Missing or non-finite values use the default. |
 | `GITHUB_EVIDENCE_UI_ENABLED` | No | Global kill switch for Merged PRs, CI runs, CI failures / PR and the GitHub settings page and onboarding step. Dashboard visibility also requires per-organization readiness or an explicit forced preview; forced organizations (`GITHUB_EVIDENCE_UI_FORCE_ORG_IDS`) see all of it without this flag. Collection, persistence, cron, and webhooks run regardless. Only the exact value `true` enables it; missing and invalid values fail closed (default: off, including local dev). |
@@ -74,8 +68,8 @@ A platform for ingesting, storing, and analyzing Claude Code / Codex session tra
 | `CH_MIGRATE_SKIP_CONFIRMED_SHA` | No | Outage-only operator override for production builds: the full commit SHA that may deploy without its ClickHouse forward migrations while ClickHouse is unreachable. Set it only after confirming that commit changes no ClickHouse schema (`packages/ch-schema`), and remove it after the deploy. The deploy workflow passes `CH_DEPLOY_SHA`. |
 | `APP_URL` | No | API base URL (default: `http://localhost:4010`) |
 | `ALLOWED_ORIGIN` | No | CORS origin (default: `http://localhost:4011`) |
-| `OPALINE_SELF_HOSTED` | No | `1` makes the server a single-team self-hosted install (`apps/api/src/selfhost/main.ts` sets it): every workspace gate open, no billing, no Stripe/PostHog/Sentry/Slack calls, jobs run in process, `/api/selfhost/*` exists. Anything that only applies to it checks `isSelfHosted()` (`lib/self-hosted.ts`), so production is unchanged. See [docs/self-hosting.md](docs/self-hosting.md). |
-| `OPALINE_SETUP_TOKEN` | Self-hosted | Shared secret (16+ characters) between whatever starts the server (the Mac app's local server, `deploy/selfhost/install.sh`) and the server: `POST /api/selfhost/setup` (`X-Opaline-Setup-Token`) creates the owner account while no account exists, and `POST /api/selfhost/login-link` with it makes a sign-in link for any account. Unset: setup answers 403. |
+| `OPALINE_SELF_HOSTED` | No | `1` makes the server a single-team self-hosted install (`apps/api/src/selfhost/main.ts` sets it): every workspace gate open, no billing, no Stripe/PostHog/Sentry/Slack calls, jobs run in process, `/api/selfhost/*` exists. Anything that only applies to it checks `isSelfHosted()` (`lib/self-hosted.ts`), so production is unchanged. |
+| `OPALINE_SETUP_TOKEN` | Self-hosted | Shared secret (16+ characters) between whatever starts the server (the Mac app's local server) and the server: `POST /api/selfhost/setup` (`X-Opaline-Setup-Token`) creates the owner account while no account exists, and `POST /api/selfhost/login-link` with it makes a sign-in link for any account. Unset: setup answers 403. |
 | `OPALINE_DATA_DIR` | Self-hosted | Directory for server files; the local object store lives in `<dir>/object-store` unless `S3_*` or `R2_*` select another store. |
 | `OPALINE_WEB_DIR` | Self-hosted | The built web app (`apps/web/dist`, with `dist-plugin` next to it); must contain `index.html`. Unset: API only. |
 | `OPALINE_VERSION` | Self-hosted | Version reported by `GET /api/selfhost/info` (default `dev`). |
@@ -153,8 +147,8 @@ A platform for ingesting, storing, and analyzing Claude Code / Codex session tra
 | `ANALYSIS_LOG_WORKSPACES` | No | Comma-separated workspace (organization) ids whose find/read calls are captured and who may use analysis history, or `*` for every workspace. Empty or missing means nobody, even with a store configured (default: off). `*` mixed with ids is a configuration error: it is logged and nobody is captured. Where the log is off, the `analyses` MCP tool tells the agent to continue with find and read. Account and workspace purges clean every workspace regardless. |
 | `ANALYSIS_LOG_RESTRICTED_WORKSPACES` | No | Comma-separated workspace (organization) ids, or `*` for every workspace, that restrict stored find/read results in shared analyses: a non-admin reads a result only when every session the query read is their own. Applies only to workspaces with the own-sessions-only option on (`organization.own_sessions_only`, ADR 0004), which is off for every workspace; elsewhere it restricts nothing. Empty or missing means nobody, so anyone who can see an analysis reads all its stored results (default: off); `*` mixed with ids is logged and restricts every workspace. Analysis visibility itself is unchanged. |
 | `CONVEX_URL` | Convex only | Analysis-log deployment URL (`https://<deployment>.convex.cloud`). Account and workspace purges clean this deployment whenever it is set, whatever `ANALYSIS_LOG_STORE` says, and fail (to be retried) without a valid signing key. `ANALYSIS_LOG_STORE=convex` without this or the key logs an error and keeps capture off. Keep it set while the deployment holds analyses. |
-| `ANALYSIS_LOG_PURGE_BACKENDS` | Convex or Postgres store | Comma-separated backends that may hold analyses (`convex`, `postgres`). A declared `postgres` makes every account and workspace purge clean the `analysis_log_*` tables. Purges fail, to be retried, while a declared backend lacks working configuration (`convex` without `CONVEX_URL` or a valid signing key), so losing configuration can never acknowledge a deletion without cleaning. `ANALYSIS_LOG_STORE=convex` captures only when `convex` is declared. Removing `convex` is the explicit decommission step in `deploy/cloud/convex/README.md`. |
-| `ANALYSIS_LOG_SIGNING_KEY` | Convex only | The API's private ES256 JWK; it signs the short-lived tokens Convex accepts. Its public half is the Convex deployment's `ANALYSIS_LOG_JWKS`. Create both with `bun run --cwd apps/api analysis-log:keys` (see `deploy/cloud/convex/README.md`). Server-only. |
+| `ANALYSIS_LOG_PURGE_BACKENDS` | Convex or Postgres store | Comma-separated backends that may hold analyses (`convex`, `postgres`). A declared `postgres` makes every account and workspace purge clean the `analysis_log_*` tables. Purges fail, to be retried, while a declared backend lacks working configuration (`convex` without `CONVEX_URL` or a valid signing key), so losing configuration can never acknowledge a deletion without cleaning. `ANALYSIS_LOG_STORE=convex` captures only when `convex` is declared. Removing `convex` is the explicit decommission step for the hosted service's Convex deployment. |
+| `ANALYSIS_LOG_SIGNING_KEY` | Convex only | The API's private ES256 JWK; it signs the short-lived tokens Convex accepts. Its public half is the Convex deployment's `ANALYSIS_LOG_JWKS`. Create both with `bun run --cwd apps/api analysis-log:keys`. Server-only. |
 | `OPENAI_API_KEY` | No | Embeddings (`text-embedding-3-small`) for searching past analyses by meaning; only the question title and topics of a saved analysis are sent, when it is saved. Required by `ANALYSIS_LOG_STORE=convex` (capture stays off without it); the memory and Postgres stores fall back to local word vectors. Every stored vector records its model and searches compare only vectors of the current model. |
 | `PRODUCT_ANALYTICS_EXCLUDED_ORG_IDS` | No | Comma-separated workspace (organization) IDs whose members the API never sends to PostHog: server events, signup events and the billing traits that the daily billing cron re-sends for every member of a paid workspace. Use it for test and seed workspaces. Empty or missing excludes nobody. A user who joins such a workspace after signing up still sends that signup event. |
 | `RESEND_API_KEY` | No | Resend API key for email integration |
@@ -206,7 +200,7 @@ Open **http://localhost:4011** in your browser. Sign up with email/password to c
 
 Environment is hardcoded in the script: local Postgres (`postgres://postgres:postgres@localhost:5432/rudel`), local ClickHouse (`http://localhost:8123`, password: `clickhouse`), and a static auth secret.
 
-Manage containers separately: `bun run infra:up` / `bun run infra:down`. To wipe all data and start fresh: `docker compose down -v`.
+Manage containers separately: `bun run infra:up` / `bun run infra:down`. To wipe all data and start fresh: `docker compose -f scripts/dev-compose.yml down -v`.
 
 Hosted-service operations live in the core team's private ops repo.
 
@@ -239,7 +233,7 @@ Shared avatar constants (size caps, MIME allowlist, regex patterns) live in `pac
 
 ## Self-Hosting
 
-See [docs/self-hosting.md](docs/self-hosting.md): the Mac app (`apps/desktop`, with `packages/local-server`) runs Opaline on one Mac, and `deploy/selfhost` runs it as a Docker Compose stack on a NAS or server for a team. The published CLI has no `opaline server` command yet. The entry point is `apps/api/src/selfhost/main.ts` (env checks, migrations, schema, HTTP, scheduler in `selfhost/scheduler.ts`); the `/api/selfhost/*` routes are in `handlers/selfhost-http.ts`. Self-hosted behaviour stays behind `isSelfHosted()` so production does not change.
+The Mac app (`apps/desktop`, with `packages/local-server`) runs this server in self-hosted mode on one Mac. The entry point is `apps/api/src/selfhost/main.ts` (env checks, migrations, schema, HTTP, scheduler in `selfhost/scheduler.ts`); the `/api/selfhost/*` routes are in `handlers/selfhost-http.ts`. Self-hosted behaviour stays behind `isSelfHosted()`. The hosted service (Vercel functions, Convex, the website, the Docker team server) is not in this repository.
 
 ## ClickHouse Schema Management (chkit)
 
@@ -435,7 +429,7 @@ Sessions up to 128 MiB ("standard", `STANDARD_SESSION_MAX_BYTES` in `apps/api/sr
 
 - is never materialized inside `ingest.commit`. The commit stores its receipt as `R2_INGEST_COMMIT_QUEUED` and answers the retryable 503 with `queued: true`; the CLI polls `ingest.status`.
 - is never selected by the main Vercel project. Its 2 GB ingest and 1 GB cron functions materialize and recover only jobs up to 48 MiB (`LARGE_INGEST_MIN_BYTES` in `apps/api/src/lib/ingest-size.ts`; materialization peaks near ten times the session size). A commit above that on a main-project function is queued exactly like a large session (retryable 503, `queued: true`) and left to the worker (`canMaterializeLargeR2IngestJobs()` is false on Vercel, whatever the environment says).
-- is materialized in production by the separate large-ingest Vercel project. That project's root directory is `deploy/cloud/large-ingest`, with Function CPU set to Performance (4 GB / 2 vCPU). Its only cron, `/api/cron/large-r2-ingest`, runs every minute with `maxDuration` 800 s.
+- is materialized in production by the separate large-ingest Vercel project. That project's root directory is the hosted service's large-ingest project, with Function CPU set to Performance (4 GB / 2 vCPU). Its only cron, `/api/cron/large-r2-ingest`, runs every minute with `maxDuration` 800 s.
   - With `R2_LARGE_INGEST_WORKER=true` and at least 3,500 MB of function memory, it claims due sessions above 48 MiB (queued, retrying, or running with an expired lease) one at a time and alone in its process (`large-r2-ingest-worker.service.ts`). It uses the recovery code path, gate and budgets.
   - It starts a job only with at least 7 minutes of its 740 s budget left, and aborts a running job at the budget. The job is then recorded as a retry.
   - It holds a 5-minute job lease renewed by the heartbeat, so a killed invocation's job is reclaimed within 5 minutes.
