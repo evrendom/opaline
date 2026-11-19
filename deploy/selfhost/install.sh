@@ -23,7 +23,7 @@ Run it again at any time: secrets in .env are kept and you get a fresh link.
   --artifact FILE      build from a local opaline-server-<version>.tgz (its .json
                        manifest must sit next to it)
   --clickhouse-only    run only ClickHouse here, reachable on the LAN, for an
-                       Opaline server on a laptop (opaline server --clickhouse-url)
+                       Opaline server that runs elsewhere (CLICKHOUSE_URL)
   -h, --help           show this help
 EOF
 }
@@ -233,9 +233,9 @@ if [ -z "$server" ]; then
 	cat <<EOF
 
 ClickHouse is running on http://$address:$(env_get CLICKHOUSE_HTTP_PORT) (user opaline).
-Start Opaline on your laptop with it:
+Point an Opaline server at it with:
 
-  OPALINE_CLICKHOUSE_PASSWORD=$(env_get CLICKHOUSE_PASSWORD) npx opaline@latest server --clickhouse-url http://$address:$(env_get CLICKHOUSE_HTTP_PORT) --clickhouse-user opaline
+  CLICKHOUSE_URL=http://$address:$(env_get CLICKHOUSE_HTTP_PORT) CLICKHOUSE_USERNAME=opaline CLICKHOUSE_PASSWORD=$(env_get CLICKHOUSE_PASSWORD)
 
 The password is CLICKHOUSE_PASSWORD in $(pwd)/.env. ClickHouse speaks plain HTTP: keep it on your LAN.
 EOF
@@ -278,7 +278,7 @@ Sign in as $email with this one-time link (valid for 10 minutes):
   $login_url
 
 Connect Claude Code and Codex on each computer (yours and your teammates'):
-  npx opaline@latest login --server $url$insecure
+  npx opaline@latest login --api-base $url$insecure
 
 Teammates join from Settings > Members in the dashboard. Run ./install.sh again for a new sign-in link.
 EOF

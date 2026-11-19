@@ -1,8 +1,8 @@
 # Opaline on a NAS or small server
 
 A Docker Compose stack for a team: Opaline (API, MCP, dashboard, background jobs), Postgres 17 and
-ClickHouse, with an optional Caddy for HTTPS on your own domain. For one person on a laptop,
-`npx opaline@latest server` is simpler and needs no Docker.
+ClickHouse, with an optional Caddy for HTTPS on your own domain. For one person on a Mac, the
+[Mac app](../../README.md) is simpler and needs no Docker.
 
 ## Requirements
 
@@ -26,7 +26,7 @@ waits until every service is healthy, creates your owner account and prints a on
 link plus the command that connects Claude Code and Codex on each computer:
 
 ```sh
-npx opaline@latest login --server http://192.168.1.10:4100 --allow-insecure-api-base
+npx opaline@latest login --api-base http://192.168.1.10:4100 --allow-insecure-api-base
 ```
 
 (`--allow-insecure-api-base` appears only for a plain-HTTP server on the LAN.) Teammates sign up
@@ -39,11 +39,13 @@ Options: `--public-url` (how browsers and the CLI reach the server; default
 
 ### Where the server comes from
 
-The image installs the `@opalinehq/server` package at `OPALINE_VERSION` from npm. Until that
-package is published, build it from an athena checkout and hand the file to the installer:
+The image installs the `@opalinehq/server` package at `OPALINE_VERSION` from npm. That package
+is not published yet, so build it from a checkout of this repository and hand the file to the
+installer:
 
 ```sh
-bun run build:selfhost --version 0.18.0          # in athena: dist-selfhost/opaline-server-0.18.0.tgz + .json
+bun install
+bun run build:selfhost --version 0.18.0          # writes dist-selfhost/opaline-server-0.18.0.tgz + .json
 ./install.sh --artifact /path/to/opaline-server-0.18.0.tgz --email you@example.com
 ```
 
@@ -60,23 +62,24 @@ This enables the `https` profile: Caddy serves `https://opaline.example.com` wit
 certificate and Opaline listens only on 127.0.0.1. DNS for the domain must point at this machine
 and ports 80 and 443 must reach it.
 
-## ClickHouse on the NAS, Opaline on a laptop
+## ClickHouse on the NAS, Opaline elsewhere
 
-To keep the data on the NAS but run Opaline itself on your laptop:
+To keep the data on the NAS but run the Opaline server on another machine:
 
 ```sh
 ./install.sh --clickhouse-only
 ```
 
 Only ClickHouse starts, published on the LAN at port 8123 with the user `opaline` and the password
-from `.env` (`CLICKHOUSE_PASSWORD`). The installer prints the laptop command:
+from `.env` (`CLICKHOUSE_PASSWORD`). The installer prints the settings for the other machine:
 
 ```sh
-OPALINE_CLICKHOUSE_PASSWORD=<password> npx opaline@latest server --clickhouse-url http://192.168.1.10:8123 --clickhouse-user opaline
+CLICKHOUSE_URL=http://192.168.1.10:8123 CLICKHOUSE_USERNAME=opaline CLICKHOUSE_PASSWORD=<password>
 ```
 
-The laptop then runs Opaline and Postgres locally and keeps every session in the NAS's ClickHouse.
-ClickHouse speaks plain HTTP here, so keep port 8123 on your LAN. Running `./install.sh` without
+Start the server there with those variables (see "Running the server without Docker" in
+[docs/self-hosting.md](../../docs/self-hosting.md)); it keeps every session in the NAS's
+ClickHouse. ClickHouse speaks plain HTTP here, so keep port 8123 on your LAN. Running `./install.sh` without
 `--clickhouse-only` later turns the full stack on and takes ClickHouse off the LAN again.
 
 ## Profiles and settings
@@ -102,7 +105,8 @@ the `repo` scope, or a fine-grained one).
 
 - Logs: `docker compose logs -f opaline`
 - Stop / start: `docker compose stop`, `docker compose up -d`
-- Upgrade: `./install.sh --upgrade` (newest npm release) or `./install.sh --artifact <newer tgz>`.
+- Upgrade: `./install.sh --artifact <newer tgz>`, or `./install.sh --upgrade` once
+  `@opalinehq/server` is on npm.
   The new image runs the Postgres and ClickHouse migrations on start; data stays in the volumes.
 - Back up: the named volumes `opaline_postgres-data`, `opaline_clickhouse-data` and
   `opaline_opaline-data` (uploaded objects), plus `.env`.
@@ -110,6 +114,6 @@ the `repo` scope, or a fine-grained one).
 
 ## Building the image from source
 
-The repository's root `Dockerfile` builds the same image from an athena checkout
+The repository's root `Dockerfile` builds the same image from a checkout of this repository
 (`docker build -t opaline-server .`); it compiles the artifact with Bun 1.3.14, so build it on a
 machine with AVX2 or arm64. The image it produces runs anywhere this stack does.

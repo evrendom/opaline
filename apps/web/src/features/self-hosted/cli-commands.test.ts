@@ -39,34 +39,34 @@ describe("CLI commands for any other server", () => {
 				"http://localhost:4011",
 			),
 		).toBe(
-			"npx opaline@latest --code ABCD-1234 --server http://localhost:4011",
+			"npx opaline@latest --code ABCD-1234 --api-base http://localhost:4011",
 		);
 		expect(cliLoginCommand("http://127.0.0.1:4790")).toBe(
-			"npx opaline@latest login --server http://127.0.0.1:4790",
+			"npx opaline@latest login --api-base http://127.0.0.1:4790",
 		);
 	});
 
 	it("name a self-hosted https server", () => {
 		expect(cliLoginCommand("https://opaline.acme.lan/")).toBe(
-			"npx opaline@latest login --server https://opaline.acme.lan",
+			"npx opaline@latest login --api-base https://opaline.acme.lan",
 		);
 		expect(cliInstallAndLoginCommand("https://opaline.acme.lan")).toBe(
-			"npm install -g opaline@latest && opaline login --server https://opaline.acme.lan",
+			"npm install -g opaline@latest && opaline login --api-base https://opaline.acme.lan",
 		);
 	});
 
 	it("opt in to plaintext http only for a server on the network, which the CLI refuses otherwise", () => {
 		expect(serverArguments("http://192.168.2.74:4100")).toEqual([
-			"--server",
+			"--api-base",
 			"http://192.168.2.74:4100",
 			"--allow-insecure-api-base",
 		]);
 		expect(serverArguments("http://localhost:4100")).toEqual([
-			"--server",
+			"--api-base",
 			"http://localhost:4100",
 		]);
 		expect(serverArguments("https://opaline.acme.lan")).toEqual([
-			"--server",
+			"--api-base",
 			"https://opaline.acme.lan",
 		]);
 	});
@@ -75,7 +75,7 @@ describe("CLI commands for any other server", () => {
 		expect(
 			teammateSetupSteps("http://localhost:4790").map((step) => step.command),
 		).toEqual([
-			"npx opaline@latest login --server http://localhost:4790",
+			"npx opaline@latest login --api-base http://localhost:4790",
 			"npx opaline@latest upload",
 			"opaline mcp install",
 		]);

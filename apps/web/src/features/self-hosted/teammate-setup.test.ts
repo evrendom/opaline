@@ -17,7 +17,7 @@ describe("selfHostedWelcomeCopy", () => {
 			"upload",
 			"mcp",
 		]);
-		expect(copy.steps[0]?.command).toContain(`--server ${ORIGIN}`);
+		expect(copy.steps[0]?.command).toContain(`--api-base ${ORIGIN}`);
 		expect(JSON.stringify(copy)).not.toContain("opaline.so");
 		expect(
 			selfHostedWelcomeCopy(ORIGIN, { ...waiting, hasCliLogin: true }, false),

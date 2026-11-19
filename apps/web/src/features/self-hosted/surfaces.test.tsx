@@ -220,7 +220,7 @@ describe("MCP settings", () => {
 		const text = container.textContent ?? "";
 		expect(text).toContain("opaline mcp install");
 		expect(text).toContain(
-			"npx opaline@latest login --server http://localhost:4790",
+			"npx opaline@latest login --api-base http://localhost:4790",
 		);
 		expect(text).toContain(
 			'claude mcp add --scope user --transport http opaline http://localhost:4790/api/mcp --header "Authorization: Bearer <your CLI API key>"',

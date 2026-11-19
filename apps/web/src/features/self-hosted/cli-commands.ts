@@ -28,7 +28,7 @@ export function serverArguments(origin: string): string[] {
 	const plaintextOverNetwork =
 		url.protocol === "http:" && !isLoopbackHostname(url.hostname);
 	return [
-		"--server",
+		"--api-base",
 		url.origin,
 		...(plaintextOverNetwork ? ["--allow-insecure-api-base"] : []),
 	];

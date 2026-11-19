@@ -67,7 +67,7 @@ A platform for ingesting, storing, and analyzing Claude Code / Codex session tra
 | `APP_URL` | No | API base URL (default: `http://localhost:4010`) |
 | `ALLOWED_ORIGIN` | No | CORS origin (default: `http://localhost:4011`) |
 | `OPALINE_SELF_HOSTED` | No | `1` makes the server a single-team self-hosted install (`apps/api/src/selfhost/main.ts` sets it): every workspace gate open, no billing, no Stripe/PostHog/Sentry/Slack calls, jobs run in process, `/api/selfhost/*` exists. Anything that only applies to it checks `isSelfHosted()` (`lib/self-hosted.ts`), so production is unchanged. See [docs/self-hosting.md](docs/self-hosting.md). |
-| `OPALINE_SETUP_TOKEN` | Self-hosted | Shared secret (16+ characters) between `opaline server` and the server: `POST /api/selfhost/setup` (`X-Opaline-Setup-Token`) creates the owner account while no account exists, and `POST /api/selfhost/login-link` with it makes a sign-in link for any account. Unset: setup answers 403. |
+| `OPALINE_SETUP_TOKEN` | Self-hosted | Shared secret (16+ characters) between whatever starts the server (the Mac app's local server, `deploy/selfhost/install.sh`) and the server: `POST /api/selfhost/setup` (`X-Opaline-Setup-Token`) creates the owner account while no account exists, and `POST /api/selfhost/login-link` with it makes a sign-in link for any account. Unset: setup answers 403. |
 | `OPALINE_DATA_DIR` | Self-hosted | Directory for server files; the local object store lives in `<dir>/object-store` unless `S3_*` or `R2_*` select another store. |
 | `OPALINE_WEB_DIR` | Self-hosted | The built web app (`apps/web/dist`, with `dist-plugin` next to it); must contain `index.html`. Unset: API only. |
 | `OPALINE_VERSION` | Self-hosted | Version reported by `GET /api/selfhost/info` (default `dev`). |
@@ -231,7 +231,7 @@ Shared avatar constants (size caps, MIME allowlist, regex patterns) live in `pac
 
 ## Self-Hosting
 
-See [docs/self-hosting.md](docs/self-hosting.md): `npx opaline@latest server` runs Opaline on one machine with a local or your own ClickHouse, `deploy/selfhost` runs it as a Docker Compose stack on a NAS. The entry point is `apps/api/src/selfhost/main.ts` (env checks, migrations, schema, HTTP, scheduler in `selfhost/scheduler.ts`); the `/api/selfhost/*` routes are in `handlers/selfhost-http.ts`. Self-hosted behaviour stays behind `isSelfHosted()` so production does not change. Fly.io (`fly.toml`, `fly-lifecycle.ts`) is dead code; do not build on it.
+See [docs/self-hosting.md](docs/self-hosting.md): the Mac app (`apps/desktop`, with `packages/local-server`) runs Opaline on one Mac, and `deploy/selfhost` runs it as a Docker Compose stack on a NAS or server for a team. The published CLI has no `opaline server` command yet. The entry point is `apps/api/src/selfhost/main.ts` (env checks, migrations, schema, HTTP, scheduler in `selfhost/scheduler.ts`); the `/api/selfhost/*` routes are in `handlers/selfhost-http.ts`. Self-hosted behaviour stays behind `isSelfHosted()` so production does not change. Fly.io (`fly.toml`, `fly-lifecycle.ts`) is dead code; do not build on it.
 
 ## ClickHouse Schema Management (chkit)
 

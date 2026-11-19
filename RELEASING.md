@@ -11,8 +11,8 @@ configure a GitHub Actions trusted publisher:
 
 | Field | Value |
 | --- | --- |
-| Organization | `opalinehq` |
-| Repository | `cli` |
+| Organization | `evrendom` |
+| Repository | `opaline` |
 | Workflow filename | `release.yml` |
 | Environment | `npm-publish` |
 
