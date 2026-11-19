@@ -6,7 +6,7 @@ const MONOREPO_ROOT = resolve(import.meta.dir, "..", "..", "..", "..", "..");
 const MISSING_USERNAME_ERROR =
 	"Refusing to fall back to the `default` superuser";
 const API_IDENTITY_SCRIPT = `
-	import { getClickhouse } from "./app/server/src/clickhouse.ts";
+	import { getClickhouse } from "./apps/desktop/server/src/clickhouse.ts";
 
 	const marker = process.env.CLICKHOUSE_CREDENTIAL_TEST_MARKER;
 	if (!marker) throw new Error("CLICKHOUSE_CREDENTIAL_TEST_MARKER is required");
