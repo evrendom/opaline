@@ -24,9 +24,7 @@ import {
 } from "../clickhouse.js";
 import { ingestProcessingSqlClient, sqlClient } from "../db.js";
 import { handleR2IngestMaintenanceRequest } from "../handlers/api-maintenance.js";
-import { handleLargeR2IngestWorkerRequest } from "../handlers/large-r2-ingest-worker.js";
 import { router } from "../router.js";
-import { requeueFailedIngestJobs } from "../scripts/requeue-failed-ingest-jobs.js";
 import { setAnalysisLogForTests } from "../services/analysis-log/config.js";
 import { createLocalEmbedder } from "../services/analysis-log/embedder.js";
 import { createMemoryAnalysisStore } from "../services/analysis-log/memory-store.js";
@@ -46,7 +44,6 @@ import {
 	withIngestProcessingLedger,
 } from "../services/ingest-processing-ledger.service.js";
 import { IngestFilterWorkerOperationalError } from "../services/ingest-worker-operational.error.js";
-import { runLargeR2IngestWorkerPass } from "../services/large-r2-ingest-worker.service.js";
 import {
 	acquirePostgresLease,
 	PostgresLeaseLostError,
@@ -502,100 +499,7 @@ describe("R2 ingest commit lifecycle", () => {
 		});
 	});
 
-	test("the large-ingest worker materializes only queued sessions above the standard size, one per process", async () => {
-		const large = await initializeUploadedJob(
-			crypto.randomUUID(),
-			"y".repeat(128 * 1024 * 1024 + 1),
-		);
-		const standard = await initializeUploadedJob(
-			crypto.randomUUID(),
-			"standard queued transcript",
-		);
-		const workerGate = createR2IngestMaterializationGate({
-			largeJobMaxBytes: 256 * 1024 * 1024,
-			maxBytes: 128 * 1024 * 1024,
-			maxJobs: 1,
-			maxQueuedJobs: 1,
-			operationTimeoutMs: 60_000,
-			queueTimeoutMs: 10,
-		});
-		// The standard commit finds the worker's gate busy and is queued too.
-		let releaseBlocker: (() => void) | undefined;
-		const blocker = new Promise<void>((resolve) => {
-			releaseBlocker = resolve;
-		});
-		const active = workerGate.run(1, async () => blocker);
-		try {
-			for (const initialized of [large, standard])
-				await expect(
-					commitR2IngestJob({
-						gate: workerGate,
-						input: buildCompletionInput(initialized),
-						process: async () => {
-							throw new Error("commit unexpectedly materialized");
-						},
-						r2: fakeR2,
-						userId: USER_ID,
-					}),
-				).rejects.toBeInstanceOf(R2IngestCommitQueuedError);
-			// Another large job is already running in this process.
-			await expect(
-				runLargeR2IngestWorkerPass({
-					database: sqlClient,
-					deadline: { deadlineAt: Date.now() + 800_000, now: Date.now },
-					gate: workerGate,
-					process: async () => {
-						throw new Error("a busy worker started a second job");
-					},
-					r2: fakeR2,
-				}),
-			).resolves.toEqual({ attempted: 0, completed: 0, stopReason: "busy" });
-		} finally {
-			releaseBlocker?.();
-			await active;
-		}
-		await sqlClient`
-			UPDATE ingest_job SET available_at = NOW() - INTERVAL '1 second'
-			WHERE id IN (${large.jobId}, ${standard.jobId})
-		`;
-
-		const processed: string[] = [];
-		await expect(
-			runLargeR2IngestWorkerPass({
-				database: sqlClient,
-				deadline: { deadlineAt: Date.now() + 800_000, now: Date.now },
-				gate: workerGate,
-				process: async (input) => {
-					processed.push(input.sessionId);
-					return processorResult(input.sessionId);
-				},
-				r2: fakeR2,
-			}),
-		).resolves.toEqual({ attempted: 1, completed: 1, stopReason: "complete" });
-		expect(processed).toEqual([large.jobId]);
-		expect(await getR2IngestJobStatus(large.jobId, USER_ID)).toMatchObject({
-			status: "completed",
-		});
-		// Standard sessions stay with the main project's recovery.
-		expect(await getR2IngestJobStatus(standard.jobId, USER_ID)).toMatchObject({
-			error: { code: "R2_INGEST_COMMIT_QUEUED" },
-			status: "pending",
-		});
-		// Too little budget left for another large job: nothing is claimed.
-		await expect(
-			runLargeR2IngestWorkerPass({
-				database: sqlClient,
-				deadline: { deadlineAt: Date.now() + 60_000, now: Date.now },
-				gate: workerGate,
-				process: async () => {
-					throw new Error("started a job without enough budget");
-				},
-				r2: fakeR2,
-			}),
-		).resolves.toEqual({ attempted: 0, completed: 0, stopReason: "deadline" });
-	}, 120_000);
-
-	test("a main Vercel function queues a 60 MiB commit for the large-ingest worker, which rescues it after an expired lease", async () => {
+	test("a main Vercel function queues a 60 MiB commit and main recovery leaves it after an expired lease", async () => {
 		const midsize = await initializeUploadedJob(
 			crypto.randomUUID(),
 			"m".repeat(60 * 1024 * 1024),
@@ -666,65 +570,7 @@ describe("R2 ingest commit lifecycle", () => {
 				r2: fakeR2,
 			}),
 		).resolves.toMatchObject({ attempted: 0, completed: 0 });
-
-		const workerGate = createR2IngestMaterializationGate({
-			largeJobMaxBytes: 256 * 1024 * 1024,
-			maxBytes: 128 * 1024 * 1024,
-			maxJobs: 1,
-			maxQueuedJobs: 1,
-			operationTimeoutMs: 60_000,
-			queueTimeoutMs: 10,
-		});
-		const processed: string[] = [];
-		await expect(
-			runLargeR2IngestWorkerPass({
-				database: sqlClient,
-				deadline: { deadlineAt: Date.now() + 800_000, now: Date.now },
-				gate: workerGate,
-				process: async (input) => {
-					processed.push(input.sessionId);
-					return processorResult(input.sessionId);
-				},
-				r2: fakeR2,
-			}),
-		).resolves.toEqual({ attempted: 1, completed: 1, stopReason: "complete" });
-		expect(processed).toEqual([midsize.jobId]);
-		expect(await getR2IngestJobStatus(midsize.jobId, USER_ID)).toMatchObject({
-			attempts: 2,
-			error: null,
-			status: "completed",
-		});
 	}, 120_000);
-
-	test("the large-ingest worker endpoint requires the cron secret and fails closed without worker mode", async () => {
-		const previous = new Map(
-			["CRON_SECRET", "R2_LARGE_INGEST_WORKER"].map((name) => [
-				name,
-				process.env[name],
-			]),
-		);
-		try {
-			process.env.CRON_SECRET = "large-ingest-worker-secret";
-			delete process.env.R2_LARGE_INGEST_WORKER;
-			const url = "http://127.0.0.1/api/cron/large-r2-ingest";
-			expect(
-				(await handleLargeR2IngestWorkerRequest(new Request(url))).status,
-			).toBe(401);
-			const disabled = await handleLargeR2IngestWorkerRequest(
-				new Request(url, {
-					headers: { Authorization: "Bearer large-ingest-worker-secret" },
-				}),
-			);
-			expect(disabled.status).toBe(503);
-			expect(await disabled.json()).toMatchObject({
-				enabled: false,
-				reason: "flag_off",
-			});
-		} finally {
-			for (const [name, value] of previous)
-				restoreEnvironmentVariable(name, value);
-		}
-	});
 
 	test("a session above the standard size is queued at commit and materialized only where large jobs are admitted", async () => {
 		const initialized = await initializeUploadedJob(
@@ -1827,127 +1673,7 @@ describe("R2 ingest commit lifecycle", () => {
 		expect(fakeR2.deletedKeys).toHaveLength(1);
 	});
 
-	test("requeue preview is read-only and execute preserves TTL and makes jobs worker-recoverable", async () => {
-		const jobs = await Promise.all(
-			Array.from({ length: 6 }, () =>
-				initializeUploadedJob(
-					crypto.randomUUID(),
-					"operator requeue transcript",
-				),
-			),
-		);
-		const [
-			eligible,
-			permanent,
-			deleted,
-			expired,
-			outsideWindow,
-			changedAfterCutoff,
-		] = jobs;
-		if (
-			!eligible ||
-			!permanent ||
-			!deleted ||
-			!expired ||
-			!outsideWindow ||
-			!changedAfterCutoff
-		) {
-			throw new Error("missing requeue fixtures");
-		}
-		const now = new Date("2030-01-01T10:00:00.000Z");
-		await sqlClient`
-			UPDATE ingest_job SET status = 'failed', attempts = 5,
-				last_error_code = 'R2_INGEST_TRANSIENT_FAILURE',
-				last_error_message = 'Ingest processing temporarily failed and may be retried',
-				failed_at = '2030-01-01T09:00:00.000Z', updated_at = '2030-01-01T09:00:00.000Z'
-			WHERE user_id = ${USER_ID}
-		`;
-		await sqlClient`UPDATE ingest_job SET last_error_code = 'R2_INGEST_FORBIDDEN' WHERE id = ${permanent.jobId}`;
-		await sqlClient`UPDATE ingest_job SET objects_deleted_at = NOW() WHERE id = ${deleted.jobId}`;
-		await sqlClient`UPDATE ingest_job SET expires_at = '2030-01-01T10:00:00.000Z' WHERE id = ${expired.jobId}`;
-		await sqlClient`UPDATE ingest_job SET failed_at = '2030-01-01T08:00:00.000Z' WHERE id = ${outsideWindow.jobId}`;
-		await sqlClient`UPDATE ingest_job SET updated_at = '2030-01-01T11:00:00.000Z' WHERE id = ${changedAfterCutoff.jobId}`;
-		const options = {
-			cutoff: now,
-			database: sqlClient,
-			from: new Date("2030-01-01T08:30:00.000Z"),
-			limit: 100,
-			now,
-			to: new Date("2030-01-01T10:00:00.000Z"),
-		};
-		const before = await readIngestJobRowSnapshot(eligible.jobId);
-		expect(
-			await requeueFailedIngestJobs({ ...options, execute: false }),
-		).toMatchObject({ count: 0, legacyUnclassifiedCount: 0 });
-		expect(
-			await requeueFailedIngestJobs({ ...options, execute: true }),
-		).toMatchObject({ count: 0, legacyUnclassifiedCount: 0 });
-		const preview = await requeueFailedIngestJobs({
-			...options,
-			execute: false,
-			includeLegacy: true,
-		});
-		expect(preview).toMatchObject({
-			mode: "preview",
-			count: 1,
-			legacyUnclassifiedCount: 1,
-		});
-		expect(preview.jobs.map((job) => job.jobId)).toEqual([eligible.jobId]);
-		expect(await readIngestJobRowSnapshot(eligible.jobId)).toEqual(before);
-		const executed = await requeueFailedIngestJobs({
-			...options,
-			execute: true,
-			includeLegacy: true,
-		});
-		expect(executed).toMatchObject({ mode: "execute", count: 1 });
-		expect(await getR2IngestJobStatus(eligible.jobId, USER_ID)).toMatchObject({
-			attempts: 0,
-			status: "pending",
-		});
-		const [requeued] = await sqlClient<
-			Array<{ expiresAt: string; failedAt: string | null }>
-		>`
-			SELECT expires_at AS "expiresAt", failed_at AS "failedAt" FROM ingest_job WHERE id = ${eligible.jobId}
-		`;
-		expect(requeued?.failedAt).toBeNull();
-		expect(new Date(requeued?.expiresAt ?? "").toISOString()).toBe(
-			"2031-01-01T00:00:00.000Z",
-		);
-		const [staleCleanup] = await sqlClient<
-			Array<{ id: string; objectManifest: unknown; objectsDeletedAt: null }>
-		>`
-			SELECT id, object_manifest AS "objectManifest", objects_deleted_at AS "objectsDeletedAt"
-			FROM ingest_job WHERE id = ${eligible.jobId}
-		`;
-		if (!staleCleanup) throw new Error("missing stale cleanup candidate");
-		expect(
-			await cleanupIngestJobObjects(staleCleanup, sqlClient, fakeR2, undefined),
-		).toBe(false);
-		const recovered = await repairRecoverableR2IngestJobs({
-			database: sqlClient,
-			now: () => now,
-			process: async (input) => processorResult(input.sessionId),
-			r2: fakeR2,
-		});
-		expect(recovered).toMatchObject({ attempted: 1, completed: 1 });
-		for (const job of [
-			permanent,
-			deleted,
-			expired,
-			outsideWindow,
-			changedAfterCutoff,
-		]) {
-			expect(await getR2IngestJobStatus(job.jobId, USER_ID)).toMatchObject({
-				status: "failed",
-			});
-		}
-		expect(
-			await requeueFailedIngestJobs({ ...options, execute: true }),
-		).toMatchObject({ count: 0 });
-	});
-
-	test("cleanup and requeue selections cannot overlap for transient failures", async () => {
-		const retainedIds: string[] = [];
+	test("cleanup keeps unexpired transient failures and repairs only expired ones", async () => {
 		const retainedKeys: string[] = [];
 		const now = new Date();
 		for (const code of [
@@ -1959,7 +1685,7 @@ describe("R2 ingest commit lifecycle", () => {
 			for (const expired of [false, true]) {
 				const initialized = await initializeUploadedJob(
 					crypto.randomUUID(),
-					"disjoint cleanup and requeue transcript",
+					"transient cleanup transcript",
 				);
 				await sqlClient`
 					UPDATE ingest_job SET status = 'failed', last_error_code = ${code},
@@ -1969,7 +1695,6 @@ describe("R2 ingest commit lifecycle", () => {
 					WHERE id = ${initialized.jobId}
 				`;
 				if (!expired) {
-					retainedIds.push(initialized.jobId);
 					retainedKeys.push(
 						...initialized.objects.map((object) => object.objectKey),
 					);
@@ -1996,22 +1721,6 @@ describe("R2 ingest commit lifecycle", () => {
 				}
 			}
 		}
-		const options = {
-			cutoff: now,
-			database: sqlClient,
-			from: new Date(now.getTime() - 60_000),
-			includeLegacy: true,
-			limit: 100,
-			now,
-			to: new Date(now.getTime() + 60_000),
-		};
-		const preview = await requeueFailedIngestJobs({
-			...options,
-			execute: false,
-		});
-		expect(preview.jobs.map((job) => job.jobId).sort()).toEqual(
-			retainedIds.sort(),
-		);
 		expect(
 			await repairR2IngestCleanupJobs({ database: sqlClient, r2: fakeR2 }),
 		).toMatchObject({
@@ -2024,95 +1733,6 @@ describe("R2 ingest commit lifecycle", () => {
 				(key) => !fakeR2.deletedKeys.includes(key) && fakeR2.objects.has(key),
 			),
 		).toBe(true);
-		const executed = await requeueFailedIngestJobs({
-			...options,
-			execute: true,
-		});
-		expect(executed.jobs.map((job) => job.jobId).sort()).toEqual(retainedIds);
-	});
-
-	test("requeue executable defaults to preview and requires a cutoff before writes", async () => {
-		const initialized = await initializeUploadedJob(
-			crypto.randomUUID(),
-			"requeue CLI preview transcript",
-		);
-		await sqlClient`
-			UPDATE ingest_job SET status = 'failed', attempts = 5,
-				failed_at = NOW(), updated_at = NOW(), last_error_code = 'R2_INGEST_SERVICE_UNAVAILABLE',
-				last_error_message = 'Request-level usage analytics is temporarily unavailable'
-			WHERE id = ${initialized.jobId}
-		`;
-		const args = [
-			process.execPath,
-			new URL("../scripts/requeue-failed-ingest-jobs.ts", import.meta.url)
-				.pathname,
-			"--from",
-			new Date(Date.now() - 60_000).toISOString(),
-			"--to",
-			new Date(Date.now() + 60_000).toISOString(),
-			"--workspace",
-			ORGANIZATION_ID,
-			"--user",
-			USER_ID,
-		];
-		const preview = Bun.spawn(args, { stdout: "pipe", stderr: "pipe" });
-		const output = await new Response(preview.stdout).text();
-		expect(await preview.exited).toBe(0);
-		expect(JSON.parse(output)).toMatchObject({
-			mode: "preview",
-			count: 1,
-			jobs: [
-				{
-					jobId: initialized.jobId,
-					workspaceId: ORGANIZATION_ID,
-					userId: USER_ID,
-				},
-			],
-		});
-		for (const filter of [
-			{ workspaceId: "other-workspace" },
-			{ userId: "other-user" },
-		]) {
-			expect(
-				await requeueFailedIngestJobs({
-					cutoff: new Date(),
-					database: sqlClient,
-					execute: false,
-					from: new Date(Date.now() - 60_000),
-					limit: 100,
-					now: new Date(),
-					to: new Date(Date.now() + 60_000),
-					...filter,
-				}),
-			).toMatchObject({ count: 0 });
-		}
-		await sqlClient`UPDATE ingest_job SET last_error_code = 'R2_INGEST_TRANSIENT_FAILURE' WHERE id = ${initialized.jobId}`;
-		const legacyPreview = Bun.spawn(args, { stdout: "pipe", stderr: "pipe" });
-		expect(
-			JSON.parse(await new Response(legacyPreview.stdout).text()),
-		).toMatchObject({ count: 0 });
-		expect(await legacyPreview.exited).toBe(0);
-		const legacyOptIn = Bun.spawn([...args, "--include-legacy"], {
-			stdout: "pipe",
-			stderr: "pipe",
-		});
-		expect(
-			JSON.parse(await new Response(legacyOptIn.stdout).text()),
-		).toMatchObject({ count: 1, legacyUnclassifiedCount: 1 });
-		expect(await legacyOptIn.exited).toBe(0);
-		expect(
-			await getR2IngestJobStatus(initialized.jobId, USER_ID),
-		).toMatchObject({ status: "failed" });
-		const execution = Bun.spawn([...args, "--execute"], {
-			stdout: "pipe",
-			stderr: "pipe",
-		});
-		const error = await new Response(execution.stderr).text();
-		expect(await execution.exited).not.toBe(0);
-		expect(error).toContain("exact --cutoff");
-		expect(
-			await getR2IngestJobStatus(initialized.jobId, USER_ID),
-		).toMatchObject({ status: "failed" });
 	});
 
 	test("Vercel commit reports retry-later, status stays pending, and the minute cron completes after recovery", async () => {

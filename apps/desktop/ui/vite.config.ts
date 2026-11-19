@@ -1,72 +1,8 @@
-import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 import path from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { loadEnv } from "vite";
 import { configDefaults, defineConfig } from "vitest/config";
-
-const { version } = JSON.parse(
-	readFileSync(new URL("./package.json", import.meta.url), "utf-8"),
-) as { version: string };
-
-async function getLatestGitHubVersion() {
-	const response = await fetch(
-		"https://api.github.com/repos/opalinehq/cli/releases/latest",
-		{
-			headers: {
-				Accept: "application/vnd.github+json",
-				"User-Agent": "opaline-web-build",
-			},
-		},
-	);
-
-	if (!response.ok) {
-		throw new Error(`GitHub returned ${response.status}`);
-	}
-
-	const data = (await response.json()) as { tag_name?: string };
-
-	if (!data.tag_name) {
-		throw new Error("GitHub release response did not include a tag");
-	}
-
-	return normalizeCliReleaseTag(data.tag_name);
-}
-
-function normalizeCliReleaseTag(tag: string) {
-	return tag.replace(/^(?:opaline-cli|rudel)@/u, "");
-}
-
-function getLatestLocalTagVersion() {
-	const output = execFileSync("git", ["tag", "--sort=-version:refname"], {
-		cwd: __dirname,
-		encoding: "utf-8",
-	});
-
-	const tag = output
-		.split("\n")
-		.map((line) => line.trim())
-		.find(Boolean);
-
-	if (!tag) {
-		throw new Error("No git tags found");
-	}
-
-	return normalizeCliReleaseTag(tag);
-}
-
-async function resolveAppVersion() {
-	try {
-		return await getLatestGitHubVersion();
-	} catch {
-		try {
-			return getLatestLocalTagVersion();
-		} catch {
-			return version;
-		}
-	}
-}
 
 // Point the dev proxy at a remote API (e.g. RUDEL_API_TARGET=https://opaline.so)
 // instead of the default local API server. For https targets the proxy rewrites
@@ -125,8 +61,7 @@ function vendorChunk(id: string) {
 	return VENDOR_CHUNKS.find(([, pattern]) => pattern.test(name))?.[0];
 }
 
-export default defineConfig(async ({ mode }) => {
-	const appVersion = await resolveAppVersion();
+export default defineConfig(({ mode }) => {
 	const env = loadEnv(mode, __dirname, "");
 	const apiTarget =
 		env.RUDEL_API_TARGET ??
@@ -136,9 +71,6 @@ export default defineConfig(async ({ mode }) => {
 		env.RUDEL_API_BEARER_TOKEN ?? process.env.RUDEL_API_BEARER_TOKEN;
 
 	return {
-		define: {
-			__APP_VERSION__: JSON.stringify(appVersion),
-		},
 		plugins: [react(), tailwindcss()],
 		build:
 			mode === "plugin"

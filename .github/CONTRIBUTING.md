@@ -11,7 +11,7 @@ Thanks for your interest in contributing! This guide covers setup, workflow, and
 
 ```bash
 git clone https://github.com/evrendom/opaline.git
-cd athena
+cd opaline
 bun install
 bun run dev:local
 ```

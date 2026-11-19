@@ -16,7 +16,6 @@
 		"./model-pricing": "./src/model-pricing.ts",
 		"./model-registry": "./src/model-registry.ts",
 		"./trends-aa-release": "./src/trends-aa-release.ts",
-		"./trends-source-fetch": "./src/trends-source-fetch.ts",
 		"./trends-sources": "./src/trends-sources.ts",
 		"./trends-t3-usage": "./src/trends-t3-usage.ts",
 		"./trends-usage": "./src/trends-usage.ts",

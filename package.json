@@ -17,7 +17,6 @@
 		"test:integration": "turbo run test:integration --concurrency=1",
 		"test:kill-matrix": "bun apps/desktop/server/src/scripts/kill-matrix/kill-matrix.ts",
 		"verify": "bun scripts/check-disclosure.ts && bun run check-types && turbo run lint test build",
-		"deploy": "turbo run build",
 		"dev:local": "bash scripts/dev-local.sh",
 		"infra:up": "docker compose -f scripts/dev-compose.yml up -d",
 		"infra:down": "docker compose -f scripts/dev-compose.yml down",

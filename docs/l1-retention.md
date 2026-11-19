@@ -100,7 +100,6 @@ Each purge runs inline, is retried by the purge worker, and runs a second pass a
 - Staged upload objects of ingest jobs that are still in flight when the account or workspace is deleted. `ingest_job` cascades away, so its object manifest cannot clean them. They are removed by the `ingest/` bucket lifecycle rule (seven days, `docs/operations/vercel-production.md`, "Direct-to-R2 Ingest Lifecycle Backstop"); this rule must exist in production. This existed before this change.
 - A user removed from a workspace (or leaving it) keeps their sessions in it until the workspace or account is deleted. Nothing deletes one session or one member's sessions without deleting the whole account. The DPA says the customer may delete sessions; with no expiry, a session-level deletion request has no path.
 - `ingest_processing_ledger` has no user column (see the table).
-- `session-ownership-cleanup.service.ts` (an operator script for non-canonical rows) covers only a few tables and is not a deletion-request path.
 
 ## Operational considerations
 

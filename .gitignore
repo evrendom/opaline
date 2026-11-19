@@ -7,7 +7,6 @@ node_modules/
 dist/
 build/
 out/
-.next/
 
 # Environment variables
 .env
@@ -37,9 +36,6 @@ coverage/
 # Turbo
 .turbo
 
-# Vercel
-.vercel
-
 # Misc
 *.pem
 
@@ -50,8 +46,6 @@ packages/api-routes/.fact-review/
 .context
 
 # Local agent/editor skill installs
-.agents/skills/posthog-debugger/
-.agents/skills/vercel-react-best-practices/
 .codex/skills/
 .windsurf/
 
