@@ -39,11 +39,11 @@ const RELEASE_PREFIX = "desktop-v";
 
 const README = `# Repository stats
 
-Written once a day by \`.github/workflows/repo-stats.yml\` on main
-(\`bun scripts/repo-stats.ts snapshot\`). GitHub keeps traffic for 14 days
-and resets a release file's download count when the file is replaced, so
-these files are the long-term record. \`bun scripts/repo-stats.ts report --dir
-<this folder>\` turns downloads.csv into installs, update rates and active
+Written once a day by \`bun scripts/repo-stats.ts snapshot\` from the
+public Opaline repository. GitHub keeps traffic for 14 days and resets a
+release file's download count when the file is replaced, so these files
+are the long-term record. \`bun scripts/repo-stats.ts report --dir <this
+folder>\` turns downloads.csv into installs, update rates and active
 installs.
 
 | File | One row per | Notes |

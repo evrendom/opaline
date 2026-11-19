@@ -31,6 +31,8 @@ Environment:
   OPALINE_RELEASE_REPO  GitHub repository (default: the one the app reads updates from)
   OPALINE_TEAM_ID       Developer ID team the app must be signed by (default M8L5AS39YN)
   OPALINE_RELEASE_WORK  where the zip and feed are written (default ~/.cache/opaline-desktop/release)
+  OPALINE_STATS_REPOSITORY  repository whose repo-stats.yml saves download counts before the
+                        DMG and feed are replaced (default: none, skipped)
 USAGE
 }
 
@@ -172,21 +174,24 @@ if [ "$dry_run" = 1 ]; then
 	exit 0
 fi
 
-step "saving download counts before the DMG and feed are replaced"
-stats_started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-stats_run=""
-if gh workflow run repo-stats.yml -R "$repository" >/dev/null 2>&1; then
-	for _ in $(seq 1 24); do
-		sleep 5
-		stats_run=$(gh run list -R "$repository" --workflow repo-stats.yml --event workflow_dispatch \
-			--created ">=$stats_started" --limit 1 --json databaseId --jq '.[0].databaseId // empty' 2>/dev/null)
-		[ -n "$stats_run" ] && break
-	done
-fi
-if [ -n "$stats_run" ] && gh run watch "$stats_run" -R "$repository" --exit-status >/dev/null 2>&1; then
-	step "download counts saved to the stats branch"
-else
-	step "warning: could not save download counts; downloads since the last daily snapshot are not kept"
+stats_repository="${OPALINE_STATS_REPOSITORY:-}"
+if [ -n "$stats_repository" ]; then
+	step "saving download counts in $stats_repository before the DMG and feed are replaced"
+	stats_started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+	stats_run=""
+	if gh workflow run repo-stats.yml -R "$stats_repository" >/dev/null 2>&1; then
+		for _ in $(seq 1 24); do
+			sleep 5
+			stats_run=$(gh run list -R "$stats_repository" --workflow repo-stats.yml --event workflow_dispatch \
+				--created ">=$stats_started" --limit 1 --json databaseId --jq '.[0].databaseId // empty' 2>/dev/null)
+			[ -n "$stats_run" ] && break
+		done
+	fi
+	if [ -n "$stats_run" ] && gh run watch "$stats_run" -R "$stats_repository" --exit-status >/dev/null 2>&1; then
+		step "download counts saved"
+	else
+		step "warning: could not save download counts; downloads since the last daily snapshot are not kept"
+	fi
 fi
 
 step "creating release $tag"
