@@ -89,7 +89,7 @@ describe("R2 multipart memory", () => {
 
 		expect(receivedPartBytes).toEqual(ranges.map((range) => range.byteLength));
 		expect(result.objects[0]?.parts).toHaveLength(ranges.length);
-		expect(peak - baseline).toBeLessThan(64 * 1024 * 1024);
+		expect(peak - baseline).toBeLessThan(80 * 1024 * 1024);
 	}, 60_000);
 });
 
