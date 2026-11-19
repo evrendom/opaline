@@ -67,33 +67,24 @@ test("the plugin version follows what the plugins contain, so a changed key rein
 	).not.toBe(first);
 });
 
-const localPluginDir = path.join(
-	__dirname,
-	"..",
-	"..",
-	"..",
-	"plugins",
-	"opaline-local",
-);
 const text = (file) => fs.readFileSync(file, "utf8");
 
-test("the local plugin carries the local skills and manifests, and the cloud playbook files beside them", () => {
+test("the installed plugin carries the skills, playbook files and manifests of plugins/opaline", () => {
 	const { root: marketplace, version } = writeMarketplace({
 		pluginDir,
-		localPluginDir,
 		server,
 	});
-	const cloudVersion = read(
+	const baseVersion = read(
 		path.join(pluginDir, ".claude-plugin", "plugin.json"),
 	).version;
 	expect(version).toMatch(
-		new RegExp(`^${cloudVersion.replaceAll(".", "\\.")}-local\\.[0-9a-f]{10}$`),
+		new RegExp(`^${baseVersion.replaceAll(".", "\\.")}-local\\.[0-9a-f]{10}$`),
 	);
 	for (const agent of ["claude", "codex"]) {
 		const target = path.join(marketplace, `opaline-${agent}`);
 		const skill = text(path.join(target, "skills", "opaline", "SKILL.md"));
 		expect(skill).toBe(
-			text(path.join(localPluginDir, "skills", "opaline", "SKILL.md")),
+			text(path.join(pluginDir, "skills", "opaline", "SKILL.md")),
 		);
 		expect(skill).toContain("Nothing leaves this Mac");
 		expect(skill).toContain("open the Opaline app and connect their agents");
@@ -103,7 +94,7 @@ test("the local plugin carries the local skills and manifests, and the cloud pla
 			.filter((line) => /browser/i.test(line)))
 			expect(line).toContain("never in a browser");
 		expect(text(path.join(target, "skills", "setup", "SKILL.md"))).toBe(
-			text(path.join(localPluginDir, "skills", "setup", "SKILL.md")),
+			text(path.join(pluginDir, "skills", "setup", "SKILL.md")),
 		);
 		for (const shared of [
 			"retro.md",
@@ -139,16 +130,13 @@ test("the local plugin carries the local skills and manifests, and the cloud pla
 	}
 });
 
-test("nothing in the local plugin text sends the user to opaline.so or talks about a team", () => {
-	const files = [];
-	const walk = (dir) => {
-		for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-			const file = path.join(dir, entry.name);
-			if (entry.isDirectory()) walk(file);
-			else files.push(file);
-		}
-	};
-	walk(localPluginDir);
+test("nothing in the plugin's manifests or skills sends the user to opaline.so or talks about a team", () => {
+	const files = [
+		".claude-plugin/plugin.json",
+		".codex-plugin/plugin.json",
+		"skills/opaline/SKILL.md",
+		"skills/setup/SKILL.md",
+	].map((file) => path.join(pluginDir, file));
 	const found = [];
 	for (const file of files) {
 		const content = text(file).replace(
@@ -165,17 +153,15 @@ test("nothing in the local plugin text sends the user to opaline.so or talks abo
 			/share it with/i,
 		]) {
 			const match = content.match(phrase);
-			if (match) found.push([path.relative(localPluginDir, file), match[0]]);
+			if (match) found.push([path.relative(pluginDir, file), match[0]]);
 		}
 	}
 	expect(found).toEqual([]);
 });
 
-test("the local skills have valid front matter, and the opaline skill triggers on session analysis in either agent", () => {
+test("the skills have valid front matter, and the opaline skill triggers on session analysis in either agent", () => {
 	for (const skill of ["opaline", "setup"]) {
-		const content = text(
-			path.join(localPluginDir, "skills", skill, "SKILL.md"),
-		);
+		const content = text(path.join(pluginDir, "skills", skill, "SKILL.md"));
 		const front = /^---\n([\s\S]*?)\n---\n/.exec(content);
 		const parsed = Bun.YAML.parse(front?.[1] ?? "");
 		expect(parsed.name).toBe(skill);
@@ -184,7 +170,7 @@ test("the local skills have valid front matter, and the opaline skill triggers o
 	}
 	const description = Bun.YAML.parse(
 		/^---\n([\s\S]*?)\n---\n/.exec(
-			text(path.join(localPluginDir, "skills", "opaline", "SKILL.md")),
+			text(path.join(pluginDir, "skills", "opaline", "SKILL.md")),
 		)[1],
 	).description;
 	for (const trigger of [
@@ -199,43 +185,17 @@ test("the local skills have valid front matter, and the opaline skill triggers o
 		expect(description).toContain(trigger);
 });
 
-test("the local skill names only tools the cloud skill names too", () => {
-	const tools = (content) =>
-		new Set(
-			[...content.matchAll(/`([a-z]+(?:_[a-z]+)+|[a-z]+)`/g)].map(
-				(match) => match[1],
-			),
-		);
-	const cloud = tools(
-		text(path.join(pluginDir, "skills", "opaline", "SKILL.md")),
-	);
-	const local = [
-		...tools(text(path.join(localPluginDir, "skills", "opaline", "SKILL.md"))),
-		...tools(text(path.join(localPluginDir, "skills", "setup", "SKILL.md"))),
-	].filter((name) =>
-		/^(?:[a-z]+_[a-z_]+|find|read|run|sql|schema|answers|measures|patterns|checks|search)$/.test(
-			name,
-		),
-	);
-	expect(
-		local.filter(
-			(name) =>
-				!cloud.has(name) && name !== "agent_feedback" && name !== "claude_code",
-		),
-	).toEqual([]);
-});
-
-test("changing the local skill text changes the plugin version", () => {
-	const first = writeMarketplace({ pluginDir, localPluginDir, server }).version;
-	const changed = path.join(root, "opaline-local");
-	fs.cpSync(localPluginDir, changed, { recursive: true });
+test("changing the skill text changes the plugin version", () => {
+	const first = writeMarketplace({ pluginDir, server }).version;
+	const changed = path.join(root, "changed-plugin");
+	fs.cpSync(pluginDir, changed, { recursive: true });
 	fs.appendFileSync(
 		path.join(changed, "skills", "opaline", "SKILL.md"),
 		"\nMore.\n",
 	);
-	expect(
-		writeMarketplace({ pluginDir, localPluginDir: changed, server }).version,
-	).not.toBe(first);
+	expect(writeMarketplace({ pluginDir: changed, server }).version).not.toBe(
+		first,
+	);
 });
 
 const fakeHome = () => {

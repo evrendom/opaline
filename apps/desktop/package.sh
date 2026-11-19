@@ -68,7 +68,6 @@ printf '{"commit":"%s","dirty":%s}\n' "$(git -C "$repo" rev-parse --short=9 HEAD
 cp "$repo/packages/local-server/dist/local-server.js" "$dest/local-server/"
 printf '{"type":"module"}\n' > "$dest/local-server/package.json"
 cp -R "$repo/plugins/opaline" "$dest/agent-plugin"
-cp -R "$repo/plugins/opaline-local" "$dest/agent-plugin-local"
 cp "$server_manifest" "$server_tarball" "$resources/server/"
 if [ "$layout" = unpacked ]; then
 	cp -R "$work/unpacked/bin/." "$resources/runtimes/"

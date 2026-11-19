@@ -1,15 +1,15 @@
 ---
 name: setup
-description: "Set up Opaline right after the plugin is installed. Check that the workspace has uploaded sessions and, if not, point the user to opaline.so to connect their coding agents."
+description: "Set up Opaline right after the plugin is installed. Check that the Opaline app on this Mac has imported sessions and, if not, point the user to the Opaline app to connect their coding agents."
 ---
 
 # Set up Opaline
 
-Opaline helps a team find where their coding agents get stuck or waste time, so they can fix their setup (instructions, docs, scripts, CI).
+Opaline analyses the Claude Code and Codex sessions on this Mac: where the agents get stuck or waste time and money, and what to fix in the setup (instructions, docs, scripts, hooks, CI). The Opaline app imports the sessions and runs the analysis here. Nothing leaves this Mac.
 
 Use only `list_workspaces` here. It reads no session content and saves nothing.
 
-1. Call `list_workspaces`. Each workspace has `sessionsLast365Days`: the sessions you can see from the last 365 days (the whole team's). The entry with `default: true` is the workspace Opaline answers from; name it. If the user belongs to more than one workspace, say they can name another workspace in their question, or change the default under **Default workspace** in the plugin settings where their app has them (ChatGPT and Codex).
-2. Look at the default workspace's `sessionsLast365Days`.
-   - Above 0: say Opaline is ready and suggest two team questions, such as "Where did our agents get stuck or waste the most time this month?" or "What mistakes keep coming back in our agent runs?". They can also ask to see the Opaline dashboard.
-   - 0: say there are no sessions you can see yet. Tell the user to open https://opaline.so, sign in and follow the steps there to connect their coding agents. Each teammate connects their own, so team questions get better as more of the team joins. Don't run any commands for them. Once they're done, check again with `list_workspaces`.
+1. Call `list_workspaces`. When the tool is missing or cannot connect, the Opaline server on this Mac is not running: ask the user to open the Opaline app, then call it again.
+2. Look at `sessionsLast365Days`.
+   - Above 0: say Opaline is ready and suggest two questions, such as "Where did my agents get stuck or waste the most time this week?" or "Compare my Claude Code and Codex runs this month". They can also ask to see the Opaline dashboard.
+   - 0: say no sessions have been imported yet. Tell the user to open the Opaline app and connect their agents there; it imports the sessions already on this Mac. Don't run any commands for them. Once they're done, check again with `list_workspaces`.

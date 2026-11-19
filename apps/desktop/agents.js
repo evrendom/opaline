@@ -131,7 +131,7 @@ function treeDigest(hash, dir) {
 	walk("");
 }
 
-function writeMarketplace({ pluginDir, localPluginDir, server }) {
+function writeMarketplace({ pluginDir, server }) {
 	const root = marketplaceDir();
 	const hook = (agent) => ({
 		type: "command",
@@ -167,7 +167,6 @@ function writeMarketplace({ pluginDir, localPluginDir, server }) {
 	};
 	const hash = crypto.createHash("sha256").update(JSON.stringify(variants));
 	treeDigest(hash, pluginDir);
-	treeDigest(hash, localPluginDir);
 	const fingerprint = hash.digest("hex").slice(0, 10);
 	const base = String(
 		parse(
@@ -182,8 +181,6 @@ function writeMarketplace({ pluginDir, localPluginDir, server }) {
 		const target = path.join(root, `opaline-${agent}`);
 		fs.rmSync(target, { recursive: true, force: true });
 		fs.cpSync(pluginDir, target, { recursive: true });
-		if (localPluginDir)
-			fs.cpSync(localPluginDir, target, { recursive: true, force: true });
 		fs.writeFileSync(
 			path.join(target, ".mcp.json"),
 			`${JSON.stringify({ mcpServers: { opaline: variant.mcp } }, null, 2)}\n`,
@@ -554,7 +551,6 @@ async function addMarketplace(key, binary, root) {
 function createAgents({ stack, confirmInstructionLine = askInstructionLine }) {
 	const marketplaceSources = () => ({
 		pluginDir: stack.bundle.pluginDir,
-		localPluginDir: stack.bundle.localPluginDir,
 	});
 
 	async function prepareMarketplace() {
@@ -564,8 +560,6 @@ function createAgents({ stack, confirmInstructionLine = askInstructionLine }) {
 		if (!server) throw new Error("The local Opaline server is not ready yet.");
 		if (!stack.bundle.pluginDir || !stack.bundle.launcherPath)
 			throw new Error("This build has no agent plugin.");
-		if (!stack.bundle.localPluginDir)
-			log("this build has no local plugin text; agents get the cloud text");
 		writeHookScript({
 			launcherPath: stack.bundle.launcherPath,
 			dataDir: server.dataDir,

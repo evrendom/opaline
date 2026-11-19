@@ -1,44 +1,41 @@
 {
 	"name": "opaline",
 	"version": "1.4.1",
-	"description": "Team-wide insight into your coding agents: where they waste time and money, and which mistakes keep coming back.",
+	"description": "Analyse your Claude Code and Codex sessions on this Mac: where your agents get stuck or waste time and money, and what to fix in your setup. Nothing leaves this Mac.",
 	"author": {
 		"name": "Opaline",
-		"email": "evren@opaline.so",
 		"url": "https://opaline.so"
 	},
 	"homepage": "https://opaline.so",
 	"repository": "https://github.com/evrendom/opaline",
-	"license": "MIT",
+	"license": "Apache-2.0",
 	"keywords": [
 		"opaline",
 		"analytics",
 		"coding-agents",
-		"team",
-		"cost"
+		"claude-code",
+		"codex",
+		"local"
 	],
 	"skills": "./skills/",
 	"mcpServers": "./.mcp.json",
 	"interface": {
 		"displayName": "Opaline",
-		"shortDescription": "Improve your agent setup",
-		"longDescription": "Opaline helps your team improve its coding agent setup. It finds where agents get stuck or waste time and money, so you can fix the instructions, docs, scripts and CI behind it. Every member of a workspace can analyze the whole team's sessions.\n\nAsk in plain words: \"Where did our agents get stuck or waste the most time this month?\", \"Which repositories cost us the most, and why?\", \"What mistakes keep coming back in our agent runs?\". Opaline looks through the sessions your team has uploaded, finds the patterns, reads the runs that show them and answers with the evidence and a suggested fix. A dashboard shows cost and usage by repository and model, and per member to see where each person's setup needs help. Answers describe team patterns and setup fixes, not rankings of people.\n\nAnswers are saved, so the next question on the same topic updates the last answer instead of starting over, and you can share them with your workspace.\n\nTo start, each teammate connects their coding agents at opaline.so. After you install the plugin, it walks you through it.\n\nOpaline only reads workspaces you belong to and never changes or deletes sessions.",
+		"shortDescription": "Analyse your agent sessions on this Mac",
+		"longDescription": "Opaline analyses the Claude Code and Codex sessions on this Mac. It finds where your agents get stuck, loop or waste time and money, reads the runs that show why, and suggests the fix in your setup: instructions, skills, docs, scripts, hooks or CI.\n\nAsk in plain words: \"Where did my agents get stuck this week?\", \"Why was that run so slow?\", \"Compare my Claude Code and Codex runs\", \"What did my sessions cost this month?\". Answers are saved in the Opaline app, so the next question on the same topic updates the last answer instead of starting over.\n\nThe Opaline app imports the sessions and runs the analysis on this Mac. Nothing leaves this Mac. If there are no sessions yet, open the Opaline app and connect your agents there.",
 		"developerName": "Opaline",
 		"category": "Developer Tools",
 		"capabilities": [
-			"Find where your coding agents get stuck or waste time and money across the whole team's sessions",
-			"Spot mistakes that keep coming back, and see whether a fix worked",
-			"Get a concrete fix for your setup: instructions, docs, scripts or CI",
-			"Save answers, update them later and share them with your workspace"
+			"Find where your Claude Code and Codex agents get stuck or waste time and money",
+			"Explain why a run was slow or expensive, and compare Claude Code with Codex",
+			"Get a concrete fix for your setup: instructions, docs, scripts, hooks or CI",
+			"Save answers in the Opaline app and update them later"
 		],
 		"websiteURL": "https://opaline.so",
-		"supportURL": "https://opaline.so/support/",
-		"privacyPolicyURL": "https://opaline.so/legal/privacy-policy/",
-		"termsOfServiceURL": "https://opaline.so/legal/terms-of-service/",
 		"defaultPrompt": [
-			"Where did our coding agents get stuck or waste the most time this month?",
-			"Which repositories cost us the most over the last 4 weeks, and why?",
-			"What mistakes keep coming back in our agent runs?"
+			"Where did my coding agents get stuck or waste the most time this week?",
+			"Why were my most expensive runs this month so expensive?",
+			"Compare my Claude Code and Codex runs over the last 30 days."
 		],
 		"brandColor": "#1F1F1F",
 		"brandColorDark": "#ECECEC",
@@ -47,66 +44,7 @@
 	},
 	"extensions": {
 		"com.openai": {
-			"onboardingSkill": "./skills/setup/SKILL.md",
-			"review": {
-				"test_cases": {
-					"positive": [
-						{
-							"description": "Where agents get stuck over a month",
-							"prompt": "Where did our coding agents get stuck or waste the most time over the last 30 days?",
-							"tools_triggered": "search_answers, get_answer (only if search_answers finds a matching saved answer), find, read, save_answer",
-							"expected_behavior": "find, read and save_answer may ask for permission once; choosing \"always allow\" is fine. States the scope it used (the last 30 days, every session the account can see) and the coverage from the find header. Names a few concrete causes, such as agents following outdated web-app docs and repeated no-console lint failures, ranked by time and cost, each backed by evidence from several sessions and weeks, and says how many runs it read out of how many matched. Suggests a setup fix for each (docs, scripts, lint config or instructions), saves the answer and then gives it in full."
-						},
-						{
-							"description": "Cost by repository, and why",
-							"prompt": "Which repositories cost our team the most over the last 4 weeks, and why?",
-							"tools_triggered": "search_answers, get_answer (only if search_answers finds a matching saved answer), find, read, save_answer",
-							"expected_behavior": "find, read and save_answer may ask for permission once; choosing \"always allow\" is fine. Gives the estimated API cost in USD per repository for the stated date range, mentions any unpriced runs, and explains what drove the cost in the top repositories from runs it read (for example repeated retries in web-app), with a setup fix where one applies. Does not rank people. Saves the answer and then gives it in full."
-						},
-						{
-							"description": "Recurring mistakes across the team",
-							"prompt": "What mistakes keep coming back in our agent runs over the last 6 weeks?",
-							"tools_triggered": "search_answers, get_answer (only if search_answers finds a matching saved answer), find, read, save_answer",
-							"expected_behavior": "find, read and save_answer may ask for permission once; choosing \"always allow\" is fine. Groups failed tool calls by cause, reads a sample of the runs behind the largest groups and names the recurring mistakes with evidence from several sessions and weeks: agents following outdated web-app docs (a missing typecheck script, dollars instead of cents) and repeated no-console lint failures. Suggests a setup fix for each (for example update the docs, or add the lint rule to the agent instructions), does not rank people, and saves the answer before giving it."
-						},
-						{
-							"description": "Team dashboard in the chat",
-							"prompt": "Show the Opaline dashboard for our team for the last 30 days.",
-							"tools_triggered": "get_dashboard",
-							"expected_behavior": "Shows the Opaline dashboard in the chat for the last 30 days, with estimated API cost, sessions and agent runs over time and breakdowns by repository and model. It does not answer with a link instead and needs no permission prompt."
-						},
-						{
-							"description": "Update an earlier answer and share it",
-							"prompt": "Check again where our agents got stuck over the last 30 days, update the earlier answer if there is one, and share it with my workspace.",
-							"tools_triggered": "search_answers, get_answer (only if search_answers finds a matching saved answer), find, read, save_answer, share_answer",
-							"expected_behavior": "find, read, save_answer and share_answer may ask for permission once; choosing \"always allow\" is fine. Searches the saved answers first. If one on the same topic exists (for example from an earlier test), it says so and answers for the last 30 days: totals and rankings are computed fresh over the whole 30 days, it reads new runs only after the earlier answer's last day, and it keeps or drops earlier findings only if their evidence falls inside the 30 days. Before reusing an earlier finding it checks the stored result behind it and re-reads the runs if a session changed. It saves a new answer that says which findings were confirmed, weakened, new or dropped (without an earlier answer it answers from scratch), then shares the saved answer with the workspace, and only then gives its final message: the saved answer, a note that it updated the earlier answer named by its title and the last day of data it covered, and one line confirming the answer is shared (or saying sharing failed). It does not single out or rank people."
-						}
-					],
-					"negative": [
-						{
-							"description": "Deleting sessions is not supported: no tool deletes or edits session data",
-							"prompt": "Delete all of my coding sessions from last week in Opaline.",
-							"expected_behavior": "Says Opaline cannot delete or edit sessions from the chat, calls no tool that changes data, and points the user to opaline.so."
-						},
-						{
-							"description": "Billing changes are not supported: the plugin cannot change plans or take payments",
-							"prompt": "Upgrade my Opaline workspace to the paid plan.",
-							"expected_behavior": "Says the plugin cannot change plans or take payments, calls no tool, and points the user to the workspace settings on opaline.so."
-						},
-						{
-							"description": "Workspaces the account does not belong to are not accessible",
-							"prompt": "Show the coding agent costs of the acme-corp workspace in Opaline.",
-							"expected_behavior": "Does not show any data from acme-corp: the workspace is not one the account belongs to, so the tool call is refused or it checks list_workspaces first. It says so and offers the workspaces the account does belong to."
-						}
-					]
-				},
-				"commerce": false,
-				"commerce_description": "Opaline does not sell products or process payments in ChatGPT or Codex.",
-				"demo_recording_url": "https://www.youtube.com/watch?v=9nxh58DtOpU"
-			},
-			"publication": {
-				"release_notes": "Opaline now focuses on improving your team's agent setup: find where agents get stuck or waste time, and what to fix. The assistant uses nine tools, one operation each, with plain descriptions; the dashboard's data tools are used only by the dashboard. find and read take only what they need to look up runs, never the user's question; save_answer saves a short title instead. find and read keep their calls as a private draft that nobody can open; it is kept only when save_answer saves it, and unsaved drafts are deleted after 7 days. A saved answer is never changed; an update is a new answer that says how each finding changed. share_answer only adds access."
-			}
+			"onboardingSkill": "./skills/setup/SKILL.md"
 		}
 	}
 }

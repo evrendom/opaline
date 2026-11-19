@@ -1,8 +1,0 @@
-{
-	"mcpServers": {
-		"opaline": {
-			"type": "streamable-http",
-			"url": "https://opaline.so/api/mcp"
-		}
-	}
-}

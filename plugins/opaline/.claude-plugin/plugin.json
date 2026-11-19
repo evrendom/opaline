@@ -1,14 +1,20 @@
 {
 	"name": "opaline",
 	"version": "1.4.1",
-	"description": "Team-wide insight into your coding agents: where they waste time and money, and which mistakes keep coming back.",
+	"description": "Analyse your Claude Code and Codex sessions on this Mac: where your agents get stuck or waste time and money, and what to fix in your setup. Nothing leaves this Mac.",
 	"author": {
 		"name": "Opaline",
-		"email": "evren@opaline.so",
 		"url": "https://opaline.so"
 	},
 	"homepage": "https://opaline.so",
 	"repository": "https://github.com/evrendom/opaline",
-	"license": "MIT",
-	"keywords": ["opaline", "analytics", "coding-agents", "team", "cost"]
+	"license": "Apache-2.0",
+	"keywords": [
+		"opaline",
+		"analytics",
+		"coding-agents",
+		"claude-code",
+		"codex",
+		"local"
+	]
 }

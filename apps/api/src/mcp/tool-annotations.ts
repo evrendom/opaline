@@ -1,6 +1,6 @@
 /**
- * MCP tool annotations. Every tool declares its own; the OpenAI plugin review
- * checks them against what the tool does (docs/plugin-directory-review.md).
+ * MCP tool annotations. Every tool declares its own; clients use them to decide
+ * which calls need the user's permission.
  */
 export interface McpToolAnnotations {
 	readonly readOnlyHint: boolean;

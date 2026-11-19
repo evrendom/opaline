@@ -31,8 +31,6 @@
 		"chkit:unlink": "bun scripts/chkit-link.ts unlink",
 		"build:site": "bun scripts/build-site.ts",
 		"build:selfhost": "bun scripts/build-selfhost.ts",
-		"plugin:screenshots": "bun scripts/plugin-screenshots.ts",
-		"plugin:zip": "bun scripts/build-plugin-zip.ts",
 		"check-types:vercel": "tsc --project deploy/cloud/tsconfig.json",
 		"check-types:convex": "tsc --project deploy/cloud/convex/tsconfig.json",
 		"convex:dev": "cd deploy/cloud && convex dev",

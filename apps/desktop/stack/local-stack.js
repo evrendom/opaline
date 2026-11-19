@@ -71,10 +71,6 @@ function resolveBundle({ app, resourcesPath }) {
 		path.join(appRoot, "agent-plugin"),
 		path.join(appRoot, "..", "..", "plugins", "opaline"),
 	]);
-	const localPluginDir = firstExisting([
-		path.join(appRoot, "agent-plugin-local"),
-		path.join(appRoot, "..", "..", "plugins", "opaline-local"),
-	]);
 	const runtimesDir = resources && path.join(resources, "runtimes");
 	const manifest = runtimesDir
 		? readJson(path.join(runtimesDir, "runtimes.json"))
@@ -106,7 +102,6 @@ function resolveBundle({ app, resourcesPath }) {
 		resources,
 		launcherPath,
 		pluginDir,
-		localPluginDir,
 		clickhouse: runtime("clickhouse"),
 		postgres: runtime("postgres"),
 		bun: runtime("bun"),

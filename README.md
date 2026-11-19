@@ -71,7 +71,7 @@ Session transcripts contain whatever your agents saw: source code, prompts, comm
 | `apps/marketing` | The website |
 | `apps/cli` | The CLI (npm `opaline`, `@opalinehq/cli`, `rudel`), with its launchers in `packages/opaline` and `packages/rudel-alias` |
 | `apps/cli-harness` | An older CLI copy that the API integration and version-skew tests run against; not published |
-| `plugins/opaline` | The Claude Code and Codex plugin |
+| `plugins/opaline` | The Claude Code and Codex plugin; the Mac app installs it from "Connect your agents" |
 | `deploy/selfhost` | The Docker Compose stack for a team server |
 | `deploy/dev` | Postgres and ClickHouse for local development (`bun run infra:up`) |
 | `deploy/cloud` | The hosted service's Vercel functions, Convex functions and load tests; not used by the Mac app or a self-hosted server |
