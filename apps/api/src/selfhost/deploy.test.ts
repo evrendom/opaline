@@ -153,7 +153,10 @@ describe("the self-hosted compose stack", () => {
 
 describe("the images", () => {
 	const nas = read("Dockerfile");
-	const source = readFileSync(join(ROOT, "Dockerfile"), "utf8");
+	const source = readFileSync(
+		join(ROOT, "deploy/selfhost/source.Dockerfile"),
+		"utf8",
+	);
 
 	test("the source build and the NAS image share the Bun and runtime stages", () => {
 		for (const name of ["bun", "runtime"])
