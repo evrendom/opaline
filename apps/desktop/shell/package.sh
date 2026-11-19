@@ -139,7 +139,6 @@ build_dmg() {
 	done
 	mkdir -p "$stage/.background"
 	cp -cR "$app" "$stage/" 2>/dev/null || { rm -rf "$stage/Opaline.app"; ditto "$app" "$stage/Opaline.app"; }
-	ln -s /Applications "$stage/Applications"
 	cp "$here/dmg/background-$dmg_theme.tiff" "$stage/.background/background.tiff"
 	size=$(($(du -sm "$stage" | cut -f1) * 11 / 10 + 64))
 	hdiutil create -srcfolder "$stage" -volname Opaline -fs HFS+ -format UDRW -size "${size}m" "$rw" >/dev/null
@@ -148,6 +147,14 @@ build_dmg() {
 	volume=$(printf '%s\n' "$attached" | sed -n 's|^.*[[:space:]]\(/Volumes/.*\)$|\1|p' | tail -n 1)
 	trap 'hdiutil detach "$device" -force >/dev/null 2>&1' EXIT
 	[ "$volume" = /Volumes/Opaline ] || { echo "$rw mounted at ${volume:-nowhere}, not /Volumes/Opaline." >&2; exit 1; }
+	osascript -l JavaScript - "$volume" >/dev/null <<'JXA'
+ObjC.import("AppKit");
+function run([volume]) {
+	Application("Finder").make({ new: "aliasFile", at: Path(volume), to: Path("/Applications"), withProperties: { name: "Applications" } });
+	const workspace = $.NSWorkspace.sharedWorkspace;
+	if (!workspace.setIconForFileOptions(workspace.iconForFile("/Applications"), `${volume}/Applications`, 0)) throw new Error("could not set the Applications icon");
+}
+JXA
 	osascript >/dev/null <<'APPLESCRIPT'
 tell application "Finder"
 	tell disk "Opaline"
