@@ -54,7 +54,7 @@ Session transcripts contain whatever your agents saw: source code, prompts, comm
 | `apps/desktop` | The Mac app (Electron), its onboarding and packaging |
 | `packages/local-server` | Runs the local server, Postgres and ClickHouse for the app |
 | `apps/api` | The server: ingest, analysis, MCP |
-| `apps/web` | The dashboard |
+| `apps/ui` | The UI: the dashboard the Mac app shows (React) |
 | `apps/cli` | The CLI (npm `opaline`, `@opalinehq/cli`, `rudel`), with its launchers in `packages/opaline` and `packages/rudel-alias` |
 | `apps/cli-harness` | An older CLI copy that the API integration and version-skew tests run against; not published |
 | `plugin` | The Claude Code and Codex plugin; the Mac app installs it from "Connect your agents" |

@@ -1,6 +1,6 @@
 # Opaline
 
-A Mac app that analyses Claude Code and Codex sessions. The app (`apps/desktop`, Electron) runs the server (`apps/api`) and the dashboard (`apps/web`) on the Mac, with its own Postgres and ClickHouse, and serves the MCP endpoint the agents connect to. The CLI (`apps/cli`) uploads sessions to the hosted service at `opaline.so`, which is developed in a separate private repository.
+A Mac app that analyses Claude Code and Codex sessions. The app (`apps/desktop`, Electron) runs the server (`apps/api`) and the dashboard (`apps/ui`) on the Mac, with its own Postgres and ClickHouse, and serves the MCP endpoint the agents connect to. The CLI (`apps/cli`) uploads sessions to the hosted service at `opaline.so`, which is developed in a separate private repository.
 
 This file is the instructions for every coding agent: Codex reads `AGENTS.md`, and Claude Code reads it because the repository has no `CLAUDE.md`.
 
@@ -12,7 +12,7 @@ This file is the instructions for every coding agent: Codex reads `AGENTS.md`, a
 - The product is Opaline. Rudel is a legacy name.
 - Wrapped is retired. Do not use its old code, screenshots, docs, or Git history as the source for current onboarding or product design.
 - New users continue setup at `/welcome`. Returning users open `/{workspace}/sessions`, using the actual workspace slug.
-- Current onboarding lives in `apps/web/src/features/cli-onboarding/`.
+- Current onboarding lives in `apps/ui/src/features/cli-onboarding/`.
 - Preserve CLI pairing, browser-approved workspace binding, and completion updates when changing onboarding or `opaline --code`.
 - Historical `.context` worktrees and launch notes are not current product specifications.
 
@@ -23,7 +23,7 @@ This file is the instructions for every coding agent: Codex reads `AGENTS.md`, a
 
 ## Web UI
 
-- Menus, selects and popover lists get the fluid hover by building them from the components that carry it: `apps/web/src/app/ui` (dropdown-menu, select, popover), `components/dashboard/select`, and `SessionMenuPopup` for the session-style menus. Do not hand-roll a Base UI popup.
+- Menus, selects and popover lists get the fluid hover by building them from the components that carry it: `apps/ui/src/app/ui` (dropdown-menu, select, popover), `components/dashboard/select`, and `SessionMenuPopup` for the session-style menus. Do not hand-roll a Base UI popup.
 
 ## Tests
 
@@ -43,7 +43,7 @@ This file is the instructions for every coding agent: Codex reads `AGENTS.md`, a
 |-----|---------|-------------|
 | `apps/api` | `@rudel/api` | HTTP API server (Bun). Auth via `better-auth`, RPC via `@orpc/server`, session ingestion into ClickHouse. |
 | `apps/cli` | `@opalinehq/cli` | The published CLI, installed as npm `opaline` (`packages/opaline`) or `rudel` (`packages/rudel-alias`). CI also uses it for the version-skew tests and the CLI → API → ClickHouse integration tests. Released by `.github/workflows/release.yml`; see `docs/releasing.md`. |
-| `apps/web` | `@rudel/web` | React SPA (Vite + Tailwind + shadcn). Auth UI and CLI login portal. |
+| `apps/ui` | `@rudel/web` | React SPA (Vite + Tailwind + shadcn). Auth UI and CLI login portal. |
 
 ### Packages
 
@@ -100,7 +100,7 @@ Local development databases: `scripts/dev-compose.yml` starts Postgres and Click
 | `OPALINE_SELF_HOSTED` | No | `1` makes the server a single-team self-hosted install (`apps/api/src/selfhost/main.ts` sets it): every workspace gate open, no billing, no Stripe/PostHog/Sentry/Slack calls, jobs run in process, `/api/selfhost/*` exists. Anything that only applies to it checks `isSelfHosted()` (`lib/self-hosted.ts`), so production is unchanged. |
 | `OPALINE_SETUP_TOKEN` | Self-hosted | Shared secret (16+ characters) between whatever starts the server (the Mac app's local server) and the server: `POST /api/selfhost/setup` (`X-Opaline-Setup-Token`) creates the owner account while no account exists, and `POST /api/selfhost/login-link` with it makes a sign-in link for any account. Unset: setup answers 403. |
 | `OPALINE_DATA_DIR` | Self-hosted | Directory for server files; the local object store lives in `<dir>/object-store` unless `S3_*` or `R2_*` select another store. |
-| `OPALINE_WEB_DIR` | Self-hosted | The built web app (`apps/web/dist`, with `dist-plugin` next to it); must contain `index.html`. Unset: API only. |
+| `OPALINE_WEB_DIR` | Self-hosted | The built web app (`apps/ui/dist`, with `dist-plugin` next to it); must contain `index.html`. Unset: API only. |
 | `OPALINE_VERSION` | Self-hosted | Version reported by `GET /api/selfhost/info` (default `dev`). |
 | `HOST` | Self-hosted | Listen address (default `127.0.0.1`; `PORT` defaults to 4100 when self-hosted). |
 | `CLICKHOUSE_FLAVOR` | Self-hosted | `auto` (default) probes `system.table_engines` for Shared engines and `system.storage_policies` for `s3`, and creates plain tables on the default disk without them; `oss` skips the engine probe, `cloud` assumes both. |
@@ -239,7 +239,7 @@ Per-workspace switches live in Postgres `workspace_feature` (migration 0066), se
 
 ## Compass: noticeable runs and patterns
 
-Compass (`/compass`, `apps/web/src/features/compass/`, the first sidebar item where it is on) is an inbox in the dashboard's colours (`cost-dashboard.css`, plus `compass.css`): on the left the range's noticeable runs (or, on the Patterns tab, the patterns their observations form), filtered by flag and by everyone or mine, with the settings button beside the filters; on the right everything about the selected one. A run's detail (`analytics.moments.run`) shows its flags (a click jumps to the records each points at), its observation, and every record of the run in order from its transcript-records generation (`turn_idx` of the run, meta left out, at most `RUN_RECORDS_MAX` records of `RUN_RECORD_TEXT_MAX_CHARS` each), the records a flag points at marked in its colour. Workspace features `moments` (Compass), `moment_observations` and `frustration_check`, all off by default; see CONTEXT.md "Moment". Contract `packages/api-routes/src/moments.ts`; services `apps/api/src/services/moments/`; design `docs/adr/0006-moments-observations-patterns.md`.
+Compass (`/compass`, `apps/ui/src/features/compass/`, the first sidebar item where it is on) is an inbox in the dashboard's colours (`cost-dashboard.css`, plus `compass.css`): on the left the range's noticeable runs (or, on the Patterns tab, the patterns their observations form), filtered by flag and by everyone or mine, with the settings button beside the filters; on the right everything about the selected one. A run's detail (`analytics.moments.run`) shows its flags (a click jumps to the records each points at), its observation, and every record of the run in order from its transcript-records generation (`turn_idx` of the run, meta left out, at most `RUN_RECORDS_MAX` records of `RUN_RECORD_TEXT_MAX_CHARS` each), the records a flag points at marked in its colour. Workspace features `moments` (Compass), `moment_observations` and `frustration_check`, all off by default; see CONTEXT.md "Moment". Contract `packages/api-routes/src/moments.ts`; services `apps/api/src/services/moments/`; design `docs/adr/0006-moments-observations-patterns.md`.
 
 - **Flags** (`moment-rules.ts`, registry `COMPASS_FLAGS`) make a run noticeable: file searches (reads and searches before the first edit, or without one), expensive and long runs (the top percent of the range's runs by cost or duration, with at least 20 runs to rank), edit churn (one file edited again and again), failing streak, repeated failing command, CI failed (`gh pr checks` or `gh run watch|view` with a failing exit status; 8, pending, does not count), git reverted (revert, reset --hard, restore without --staged, checkout --, clean -f), calls denied, interrupted, context compacted, redirected mid-run (Claude Code queued prompts), model apology (the dashboard's apology phrases in the first 1,024 characters of an assistant message) and user frustrated. They are read from each run's committed `run_index` build and its transcript-records generation in one ClickHouse query per page (at most 5,000 runs), with no model and nothing stored.
 - **Settings** (the settings button on Compass, `compass_settings`, migration 0068): each flag on or off with its value, per workspace; owners and admins change them (`analytics.moments.updateSettings`, saved on each change), members see them. No row means every flag on at its default.

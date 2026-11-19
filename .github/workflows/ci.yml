@@ -101,7 +101,7 @@ jobs:
         run: bun run turbo run build --concurrency=1
 
       - name: Verify browser resource budgets in Chrome
-        run: bun run --cwd apps/web test:resource-budgets:chrome
+        run: bun run --cwd apps/ui test:resource-budgets:chrome
 
   integration:
     # Pushes to main follow the same filter; manual runs always run it.

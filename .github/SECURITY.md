@@ -31,4 +31,4 @@ This policy covers the Opaline platform:
 
 - API server (`apps/api`)
 - CLI tool (`opaline`, `@opalinehq/cli` and `rudel` on npm, built from `apps/cli` in this repository)
-- Web application (`apps/web`)
+- Web application (`apps/ui`)

@@ -112,7 +112,7 @@ test("every problem is reported at once, in words a user can act on", () => {
 		"BETTER_AUTH_SECRET must be at least 32 characters",
 		"OPALINE_SETUP_TOKEN must be at least 16 characters",
 		"CRON_SECRET must be at least 16 characters",
-		"OPALINE_WEB_DIR=/nonexistent/dist has no index.html; point it at the built web app (apps/web/dist)",
+		"OPALINE_WEB_DIR=/nonexistent/dist has no index.html; point it at the built web app (apps/ui/dist)",
 	]);
 	expect(
 		problems({

@@ -139,7 +139,7 @@ async function git(args: string[]): Promise<string | null> {
 }
 
 async function buildWeb(): Promise<void> {
-	const web = join(root, "apps/web");
+	const web = join(root, "apps/ui");
 	const reusable =
 		values["reuse-web"] &&
 		existsSync(join(web, "dist/index.html")) &&

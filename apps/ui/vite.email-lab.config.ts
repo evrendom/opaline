@@ -1,7 +1,7 @@
 // Email lab: the usage digest emails rendered from fixtures, with a client
 // simulator and Agentation.
 //
-//   bun run --cwd apps/web dev:email-lab   → http://localhost:4011/email-lab.html
+//   bun run --cwd apps/ui dev:email-lab   → http://localhost:4011/email-lab.html
 //
 // The simulator reads caniemail.com's support data (MIT). This server
 // downloads it once and serves it from a cache outside the repository,

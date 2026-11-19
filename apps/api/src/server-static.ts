@@ -6,6 +6,6 @@ export type ServerStaticFallback = StaticFallback;
 export function createServerStaticFallback(): ServerStaticFallback {
 	return createStaticFallback({
 		directory: join(import.meta.dir, "..", process.env.STATIC_DIR ?? "public"),
-		pluginBuildDirectory: join(import.meta.dir, "../../web/dist-plugin"),
+		pluginBuildDirectory: join(import.meta.dir, "../../ui/dist-plugin"),
 	});
 }

@@ -10,7 +10,7 @@ import {
 	sessionUrl,
 } from "./app-links.js";
 
-const WEB = join(import.meta.dir, "../../../web/src");
+const WEB = join(import.meta.dir, "../../../ui/src");
 const saved = process.env.ALLOWED_ORIGIN;
 beforeEach(() => {
 	process.env.ALLOWED_ORIGIN = "https://opaline.so/";

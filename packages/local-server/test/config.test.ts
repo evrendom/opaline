@@ -172,7 +172,7 @@ describe("server environment", () => {
 		kind: "checkout" as const,
 		root: "/srv/athena",
 		entry: "/srv/athena/apps/api/src/selfhost/main.ts",
-		webDir: "/srv/athena/apps/web/dist",
+		webDir: "/srv/athena/apps/ui/dist",
 		hasWebBuild: true,
 		source: "checkout /srv/athena",
 	};
@@ -207,7 +207,7 @@ describe("server environment", () => {
 			CLICKHOUSE_URL: "http://127.0.0.1:18123",
 			CLICKHOUSE_USERNAME: "default",
 			CLICKHOUSE_FLAVOR: "auto",
-			OPALINE_WEB_DIR: "/srv/athena/apps/web/dist",
+			OPALINE_WEB_DIR: "/srv/athena/apps/ui/dist",
 			OPALINE_DATA_DIR: join(root, "data"),
 		});
 	});
@@ -263,11 +263,11 @@ describe("server checkout", () => {
 			kind: "checkout",
 			root,
 			entry: join(entry, "main.ts"),
-			webDir: join(root, "apps", "web", "dist"),
+			webDir: join(root, "apps", "ui", "dist"),
 			hasWebBuild: false,
 			source: `checkout ${root}`,
 		});
-		mkdirSync(join(root, "apps", "web", "dist"), { recursive: true });
+		mkdirSync(join(root, "apps", "ui", "dist"), { recursive: true });
 		writeFileSync(join(root, "apps", "web", "dist", "index.html"), "");
 		expect(
 			resolveCheckoutDistribution({ OPALINE_SERVER_DIR: root }),

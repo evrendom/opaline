@@ -12,6 +12,7 @@ import { join, relative } from "node:path";
 // `withPostgresLease` (services/postgres-lease.service.ts) for longer work.
 
 const API_SOURCE_ROOT = join(import.meta.dir, "..");
+const REPOSITORY_ROOT = join(API_SOURCE_ROOT, "..", "..", "..");
 
 test("no API source depends on Postgres session state", () => {
 	const files = sourceFiles(API_SOURCE_ROOT);

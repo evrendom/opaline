@@ -1299,7 +1299,7 @@ export async function startServices(options: {
 		if (!options.distribution.hasWebBuild)
 			context.reporter.warn(
 				options.distribution.kind === "checkout"
-					? `No web build in ${options.distribution.webDir}; the API and MCP work, the dashboard does not. Build it with \`bun run --cwd apps/web build\` in the server checkout.`
+					? `No web build in ${options.distribution.webDir}; the API and MCP work, the dashboard does not. Build it with \`bun run --cwd apps/ui build\` in the server checkout.`
 					: `The Opaline server ${options.distribution.version} has no web build in ${options.distribution.webDir}; the API and MCP work, the dashboard does not.`,
 			);
 		context.reporter.info(

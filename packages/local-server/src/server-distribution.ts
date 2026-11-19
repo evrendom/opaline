@@ -36,7 +36,7 @@ export function resolveCheckoutDistribution(
 		return new Error(
 			`${SERVER_DIR_ENV}=${configured} has no apps/api/src/selfhost/main.ts. Point it at an Opaline server checkout that includes self-hosting.`,
 		);
-	const webDir = join(root, "apps", "web", "dist");
+	const webDir = join(root, "apps", "ui", "dist");
 	return {
 		kind: "checkout",
 		root,

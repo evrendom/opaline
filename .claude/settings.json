@@ -1,14 +1,5 @@
 {
 	"permissions": {
-		"allow": [
-			"Bash(npx rudel upload --help:*)",
-			"Bash(npx rudel login:*)",
-			"Bash(netstat:*)",
-			"Bash(bun run:*)",
-			"Bash(bun test:*)",
-			"Bash(where:*)",
-			"Bash(npm root:*)",
-			"Bash(sqlite3:*)"
-		]
+		"allow": ["Bash(bun run:*)", "Bash(bun test:*)"]
 	}
 }

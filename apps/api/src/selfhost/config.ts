@@ -111,7 +111,7 @@ export function readSelfHostConfig(env: Environment): {
 	const webDir = env.OPALINE_WEB_DIR?.trim() || null;
 	if (webDir !== null && !existsSync(join(webDir, "index.html")))
 		problems.push(
-			`OPALINE_WEB_DIR=${webDir} has no index.html; point it at the built web app (apps/web/dist)`,
+			`OPALINE_WEB_DIR=${webDir} has no index.html; point it at the built web app (apps/ui/dist)`,
 		);
 	const dataDir = env.OPALINE_DATA_DIR?.trim() || null;
 	problems.push(...objectStoreConfigurationProblems(env));

@@ -68,12 +68,12 @@
 		},
 		{
 			"includes": [
-				"apps/web/src/components/analytics/**",
-				"apps/web/src/components/conversation/**",
-				"apps/web/src/features/dashboard/DashboardPage.tsx",
-				"apps/web/src/features/sessions/components/**",
-				"apps/web/src/features/sessions/reader/**",
-				"apps/web/src/hooks/useChartTheme.ts"
+				"apps/ui/src/components/analytics/**",
+				"apps/ui/src/components/conversation/**",
+				"apps/ui/src/features/dashboard/DashboardPage.tsx",
+				"apps/ui/src/features/sessions/components/**",
+				"apps/ui/src/features/sessions/reader/**",
+				"apps/ui/src/hooks/useChartTheme.ts"
 			],
 			"linter": {
 				"rules": {
@@ -111,7 +111,7 @@
 			}
 		},
 		{
-			"includes": ["apps/web/src/features/wrapped/**"],
+			"includes": ["apps/ui/src/features/wrapped/**"],
 			"linter": {
 				"rules": {
 					"style": {

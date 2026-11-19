@@ -3,7 +3,7 @@
 // sends (packages/api-routes/src/usage-digest-email.ts), so edits hot-reload
 // here.
 //
-//   bun run --cwd apps/web dev:email-lab   → http://localhost:4011/email-lab.html
+//   bun run --cwd apps/ui dev:email-lab   → http://localhost:4011/email-lab.html
 
 import {
 	buildQuietWeekEmail,
@@ -106,7 +106,7 @@ function EmailLab() {
 			)
 			.then(setData, (error: unknown) =>
 				setDataError(
-					`Client data unavailable (${String(error)}). Run the lab with \`bun run --cwd apps/web dev:email-lab\`.`,
+					`Client data unavailable (${String(error)}). Run the lab with \`bun run --cwd apps/ui dev:email-lab\`.`,
 				),
 			);
 	});

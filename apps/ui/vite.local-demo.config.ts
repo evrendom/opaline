@@ -1,7 +1,7 @@
 // Local preview of the full app against the public read-only demo workspace,
 // without a local API or database:
 //
-//   bun run --cwd apps/web dev:demo   → http://localhost:4011/
+//   bun run --cwd apps/ui dev:demo   → http://localhost:4011/
 //
 // product-demo mode holds auth requests until the marketing page's "Explore"
 // button activates the demo. There is no such button here, so activate it as

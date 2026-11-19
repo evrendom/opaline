@@ -104,7 +104,7 @@
       "name": "@rudel/desktop",
       "version": "0.1.0",
     },
-    "apps/web": {
+    "apps/ui": {
       "name": "@rudel/web",
       "version": "0.0.0",
       "dependencies": {
@@ -976,7 +976,7 @@
 
     "@rudel/usage-events": ["@rudel/usage-events@workspace:packages/usage-events"],
 
-    "@rudel/web": ["@rudel/web@workspace:apps/web"],
+    "@rudel/web": ["@rudel/web@workspace:apps/ui"],
 
     "@sec-ant/readable-stream": ["@sec-ant/readable-stream@0.4.1", "", {}, "sha512-831qok9r2t8AlxLko40y2ebgSDhenenCatLVeW/uBtnHPyhHOvG0C7TvfgecV+wHzIm5KUICgzmVpWS+IMEAeg=="],
 

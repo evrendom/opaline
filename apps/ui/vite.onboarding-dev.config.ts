@@ -1,7 +1,7 @@
 // Onboarding dev mode: work on /welcome in every state without an account,
 // API or terminal.
 //
-//   bun run --cwd apps/web dev:onboarding   → http://localhost:4011/dev/onboarding
+//   bun run --cwd apps/ui dev:onboarding   → http://localhost:4011/dev/onboarding
 //
 // The page runs as usual; its API calls get fixture answers for the state
 // picked in the floating panel (tools/onboarding-dev.ts), which also switches

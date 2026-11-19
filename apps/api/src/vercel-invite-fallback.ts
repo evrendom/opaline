@@ -6,7 +6,7 @@ import {
 	handleTeamInvitePageRequest,
 } from "./handlers/team-invite-page-http.js";
 
-const SPA_INDEX_PATH = resolve(process.cwd(), "apps/web/dist/index.html");
+const SPA_INDEX_PATH = resolve(process.cwd(), "apps/ui/dist/index.html");
 let indexHtmlPromise: Promise<string> | undefined;
 
 export async function handleVercelInviteFallback(
