@@ -4,7 +4,7 @@ See where your coding agents get stuck, and what to fix in your setup.
 
 Opaline is a Mac app for Claude Code and Codex. It reads the sessions your agents leave on your Mac and shows what they cost, where they loop or fail, which mistakes keep coming back, and what to change in your `CLAUDE.md`, `AGENTS.md`, skills, hooks, scripts or CI. Everything runs on your Mac: the app brings its own server, Postgres and ClickHouse, and nothing leaves the machine.
 
-**[Download Opaline for Mac](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-macOS-arm64.dmg)** (Apple silicon) · [evren.opaline.so](https://evren.opaline.so)
+**[Download Opaline for Mac](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-macOS-arm64.dmg)** (Apple silicon)
 
 > **Coming from the Opaline CLI?** This repository used to be `opalinehq/cli`. It now holds all of
 > Opaline: the Mac app, the server, the dashboard and the CLI. The CLI still lives here, in
