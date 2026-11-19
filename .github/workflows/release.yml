@@ -40,9 +40,9 @@ jobs:
       issues: write
       pull-requests: write
     outputs:
-      cli_release_created: ${{ steps.release.outputs['apps/cli--release_created'] }}
-      cli_tag_name: ${{ steps.release.outputs['apps/cli--tag_name'] }}
-      cli_sha: ${{ steps.release.outputs['apps/cli--sha'] }}
+      cli_release_created: ${{ steps.release.outputs['cli--release_created'] }}
+      cli_tag_name: ${{ steps.release.outputs['cli--tag_name'] }}
+      cli_sha: ${{ steps.release.outputs['cli--sha'] }}
     steps:
       - name: Run Release Please
         id: release
@@ -79,7 +79,7 @@ jobs:
           node <<'NODE'
           const fs = require("node:fs");
           let lockfile = fs.readFileSync("bun.lock", "utf8");
-          for (const workspace of ["apps/cli", "packages/opaline", "packages/rudel-alias"]) {
+          for (const workspace of ["cli", "packages/opaline", "packages/rudel-alias"]) {
             const manifest = JSON.parse(fs.readFileSync(`${workspace}/package.json`, "utf8"));
             const start = lockfile.indexOf(`    "${workspace}": {\n`);
             const end = lockfile.indexOf("\n    },", start) + "\n    },".length;
@@ -87,7 +87,7 @@ jobs:
             const original = lockfile.slice(start, end);
             let updated = original;
             const fields = { version: manifest.version };
-            if (workspace !== "apps/cli") fields["@opalinehq/cli"] = manifest.dependencies["@opalinehq/cli"];
+            if (workspace !== "cli") fields["@opalinehq/cli"] = manifest.dependencies["@opalinehq/cli"];
             for (const [field, version] of Object.entries(fields)) {
               const pattern = new RegExp(`("${field}": ")[^"]+("(?=,?\\n))`, "g");
               if ([...updated.matchAll(pattern)].length !== 1) throw new Error(`Unexpected ${field} in ${workspace}`);
@@ -136,7 +136,7 @@ jobs:
           CLI_RELEASE_SHA: ${{ needs.release_please.outputs.cli_sha }}
           CLI_RELEASE_TAG: ${{ needs.release_please.outputs.cli_tag_name || inputs.release_tag }}
         run: |
-          package_version="$(node -p "require('./apps/cli/package.json').version")"
+          package_version="$(node -p "require('./cli/package.json').version")"
           expected_cli_tag="opaline-cli@${package_version}"
 
           test "${CLI_RELEASE_TAG}" = "${expected_cli_tag}"
@@ -181,7 +181,7 @@ jobs:
         run: bun run verify
 
       - name: Publish @opalinehq/cli with provenance
-        working-directory: apps/cli
+        working-directory: cli
         env:
           OPALINE_BUILD_POSTHOG_KEY: ${{ vars.OPALINE_BUILD_POSTHOG_KEY }}
           OPALINE_BUILD_POSTHOG_HOST: ${{ vars.OPALINE_BUILD_POSTHOG_HOST }}
@@ -198,7 +198,7 @@ jobs:
 
       - name: Wait for @opalinehq/cli registry availability
         run: |
-          version="$(node -p "require('./apps/cli/package.json').version")"
+          version="$(node -p "require('./cli/package.json').version")"
           for attempt in {1..150}; do
             if [[ "$(npm view "@opalinehq/cli@${version}" version 2>/dev/null)" == "${version}" ]]; then
               exit 0

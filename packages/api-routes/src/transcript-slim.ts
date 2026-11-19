@@ -8,7 +8,7 @@ import {
  * Transcript slimming removes bytes Opaline never reads while keeping every
  * record, every line and everything its parsers use. The API applies it to
  * every upload before secret filtering; the CLI (`opalinehq/cli`,
- * `apps/cli/src/lib/transcript-slim.ts`) applies the same rules before
+ * `cli/src/lib/transcript-slim.ts`) applies the same rules before
  * upload. Both must produce identical bytes for identical input, so the API's
  * pass is a no-op on CLI-slimmed uploads and every client stores one content
  * hash. Keep the two in lockstep; the shared parity fixtures in

@@ -208,15 +208,15 @@ function notRecorded(
 }
 
 const RUN_INDEX = "run_index, counted from the stored records";
-const RUN_INDEX_TEST = "apps/api/src/__tests__/run-index.integration.ts";
+const RUN_INDEX_TEST = "app/server/src/__tests__/run-index.integration.ts";
 
 const CLAUDE_TOOL_NAME = "assistant.message.content[tool_use:*].name";
 
 /** Where the command identity facts come from: nothing is stored. */
 const COMMAND_IDENTITY =
-	"no table: find source=calls computes it at query time from the stored call text (apps/api/src/services/analysis/command-identity.ts), so new rules apply to every call at once";
+	"no table: find source=calls computes it at query time from the stored call text (app/server/src/services/analysis/command-identity.ts), so new rules apply to every call at once";
 const COMMAND_IDENTITY_TEST =
-	"apps/api/src/__tests__/command-identity.integration.ts";
+	"app/server/src/__tests__/command-identity.integration.ts";
 const COMMAND_PROGRAM_TRAPS =
 	"Traps: the first program of a chain or pipeline only (`git add . && git push` is git add; command_programs and command_prefixes list every one); a compound command keeps its keyword (`for`, `while`, `if`); a program run through a variable or substitution is that word (`$PY`, `$(which python)`); null for code-mode scripts and written files, which run no single program, and when only part of the text is stored. The prefix adds the next word only when it is a subcommand-like word (flags that take a value, such as git -C dir, are passed over), or `-m module` for Python.";
 const COMMAND_FINGERPRINT_TRAPS =
@@ -2614,7 +2614,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 					notes:
 						"Traps: a branch name the stored text cap cut is not read; a push with -q prints no ref lines and reads as none; a dry run is no push.",
 					testedIn:
-						"apps/api/src/services/analysis/run-index-components.test.ts",
+						"app/server/src/services/analysis/run-index-components.test.ts",
 				},
 			),
 		},
@@ -7863,7 +7863,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 						from: ["calls/call_id", "calls/tool_name"],
 					},
 					justification: "Opaline computation, not an agent-written value. ",
-					testedIn: "apps/api/src/__tests__/run-index.integration.ts",
+					testedIn: "app/server/src/__tests__/run-index.integration.ts",
 				},
 			),
 			codex: stored(
@@ -7876,7 +7876,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 						from: ["calls/call_id", "calls/tool_name"],
 					},
 					justification: "Opaline computation, not an agent-written value. ",
-					testedIn: "apps/api/src/__tests__/run-index.integration.ts",
+					testedIn: "app/server/src/__tests__/run-index.integration.ts",
 				},
 			),
 		},
@@ -7898,7 +7898,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 					justification: "Opaline computation, not an agent-written value. ",
 					conflict:
 						"Derived counts inherit the incompatible Claude/Codex is_error predicates and Codex transport-failure gaps.",
-					testedIn: "apps/api/src/__tests__/run-index.integration.ts",
+					testedIn: "app/server/src/__tests__/run-index.integration.ts",
 				},
 			),
 			codex: stored(
@@ -7916,7 +7916,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 					justification: "Opaline computation, not an agent-written value. ",
 					conflict:
 						"Derived counts inherit the incompatible Claude/Codex is_error predicates and Codex transport-failure gaps.",
-					testedIn: "apps/api/src/__tests__/run-index.integration.ts",
+					testedIn: "app/server/src/__tests__/run-index.integration.ts",
 					evidence: [
 						...([
 							{
@@ -7956,7 +7956,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 						kind: "derived",
 						from: ["calls/denial_kind", "calls/call_id"],
 					},
-					testedIn: "apps/api/src/__tests__/run-index.integration.ts",
+					testedIn: "app/server/src/__tests__/run-index.integration.ts",
 					justification:
 						"Opaline computation, not an agent-written value. No agent field counts refusals; the count is derived from denied tool results (Claude toolDenialKind 158, Codex `Rejected(` output text 99). Witness: 49ead9e1:1030 user.toolDenialKind [string] n=158 v2.1.220..2.1.293",
 					evidence: [
@@ -7994,7 +7994,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 						kind: "derived",
 						from: ["calls/denial_kind", "calls/call_id"],
 					},
-					testedIn: "apps/api/src/__tests__/run-index.integration.ts",
+					testedIn: "app/server/src/__tests__/run-index.integration.ts",
 					justification:
 						"Opaline computation, not an agent-written value. No agent field counts refusals; the count is derived from `Rejected(`/`Sandbox(Denied` output text, a convention rather than a recorded count. Witness: 019cb960:2007 response_item/function_call_output.output~Rejected [string] n=95 v0.100.0..0.157.1",
 					evidence: [
@@ -8033,7 +8033,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 						kind: "derived",
 						from: ["calls/file_path", "calls/file_op", "calls/is_error"],
 					},
-					testedIn: "apps/api/src/__tests__/run-index.integration.ts",
+					testedIn: "app/server/src/__tests__/run-index.integration.ts",
 					justification:
 						"Opaline computation, not an agent-written value. The count of changed files is derived from edit results (structuredPatch on Write/Edit results, bashEditDiff on Bash results), not written by the agent. Witness: 49ead9e1:396 user.toolUseResult.bashEditDiff.files[].filePath [string] n=1688 v2.1.280..2.1.292",
 					evidence: [
@@ -8063,7 +8063,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 						kind: "derived",
 						from: ["calls/file_path", "calls/file_op", "calls/is_error"],
 					},
-					testedIn: "apps/api/src/__tests__/run-index.integration.ts",
+					testedIn: "app/server/src/__tests__/run-index.integration.ts",
 					justification:
 						"Opaline computation, not an agent-written value. The count is derived from FileChange items and shell/patch text, none of which records 'files changed' directly; refused calls still count today (status wrong). Witness: 019d0073:783 event_msg/item_completed:FileChange.changes.{*}.type [string] n=54978 v0.107.0..0.160.0 values={'update': 49396, 'add': 4643, 'delete': 939}",
 					evidence: [
@@ -8111,7 +8111,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 							"calls/call_id",
 						],
 					},
-					testedIn: "apps/api/src/__tests__/run-index.integration.ts",
+					testedIn: "app/server/src/__tests__/run-index.integration.ts",
 					notes:
 						"Parser review: toolGroupSql classifies native names and shell-head read/search conventions, not only tool names; run_index counts tool_call rows rather than parsed command parts.",
 					justification:
@@ -8135,7 +8135,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 							"calls/call_id",
 						],
 					},
-					testedIn: "apps/api/src/__tests__/run-index.integration.ts",
+					testedIn: "app/server/src/__tests__/run-index.integration.ts",
 					justification:
 						"Opaline computation, not an agent-written value. parsed_cmd[].type read/search (76732 and 26355 parts) is Codex's own classification, but the count is derived per part, not per call, and the current tool-name counting misses shell reads. Witness: 019d0073:657 event_msg/item_completed:CommandExecution.parsed_cmd[].type [string] n=210301 v0.107.0..0.162.0-alpha.2 values={'unknown': 101047, 'read': 76732, 'search': 26355, 'list_files': 6167}",
 					sourceMappings: [
@@ -8199,7 +8199,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 							"calls/search_matches",
 						],
 					},
-					testedIn: "apps/api/src/__tests__/run-index.integration.ts",
+					testedIn: "app/server/src/__tests__/run-index.integration.ts",
 					notes:
 						"Run index 3 counts a read or search call once when its result records that it found nothing: Claude Code's zero-result text (`No files found`, `No matches found`) or zero counter (numFiles, numMatches or numLines by search mode), its returnCodeInterpretation `No matches found` (parser 6, main stream only: subagent transcripts keep no toolUseResult), the shell's `no matches found:` for a file pattern, a search that printed nothing (`(Bash completed with no output)` or a bare `Exit code N`, unless its command silences or redirects its output), or a failure whose text says not found, no such file, ENOENT or does not exist (Read's `File does not exist.`). An exit code alone is not used: find and ls exit 1 for errors, and a compound command exits with its last part's status. Unknown (NULL, in unrecorded_facts) before parser 6 and on subagent streams. Before run index 3 only failures with not-found text counted, so Grep and Bash searches that found nothing and Read's `File does not exist.` were 0 (OPL-384).",
 					justification:
@@ -8222,7 +8222,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 							"calls/result_chars",
 						],
 					},
-					testedIn: "apps/api/src/__tests__/run-index.integration.ts",
+					testedIn: "app/server/src/__tests__/run-index.integration.ts",
 					notes:
 						"Run index 3 counts a read or search call once when its result records that it found nothing: a search that finished printing nothing (empty output, or `Original token count: 0` once the process exited; not when its command silences or redirects its output), or a failure whose text says not found, no such file, ENOENT or does not exist. An exit code alone is not used: rg exits 1 for no match, but find and ls exit 1 for errors, and a compound command exits with its last part's status. Exit codes and output are kept by every parser version, so it is never unknown for Codex. Before run index 3 only failures with not-found text counted, so `rg` with no match (exit 1, empty output) was 0 (OPL-384).",
 					justification:
@@ -9297,7 +9297,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 				{
 					evidence: [],
 					relation: { kind: "close" },
-					testedIn: "apps/api/src/services/git-observation-parser.test.ts",
+					testedIn: "app/server/src/services/git-observation-parser.test.ts",
 					notes:
 						"From push output; `gitOperation` records only the pushed branch. Parser review: git-observation-parser.ts:578 parses git-push output conventions, preserving abbreviated push endpoints; not all intermediate commits or arbitrary tool output.",
 					justification:
@@ -9316,7 +9316,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 				{
 					evidence: [],
 					relation: { kind: "close" },
-					testedIn: "apps/api/src/services/git-observation-parser.test.ts",
+					testedIn: "app/server/src/services/git-observation-parser.test.ts",
 					notes:
 						"Parser review: git-observation-parser.ts:578 parses git-push output conventions, preserving abbreviated push endpoints; not all intermediate commits or arbitrary call output.",
 					justification:
@@ -9386,7 +9386,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 				{
 					evidence: [],
 					relation: { kind: "close" },
-					testedIn: "apps/api/src/services/git-observation-parser.test.ts",
+					testedIn: "app/server/src/services/git-observation-parser.test.ts",
 					gap: {
 						sources: ["response_item/function_call:*.namespace"],
 						plan: "git extractor: match connector tools by namespace and name (43 `_create_pull_request` calls locally produce no observation); needs tool_namespace.",
@@ -9471,7 +9471,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 				{
 					evidence: [],
 					relation: { kind: "provenance" },
-					testedIn: "apps/api/src/services/analysis/git-links.test.ts",
+					testedIn: "app/server/src/services/analysis/git-links.test.ts",
 					notes:
 						"Parser review: The repository identity is CLI git-remote/evidence-index provenance; no Claude transcript field supplies it.",
 					justification:
@@ -9495,7 +9495,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 						},
 					],
 					relation: { kind: "exact" },
-					testedIn: "apps/api/src/services/analysis/git-links.test.ts",
+					testedIn: "app/server/src/services/analysis/git-links.test.ts",
 					notes:
 						"Parser review: session_meta.git.repository_url is the primary literal remote (2235/2899 reviewer sessions); branch/commit hash are identity context, not repository IDs. Parser 12 also stores it on the session_meta record (git_remote, user and password removed) with the session_meta cwd (git_remote_cwd), which runs.cwd_repository reads as the repository of that directory.",
 					sourceMappings: [
@@ -10081,7 +10081,7 @@ export const FACT_CATALOG: readonly FactEntry[] = [
 						transform:
 							"extract the name from the '<command-name>...</command-name>' wrapper in the user message text",
 					},
-					testedIn: "apps/api/src/__tests__/run-index.integration.ts",
+					testedIn: "app/server/src/__tests__/run-index.integration.ts",
 					notes:
 						"run_index reads the command name from the prompt's `<command-name>` wrapper. Parser review: classifyUserText recognizes command-name/command-message wrappers as injected slash_command records; arbitrary leading-slash text is not that convention.",
 					justification:

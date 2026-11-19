@@ -27,7 +27,7 @@ export default defineConfig({
 	],
 	clickhouse: {
 		url: clickhouseUrl,
-		// Prefers CLICKHOUSE_USERNAME to match apps/api and .env.example, and
+		// Prefers CLICKHOUSE_USERNAME to match app/server and .env.example, and
 		// assumes the `default` superuser only for a local endpoint. Throws rather
 		// than falling back to `default` against a remote one.
 		username: resolveClickHouseUsername(process.env, clickhouseUrl),

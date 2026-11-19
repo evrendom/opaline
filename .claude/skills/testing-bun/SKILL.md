@@ -123,7 +123,7 @@ assert(checkoutRecord)
 Keep a test only if it catches something no other test catches. Prove it with the mutation-testing kill matrix before adding tests to a module, and when trimming its suite:
 
 ```bash
-bun run test:kill-matrix apps/api/src/services/analysis/find-cursor.ts
+bun run test:kill-matrix app/server/src/services/analysis/find-cursor.ts
 # Several modules, explicit test files, options, extra `bun test` flags after --
 bun run test:kill-matrix <module.ts>... [--test <file.test.ts>]... [--jobs <n>] [--timeout-ms <n>] [--json <out.json>] [-- <bun test flags>]
 ```

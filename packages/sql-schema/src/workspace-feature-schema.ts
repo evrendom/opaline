@@ -8,7 +8,7 @@ import {
 import { organization, user } from "./auth-schema.js";
 
 // Per-workspace feature switches set in the admin features page
-// (apps/api/src/services/workspace-features.ts). A row overrides the
+// (app/server/src/services/workspace-features.ts). A row overrides the
 // feature's environment list for that workspace, on or off; no row leaves the
 // environment list in charge, so a feature behaves as before until someone
 // toggles it. Deleted with the workspace.

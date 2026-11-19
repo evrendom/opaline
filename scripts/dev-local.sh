@@ -23,9 +23,9 @@ export ALLOWED_ORIGIN=http://localhost:4011
 export TRUSTED_ORIGINS=http://localhost:4011,http://localhost:4012
 
 # Run API and Web in parallel, kill both on Ctrl+C
-bun --watch apps/api/src/index.ts &
+bun --watch app/server/src/index.ts &
 API_PID=$!
-bun run --cwd apps/ui dev &
+bun run --cwd app/ui dev &
 WEB_PID=$!
 
 trap "kill $API_PID $WEB_PID 2>/dev/null" EXIT

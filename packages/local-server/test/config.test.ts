@@ -171,8 +171,8 @@ describe("server environment", () => {
 	const distribution = {
 		kind: "checkout" as const,
 		root: "/srv/athena",
-		entry: "/srv/athena/apps/api/src/selfhost/main.ts",
-		webDir: "/srv/athena/apps/ui/dist",
+		entry: "/srv/athena/app/server/src/selfhost/main.ts",
+		webDir: "/srv/athena/app/ui/dist",
 		hasWebBuild: true,
 		source: "checkout /srv/athena",
 	};
@@ -207,7 +207,7 @@ describe("server environment", () => {
 			CLICKHOUSE_URL: "http://127.0.0.1:18123",
 			CLICKHOUSE_USERNAME: "default",
 			CLICKHOUSE_FLAVOR: "auto",
-			OPALINE_WEB_DIR: "/srv/athena/apps/ui/dist",
+			OPALINE_WEB_DIR: "/srv/athena/app/ui/dist",
 			OPALINE_DATA_DIR: join(root, "data"),
 		});
 	});
@@ -252,23 +252,23 @@ describe("server checkout", () => {
 		expect(resolveCheckoutDistribution({})).toBeUndefined();
 		expect(
 			String(resolveCheckoutDistribution({ OPALINE_SERVER_DIR: root })),
-		).toContain("has no apps/api/src/selfhost/main.ts");
+		).toContain("has no app/server/src/selfhost/main.ts");
 	});
 
 	test("finds the self-host entry point and the web build", () => {
-		const entry = join(root, "apps", "api", "src", "selfhost");
+		const entry = join(root, "app", "server", "src", "selfhost");
 		mkdirSync(entry, { recursive: true });
 		writeFileSync(join(entry, "main.ts"), "");
 		expect(resolveCheckoutDistribution({ OPALINE_SERVER_DIR: root })).toEqual({
 			kind: "checkout",
 			root,
 			entry: join(entry, "main.ts"),
-			webDir: join(root, "apps", "ui", "dist"),
+			webDir: join(root, "app", "ui", "dist"),
 			hasWebBuild: false,
 			source: `checkout ${root}`,
 		});
-		mkdirSync(join(root, "apps", "ui", "dist"), { recursive: true });
-		writeFileSync(join(root, "apps", "ui", "dist", "index.html"), "");
+		mkdirSync(join(root, "app", "ui", "dist"), { recursive: true });
+		writeFileSync(join(root, "app", "ui", "dist", "index.html"), "");
 		expect(
 			resolveCheckoutDistribution({ OPALINE_SERVER_DIR: root }),
 		).toMatchObject({ hasWebBuild: true });

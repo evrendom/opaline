@@ -1,7 +1,7 @@
 /**
  * The usage digest emails (daily, weekly, quiet week), rendered from numbers
  * the API computes. Pure string building, so the API sends it and the web
- * app's email lab (`bun run --cwd apps/ui dev:email-lab`) renders the same
+ * app's email lab (`bun run --cwd app/ui dev:email-lab`) renders the same
  * thing from fixtures. Email clients ignore stylesheets and most layout CSS:
  * everything is nested tables with inline styles, and a plain-text part says
  * the same.
@@ -144,7 +144,7 @@ const C = {
 	pillBorder: "#ececec",
 };
 /**
- * The dashboard's opal palette (apps/ui/src/app/preset-extensions.css,
+ * The dashboard's opal palette (app/ui/src/app/preset-extensions.css,
  * opal-1…opal-5 and their tints) in sRGB hex: email clients do not read
  * oklch(). Blue, indigo, purple, magenta, pink.
  */

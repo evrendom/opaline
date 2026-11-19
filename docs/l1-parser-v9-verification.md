@@ -347,9 +347,9 @@ Configured service tiers are preserved as written, including explicit null/empty
 
 ## Checks and rollout boundary
 
-Before every implementation commit: API-routes and usage-events types/full tests; apps/api types/relevant tests; fact-matrix `--check`; root lint; diff whitespace check. Final suite totals: **670 API-routes**, **75 usage-events**, **103 relevant apps/api**, and **11 schema/migration-proof tests** pass. Current-source types, the v5 identity check and the fact-matrix check pass.
+Before every implementation commit: API-routes and usage-events types/full tests; app/server types/relevant tests; fact-matrix `--check`; root lint; diff whitespace check. Final suite totals: **670 API-routes**, **75 usage-events**, **103 relevant app/server**, and **11 schema/migration-proof tests** pass. Current-source types, the v5 identity check and the fact-matrix check pass.
 
-The standard apps/api type command hits pre-existing stale symlinked node_modules workspace-export failures on the baseline and this branch; newly added exports are likewise unavailable through those stale aliases. A temporary local tsconfig resolving workspace exports to this worktree passes; the runtime test override is separate. No installation or dependency modification was used. Root lint has only **12 existing warnings**. No live DB/integration test, migration or backfill was executed: use `docs/l1-backfill-runbook.md` for an authorized, additive, canary-first rollout, with usage v5 and parent generations ready before index 2 builds.
+The standard app/server type command hits pre-existing stale symlinked node_modules workspace-export failures on the baseline and this branch; newly added exports are likewise unavailable through those stale aliases. A temporary local tsconfig resolving workspace exports to this worktree passes; the runtime test override is separate. No installation or dependency modification was used. Root lint has only **12 existing warnings**. No live DB/integration test, migration or backfill was executed: use `docs/l1-backfill-runbook.md` for an authorized, additive, canary-first rollout, with usage v5 and parent generations ready before index 2 builds.
 
 ### Local evidence artifacts
 
@@ -437,7 +437,7 @@ JSON parsing times, separately: Oct 5 **0.018625 / 0.016916 s**, Oct 6 **0.05829
 
 ### Required checks before each commit
 
-Every correction commit ran the exact requested commands sequentially, saving each command's real exit code before any log display; no pipe masks a failure. Current apps/api workspace links resolve this branch. The final check run uses `/private/tmp/parser9-checks/verification/`; the earlier per-finding logs are sibling directories.
+Every correction commit ran the exact requested commands sequentially, saving each command's real exit code before any log display; no pipe masks a failure. Current app/server workspace links resolve this branch. The final check run uses `/private/tmp/parser9-checks/verification/`; the earlier per-finding logs are sibling directories.
 
 | Command / cwd | Exit | Latest suite result |
 | --- | --- | --- |
@@ -447,12 +447,12 @@ Every correction commit ran the exact requested commands sequentially, saving ea
 | `bun run check-types` / `packages/usage-events` | **0** | Pass |
 | `bun test` / `packages/ch-schema` | **1** | 82 pass, 2 fail |
 | `bun run check-types` / `packages/ch-schema` | **0** | Pass |
-| `bun test` / `apps/api` | **1** | 1,320 pass, 7 fail, 1 error |
+| `bun test` / `app/server` | **1** | 1,320 pass, 7 fail, 1 error |
 | `bun run --cwd packages/api-routes facts:matrix -- --check` / root | **0** | Pass |
 | `bun run lint` / root | **0** | 12 existing warnings; no errors |
 | `git diff --check` / root | **0** | Pass |
 
-The nonzero tests are unchanged sandbox/listener failures, not hidden or skipped: the two schema F16 detached-command HTTP fixtures cannot `Bun.serve` on localhost (`EADDRINUSE`); apps/api's ClickHouse/R2/ingest listener fixtures fail similarly, and `convex-http.test.ts` has a top-level listener error. The ingest fixture expects its deliberately unreachable-endpoint result but cannot establish its local HTTP fixture in this environment. These failures were reported before every commit. Pure parser, usage, SQL-generation, schema-proof tests, all three package type checks, matrix validation, and lint pass. No live ClickHouse correctness claim substitutes for unavailable integration testing.
+The nonzero tests are unchanged sandbox/listener failures, not hidden or skipped: the two schema F16 detached-command HTTP fixtures cannot `Bun.serve` on localhost (`EADDRINUSE`); app/server's ClickHouse/R2/ingest listener fixtures fail similarly, and `convex-http.test.ts` has a top-level listener error. The ingest fixture expects its deliberately unreachable-endpoint result but cannot establish its local HTTP fixture in this environment. These failures were reported before every commit. Pure parser, usage, SQL-generation, schema-proof tests, all three package type checks, matrix validation, and lint pass. No live ClickHouse correctness claim substitutes for unavailable integration testing.
 
 ### Correction commits and remaining decisions
 
@@ -544,7 +544,7 @@ Limits: this is a real-corpus **run-index unit-harness measurement**, not a live
 
 ### Checks before the owner follow-up commits
 
-The required commands ran with their real exit codes before each commit. Logs: `/private/tmp/parser9-owner-checks/`, `/private/tmp/parser9-run-index-checks/`, and `/private/tmp/parser9-evidence-checks/` (documentation/harness follow-up). The new SQL/component/row tests are part of `apps/api`'s ordinary `bun test`; none are skipped or replaced with a custom test-only command.
+The required commands ran with their real exit codes before each commit. Logs: `/private/tmp/parser9-owner-checks/`, `/private/tmp/parser9-run-index-checks/`, and `/private/tmp/parser9-evidence-checks/` (documentation/harness follow-up). The new SQL/component/row tests are part of `app/server`'s ordinary `bun test`; none are skipped or replaced with a custom test-only command.
 
 | Command / cwd | Exit |
 | --- | ---: |
@@ -554,7 +554,7 @@ The required commands ran with their real exit codes before each commit. Logs: `
 | `bun run check-types` / `packages/usage-events` | 0 |
 | `bun test` / `packages/ch-schema` | 1 (same two localhost listener fixtures) |
 | `bun run check-types` / `packages/ch-schema` | 0 |
-| `bun test` / `apps/api` | 1 (same seven failures and one top-level localhost listener error) |
+| `bun test` / `app/server` | 1 (same seven failures and one top-level localhost listener error) |
 | `bun run --cwd packages/api-routes facts:matrix -- --check` / root | 0 |
 | `bun run lint` / root | 0 (12 existing warnings) |
 | `git diff --check` / root | 0 |

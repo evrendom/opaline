@@ -45,9 +45,9 @@ jobs:
           predicate-quantifier: every
           filters: |
             integration:
-              - "{apps/api/**,apps/cli/**,apps/cli-harness/**,packages/**,scripts/**,.github/actions/setup/**,.github/workflows/ci.yml,bun.lock,package.json,turbo.json}"
-              - "!apps/api/src/mcp/**"
-              - "!apps/api/src/handlers/mcp-http*"
+              - "{app/server/**,cli/**,packages/cli-harness/**,packages/**,scripts/**,.github/actions/setup/**,.github/workflows/ci.yml,bun.lock,package.json,turbo.json}"
+              - "!app/server/src/mcp/**"
+              - "!app/server/src/handlers/mcp-http*"
               - "!**/*.md"
             skill:
               - "plugin/skills/**"
@@ -101,7 +101,7 @@ jobs:
         run: bun run turbo run build --concurrency=1
 
       - name: Verify browser resource budgets in Chrome
-        run: bun run --cwd apps/ui test:resource-budgets:chrome
+        run: bun run --cwd app/ui test:resource-budgets:chrome
 
   integration:
     # Pushes to main follow the same filter; manual runs always run it.
@@ -235,7 +235,7 @@ jobs:
           node .tmp/old-cli/package/dist/cli.js --version
 
       - name: Run version-skew tests against the published 0.1.17 CLI
-        run: bun run --cwd apps/cli-harness test:integration:skew
+        run: bun run --cwd packages/cli-harness test:integration:skew
         env:
           RUDEL_OLD_CLI_PATH: ${{ github.workspace }}/.tmp/old-cli/package/dist/cli.js
 
@@ -273,14 +273,14 @@ jobs:
       - name: Verify settings recovery and hook migration
         env:
           POSTHOG_ENABLED: "false"
-        run: bun test apps/cli/src/__tests__/auto-upload-config.test.ts apps/cli/src/__tests__/upload-manager-migration.test.ts
+        run: bun test cli/src/__tests__/auto-upload-config.test.ts cli/src/__tests__/upload-manager-migration.test.ts
 
       - name: Pack and install all three CLI packages
         shell: bash
         run: |
           rm -rf .tmp/cli-smoke
           mkdir -p .tmp/cli-smoke/package .tmp/cli-smoke/install
-          opaline_tarball="$(npm pack ./apps/cli --pack-destination .tmp/cli-smoke/package | tail -n 1)"
+          opaline_tarball="$(npm pack ./cli --pack-destination .tmp/cli-smoke/package | tail -n 1)"
           primary_tarball="$(npm pack ./packages/opaline --pack-destination .tmp/cli-smoke/package | tail -n 1)"
           rudel_tarball="$(npm pack ./packages/rudel-alias --pack-destination .tmp/cli-smoke/package | tail -n 1)"
           npm install \
@@ -299,7 +299,7 @@ jobs:
           primary_cli=".tmp/cli-smoke/install/node_modules/opaline/bin/opaline.js"
           rudel_cli=".tmp/cli-smoke/install/node_modules/rudel/bin/rudel.js"
 
-          version="$(node -p "require('./apps/cli/package.json').version")"
+          version="$(node -p "require('./cli/package.json').version")"
           for package_dir in packages/opaline packages/rudel-alias; do
             test "$(node -p "require('./${package_dir}/package.json').version")" = "${version}"
             test "$(node -p "require('./${package_dir}/package.json').dependencies['@opalinehq/cli']")" = "${version}"
@@ -353,14 +353,14 @@ jobs:
 
       - name: Run packed CLI smoke suite through opaline
         shell: bash
-        run: bun run --cwd apps/cli test:packed-smoke
+        run: bun run --cwd cli test:packed-smoke
         env:
           OPALINE_PACKED_CLI: ${{ github.workspace }}/.tmp/cli-smoke/install/node_modules/opaline/bin/opaline.js
 
       - name: Verify Windows browser opening
         if: runner.os == 'Windows'
         shell: bash
-        run: bun test ./apps/cli/src/__tests__/browser-opener.windows.integration.ts
+        run: bun test ./cli/src/__tests__/browser-opener.windows.integration.ts
 
   cli-smoke-required:
     if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)

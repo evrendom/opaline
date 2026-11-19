@@ -12,7 +12,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { organization, user } from "./auth-schema.js";
 
-// Moment observations (apps/api/src/services/moments/): a model's note about
+// Moment observations (app/server/src/services/moments/): a model's note about
 // one moment of a run, written when a member asks for it. The note is derived
 // from the session owner's transcript, so it goes with that member's account
 // and with the workspace. One per moment, transcript revision and prompt

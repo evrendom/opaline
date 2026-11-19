@@ -9,7 +9,7 @@ import {
 	ARTIFACT_MINIMUM_BUN,
 	ARTIFACT_PACKAGE_NAME,
 	type ArtifactManifest,
-} from "../apps/api/src/selfhost/layout";
+} from "../app/server/src/selfhost/layout";
 import {
 	checkReferences,
 	digests,
@@ -139,7 +139,7 @@ async function git(args: string[]): Promise<string | null> {
 }
 
 async function buildWeb(): Promise<void> {
-	const web = join(root, "apps/ui");
+	const web = join(root, "app/ui");
 	const reusable =
 		values["reuse-web"] &&
 		existsSync(join(web, "dist/index.html")) &&
@@ -179,10 +179,10 @@ async function buildWeb(): Promise<void> {
 async function buildServer(): Promise<void> {
 	await bundle(
 		"server",
-		[join(root, "apps/api/src/selfhost/main.ts")],
+		[join(root, "app/server/src/selfhost/main.ts")],
 		serverDir,
 	);
-	const services = join(root, "apps/api/src/services");
+	const services = join(root, "app/server/src/services");
 	const workers = (await readdir(services))
 		.filter((name) => name.endsWith(".worker.ts"))
 		.map((name) => join(services, name));
@@ -192,7 +192,7 @@ async function buildServer(): Promise<void> {
 		join(serverDir, "demo-repository-files.json.gz"),
 	);
 	await cp(
-		join(root, "apps/api/src/assets/team-invite"),
+		join(root, "app/server/src/assets/team-invite"),
 		join(pkg, "assets/team-invite"),
 		{ recursive: true },
 	);

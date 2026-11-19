@@ -52,7 +52,7 @@ This runs linting, type checking, tests, and builds across the entire monorepo. 
   `feat:` | `fix:` | `docs:` | `style:` | `refactor:` | `perf:` | `test:` | `build:` | `ci:` | `chore:` | `revert:`
 - Keep PRs focused — one logical change per PR.
 - Include a description of what changed and why.
-- CLI changes go to `apps/cli`. The CLI is published from this repository; see `docs/releasing.md`.
+- CLI changes go to `cli`. The CLI is published from this repository; see `docs/releasing.md`.
 
 ## Project Structure
 

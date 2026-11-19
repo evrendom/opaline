@@ -8,21 +8,21 @@
 	"files": {
 		"ignoreUnknown": false,
 		"includes": [
-			"apps/**",
+			"app/**",
+			"cli/**",
 			"packages/**",
-			"convex/**",
 			"*.json",
 			"!**/generated",
-			"!apps/desktop/main.js",
-			"!apps/desktop/analyze.js",
-			"!apps/desktop/preload.js",
-			"!apps/desktop/onboarding-preload.js",
-			"!apps/desktop/onboarding-window",
-			"!apps/desktop/dots",
-			"!apps/desktop/glass3d",
-			"!apps/desktop/onboarding",
-			"!apps/desktop/icon",
-			"!apps/desktop/dmg"
+			"!app/shell/main.js",
+			"!app/shell/analyze.js",
+			"!app/shell/preload.js",
+			"!app/shell/onboarding-preload.js",
+			"!app/shell/onboarding-window",
+			"!app/shell/dots",
+			"!app/shell/glass3d",
+			"!app/shell/onboarding",
+			"!app/shell/icon",
+			"!app/shell/dmg"
 		]
 	},
 	"formatter": {
@@ -68,12 +68,12 @@
 		},
 		{
 			"includes": [
-				"apps/ui/src/components/analytics/**",
-				"apps/ui/src/components/conversation/**",
-				"apps/ui/src/features/dashboard/DashboardPage.tsx",
-				"apps/ui/src/features/sessions/components/**",
-				"apps/ui/src/features/sessions/reader/**",
-				"apps/ui/src/hooks/useChartTheme.ts"
+				"app/ui/src/components/analytics/**",
+				"app/ui/src/components/conversation/**",
+				"app/ui/src/features/dashboard/DashboardPage.tsx",
+				"app/ui/src/features/sessions/components/**",
+				"app/ui/src/features/sessions/reader/**",
+				"app/ui/src/hooks/useChartTheme.ts"
 			],
 			"linter": {
 				"rules": {
@@ -111,7 +111,7 @@
 			}
 		},
 		{
-			"includes": ["apps/ui/src/features/wrapped/**"],
+			"includes": ["app/ui/src/features/wrapped/**"],
 			"linter": {
 				"rules": {
 					"style": {

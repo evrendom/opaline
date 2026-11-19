@@ -8,7 +8,7 @@ import { filterSessionTextFields } from "../index.js";
  * and credentials-file dumps in tool results, and shell commands.
  *
  * This file is kept identical in opalinehq/athena (packages/secret-filter) and
- * opalinehq/cli (apps/cli/src/internal/secret-filter): both filters must turn
+ * opalinehq/cli (cli/src/internal/secret-filter): both filters must turn
  * every input into the same bytes.
  *
  * Every value is fake and assembled at runtime.

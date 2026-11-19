@@ -518,11 +518,11 @@ describe("a server artifact on disk", () => {
 
 	test("a checkout wins over an artifact", async () => {
 		const checkout = join(root, "athena");
-		mkdirSync(join(checkout, "apps", "api", "src", "selfhost"), {
+		mkdirSync(join(checkout, "app", "server", "src", "selfhost"), {
 			recursive: true,
 		});
 		writeFileSync(
-			join(checkout, "apps", "api", "src", "selfhost", "main.ts"),
+			join(checkout, "app", "server", "src", "selfhost", "main.ts"),
 			"",
 		);
 		const { tgz } = writeArtifact("1.0.0");
