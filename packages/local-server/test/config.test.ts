@@ -268,7 +268,7 @@ describe("server checkout", () => {
 			source: `checkout ${root}`,
 		});
 		mkdirSync(join(root, "apps", "ui", "dist"), { recursive: true });
-		writeFileSync(join(root, "apps", "web", "dist", "index.html"), "");
+		writeFileSync(join(root, "apps", "ui", "dist", "index.html"), "");
 		expect(
 			resolveCheckoutDistribution({ OPALINE_SERVER_DIR: root }),
 		).toMatchObject({ hasWebBuild: true });
