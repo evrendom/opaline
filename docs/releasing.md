@@ -69,4 +69,4 @@ npx --yes rudel@latest --version
 
 The three commands should report the same CLI version. `rudel` also emits
 its existing rename notice to stderr. Migration instructions for existing
-global installations are in the [CLI guide](docs/usage.md#optional-global-install).
+global installations are in the [CLI guide](usage.md#optional-global-install).

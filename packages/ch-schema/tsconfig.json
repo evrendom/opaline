@@ -8,9 +8,7 @@
 		"src",
 		"scripts/chcli-connect.ts",
 		"scripts/bootstrap.ts",
-		"scripts/migrate-f16.ts",
-		"scripts/migrate-f16-ci-prerequisites.ts",
-		"scripts/backfill-subagent-metrics.ts"
+		"scripts/migrate-f16.ts"
 	],
 	"exclude": ["src/generated"]
 }

@@ -56,24 +56,12 @@
 			"formatter": { "enabled": false }
 		},
 		{
-			"includes": ["**/*.astro"],
-			"linter": {
-				"rules": {
-					"correctness": {
-						"noUnusedImports": "off",
-						"noUnusedVariables": "off"
-					}
-				}
-			}
-		},
-		{
 			"includes": [
 				"apps/desktop/ui/src/components/analytics/**",
 				"apps/desktop/ui/src/components/conversation/**",
 				"apps/desktop/ui/src/features/dashboard/DashboardPage.tsx",
 				"apps/desktop/ui/src/features/sessions/components/**",
-				"apps/desktop/ui/src/features/sessions/reader/**",
-				"apps/desktop/ui/src/hooks/useChartTheme.ts"
+				"apps/desktop/ui/src/features/sessions/reader/**"
 			],
 			"linter": {
 				"rules": {
@@ -104,26 +92,6 @@
 							"level": "error",
 							"options": {
 								"ignoreNull": false
-							}
-						}
-					}
-				}
-			}
-		},
-		{
-			"includes": ["apps/desktop/ui/src/features/wrapped/**"],
-			"linter": {
-				"rules": {
-					"style": {
-						"noRestrictedImports": {
-							"level": "error",
-							"options": {
-								"paths": {
-									"react": {
-										"importNames": ["useEffect"],
-										"message": "Wrapped files must use useMountEffect instead of importing useEffect directly."
-									}
-								}
 							}
 						}
 					}

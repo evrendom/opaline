@@ -3,12 +3,6 @@
 	"version": "0.18.0",
 	"private": true,
 	"type": "module",
-	"exports": {
-		".": "./src/index.ts"
-	},
-	"bin": {
-		"opaline-local": "./src/main.ts"
-	},
 	"scripts": {
 		"check-types": "tsc --noEmit",
 		"test": "bun test",

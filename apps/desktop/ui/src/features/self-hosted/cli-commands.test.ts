@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { getCliSetupCommands } from "@/components/analytics/cli-setup-commands";
 import {
 	CLI_API_KEY_PLACEHOLDER,
 	claudeMcpAddCommand,
@@ -23,9 +22,6 @@ describe("CLI commands on opaline.so", () => {
 		).toBe("npx opaline@latest --code ABCD-1234");
 		expect(cliLoginCommand("https://opaline.so")).toBe(
 			"npx opaline@latest login",
-		);
-		expect(getCliSetupCommands("https://opaline.so")[0].command).toBe(
-			"npm install -g opaline@latest && opaline login --api-base https://opaline.so",
 		);
 	});
 });

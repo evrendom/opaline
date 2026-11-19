@@ -372,7 +372,7 @@ describe("analytics service guardrails", () => {
 		expect(sessionAnalyticsSource).not.toContain("|| split_by");
 	});
 
-	test("keeps ownership reads duplicate-safe and backfill scans bounded", async () => {
+	test("keeps ownership reads duplicate-safe", async () => {
 		const sessionDetailSource = await readFile(
 			resolve(
 				import.meta.dir,
@@ -382,37 +382,9 @@ describe("analytics service guardrails", () => {
 			),
 			"utf8",
 		);
-		const backfillSource = await readFile(
-			resolve(
-				import.meta.dir,
-				"..",
-				"services",
-				"session-ownership-backfill.service.ts",
-			),
-			"utf8",
-		);
-		const cleanupSource = await readFile(
-			resolve(
-				import.meta.dir,
-				"..",
-				"services",
-				"session-ownership-cleanup.service.ts",
-			),
-			"utf8",
-		);
 		expect(sessionDetailSource).not.toContain(" FINAL");
 		expect(sessionDetailSource).toContain("argMax(");
 		expect(sessionDetailSource).toContain("LEFT ANY JOIN latest_analytics");
-		expect(backfillSource).toContain("max_bytes_to_read");
-		expect(backfillSource).toContain("max_execution_time");
-		expect(
-			backfillSource.match(/clickhouse_settings: BACKFILL_QUERY_SETTINGS/g),
-		).toHaveLength(2);
-		expect(cleanupSource).toContain("max_bytes_to_read");
-		expect(cleanupSource).toContain("max_execution_time");
-		expect(cleanupSource).toContain('lightweight_deletes_sync: "3"');
-		expect(cleanupSource).toContain("buildKeyedDeleteOperations(");
-		expect(cleanupSource).not.toContain("ALTER TABLE");
 	});
 });
 

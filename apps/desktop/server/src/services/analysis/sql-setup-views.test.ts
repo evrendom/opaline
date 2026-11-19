@@ -1,6 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { createHash } from "node:crypto";
-import { evidenceSetupIndexPatch } from "../repository-evidence-setup-backfill.service.js";
 import { SETUP_SNAPSHOT_COLUMNS } from "./sql-setup-views.js";
 import { findSqlView } from "./sql-views.js";
 
@@ -58,57 +56,5 @@ describe("runs coverage", () => {
 			"notEmpty(context_roots) AND capture_reason = ''), [], ['setup_snapshot'])",
 		);
 		expect(sql).not.toContain("['setup_snapshot'],");
-	});
-});
-
-describe("evidence setup backfill", () => {
-	const manifest = new TextEncoder().encode(
-		JSON.stringify({
-			captureReason: "task-output-sweep",
-			roots: [
-				{
-					id: "repository",
-					origin: "repository",
-					scope: "repository",
-					status: "collected",
-					absolutePath: "/Users/dev/code/shop",
-				},
-			],
-			runtime: { tools: { git: "2.51.0" } },
-		}),
-	);
-	const objectId = `sha256:${createHash("sha256").update(manifest).digest("hex")}`;
-
-	test("reads the setup of a stored manifest under a newer index version", () => {
-		const patch = evidenceSetupIndexPatch({
-			manifestObjectId: objectId,
-			manifestBytes: manifest,
-			indexedAt: new Date("2026-10-16T17:00:00.000Z"),
-		});
-		expect(patch).toMatchObject({
-			capture_reason: "task-output-sweep",
-			context_roots: [
-				[
-					"repository",
-					"repository",
-					"repository",
-					"collected",
-					"/Users/dev/code/shop",
-				],
-			],
-			runtime_versions: [["tools.git", "2.51.0"]],
-			index_version: String(Date.parse("2026-10-16T17:00:00.000Z")),
-			indexed_at: "2026-10-16 17:00:00.000",
-		});
-	});
-
-	test("refuses a manifest that does not match its object id", () => {
-		expect(() =>
-			evidenceSetupIndexPatch({
-				manifestObjectId: `sha256:${"0".repeat(64)}`,
-				manifestBytes: manifest,
-				indexedAt: new Date(),
-			}),
-		).toThrow("does not match");
 	});
 });

@@ -13,8 +13,8 @@ PY
 for mode in dark light; do
 	for scale in 1 2; do
 		name=background-$mode; [ $scale = 2 ] && name=$name@2x
-		"$chrome" --headless=new --hide-scrollbars --enable-unsafe-swiftshader --use-angle=swiftshader --force-device-scale-factor=$scale --window-size=1200,900 --virtual-time-budget=5000 --screenshot="$here/$name.png" "file://$t/page.html?mode=$mode" 2>/dev/null
+		"$chrome" --headless=new --hide-scrollbars --enable-unsafe-swiftshader --use-angle=swiftshader --force-device-scale-factor=$scale --window-size=1200,900 --virtual-time-budget=5000 --screenshot="$t/$name.png" "file://$t/page.html?mode=$mode" 2>/dev/null
 	done
-	tiffutil -cathidpicheck "$here/background-$mode.png" "$here/background-$mode@2x.png" -out "$here/background-$mode.tiff" >/dev/null 2>&1
+	tiffutil -cathidpicheck "$t/background-$mode.png" "$t/background-$mode@2x.png" -out "$here/background-$mode.tiff" >/dev/null 2>&1
 done
 rm -rf "$t"

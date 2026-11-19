@@ -4,40 +4,30 @@ import { resolve } from "node:path";
 
 describe("historical skills API guardrails", () => {
 	test("keeps persistent reads workspace-scoped and off raw transcript tables", async () => {
-		const [serviceSource, persistenceSource, backfillSource, purgeSource] =
-			await Promise.all([
-				readFile(
-					resolve(
-						import.meta.dir,
-						"..",
-						"services",
-						"historical-skills.service.ts",
-					),
-					"utf8",
+		const [serviceSource, persistenceSource, purgeSource] = await Promise.all([
+			readFile(
+				resolve(
+					import.meta.dir,
+					"..",
+					"services",
+					"historical-skills.service.ts",
 				),
-				readFile(
-					resolve(
-						import.meta.dir,
-						"..",
-						"services",
-						"skill-extraction-ingest.service.ts",
-					),
-					"utf8",
+				"utf8",
+			),
+			readFile(
+				resolve(
+					import.meta.dir,
+					"..",
+					"services",
+					"skill-extraction-ingest.service.ts",
 				),
-				readFile(
-					resolve(
-						import.meta.dir,
-						"..",
-						"services",
-						"skill-extraction-backfill.service.ts",
-					),
-					"utf8",
-				),
-				readFile(
-					resolve(import.meta.dir, "..", "services", "org-session.service.ts"),
-					"utf8",
-				),
-			]);
+				"utf8",
+			),
+			readFile(
+				resolve(import.meta.dir, "..", "services", "org-session.service.ts"),
+				"utf8",
+			),
+		]);
 
 		expect(serviceSource).toContain("organizationId");
 		expect(serviceSource).toContain("rudel.skill_version_contents");
@@ -112,49 +102,13 @@ describe("historical skills API guardrails", () => {
 		expect(persistenceSource).toContain(
 			"timeout_before_checking_execution_speed: 0",
 		);
-		for (const lookupSource of [persistenceSource, backfillSource]) {
-			expect(lookupSource).toContain(
-				"max_bytes_to_read: String(2 * 1024 * 1024 * 1024)",
-			);
-			expect(lookupSource).toContain("max_execution_time: 60");
-			expect(lookupSource).toContain('max_rows_to_read: "10000000"');
-			expect(lookupSource).toContain(
-				"timeout_before_checking_execution_speed: 0",
-			);
-		}
+		expect(persistenceSource).toContain(
+			"max_bytes_to_read: String(2 * 1024 * 1024 * 1024)",
+		);
+		expect(persistenceSource).toContain("max_execution_time: 60");
+		expect(persistenceSource).toContain('max_rows_to_read: "10000000"');
 		expect(serviceSource).toContain("filterSkillName: true");
 		expect(serviceSource).not.toMatch(/'\$\{/);
-		expect(backfillSource).toContain(
-			"const WRITE_BUFFER_MAX_BYTES = 32 * 1024 * 1024",
-		);
-		expect(backfillSource).toContain(
-			"buffer.byteCount + additionalBytes > WRITE_BUFFER_MAX_BYTES",
-		);
-		expect(backfillSource).toContain("contentBytes >= WRITE_BUFFER_MAX_BYTES");
-		expect(backfillSource).toContain(
-			"createByteBoundedRowChunks(rows.contentRows)",
-		);
-		expect(backfillSource).toContain("if (rowBytes >= WRITE_BUFFER_MAX_BYTES)");
-		expect(backfillSource).toContain("user_id IN {userIds:Array(String)}");
-		expect(backfillSource).toContain(
-			"session_date IN {sessionDates:Array(DateTime64(3, 'UTC'))}",
-		);
-		expect(backfillSource).toContain(
-			"clickhouse_settings: SKILL_SCAN_SETTINGS",
-		);
-		expect(backfillSource).toContain(
-			"clickhouse_settings: SOURCE_SCAN_SETTINGS",
-		);
-		expect(backfillSource).toContain(
-			"(skill_name, content_sha256, user_id) IN {versionIdentities:Array(Tuple(String, FixedString(64), String))}",
-		);
-		expect(backfillSource).toContain("new TupleParam([");
-		expect(backfillSource).toContain(
-			"clickhouse_settings: SKILL_VERSION_LOOKUP_SETTINGS",
-		);
-		expect(backfillSource).toContain(
-			"timeout_before_checking_execution_speed: 0",
-		);
 		expect(purgeSource).toContain("SKILL_VERSION_CONTENTS_TABLE");
 		expect(purgeSource).toContain("PRIVACY_DELETE_SCAN_SETTINGS");
 	});

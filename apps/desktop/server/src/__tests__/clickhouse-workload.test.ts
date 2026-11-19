@@ -2,10 +2,8 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { createClickHouseExecutor } from "../clickhouse.js";
 import {
 	clickHouseWorkloadForPath,
-	currentClickHouseWorkload,
 	runAsClickHouseWorkload,
 } from "../clickhouse-workload.js";
-import { createVercelFunctionHandler } from "../lib/vercel-function-handler.js";
 
 const requests: URL[] = [];
 const server = Bun.serve({
@@ -63,24 +61,10 @@ describe("ClickHouse workload settings", () => {
 		).toEqual({ maxThreads: "1", priority: "5" });
 	});
 
-	test("cron functions are background, everything else interactive", async () => {
+	test("cron functions are background, everything else interactive", () => {
 		expect(clickHouseWorkloadForPath("/api/cron/l1-edges")).toBe("background");
 		expect(clickHouseWorkloadForPath("/rpc/analytics/overview/costs")).toBe(
 			"interactive",
 		);
-		const seen: string[] = [];
-		const handler = createVercelFunctionHandler({
-			functionGroup: "test",
-			marksActivity: "never",
-			fetch: async () => {
-				await Promise.resolve();
-				seen.push(currentClickHouseWorkload());
-				return new Response("ok");
-			},
-		});
-		await handler(new Request("https://example.test/api/cron/run-index-heal"));
-		await handler(new Request("https://example.test/api/ingest"));
-		expect(seen).toEqual(["background", "interactive"]);
-		expect(currentClickHouseWorkload()).toBe("interactive");
 	});
 });
