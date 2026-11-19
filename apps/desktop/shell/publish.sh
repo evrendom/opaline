@@ -172,6 +172,23 @@ if [ "$dry_run" = 1 ]; then
 	exit 0
 fi
 
+step "saving download counts before the DMG and feed are replaced"
+stats_started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+stats_run=""
+if gh workflow run repo-stats.yml -R "$repository" >/dev/null 2>&1; then
+	for _ in $(seq 1 24); do
+		sleep 5
+		stats_run=$(gh run list -R "$repository" --workflow repo-stats.yml --event workflow_dispatch \
+			--created ">=$stats_started" --limit 1 --json databaseId --jq '.[0].databaseId // empty' 2>/dev/null)
+		[ -n "$stats_run" ] && break
+	done
+fi
+if [ -n "$stats_run" ] && gh run watch "$stats_run" -R "$repository" --exit-status >/dev/null 2>&1; then
+	step "download counts saved to the stats branch"
+else
+	step "warning: could not save download counts; downloads since the last daily snapshot are not kept"
+fi
+
 step "creating release $tag"
 gh release create "$tag" -R "$repository" --target "$commit" --title "Opaline $version" --latest "$@" \
 	"$work/Opaline-$version.dmg" "$work/$zip_name" "$work/$feed_name"
