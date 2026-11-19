@@ -45,9 +45,9 @@ jobs:
           predicate-quantifier: every
           filters: |
             integration:
-              - "{app/server/**,cli/**,packages/cli-harness/**,packages/**,scripts/**,.github/actions/setup/**,.github/workflows/ci.yml,bun.lock,package.json,turbo.json}"
-              - "!app/server/src/mcp/**"
-              - "!app/server/src/handlers/mcp-http*"
+              - "{apps/desktop/server/**,cli/**,packages/cli-harness/**,packages/**,scripts/**,.github/actions/setup/**,.github/workflows/ci.yml,bun.lock,package.json,turbo.json}"
+              - "!apps/desktop/server/src/mcp/**"
+              - "!apps/desktop/server/src/handlers/mcp-http*"
               - "!**/*.md"
             skill:
               - "plugin/skills/**"
@@ -101,7 +101,7 @@ jobs:
         run: bun run turbo run build --concurrency=1
 
       - name: Verify browser resource budgets in Chrome
-        run: bun run --cwd app/ui test:resource-budgets:chrome
+        run: bun run --cwd apps/desktop/ui test:resource-budgets:chrome
 
   integration:
     # Pushes to main follow the same filter; manual runs always run it.
@@ -273,7 +273,7 @@ jobs:
       - name: Verify settings recovery and hook migration
         env:
           POSTHOG_ENABLED: "false"
-        run: bun test cli/src/__tests__/auto-upload-config.test.ts cli/src/__tests__/upload-manager-migration.test.ts
+        run: bun test apps/cli/src/__tests__/auto-upload-config.test.ts apps/cli/src/__tests__/upload-manager-migration.test.ts
 
       - name: Pack and install all three CLI packages
         shell: bash
@@ -353,7 +353,7 @@ jobs:
 
       - name: Run packed CLI smoke suite through opaline
         shell: bash
-        run: bun run --cwd cli test:packed-smoke
+        run: bun run --cwd apps/cli test:packed-smoke
         env:
           OPALINE_PACKED_CLI: ${{ github.workspace }}/.tmp/cli-smoke/install/node_modules/opaline/bin/opaline.js
 

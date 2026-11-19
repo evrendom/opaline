@@ -40,9 +40,9 @@ jobs:
       issues: write
       pull-requests: write
     outputs:
-      cli_release_created: ${{ steps.release.outputs['cli--release_created'] }}
-      cli_tag_name: ${{ steps.release.outputs['cli--tag_name'] }}
-      cli_sha: ${{ steps.release.outputs['cli--sha'] }}
+      cli_release_created: ${{ steps.release.outputs['apps/cli--release_created'] }}
+      cli_tag_name: ${{ steps.release.outputs['apps/cli--tag_name'] }}
+      cli_sha: ${{ steps.release.outputs['apps/cli--sha'] }}
     steps:
       - name: Run Release Please
         id: release

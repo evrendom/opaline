@@ -6,7 +6,7 @@
  * URLs can never collide with product or platform routes.
  *
  * Organization creation and slug updates enforce this list at the server
- * boundary through the Better Auth organization plugin hooks in `app/server`.
+ * boundary through the Better Auth organization plugin hooks in `apps/desktop/server`.
  */
 export const RESERVED_ORG_SLUGS: readonly string[] = [
 	".well-known",

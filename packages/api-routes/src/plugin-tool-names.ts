@@ -1,7 +1,7 @@
 /**
  * The read-only procedures the Opaline plugin app may call, each served as
  * an app-only MCP tool under a plain name. The API (`plugin-tools.ts`) and
- * the plugin app (`app/ui/src/widget/plugin-transport.ts`) both read this
+ * the plugin app (`apps/desktop/ui/src/widget/plugin-transport.ts`) both read this
  * map, so a name is defined in one place. Never add a procedure that writes.
  */
 export const PLUGIN_TOOL_NAMES = {

@@ -29,6 +29,6 @@ We aim to acknowledge reports within 48 hours and provide a fix or mitigation pl
 
 This policy covers the Opaline platform:
 
-- API server (`app/server`)
-- CLI tool (`opaline`, `@opalinehq/cli` and `rudel` on npm, built from `cli` in this repository)
-- Web application (`app/ui`)
+- API server (`apps/desktop/server`)
+- CLI tool (`opaline`, `@opalinehq/cli` and `rudel` on npm, built from `apps/cli` in this repository)
+- Web application (`apps/desktop/ui`)

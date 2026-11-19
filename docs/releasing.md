@@ -44,8 +44,8 @@ See [npm's trusted publishing documentation](https://docs.npmjs.com/trusted-publ
 All three install names remain supported. Do not deprecate or unpublish the
 compatibility packages when maintaining or releasing the CLI.
 
-Release Please tracks changes under `cli`. A launcher-only change should
-include an update to the CLI's installation documentation under `cli`
+Release Please tracks changes under `apps/cli`. A launcher-only change should
+include an update to the CLI's installation documentation under `apps/cli`
 in the same conventional-commit PR so it triggers a shared release.
 
 ## Retrying a partial release

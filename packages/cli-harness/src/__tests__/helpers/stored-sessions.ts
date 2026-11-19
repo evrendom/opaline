@@ -1,5 +1,5 @@
-import type { getClickhouse } from "../../../../../app/server/src/clickhouse.js";
-import type { sqlClient } from "../../../../../app/server/src/db.js";
+import type { getClickhouse } from "../../../../../apps/desktop/server/src/clickhouse.js";
+import type { sqlClient } from "../../../../../apps/desktop/server/src/db.js";
 
 /**
  * Readers for rows the API stores in ClickHouse and Postgres.
@@ -7,7 +7,7 @@ import type { sqlClient } from "../../../../../app/server/src/db.js";
  * cli has no runtime dependency on @rudel/api, and this helper must not
  * create one: the api imports above are type-only (erased at build time), and
  * callers inject the live clients they already import for themselves. Only the
- * test files that construct these readers touch app/server source.
+ * test files that construct these readers touch apps/desktop/server source.
  */
 
 type ClickHouseClient = ReturnType<typeof getClickhouse>;

@@ -31,12 +31,20 @@ export function resolveCheckoutDistribution(
 	const configured = environment[SERVER_DIR_ENV]?.trim();
 	if (!configured) return undefined;
 	const root = resolve(configured);
-	const entry = join(root, "app", "server", "src", "selfhost", "main.ts");
+	const entry = join(
+		root,
+		"apps",
+		"desktop",
+		"server",
+		"src",
+		"selfhost",
+		"main.ts",
+	);
 	if (!existsSync(entry))
 		return new Error(
-			`${SERVER_DIR_ENV}=${configured} has no app/server/src/selfhost/main.ts. Point it at an Opaline server checkout that includes self-hosting.`,
+			`${SERVER_DIR_ENV}=${configured} has no apps/desktop/server/src/selfhost/main.ts. Point it at an Opaline server checkout that includes self-hosting.`,
 		);
-	const webDir = join(root, "app", "ui", "dist");
+	const webDir = join(root, "apps", "desktop", "ui", "dist");
 	return {
 		kind: "checkout",
 		root,

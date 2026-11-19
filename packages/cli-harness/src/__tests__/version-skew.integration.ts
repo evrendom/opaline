@@ -17,8 +17,8 @@ import { FILTER_VERSION } from "@rudel/secret-filter";
 import {
 	getClickhouse,
 	getSafeClickHouseTable,
-} from "../../../../app/server/src/clickhouse.js";
-import { sqlClient } from "../../../../app/server/src/db.js";
+} from "../../../../apps/desktop/server/src/clickhouse.js";
+import { sqlClient } from "../../../../apps/desktop/server/src/db.js";
 import { createApiClient } from "../lib/api-client.js";
 import {
 	signUpTestUser,

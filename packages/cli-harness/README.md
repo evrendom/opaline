@@ -16,10 +16,10 @@ Do not install this package from npm. `npm install -g rudel` installs the publis
 
 ```bash
 # Run the harness from source
-bun run --cwd cli dev -- --help
+bun run --cwd packages/cli-harness dev -- --help
 
 # Run the harness tests
-bun run --cwd cli test
+bun run --cwd packages/cli-harness test
 ```
 
 ## Commands

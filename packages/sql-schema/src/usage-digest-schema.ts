@@ -13,7 +13,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { organization, user } from "./auth-schema.js";
 
-// Usage digest emails (app/server/src/services/usage-digest/). A member's
+// Usage digest emails (apps/desktop/server/src/services/usage-digest/). A member's
 // choice per workspace; no row means both digests are on, so every member
 // receives them until they turn one off in settings or unsubscribe.
 export const usageDigestPreference = pgTable(

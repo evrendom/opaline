@@ -26,20 +26,20 @@ import {
 import {
 	codexLifecycleFactsByRun,
 	streamTurnKey,
-} from "../app/server/src/services/analysis/codex-lifecycle.js";
+} from "../apps/desktop/server/src/services/analysis/codex-lifecycle.js";
 import {
 	isRunIndexColumnRecordable,
 	type RunIndexFactColumn,
-} from "../app/server/src/services/analysis/run-index-columns.js";
+} from "../apps/desktop/server/src/services/analysis/run-index-columns.js";
 import {
 	RUN_INDEX_PR_URL_PATTERN,
 	readRunIndexComponentValues,
-} from "../app/server/src/services/analysis/run-index-components.js";
+} from "../apps/desktop/server/src/services/analysis/run-index-components.js";
 import {
 	type CodexLifecycleRow,
 	CodexLifecycleRowSchema,
 	type CodexTurnMark,
-} from "../app/server/src/services/analysis/run-index-sql.js";
+} from "../apps/desktop/server/src/services/analysis/run-index-sql.js";
 
 const COLUMNS = [
 	"skills",

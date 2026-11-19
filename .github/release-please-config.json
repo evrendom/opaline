@@ -11,7 +11,7 @@
 		}
 	],
 	"packages": {
-		"cli": {
+		"apps/cli": {
 			"release-type": "node",
 			"component": "opaline-cli",
 			"changelog-path": "CHANGELOG.md",

@@ -26,13 +26,13 @@ interface PullRequestMetadata {
 // explicit exclusions narrow and review additions as policy changes.
 const TRACKED_FILE_EXCLUSIONS = new Set([
 	// Synthetic parser corpus intentionally exercises Windows skill paths.
-	"app/server/src/services/fixtures/skill-transcript-corpus.ts",
+	"apps/desktop/server/src/services/fixtures/skill-transcript-corpus.ts",
 	// The CLI maps the legacy hosted API base to the dashboard for old installs.
-	"cli/src/lib/dashboard-url.ts",
-	"cli/src/__tests__/dashboard-url.test.ts",
+	"apps/cli/src/lib/dashboard-url.ts",
+	"apps/cli/src/__tests__/dashboard-url.test.ts",
 	// Synthetic Windows paths in CLI install and metadata-filter tests.
-	"cli/src/__tests__/alias-hook-config.test.ts",
-	"cli/src/internal/local-context-source/metadata-filter.test.ts",
+	"apps/cli/src/__tests__/alias-hook-config.test.ts",
+	"apps/cli/src/internal/local-context-source/metadata-filter.test.ts",
 	"scripts/check-disclosure.ts",
 	".github/CONTRIBUTING.md",
 ]);

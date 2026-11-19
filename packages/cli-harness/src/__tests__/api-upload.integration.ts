@@ -19,8 +19,8 @@ import { SESSION_INGEST_FILTER_VERSION } from "@rudel/api-routes/transcript-slim
 import {
 	getClickhouse,
 	getSafeClickHouseTable,
-} from "../../../../app/server/src/clickhouse.js";
-import { sqlClient } from "../../../../app/server/src/db.js";
+} from "../../../../apps/desktop/server/src/clickhouse.js";
+import { sqlClient } from "../../../../apps/desktop/server/src/db.js";
 import { createApiClient } from "../lib/api-client.js";
 import { uploadSession } from "../lib/uploader.js";
 import {

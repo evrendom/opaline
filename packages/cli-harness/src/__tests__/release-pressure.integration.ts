@@ -28,9 +28,9 @@ import {
 import {
 	getClickhouse,
 	getSafeClickHouseTable,
-} from "../../../../app/server/src/clickhouse.js";
-import { sqlClient } from "../../../../app/server/src/db.js";
-import { computeIngestContentHash } from "../../../../app/server/src/lib/ingest-content-hash.js";
+} from "../../../../apps/desktop/server/src/clickhouse.js";
+import { sqlClient } from "../../../../apps/desktop/server/src/db.js";
+import { computeIngestContentHash } from "../../../../apps/desktop/server/src/lib/ingest-content-hash.js";
 import { createApiClient } from "../lib/api-client.js";
 import { type BatchUploadItem, batchUpload } from "../lib/batch-upload.js";
 import { getGitInfo } from "../lib/git-info.js";

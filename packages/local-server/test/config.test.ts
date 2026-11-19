@@ -252,23 +252,26 @@ describe("server checkout", () => {
 		expect(resolveCheckoutDistribution({})).toBeUndefined();
 		expect(
 			String(resolveCheckoutDistribution({ OPALINE_SERVER_DIR: root })),
-		).toContain("has no app/server/src/selfhost/main.ts");
+		).toContain("has no apps/desktop/server/src/selfhost/main.ts");
 	});
 
 	test("finds the self-host entry point and the web build", () => {
-		const entry = join(root, "app", "server", "src", "selfhost");
+		const entry = join(root, "apps", "desktop", "server", "src", "selfhost");
 		mkdirSync(entry, { recursive: true });
 		writeFileSync(join(entry, "main.ts"), "");
 		expect(resolveCheckoutDistribution({ OPALINE_SERVER_DIR: root })).toEqual({
 			kind: "checkout",
 			root,
 			entry: join(entry, "main.ts"),
-			webDir: join(root, "app", "ui", "dist"),
+			webDir: join(root, "apps", "desktop", "ui", "dist"),
 			hasWebBuild: false,
 			source: `checkout ${root}`,
 		});
-		mkdirSync(join(root, "app", "ui", "dist"), { recursive: true });
-		writeFileSync(join(root, "app", "ui", "dist", "index.html"), "");
+		mkdirSync(join(root, "apps", "desktop", "ui", "dist"), { recursive: true });
+		writeFileSync(
+			join(root, "apps", "desktop", "ui", "dist", "index.html"),
+			"",
+		);
 		expect(
 			resolveCheckoutDistribution({ OPALINE_SERVER_DIR: root }),
 		).toMatchObject({ hasWebBuild: true });

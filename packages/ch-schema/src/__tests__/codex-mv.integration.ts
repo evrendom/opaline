@@ -56,8 +56,8 @@ afterAll(async () => {
 //
 // Scope: this exercises the MV's *query*, not its wiring. The insert trigger, the
 // `TO rudel.session_analytics` target, and ReplacingMergeTree collapse are covered by
-// app/server/src/__tests__/session-analytics-values.integration.ts (real adapter → MV →
-// FINAL) and cli/src/__tests__/api-upload.integration.ts (CLI → API → ClickHouse
+// apps/desktop/server/src/__tests__/session-analytics-values.integration.ts (real adapter → MV →
+// FINAL) and apps/cli/src/__tests__/api-upload.integration.ts (CLI → API → ClickHouse
 // with auth).
 const MV_QUERY = withSessionFilter(CODEX_SESSION_ANALYTICS_MV_SQL, {
 	organizationId: orgId,

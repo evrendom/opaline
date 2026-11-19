@@ -16,9 +16,9 @@ Not changed: the GitHub links keep their own retention; the weekly totals (`week
 | `chx/migrations/20260826090551_auto.sql:276,303` (current `claude_sessions`, `codex_sessions`; older copies in `20260311084657_auto.sql:34,58` and `20260518233052_auto.sql:40,64`), `20260930105809_transcript_records.sql:46`, `20260822140000_session_lineage.sql:45` and `20260913190000_product_launch.sql:43` (`session_lineage`), `20261010120000_run_index.sql:126` (table) and `:38,84,88,91,92,94,99,120` (eight column TTLs: `prompt_head`, `turn_error`, `hook_stop_reason`, `hook_errors`, `hook_runs`, `api_error`, `goal`, `title`) | the TTLs themselves; checked-in migrations are history and stay byte for byte | new forward migration `chx/migrations/20261011120000_l1_retention_removed.sql` removes all of them |
 | `packages/ch-schema/chx/meta/snapshot.json:94,186,1647,2025,3983` | TTLs of the five tables | removed (the snapshot only keeps TTLs of `dependency_health_probes` and `session_language_signals`) |
 | `packages/ch-schema/scripts/migrate-run-index.ts:45-48,218-230` | read-back required the table TTL and the eight column TTLs, so it would fail once they are removed | does not check TTLs or the nine reworded comments; the retention runner owns them |
-| `app/server/src/services/analysis/run-index-reader.ts:45-72,93` | `isRunIndexTextExpired`, `expireRunIndexText`, and an `if(... <= today(), NULL, col)` per text column on every read | removed; text is read as stored |
-| `app/server/src/services/l1-edges/run-index.service.ts:268-274` | nulled text of sessions older than 365 days before writing | removed |
-| `app/server/src/clickhouse.ts:128-131`, `docs/l1-literal-schema.md:9,165,175`, `docs/adr/0002-literal-l1-for-analysis.md:17`, `AGENTS.md` (run index and new L1 retention sections) | stated the expiry | state "kept until a deletion request" |
+| `apps/desktop/server/src/services/analysis/run-index-reader.ts:45-72,93` | `isRunIndexTextExpired`, `expireRunIndexText`, and an `if(... <= today(), NULL, col)` per text column on every read | removed; text is read as stored |
+| `apps/desktop/server/src/services/l1-edges/run-index.service.ts:268-274` | nulled text of sessions older than 365 days before writing | removed |
+| `apps/desktop/server/src/clickhouse.ts:128-131`, `docs/l1-literal-schema.md:9,165,175`, `docs/adr/0002-literal-l1-for-analysis.md:17`, `AGENTS.md` (run index and new L1 retention sections) | stated the expiry | state "kept until a deletion request" |
 
 No scheduled job deletes these tables by age. The maintenance steps that delete rows (`retire:transcript-records`, the hourly session retirement, session revision receipts, expired purge jobs, expired ingest jobs) remove superseded generations or operational rows, never a session's data by age. The `l1-edge-census` and `run-index-census` steps look back 14 days only to find sessions to queue, not to expire anything.
 
@@ -47,7 +47,7 @@ Each purge runs inline, is retried by the purge worker, and runs a second pass a
 
 ## Coverage: table by deletion path
 
-`yes` means the purge plan deletes the table (ClickHouse) or the row is removed by the same transaction or a cascade (Postgres). The ClickHouse rows are enforced by `app/server/src/__tests__/l1-deletion-coverage.test.ts`, which reads the schema snapshot and fails when a table with an owner column is not in the plan.
+`yes` means the purge plan deletes the table (ClickHouse) or the row is removed by the same transaction or a cascade (Postgres). The ClickHouse rows are enforced by `apps/desktop/server/src/__tests__/l1-deletion-coverage.test.ts`, which reads the schema snapshot and fails when a table with an owner column is not in the plan.
 
 | Data | Holds | Account deletion (self or admin) | Workspace deletion |
 | --- | --- | --- | --- |

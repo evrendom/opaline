@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { extractUsageEventsOffThread } from "../app/server/src/services/usage-extraction.service.js";
+import { extractUsageEventsOffThread } from "../apps/desktop/server/src/services/usage-extraction.service.js";
 
 const targetMiB = readTargetMiB();
 const targetBytes = targetMiB * 1024 * 1024;

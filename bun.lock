@@ -15,7 +15,31 @@
         "typescript": "5.9.2",
       },
     },
-    "app/server": {
+    "apps/cli": {
+      "name": "@opalinehq/cli",
+      "version": "0.17.1",
+      "bin": {
+        "opaline": "./dist/cli.js",
+      },
+      "dependencies": {
+        "@clack/prompts": "^1.0.1",
+        "@logtape/file": "^2.0.4",
+        "@logtape/logtape": "^2.0.4",
+        "@orpc/client": "^1.13.5",
+        "@orpc/contract": "^1.13.5",
+        "@stricli/core": "^1.2.5",
+        "p-map": "^7.0.4",
+        "posthog-node": "5.46.1",
+        "smol-toml": "^1.6.0",
+        "zod": "^4.6.5",
+      },
+      "devDependencies": {
+        "@types/node": "^22",
+        "bun-types": "latest",
+        "typescript": "5.9.2",
+      },
+    },
+    "apps/desktop/server": {
       "name": "@rudel/api",
       "version": "0.0.0",
       "dependencies": {
@@ -52,11 +76,11 @@
         "typescript": "5.9.2",
       },
     },
-    "app/shell": {
+    "apps/desktop/shell": {
       "name": "@rudel/desktop",
       "version": "0.1.0",
     },
-    "app/ui": {
+    "apps/desktop/ui": {
       "name": "@rudel/web",
       "version": "0.0.0",
       "dependencies": {
@@ -119,30 +143,6 @@
         "typescript": "~5.9.3",
         "vite": "^7.3.1",
         "vitest": "3.2.7",
-      },
-    },
-    "cli": {
-      "name": "@opalinehq/cli",
-      "version": "0.17.1",
-      "bin": {
-        "opaline": "./dist/cli.js",
-      },
-      "dependencies": {
-        "@clack/prompts": "^1.0.1",
-        "@logtape/file": "^2.0.4",
-        "@logtape/logtape": "^2.0.4",
-        "@orpc/client": "^1.13.5",
-        "@orpc/contract": "^1.13.5",
-        "@stricli/core": "^1.2.5",
-        "p-map": "^7.0.4",
-        "posthog-node": "5.46.1",
-        "smol-toml": "^1.6.0",
-        "zod": "^4.6.5",
-      },
-      "devDependencies": {
-        "@types/node": "^22",
-        "bun-types": "latest",
-        "typescript": "5.9.2",
       },
     },
     "packages/agent-adapters": {
@@ -670,7 +670,7 @@
 
     "@obsessiondb/chcli": ["@obsessiondb/chcli@0.1.1-beta.4", "", { "dependencies": { "@clickhouse/client": "^1.17.0" }, "peerDependencies": { "typescript": "^5" }, "bin": { "chcli": "dist/chcli.js" } }, "sha512-jsapc7STpKdHlMvyOnRa9kkFB/nZ7AAG6ZBmZeVYghsqHx89QP+bd3p+SePMDiGfHDf74rD6vazg9olX5Q445Q=="],
 
-    "@opalinehq/cli": ["@opalinehq/cli@workspace:cli"],
+    "@opalinehq/cli": ["@opalinehq/cli@workspace:apps/cli"],
 
     "@open-draft/deferred-promise": ["@open-draft/deferred-promise@2.2.0", "", {}, "sha512-CecwLWx3rhxVQF6V4bAgPS5t+So2sTbPgAzafKkVizyi7tlwpcFpdFqq+wqF2OwNBmqFuu6tOyouTuxgpMfzmA=="],
 
@@ -950,7 +950,7 @@
 
     "@rudel/agent-adapters": ["@rudel/agent-adapters@workspace:packages/agent-adapters"],
 
-    "@rudel/api": ["@rudel/api@workspace:app/server"],
+    "@rudel/api": ["@rudel/api@workspace:apps/desktop/server"],
 
     "@rudel/api-routes": ["@rudel/api-routes@workspace:packages/api-routes"],
 
@@ -958,7 +958,7 @@
 
     "@rudel/cli-harness": ["@rudel/cli-harness@workspace:packages/cli-harness"],
 
-    "@rudel/desktop": ["@rudel/desktop@workspace:app/shell"],
+    "@rudel/desktop": ["@rudel/desktop@workspace:apps/desktop/shell"],
 
     "@rudel/language-signals": ["@rudel/language-signals@workspace:packages/language-signals"],
 
@@ -976,7 +976,7 @@
 
     "@rudel/usage-events": ["@rudel/usage-events@workspace:packages/usage-events"],
 
-    "@rudel/web": ["@rudel/web@workspace:app/ui"],
+    "@rudel/web": ["@rudel/web@workspace:apps/desktop/ui"],
 
     "@sec-ant/readable-stream": ["@sec-ant/readable-stream@0.4.1", "", {}, "sha512-831qok9r2t8AlxLko40y2ebgSDhenenCatLVeW/uBtnHPyhHOvG0C7TvfgecV+wHzIm5KUICgzmVpWS+IMEAeg=="],
 

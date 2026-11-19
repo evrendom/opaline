@@ -67,7 +67,7 @@ export async function startTestServer(
 }
 
 function spawnServer(env: Record<string, string | undefined>) {
-	const proc = Bun.spawn(["bun", "app/server/src/index.ts"], {
+	const proc = Bun.spawn(["bun", "apps/desktop/server/src/index.ts"], {
 		cwd: MONOREPO_ROOT,
 		stdout: "pipe",
 		stderr: "pipe",
