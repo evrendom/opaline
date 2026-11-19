@@ -1,28 +1,81 @@
+<div align="center">
+
 # Opaline
 
-See where your coding agents get stuck, and what to fix in your setup.
+**See where your Claude Code and Codex agents get stuck, what they cost, and what to fix in your setup.**
 
-Opaline is a Mac app for Claude Code and Codex. It reads the sessions your agents leave on your Mac and shows what they cost, where they loop or fail, which mistakes keep coming back, and what to change in your `CLAUDE.md`, `AGENTS.md`, skills, hooks, scripts or CI. Everything runs on your Mac: the app brings its own server, Postgres and ClickHouse, and nothing leaves the machine.
+[![Download for macOS (Apple Silicon)](https://img.shields.io/badge/Download-macOS%20(Apple%20Silicon)-black?logo=apple)](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-macOS-arm64.dmg)
+[![Latest Release](https://img.shields.io/github/v/release/evrendom/opaline?label=release)](https://github.com/evrendom/opaline/releases)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-**[Download Opaline for Mac](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-macOS-arm64.dmg)** (Apple silicon) · [evren.opaline.so](https://evren.opaline.so)
+[**Download Opaline for Mac**](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-macOS-arm64.dmg) *(Apple Silicon)* · [opaline.so](https://opaline.so)
 
-> **Coming from the Opaline CLI?** This repository used to be `opalinehq/cli`. It now holds all of
-> Opaline: the Mac app, the server, the dashboard and the CLI. The CLI still lives here, in
-> [`apps/cli`](apps/cli), and is still published to npm as `opaline`, `@opalinehq/cli` and `rudel`;
-> `npx opaline@latest` keeps working. See [The CLI](#the-cli).
+</div>
+
+<p align="center">
+  <a href="docs/assets/readme/dashboard.mp4">
+    <img src="docs/assets/readme/dashboard.gif" alt="The Opaline dashboard: usage, cost, sessions, agent runs and frustrations over a month" width="100%" />
+  </a>
+</p>
+
+Opaline is a local-first Mac app for **Claude Code** and **Codex**. It reads the sessions your coding agents already leave on your Mac and shows what they cost, where they loop or fail, which mistakes keep coming back, and what to improve in your `CLAUDE.md`, `AGENTS.md`, skills, hooks, scripts, or CI.
+
+Everything runs on your machine. Opaline brings its own local server, Postgres, and ClickHouse—nothing leaves your Mac.
+
+---
 
 ## What you get
 
-- **Usage and cost** for Claude Code and Codex by day, repository and model, including your plan usage.
-- **Every session, readable**: turns, tool calls, files, context, subagents, pull requests and CI.
-- **Flags** for runs that looped, failed or got corrected, so the problems that repeat stand out.
-- **Your agents can ask too**: "Connect your agents" adds the Opaline plugin to Claude Code and Codex, so they can look up past sessions and answer questions about them through the local MCP server.
+- **Usage & cost breakdowns** — Track Claude Code and Codex spend and usage by day, repository, and model, including your plan usage.
+- **Readable session inspector** — Inspect every turn, tool call, touched file, context window, subagent, pull request, and CI run without digging through raw transcripts.
+- **Loop & failure flags** — Automatically surface runs that looped, failed, or needed correction so recurring setup problems stand out immediately.
+- **Built-in MCP for your agents** — Click **"Connect your agents"** to install the Opaline plugin in Claude Code and Codex so your agents can query past sessions directly through the local MCP server.
+- **Zero-config local stack** — Bundles its own server, Postgres, and ClickHouse, and keeps itself up to date from GitHub Releases.
 
-The app keeps itself up to date from this repository's releases.
+<table>
+  <tr>
+    <td width="50%"><img src="docs/assets/readme/cost.png" alt="Cost over time, by repository and model" /></td>
+    <td width="50%"><img src="docs/assets/readme/frustrations.png" alt="Frustrations over time, with signal types and the exact phrases" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>Cost</b> by day, repository and model</sub></td>
+    <td align="center"><sub><b>Frustrations</b>: corrections and apologies, with the exact words</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/assets/readme/sessions.png" alt="Session list with cost, skills, errors and feedback per session" /></td>
+    <td width="50%"><img src="docs/assets/readme/session-summary.png" alt="One session: context window, cost, duration, skills, tools and files" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>Sessions</b> with cost, skills, errors and feedback</sub></td>
+    <td align="center"><sub><b>Session summary</b>: what filled the context window</sub></td>
+  </tr>
+</table>
 
-## Build from source
+<p align="center">
+  <img src="docs/assets/readme/session-detail.png" alt="A session's turns and tool calls on a timeline" width="100%" />
+  <br />
+  <sub><b>Session detail</b>: every turn and tool call on one timeline</sub>
+</p>
 
-You need [Bun](https://bun.sh) and macOS.
+---
+
+## Quick Start
+
+1. [**Download Opaline for Mac (Apple Silicon)**](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-macOS-arm64.dmg) and move it to Applications.
+2. Launch Opaline—it automatically starts its bundled local stack and reads your existing Claude Code and Codex sessions.
+3. *(Optional)* Click **"Connect your agents"** inside the app to enable the local MCP plugin for Claude Code and Codex.
+
+---
+
+## Privacy
+
+Agent transcripts contain whatever your agents saw: source code, prompts, command output, file contents, URLs, and sometimes secrets. Opaline processes and stores everything locally on your Mac—no telemetry, no cloud sync, and no external database required.
+
+---
+
+## Build from Source
+
+**Requirements:** macOS and [Bun](https://bun.sh).
 
 ```bash
 git clone https://github.com/evrendom/opaline.git
@@ -30,42 +83,3 @@ cd opaline
 bun install
 bash apps/desktop/shell/package.sh
 ```
-
-`package.sh` builds the server and web app from your checkout and writes `Opaline.app` and `Opaline.dmg` to `~/.cache/opaline-desktop/package`. For day-to-day development, see [CONTRIBUTING.md](.github/CONTRIBUTING.md).
-
-## The CLI
-
-The `opaline` command (`apps/cli`, published to npm as `opaline`, `@opalinehq/cli` and `rudel`) finds saved Claude Code and Codex sessions on a computer, uploads them to Opaline at [opaline.so](https://opaline.so), and keeps new ones in sync. The Mac app does not need it: it reads the sessions on your Mac directly.
-
-```bash
-npx opaline@latest
-```
-
-See [docs/usage.md](docs/usage.md) and [docs/data-handling.md](docs/data-handling.md). Releases are listed under `opaline-cli@*` in this repository's releases; see [docs/releasing.md](docs/releasing.md).
-
-## Privacy and secrets
-
-Session transcripts contain whatever your agents saw: source code, prompts, command output, file contents, URLs, and sometimes secrets. In the Mac app they stay on your Mac. When sessions are sent to a server, the CLI removes known secret formats first and the server applies the same filter again before storing anything. The filter catches known formats only; it does not catch values such as `DB_PASSWORD=hunter2`, custom tokens without a recognizable prefix, or secrets split across lines. Keep secrets out of agent sessions where you can.
-
-## Repository layout
-
-| Path | What it is |
-| --- | --- |
-| `apps/desktop` | The Mac app, the thing you download |
-| `apps/desktop/shell` | The native app (Electron): windows, menus, onboarding, the updater and packaging |
-| `apps/desktop/server` | The local server the app starts: imports, analysis and the MCP endpoint your agents use |
-| `apps/desktop/ui` | The screens the app's window shows (React) |
-| `apps/cli` | The CLI (npm `opaline`, `@opalinehq/cli`, `rudel`), with its launchers in `packages/opaline` and `packages/rudel-alias` |
-| `plugin` | The Claude Code and Codex plugin the app installs from "Connect your agents" |
-| `packages/local-server` | Starts the server, Postgres and ClickHouse on the Mac for the app |
-| `packages/cli-harness` | An older CLI copy the server's integration and version-skew tests run against; not published |
-| `packages/*` | Shared code: schemas, transcript parsing, the secret filter |
-| `scripts` | Build and development scripts; `scripts/dev-compose.yml` starts Postgres and ClickHouse for local development (`bun run infra:up`) |
-
-## Contributing and security
-
-See [CONTRIBUTING.md](.github/CONTRIBUTING.md). To report a vulnerability, see [SECURITY.md](.github/SECURITY.md); please do not open public issues for security problems.
-
-## License
-
-Opaline is created by Evren Dombak and licensed under the [Apache License 2.0](LICENSE). If you redistribute it or build on it, keep the [NOTICE](NOTICE) file with it.
