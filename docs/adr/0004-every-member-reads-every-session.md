@@ -11,5 +11,5 @@ By default every member of a workspace may read every teammate's sessions and se
 ## Consequences
 
 - "Own sessions only, admins all" stays in the code as a workspace option, switched off and not settable in settings for now.
-- `session-detail-access.ts`, `services/analysis/scope.ts`, the MCP tool descriptions and the plugin skill (`plugins/opaline/skills/opaline/SKILL.md`), which all say members see only their own sessions, change with this decision.
+- `session-detail-access.ts`, `services/analysis/scope.ts`, the MCP tool descriptions and the plugin skill (`plugin/skills/opaline/SKILL.md`), which all say members see only their own sessions, change with this decision.
 - The admin is no longer a reading role. ADR 0001's option to restrict a shared analysis's results to admins and the session's owner applies only with the own-sessions-only option on.

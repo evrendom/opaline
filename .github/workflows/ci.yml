@@ -50,7 +50,7 @@ jobs:
               - "!apps/api/src/handlers/mcp-http*"
               - "!**/*.md"
             skill:
-              - "plugins/opaline/skills/**"
+              - "plugin/skills/**"
 
   verify:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false

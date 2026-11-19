@@ -8,7 +8,7 @@ import { RUN_CUT_NOTE, readJson, runJson } from "./json-output.js";
 
 const SCRIPTS = join(
 	import.meta.dir,
-	"../../../../plugins/opaline/skills/opaline/scripts",
+	"../../../../plugin/skills/opaline/scripts",
 );
 const sessionUrl = (id: string) => `https://opaline.so/acme/sessions/${id}`;
 const directory = mkdtempSync(join(tmpdir(), "opaline-skill-scripts-"));

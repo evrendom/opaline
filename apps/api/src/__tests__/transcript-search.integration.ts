@@ -411,10 +411,7 @@ describe("search over uploaded transcripts", () => {
 	});
 
 	test("every SQL example in the plugin skill pages runs in ClickHouse through the sql gateway", async () => {
-		const skillDir = join(
-			import.meta.dir,
-			"../../../../plugins/opaline/skills/opaline",
-		);
+		const skillDir = join(import.meta.dir, "../../../../plugin/skills/opaline");
 		const pages = await Array.fromAsync(
 			new Bun.Glob("**/*.md").scan({ cwd: skillDir }),
 		);

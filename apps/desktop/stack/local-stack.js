@@ -69,7 +69,7 @@ function resolveBundle({ app, resourcesPath }) {
 	]);
 	const pluginDir = firstExisting([
 		path.join(appRoot, "agent-plugin"),
-		path.join(appRoot, "..", "..", "plugins", "opaline"),
+		path.join(appRoot, "..", "..", "plugin"),
 	]);
 	const runtimesDir = resources && path.join(resources, "runtimes");
 	const manifest = runtimesDir

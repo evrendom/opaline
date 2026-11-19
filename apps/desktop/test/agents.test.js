@@ -30,7 +30,7 @@ beforeEach(() => {
 
 afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 
-const pluginDir = path.join(__dirname, "..", "..", "..", "plugins", "opaline");
+const pluginDir = path.join(__dirname, "..", "..", "..", "plugin");
 const server = { mcpUrl: "http://127.0.0.1:4100/api/mcp", apiKey: "key-1" };
 const read = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
 
@@ -69,7 +69,7 @@ test("the plugin version follows what the plugins contain, so a changed key rein
 
 const text = (file) => fs.readFileSync(file, "utf8");
 
-test("the installed plugin carries the skills, playbook files and manifests of plugins/opaline", () => {
+test("the installed plugin carries the skills, playbook files and manifests of plugin/", () => {
 	const { root: marketplace, version } = writeMarketplace({
 		pluginDir,
 		server,

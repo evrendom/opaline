@@ -8,7 +8,7 @@ import {
 } from "../services/analysis/sql-guard.js";
 import { SQL_VIEWS } from "../services/analysis/sql-views.js";
 
-const SKILLS = join(import.meta.dir, "../../../../plugins/opaline/skills");
+const SKILLS = join(import.meta.dir, "../../../../plugin/skills");
 
 async function opalineSkillText(): Promise<string> {
 	const files = [...new Glob("opaline/*.md").scanSync(SKILLS)].sort();
@@ -38,7 +38,7 @@ test("every plugin skill's front matter is valid YAML with a name and a descript
 	}
 });
 
-const PLUGIN = join(import.meta.dir, "../../../../plugins/opaline");
+const PLUGIN = join(import.meta.dir, "../../../../plugin");
 
 test("the Claude Code manifest matches the Codex manifest", async () => {
 	const codex = await Bun.file(
