@@ -4,7 +4,6 @@ import type {
 	SessionDetailWindow,
 } from "@rudel/api-routes";
 import { memo, useCallback, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
 import { useFlaggedTurns } from "@/features/compass/session-flags";
 import "@/hooks/scroll-fade.css";
@@ -36,6 +35,7 @@ import {
 	AGENT_PARAM,
 	TURN_PARAM,
 	updateReaderParams,
+	useReaderSearchParams,
 	writePick,
 } from "../reader-params";
 import {
@@ -114,7 +114,7 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 	userLabel: string;
 	reading?: ActiveTurnStore;
 }) {
-	const [searchParams, setSearchParams] = useSearchParams();
+	const [searchParams, setSearchParams] = useReaderSearchParams();
 	const pages = useSessionDetailOverviewPages(overview);
 	const turns = useMemo(
 		() => pages.data.pages.flatMap((page) => page.turnPage.items),

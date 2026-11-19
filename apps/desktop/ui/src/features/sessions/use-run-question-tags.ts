@@ -12,9 +12,8 @@ import { orpc } from "@/lib/orpc";
 // Run question answers for the dashboard. Only a workspace whose runs are
 // answered gets any (the API answers `enabled: false` elsewhere, without
 // reading), so the reads are cheap where there is nothing to show. The
-// plugin app reaches only the procedures it serves as tools, and the product
-// demo has no answers: both leave the tags out, as does a view outside a
-// workspace. A failure reads as no tags: they never hold up the sessions
+// plugin app reaches only the procedures it serves as tools, so it leaves the
+// tags out, as do a view outside a workspace and the demo before Explore. A failure reads as no tags: they never hold up the sessions
 // list or the reader.
 
 /** Answers go stale slowly: a run is answered once, minutes after its upload. */
@@ -22,7 +21,7 @@ const RUN_QUESTION_STALE_TIME_MS = 5 * 60 * 1000;
 
 function useRunQuestionsAvailable(): boolean {
 	const demo = useDemoRuntime();
-	return import.meta.env.MODE !== "plugin" && demo === null;
+	return import.meta.env.MODE !== "plugin" && (demo === null || demo.live);
 }
 
 function chunk<T>(items: readonly T[], size: number): T[][] {

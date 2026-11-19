@@ -1,7 +1,6 @@
 import type { SessionRunCiRun } from "@rudel/api-routes";
 import { IconAlertTriangle, IconGitPullRequest } from "@tabler/icons-react";
 import { type ReactNode, useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
 import { Reveal } from "@/app/ui/bones";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { cn } from "@/lib/utils";
@@ -25,6 +24,7 @@ import {
 	PR_PARAM,
 	pickOf,
 	updateReaderParams,
+	useReaderSearchParams,
 	writePick,
 } from "../reader-params";
 import { CiColumnsSample } from "../session-reader-samples";
@@ -106,7 +106,7 @@ export function SessionReaderCiView({
 	);
 	const railTags = useFilesRailTags();
 	const { agent, run } = useReaderPick();
-	const [, setSearchParams] = useSearchParams();
+	const [, setSearchParams] = useReaderSearchParams();
 	const setPicks = (
 		next: { ci?: string | null; pr?: string | null },
 		rail?: { run: string | null; subagent: string | null },

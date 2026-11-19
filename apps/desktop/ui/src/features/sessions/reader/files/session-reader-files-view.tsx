@@ -2,7 +2,6 @@ import type { SessionRunStep } from "@rudel/api-routes";
 import { absolutePath } from "@rudel/api-routes/call-paths";
 import { IconAlertTriangle, IconFile, IconFileCode } from "@tabler/icons-react";
 import { useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
 import { Reveal } from "@/app/ui/bones";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { cn } from "@/lib/utils";
@@ -25,6 +24,7 @@ import {
 	SUBAGENT_PARAM,
 	syncPick,
 	updateReaderParams,
+	useReaderSearchParams,
 } from "../reader-params";
 import { resolveSessionFile } from "../session-places";
 import { FilesColumnsSample } from "../session-reader-samples";
@@ -69,7 +69,7 @@ export function SessionReaderFilesView({
 		if (turnId) onOpenTurn(turnId, subagentId);
 	};
 	const railTags = useFilesRailTags();
-	const [searchParams, setSearchParams] = useSearchParams();
+	const [searchParams, setSearchParams] = useReaderSearchParams();
 	const files = query.data?.files ?? [];
 	const runFiles = useMemo(() => getRunFiles(files), [files]);
 	const idle = useMemo(() => {

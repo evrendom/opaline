@@ -82,6 +82,7 @@ export function PillTabs<T extends string>({
 						}}
 						className={cn(
 							"relative flex h-8 items-center rounded-md px-2.5 text-sm font-medium transition-colors outline-none corner-squircle squircle:rounded-xl",
+							active && !pill && cn("bg-muted dark:bg-muted/50", pillClassName),
 							active
 								? empty
 									? "text-foreground/45"
