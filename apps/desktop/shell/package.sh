@@ -60,8 +60,10 @@ resources="$app/Contents/Resources"
 dest="$resources/app"
 mkdir -p "$dest/local-server" "$resources/server" "$resources/runtimes"
 cp "$here/package.json" "$here/main.js" "$here/deep-link.js" "$here/agents.js" "$here/analyze.js" "$here/pricing.js" "$here/updates.js" "$here/window-state.js" \
-	"$here/preload.js" "$here/onboarding-preload.js" "$here/environments.js" "$here/environment-preload.js" "$dest/"
+	"$here/preload.js" "$here/onboarding-preload.js" "$here/environments.js" "$here/environment-preload.js" "$here/dock-usage.js" "$dest/"
 cp -R "$here/stack" "$here/analysis" "$here/onboarding" "$here/onboarding-window" "$here/environment-window" "$here/start-window" "$dest/"
+mkdir -p "$dest/icon/dock"
+cp -R "$here/icon/dock/light" "$here/icon/dock/dark" "$here/icon/dock/draw.html" "$here/icon/dock/draw.js" "$dest/icon/dock/"
 build_dirty=false
 [ -z "$(git -C "$repo" status --porcelain --untracked-files=no)" ] || build_dirty=true
 printf '{"commit":"%s","dirty":%s}\n' "$(git -C "$repo" rev-parse --short=9 HEAD)" "$build_dirty" > "$dest/build.json"

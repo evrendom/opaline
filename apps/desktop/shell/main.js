@@ -30,6 +30,7 @@ app.on("open-url", (event, url) => {
 
 const { analyzeSessions, scanSessions } = require("./analyze");
 const { createAgents } = require("./agents");
+const { createDockUsage } = require("./dock-usage");
 const { createLocalStack, introUrl } = require("./stack/local-stack");
 const { createEnvironmentMenu } = require("./environments");
 const { keepClaudeTranscripts } = require("./stack/transcripts");
@@ -42,6 +43,7 @@ app.userAgentFallback = `${app.userAgentFallback
 
 const stack = createLocalStack({ app });
 const agents = createAgents({ stack });
+const dockUsage = createDockUsage({ agents, dataDir: process.env.OPALINE_SERVER_DATA_DIR });
 const updates = app.isPackaged && process.platform === "darwin" && !isDev ? createAppUpdater() : undefined;
 
 function updateLog(line) {
@@ -418,7 +420,12 @@ ipcMain.handle("onboarding:icons", (event) =>
 		: null,
 );
 ipcMain.handle("onboarding:agents", (event) => (fromOnboarding(event) ? agents.statuses() : null));
-ipcMain.handle("onboarding:connect", (event, key) => (fromOnboarding(event) ? agents.connect(key) : null));
+ipcMain.handle("onboarding:connect", async (event, key) => {
+	if (!fromOnboarding(event)) return null;
+	const status = await agents.connect(key);
+	dockUsage.refreshAgents();
+	return status;
+});
 ipcMain.on("onboarding:theme", (event, theme) => {
 	if (!fromOnboarding(event) || !["light", "dark", "system"].includes(theme)) return;
 	nativeTheme.themeSource = theme;
@@ -590,6 +597,7 @@ app.whenReady().then(() => {
 		stack.supervise({ onRestart: () => recoverWindows({ reload: true }) });
 		stack.ready().then(() => agents.refresh()).catch(() => {});
 	}
+	dockUsage.start();
 	updates?.start();
 	app.on("activate", () => {
 		if (!quitting && BrowserWindow.getAllWindows().length === 0 && !pendingLink) createWindow();
