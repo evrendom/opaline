@@ -44,7 +44,9 @@ app.userAgentFallback = `${app.userAgentFallback
 
 const stack = createLocalStack({ app });
 const agents = createAgents({ stack });
-const dockUsage = createDockUsage({ agents, dataDir: process.env.OPALINE_SERVER_DATA_DIR });
+// Anything but a signed release (electron ., a dev URL, an ad-hoc package.sh build) shows the development icon.
+const developmentBuild = isDev || !app.isPackaged || readBuild()?.release !== true;
+const dockUsage = createDockUsage({ agents, dataDir: process.env.OPALINE_SERVER_DATA_DIR, development: developmentBuild });
 const updates = app.isPackaged && process.platform === "darwin" && !isDev ? createAppUpdater() : undefined;
 
 function updateLog(line) {

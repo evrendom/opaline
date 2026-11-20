@@ -115,7 +115,7 @@ function systemIsDark() {
 	);
 }
 
-function createDockUsage({ agents, dataDir }) {
+function createDockUsage({ agents, dataDir, development = false }) {
 	const usageFile = path.join(dataDir, "data", "plan-usage.jsonl");
 	const modeFile = path.join(app.getPath("userData"), "dock-usage");
 	const drawPage = path.join(__dirname, "icon", "dock", "draw.html");
@@ -179,26 +179,28 @@ function createDockUsage({ agents, dataDir }) {
 		]).finally(() => clearTimeout(timeout));
 	}
 
+	/** `left` is null without a reading; only a development build draws an icon then. */
 	async function draw(left, dark) {
 		clearTimeout(idle);
 		const window = await withTimeout(drawWindow());
 		try {
+			// The development icon keeps the light icon's graphite ring and digits in both appearances.
 			const folder = path.join(
 				__dirname,
 				"icon",
 				"dock",
-				dark ? "dark" : "light",
+				dark && !development ? "dark" : "light",
 			);
 			const source = (name) =>
 				`data:image/png;base64,${fs.readFileSync(path.join(folder, `${name}.png`)).toString("base64")}`;
 			const layers = {
 				base: source("base"),
 				ring: source("ring"),
-				number: source(String(left)),
+				...(left === null ? {} : { number: source(String(left)) }),
 			};
 			const url = await withTimeout(
 				window.webContents.executeJavaScript(
-					`window.draw(${JSON.stringify({ left: left / 100, dark, size: ICON_SIZE, layers })})`,
+					`window.draw(${JSON.stringify({ left: left === null ? null : left / 100, dark, size: ICON_SIZE, layers, dev: development })})`,
 				),
 			);
 			return nativeImage.createFromDataURL(url);
@@ -258,14 +260,16 @@ function createDockUsage({ agents, dataDir }) {
 		const left = iconValue(mode, readings, connected);
 		const dark = systemIsDark();
 		menu(mode);
-		const key = left === null ? null : `${left}:${dark}`;
+		const key = left === null && !development ? null : `${left}:${dark}`;
 		if (key === shown) return drawing;
 		shown = key;
 		drawing = drawing
 			.then(async () => {
 				if (shown !== key) return;
 				app.dock.setIcon(
-					left === null ? nativeImage.createEmpty() : await draw(left, dark),
+					left === null && !development
+						? nativeImage.createEmpty()
+						: await draw(left, dark),
 				);
 			})
 			.catch(() => {});
