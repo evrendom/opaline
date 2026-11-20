@@ -378,7 +378,7 @@ jobs:
       - name: Run integration tests
         if: steps.plan.outputs.empty != 'true'
         env:
-          ITEMS: ${{ toJSON(fromJSON(needs.plan.outputs.integration_plan)[matrix.shard]) }}
+          ITEMS: ${{ steps.plan.outputs.items }}
         run: bun scripts/ci-tests.ts run --suite integration --items "${ITEMS}"
 
       - name: Fetch the published rudel@0.1.17 CLI
