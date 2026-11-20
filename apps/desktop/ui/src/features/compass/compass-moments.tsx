@@ -175,6 +175,7 @@ export function KindsMenu({
 }
 
 const FLAG_TONE: ShellNavTone = {
+	// design-escape-ok: the flag chip's fill, ring and glow are tinted from its flag colour (artwork)
 	chip: "[--opal-fill:color-mix(in_oklch,var(--flag-tint)_14%,var(--surface))] [--opal-ring:color-mix(in_oklch,var(--flag-tint)_20%,transparent)] drop-shadow-[0_1.5px_2px_color-mix(in_oklch,var(--flag-tint)_25%,transparent)]",
 	glyph: "text-(--flag-tint)",
 };

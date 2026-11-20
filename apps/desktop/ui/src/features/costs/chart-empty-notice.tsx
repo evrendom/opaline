@@ -14,6 +14,7 @@ export function ChartEmptyNotice({ title }: { title: string }) {
 					className={cn(
 						"absolute inset-0",
 						restingChipClassName,
+						// design-escape-ok: the opal shape's ring is artwork
 						"[--opal-ring:rgb(17_24_39/0.08)]",
 					)}
 				/>

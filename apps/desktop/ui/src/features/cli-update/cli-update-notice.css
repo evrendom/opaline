@@ -45,8 +45,8 @@
 	color: var(--ink-3);
 	outline: none;
 	transition:
-		background-color 100ms ease-in-out,
-		color 100ms ease-in-out;
+		background-color var(--motion-quick-duration) ease-in-out,
+		color var(--motion-quick-duration) ease-in-out;
 }
 
 .cli-update-notice-dismiss:is(:hover, :focus-visible) {

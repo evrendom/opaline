@@ -18,6 +18,7 @@ const COMPACTION_FROM = 0.3;
 const CONTEXT_HEADROOM = 1.1;
 
 export const LANE_LABEL =
+	// design-escape-ok: a lane label set solid to sit inside its bar
 	"absolute text-body-xxs leading-none font-medium tabular-nums";
 
 export function ContextLane({

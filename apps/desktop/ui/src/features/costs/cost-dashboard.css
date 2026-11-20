@@ -140,7 +140,7 @@
 	text-align: left;
 	transition:
 		box-shadow var(--motion-duration) ease,
-		--metric-tint 200ms ease;
+		--metric-tint var(--motion-medium-duration) ease;
 }
 .cost-metric[data-primary="true"] {
 	--metric-tint: var(--metric-color);
@@ -753,8 +753,8 @@
 	background: color-mix(in srgb, var(--ink) 14%, var(--canvas));
 	box-shadow: 0 0 0 1px var(--line);
 	transition:
-		grid-template-columns 200ms ease,
-		grid-template-rows 200ms ease;
+		grid-template-columns var(--motion-medium-duration) ease,
+		grid-template-rows var(--motion-medium-duration) ease;
 }
 .cost-tools-inner {
 	display: flex;
@@ -765,7 +765,7 @@
 	opacity: 0;
 	transform: scale(0.25);
 	transition:
-		transform 200ms ease,
+		transform var(--motion-medium-duration) ease,
 		opacity var(--motion-duration) ease;
 	padding: var(--space-xs);
 }
@@ -995,7 +995,8 @@
 	animation: cost-fade-in 500ms ease both;
 }
 .cost-chart-canvas[data-lines-entering] .recharts-line {
-	animation: cost-chart-draw 650ms cubic-bezier(0.22, 1, 0.36, 1);
+	animation: cost-chart-draw var(--motion-slow-duration)
+		cubic-bezier(0.22, 1, 0.36, 1);
 }
 .cost-chart-canvas[data-phase="morph"] .recharts-area-curve {
 	transition: stroke 800ms ease-in-out;
@@ -1016,7 +1017,7 @@
 }
 .cost-chart-skeleton[data-leaving] {
 	pointer-events: none;
-	animation: cost-chart-skeleton-out 650ms ease both;
+	animation: cost-chart-skeleton-out var(--motion-slow-duration) ease both;
 }
 .cost-metric[data-revealing] .cost-metric-wave {
 	position: absolute;
@@ -1182,7 +1183,7 @@
 }
 .cost-page[data-updating="true"] .cost-chart-canvas {
 	opacity: 0.55;
-	transition: opacity 200ms ease 250ms;
+	transition: opacity var(--motion-medium-duration) ease 250ms;
 }
 
 /* Only the Dashboard supplies this extra date-picker column. */
@@ -1363,7 +1364,7 @@
 	fill: none;
 	stroke: color-mix(in oklab, var(--ink) 18%, transparent);
 	stroke-width: var(--border-l);
-	transition: stroke 200ms ease;
+	transition: stroke var(--motion-medium-duration) ease;
 }
 .cost-ci-ring path[data-failed] {
 	stroke: var(--error);

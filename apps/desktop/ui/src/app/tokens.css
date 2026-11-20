@@ -169,6 +169,15 @@
 	/* the ground of a list's expanded row and its frozen cap: the field in
 	   light, the card in dark */
 	--shelf: var(--field);
+	/* a faint edge ringing a small avatar or logo on any ground */
+	--line-faint: color-mix(in oklab, var(--ink) 5%, transparent);
+	/* text and counts on an accent fill: white in both modes */
+	--accent-fg: var(--neutral-1);
+	/* a window or lens floating over a chart: a 1px ring and a soft drop;
+	   dark keeps only the ring */
+	--shadow-window:
+		0 0 0 1px color-mix(in oklab, var(--neutral-10) 10%, transparent),
+		0 1px 2px rgb(0 0 0 / 0.06), 0 2px 8px -2px rgb(0 0 0 / 0.08);
 	/* --- end product --- */
 }
 
@@ -214,6 +223,9 @@
 	--card-soft: color-mix(in oklab, var(--ink-3) 10%, transparent);
 	--track: color-mix(in oklab, var(--field) 50%, transparent);
 	--shelf: var(--card);
+	--line-faint: color-mix(in oklab, var(--ink) 10%, transparent);
+	--accent-fg: var(--neutral-10);
+	--shadow-window: 0 0 0 1px rgb(255 255 255 / 0.15);
 	/* --- end product --- */
 }
 
@@ -259,6 +271,8 @@
 	--color-card-soft: var(--card-soft);
 	--color-track: var(--track);
 	--color-shelf: var(--shelf);
+	--color-line-faint: var(--line-faint);
+	--color-accent-fg: var(--accent-fg);
 	/* --- end product --- */
 }
 
@@ -280,6 +294,9 @@
 	--shadow-float: var(--shadow-float);
 	--shadow-sheet: var(--shadow-sheet);
 	--shadow-contact: var(--shadow-contact);
+	/* --- roles added by product --- */
+	--shadow-window: var(--shadow-window);
+	/* --- end product --- */
 }
 
 /* Inset corners: a child drawn 1px inside a surface keeps its corners

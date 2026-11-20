@@ -38,7 +38,9 @@ import { ChangeBlock } from "@/features/sessions/reader/files/session-reader-fil
 import {
 	Crumb,
 	CrumbSeparator,
-	ScrollColumn,
+	ReaderPane,
+	ReaderPaneHeader,
+	ReaderPaneScroll,
 } from "@/features/sessions/reader/files/session-reader-files-parts";
 import {
 	mcpResult,
@@ -350,19 +352,22 @@ function CallCard({
 		sessionParams,
 	);
 	return (
-		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-s pt-xl pr-xl pl-xxl">
-			<div className="flex min-h-7 shrink-0 flex-wrap items-center gap-x-l gap-y-xs">
-				<div className="flex min-w-0 flex-1 items-center gap-s">
-					<Crumb onClear={onClear}>
-						Run {run.turnId ? shortRunId(run.turnId) : run.turn}
-					</Crumb>
-					{call ? (
-						<>
-							<CrumbSeparator />
-							<Crumb title={call.path ?? undefined}>{callLabel(call)}</Crumb>
-						</>
-					) : null}
-				</div>
+		<ReaderPane>
+			<ReaderPaneHeader
+				crumbs={
+					<>
+						<Crumb onClear={onClear}>
+							Run {run.turnId ? shortRunId(run.turnId) : run.turn}
+						</Crumb>
+						{call ? (
+							<>
+								<CrumbSeparator />
+								<Crumb title={call.path ?? undefined}>{callLabel(call)}</Crumb>
+							</>
+						) : null}
+					</>
+				}
+			>
 				<Link
 					to={openRun}
 					className={cn(
@@ -376,7 +381,7 @@ function CallCard({
 					Open in session
 					<IconArrowUpRight aria-hidden="true" className="size-3.5" />
 				</Link>
-			</div>
+			</ReaderPaneHeader>
 			{call?.path && !file ? (
 				<span
 					className={cn(
@@ -398,7 +403,7 @@ function CallCard({
 					className="mt-l"
 				/>
 			) : (
-				<ScrollColumn className="-mr-xl -ml-s pr-xl pl-s">
+				<ReaderPaneScroll>
 					<Reveal
 						label="Loading the call"
 						loading={query.isPending}
@@ -419,9 +424,9 @@ function CallCard({
 							) : null
 						}
 					</Reveal>
-				</ScrollColumn>
+				</ReaderPaneScroll>
 			)}
-		</div>
+		</ReaderPane>
 	);
 }
 

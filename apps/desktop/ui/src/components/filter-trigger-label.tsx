@@ -28,7 +28,7 @@ export function FilterTriggerLabel({
 						"min-w-4",
 						"corner-full px-xs",
 						"text-center text-body-xs font-heavy tabular-nums",
-						"bg-accent text-white",
+						"bg-accent text-accent-fg",
 					)}
 				>
 					<FlowNumber value={activeCount} format={PLAIN_NUMBER} />

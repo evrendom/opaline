@@ -447,6 +447,7 @@ export function RepoSignals({ repo }: { repo: RepositorySummary }) {
 					key={signal.label}
 					title={signal.title}
 					className={cn(
+						// design-escape-ok: 10/12 signal chip; body-xs's 14px line would grow the chip 2px
 						"shrink-0 corner-xs px-s py-xxs text-[0.625rem]/3 whitespace-nowrap",
 						signal.color,
 					)}

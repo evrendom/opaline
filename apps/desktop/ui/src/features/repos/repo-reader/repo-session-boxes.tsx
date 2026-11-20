@@ -504,10 +504,11 @@ function SessionTile({
 			className={cn(
 				"group/tile absolute overflow-hidden corner-s edge-m corner-squircle squircle:corner-l",
 				look.className,
-				"transition-opacity duration-200",
-				"transition-[filter] duration-200",
+				"transition-opacity duration-(--motion-medium-duration)",
+				"transition-[filter] duration-(--motion-medium-duration)",
 				dimmed && "[filter:opacity(0.4)]",
 				picked &&
+					// design-escape-ok: the picked tile glows in its own session tint (data paint)
 					"z-40 bg-[color-mix(in_oklab,var(--tint)_34%,transparent)] shadow-[0_2px_10px_-2px_color-mix(in_oklab,var(--tint)_45%,transparent)] dark:bg-[color-mix(in_oklab,var(--tint)_40%,transparent)] dark:shadow-[0_2px_12px_-2px_color-mix(in_oklab,var(--tint)_55%,transparent)]",
 			)}
 			style={{ height: h, left: tile.x, top: tile.y, width: w }}
@@ -520,6 +521,7 @@ function SessionTile({
 				onPointerEnter={onIntent}
 				onFocus={onIntent}
 				title={`${session.sessionId}\n${figure}`}
+				// design-escape-ok: the hit area sits one hairline inside the tile, so its corners are the tile's less 1px
 				className="absolute inset-0 rounded-[calc(var(--radius-s)-1px)] corner-squircle outline-none transition-colors hover:bg-hover squircle:rounded-[calc(var(--radius-xl)-1px)]"
 			/>
 			<span

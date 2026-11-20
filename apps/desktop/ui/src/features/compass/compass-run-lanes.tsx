@@ -142,7 +142,7 @@ function GroupGap() {
 const AgentGlyph = LANE_LOOK.agent.glyph;
 
 const TRACE_WINDOW =
-	"pointer-events-none absolute -top-1.5 -bottom-0.5 -z-5 hidden corner-xs bg-canvas corner-squircle squircle:corner-l shadow-[0_1px_2px_rgb(0_0_0/0.06),0_2px_8px_-2px_rgb(0_0_0/0.08)] ring-1 ring-zinc-950/10 will-change-transform dark:bg-hover-strong dark:shadow-none dark:ring-white/15";
+	"pointer-events-none absolute -top-1.5 -bottom-0.5 -z-5 hidden corner-xs bg-canvas corner-squircle squircle:corner-l shadow-window will-change-transform dark:bg-hover-strong";
 
 export function RunLanes({
 	onlyPickedLane = false,
@@ -412,7 +412,7 @@ export function RunLanes({
 							className={cn(
 								"inline-flex shrink-0 items-center gap-xxs",
 								"text-body-m tabular-nums",
-								"text-error transition-[opacity,filter] duration-200",
+								"text-error transition-[opacity,filter] duration-(--motion-medium-duration)",
 								anyPicked &&
 									!pickedLanes.has(lane.id) &&
 									"opacity-35 saturate-[0.15]",
@@ -480,8 +480,9 @@ export function RunLanes({
 								"corner-xs",
 								"hover:brightness-110",
 								own ? null : bar.className,
-								"transition-[opacity,filter] duration-200",
+								"transition-[opacity,filter] duration-(--motion-medium-duration)",
 								bar.stepId === selected &&
+									// design-escape-ok: the picked bar's ring is white over its lane colour in both modes (data paint)
 									"z-10 ring-2 ring-white/90 ring-inset",
 								anyPicked &&
 									bar.stepId !== selected &&
@@ -491,7 +492,7 @@ export function RunLanes({
 								runsOn &&
 									"inset-y-[7px] [mask-image:repeating-linear-gradient(to_right,#000_0_3px,transparent_3px_5px)]",
 								base !== undefined &&
-									"transition-[left,width,opacity,filter] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
+									"transition-[left,width,opacity,filter] duration-500 ease-drawer",
 							)}
 							style={{
 								...(own ? { backgroundColor: own } : {}),
@@ -510,7 +511,10 @@ export function RunLanes({
 							}}
 						>
 							{bar.name && !bar.open && at.width > 18 ? (
-								<span className="pointer-events-none truncate pl-xs font-data text-body-xxs leading-none text-white">
+								<span
+									// design-escape-ok: the step name is printed on its painted lane bar, white in both modes and set solid
+									className="pointer-events-none truncate pl-xs font-data text-body-xxs leading-none text-white"
+								>
 									{bar.name}
 								</span>
 							) : null}
@@ -672,7 +676,10 @@ export function RunLanes({
 							/>
 						) : null}
 					</div>
-					<div className="relative flex justify-between gap-m px-xxs text-body-xxs leading-none text-ink-3/70 tabular-nums">
+					<div
+						// design-escape-ok: axis ticks set solid under the lanes
+						className="relative flex justify-between gap-m px-xxs text-body-xxs leading-none text-ink-3/70 tabular-nums"
+					>
 						<span className={cn(brush && "invisible")}>
 							{offset(view.from)}
 						</span>
