@@ -70,3 +70,37 @@ npx --yes rudel@latest --version
 The three commands should report the same CLI version. `rudel` also emits
 its existing rename notice to stderr. Migration instructions for existing
 global installations are in the [CLI guide](usage.md#optional-global-install).
+
+# Releasing the Opaline Mac app
+
+The Mac app releases itself from GitHub Actions (`.github/workflows/desktop-release.yml`).
+
+## Releasing
+
+Change `"version"` in `apps/desktop/shell/package.json` in a pull request. Use semver, higher than the last `desktop-v*` release. When it merges, the workflow:
+
+1. builds the app for Apple silicon (`macos-15`) and Intel (`macos-15-intel`) with `apps/desktop/shell/package.sh`;
+2. signs it with the Developer ID and notarizes it;
+3. publishes it with `apps/desktop/shell/publish.sh`. The Apple silicon build creates release `desktop-v<version>`, and the Intel build adds itself to it. Installed apps offer the update on their next check.
+
+The release notes are the `feat`, `fix` and `perf` commit titles under `apps/desktop`, `packages` and `plugin` since the previous `desktop-v*` tag.
+
+A release that failed part way is finished from Actions → Desktop Release → Run workflow. It builds only the chips the release does not have yet.
+
+## One-time signing setup
+
+The `release` environment holds five secrets:
+
+| Secret | What it is |
+|---|---|
+| `DESKTOP_SIGNING_CERTIFICATE_P12_BASE64` | The "Developer ID Application: Evren Dombak (M8L5AS39YN)" certificate with its private key, exported from Keychain Access as `.p12`, then `base64 -i certificate.p12` |
+| `DESKTOP_SIGNING_CERTIFICATE_PASSWORD` | The password chosen for that export |
+| `DESKTOP_NOTARY_KEY_P8` | The contents of an App Store Connect API key (`AuthKey_….p8`): Users and Access → Integrations → Team Keys, role Developer |
+| `DESKTOP_NOTARY_KEY_ID` | That key's ID |
+| `DESKTOP_NOTARY_ISSUER_ID` | The issuer ID shown above the keys |
+
+Set them with `gh secret set <NAME> --env release` (for example `base64 -i certificate.p12 | gh secret set DESKTOP_SIGNING_CERTIFICATE_P12_BASE64 --env release`). The workflow stops with a named error when one is missing.
+
+## By hand
+
+`apps/desktop/shell/publish.sh --help` describes the manual procedure the workflow runs.

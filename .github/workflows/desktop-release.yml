@@ -1,0 +1,138 @@
+name: Desktop Release
+
+# A merge that changes "version" in apps/desktop/shell/package.json releases
+# the Mac app: both chips are built, signed with the Developer ID, notarized
+# and published with apps/desktop/shell/publish.sh. Run it by hand to finish a
+# release that failed; it builds only the chips the release is still missing.
+on:
+  push:
+    branches: [main]
+    paths: [apps/desktop/shell/package.json]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-release
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(jq -r .version apps/desktop/shell/package.json)
+          assets=$(gh release view "desktop-v$version" -R "$GITHUB_REPOSITORY" --json assets -q '.assets[].name' 2>/dev/null || true)
+          entries=()
+          for arch in arm64 x64; do
+            if grep -qx "Opaline-$version-macOS-$arch.dmg" <<<"$assets"; then
+              echo "desktop-v$version already has $arch"
+            else
+              runner=$([ "$arch" = arm64 ] && echo macos-15 || echo macos-15-intel)
+              entries+=("{\"arch\":\"$arch\",\"runner\":\"$runner\"}")
+            fi
+          done
+          matrix="[$(IFS=,; echo "${entries[*]}")]"
+          echo "version=$version" >>"$GITHUB_OUTPUT"
+          echo "matrix=$matrix" >>"$GITHUB_OUTPUT"
+          echo "Opaline $version: building $matrix"
+
+  release:
+    name: Release ${{ needs.plan.outputs.version }} (${{ matrix.arch }})
+    needs: plan
+    if: needs.plan.outputs.matrix != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    environment: release
+    permissions:
+      contents: write
+    env:
+      OPALINE_ARCH: ${{ matrix.arch }}
+      OPALINE_SIGN_IDENTITY: "Developer ID Application: Evren Dombak (M8L5AS39YN)"
+      OPALINE_NOTARY_PROFILE: opaline-notary
+      VERSION: ${{ needs.plan.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup
+
+      - name: Signing keychain
+        env:
+          CERTIFICATE: ${{ secrets.DESKTOP_SIGNING_CERTIFICATE_P12_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.DESKTOP_SIGNING_CERTIFICATE_PASSWORD }}
+          NOTARY_KEY: ${{ secrets.DESKTOP_NOTARY_KEY_P8 }}
+          NOTARY_KEY_ID: ${{ secrets.DESKTOP_NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.DESKTOP_NOTARY_ISSUER_ID }}
+        run: |
+          for name in CERTIFICATE CERTIFICATE_PASSWORD NOTARY_KEY NOTARY_KEY_ID NOTARY_ISSUER_ID; do
+            [ -n "${!name}" ] || { echo "::error::The release environment is missing the secret for $name (see docs/releasing.md)."; exit 1; }
+          done
+          keychain="$RUNNER_TEMP/opaline-signing.keychain-db"
+          password=$(openssl rand -hex 24)
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          printf '%s' "$CERTIFICATE" | base64 --decode >"$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$keychain" -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/certificate.p12"
+          # The Developer ID intermediate, so codesign can build the chain.
+          curl -fsSL https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer -o "$RUNNER_TEMP/DeveloperIDG2CA.cer"
+          security import "$RUNNER_TEMP/DeveloperIDG2CA.cer" -k "$keychain" || true
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          security default-keychain -s "$keychain"
+          security find-identity -v -p codesigning "$keychain" | grep -q "$OPALINE_SIGN_IDENTITY" ||
+            { echo "::error::The certificate is not \"$OPALINE_SIGN_IDENTITY\"."; exit 1; }
+          printf '%s' "$NOTARY_KEY" >"$RUNNER_TEMP/notary.p8"
+          xcrun notarytool store-credentials "$OPALINE_NOTARY_PROFILE" --key "$RUNNER_TEMP/notary.p8" \
+            --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" --keychain "$keychain" >/dev/null
+          rm -f "$RUNNER_TEMP/notary.p8"
+          echo "KEYCHAIN=$keychain" >>"$GITHUB_ENV"
+
+      - name: Build, sign and notarize
+        run: apps/desktop/shell/package.sh
+
+      - name: Release notes
+        run: |
+          previous=$(git tag --list 'desktop-v*' --sort=-v:refname | grep -vx "desktop-v$VERSION" | head -n 1)
+          {
+            echo "Opaline $VERSION for macOS."
+            echo
+            git log --format='%s' ${previous:+"$previous..HEAD"} -- apps/desktop packages plugin |
+              grep -E '^(feat|fix|perf)(\([^)]*\))?!?: ' |
+              perl -pe 's/^[a-z]+(\([^)]*\))?!?: (.)/- \u$2/'
+          } >"$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md"
+
+      - name: Publish
+        run: |
+          if [ "$OPALINE_ARCH" != arm64 ] && grep -q '"arm64"' <<<'${{ needs.plan.outputs.matrix }}'; then
+            # The Apple silicon build creates the release; this one adds itself to it.
+            for _ in $(seq 1 90); do
+              gh release view "desktop-v$VERSION" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 && break
+              sleep 60
+            done
+          fi
+          apps/desktop/shell/publish.sh --arch "$OPALINE_ARCH" --notes-file "$RUNNER_TEMP/notes.md"
+
+      - name: Remove the signing keychain
+        if: always()
+        run: |
+          [ -n "${KEYCHAIN:-}" ] && security delete-keychain "$KEYCHAIN" || true
