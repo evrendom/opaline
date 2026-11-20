@@ -27,6 +27,8 @@ export interface LocalIngestHandle {
 		stopped?: boolean,
 	): Promise<number>;
 	wake(): void;
+	/** Imports a pending change of this session soon, past its live gap. */
+	refresh(sessionId: string): boolean;
 	stop(): Promise<void>;
 }
 
@@ -151,6 +153,7 @@ export async function startLocalIngest(options: {
 		liveSessions: () => service.liveSessions(),
 		notify: (paths, final, stopped) => service.notify(paths, final, stopped),
 		wake: () => service.wake(),
+		refresh: (sessionId) => service.refresh(sessionId),
 		stop: async () => {
 			clearTimeout(wakeTimer);
 			await service.stop();
