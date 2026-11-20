@@ -33,6 +33,7 @@ import {
 	R2MultipartUploadError,
 	uploadR2MultipartObjects,
 } from "./r2-multipart-upload.js";
+import { testTimingMs } from "./test-timing.js";
 import type { UploadTransferProgress } from "./types.js";
 
 const RPC_MAX_ATTEMPTS = 3;
@@ -68,6 +69,13 @@ export interface R2UploadFlowConfig {
 	 */
 	readonly canSlim: () => Promise<boolean>;
 	readonly multipartBaseDelayMs: number | undefined;
+	/** First backoff of a retried init, commit or status call (tests). */
+	readonly rpcBaseDelayMs?: number;
+	/**
+	 * The size older servers still accept at init (tests); defaults to
+	 * INGEST_DIRECT_CONTENT_MAX_BYTES.
+	 */
+	readonly maxDirectContentBytes?: number;
 	readonly onProgress: ((progress: R2MultipartProgress) => void) | undefined;
 	readonly onTransferProgress?: (progress: UploadTransferProgress) => void;
 	readonly onRetry:
@@ -240,12 +248,16 @@ async function uploadStagedSession(
 	try {
 		initCall = await callRpcWithRetry(
 			() => client.ingest.init(buildInitInput(staged)),
-			config.onRetry,
+			config,
 		);
 	} catch (error) {
-		if (isServerSessionSizeRejection(error, staged.aggregateBytes)) {
+		const directLimit =
+			config.maxDirectContentBytes ?? INGEST_DIRECT_CONTENT_MAX_BYTES;
+		if (
+			isServerSessionSizeRejection(error, staged.aggregateBytes, directLimit)
+		) {
 			throw new R2IngestFlowError(
-				formatServerSessionSizeRejection(staged.aggregateBytes),
+				formatServerSessionSizeRejection(staged.aggregateBytes, directLimit),
 				true,
 			);
 		}
@@ -294,7 +306,7 @@ async function uploadStagedSession(
 	try {
 		const commitCall = await callRpcWithRetry(
 			() => client.ingest.commit(commitInput),
-			config.onRetry,
+			config,
 		);
 		commitAttempts = commitCall.attempts;
 		if (!isR2IngestCommitOutput(commitCall.value)) {
@@ -353,8 +365,9 @@ async function uploadStagedSession(
 export function isServerSessionSizeRejection(
 	error: unknown,
 	aggregateBytes: number,
+	directLimit = INGEST_DIRECT_CONTENT_MAX_BYTES,
 ): boolean {
-	if (aggregateBytes <= INGEST_DIRECT_CONTENT_MAX_BYTES) return false;
+	if (aggregateBytes <= directLimit) return false;
 	if (!(error instanceof ORPCError)) return false;
 	if (error.status === 413) return true;
 	if (error.status !== 400) return false;
@@ -374,9 +387,12 @@ export function isServerSessionSizeRejection(
 	});
 }
 
-function formatServerSessionSizeRejection(aggregateBytes: number): string {
+function formatServerSessionSizeRejection(
+	aggregateBytes: number,
+	directLimit: number,
+): string {
 	const size = (aggregateBytes / (1024 * 1024)).toFixed(2);
-	const limit = INGEST_DIRECT_CONTENT_MAX_BYTES / (1024 * 1024);
+	const limit = directLimit / (1024 * 1024);
 	return `The Opaline server does not accept sessions this large yet: this session is ${size} MiB after slimming, and the server still accepts up to ${limit} MiB. It stays queued; retry with \`opaline upload --retry\` after the server is updated.`;
 }
 
@@ -398,7 +414,7 @@ async function pollJobStatus(
 		try {
 			statusCall = await callRpcWithRetry(
 				() => client.ingest.status({ jobId }),
-				config.onRetry,
+				config,
 			);
 		} catch (error) {
 			// The job was accepted; an unreachable status endpoint does not make
@@ -429,7 +445,10 @@ async function pollJobStatus(
 			);
 		}
 		if (poll + 1 < maxPolls) {
-			await delay(config.statusPollIntervalMs ?? STATUS_POLL_INTERVAL_MS);
+			await delay(
+				config.statusPollIntervalMs ??
+					testTimingMs("R2_STATUS_POLL_INTERVAL", STATUS_POLL_INTERVAL_MS),
+			);
 		}
 	}
 	throw new R2IngestPendingError(jobId);
@@ -503,9 +522,7 @@ function getObjectIdentity(
 
 async function callRpcWithRetry<TValue>(
 	operation: () => Promise<TValue>,
-	onRetry:
-		| ((attempt: number, maxAttempts: number, error: string) => void)
-		| undefined,
+	config: Pick<R2UploadFlowConfig, "onRetry" | "rpcBaseDelayMs">,
 ): Promise<{ readonly attempts: number; readonly value: TValue }> {
 	for (let attempt = 1; attempt <= RPC_MAX_ATTEMPTS; attempt += 1) {
 		try {
@@ -520,8 +537,10 @@ async function callRpcWithRetry<TValue>(
 			}
 			const detail =
 				error instanceof Error ? error.message : "connection failed";
-			onRetry?.(attempt, RPC_MAX_ATTEMPTS, detail);
-			await delay(RPC_BASE_DELAY_MS * 2 ** (attempt - 1));
+			config.onRetry?.(attempt, RPC_MAX_ATTEMPTS, detail);
+			await delay(
+				(config.rpcBaseDelayMs ?? RPC_BASE_DELAY_MS) * 2 ** (attempt - 1),
+			);
 		}
 	}
 	throw new Error("R2 RPC retries were exhausted");

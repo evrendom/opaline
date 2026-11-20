@@ -34,6 +34,7 @@ import {
 	continueSessionAttribution,
 	type SessionAttributionManifest,
 } from "./session-attribution.js";
+import { testTimingMs } from "./test-timing.js";
 import type {
 	TranscriptDeliveryState,
 	TranscriptRevisionPlan,
@@ -410,7 +411,7 @@ export async function uploadRepositoryEvidence(
 		: undefined;
 	const boundedFetch = withRequestTimeout(
 		fetchImplementation,
-		config.requestTimeoutMs ?? 15_000,
+		config.requestTimeoutMs ?? testTimingMs("EVIDENCE_REQUEST_TIMEOUT", 15_000),
 		operationTimeout,
 	);
 	const link = new RPCLink({
