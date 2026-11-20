@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
+import { isProtectedPath } from "./protected-folders.js";
 
 export interface GitInfo {
 	readonly repositoryRoot?: string;
@@ -17,6 +18,9 @@ const GIT_TIMEOUT_MS = 5_000;
 export function git(
 	args: readonly string[],
 ): Promise<{ exitCode: number; stdout: string }> {
+	const directory = args[args.indexOf("-C") + 1];
+	if (args.includes("-C") && directory && isProtectedPath(directory))
+		return Promise.resolve({ exitCode: 1, stdout: "" });
 	return new Promise((done) => {
 		execFile(
 			"git",
@@ -52,6 +56,7 @@ export function normalizeRemoteUrl(url: string): string {
 }
 
 export async function getGitInfo(cwd: string): Promise<GitInfo> {
+	if (isProtectedPath(cwd)) return {};
 	const repositoryRoot = await getRepositoryRoot(cwd);
 	const [remoteUrl, branch, sha, packageInfo] = await Promise.all([
 		getGitRemoteUrl(repositoryRoot ?? cwd),

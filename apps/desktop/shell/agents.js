@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { createInterface } = require("node:readline");
-const { app, BrowserWindow, dialog } = require("electron");
+const { app } = require("electron");
 
 const MARKETPLACE = "opaline-local";
 const LOCAL_PLUGIN = `opaline@${MARKETPLACE}`;
@@ -333,9 +333,8 @@ function instructionTargets(keys, env) {
 		.filter(({ file }) => createsInstructionFile(file) || fs.existsSync(file));
 }
 
-async function offerInstructionLine({ keys, env, confirm }) {
+function offerInstructionLine({ keys, env }) {
 	const targets = instructionTargets(keys, env);
-	const files = targets.map(({ file }) => file);
 	const remembered = instructionsAnswer();
 	if (remembered)
 		return {
@@ -348,15 +347,14 @@ async function offerInstructionLine({ keys, env, confirm }) {
 							.filter(addInstructionLine)
 					: [],
 		};
-	if (files.length === 0) return { answer: "no file", added: [] };
-	const answer = (await confirm(files)) ? "accepted" : "declined";
+	if (targets.length === 0) return { answer: "no file", added: [] };
 	writeIfChanged(
 		instructionsAnswerFile(),
-		`${JSON.stringify({ answer, answeredAt: new Date().toISOString() }, null, 2)}\n`,
+		`${JSON.stringify({ answer: "accepted", answeredAt: new Date().toISOString() }, null, 2)}\n`,
 	);
 	return {
-		answer,
-		added: answer === "accepted" ? files.filter(addInstructionLine) : [],
+		answer: "accepted",
+		added: targets.map(({ file }) => file).filter(addInstructionLine),
 	};
 }
 
@@ -372,26 +370,6 @@ function removeInstructionLines({ keys, env }) {
 	return keys
 		.map((key) => instructionFile(key, env))
 		.filter(removeInstructionLine);
-}
-
-async function askInstructionLine(files) {
-	const home = os.homedir();
-	const names = files.map((file) =>
-		file.startsWith(`${home}/`) ? `~/${file.slice(home.length + 1)}` : file,
-	);
-	const options = {
-		type: "question",
-		buttons: ["Add the Line", "Don’t Add"],
-		defaultId: 1,
-		cancelId: 1,
-		message: "Use Opaline for all session analysis?",
-		detail: `Opaline can add one line to ${names.join(" and ")}, so your agents use Opaline whenever they look into past sessions:\n\n“${INSTRUCTION_LINE}”\n\nNothing else in ${names.length > 1 ? "these files" : "this file"} changes, and you can delete the line at any time.`,
-	};
-	const parent = BrowserWindow.getFocusedWindow();
-	const { response } = await (parent
-		? dialog.showMessageBox(parent, options)
-		: dialog.showMessageBox(options));
-	return response === 0;
 }
 
 async function inspectAgent(key) {
@@ -548,7 +526,7 @@ async function addMarketplace(key, binary, root) {
 	return added;
 }
 
-function createAgents({ stack, confirmInstructionLine = askInstructionLine }) {
+function createAgents({ stack }) {
 	const marketplaceSources = () => ({
 		pluginDir: stack.bundle.pluginDir,
 	});
@@ -576,10 +554,9 @@ function createAgents({ stack, confirmInstructionLine = askInstructionLine }) {
 						(await inspectAgent(other)).local ? other : null,
 					),
 			);
-			const { answer, added } = await offerInstructionLine({
+			const { answer, added } = offerInstructionLine({
 				keys: [key, ...others.filter(Boolean)],
 				env: await loginShellEnv(),
-				confirm: confirmInstructionLine,
 			});
 			log(
 				`instruction line ${answer}${added.length ? `, added to ${added.join(", ")}` : ""}`,
@@ -591,6 +568,8 @@ function createAgents({ stack, confirmInstructionLine = askInstructionLine }) {
 
 	async function connect(key) {
 		if (!Object.hasOwn(agents, key)) throw new Error("Unknown agent.");
+		const preparing = prepareMarketplace();
+		preparing.catch(() => {});
 		const found = await inspectAgent(key);
 		if (!found.binary || found.local) return agentStatus(key, found);
 		if (found.cloud) {
@@ -607,7 +586,7 @@ function createAgents({ stack, confirmInstructionLine = askInstructionLine }) {
 		}
 		let marketplace;
 		try {
-			marketplace = await prepareMarketplace();
+			marketplace = await preparing;
 		} catch (error) {
 			return {
 				...agentStatus(key, found),
@@ -634,7 +613,7 @@ function createAgents({ stack, confirmInstructionLine = askInstructionLine }) {
 			};
 		await agents[key].afterInstall?.(found.binary);
 		const status = agentStatus(key, await inspectAgent(key));
-		if (status.connected) await offerInstructions(key);
+		if (status.connected) void offerInstructions(key);
 		return status;
 	}
 

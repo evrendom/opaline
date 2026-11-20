@@ -7,6 +7,7 @@ import {
 	type RepositoryEvidenceIndexRow,
 } from "../../services/repository-evidence-index.service.js";
 import { readRepositoryEvidenceSetup } from "../../services/repository-evidence-setup.js";
+import { isProtectedPath } from "./protected-folders.js";
 
 export const LOCAL_SETUP_CAPTURE_REASON = "local-import";
 
@@ -66,7 +67,7 @@ export async function readLocalSetupManifest(
 				"~/.claude/settings.local.json",
 				join(paths.home, ".claude/settings.local.json"),
 			],
-			...(projectPath
+			...(projectPath && !isProtectedPath(projectPath)
 				? [
 						[
 							"project",
