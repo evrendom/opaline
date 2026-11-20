@@ -7,6 +7,7 @@ const { fileURLToPath } = require("node:url");
 const {
 	buildFeed,
 	compareVersions,
+	createUpdateDialogs,
 	createUpdateNotifier,
 	createUpdater,
 	defaultFeedUrl,
@@ -270,6 +271,89 @@ describe("checks", () => {
 		expect(changes).toEqual(["checking", "downloading", "ready"]);
 		await updater.check();
 		expect(autoUpdater.checks).toBe(1);
+	});
+
+	test("a downloaded update posts a notification whose click asks to restart, never twice at once", async () => {
+		let answer;
+		const ui = fakeUi();
+		const notices = [];
+		ui.notifyReady = (release, onClick) =>
+			notices.push({ version: release.version, onClick });
+		ui.askToRestart = (release) => {
+			ui.calls.push(["askToRestart", release.version]);
+			return new Promise((resolve) => {
+				answer = resolve;
+			});
+		};
+		const { updater, autoUpdater } = setup({
+			ui,
+			fetch: async () => jsonResponse(feedFor("0.2.0")),
+		});
+		await updater.check();
+		autoUpdater.emit("update-downloaded");
+		await Bun.sleep(0);
+		expect(notices.map((notice) => notice.version)).toEqual(["0.2.0"]);
+		expect(ui.calls).toEqual([["askToRestart", "0.2.0"]]);
+		notices[0].onClick();
+		await Bun.sleep(0);
+		expect(ui.calls).toEqual([["askToRestart", "0.2.0"]]);
+		answer(false);
+		await Bun.sleep(0);
+		notices[0].onClick();
+		await Bun.sleep(0);
+		expect(ui.calls).toEqual([
+			["askToRestart", "0.2.0"],
+			["askToRestart", "0.2.0"],
+		]);
+	});
+
+	test("the dialogs post system notifications where they are supported", () => {
+		const posted = [];
+		class FakeNotification {
+			static isSupported() {
+				return true;
+			}
+			constructor(options) {
+				this.options = options;
+				this.listeners = {};
+				this.closed = false;
+			}
+			on(name, listener) {
+				this.listeners[name] = listener;
+			}
+			show() {
+				posted.push(this);
+			}
+			close() {
+				this.closed = true;
+			}
+		}
+		const dialogs = createUpdateDialogs({
+			dialog: {},
+			window: () => undefined,
+			canPrompt: () => true,
+			Notification: FakeNotification,
+		});
+		const clicks = [];
+		dialogs.notifyReady({ version: "0.2.0" }, () => clicks.push("ready"));
+		dialogs.notifyAvailable({ version: "0.3.0" }, () =>
+			clicks.push("available"),
+		);
+		expect(posted.map((notice) => notice.options.title)).toEqual([
+			"Opaline 0.2.0 is ready to install",
+			"Opaline 0.3.0 is available",
+		]);
+		expect(posted[0].closed).toBe(true);
+		posted[1].listeners.click();
+		expect(clicks).toEqual(["available"]);
+		const without = createUpdateDialogs({
+			dialog: {},
+			window: () => undefined,
+			canPrompt: () => true,
+		});
+		expect(() =>
+			without.notifyReady({ version: "0.2.0" }, () => {}),
+		).not.toThrow();
 	});
 
 	test("the test feed override replaces the GitHub feed", async () => {
