@@ -7,6 +7,7 @@ const { fileURLToPath } = require("node:url");
 const {
 	buildFeed,
 	compareVersions,
+	createUpdateNotifier,
 	createUpdater,
 	defaultFeedUrl,
 	feedAssetName,
@@ -472,5 +473,86 @@ describe("private repository token", () => {
 		await updater.check();
 		expect(ui.calls).toEqual([]);
 		expect(lines.join("\n")).not.toContain("test-token");
+	});
+});
+
+describe("notifier (Linux and Windows)", () => {
+	const LINUX_ZIP =
+		"https://github.com/evrendom/opaline/releases/download/desktop-v0.2.0/Opaline-0.2.0-linux-x64.AppImage";
+
+	function notifier({
+		feedVersion = "0.2.0",
+		download = true,
+		canPrompt = true,
+	} = {}) {
+		const calls = [];
+		const opened = [];
+		const urls = [];
+		const ui = {
+			canPrompt: () => canPrompt,
+			upToDate: (version) => calls.push(["upToDate", version]),
+			failed: (error) => calls.push(["failed", error.message]),
+			offerDownload: async (release, current) => {
+				calls.push(["offerDownload", release.version, current]);
+				return download;
+			},
+		};
+		const updates = createUpdateNotifier({
+			currentVersion: "0.1.0",
+			env: {},
+			arch: "x64",
+			platform: "linux",
+			fetch: async (url) => {
+				urls.push(url);
+				return jsonResponse(feedFor(feedVersion, LINUX_ZIP));
+			},
+			ui,
+			openDownload: (url) => opened.push(url),
+			stateFile: path.join(root, "update", "notified.json"),
+			timers: {
+				setTimeout: () => undefined,
+				clearTimeout: () => {},
+				setInterval: () => undefined,
+				clearInterval: () => {},
+			},
+		});
+		return { updates, calls, opened, urls };
+	}
+
+	test("offers a newer version once and opens its release page", async () => {
+		const { updates, calls, opened, urls } = notifier();
+		await updates.check();
+		await updates.check();
+		expect(urls[0]).toBe(
+			"https://github.com/evrendom/opaline/releases/download/desktop-latest/desktop-update-linux-x64.json",
+		);
+		expect(calls).toEqual([["offerDownload", "0.2.0", "0.1.0"]]);
+		expect(opened).toEqual([
+			"https://github.com/evrendom/opaline/releases/tag/desktop-v0.2.0",
+		]);
+		expect(updates.menuItem().label).toBe("Download Opaline 0.2.0…");
+	});
+
+	test("Check for Updates asks again, and says when it is up to date", async () => {
+		const newer = notifier({ download: false });
+		await newer.updates.check();
+		await newer.updates.check({ interactive: true });
+		expect(newer.calls).toEqual([
+			["offerDownload", "0.2.0", "0.1.0"],
+			["offerDownload", "0.2.0", "0.1.0"],
+		]);
+		expect(newer.opened).toEqual([]);
+
+		const same = notifier({ feedVersion: "0.1.0" });
+		await same.updates.check();
+		await same.updates.check({ interactive: true });
+		expect(same.calls).toEqual([["upToDate", "0.1.0"]]);
+		expect(same.updates.menuItem().label).toBe("Check for Updates…");
+	});
+
+	test("waits while onboarding or quitting holds the prompt", async () => {
+		const { updates, calls } = notifier({ canPrompt: false });
+		await updates.check();
+		expect(calls).toEqual([]);
 	});
 });
