@@ -81,12 +81,14 @@ export function LineCounts({
 	return (
 		<>
 			<FlowNumber
+				// design-escape-ok: diff paint: added lines
 				className="text-success dark:text-green-400"
 				value={added}
 				format={PLAIN_NUMBER}
 				prefix="+"
 			/>{" "}
 			<FlowNumber
+				// design-escape-ok: diff paint: removed lines
 				className="text-error dark:text-red-400"
 				value={removed}
 				format={PLAIN_NUMBER}

@@ -143,7 +143,7 @@ const CONVERSATION_TRACE_TREE_COMPACT_ROW_HEIGHT = 32;
 const TRACE_EVENT_ICON_RAIL_OFFSET = 14;
 const COLLAPSED_TRACE_ICON_LIMIT = 25;
 const traceCollapsiblePanelClassName =
-	"h-(--collapsible-panel-height) min-w-0 overflow-clip transition-[height,opacity] duration-200 ease-[cubic-bezier(0.2,0,0,1)] data-ending-style:h-0 data-ending-style:opacity-0 data-starting-style:h-0 data-starting-style:opacity-0 motion-reduce:transition-none";
+	"h-(--collapsible-panel-height) min-w-0 overflow-clip transition-[height,opacity] duration-(--motion-medium-duration) ease-[cubic-bezier(0.2,0,0,1)] data-ending-style:h-0 data-ending-style:opacity-0 data-starting-style:h-0 data-starting-style:opacity-0 motion-reduce:transition-none";
 type ConversationTraceTreeConnectorShape = "branch" | "through";
 
 function SplitRailEventIconSegments({
@@ -1286,6 +1286,7 @@ export function AgentCollapsedTraceIcons({
 						data-trace-tree-line
 					/>
 					<span
+						// design-escape-ok: digits packed into a 16px glyph
 						className="flex shrink-0 items-center justify-center font-body text-body-xxs leading-none font-medium tracking-[-0.08em] tabular-nums [text-indent:-1.5px]"
 						data-trace-collapsed-flow-count
 						data-trace-icon

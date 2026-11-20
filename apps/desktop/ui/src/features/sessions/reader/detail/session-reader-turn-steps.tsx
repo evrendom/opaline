@@ -185,7 +185,7 @@ function StepStrip({
 					<span
 						key={step.id}
 						className={cn(
-							"absolute inset-y-0 min-w-0.5 transition-[opacity,background-color] duration-200",
+							"absolute inset-y-0 min-w-0.5 transition-[opacity,background-color] duration-(--motion-medium-duration)",
 							!lit && "opacity-15",
 						)}
 						style={{

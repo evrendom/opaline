@@ -101,6 +101,7 @@ export {
 } from "./expandable-trace-row";
 
 const speakerLabelClassName =
+	// design-escape-ok: 13/18 heading; no step (listed)
 	"shrink-0 [font-family:var(--app-font-heading)] text-[0.8125rem]/[1.125rem] font-heavy text-ink";
 
 function AgentSection({

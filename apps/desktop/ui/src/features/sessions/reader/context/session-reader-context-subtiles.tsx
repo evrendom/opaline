@@ -17,6 +17,7 @@ const MARK: Record<Tone, string> = {
 };
 
 const MARKED =
+	// design-escape-ok: a marked tile glows in its mark's colour
 	"border-[color-mix(in_oklab,var(--mark)_45%,transparent)] shadow-[0_0_4px_color-mix(in_oklab,var(--mark)_60%,transparent),0_0_14px_color-mix(in_oklab,var(--mark)_45%,transparent)]";
 
 export const markGlow = (tone: Tone) => `${MARK[tone]} ${MARKED}`;

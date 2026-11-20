@@ -9,7 +9,8 @@ const sessionTraceDockPressClassName =
 	"scale-100 transition-transform duration-(--motion-duration) ease-out active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100";
 
 const sessionTraceDockButtonClassName = cn(
-	"group relative flex size-9 shrink-0 items-center justify-center rounded-[calc(var(--dock-radius)-var(--dock-padding))] text-ink outline-none hover:bg-neutral-950/4 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:active:scale-100 dark:hover:bg-white/6",
+	// design-escape-ok: the dock's buttons nest inside its corner
+	"group relative flex size-9 shrink-0 items-center justify-center rounded-[calc(var(--dock-radius)-var(--dock-padding))] text-ink outline-none hover:bg-ink/4 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:active:scale-100 dark:hover:bg-ink/6",
 	sessionTraceDockPressClassName,
 );
 
@@ -73,17 +74,18 @@ export function SessionTraceDock({
 				aria-label="Back to sessions"
 				className={cn(
 					"group relative flex h-9 shrink-0 items-center gap-s",
+					// design-escape-ok: the dock's buttons nest inside its corner
 					"rounded-[calc(var(--dock-radius)-var(--dock-padding))] pl-m pr-l",
 					"text-body-xxl font-medium",
 					"text-ink outline-none",
-					"hover:bg-neutral-950/4 dark:hover:bg-white/6 sm:text-body-xl",
+					"hover:bg-ink/4 dark:hover:bg-ink/6 sm:text-body-xl",
 					sessionTraceDockPressClassName,
 				)}
 				onClick={onReturn}
 			>
 				<IconArrowLeft
 					aria-hidden="true"
-					className="size-4 shrink-0 transition-transform duration-200 ease-out group-hover:-translate-x-px group-active:translate-x-0 motion-reduce:transition-none"
+					className="size-4 shrink-0 transition-transform duration-(--motion-medium-duration) ease-out group-hover:-translate-x-px group-active:translate-x-0 motion-reduce:transition-none"
 				/>
 				<span>Back</span>
 				<TouchTarget className="size-12" />
@@ -94,7 +96,7 @@ export function SessionTraceDock({
 				icon={
 					<IconArrowUp
 						aria-hidden="true"
-						className="size-4 shrink-0 transition-transform duration-200 ease-out group-hover:-translate-y-px group-active:translate-y-0 group-disabled:translate-y-0 motion-reduce:transition-none"
+						className="size-4 shrink-0 transition-transform duration-(--motion-medium-duration) ease-out group-hover:-translate-y-px group-active:translate-y-0 group-disabled:translate-y-0 motion-reduce:transition-none"
 					/>
 				}
 				label="Previous session"
@@ -118,7 +120,7 @@ export function SessionTraceDock({
 				icon={
 					<IconArrowDown
 						aria-hidden="true"
-						className="size-4 shrink-0 transition-transform duration-200 ease-out group-hover:translate-y-px group-active:translate-y-0 group-disabled:translate-y-0 motion-reduce:transition-none"
+						className="size-4 shrink-0 transition-transform duration-(--motion-medium-duration) ease-out group-hover:translate-y-px group-active:translate-y-0 group-disabled:translate-y-0 motion-reduce:transition-none"
 					/>
 				}
 				label="Next session"

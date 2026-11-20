@@ -295,7 +295,7 @@ function Thing({
 				"squircle:corner-xs",
 				lit
 					? litLook
-					: "edge-m border-current/25 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]",
+					: "edge-m border-current/25 hover:bg-ink/4 dark:hover:bg-ink/6",
 			)}
 			style={style}
 		>

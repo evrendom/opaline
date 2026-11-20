@@ -87,7 +87,7 @@ export function tileLook(
 	if (kind === "free")
 		return {
 			className:
-				"border-dashed border-line-soft text-ink-3 bg-[repeating-linear-gradient(135deg,transparent_0_6px,rgba(0,0,0,0.035)_6px_7px)] dark:border-[rgba(255,255,255,0.16)] dark:bg-[repeating-linear-gradient(135deg,transparent_0_6px,rgba(255,255,255,0.05)_6px_7px)]",
+				"border-dashed border-line-soft text-ink-3 bg-[repeating-linear-gradient(135deg,transparent_0_6px,color-mix(in_srgb,var(--ink)_3.5%,transparent)_6px_7px)] dark:border-ink/16 dark:bg-[repeating-linear-gradient(135deg,transparent_0_6px,color-mix(in_srgb,var(--ink)_5%,transparent)_6px_7px)]",
 		};
 	if (strong)
 		return {
@@ -229,7 +229,7 @@ export function ContextBar({
 										? "bg-error-tint text-error"
 										: warns && share >= CONTEXT_WARN
 											? "bg-warning-tint text-warning"
-											: "bg-wash text-ink-3 dark:bg-[rgba(255,255,255,0.08)]",
+											: "bg-wash text-ink-3 dark:bg-ink/8",
 								)}
 							>
 								{share}%
@@ -293,7 +293,7 @@ function MeasureToggle({
 	onMeasure: (measure: ContextMeasure) => void;
 }) {
 	return (
-		<fieldset className="m-zero flex shrink-0 items-center gap-xxs corner-m edge-none bg-wash p-xxs corner-squircle squircle:corner-xl dark:bg-[rgba(255,255,255,0.06)]">
+		<fieldset className="m-zero flex shrink-0 items-center gap-xxs corner-m edge-none bg-wash p-xxs corner-squircle squircle:corner-xl dark:bg-ink/6">
 			<legend className="sr-only">Measure the map by</legend>
 			{MEASURES.map((each) => {
 				const pressed = each === measure;
@@ -318,7 +318,7 @@ function MeasureToggle({
 							"disabled:cursor-default disabled:opacity-40 squircle:corner-l",
 							pressed
 								? cn("bg-card font-medium", PILL_SHADOW)
-								: "text-ink-3 hover:text-[rgba(0,0,0,0.88)] dark:hover:text-white",
+								: "text-ink-3 hover:text-ink/88 dark:hover:text-ink",
 						)}
 					>
 						{MEASURE_LOOK[each].label}

@@ -24,11 +24,13 @@ export function RowTotals({
 	return (
 		<div className="flex flex-col items-end pr-xs text-right">
 			{durationMs !== null ? (
+				// design-escape-ok: waterfall figures inherit the row's line; no step (listed)
 				<span className="text-[11px] font-medium text-ink/80 tabular-nums">
 					{formatSpanDuration(durationMs)}
 				</span>
 			) : null}
 			{cost !== null || tokens > 0 ? (
+				// design-escape-ok: waterfall figures inherit the row's line; no step (listed)
 				<span className="hidden text-[10px] whitespace-nowrap text-ink-3 tabular-nums @lg:inline">
 					{cost !== null ? formatReaderCost(cost) : null}
 					{cost !== null && tokens > 0 ? " · " : null}
@@ -53,6 +55,7 @@ export function TimeRuler({ total }: { total: number }) {
 					className={cn(
 						// One line: a label at the track's end has no width left to
 						// lay out in, so "4m 10s" would otherwise stack its words.
+						// design-escape-ok: ruler labels at 10px inherit the ruler's line (listed)
 						"absolute top-0 text-[10px] whitespace-nowrap text-ink-3/50 tabular-nums",
 						fraction === 1 && "-translate-x-full",
 						// The inner labels collide on a short track, so only the two
@@ -136,6 +139,7 @@ export function ProgressBar({
 
 export function RanOnChip({ ms }: { ms: number }) {
 	return (
+		// design-escape-ok: a 10/16 label on the bar (listed)
 		<span className="absolute top-1/2 right-0 -translate-y-1/2 corner-xs bg-canvas px-xs text-[10px] leading-4 text-ink-3 tabular-nums">
 			+{formatRanOn(ms)}
 		</span>

@@ -342,7 +342,7 @@ export const SessionTurnTableRowView = memo(function SessionTurnTableRowView({
 																"absolute right-0 bottom-0 z-10 min-w-2.5",
 																"corner-xs px-xxs",
 																"text-center text-body-xxs font-heavy tabular-nums",
-																"bg-canvas text-ink shadow-[0_0_0_1px_var(--canvas)]",
+																"bg-canvas text-ink ring-1 ring-canvas",
 															)}
 														>
 															{group.count}x

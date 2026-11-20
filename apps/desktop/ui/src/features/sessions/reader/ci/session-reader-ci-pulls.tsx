@@ -254,6 +254,7 @@ export function PullLine({
 						/>
 					) : null}
 					{meta ? (
+						// design-escape-ok: one-line status glyphs sit on the row's centre
 						<span className="ml-auto flex shrink-0 items-center leading-none [&>*]:leading-none">
 							{meta}
 						</span>

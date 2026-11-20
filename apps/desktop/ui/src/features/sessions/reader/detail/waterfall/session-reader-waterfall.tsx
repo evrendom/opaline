@@ -298,6 +298,7 @@ export function SessionReaderWaterfallView({
 				<span
 					ref={cursorLabelRef}
 					style={{ display: "none" }}
+					// design-escape-ok: a 10px label floating over the bars (listed)
 					className="pointer-events-none absolute top-0 z-10 corner-xs border bg-canvas px-s py-xxs text-[10px] whitespace-nowrap text-ink-3 tabular-nums shadow-label"
 				/>
 			</div>
@@ -370,6 +371,7 @@ export function SessionReaderWaterfallView({
 												/>
 											))}
 											{bare ? (
+												// design-escape-ok: 9/12 ruler ticks (listed)
 												<div className="absolute inset-x-0 top-0 flex justify-between px-xs text-[9px] leading-3 text-ink-3/70 tabular-nums">
 													<span>0s</span>
 													<span>{formatWholeDuration(total)}</span>

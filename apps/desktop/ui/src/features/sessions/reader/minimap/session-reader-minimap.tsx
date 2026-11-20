@@ -479,7 +479,7 @@ export function ReaderMinimap({
 			</svg>
 			<div
 				ref={viewRef}
-				className="absolute inset-x-0 top-0 corner-s bg-canvas corner-squircle squircle:corner-l ring-1 ring-zinc-950/8 hover:ring-zinc-950/15 dark:bg-wash dark:ring-white/12 dark:hover:bg-white/8"
+				className="absolute inset-x-0 top-0 corner-s bg-canvas corner-squircle squircle:corner-l ring-1 ring-ink/8 hover:ring-ink/15 dark:bg-wash dark:ring-ink/12 dark:hover:bg-ink/8"
 			/>
 			<MinimapHeads
 				focus={focus ?? null}

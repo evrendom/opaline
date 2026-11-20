@@ -185,6 +185,7 @@ const LINE_LOOK: Record<
 	{ mark: string; row: string; sign: string; signColor: string }
 > = {
 	added: {
+		// design-escape-ok: word highlights hug the glyphs
 		mark: "rounded-[3px] bg-green-500/20 box-decoration-clone",
 		row: "bg-green-500/10",
 		sign: "+",
@@ -192,6 +193,7 @@ const LINE_LOOK: Record<
 	},
 	context: { mark: "", row: "", sign: " ", signColor: "" },
 	removed: {
+		// design-escape-ok: word highlights hug the glyphs
 		mark: "rounded-[3px] bg-red-500/20 box-decoration-clone",
 		row: "bg-red-500/10",
 		sign: "−",

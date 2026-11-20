@@ -87,12 +87,13 @@ function SessionDetailActivityMenuItem({
 				aria-expanded={flyoutsEnabled ? isOpen : undefined}
 				aria-haspopup={flyoutsEnabled ? "menu" : undefined}
 				className={cn(
-					"session-detail-opaline-trigger relative inline-flex shrink-0 items-center justify-center gap-s corner-s border-[0.5px] border-black/20 bg-white px-2.5 py-xs text-body-l font-medium text-black/60 disabled:pointer-events-none dark:border-white/25 dark:bg-canvas dark:text-white/70",
+					// design-escape-ok: 10px trigger padding sits between steps; a step shifts the strip (listed)
+					"session-detail-opaline-trigger relative inline-flex shrink-0 items-center justify-center gap-s corner-s border-[0.5px] border-ink/20 bg-canvas px-2.5 py-xs text-body-l font-medium text-ink/60 disabled:pointer-events-none dark:border-ink/25 dark:text-ink/70",
 					flyoutsEnabled &&
-						"hover:bg-black/[0.063] hover:text-black/90 dark:hover:bg-white/[0.071] dark:hover:text-white/95",
+						"hover:bg-ink/[0.063] hover:text-ink/90 dark:hover:bg-ink/[0.071] dark:hover:text-ink/95",
 					flyoutsEnabled &&
 						isOpen &&
-						"bg-black/[0.063] text-black/90 dark:bg-white/[0.071] dark:text-white/95",
+						"bg-ink/[0.063] text-ink/90 dark:bg-ink/[0.071] dark:text-ink/95",
 				)}
 				data-state={isOpen ? "open" : "closed"}
 				disabled={!flyoutsEnabled}
@@ -106,7 +107,7 @@ function SessionDetailActivityMenuItem({
 			>
 				<TouchTarget className="pointer-events-none" />
 				<span>{group.label}</span>
-				<span className="text-black/60 tabular-nums dark:text-white/70">
+				<span className="text-ink/60 tabular-nums dark:text-ink/70">
 					{group.totalCount.toLocaleString()}
 				</span>
 			</button>
@@ -531,7 +532,8 @@ export function SessionDetailActivityStrip({
 				</ul>
 				{flyoutsEnabled && panelFrames.length > 0 ? (
 					<div
-						className="session-detail-opaline-menu absolute top-[calc(100%+1px)] right-0 left-0 overflow-hidden corner-l bg-white/90 text-[#282a30] shadow-[0_8px_32px_#08090a0d] ring-1 ring-black/8 backdrop-blur-2xl outline-none dark:bg-[#08090ae6] dark:text-[#f7f8f8] dark:shadow-[0_8px_32px_#08090a] dark:ring-white/8"
+						// design-escape-ok: the flyout's drop; no shadow role matches (listed)
+						className="session-detail-opaline-menu absolute top-[calc(100%+1px)] right-0 left-0 overflow-hidden corner-l bg-canvas/90 text-ink/90 shadow-[0_8px_32px_#08090a0d] ring-1 ring-ink/8 backdrop-blur-2xl outline-none dark:text-ink dark:shadow-[0_8px_32px_#08090a]"
 						data-state={popupState}
 						onPointerEnter={() => clearTimer(closeTimerRef.current)}
 						onPointerLeave={scheduleClose}

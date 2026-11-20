@@ -40,7 +40,7 @@ import { recordAnchorJournal } from "./transcript-forensics";
 import { useSessionDetailOverviewPages } from "./use-session-detail-overview-pages";
 
 const columnBottomPaddingClassName =
-	"pb-[calc(5rem+env(safe-area-inset-bottom))]";
+	"pb-[calc(var(--space-xxl)*10/3+env(safe-area-inset-bottom))]";
 
 export function SessionDetailFastContent({
 	showOverviewStrip = true,

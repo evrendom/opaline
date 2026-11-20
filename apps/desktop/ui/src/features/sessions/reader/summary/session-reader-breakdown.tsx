@@ -118,6 +118,7 @@ export function Breakdown({
 			) : (
 				heading
 			)}
+			{/* design-escape-ok: 13/16 keeps the figure row dense; body-l's 20px line grows it (listed) */}
 			<span className="truncate text-[13px]/4 text-ink tabular-nums">
 				{value}
 			</span>

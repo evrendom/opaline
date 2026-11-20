@@ -111,6 +111,7 @@ function Inline({ text }: { text: string }) {
 				return (
 					<code
 						key={key}
+						// design-escape-ok: inline code scales with its prose
 						className="corner-xs bg-field px-xs py-xxs font-data text-[0.85em]"
 					>
 						{part.slice(1, -1)}

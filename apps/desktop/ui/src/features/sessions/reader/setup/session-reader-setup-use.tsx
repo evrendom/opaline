@@ -180,6 +180,7 @@ export function SetupRunTrace({
 				waterfall ? (
 					<div
 						ref={attachPane}
+						// design-escape-ok: indent aligns under the tool icon column
 						className="pb-[calc(var(--space-xxl)*4/3)] pl-[calc(2.25rem+9px)]"
 					>
 						<TraceAttempts

@@ -62,7 +62,7 @@ export function SessionUploadFailureDetail({
 						)}
 					</p>
 				</div>
-				<dl className="min-w-0 divide-y divide-black/6 dark:divide-white/8">
+				<dl className="min-w-0 divide-y divide-ink/6 dark:divide-ink/8">
 					{fields.map(([label, value]) => (
 						<div
 							key={label}

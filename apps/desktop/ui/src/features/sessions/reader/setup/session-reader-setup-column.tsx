@@ -299,6 +299,7 @@ function SetupUseGroup({
 					{uses.map((use) => (
 						<SetupUseRow
 							key={use.step.id}
+							// design-escape-ok: indents align under the tool icon column
 							indent={tool ? "pl-13" : "pl-9"}
 							index={indexOf(use)}
 							isPicked={use.step.id === pickedUse}

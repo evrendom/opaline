@@ -134,18 +134,19 @@ export function OpalTag({
 				ref={outlineRef}
 				aria-hidden="true"
 				height={TAG_HEIGHT}
+				// design-escape-ok: the opal tag's drop is artwork
 				className="pointer-events-none absolute top-0 left-0 overflow-visible drop-shadow-[0_0.5px_1px_rgb(0_0_0/0.06)] dark:drop-shadow-none"
 			>
 				<path
 					ref={pathRef}
 					strokeWidth={0.5}
-					className="fill-card stroke-black/10 dark:stroke-white/10"
+					className="fill-card stroke-ink/10"
 				/>
 			</svg>
 			<span className="relative inline-flex items-center gap-xs">
 				{children}
 				{word ? (
-					<span className="-ml-xs grid grid-cols-[0fr] transition-[grid-template-columns] duration-200 ease-out group-hover/tag:grid-cols-[1fr]">
+					<span className="-ml-xs grid grid-cols-[0fr] transition-[grid-template-columns] duration-(--motion-medium-duration) ease-out group-hover/tag:grid-cols-[1fr]">
 						<span className="overflow-hidden whitespace-nowrap">
 							{"\u00a0"}
 							{word}

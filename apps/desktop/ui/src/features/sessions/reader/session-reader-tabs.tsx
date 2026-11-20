@@ -278,7 +278,7 @@ export function TabsBandFade({ className }: { className?: string }) {
 			className={cn(
 				"sticky z-40 h-4",
 				"-mb-xl",
-				"pointer-events-none bg-linear-to-b from-canvas to-transparent opacity-0 transition-opacity duration-200",
+				"pointer-events-none bg-linear-to-b from-canvas to-transparent opacity-0 transition-opacity duration-(--motion-medium-duration)",
 				"in-data-fade-top:opacity-100",
 				className,
 			)}
@@ -293,7 +293,7 @@ export function ViewBottomFade({ className }: { className?: string }) {
 			className={cn(
 				"sticky bottom-0 z-30 h-8",
 				"-mt-[calc(var(--space-xxl)*4/3)]",
-				"pointer-events-none bg-linear-to-t from-canvas to-transparent opacity-0 transition-opacity duration-200",
+				"pointer-events-none bg-linear-to-t from-canvas to-transparent opacity-0 transition-opacity duration-(--motion-medium-duration)",
 				"in-data-fade-bottom:opacity-100",
 				className,
 			)}
