@@ -135,6 +135,22 @@ export function refreshRuntime(
 	}
 }
 
+/**
+ * A directory a hook points at is treated as an Opaline configuration
+ * directory only when it holds a released Opaline runtime, so a hook with an
+ * unusual path can never make the cleanup delete names in an unrelated folder.
+ */
+export function isCliConfigDir(configDir: string): boolean {
+	try {
+		const content = readFileSync(join(configDir, "runtime", "cli.js"), "utf8");
+		return /\bname:\s*"(?:@opalinehq\/cli|rudel|opaline)",\s*version:\s*"[^"]+"/u.test(
+			content,
+		);
+	} catch {
+		return false;
+	}
+}
+
 /** Bun bundles embed the package manifest; released updaters read it the same way. */
 export function readBundleVersion(content: string): string | undefined {
 	return /\bname:\s*"@opalinehq\/cli",\s*version:\s*"([^"]+)"/u.exec(

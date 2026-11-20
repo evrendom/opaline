@@ -18,6 +18,7 @@ import {
 	unique,
 } from "./paths.js";
 import {
+	isCliConfigDir,
 	isDirectory,
 	type RuntimeRefresh,
 	refreshRuntime,
@@ -142,11 +143,12 @@ function cleanSettingsAndState(
 	// Hooks name the runtime they run, and so the configuration directory
 	// they were installed with, even when this run's environment differs.
 	for (const dir of [...claude.configDirs, ...codex.configDirs])
-		configDirs.add(resolve(dir));
+		if (isCliConfigDir(dir)) configDirs.add(resolve(dir));
 	for (const dir of configDirs)
 		for (const projectPath of autoUploadProjectPaths(dir))
 			cleanClaudeFile(claudeProjectSettingsPath(projectPath));
-	for (const dir of claude.configDirs) configDirs.add(resolve(dir));
+	for (const dir of claude.configDirs)
+		if (isCliConfigDir(dir)) configDirs.add(resolve(dir));
 
 	for (const dir of configDirs) {
 		if (dir !== resolve(primary)) {

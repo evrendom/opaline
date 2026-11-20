@@ -245,6 +245,33 @@ test("finds hooks installed under another configuration directory than this run'
 	expect(existsSync(join(home, ".rudel"))).toBe(false);
 });
 
+test("a hook pointing at a folder without an Opaline runtime removes the hook and deletes nothing there", () => {
+	const unrelated = join(home, "not-opaline");
+	seedState(unrelated);
+	write(join(unrelated, "runtime", "cli.js"), "#!/usr/bin/env node\n// someone else's tool\n");
+	write(join(home, ".claude", "settings.json"), {
+		hooks: {
+			SessionEnd: [
+				{
+					hooks: [
+						{
+							type: "command",
+							command: persistentClaudeHook(unrelated, "session-end"),
+						},
+					],
+				},
+			],
+		},
+	});
+
+	const report = runRetire(home, cwd);
+
+	expect(readJson(join(home, ".claude", "settings.json"))).toEqual({});
+	expect(report.configDirs).not.toContain(unrelated);
+	expect(existsSync(join(unrelated, "credentials.json"))).toBe(true);
+	expect(existsSync(join(unrelated, "failed-uploads.json"))).toBe(true);
+});
+
 test("a hook runtime cleans the directory it lives in, whatever its environment says", () => {
 	const custom = join(home, "custom-profile");
 	seedState(custom);
