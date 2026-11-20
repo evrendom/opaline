@@ -122,4 +122,15 @@ async function analyzeSessions() {
 	return { claude: priced(claude), codex: priced(codex), ms: Date.now() - started };
 }
 
-module.exports = { analyzeSessions, scanSessions };
+/** Where the transcripts are, for asking about the folders their sessions ran in. */
+function sessionSources() {
+	let codexFiles = [];
+	try {
+		codexFiles = codexFolders().flatMap((folder) =>
+			listFiles(path.join(codexRoot, folder), /\.jsonl$/).map((name) => path.join(codexRoot, folder, name)),
+		);
+	} catch {}
+	return { claudeRoot, codexFiles };
+}
+
+module.exports = { analyzeSessions, scanSessions, sessionSources };

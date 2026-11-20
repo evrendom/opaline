@@ -262,42 +262,31 @@ test("a line the user moved between their own lines is found, and only it is rem
 	expect(text(file)).toBe("one\n\ntwo\n");
 });
 
-test("Connect asks once; a yes adds the line to every connected agent's file, later connects add it without asking", async () => {
+test("Connect adds the line to every connected agent's file without asking, later connects only to their own", () => {
 	const env = fakeHome();
 	fs.mkdirSync(env.CLAUDE_CONFIG_DIR, { recursive: true });
 	fs.writeFileSync(instructionFile("claude", env), "");
-	const asked = [];
-	const confirm = async (files) => {
-		asked.push(files);
-		return true;
-	};
-	const first = await offerInstructionLine({
-		keys: ["claude", "codex"],
-		env,
-		confirm,
-	});
-	expect(asked).toEqual([
-		[instructionFile("claude", env), instructionFile("codex", env)],
-	]);
-	expect(first).toEqual({
+	expect(offerInstructionLine({ keys: ["claude", "codex"], env })).toEqual({
 		answer: "accepted",
 		added: [instructionFile("claude", env), instructionFile("codex", env)],
 	});
 	expect(text(instructionFile("codex", env))).toBe(`${INSTRUCTION_LINE}\n`);
 	fs.rmSync(instructionFile("claude", env));
-	expect(
-		await offerInstructionLine({ keys: ["codex", "claude"], env, confirm }),
-	).toEqual({ answer: "accepted", added: [] });
+	expect(offerInstructionLine({ keys: ["codex", "claude"], env })).toEqual({
+		answer: "accepted",
+		added: [],
+	});
 	expect(fs.existsSync(instructionFile("claude", env))).toBe(false);
-	expect(
-		await offerInstructionLine({ keys: ["claude"], env, confirm }),
-	).toEqual({ answer: "accepted", added: [] });
+	expect(offerInstructionLine({ keys: ["claude"], env })).toEqual({
+		answer: "accepted",
+		added: [],
+	});
 	expect(fs.existsSync(instructionFile("claude", env))).toBe(false);
 	fs.writeFileSync(instructionFile("claude", env), "");
-	expect(
-		await offerInstructionLine({ keys: ["claude"], env, confirm }),
-	).toEqual({ answer: "accepted", added: [instructionFile("claude", env)] });
-	expect(asked).toHaveLength(1);
+	expect(offerInstructionLine({ keys: ["claude"], env })).toEqual({
+		answer: "accepted",
+		added: [instructionFile("claude", env)],
+	});
 	expect(text(instructionFile("claude", env))).toBe(`${INSTRUCTION_LINE}\n`);
 	expect(removeInstructionLines({ keys: ["claude", "codex"], env })).toEqual([
 		instructionFile("claude", env),
@@ -306,54 +295,40 @@ test("Connect asks once; a yes adds the line to every connected agent's file, la
 	expect(fs.existsSync(instructionFile("claude", env))).toBe(false);
 });
 
-test("a no is remembered: nothing is written and Connect does not ask again", async () => {
+test("a no from the old dialog no longer blocks the line", () => {
 	const env = fakeHome();
-	let asks = 0;
-	const confirm = async () => {
-		asks += 1;
-		return false;
-	};
-	for (let attempt = 0; attempt < 2; attempt += 1)
-		expect(
-			await offerInstructionLine({ keys: ["claude", "codex"], env, confirm }),
-		).toEqual({ answer: "declined", added: [] });
-	expect(asks).toBe(1);
-	expect(fs.existsSync(path.join(root, "home"))).toBe(false);
-	const file = instructionFile("claude", env);
-	fs.mkdirSync(path.dirname(file), { recursive: true });
-	fs.writeFileSync(file, `${INSTRUCTION_LINE}\n`);
-	expect(removeInstructionLines({ keys: ["claude"], env })).toEqual([]);
-	expect(text(file)).toBe(`${INSTRUCTION_LINE}\n`);
+	const answers = path.join(root, "userData", "agents", "instructions.json");
+	fs.mkdirSync(path.dirname(answers), { recursive: true });
+	fs.writeFileSync(answers, JSON.stringify({ answer: "declined" }));
+	expect(offerInstructionLine({ keys: ["codex"], env })).toEqual({
+		answer: "accepted",
+		added: [instructionFile("codex", env)],
+	});
+	expect(text(instructionFile("codex", env))).toBe(`${INSTRUCTION_LINE}\n`);
+	expect(removeInstructionLines({ keys: ["codex"], env })).toEqual([
+		instructionFile("codex", env),
+	]);
 });
 
-test("without a CLAUDE.md none is created: only AGENTS.md is offered and written", async () => {
+test("without a CLAUDE.md none is created: only AGENTS.md is written", () => {
 	const env = fakeHome();
-	const asked = [];
-	const confirm = async (files) => {
-		asked.push(files);
-		return true;
-	};
-	expect(
-		await offerInstructionLine({ keys: ["claude", "codex"], env, confirm }),
-	).toEqual({ answer: "accepted", added: [instructionFile("codex", env)] });
-	expect(asked).toEqual([[instructionFile("codex", env)]]);
+	expect(offerInstructionLine({ keys: ["claude", "codex"], env })).toEqual({
+		answer: "accepted",
+		added: [instructionFile("codex", env)],
+	});
 	expect(fs.existsSync(instructionFile("claude", env))).toBe(false);
 	expect(addInstructionLine(instructionFile("claude", env))).toBe(false);
 	expect(fs.existsSync(instructionFile("claude", env))).toBe(false);
 });
 
-test("with only Claude Code connected and no CLAUDE.md, nothing is asked or written", async () => {
+test("with only Claude Code connected and no CLAUDE.md, nothing is written or remembered", () => {
 	const env = fakeHome();
-	let asks = 0;
-	const confirm = async () => {
-		asks += 1;
-		return true;
-	};
-	expect(
-		await offerInstructionLine({ keys: ["claude"], env, confirm }),
-	).toEqual({ answer: "no file", added: [] });
-	expect(asks).toBe(0);
+	expect(offerInstructionLine({ keys: ["claude"], env })).toEqual({
+		answer: "no file",
+		added: [],
+	});
 	expect(fs.existsSync(path.join(root, "home"))).toBe(false);
+	expect(fs.existsSync(path.join(root, "userData"))).toBe(false);
 });
 
 test("an earlier line is swapped for the current one in place, and removing finds either", async () => {
@@ -369,7 +344,6 @@ test("an earlier line is swapped for the current one in place, and removing find
 	await offerInstructionLine({
 		keys: ["codex"],
 		env,
-		confirm: async () => true,
 	});
 	expect(text(codex)).toBe(`one\n  ${INSTRUCTION_LINE}\ntwo\n`);
 	expect(updateInstructionLines({ keys: ["claude", "codex"], env })).toEqual([

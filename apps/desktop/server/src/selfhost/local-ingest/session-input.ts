@@ -8,7 +8,7 @@ import {
 	type IngestSessionInput,
 	LocalIngestSessionInputSchema,
 } from "@rudel/api-routes";
-import { type GitInfo, getGitInfo } from "./git-info.js";
+import { type GitInfo, getGitInfo, normalizeRemoteUrl } from "./git-info.js";
 import { inferSessionRepository } from "./session-repository.js";
 import { claudeProjectDirectory, claudeSessionId } from "./sources.js";
 import {
@@ -76,6 +76,7 @@ function codexMeta(content: string): {
 	cwd: string;
 	branch?: string;
 	sha?: string;
+	remote?: string;
 } | null {
 	const end = content.indexOf("\n");
 	const first = end === -1 ? content : content.slice(0, end);
@@ -85,7 +86,12 @@ function codexMeta(content: string): {
 			payload?: {
 				id?: unknown;
 				cwd?: unknown;
-				git?: { branch?: unknown; commit_hash?: unknown; sha?: unknown };
+				git?: {
+					branch?: unknown;
+					commit_hash?: unknown;
+					sha?: unknown;
+					repository_url?: unknown;
+				};
 			};
 		};
 		if (parsed.type !== "session_meta" || !parsed.payload) return null;
@@ -97,6 +103,7 @@ function codexMeta(content: string): {
 			cwd: text(parsed.payload.cwd) ?? "",
 			branch: text(git.branch),
 			sha: text(git.commit_hash) ?? text(git.sha),
+			remote: text(git.repository_url),
 		};
 	} catch {
 		return null;
@@ -125,9 +132,12 @@ export async function buildLocalSessionInput(
 		if (!codexAdapter.extractTimestamps(content))
 			return skipped("no timestamped records", session);
 		const gitInfo = meta.cwd ? await cachedGitInfo(meta.cwd, input.now) : {};
+		const recordedRemote = meta.remote
+			? normalizeRemoteUrl(meta.remote)
+			: undefined;
 		const inferred = await inferSessionRepository({
 			projectPath: meta.cwd,
-			gitRemote: gitInfo.gitRemote,
+			gitRemote: gitInfo.gitRemote ?? recordedRemote,
 			packageName: gitInfo.packageName,
 			streams: [content],
 		}).catch(() => null);
@@ -139,7 +149,7 @@ export async function buildLocalSessionInput(
 					meta.id ??
 					basename(input.sessionPath).replace(/\.jsonl(?:\.zst)?$/u, ""),
 				projectPath: meta.cwd,
-				gitRemote: repository.gitRemote,
+				gitRemote: repository.gitRemote ?? recordedRemote,
 				packageName: repository.packageName,
 				packageType: repository.packageType,
 				gitBranch: inferred ? inferred.branch : (meta.branch ?? gitInfo.branch),
