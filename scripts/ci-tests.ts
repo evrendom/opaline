@@ -533,6 +533,41 @@ function requiredEnv(name: string): string {
 	return value;
 }
 
+/**
+ * A job's log. Not through gh: it refuses a body with terminal escape
+ * sequences, which every colored test log has. curl follows the redirect to
+ * the log's storage without passing the token on to that host.
+ */
+function jobLog(repo: string, jobId: string, strict: boolean): string | null {
+	const token = process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN;
+	const timeout = strict
+		? 60_000
+		: Math.min(recordedDeadline - Date.now(), 20_000);
+	if (!token || timeout <= 0) {
+		if (strict) throw new Error("no token to read job logs with");
+		return null;
+	}
+	const result = spawnSync(
+		"curl",
+		[
+			"--fail",
+			"--silent",
+			"--show-error",
+			"--location",
+			"--header",
+			`Authorization: Bearer ${token}`,
+			"--header",
+			"Accept: application/vnd.github+json",
+			`https://api.github.com/repos/${repo}/actions/jobs/${jobId}/logs`,
+		],
+		{ encoding: "utf8", maxBuffer: 256 * 1024 * 1024, timeout },
+	);
+	if (result.status === 0) return result.stdout;
+	if (strict)
+		throw new Error(`reading the log of job ${jobId} failed: ${result.stderr}`);
+	return null;
+}
+
 /** A GitHub API call the result depends on: a failure fails the job. */
 function strictGh(args: string[]): string {
 	const result = spawnSync("gh", args, {
@@ -598,7 +633,7 @@ export function recordedTimings(
 				?.split("\n")
 				.filter(Boolean) ?? [];
 		for (const jobId of jobs) {
-			const log = gh(["api", `repos/${repo}/actions/jobs/${jobId}/logs`]);
+			const log = jobLog(repo, jobId, false);
 			const line = log?.split("\n").find((l) => l.includes(TIMINGS_MARKER));
 			if (!line) continue;
 			try {
@@ -856,7 +891,7 @@ function main() {
 			.filter((j) => shardIndex(suite, j.name) !== null)
 			.map((j) => ({
 				name: j.name,
-				log: strictGh(["api", `repos/${repo}/actions/jobs/${j.id}/logs`]),
+				log: jobLog(repo, String(j.id), true) as string,
 			}));
 		console.log(verifyShards(suite, Number(options.shards), logs));
 		return;
