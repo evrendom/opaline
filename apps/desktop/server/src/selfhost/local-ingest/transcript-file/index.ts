@@ -27,6 +27,7 @@ import {
 export type { FileIdentity, FileStat, WholeReason } from "./identity.js";
 export { FINGERPRINT_BYTES, statTranscript } from "./identity.js";
 export type { CollectedImage } from "./images.js";
+export { clearImageSpill } from "./images.js";
 export type TranscriptRevision = ReadRevision;
 
 export type TranscriptChange =
@@ -115,6 +116,10 @@ export interface SessionRead {
 	readonly revision: TranscriptRevision;
 	readonly subagents: () => Promise<readonly SubagentTranscript[]>;
 	readonly images: () => readonly CollectedImage[];
+	/** The folder holding the images' files, or null when the read found none. */
+	readonly imageDirectory: () => string | null;
+	/** Deletes the images' files; the read is not used for storing after this. */
+	readonly discardImages: () => void;
 	readonly files: () => readonly ReadFile[];
 }
 
@@ -135,6 +140,8 @@ export async function readSession(
 		revision: main.revision,
 		subagents: () => readSubagents(sessionPath, content, images, files),
 		images: () => images.images(),
+		imageDirectory: () => images.directory(),
+		discardImages: () => images.discard(),
 		files: () => files,
 	};
 }

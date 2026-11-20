@@ -21,10 +21,12 @@ import type {
 export function slimAndFilterSecrets(
 	fields: IngestFilterFields,
 ): IngestFilterResult {
-	const content = slimTranscriptText(fields.content);
+	const slim = (text: string) =>
+		fields.slimmed ? text : slimTranscriptText(text);
+	const content = slim(fields.content);
 	let filterInputBytes = getUtf8ByteLength(content);
 	const subagents = fields.subagents?.map((subagent) => {
-		const slimmed = slimTranscriptText(subagent.content);
+		const slimmed = slim(subagent.content);
 		filterInputBytes += getUtf8ByteLength(slimmed);
 		return { ...subagent, content: slimmed };
 	});

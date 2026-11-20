@@ -27,7 +27,10 @@ const files = [
 	},
 ];
 
-function run(outcomes: SessionImportOutcome[]) {
+function run(
+	outcomes: SessionImportOutcome[],
+	imageDirectory: string | null = null,
+) {
 	const sleeps: number[] = [];
 	const runner = createSessionRunner({
 		importSession: async () => {
@@ -45,6 +48,7 @@ function run(outcomes: SessionImportOutcome[]) {
 			},
 			bytes: 2,
 			images: [],
+			imageDirectory,
 			files,
 		}),
 		sql: (() => {
@@ -127,6 +131,21 @@ test("stored, skipped and failed imports become ingested, skipped and retry", as
 	).toEqual({ kind: "retry", reason: "down", files });
 });
 
+test("the images' folder of a read is removed once its session is done, stored or failed", async () => {
+	for (const outcomes of [
+		[{ kind: "stored", usage: "complete" }],
+		[],
+	] as SessionImportOutcome[][]) {
+		const folder = await mkdtemp(join(tmpdir(), "opaline-runner-images-"));
+		directories.push(folder);
+		await writeFile(join(folder, "a".repeat(64)), "png");
+		const outcome = run(outcomes, folder).outcome();
+		if (outcomes.length) await outcome;
+		else await expect(outcome).rejects.toThrow("no outcome left");
+		expect(await Bun.file(join(folder, "a".repeat(64))).exists()).toBe(false);
+	}
+});
+
 test("a full queue is given up on after the busy wait limit", async () => {
 	let clock = Date.parse("2026-11-16T10:00:00.000Z");
 	const sleeps: number[] = [];
@@ -146,6 +165,7 @@ test("a full queue is given up on after the busy wait limit", async () => {
 			},
 			bytes: 2,
 			images: [],
+			imageDirectory: null,
 			files,
 		}),
 		sql: (() => {

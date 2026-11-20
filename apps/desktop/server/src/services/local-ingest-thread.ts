@@ -18,10 +18,19 @@ export class LocalIngestThread {
 	private nextId = 1;
 	private closed = false;
 	private recycleWhenIdle = false;
+	private bytesSinceStart = 0;
+	private idleTimer: ReturnType<typeof setTimeout> | undefined;
 
+	/**
+	 * A worker's heap keeps the high-water mark of what it ran. One job of
+	 * `recycleAfterBytes`, jobs adding up to `recycleAfterTotalBytes`, or
+	 * `idleMs` without work end it; the next job starts a fresh one.
+	 */
 	constructor(
 		private readonly options: {
 			readonly recycleAfterBytes?: number;
+			readonly recycleAfterTotalBytes?: number;
+			readonly idleMs?: number;
 			readonly inline?: boolean;
 			readonly createWorker?: () => Worker;
 		} = {},
@@ -34,7 +43,12 @@ export class LocalIngestThread {
 				reason: "The server is stopping",
 			});
 		const id = this.nextId++;
-		if ((job.bytes ?? 0) >= (this.options.recycleAfterBytes ?? Infinity))
+		clearTimeout(this.idleTimer);
+		this.bytesSinceStart += job.bytes ?? 0;
+		if (
+			(job.bytes ?? 0) >= (this.options.recycleAfterBytes ?? Infinity) ||
+			this.bytesSinceStart >= (this.options.recycleAfterTotalBytes ?? Infinity)
+		)
 			this.recycleWhenIdle = true;
 		return new Promise((resolve) => {
 			this.pending.set(id, resolve);
@@ -61,6 +75,7 @@ export class LocalIngestThread {
 
 	close(): void {
 		this.closed = true;
+		clearTimeout(this.idleTimer);
 		this.stop("The server is stopping");
 	}
 
@@ -73,10 +88,16 @@ export class LocalIngestThread {
 				mergeIngestPhaseTotals(event.data.timings);
 				const resolve = this.pending.get(event.data.id);
 				this.pending.delete(event.data.id);
-				if (this.recycleWhenIdle && this.pending.size === 0) {
-					this.recycleWhenIdle = false;
-					this.worker = undefined;
-					worker.terminate();
+				if (this.pending.size === 0) {
+					if (this.recycleWhenIdle) this.end(worker);
+					else if (this.options.idleMs !== undefined) {
+						clearTimeout(this.idleTimer);
+						this.idleTimer = setTimeout(() => {
+							if (this.worker === worker && this.pending.size === 0)
+								this.end(worker);
+						}, this.options.idleMs);
+						this.idleTimer.unref?.();
+					}
 				}
 				resolve?.(event.data.outcome);
 			},
@@ -94,9 +115,18 @@ export class LocalIngestThread {
 		return worker;
 	}
 
+	private end(worker: Worker): void {
+		this.recycleWhenIdle = false;
+		this.bytesSinceStart = 0;
+		this.worker = undefined;
+		worker.terminate();
+	}
+
 	private stop(reason: string): void {
 		const worker = this.worker;
 		this.worker = undefined;
+		this.bytesSinceStart = 0;
+		this.recycleWhenIdle = false;
 		worker?.terminate();
 		for (const resolve of this.pending.values())
 			resolve({ kind: "retry", reason });

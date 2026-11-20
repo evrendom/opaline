@@ -14,6 +14,7 @@ import {
 	type SessionOutcome,
 } from "./service.js";
 import { localIngestRoots } from "./sources.js";
+import { clearImageSpill } from "./transcript-file/index.js";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -108,6 +109,7 @@ export async function startLocalIngest(options: {
 	readonly env?: Environment;
 }): Promise<LocalIngestHandle> {
 	const env = options.env ?? process.env;
+	clearImageSpill();
 	const { sqlClient } = await import("../../db.js");
 	const settings = readLocalIngestSettings(env);
 	const runner =
@@ -172,7 +174,7 @@ interface SessionRunner {
 }
 
 async function threadRunner(threads: number): Promise<SessionRunner> {
-	const [{ LocalIngestThread }, { WORKER_RECYCLE_BYTES }] = await Promise.all([
+	const [{ LocalIngestThread }, memory] = await Promise.all([
 		import("../../services/local-ingest-thread.js"),
 		import("../../lib/worker-memory.js"),
 	]);
@@ -180,7 +182,9 @@ async function threadRunner(threads: number): Promise<SessionRunner> {
 		{ length: Math.max(1, threads) },
 		() =>
 			new LocalIngestThread({
-				recycleAfterBytes: WORKER_RECYCLE_BYTES,
+				recycleAfterBytes: memory.WORKER_RECYCLE_BYTES,
+				recycleAfterTotalBytes: memory.WORKER_RECYCLE_TOTAL_BYTES,
+				idleMs: memory.WORKER_IDLE_MS,
 				inline: true,
 			}),
 	);

@@ -25,6 +25,8 @@ export type LocalSessionInput =
 			readonly input: IngestSessionInput;
 			readonly bytes: number;
 			readonly images: readonly CollectedImage[];
+			/** Holds the images' files until the runner has stored them. */
+			readonly imageDirectory: string | null;
 			readonly files: readonly ReadFile[];
 	  }
 	| {
@@ -118,6 +120,7 @@ function byteLength(input: IngestSessionInput): number {
 }
 
 function skipped(reason: string, session: SessionRead): LocalSessionInput {
+	session.discardImages();
 	return { kind: "skipped", reason, files: session.files() };
 }
 
@@ -125,6 +128,18 @@ export async function buildLocalSessionInput(
 	input: LocalSessionInputRequest,
 ): Promise<LocalSessionInput> {
 	const session = await readSession(input.sessionPath, input.change);
+	try {
+		return await fromSession(input, session);
+	} catch (error) {
+		session.discardImages();
+		throw error;
+	}
+}
+
+async function fromSession(
+	input: LocalSessionInputRequest,
+	session: SessionRead,
+): Promise<LocalSessionInput> {
 	const { content } = session;
 	if (input.source === "codex") {
 		const meta = codexMeta(content);
@@ -216,6 +231,7 @@ function parsed(
 		input: result.data,
 		bytes: byteLength(result.data),
 		images: session.images(),
+		imageDirectory: session.imageDirectory(),
 		files: session.files(),
 	};
 }

@@ -7,7 +7,13 @@ import {
 	parseInlineImageMarker,
 	readInlineImageMarkerFromSource,
 } from "./inline-image-marker.js";
-import { slimTranscriptText } from "./transcript-slim.js";
+import {
+	collectInlineImagesFromLine,
+	createTranscriptSlimmer,
+	slimTranscriptText,
+	stripAndCollectInlineImages,
+	stripInlineImagesFromLine,
+} from "./transcript-slim.js";
 
 const fixtureUrl = (name: string) =>
 	new URL(`./__fixtures__/transcript-slim/${name}`, import.meta.url);
@@ -360,5 +366,28 @@ describe("parity fixtures shared with the CLI", () => {
 
 		expect(slimTranscriptText(input)).toBe(expected);
 		expect(slimTranscriptText(expected)).toBe(expected);
+	});
+});
+
+describe("stripping and collecting images in one pass", () => {
+	test("gives the bytes and images of the two separate calls, and slims to the same record", async () => {
+		const input = await Bun.file(fixtureUrl("input.jsonl")).text();
+		const lines = [
+			...input.split("\n"),
+			claudeScreenshotLine(),
+			`${claudeScreenshotLine()}\r`,
+			"not json base64",
+		];
+		const whole = createTranscriptSlimmer();
+		const split = createTranscriptSlimmer();
+		let imagesSeen = 0;
+		for (const line of lines) {
+			const { text, images } = stripAndCollectInlineImages(line);
+			expect(text).toBe(stripInlineImagesFromLine(line));
+			expect(images).toEqual(collectInlineImagesFromLine(line));
+			expect(split.slimRecord(text)).toBe(whole.slimRecord(line));
+			imagesSeen += images.length;
+		}
+		expect(imagesSeen).toBeGreaterThan(0);
 	});
 });

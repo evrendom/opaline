@@ -28,12 +28,7 @@ self.addEventListener("message", (event) => {
 	void (async () => {
 		try {
 			const prepared = await buildLocalSessionInput(request);
-			self.postMessage(
-				{ requestId, status: "ok", prepared },
-				prepared.kind === "skipped"
-					? []
-					: prepared.images.map((image) => image.bytes.buffer as ArrayBuffer),
-			);
+			self.postMessage({ requestId, status: "ok", prepared });
 		} catch (error) {
 			self.postMessage({
 				requestId,

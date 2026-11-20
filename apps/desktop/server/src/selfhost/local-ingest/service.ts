@@ -186,6 +186,7 @@ const DAY_MS = 86_400_000;
 const GAVE_UP = "gave up after";
 const DRAINED_READS = 2;
 const STOP_GRACE_MS = 10_000;
+const ZST_DECODED_RATIO = 4;
 
 export class LocalIngest {
 	private readonly settings: LocalIngestSettings;
@@ -616,6 +617,21 @@ export class LocalIngest {
 		return bytes;
 	}
 
+	/**
+	 * The memory an import of the session needs grows with its decoded size,
+	 * and a `.zst` transcript decodes to several times its size on disk (2.3x
+	 * for one screenshot-heavy Codex session, more for plain text). Budgets,
+	 * exclusive runs and worker recycling go by this estimate.
+	 */
+	private workBytes(sessionPath: string): number {
+		let bytes = 0;
+		for (const seen of this.filesOf(sessionPath))
+			bytes += seen.file.path.endsWith(".zst")
+				? seen.stat.size * ZST_DECODED_RATIO
+				: seen.stat.size;
+		return bytes;
+	}
+
 	private filesOf(sessionPath: string): SeenFile[] {
 		const main = this.files.get(sessionPath);
 		const files = main ? [main] : [];
@@ -693,13 +709,25 @@ export class LocalIngest {
 	private pump(): void {
 		if (this.stopped || !this.owner) return;
 		const now = this.now();
+		// During the first import, sessions big enough to run alone wait until
+		// the rest are in, so one huge transcript neither holds up the others
+		// nor sits on its memory while they are still coming in.
+		const giantsLast = this.initialDoneAt === null;
+		const giant = (entry: SessionEntry) =>
+			giantsLast &&
+			this.workBytes(entry.sessionPath) >= this.settings.exclusiveBytes
+				? 1
+				: 0;
 		const due = [...this.sessions.values()]
 			.filter((entry) => !entry.running && entry.dueAt !== null)
+			.map((entry) => ({ entry, giant: giant(entry) }))
 			.sort(
 				(left, right) =>
-					(this.files.get(right.sessionPath)?.stat.mtimeMs ?? 0) -
-					(this.files.get(left.sessionPath)?.stat.mtimeMs ?? 0),
-			);
+					left.giant - right.giant ||
+					(this.files.get(right.entry.sessionPath)?.stat.mtimeMs ?? 0) -
+						(this.files.get(left.entry.sessionPath)?.stat.mtimeMs ?? 0),
+			)
+			.map(({ entry }) => entry);
 		let next = Number.POSITIVE_INFINITY;
 		const exclusiveRunning = this.exclusiveRunning;
 		for (const entry of due) {
@@ -710,7 +738,7 @@ export class LocalIngest {
 				next = Math.min(next, dueAt);
 				continue;
 			}
-			const bytes = this.sessionBytes(entry.sessionPath);
+			const bytes = this.workBytes(entry.sessionPath);
 			const exclusive = bytes >= this.settings.exclusiveBytes;
 			if (exclusive && this.running > 0) break;
 			if (
@@ -751,7 +779,7 @@ export class LocalIngest {
 		for (const entry of this.sessions.values())
 			if (
 				entry.running &&
-				this.sessionBytes(entry.sessionPath) >= this.settings.exclusiveBytes
+				this.workBytes(entry.sessionPath) >= this.settings.exclusiveBytes
 			)
 				return true;
 		return false;
@@ -833,7 +861,7 @@ export class LocalIngest {
 				sessionPath: entry.sessionPath,
 				source: entry.source,
 				change,
-				bytes: this.sessionBytes(entry.sessionPath),
+				bytes: this.workBytes(entry.sessionPath),
 			},
 			owner,
 		);
