@@ -232,10 +232,25 @@ export function setUpAgentRunsDashboard(members: readonly string[]) {
 		return { ingestedAt, rawRevision };
 	}
 
-	async function dashboard(
+	// Requests run one at a time, as they did before the file was split.
+	// Fired together, one returned a 500 on a CI runner that no local run
+	// reproduced; that cause is being chased with the concurrent version
+	// (#568), and a failing request prints the server's log either way.
+	let queue: Promise<unknown> = Promise.resolve();
+	function dashboard(
 		filters: Partial<CostDashboardInput> = {},
 		userIndex = 0,
 		endpoint = servers().legacy,
+	) {
+		const next = queue.then(() => request(filters, userIndex, endpoint));
+		queue = next.catch(() => undefined);
+		return next;
+	}
+
+	async function request(
+		filters: Partial<CostDashboardInput>,
+		userIndex: number,
+		endpoint: ReturnType<typeof servers>["legacy"],
 	) {
 		const member = user(userIndex);
 		const response = await fetch(

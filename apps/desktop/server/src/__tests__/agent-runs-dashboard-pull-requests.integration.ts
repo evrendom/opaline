@@ -20,7 +20,7 @@ test("PR repository IDs scope every headline like the default metric in both cut
 		"ciRuns",
 	] as const;
 	const unmatchedRepositories = [["148003"], ["999999"], ["148003", "999999"]];
-	// Every view is read-only, so both endpoints answer them all at once.
+	// Every view is read-only; the fixture sends the requests one at a time.
 	const views = await Promise.all(
 		bothModes().map((endpoint) =>
 			Promise.all([
@@ -129,7 +129,7 @@ test("PR canonical model filters retain legacy aliases and unknown identities in
 		"mergedPullRequests",
 		"ciFailuresPerPullRequest",
 	] as const;
-	// Every view is read-only, so both endpoints answer them all at once.
+	// Every view is read-only; the fixture sends the requests one at a time.
 	const views = await Promise.all(
 		bothModes().map((endpoint) =>
 			Promise.all(
