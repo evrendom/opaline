@@ -16,8 +16,24 @@ runs:
       with:
         bun-version: 1.3.14
 
-    - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+    # The installed node_modules, keyed on everything the install reads, so a
+    # hit is the tree a fresh install would make and the install is skipped.
+    # Main saves it on the first run after a lockfile change, and pull
+    # requests read main's caches.
+    - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       if: inputs.filter == ''
+      id: node-modules
+      name: Restore node_modules
+      with:
+        path: |
+          node_modules
+          apps/*/node_modules
+          apps/desktop/*/node_modules
+          packages/*/node_modules
+        key: ${{ runner.os }}-${{ runner.arch }}-node-modules-bun-1.3.14-${{ hashFiles('bun.lock', 'package.json', 'apps/*/package.json', 'apps/desktop/*/package.json', 'packages/*/package.json', 'patches/**') }}
+
+    - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      if: inputs.filter == '' && steps.node-modules.outputs.cache-hit != 'true'
       name: Setup bun cache
       with:
         path: ~/.bun/install/cache
@@ -26,9 +42,22 @@ runs:
           ${{ runner.os }}-bun-store-
 
     - name: Install dependencies
-      if: inputs.filter == ''
+      if: inputs.filter == '' && steps.node-modules.outputs.cache-hit != 'true'
       run: bun install --frozen-lockfile
       shell: bash
+
+    # Saved straight after the install, before a build or test can write its
+    # own caches (.vite, .tmp) into these directories.
+    - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      if: inputs.filter == '' && steps.node-modules.outputs.cache-hit != 'true'
+      name: Save node_modules
+      with:
+        path: |
+          node_modules
+          apps/*/node_modules
+          apps/desktop/*/node_modules
+          packages/*/node_modules
+        key: ${{ steps.node-modules.outputs.cache-primary-key }}
 
     - name: Install the filtered workspaces' dependencies
       if: inputs.filter != ''
