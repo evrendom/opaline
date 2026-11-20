@@ -2,15 +2,18 @@
  * Splits the repository's tests across CI shards by their recorded run time,
  * and on pull requests keeps only the tests the diff can reach.
  *
- *   bun scripts/ci-tests.ts plan --suite unit --shards 3 [--timings t.json] [--base <sha>]
+ *   bun scripts/ci-tests.ts shard --suite unit --shards 3 --index 0 [--timings t.json] [--base <sha>]
  *   bun scripts/ci-tests.ts run --suite unit --items '<json>'
- *   bun scripts/ci-tests.ts recorded --timings .github/test-timings.json --out t.json
+ *   bun scripts/ci-tests.ts verify-shards --suite unit --shards 3
+ *   bun scripts/ci-tests.ts recorded --timings .github/test-timings.json --out t.json [--run <id>]
+ *   bun scripts/ci-tests.ts pick-timings
  *
  * The suites come from each workspace's own package.json: `unit` from its
  * `test` script and `integration` from its `test:integration` script, so a
  * test added there is sharded without touching CI.
  */
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
 	existsSync,
 	mkdirSync,
@@ -73,6 +76,9 @@ const INTEGRATION_ORDER = [
 	"apps/cli",
 	"packages/ch-schema",
 ];
+// The dashboard's `vitest run` took 81s on a shard as one item; in four
+// slices each lands near the 20s a single item should stay under.
+const VITEST_SLICES = 4;
 // Agent setup outside the workspaces, which no test reads.
 const AGENT_SETUP = /^\.(claude|agents)\//;
 
@@ -204,6 +210,23 @@ export function scriptItems(
 			const run = `${scriptName}#${index}`;
 			for (const file of files)
 				items.push({ kind: "file", pkg, file, run, flags, env });
+			continue;
+		}
+		if (
+			tokens[0] === "vitest" &&
+			tokens[1] === "run" &&
+			!tokens.some((t) => t.startsWith("--shard"))
+		) {
+			// Vitest's own --shard splits the files, and together its slices
+			// run each file once, so no slice has to be the longest item of a
+			// shard. A slice still sees every test file of its workspace.
+			for (let slice = 1; slice <= VITEST_SLICES; slice++)
+				items.push({
+					kind: "command",
+					pkg,
+					command: `${part} --shard=${slice}/${VITEST_SLICES}`,
+					env,
+				});
 			continue;
 		}
 		items.push({ kind: "command", pkg, command: part, env });
@@ -393,6 +416,169 @@ function changedFiles(base: string): string[] {
 }
 
 const TIMINGS_MARKER = "ci-tests timings: ";
+const PLAN_MARKER = "ci-tests plan: ";
+const RAN_MARKER = "ci-tests ran: ";
+
+/** What one shard planned, as it prints it for the gate. */
+export interface PlanRecord {
+	suite: Suite;
+	index: number;
+	hash: string;
+	timings: string | null;
+	plan: string[][];
+}
+
+export function planHash(plan: string[][]): string {
+	return createHash("sha256")
+		.update(JSON.stringify(plan))
+		.digest("hex")
+		.slice(0, 16);
+}
+
+/** Main saves the timings it recorded under this prefix and its run id. */
+export const TIMINGS_CACHE_PREFIX = "ci-test-timings-";
+// A cache main saved this long before a run was created is settled: every
+// shard of that run lists it, whenever it starts.
+const TIMINGS_SETTLE_MS = 5 * 60_000;
+
+export interface CacheEntry {
+	key: string;
+	created_at: string;
+}
+
+export function pickTimingsCache(
+	caches: CacheEntry[],
+	runCreatedAt: string,
+	settleMs = TIMINGS_SETTLE_MS,
+): string | null {
+	const cutoff = Date.parse(runCreatedAt) - settleMs;
+	return (
+		caches
+			.filter(
+				(c) =>
+					c.key.startsWith(TIMINGS_CACHE_PREFIX) &&
+					Date.parse(c.created_at) <= cutoff,
+			)
+			.sort(
+				(a, b) =>
+					Date.parse(b.created_at) - Date.parse(a.created_at) ||
+					b.key.localeCompare(a.key),
+			)[0]?.key ?? null
+	);
+}
+
+export function shardIndex(suite: Suite, jobName: string): number | null {
+	const match = jobName.match(new RegExp(`^${suite} \\((\\d+)\\)$`));
+	return match ? Number(match[1]) : null;
+}
+
+function markedJson<T>(log: string, marker: string): T | null {
+	const line = log.split("\n").find((l) => l.includes(marker));
+	return line
+		? (JSON.parse(line.slice(line.indexOf(marker) + marker.length)) as T)
+		: null;
+}
+
+/**
+ * Proves the shards of one suite agreed on a plan and together ran all of
+ * it: every shard printed the same plan, and each one that had tests ran
+ * exactly its slice. Throws with every disagreement it finds.
+ */
+export function verifyShards(
+	suite: Suite,
+	shards: number,
+	logs: { name: string; log: string }[],
+): string {
+	const problems: string[] = [];
+	const records = new Map<number, { plan: PlanRecord; ran: string[] | null }>();
+	const seen = new Set<number>();
+	for (const { name, log } of logs) {
+		const index = shardIndex(suite, name) as number;
+		seen.add(index);
+		const plan = markedJson<PlanRecord>(log, PLAN_MARKER);
+		if (!plan) {
+			problems.push(`${name} printed no plan`);
+			continue;
+		}
+		records.set(index, { plan, ran: markedJson<string[]>(log, RAN_MARKER) });
+	}
+	for (let index = 0; index < shards; index++)
+		if (!seen.has(index)) problems.push(`${suite} (${index}) did not run`);
+	const hashes = new Set([...records.values()].map((r) => r.plan.hash));
+	if (hashes.size > 1)
+		problems.push(
+			`the shards planned differently: ${[...records].map(([i, r]) => `${i}=${r.plan.hash} (timings ${r.plan.timings ?? "snapshot"})`).join(", ")}`,
+		);
+	let planned = 0;
+	for (const [index, { plan, ran }] of records) {
+		const slice = plan.plan[index] ?? [];
+		planned += slice.length;
+		if (!slice.length) continue;
+		const ranSet = new Set(ran ?? []);
+		const missing = slice.filter((k) => !ranSet.has(k));
+		const extra = [...ranSet].filter((k) => !slice.includes(k));
+		if (!ran) problems.push(`${suite} (${index}) planned ${slice.length} tests and ran none`);
+		else if (missing.length || extra.length)
+			problems.push(
+				`${suite} (${index}) ran other tests than it planned: missing ${missing.join(", ") || "none"}; extra ${extra.join(", ") || "none"}`,
+			);
+	}
+	if (problems.length) throw new Error(problems.join("\n"));
+	return `${suite}: ${shards} shards agreed on plan ${[...hashes][0]} and ran all ${planned} planned tests`;
+}
+
+function requiredEnv(name: string): string {
+	const value = process.env[name];
+	if (!value) throw new Error(`${name} is not set`);
+	return value;
+}
+
+/**
+ * A job's log. Not through gh: it refuses a body with terminal escape
+ * sequences, which every colored test log has. curl follows the redirect to
+ * the log's storage without passing the token on to that host.
+ */
+function jobLog(repo: string, jobId: string, strict: boolean): string | null {
+	const token = process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN;
+	const timeout = strict
+		? 60_000
+		: Math.min(recordedDeadline - Date.now(), 20_000);
+	if (!token || timeout <= 0) {
+		if (strict) throw new Error("no token to read job logs with");
+		return null;
+	}
+	const result = spawnSync(
+		"curl",
+		[
+			"--fail",
+			"--silent",
+			"--show-error",
+			"--location",
+			"--header",
+			`Authorization: Bearer ${token}`,
+			"--header",
+			"Accept: application/vnd.github+json",
+			`https://api.github.com/repos/${repo}/actions/jobs/${jobId}/logs`,
+		],
+		{ encoding: "utf8", maxBuffer: 256 * 1024 * 1024, timeout },
+	);
+	if (result.status === 0) return result.stdout;
+	if (strict)
+		throw new Error(`reading the log of job ${jobId} failed: ${result.stderr}`);
+	return null;
+}
+
+/** A GitHub API call the result depends on: a failure fails the job. */
+function strictGh(args: string[]): string {
+	const result = spawnSync("gh", args, {
+		encoding: "utf8",
+		maxBuffer: 256 * 1024 * 1024,
+		timeout: 60_000,
+	});
+	if (result.status !== 0)
+		throw new Error(`gh ${args.join(" ")} failed: ${result.stderr}`);
+	return result.stdout;
+}
 
 // Reading old logs may take this long in all, and one call 20s, before the
 // plan settles for the times it has.
@@ -415,7 +601,11 @@ function gh(args: string[]): string | null {
  * the shard job logs, laid over the committed snapshot (newest wins). Any API
  * failure leaves the snapshot: a worse split, never a failed plan.
  */
-export function recordedTimings(fallback: Timings, runs = 3): Timings {
+export function recordedTimings(
+	fallback: Timings,
+	runs = 3,
+	currentRun?: string,
+): Timings {
 	const repo = process.env.GITHUB_REPOSITORY;
 	if (!repo) return fallback;
 	recordedDeadline = Date.now() + RECORDED_BUDGET_MS;
@@ -428,6 +618,9 @@ export function recordedTimings(fallback: Timings, runs = 3): Timings {
 		])
 			?.split("\n")
 			.filter(Boolean) ?? [];
+	// The run recording them is still going, so it is not among the passing
+	// runs yet; its finished shards are the newest times.
+	if (currentRun) ids.unshift(currentRun);
 	const merged: Timings = { ...fallback };
 	for (const runId of ids.reverse()) {
 		const jobs =
@@ -440,7 +633,7 @@ export function recordedTimings(fallback: Timings, runs = 3): Timings {
 				?.split("\n")
 				.filter(Boolean) ?? [];
 		for (const jobId of jobs) {
-			const log = gh(["api", `repos/${repo}/actions/jobs/${jobId}/logs`]);
+			const log = jobLog(repo, jobId, false);
 			const line = log?.split("\n").find((l) => l.includes(TIMINGS_MARKER));
 			if (!line) continue;
 			try {
@@ -615,24 +808,92 @@ function main() {
 	const options = parseArgs(argv);
 	const suite = options.suite as Suite;
 
-	if (command === "plan") {
+	if (command === "shard") {
+		// `shard --suite unit --shards 3 --index 0 --timings t.json
+		//  [--timings-key k] [--base sha] [--skip true]`
+		// Every shard plans the whole suite from the same inputs and keeps
+		// its own slice; the plan line lets the gate prove they agreed.
 		const shards = Number(options.shards);
+		const index = Number(options.index);
 		const graph = readGraph();
 		const scope = options.base
 			? reach(changedFiles(options.base), graph)
 			: null;
 		const all = suiteItems(suite);
-		const items = all.filter((i) => reaches(i, scope, graph));
-		const plan = planShards(items, shards, readTimings(options.timings))
-			.map((s) => s.map(itemKey))
-			.filter((s) => s.length);
-		console.error(
-			scope === null
-				? `${suite}: all ${items.length} tests in ${plan.length} shards`
-				: `${suite}: ${items.length} of ${all.length} tests reachable from ${[...scope.changed].join(", ") || "nothing"}, in ${plan.length} shards`,
+		const items =
+			options.skip === "true"
+				? []
+				: all.filter((i) => reaches(i, scope, graph));
+		const plan = planShards(items, shards, readTimings(options.timings)).map(
+			(s) => s.map(itemKey),
 		);
-		output(`${suite}_plan`, JSON.stringify(plan));
-		output(`${suite}_shards`, JSON.stringify(plan.map((_, i) => i)));
+		console.error(
+			options.skip === "true"
+				? `${suite}: no changed file reaches this suite`
+				: scope === null
+					? `${suite}: all ${items.length} tests in ${shards} shards`
+					: `${suite}: ${items.length} of ${all.length} tests reachable from ${[...scope.changed].join(", ") || "nothing"}, in ${shards} shards`,
+		);
+		const record: PlanRecord = {
+			suite,
+			index,
+			hash: planHash(plan),
+			timings: options["timings-key"] || null,
+			plan,
+		};
+		console.log(`${PLAN_MARKER}${JSON.stringify(record)}`);
+		const mine = plan[index] ?? [];
+		output("items", JSON.stringify(mine));
+		output("empty", String(mine.length === 0));
+		return;
+	}
+
+	if (command === "pick-timings") {
+		// The newest timings main saved well before this run began, so every
+		// shard of the run, and every re-run of it, plans from the same file.
+		const repo = requiredEnv("GITHUB_REPOSITORY");
+		const created = strictGh([
+			"api",
+			`repos/${repo}/actions/runs/${requiredEnv("GITHUB_RUN_ID")}`,
+			"--jq",
+			".created_at",
+		]).trim();
+		const caches = JSON.parse(
+			strictGh([
+				"api",
+				`repos/${repo}/actions/caches?ref=refs/heads/main&key=${TIMINGS_CACHE_PREFIX}&sort=created_at&direction=desc&per_page=100`,
+				"--jq",
+				"[.actions_caches[] | {key, created_at}]",
+			]),
+		) as CacheEntry[];
+		const key = pickTimingsCache(caches, created);
+		console.error(
+			key
+				? `planning from ${key}`
+				: "no recorded timings yet; planning from the committed snapshot",
+		);
+		output("key", key ?? "");
+		return;
+	}
+
+	if (command === "verify-shards") {
+		// `verify-shards --suite unit --shards 3`, in the job that gates them.
+		const repo = requiredEnv("GITHUB_REPOSITORY");
+		const jobs = JSON.parse(
+			strictGh([
+				"api",
+				`repos/${repo}/actions/runs/${requiredEnv("GITHUB_RUN_ID")}/attempts/${requiredEnv("GITHUB_RUN_ATTEMPT")}/jobs?per_page=100`,
+				"--jq",
+				"[.jobs[] | {id, name}]",
+			]),
+		) as { id: number; name: string }[];
+		const logs = jobs
+			.filter((j) => shardIndex(suite, j.name) !== null)
+			.map((j) => ({
+				name: j.name,
+				log: jobLog(repo, String(j.id), true) as string,
+			}));
+		console.log(verifyShards(suite, Number(options.shards), logs));
 		return;
 	}
 
@@ -645,7 +906,9 @@ function main() {
 			[...suiteItems("unit"), ...suiteItems("integration")].map(itemKey),
 		);
 		const timings = Object.fromEntries(
-			Object.entries(recordedTimings(readTimings(options.timings)))
+			Object.entries(
+				recordedTimings(readTimings(options.timings), 3, options.run),
+			)
 				.filter(([key]) => current.has(key))
 				.sort(([a], [b]) => a.localeCompare(b))
 				.map(([key, seconds]) => [key, Math.round(seconds * 100) / 100]),
@@ -683,6 +946,8 @@ function main() {
 		const { timings, failed } = runItems(suite, items);
 		// The next plan reads this line back from the job log (`recorded`).
 		console.log(`${TIMINGS_MARKER}${JSON.stringify(timings)}`);
+		// The gate checks this against the shard's slice of the plan.
+		console.log(`${RAN_MARKER}${JSON.stringify(items.map(itemKey))}`);
 		if (failed.length) {
 			console.error(`\n${failed.length} failed:\n  ${failed.join("\n  ")}`);
 			process.exit(1);

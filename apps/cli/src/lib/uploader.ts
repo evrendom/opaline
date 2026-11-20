@@ -58,13 +58,22 @@ export interface UploadConfig {
 	allowInsecureEndpoint: boolean;
 	authType?: "bearer" | "api-key";
 	maxAggregateBytes?: number;
+	/**
+	 * The size a direct request, and an older server's R2 init, still
+	 * accepts (tests); defaults to INGEST_DIRECT_CONTENT_MAX_BYTES.
+	 */
+	maxDirectContentBytes?: number;
 	/** Raw source size above which a session is skipped unread. */
 	maxRawSourceBytes?: number;
 	onRetry?: (attempt: number, maxAttempts: number, error: string) => void;
 	onProgress?: (progress: R2MultipartProgress) => void;
 	onTransferProgress?: (progress: UploadTransferProgress) => void;
 	signal?: AbortSignal;
+	/** First backoff of a retried direct upload (tests). */
+	retryBaseDelayMs?: number;
 	r2MultipartBaseDelayMs?: number;
+	/** First backoff of a retried R2 init, commit or status call (tests). */
+	r2RpcBaseDelayMs?: number;
 	r2StatusPollIntervalMs?: number;
 	/** Status polls after an R2 commit before the job is recorded as pending. */
 	r2StatusMaxPolls?: number;
@@ -404,10 +413,12 @@ async function uploadSessionMeasured(
 			config.authType ?? "bearer",
 			config.token,
 		);
+	const maxDirectContentBytes =
+		config.maxDirectContentBytes ?? INGEST_DIRECT_CONTENT_MAX_BYTES;
 	const maxAggregateBytesFor = (slimming: TranscriptSlimming) =>
 		config.maxAggregateBytes ??
 		(slimming === "unsupported"
-			? INGEST_DIRECT_CONTENT_MAX_BYTES
+			? maxDirectContentBytes
 			: INGEST_AGGREGATE_CONTENT_MAX_BYTES);
 
 	// Stat file-backed transcripts before reading, filtering or staging them.
@@ -446,8 +457,10 @@ async function uploadSessionMeasured(
 				authType,
 				endpoint: endpointUrl,
 				maxAggregateBytes: maxAggregateBytesFor,
+				maxDirectContentBytes,
 				canSlim,
 				multipartBaseDelayMs: config.r2MultipartBaseDelayMs,
+				rpcBaseDelayMs: config.r2RpcBaseDelayMs,
 				onProgress: config.onProgress,
 				onTransferProgress: config.onTransferProgress,
 				onRetry: config.onRetry,
@@ -536,7 +549,12 @@ async function uploadSessionMeasured(
 
 	let legacy: LegacyUploadPreparation;
 	try {
-		legacy = await prepareLegacyUpload(request, maxAggregateBytesFor, canSlim);
+		legacy = await prepareLegacyUpload(
+			request,
+			maxAggregateBytesFor,
+			maxDirectContentBytes,
+			canSlim,
+		);
 	} catch (error) {
 		const filterFailure = getSecretFilterUploadFailure(error);
 		if (filterFailure) return filterFailure;
@@ -716,7 +734,8 @@ async function uploadSessionMeasured(
 
 			if (isRetryableUploadError(error) && attempt < MAX_ATTEMPTS) {
 				config.onRetry?.(attempt, MAX_ATTEMPTS, errorMessage);
-				const delay = BASE_DELAY_MS * 2 ** (attempt - 1);
+				const delay =
+					(config.retryBaseDelayMs ?? BASE_DELAY_MS) * 2 ** (attempt - 1);
 				await new Promise((resolve) => setTimeout(resolve, delay));
 				continue;
 			}
@@ -741,6 +760,7 @@ async function uploadSessionMeasured(
 async function prepareLegacyUpload(
 	request: UploadSessionRequest,
 	maxAggregateBytesFor: (slimming: TranscriptSlimming) => number,
+	maxDirectContentBytes: number,
 	canSlim: () => Promise<boolean>,
 ): Promise<LegacyUploadPreparation> {
 	if (isFileBackedUploadRequest(request)) {
@@ -801,10 +821,10 @@ async function prepareLegacyUpload(
 			status: "too-large",
 		};
 	}
-	if (aggregateBytes > INGEST_DIRECT_CONTENT_MAX_BYTES) {
+	if (aggregateBytes > maxDirectContentBytes) {
 		return {
 			actualBytes: aggregateBytes,
-			maxBytes: INGEST_DIRECT_CONTENT_MAX_BYTES,
+			maxBytes: maxDirectContentBytes,
 			status: "direct-too-large",
 		};
 	}

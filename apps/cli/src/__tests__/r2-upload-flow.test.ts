@@ -10,6 +10,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { ORPCError } from "@orpc/client";
 import {
 	INGEST_DIRECT_CONTENT_MAX_BYTES,
 	type IngestSessionInput,
@@ -24,6 +25,7 @@ import {
 	hasAdvertisedR2UploadCapability,
 	rememberR2UploadCapability,
 } from "../lib/r2-upload-capability.js";
+import { isServerSessionSizeRejection } from "../lib/r2-upload-flow.js";
 import type { UploadTransferProgress } from "../lib/types.js";
 import { type UploadConfig, uploadSession } from "../lib/uploader.js";
 
@@ -34,6 +36,9 @@ const temporaryDirectories: string[] = [];
 const originalConfigDirectory = process.env.OPALINE_CONFIG_DIR;
 const LARGE_TRANSCRIPT_MIN_BYTES = 101 * 1024 * 1024;
 const LEGACY_CAP_TEST_MIN_BYTES = 33 * 1024 * 1024;
+// Stands in for the 128 MiB an older server accepts, so size-rejection
+// sessions stay small; the real limit is checked on its own.
+const OLDER_SERVER_TEST_LIMIT_BYTES = 1024 * 1024;
 const MAX_HEAP_DELTA_BYTES = 64 * 1024 * 1024;
 const MAX_RSS_DELTA_BYTES = 160 * 1024 * 1024;
 const MAX_PROCESS_RSS_BYTES = 256 * 1024 * 1024;
@@ -1046,7 +1051,7 @@ describe("capability-gated R2 upload flow", () => {
 				],
 			},
 		},
-	])("keeps a 128-256 MiB session retryable when an older server rejects its size at init ($status $message)", async ({
+	])("keeps a session above an older server's limit retryable when it rejects its size at init ($status $message)", async ({
 		status,
 		code,
 		message,
@@ -1059,7 +1064,7 @@ describe("capability-gated R2 upload flow", () => {
 		const rawBytes = await writeCodexTranscriptAtLeast(
 			transcriptPath,
 			"clean",
-			INGEST_DIRECT_CONTENT_MAX_BYTES,
+			OLDER_SERVER_TEST_LIMIT_BYTES,
 		);
 		const requestPaths: string[] = [];
 		const server = serveFetchStub({
@@ -1074,7 +1079,10 @@ describe("capability-gated R2 upload flow", () => {
 			},
 		});
 		activeServers.push(server);
-		const config = createUploadConfig(server);
+		const config = {
+			...createUploadConfig(server),
+			maxDirectContentBytes: OLDER_SERVER_TEST_LIMIT_BYTES,
+		};
 		await rememberR2UploadCapability(
 			new URL(config.endpoint),
 			"api-key",
@@ -1086,14 +1094,30 @@ describe("capability-gated R2 upload flow", () => {
 			config,
 		);
 
-		expect(rawBytes).toBeGreaterThan(INGEST_DIRECT_CONTENT_MAX_BYTES);
+		expect(rawBytes).toBeGreaterThan(OLDER_SERVER_TEST_LIMIT_BYTES);
 		expect(result).toMatchObject({ success: false, retryable: true });
 		expect(result.error).toContain("does not accept sessions this large yet");
 		expect(requestPaths).toEqual(["/rpc/ingest/init"]);
 		// The slimmed size is kept so retries can order by what is sent.
-		expect(result.uploadBytes).toBeGreaterThan(INGEST_DIRECT_CONTENT_MAX_BYTES);
+		expect(result.uploadBytes).toBeGreaterThan(OLDER_SERVER_TEST_LIMIT_BYTES);
 		expect(result.uploadBytes).toBeLessThanOrEqual(rawBytes);
 	}, 60_000);
+
+	test("an older server's size rejection applies only above the 128 MiB direct limit", () => {
+		const tooLarge = new ORPCError("PAYLOAD_TOO_LARGE", {
+			message: "too large",
+			status: 413,
+		});
+		expect(
+			isServerSessionSizeRejection(tooLarge, INGEST_DIRECT_CONTENT_MAX_BYTES),
+		).toBe(false);
+		expect(
+			isServerSessionSizeRejection(
+				tooLarge,
+				INGEST_DIRECT_CONTENT_MAX_BYTES + 1,
+			),
+		).toBe(true);
+	});
 
 	test("surfaces the server's message for a 400 at init that is not about size", async () => {
 		await isolateCapabilityCache();
@@ -1103,7 +1127,7 @@ describe("capability-gated R2 upload flow", () => {
 		await writeCodexTranscriptAtLeast(
 			transcriptPath,
 			"clean",
-			INGEST_DIRECT_CONTENT_MAX_BYTES,
+			OLDER_SERVER_TEST_LIMIT_BYTES,
 		);
 		const server = serveFetchStub({
 			hostname: "127.0.0.1",
@@ -1123,7 +1147,10 @@ describe("capability-gated R2 upload flow", () => {
 			},
 		});
 		activeServers.push(server);
-		const config = createUploadConfig(server);
+		const config = {
+			...createUploadConfig(server),
+			maxDirectContentBytes: OLDER_SERVER_TEST_LIMIT_BYTES,
+		};
 		await rememberR2UploadCapability(
 			new URL(config.endpoint),
 			"api-key",
@@ -1392,6 +1419,7 @@ function createUploadConfig(server: FetchStub): UploadConfig {
 		authType: "api-key",
 		endpoint: `http://127.0.0.1:${server.port}/rpc`,
 		r2MultipartBaseDelayMs: 0,
+		r2RpcBaseDelayMs: 0,
 		r2StatusPollIntervalMs: 0,
 		token: TOKEN,
 	};

@@ -127,6 +127,8 @@ export interface LiveSessionFollowerTiming {
 	/** Exit after this long without registered sessions. */
 	readonly idleExitMs: number;
 	readonly leaseWaitMs: number;
+	/** A held lease without a follower marker gets this long to show one. */
+	readonly leaseMarkerGraceMs: number;
 	readonly transcriptWaitMs: number;
 	readonly maxSessionMs: number;
 	readonly finalReadDelayMs: number;
@@ -175,6 +177,7 @@ export const DEFAULT_LIVE_SESSION_FOLLOWER_TIMING: LiveSessionFollowerTiming = {
 	maxCapabilityFailures: 5,
 	idleExitMs: 60_000,
 	leaseWaitMs: 2_000,
+	leaseMarkerGraceMs: 2_000,
 	transcriptWaitMs: 10 * 60_000,
 	maxSessionMs: 7 * 24 * 60 * 60_000,
 	finalReadDelayMs: 300,
@@ -516,7 +519,12 @@ class LiveSessionFollower {
 			// process that reused the owner's PID): take it over once.
 			if (!checked) {
 				checked = true;
-				if (!(await isHealthyFollowerRunning(this.configDir))) {
+				if (
+					!(await isHealthyFollowerRunning(
+						this.configDir,
+						this.timing.leaseMarkerGraceMs,
+					))
+				) {
 					await discardFollowerLease(this.configDir);
 					continue;
 				}

@@ -1157,42 +1157,41 @@ test("find source=calls finds the same command across sessions, next to its text
 
 test("one deadline aborts the active ClickHouse query and stops subsequent statements", async () => {
 	const statements: ClickHouseStatement[] = [];
+	const operation = settledOperation(async (executor) => {
+		for (let index = 0; index < 3; index++)
+			await executor.query({
+				query: "SELECT sleep(0.4) LIMIT 1",
+				clickhouse_settings: { max_execution_time: 1 },
+			});
+	});
 	await expect(
-		withAnalysisDeadline(
-			"integration deadline",
-			async (executor) => {
-				for (let index = 0; index < 3; index++)
-					await executor.query({
-						query: "SELECT sleep(0.4) LIMIT 1",
-						clickhouse_settings: { max_execution_time: 1 },
-					});
-			},
-			{ executor: observingExecutor(statements), deadlineMs: 50 },
-		),
+		withAnalysisDeadline("integration deadline", operation.run, {
+			executor: observingExecutor(statements),
+			deadlineMs: 50,
+		}),
 	).rejects.toThrow("deadline");
-	await Bun.sleep(500);
+	await operation.settled;
 	expect(statements).toHaveLength(1);
 	expect(statements[0]?.abortSignal?.aborted).toBe(true);
 });
 
 test("a failed ClickHouse sibling aborts the shared signal and no following batch runs", async () => {
 	const statements: ClickHouseStatement[] = [];
+	const operation = settledOperation(async (executor) => {
+		await Promise.all([
+			executor.query({ query: "SELECT sleep(0.4) LIMIT 1" }),
+			executor.query({
+				query: "SELECT definitely_missing_analysis_column LIMIT 1",
+			}),
+		]);
+		await executor.query({ query: "SELECT 1 LIMIT 1" });
+	});
 	await expect(
-		withAnalysisDeadline(
-			"sibling error",
-			async (executor) => {
-				await Promise.all([
-					executor.query({ query: "SELECT sleep(0.4) LIMIT 1" }),
-					executor.query({
-						query: "SELECT definitely_missing_analysis_column LIMIT 1",
-					}),
-				]);
-				await executor.query({ query: "SELECT 1 LIMIT 1" });
-			},
-			{ executor: observingExecutor(statements) },
-		),
+		withAnalysisDeadline("sibling error", operation.run, {
+			executor: observingExecutor(statements),
+		}),
 	).rejects.toThrow();
-	await Bun.sleep(500);
+	await operation.settled;
 	expect(statements).toHaveLength(2);
 	expect(
 		new Set(statements.map((statement) => statement.abortSignal)).size,
@@ -1502,6 +1501,27 @@ async function signup(label: string) {
 		.parse(await response.json());
 	createdUsers.push(account.user.id);
 	return account;
+}
+
+/**
+ * An operation for withAnalysisDeadline, and a promise that resolves once the
+ * operation itself has finished: the deadline can end the call while the
+ * operation still runs, and only after it has settled can no statement follow.
+ */
+function settledOperation(
+	operation: (executor: ClickHouseExecutor) => Promise<void>,
+) {
+	let finished: Promise<unknown> = Promise.resolve();
+	return {
+		run: (executor: ClickHouseExecutor) => {
+			const running = operation(executor);
+			finished = Promise.allSettled([running]);
+			return running;
+		},
+		get settled() {
+			return finished;
+		},
+	};
 }
 
 function observingExecutor(

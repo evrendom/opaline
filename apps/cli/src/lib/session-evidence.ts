@@ -104,6 +104,7 @@ import {
 	SESSION_IMAGES_MAX_OBJECTS_PER_CAPTURE,
 	supportsRepositoryEvidenceImages,
 } from "./session-images.js";
+import { testTimingMs } from "./test-timing.js";
 import {
 	continueAcceptedTranscript,
 	persistTranscriptSource,
@@ -445,15 +446,19 @@ export async function captureAndUploadSessionEvidence(input: {
 			performance.timeOrigin +
 			performance.now() -
 			Date.parse(input.hookReceivedAt);
+		const inlineBudgetMs = testTimingMs(
+			"EVIDENCE_INLINE_DELIVERY_BUDGET",
+			EVIDENCE_INLINE_DELIVERY_BUDGET_MS,
+		);
 		const deliveryDeadlineAt =
 			Date.now() +
 			Math.max(
 				0,
 				Math.min(
-					EVIDENCE_INLINE_DELIVERY_BUDGET_MS,
+					inlineBudgetMs,
 					Number.isFinite(hookElapsedMs)
 						? EVIDENCE_HOOK_SOFT_LIMIT_MS - hookElapsedMs
-						: EVIDENCE_INLINE_DELIVERY_BUDGET_MS,
+						: inlineBudgetMs,
 				),
 			);
 		const outcome = await deliverPendingRepositoryEvidence(

@@ -523,9 +523,15 @@ describe("uploadSession aggregate size guard", () => {
 		expect(INGEST_DIRECT_CONTENT_MAX_BYTES).toBe(128 * 1024 * 1024);
 	});
 
-	for (const authType of ["api-key", "bearer"] as const) {
+	// The direct-request limit is lowered so the session stays small. An
+	// api-key session still exceeds the 32 MiB above which a first upload
+	// probes R2 without a cached capability.
+	for (const [authType, maxDirectContentBytes] of [
+		["api-key", 32 * 1024 * 1024],
+		["bearer", 64 * 1024],
+	] as const) {
 		test(`keeps a session above the direct-request limit retryable without R2 (${authType})`, async () => {
-			const content = `${JSON.stringify({ type: "user", text: "u".repeat(4096) })}\n`;
+			const line = `${JSON.stringify({ type: "user", text: "u".repeat(4096) })}\n`;
 			const stub = startIngestStub({
 				respond: () =>
 					Response.json(
@@ -546,12 +552,15 @@ describe("uploadSession aggregate size guard", () => {
 						source: "claude_code",
 						sessionId: "needs-r2",
 						projectPath: "/test",
-						content: content.repeat(40_000),
+						content: line.repeat(
+							Math.floor(maxDirectContentBytes / line.length) + 1,
+						),
 					},
 					{
 						endpoint: `${stub.loopbackBase}/rpc`,
 						allowInsecureEndpoint: true,
 						authType,
+						maxDirectContentBytes,
 						token: INGEST_STUB_TEST_TOKEN,
 					},
 				);
@@ -560,7 +569,7 @@ describe("uploadSession aggregate size guard", () => {
 					success: false,
 					attempts: 0,
 					retryable: true,
-					maxBytes: INGEST_DIRECT_CONTENT_MAX_BYTES,
+					maxBytes: maxDirectContentBytes,
 				});
 				expect(result.error).toContain("opaline upload --retry");
 				expect(stub.requests.map((request) => request.pathname)).toEqual(
@@ -687,6 +696,7 @@ describe("uploadSession transient transport handling", () => {
 					token: INGEST_STUB_TEST_TOKEN,
 					allowInsecureEndpoint: false,
 					onRetry: (attempt) => retries.push(attempt),
+					retryBaseDelayMs: 0,
 				},
 			);
 
@@ -711,6 +721,7 @@ describe("uploadSession transient transport handling", () => {
 				token: INGEST_STUB_TEST_TOKEN,
 				allowInsecureEndpoint: false,
 				onRetry: (attempt) => retries.push(attempt),
+				retryBaseDelayMs: 0,
 			},
 		);
 

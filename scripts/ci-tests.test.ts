@@ -6,11 +6,15 @@ import {
 	type Item,
 	itemKey,
 	junitSuiteTimes,
+	type PlanRecord,
+	pickTimingsCache,
+	planHash,
 	planShards,
 	reach,
 	reaches,
 	scriptItems,
 	suiteItems,
+	verifyShards,
 } from "./ci-tests";
 
 const ROOT = `${import.meta.dirname}/..`;
@@ -109,6 +113,29 @@ test("the CLI's test script expands into its files plus the two scripts it chain
 	);
 });
 
+test("a vitest run becomes slices that vitest itself splits, so each lands on any shard", () => {
+	const root = mkdtempSync(join(tmpdir(), "ci-tests-"));
+	writeFileSync(
+		join(root, "package.json"),
+		JSON.stringify({ workspaces: ["ui"] }),
+	);
+	mkdirSync(join(root, "ui"));
+	writeFileSync(
+		join(root, "ui", "package.json"),
+		JSON.stringify({
+			name: "ui",
+			scripts: { test: "vitest run && vitest run --shard=1/2" },
+		}),
+	);
+	expect(suiteItems("unit", root).map(itemKey)).toEqual([
+		"ui: vitest run --shard=1/4",
+		"ui: vitest run --shard=2/4",
+		"ui: vitest run --shard=3/4",
+		"ui: vitest run --shard=4/4",
+		"ui: vitest run --shard=1/2",
+	]);
+});
+
 test("JUnit suite times are keyed by the file bun ran", () => {
 	const xml = `<testsuites><testsuite name="a.test.ts" file="src/a.test.ts" time="1.5"><testcase time="1.5"/></testsuite><testsuite name="b" file="src/b.test.ts" time="0.25"/></testsuites>`;
 	expect(junitSuiteTimes(xml)).toEqual({
@@ -135,4 +162,75 @@ test("a test script naming a missing file fails the plan instead of skipping it"
 		}),
 	);
 	expect(() => suiteItems("integration", root)).toThrow("gone.integration.ts");
+});
+
+describe("pickTimingsCache", () => {
+	const caches = [
+		{ key: "ci-test-timings-3", created_at: "2026-11-20T12:58:00Z" },
+		{ key: "ci-test-timings-2", created_at: "2026-11-20T12:50:00Z" },
+		{ key: "ci-test-timings-1", created_at: "2026-11-20T12:00:00Z" },
+		{ key: "Linux-bun-store-x", created_at: "2026-11-20T12:59:00Z" },
+	];
+
+	test("takes the newest timings saved at least five minutes before the run", () => {
+		expect(pickTimingsCache(caches, "2026-11-20T13:00:00Z")).toBe(
+			"ci-test-timings-2",
+		);
+	});
+
+	test("a run before any settled timings plans from the snapshot", () => {
+		expect(pickTimingsCache(caches, "2026-11-20T12:04:59Z")).toBeNull();
+	});
+});
+
+describe("verifyShards", () => {
+	const plan = [["a", "b"], ["c"], []];
+	const log = (index: number, ran: string[] | null, p = plan) => {
+		const record: PlanRecord = {
+			suite: "unit",
+			index,
+			hash: planHash(p),
+			timings: null,
+			plan: p,
+		};
+		return {
+			name: `unit (${index})`,
+			log: [
+				`2026-11-20T13:00:00Z ci-tests plan: ${JSON.stringify(record)}`,
+				ran ? `2026-11-20T13:00:09Z ci-tests ran: ${JSON.stringify(ran)}` : "",
+			].join("\n"),
+		};
+	};
+
+	test("passes when every shard planned the same and ran its slice", () => {
+		expect(
+			verifyShards("unit", 3, [log(0, ["b", "a"]), log(1, ["c"]), log(2, null)]),
+		).toContain("ran all 3 planned tests");
+	});
+
+	test("fails when shards planned differently, even if each ran its own slice", () => {
+		const other = [["a"], ["b", "c"], []];
+		expect(() =>
+			verifyShards("unit", 3, [
+				log(0, ["a", "b"]),
+				log(1, ["b", "c"], other),
+				log(2, null),
+			]),
+		).toThrow("planned differently");
+	});
+
+	test("fails when a shard skipped, added or never ran its tests", () => {
+		expect(() =>
+			verifyShards("unit", 3, [log(0, ["a"]), log(1, ["c"]), log(2, null)]),
+		).toThrow("missing b");
+		expect(() =>
+			verifyShards("unit", 3, [log(0, ["a", "b", "d"]), log(1, ["c"]), log(2, null)]),
+		).toThrow("extra d");
+		expect(() =>
+			verifyShards("unit", 3, [log(0, ["a", "b"]), log(1, null), log(2, null)]),
+		).toThrow("planned 1 tests and ran none");
+		expect(() =>
+			verifyShards("unit", 3, [log(0, ["a", "b"]), log(1, ["c"])]),
+		).toThrow("unit (2) did not run");
+	});
 });

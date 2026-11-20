@@ -176,6 +176,7 @@ const result = await (async () => {
 		endpoint,
 		onProgress: sampleMemory,
 		r2MultipartBaseDelayMs: 0,
+		r2RpcBaseDelayMs: 0,
 		r2StatusPollIntervalMs: 0,
 		token,
 	});

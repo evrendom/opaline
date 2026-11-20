@@ -198,15 +198,15 @@ describe("SessionTurnTable rendering", () => {
 		).not.toHaveClass("saturate-0", "opacity-35");
 	});
 
+	// The table has no row-count threshold, so 200 rows prove it renders
+	// them all: a windowed table would render only its overscan in jsdom.
 	test("renders every loaded row in normal document flow", () => {
-		const options = Array.from({ length: 1_000 }, (_, index) =>
+		const options = Array.from({ length: 200 }, (_, index) =>
 			createOption(index),
 		);
 		const { container } = renderTable(options);
 
-		expect(container.querySelectorAll("tr[data-turn-index]")).toHaveLength(
-			1_000,
-		);
+		expect(container.querySelectorAll("tr[data-turn-index]")).toHaveLength(200);
 		expect(container.querySelector("tbody[aria-hidden='true']")).toBeNull();
 		expect(
 			container.querySelector('button[aria-label="Sort by Time, descending"]'),
@@ -215,7 +215,7 @@ describe("SessionTurnTable rendering", () => {
 		expect(container.querySelector("thead")?.textContent).not.toContain(
 			"2h 5m",
 		);
-	}, 15_000);
+	});
 
 	test("scrolls the exact selected speaker row into view", () => {
 		const scrollIntoView = vi.fn();
