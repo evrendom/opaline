@@ -15,7 +15,7 @@ function Card({
 				"group/card flex flex-col gap-xl overflow-hidden",
 				"corner-m corner-squircle py-xxl",
 				"text-body-xl",
-				"shadow-(--shadow-card) bg-card text-ink",
+				"shadow-card bg-card text-ink",
 				"squircle:corner-xl",
 				"has-[>img:first-child]:pt-zero",
 				"data-[size=sm]:gap-m data-[size=sm]:py-xxl",

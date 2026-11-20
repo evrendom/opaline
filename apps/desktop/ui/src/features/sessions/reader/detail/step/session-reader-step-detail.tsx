@@ -149,7 +149,7 @@ export function SessionReaderStepDetail({
 			)}
 		>
 			{top ? (
-				<div className="shrink-0 corner-m bg-card px-m pt-m pb-s shadow-(--shadow-card) corner-squircle squircle:corner-xl">
+				<div className="shrink-0 corner-m bg-card px-m pt-m pb-s shadow-card corner-squircle squircle:corner-xl">
 					{top}
 				</div>
 			) : null}
@@ -158,7 +158,7 @@ export function SessionReaderStepDetail({
 				className={cn(
 					"flex flex-col overflow-hidden",
 					!bare &&
-						"corner-m bg-card shadow-(--shadow-card) corner-squircle squircle:corner-xl",
+						"corner-m bg-card shadow-card corner-squircle squircle:corner-xl",
 					fit
 						? "min-h-0 flex-1"
 						: top
@@ -227,7 +227,7 @@ export function SessionReaderStepDetail({
 								"inline-flex items-center gap-xs",
 								"corner-full py-xs pr-m pl-l",
 								"text-body-m font-medium",
-								"bg-card shadow-(--shadow-card) transition-colors",
+								"bg-card shadow-card transition-colors",
 								"hover:bg-hover dark:bg-ink-3/10",
 							)}
 						>

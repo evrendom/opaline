@@ -42,14 +42,14 @@ export function MemberBubble({
 			{avatar ? (
 				<span className="mt-s flex shrink-0">{avatar}</span>
 			) : (
-				<Avatar className="mt-s size-6 shrink-0 shadow-(--shadow-card) after:hidden">
+				<Avatar className="mt-s size-6 shrink-0 shadow-card after:hidden">
 					{imageUrl ? <AvatarImage src={imageUrl} alt="" /> : null}
 					<AvatarFallback className="text-body-xs">
 						{label.charAt(0).toUpperCase()}
 					</AvatarFallback>
 				</Avatar>
 			)}
-			<div className="min-w-0 flex-1 corner-m bg-card px-l py-l shadow-(--shadow-card) corner-squircle squircle:corner-xl">
+			<div className="min-w-0 flex-1 corner-m bg-card px-l py-l shadow-card corner-squircle squircle:corner-xl">
 				{folded ? (
 					<TwoLines className="text-body-xl">{message}</TwoLines>
 				) : (

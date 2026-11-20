@@ -57,7 +57,7 @@ const USAGE_GRID_CLASS_NAME =
 	"grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,13.5rem),1fr))] gap-xl px-xl pt-xs pb-xxl sm:px-[calc(var(--space-xxl)*4/3)]";
 // Card: a squircle on its soft hairline shadow, no border.
 const USAGE_CARD_CLASS_NAME =
-	"relative flex h-full w-full min-w-0 flex-col overflow-hidden corner-m bg-card text-left text-ink shadow-(--shadow-card) squircle:corner-xl corner-squircle";
+	"relative flex h-full w-full min-w-0 flex-col overflow-hidden corner-m bg-card text-left text-ink shadow-card squircle:corner-xl corner-squircle";
 const USAGE_METADATA_ICON_CLASS_NAME =
 	"size-3.5 shrink-0 text-ink-3 dark:text-ink-3";
 

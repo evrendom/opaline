@@ -142,7 +142,7 @@ export function SettingsLayout() {
 														duration: 0.2,
 														ease: [0.32, 0.72, 0, 1],
 													}}
-													className="absolute inset-0 z-0 corner-s bg-card shadow-(--shadow-card) corner-squircle squircle:corner-l dark:bg-ink-3/10"
+													className="absolute inset-0 z-0 corner-s bg-card shadow-card corner-squircle squircle:corner-l dark:bg-ink-3/10"
 												/>
 											) : null}
 											<span className="relative z-10 flex items-center gap-s">

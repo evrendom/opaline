@@ -56,17 +56,18 @@ Opaline's primitives are shadcn-derived and built on Base UI, with the Mac app's
 
 ## Tokens and styling — Graphical on Tailwind v4
 
-The tokens come from Graphical's theme, named Opaline: `graphical/generated/theme.css`, with every value in [gui/themes.md](gui/themes.md). Follow [GUI.md](GUI.md) and the `graphical-ui` skill for UI work. Change the theme through the development editor or `graphical-adopt`, never by editing `graphical/generated/`.
+Two layers, with the rules in the `opaline-design` skill. Layer 1 is Graphical's theme, named Opaline: `graphical/themes/opaline.json` → `graphical/generated/theme.css`, with every value in [gui/themes.md](gui/themes.md). Change it through the development editor or `graphical-adopt`, never by editing `graphical/generated/`. Layer 2 is `src/app/tokens.css`: the roles screens are written against. Follow [GUI.md](GUI.md) and the `graphical-ui` skill for UI work.
 
-- **Always** use the theme's tokens: neutrals `neutral-1`…`neutral-10` (surface to strongest text), palette `color-1`…`color-5` (the opal sheen; `color-1` is the brand blue), statuses `success`, `warning`, `error`, each with `-translucent` and `-transparent` levels. Opaline's semantic names (`bg-background`, `text-muted-foreground`, `--dashboardy-*`, `--cost-*` …) stay as aliases of them.
-- **Always** set text with a text style: `text-body-{xxs…xxl}` or `text-display-{xxs…xxl}`, which carry size, line height and tracking. Faces are `font-body`, `font-display`, `font-data`; weights `font-regular`, `font-medium`, `font-heavy`. Don't add `leading-*` beside a text style.
+- **Always** colour with the Layer 2 roles: ground `bg-canvas`, `bg-surface`, `bg-card`, `bg-inset`, `bg-field`, `bg-hover`, `bg-hover-strong`, `bg-wash`; ink `text-ink`, `text-ink-2`, `text-ink-3`, `text-ink-disabled`, `text-ink-inverse`; lines `border-line`, `border-line-strong`, `border-line-soft`; action `primary`, `accent`, `accent-tint`, `accent-line`, `focus`; state `success`, `warning`, `error`, each with `-tint` and `-line`. Feature CSS reads them as `var(--surface)`. **Never** read Layer 1 (`neutral-1`…`neutral-10`, `color-1`…`color-5`, their `-translucent`/`-transparent` levels) in a screen or primitive; a colour no role covers is a new role in `tokens.css` and `graphical/role-map.json` first. The shadcn names in `tokens.css` (`--background`, `--muted-foreground`, …) exist for third-party code only.
+- **Never** switch roles with `dark:`. Roles flip with the mode; a `dark:` swap means a role is missing. A primitive keeps a `dark:` pair only where the two modes differ by an opacity step no role holds, with a comment saying so.
+- **Always** set text with a text style: `text-body-{xxs…xxl}` or `text-display-{xxs…xxl}`, which carry size, line height and tracking (body `xxs` tracks +2%, `xxl` and display −1.5%, the rest 0). Faces are `font-body`, `font-display`, `font-data`; weights `font-regular`, `font-medium`, `font-heavy`. Don't add `leading-*` beside a text style.
 - **Always** space with the steps: `p-m`, `gap-l`, `mt-xs` (`zero`, `xxs`…`xxl`). Past XXL, use a multiple such as `gap-[calc(var(--space-xxl)*4/3)]`. Sizes (`w-*`, `h-*`, `size-*`) keep Tailwind's scale.
-- **Always** round with `corner-{zero,xs…xl,full}` and stroke with `edge-{none,s,m,l}` (color stays `border-*`). Keep the squircle pair on surfaces: `corner-s squircle:corner-l corner-squircle`.
-- **Always** separate surfaces with the hairline shadows `shadow-(--custom-shadow)` and its variants; elevation is `shadow-{s,m,l}`.
+- **Always** round with `corner-{zero,xs…xl,full}` (`rounded-*` is Tailwind's own scale; don't use it) and stroke with `edge-{none,s,m,l}` (colour stays `border-*`). Keep the squircle pair on surfaces: `corner-m squircle:corner-xl corner-squircle` on cards, `corner-s squircle:corner-l corner-squircle` on menus and popovers.
+- **Always** lift and separate with the role shadows, written `shadow-<role>`: `shadow-card`, `shadow-control`, `shadow-raised`, `shadow-overlay`, `shadow-primary`, `shadow-destructive`, `shadow-chip`, `shadow-selected`, `shadow-inset`, `shadow-label`, `shadow-float` (in CSS, `var(--shadow-card)`). Each carries its dark form. Tailwind's `shadow-sm…xl`, the theme's unused `shadow-s/m/l` and literal `shadow-[…]` stay out of screens; artwork glows (opal and tint shadows) are the exception.
 - **Never** hard-code a hex, `rgb()` or `oklch()` colour, or an arbitrary text size or spacing value, in `className` or `style`. Data and artwork colours (charts, lanes, syntax, brand art) are the exception; keep them with their data.
-- **Always** merge classes with `cn()` from `@/lib/utils`: it knows Graphical's classes. Every component takes `className` and merges it on its root element.
+- **Always** merge classes with `cn()` from `@/lib/utils`: it knows Graphical's classes and the role shadows. Every component takes `className` and merges it on its root element.
 - **Never** bake outer margins into a component. The call site spaces it.
-- **Never** add a CSS file for something a utility or a primitive already covers. Feature CSS is for what Tailwind can't express (keyframes, `::part`, shadow-root styles, complex `:has()` chains), and reads the theme's variables.
+- **Never** add a CSS file for something a utility or a primitive already covers. Feature CSS is for what Tailwind can't express (keyframes, `::part`, shadow-root styles, complex `:has()` chains), and reads the roles.
 
 ## Theme
 
@@ -75,8 +76,9 @@ The tokens come from Graphical's theme, named Opaline: `graphical/generated/them
 
 ## Icons — `@tabler/icons-react`
 
-- **Always** import icons from `@tabler/icons-react`, and prefer the `*Filled` variant when one exists. **Never** add another icon library (lint rejects `lucide-react`).
-- **Always** size icons with Tailwind: `size-3.5` by default, `size-3` in dense rows and badges, `size-4` for emphasis. Primitives size their own icons, so don't size an icon inside a `Button`.
+- **Always** import icons from `@tabler/icons-react`. **Never** add another icon library (lint rejects `lucide-react`).
+- **Always** use the outline icon for actions, controls, rows and inline glyphs. Use the `*Filled` variant for navigation and identity: sidebar and settings nav, reader tabs, and small category marks in charts, legends and labels.
+- **Always** size icons by place, with Tailwind: `size-3.5` (14) in buttons, toolbar pills, inputs and by default; `size-3` (12) in badges and dense rows; `size-4` (16) in menu and select items and for emphasis. Primitives size their own icons, so don't size an icon inside a `Button`, `Badge`, menu or select item.
 - **Never** put a margin on an icon inside a `Button` or `Badge`; they space children with `gap-*`.
 
 ## Data
@@ -87,10 +89,12 @@ The tokens come from Graphical's theme, named Opaline: `graphical/generated/them
 
 ## Known debt (do not copy)
 
-These predate the rules above. Move them onto the tokens when you touch them; don't extend them.
+These predate the rules above. Move them onto the roles and primitives when you touch them; don't extend them.
 
-- `--dashboardy-*`, `--cost-*`, `--welcome-*` and `--auth-*` are now aliases of the theme's tokens; new code uses the theme's names directly.
-- Feature CSS files (`costs/cost-dashboard*.css`, `app/app-surface.css`, `compass/compass.css`, …) hold hand-written surfaces, borders and colours.
-- `className` strings still use `text-[color:var(--dashboardy-*)]`, hex colours and `border` for separation in places.
-- Feature islands with their own palette and controls: costs and Compass (`--cost-*`, `.cost-text-button`, `.cost-secondary-button`), onboarding (`--welcome-*`, `.cli-onboarding-primary`, `.cli-onboarding-text-button`), sign-in (`--auth-*`, restyled `Button` and `Input`), and settings (`workspace-settings.css` restyles `Input`, `Select` and `Button`). Moving them onto the primitives changes how they look, so do it one island at a time with before and after screenshots.
-- `.toolbar-search` and `.sessions-settings-search` are search fields styled outside `InputGroup`.
+- Tailwind's default scales still compile next to Graphical's: `text-sm`, `p-3`, `rounded-lg`, `shadow-md`, `bg-rose-500` build silently, and about 190 such classes remain (type, spacing, corners), plus `text-[…]` sizes and `leading-*` beside text styles. `index.css` keeps `--radius-sm…4xl`, which keeps `rounded-md…4xl` alive. Tailwind default shadows remain in `checkbox.tsx` (`shadow-xs`), `sheet.tsx` (`shadow-xl`) and the thread hover card (`shadow-md`).
+- About 195 `dark:` variants swap one role for another where a role is missing, and about 100 more swap in palette, white/black or literal colours.
+- Feature CSS islands with hand-written surfaces, controls and literal values: costs (`costs/cost-dashboard*.css`), the dashboard (`dashboard/dashboard-theme.css`, 22 control-like classes), Compass (`compass/compass.css`), `app/app-surface.css` (the `--dashboard-01-*` chrome and `--team-lineup-*` card colours, with Layer 1 reads), `session-constellation-tree.css` (type literals) and `product-window-chrome.css`.
+- Duplicate controls: three search fields outside `InputGroup` (`.toolbar-search`, `.cost-search`, `.sessions-settings-search`); `.compass-chip` repeats `.filter-chip`; `.cli-onboarding-primary` is a second primary button (`cli-onboarding.css`, re-overridden in `welcome.css`), with `.cli-onboarding-text-button` beside it.
+- Primitives restyled from feature CSS with `[data-slot=…]` (`app-shell.css`, `guest-app.css`, `dashboard-theme.css`, `sessions-settings.css`), and raw `<button>`s styled as controls in places.
+- `--dashboard-01-metric-button-focus-ring` is read for focus outlines (`expandable-trace-row.tsx`, `skill-cards.tsx`, `ThemeSwitcher.tsx`, `SettingsLayout.tsx`, `reports-settings.css`) but defined nowhere, so those outlines fall back to the text colour.
+- Motion: most CSS transitions and `duration-*` classes are literal timings rather than the theme's `--motion-*`.

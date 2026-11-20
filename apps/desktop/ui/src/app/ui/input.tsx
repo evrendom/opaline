@@ -12,7 +12,7 @@ function Input({ className, type, ...props }: React.ComponentProps<"input">) {
 				"h-9 w-full min-w-0",
 				"corner-s corner-squircle px-l py-xs",
 				"text-body-xxl",
-				"shadow-(--shadow-card) bg-transparent transition-[color,box-shadow] outline-none",
+				"shadow-card bg-transparent transition-[color,box-shadow] outline-none",
 				"squircle:corner-xl",
 				"dark:shadow-none dark:edge-s dark:border-line/50",
 				"hover:dark:border-line/70",

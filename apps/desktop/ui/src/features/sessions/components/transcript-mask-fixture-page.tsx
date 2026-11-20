@@ -93,7 +93,7 @@ function MaskPane({ label }: { label: string }) {
 			className={`dashboardy-page relative h-full min-h-0 overflow-hidden bg-canvas ${SESSION_THEME_CLASS_NAME}`}
 			data-transcript-mask-theme={label.toLowerCase()}
 		>
-			<div className="pointer-events-none absolute top-3 left-4 z-10 corner-xs bg-canvas px-m py-xs text-body-m font-medium text-ink-3 shadow-sm">
+			<div className="pointer-events-none absolute top-3 left-4 z-10 corner-xs bg-canvas px-m py-xs text-body-m font-medium text-ink-3 shadow-label">
 				{label}
 			</div>
 			<section
@@ -105,7 +105,7 @@ function MaskPane({ label }: { label: string }) {
 				<div aria-hidden className="h-[200vh]" />
 			</section>
 			<div
-				className="session-transcript-row-surface absolute inset-x-4 top-14 z-20 max-h-[calc(100%-4.5rem)] overflow-hidden corner-s edge-m border-line-strong shadow-sm"
+				className="session-transcript-row-surface absolute inset-x-4 top-14 z-20 max-h-[calc(100%-4.5rem)] overflow-hidden corner-s edge-m border-line-strong shadow-label"
 				data-transcript-mask-overlay
 			>
 				<SessionContinuousTurnSkeleton

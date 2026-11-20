@@ -37,7 +37,7 @@ export function SidebarUserMenu() {
 			>
 				<Avatar
 					size="sm"
-					className="size-4.5 after:edge-none after:shadow-(--shadow-card)"
+					className="size-4.5 after:edge-none after:shadow-card"
 				>
 					{viewer ? (
 						// Bundled demo portraits must be present in the prerendered HTML.

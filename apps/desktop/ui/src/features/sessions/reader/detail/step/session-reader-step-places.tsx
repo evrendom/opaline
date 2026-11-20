@@ -93,7 +93,7 @@ export function StepPlaces({
 					to={place.href}
 					aria-label={place.label}
 					title={place.label}
-					className="inline-flex items-center gap-xs corner-full bg-card py-xs pr-m pl-l text-body-m font-medium shadow-(--shadow-card) transition-colors hover:bg-hover dark:bg-ink-3/10"
+					className="inline-flex items-center gap-xs corner-full bg-card py-xs pr-m pl-l text-body-m font-medium shadow-card transition-colors hover:bg-hover dark:bg-ink-3/10"
 				>
 					Open details
 					<IconArrowUpRight

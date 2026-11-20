@@ -258,7 +258,7 @@ export function RailTagsPicker({
 					className={cn(
 						"relative inline-flex size-7 shrink-0 items-center justify-center",
 						"corner-full",
-						"bg-card text-ink-3 shadow-(--shadow-card) transition-colors",
+						"bg-card text-ink-3 shadow-card transition-colors",
 						"hover:bg-hover/60 data-popup-open:bg-hover dark:bg-ink-3/10",
 					)}
 				>

@@ -325,7 +325,7 @@ function RunStepTags({
 						"inline-flex h-5 items-center gap-xs",
 						"corner-full pr-m pl-xxs",
 						"tabular-nums",
-						"bg-canvas text-ink/80 shadow-(--shadow-control)",
+						"bg-canvas text-ink/80 shadow-control",
 						"dark:bg-card",
 					)}
 				>
@@ -460,7 +460,7 @@ function RunTag({
 				"inline-flex h-5 items-center",
 				"corner-full px-m",
 				"tabular-nums",
-				"bg-canvas text-ink/80 shadow-(--shadow-control)",
+				"bg-canvas text-ink/80 shadow-control",
 				"dark:bg-card",
 				className,
 			)}

@@ -55,7 +55,11 @@
 	--error-line: var(--error-translucent);
 
 	/* -- Elevation by role. A hairline plus a soft drop stands in for a border;
-	   dark trades the drop for an inset highlight edge. */
+	   dark trades the drop for an inset highlight edge. Tailwind reads each as
+	   `shadow-<role>` (registered below). They live here, not in the theme:
+	   each is a stack of hairline, contact and ambient layers, and dark swaps
+	   in inset highlights over black drops, which a theme shadow (one layer
+	   coloured from one neutral that flips with the mode) can't express. */
 	--shadow-card:
 		0 0 0 0.5px rgb(0 0 0 / 0.06), 0 0.5px 2px -0.5px rgb(0 0 0 / 0.06),
 		0 1px 4px 0 rgb(0 0 0 / 0.04);
@@ -72,8 +76,25 @@
 		0 0 0 0.5px rgb(0 0 0 / 0.6), 0 0.5px 2px -0.5px rgb(0 0 0 / 0.4),
 		0 2px 4px 0 rgb(0 0 0 / 0.18);
 	--shadow-destructive:
-		0 0 0 0.5px rgb(244 63 94 / 0.25), 0 0.5px 2px -0.5px rgb(244 63 94 / 0.18),
-		0 2px 4px 0 rgb(244 63 94 / 0.12);
+		0 0 0 0.5px color-mix(in srgb, var(--error) 25%, transparent),
+		0 0.5px 2px -0.5px color-mix(in srgb, var(--error) 18%, transparent),
+		0 2px 4px 0 color-mix(in srgb, var(--error) 12%, transparent);
+	/* chips, tags and pills, and the reader's light cards */
+	--shadow-chip:
+		0 0 0 0.5px rgb(0 0 0 / 0.06), 0 1px 1px -1px rgb(0 0 0 / 0.1),
+		0 1px 2px 0 rgb(0 0 0 / 0.05);
+	/* a picked row lifted off its shelf (the reader rails) */
+	--shadow-selected:
+		0 0 0 0.5px rgb(0 0 0 / 0.08), 0 1px 2px -0.5px rgb(0 0 0 / 0.1),
+		0 2px 6px -2px rgb(0 0 0 / 0.12);
+	/* the inner hairline of a recessed shelf or well */
+	--shadow-inset: inset 0 0 0 0.5px rgb(0 0 0 / 0.06);
+	/* a small label floating over content: a scrub readout, a sticky hint */
+	--shadow-label: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+	/* something floating free of a surface: a floating button, a tab menu, a
+	   toast. Its edge is a ring at the call site; dark keeps only the ring. */
+	--shadow-float:
+		0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 
 	/* -- Third-party names (shadcn registry code, the sidebar primitive).
 	   Our code reads the roles above; these exist for code we don't own. */
@@ -123,8 +144,13 @@
 		inset 0 0.5px 0 0 rgb(255 255 255 / 0.45),
 		0 0 0 0.5px rgb(255 255 255 / 0.55), 0 0.5px 2px 0 rgb(0 0 0 / 0.5);
 	--shadow-destructive:
-		inset 0 0.5px 0 0 rgb(244 63 94 / 0.03), 0 0 0 0.5px rgb(244 63 94 / 0.18),
-		0 0.5px 2px 0 rgb(244 63 94 / 0.1);
+		inset 0 0.5px 0 0 color-mix(in srgb, var(--error) 3%, transparent),
+		0 0 0 0.5px color-mix(in srgb, var(--error) 18%, transparent),
+		0 0.5px 2px 0 color-mix(in srgb, var(--error) 10%, transparent);
+	--shadow-chip: 0 0 0 0.5px rgb(255 255 255 / 0.1);
+	--shadow-selected: var(--shadow-card);
+	--shadow-inset: inset 0 0 0 0.5px rgb(255 255 255 / 0.06);
+	--shadow-float: 0 0 #0000;
 }
 
 /* Layer 2 as Tailwind colours: `bg-surface`, `text-ink-3`, `border-line`. */
@@ -158,6 +184,24 @@
 	--color-warning-line: var(--warning-line);
 	--color-error-tint: var(--error-tint);
 	--color-error-line: var(--error-line);
+}
+
+/* Layer 2 elevation as Tailwind shadows: `shadow-card`, `shadow-control`,
+   `aria-pressed:shadow-raised`. Each utility reads the role variable of the
+   same name; `reference` keeps Tailwind from writing these names back over
+   the roles above. */
+@theme reference {
+	--shadow-card: var(--shadow-card);
+	--shadow-control: var(--shadow-control);
+	--shadow-raised: var(--shadow-raised);
+	--shadow-overlay: var(--shadow-overlay);
+	--shadow-primary: var(--shadow-primary);
+	--shadow-destructive: var(--shadow-destructive);
+	--shadow-chip: var(--shadow-chip);
+	--shadow-selected: var(--shadow-selected);
+	--shadow-inset: var(--shadow-inset);
+	--shadow-label: var(--shadow-label);
+	--shadow-float: var(--shadow-float);
 }
 
 /* -- Kept as authored: chart series (data paint) and the sidebar primitive's

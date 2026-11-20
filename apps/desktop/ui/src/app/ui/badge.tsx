@@ -10,10 +10,8 @@ const badgeVariants = cva(
 	{
 		variants: {
 			variant: {
-				secondary:
-					"bg-field shadow-(--shadow-raised) text-ink [a]:hover:bg-field/80",
-				outline:
-					"shadow-(--shadow-card) text-ink [a]:hover:bg-hover [a]:hover:text-ink-3",
+				secondary: "bg-field shadow-raised text-ink [a]:hover:bg-field/80",
+				outline: "shadow-card text-ink [a]:hover:bg-hover [a]:hover:text-ink-3",
 			},
 		},
 		defaultVariants: {

@@ -157,7 +157,7 @@ function SessionRecordNavigation({
 				"flex h-8 min-w-0 shrink-0 items-center",
 				"corner-full",
 				"text-body-xl",
-				"bg-card shadow-(--shadow-control)",
+				"bg-card shadow-control",
 			)}
 		>
 			<p

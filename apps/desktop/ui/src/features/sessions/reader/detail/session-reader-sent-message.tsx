@@ -49,7 +49,7 @@ export function SentMessage({
 				</button>
 				<div
 					className={cn(
-						"min-w-0 corner-m px-l py-l shadow-(--shadow-card) corner-squircle squircle:corner-xl",
+						"min-w-0 corner-m px-l py-l shadow-card corner-squircle squircle:corner-xl",
 						!tint && "bg-wash dark:bg-wash",
 						selected && "ring-[1.5px] ring-(--sent-tint)/40",
 					)}

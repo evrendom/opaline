@@ -25,14 +25,14 @@ export function LinearActiveFiltersButton({
 		<button
 			type="button"
 			aria-label={label}
-			className="relative flex size-7 shrink-0 items-center justify-center corner-s text-ink outline-none hover:bg-[#ececed] focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-black dark:text-[#f4f4f5] dark:hover:bg-white/8"
+			className="relative flex size-7 shrink-0 items-center justify-center corner-s text-ink outline-none hover:bg-hover-strong focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-ink"
 			onClick={onClick}
 			title={label}
 		>
 			<IconFilterEdit aria-hidden="true" className="size-4" />
 			<span
 				aria-hidden="true"
-				className="absolute top-1 right-1 size-1.5 corner-full bg-ink ring-1 ring-[#fcfcfc] dark:bg-[#f4f4f5] dark:ring-[#1c1c1d]"
+				className="absolute top-1 right-1 size-1.5 corner-full bg-ink ring-1 ring-canvas"
 			/>
 		</button>
 	);

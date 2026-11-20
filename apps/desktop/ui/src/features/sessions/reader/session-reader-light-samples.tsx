@@ -22,7 +22,7 @@ function MemberSample() {
 	return (
 		<div className="flex gap-l">
 			<Bone className="mt-s size-6 shrink-0 corner-full" />
-			<div className="flex min-w-0 flex-1 flex-col gap-xxl corner-m bg-card px-l py-l text-body-xl shadow-(--shadow-card) corner-squircle squircle:corner-xl">
+			<div className="flex min-w-0 flex-1 flex-col gap-xxl corner-m bg-card px-l py-l text-body-xl shadow-card corner-squircle squircle:corner-xl">
 				{MEMBER_PARAGRAPHS.map((paragraph) => (
 					<p key={paragraph}>{paragraph}</p>
 				))}
@@ -104,7 +104,7 @@ function TraceSample() {
 
 function RunCardSample() {
 	return (
-		<div className="flex flex-col overflow-hidden corner-m bg-card shadow-(--shadow-card) corner-squircle squircle:corner-xl">
+		<div className="flex flex-col overflow-hidden corner-m bg-card shadow-card corner-squircle squircle:corner-xl">
 			<div
 				className={cn(
 					"flex h-[55px] shrink-0 items-center gap-l",
@@ -211,7 +211,7 @@ const RAIL_ROWS = [
 ].map((width, index) => ({ id: `row-${index}`, width }));
 export function RailSample() {
 	return (
-		<div className="flex h-full min-h-0 flex-col overflow-hidden corner-m bg-card shadow-(--shadow-card) corner-squircle squircle:corner-xl">
+		<div className="flex h-full min-h-0 flex-col overflow-hidden corner-m bg-card shadow-card corner-squircle squircle:corner-xl">
 			<div
 				className={cn(
 					"flex h-[45px] shrink-0 items-center justify-between gap-m",
@@ -303,7 +303,7 @@ export function SummarySample() {
 						"*:shrink-0",
 					)}
 				>
-					<div className="flex min-w-0 flex-col gap-l corner-m bg-card p-m shadow-[0_0_0_0.5px_rgba(0,0,0,0.06),0_1px_1px_-1px_rgba(0,0,0,0.1),0_1px_2px_0_rgba(0,0,0,0.05)] corner-squircle squircle:corner-xl dark:shadow-[0_0_0_0.5px_rgba(255,255,255,0.1)]">
+					<div className="flex min-w-0 flex-col gap-l corner-m bg-card p-m shadow-chip corner-squircle squircle:corner-xl">
 						<div className="grid grid-cols-4 gap-xl px-s pt-s pb-zero">
 							{FIGURES.map((key) => (
 								<Bone

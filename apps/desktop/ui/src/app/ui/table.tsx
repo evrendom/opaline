@@ -102,7 +102,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
 				// cells (same color as the body row borders) and drop the row's own
 				// border so the two don't stack into a thicker line at rest.
 				stickyHeader &&
-					"sticky top-0 z-10 bg-canvas [&_tr]:edge-b-none [&_th]:shadow-[inset_0_-1px_0_0] [&_th]:shadow-border/50 dark:[&_th]:shadow-border/40",
+					"sticky top-0 z-10 bg-canvas [&_tr]:edge-b-none [&_th]:shadow-[inset_0_-1px_0_0] [&_th]:shadow-line-soft",
 				className,
 			)}
 			{...props}
@@ -150,7 +150,7 @@ function TableRow({
 			onClick={onClick}
 			onKeyDown={handleKeyDown}
 			className={cn(
-				"[&_th:last-child]:edge-none edge-b-m dark:border-line/40 border-line/50 data-[state=selected]:bg-field has-aria-expanded:bg-hover/50",
+				"[&_th:last-child]:edge-none edge-b-m border-line-soft data-[state=selected]:bg-field has-aria-expanded:bg-hover/50",
 				"data-interactive:hover:bg-hover data-interactive:outline-none data-interactive:focus-visible:bg-hover/50",
 				// Hide the hovered row's bottom border and the previous row's (which
 				// draws the hovered row's top edge) so the highlight reads as one
@@ -175,9 +175,6 @@ function TableHead({
 			data-slot="table-head"
 			className={cn(
 				"text-left align-middle font-medium whitespace-nowrap has-[[role=checkbox]]:pr-zero px-[calc(var(--space-xxl)*4/3)]",
-				// Vertical column dividers (none on the leftmost cell). More prominent
-				// than the body cells to emphasize the header.
-				// "border-l border-neutral-200 first:border-l-0 dark:border-neutral-800 [&_tr]:border-b",
 				align && alignClass[align],
 				className,
 			)}
@@ -196,8 +193,6 @@ function TableCell({
 			data-slot="table-cell"
 			className={cn(
 				"align-middle whitespace-nowrap has-[[role=checkbox]]:pr-zero py-m px-[calc(var(--space-xxl)*4/3)]",
-				// Vertical column dividers (none on the leftmost cell).
-				// "border-l border-[#EBEBEB] first:border-l-0 dark:border-[#1E1E1E]",
 				align && alignClass[align],
 				className,
 			)}

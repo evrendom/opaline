@@ -79,7 +79,7 @@ function SelectTrigger({
 				"flex w-fit items-center justify-between gap-s",
 				"corner-s corner-squircle py-m pr-l pl-l",
 				"text-body-xl whitespace-nowrap",
-				"shadow-(--shadow-card) bg-transparent transition-all outline-none",
+				"shadow-card bg-transparent transition-all outline-none",
 				"squircle:corner-xl",
 				"dark:shadow-none dark:edge-s dark:border-line/50",
 				"disabled:cursor-not-allowed disabled:opacity-50",
@@ -135,7 +135,7 @@ function SelectContent({
 					className={cn(
 						"relative isolate z-50 max-h-(--available-height) w-(--anchor-width) min-w-36 overflow-x-hidden overflow-y-auto",
 						"corner-s corner-squircle p-xs",
-						"origin-(--transform-origin) bg-surface text-ink shadow-(--shadow-card) duration-100 outline-none",
+						"origin-(--transform-origin) bg-surface text-ink shadow-card duration-100 outline-none",
 						"squircle:corner-xl",
 						"data-[align-trigger=true]:animate-none",
 						"data-[side=bottom]:slide-in-from-top-2",

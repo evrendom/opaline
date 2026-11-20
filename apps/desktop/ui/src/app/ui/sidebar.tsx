@@ -264,7 +264,7 @@ function Sidebar({
 					data-slot="sidebar-inner"
 					className={cn(
 						"flex size-full min-w-0 flex-col overflow-hidden bg-sidebar group-data-[variant=sidebar]:edge-r-m",
-						"group-data-[variant=floating]:corner-m group-data-[variant=floating]:shadow-sm group-data-[variant=floating]:ring-1 group-data-[variant=floating]:ring-sidebar-border",
+						"group-data-[variant=floating]:corner-m group-data-[variant=floating]:shadow-label group-data-[variant=floating]:ring-1 group-data-[variant=floating]:ring-sidebar-border",
 					)}
 				>
 					{children}
@@ -307,7 +307,7 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
 			className={cn(
 				"relative flex w-full flex-1 flex-col",
 				"corner-squircle",
-				"bg-canvas shadow-(--shadow-card)",
+				"bg-canvas shadow-card",
 				"md:peer-data-[variant=inset]:m-m md:peer-data-[variant=inset]:ml-zero md:peer-data-[variant=inset]:corner-m squircle:md:peer-data-[variant=inset]:corner-xl md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-m",
 				className,
 			)}

@@ -209,7 +209,7 @@ export function ReaderStrip({
 				"flex flex-col gap-m",
 				"corner-m px-l py-l corner-squircle",
 				"text-body-m",
-				"bg-card shadow-(--shadow-card)",
+				"bg-card shadow-card",
 				"squircle:corner-xl",
 				className,
 			)}

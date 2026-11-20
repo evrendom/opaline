@@ -268,8 +268,8 @@ export function SearchInput({
 				// otherwise win over the plain bg-card and mismatch the chips.
 				"h-8 w-56",
 				"corner-full corner-round!",
-				"shadow-(--shadow-control) bg-card",
-				"squircle:corner-full dark:shadow-(--shadow-control) dark:edge-none dark:bg-card hover:bg-hover/50 dark:hover:bg-hover",
+				"shadow-control bg-card",
+				"squircle:corner-full dark:shadow-control dark:edge-none dark:bg-card hover:bg-hover/50 dark:hover:bg-hover",
 				className,
 			)}
 		>

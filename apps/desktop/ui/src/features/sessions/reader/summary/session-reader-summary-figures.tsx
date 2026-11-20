@@ -77,7 +77,7 @@ export function SummaryFigures({
 								/>
 							</div>
 							{flags ? (
-								<div className="relative -mt-xxl corner-b-m bg-field/60 px-xl pt-[calc(var(--space-xxl)*4/3)] pb-l shadow-[inset_0_0_0_0.5px_rgb(0_0_0/0.06)] corner-squircle squircle:corner-b-xl dark:bg-field/30 dark:shadow-[inset_0_0_0_0.5px_rgb(255_255_255/0.06)]">
+								<div className="relative -mt-xxl corner-b-m bg-field/60 px-xl pt-[calc(var(--space-xxl)*4/3)] pb-l shadow-inset corner-squircle squircle:corner-b-xl dark:bg-field/30">
 									{flags(groupOf(stat))}
 								</div>
 							) : null}

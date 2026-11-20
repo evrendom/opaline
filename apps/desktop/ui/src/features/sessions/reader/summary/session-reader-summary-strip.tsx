@@ -33,7 +33,7 @@ export function SummaryStrip({
 			/>
 		);
 	return (
-		<div className="hidden flex-col corner-m bg-card px-l py-l text-body-m shadow-(--shadow-card) corner-squircle has-[li]:flex squircle:corner-xl">
+		<div className="hidden flex-col corner-m bg-card px-l py-l text-body-m shadow-card corner-squircle has-[li]:flex squircle:corner-xl">
 			{children}
 		</div>
 	);

@@ -121,7 +121,7 @@ export function RepoReaderTabs({
 		<PillTabs
 			className="mr-m h-8 bg-transparent"
 			label="Repo view"
-			pillClassName="bg-card shadow-(--shadow-card) dark:bg-ink-3/10"
+			pillClassName="bg-card shadow-card dark:bg-ink-3/10"
 			onChange={onChange}
 			tabs={tabs}
 			value={value}

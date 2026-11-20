@@ -192,7 +192,7 @@ export function StatCard({
 			skullet-block={onSelect ? "" : undefined}
 			className={cn(
 				"data-[size=sm]:py-xl",
-				onSelect && "relative transition-shadow hover:shadow-(--shadow-raised)",
+				onSelect && "relative transition-shadow hover:shadow-raised",
 			)}
 			style={
 				selected && accent

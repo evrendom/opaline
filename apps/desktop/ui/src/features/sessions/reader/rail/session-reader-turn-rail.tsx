@@ -325,7 +325,7 @@ export const TurnRailList = memo(function TurnRailList({
 						rect={active.rect}
 						session={0}
 						transition={false}
-						className="z-0 corner-s bg-card shadow-[0_0_0_0.5px_rgb(0_0_0/0.08),0_1px_2px_-0.5px_rgb(0_0_0/0.1),0_2px_6px_-2px_rgb(0_0_0/0.12)] corner-squircle squircle:corner-l dark:bg-ink-3/10 dark:shadow-(--shadow-card)"
+						className="z-0 corner-s bg-card shadow-selected corner-squircle squircle:corner-l dark:bg-ink-3/10"
 					/>
 					{whole ? (
 						<button

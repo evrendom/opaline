@@ -250,7 +250,7 @@ export function RepoSkillSessions({
 												{/* The card's body, under the cap the row freezes with:
 												    its sides and bottom (the clip drops the shadow's top
 												    edge, where the cap meets it). */}
-												<div className="overflow-clip corner-b-m bg-(--dashboard-01-content-background,var(--canvas)) shadow-(--shadow-control) [clip-path:inset(0_-8px_-8px_-8px)] corner-squircle squircle:corner-b-l">
+												<div className="overflow-clip corner-b-m bg-(--dashboard-01-content-background,var(--canvas)) shadow-control [clip-path:inset(0_-8px_-8px_-8px)] corner-squircle squircle:corner-b-l">
 													<SkillRunWaterfall
 														sessionId={trace.session.session_id}
 														revision={trace.revision}
@@ -426,7 +426,7 @@ function AgentTraceRow({
 					// under the frozen header; only its top and sides show, meeting
 					// the card's body (which shows the rest) seamlessly.
 					<div className="h-4 bg-field px-xl pt-xs dark:bg-card">
-						<div className="h-5 corner-t-m bg-(--dashboard-01-content-background,var(--canvas)) shadow-(--shadow-control) [clip-path:inset(-8px_-8px_7px_-8px)] corner-squircle squircle:corner-t-l" />
+						<div className="h-5 corner-t-m bg-(--dashboard-01-content-background,var(--canvas)) shadow-control [clip-path:inset(-8px_-8px_7px_-8px)] corner-squircle squircle:corner-t-l" />
 					</div>
 				) : null}
 			</div>

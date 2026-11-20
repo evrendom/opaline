@@ -6,7 +6,7 @@ import { formatNumber, formatShortCount } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export const TOGGLE =
-	"text-ink-3 active:not-aria-[haspopup]:translate-y-0 aria-pressed:bg-card aria-pressed:text-ink aria-pressed:shadow-(--shadow-card) dark:aria-pressed:bg-ink-3/10";
+	"text-ink-3 active:not-aria-[haspopup]:translate-y-0 aria-pressed:bg-card aria-pressed:text-ink aria-pressed:shadow-card dark:aria-pressed:bg-ink-3/10";
 
 export function ViewToggle<View extends string>({
 	iconsOnly = false,
@@ -39,7 +39,7 @@ export function ViewToggle<View extends string>({
 					ref={pillRef}
 					aria-hidden="true"
 					skullet-ignore=""
-					className="pointer-events-none absolute top-1/2 left-0 h-6 origin-left corner-s bg-card shadow-(--shadow-card) corner-squircle will-change-transform squircle:corner-l dark:bg-ink-3/10"
+					className="pointer-events-none absolute top-1/2 left-0 h-6 origin-left corner-s bg-card shadow-card corner-squircle will-change-transform squircle:corner-l dark:bg-ink-3/10"
 					style={{
 						transform: `translate(${pill.left}px, -50%)`,
 						width: pill.width,
@@ -82,7 +82,7 @@ export function ViewToggle<View extends string>({
 }
 
 export const CARD =
-	"corner-m bg-card shadow-(--shadow-card) corner-squircle squircle:corner-xl";
+	"corner-m bg-card shadow-card corner-squircle squircle:corner-xl";
 
 export function ScrollColumn({
 	children,

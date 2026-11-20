@@ -96,10 +96,9 @@ export function usePickedRun() {
 }
 
 export const RAIL_SHELF =
-	"-mr-xxl flex min-h-0 shrink-0 flex-col gap-xs corner-m bg-field/60 pr-xxl shadow-[inset_0_0_0_0.5px_rgb(0_0_0/0.06)] corner-squircle squircle:corner-xl dark:bg-field/15 dark:shadow-[inset_0_0_0_0.5px_rgb(255_255_255/0.06)]";
+	"-mr-xxl flex min-h-0 shrink-0 flex-col gap-xs corner-m bg-field/60 pr-xxl shadow-inset corner-squircle squircle:corner-xl dark:bg-field/15";
 
-export const PICKED_ROW =
-	"bg-card shadow-[0_0_0_0.5px_rgb(0_0_0/0.08),0_1px_2px_-0.5px_rgb(0_0_0/0.1),0_2px_6px_-2px_rgb(0_0_0/0.12)] dark:bg-ink-3/10 dark:shadow-(--shadow-card)";
+export const PICKED_ROW = "bg-card shadow-selected dark:bg-ink-3/10";
 
 const COLUMN = cn(RAIL_SHELF, "w-[120px]");
 

@@ -551,7 +551,7 @@ export function RunLanes({
 			data-clock-from={view.from}
 			data-clock-to={view.to}
 			className={cn(
-				"corner-m bg-card px-m py-m shadow-(--shadow-card) corner-squircle squircle:corner-xl",
+				"corner-m bg-card px-m py-m shadow-card corner-squircle squircle:corner-xl",
 				!launched &&
 					"pointer-events-auto sticky top-(--reader-pane-top,var(--reader-top,1rem))",
 			)}

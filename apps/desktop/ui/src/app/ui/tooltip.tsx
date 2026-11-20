@@ -54,7 +54,7 @@ function TooltipContent({
 						"z-50 inline-flex w-fit max-w-xs items-center gap-s",
 						"corner-s corner-squircle px-l py-s",
 						"text-body-m",
-						"origin-(--transform-origin) bg-surface text-ink shadow-(--shadow-card)",
+						"origin-(--transform-origin) bg-surface text-ink shadow-card",
 						"squircle:corner-xl",
 						"has-data-[slot=kbd]:pr-s",
 						"data-[side=bottom]:slide-in-from-top-2",

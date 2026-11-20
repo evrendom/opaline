@@ -16,7 +16,7 @@ function InputGroup({ className, ...props }: React.ComponentProps<"div">) {
 			className={cn(
 				"group/input-group relative flex h-9 w-full min-w-0 items-center",
 				"corner-s corner-squircle",
-				"shadow-(--shadow-card) transition-[color,box-shadow] outline-none",
+				"shadow-card transition-[color,box-shadow] outline-none",
 				"squircle:corner-l",
 				"dark:shadow-none dark:edge-s dark:border-line/50",
 				"in-data-[slot=combobox-content]:focus-within:border-inherit",

@@ -120,11 +120,6 @@
       "format": "css"
     },
     {
-      "variable": "--team-lineup-metric-picker-foreground",
-      "token": "neutral-10",
-      "format": "css"
-    },
-    {
       "variable": "--session-overview-surface",
       "token": "neutral-1",
       "format": "css"
@@ -394,19 +389,6 @@
     "--chart-5",
     "--active-turn-rail",
     "--bone-shine",
-    "--input",
-    "--control-hover",
-    "--trace-code-primary",
-    "--trace-code-secondary",
-    "--trace-code-tertiary",
-    "--welcome-field",
-    "--dashboardy-subsurface",
-    "--dashboardy-subsurface-strong",
-    "--dashboardy-surface",
-    "--constellation-tree-primary",
-    "--constellation-tree-secondary",
-    "--constellation-tree-tertiary",
-    "--session-menu-checkbox-border",
-    "--dashboard-01-insights-subsurface"
+    "--input"
   ]
 }

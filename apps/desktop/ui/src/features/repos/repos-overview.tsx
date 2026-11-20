@@ -427,15 +427,13 @@ export function RepoSignals({ repo }: { repo: RepositorySummary }) {
 			count: repo.signals.userNegative,
 			label: "negative",
 			title: "Negative user signals",
-			color:
-				"bg-[#ffe4e6] text-[#be123c] dark:bg-[#411b25] dark:text-[#fda4af]",
+			color: "bg-error-tint text-error",
 		},
 		{
 			count: repo.signals.modelApologies,
 			label: "apologies",
 			title: "Model apologies",
-			color:
-				"bg-[#fef3c7] text-[#b45309] dark:bg-[#40321b] dark:text-[#fcd34d]",
+			color: "bg-warning-tint text-warning",
 		},
 	].filter((signal) => signal.count > 0);
 	if (signals.length === 0) return null;

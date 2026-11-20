@@ -260,7 +260,7 @@ export function SessionReaderTabs({
 		<PillTabs
 			className="h-8 bg-transparent"
 			label="Session view"
-			pillClassName="bg-card shadow-(--shadow-card) dark:bg-ink-3/10"
+			pillClassName="bg-card shadow-card dark:bg-ink-3/10"
 			onChange={onChange}
 			tabs={tabs}
 			value={value}

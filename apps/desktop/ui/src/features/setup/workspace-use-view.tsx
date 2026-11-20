@@ -1076,7 +1076,7 @@ function SkillTraceBody() {
 				</div>
 				<div className="flex gap-l">
 					<Bone className="mt-s size-6 shrink-0 corner-full" />
-					<div className="flex min-w-0 flex-1 flex-col gap-m corner-m bg-card px-l py-l shadow-(--shadow-card) corner-squircle squircle:corner-xl">
+					<div className="flex min-w-0 flex-1 flex-col gap-m corner-m bg-card px-l py-l shadow-card corner-squircle squircle:corner-xl">
 						<Bone className="h-3 w-full corner-xs" />
 						<Bone className="h-3 w-10/12 corner-xs" />
 						<Bone className="h-3 w-1/2 corner-xs" />

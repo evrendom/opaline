@@ -526,10 +526,7 @@
 	line-height: var(--line-m);
 	letter-spacing: var(--letter-spacing-m);
 	font-weight: var(--weight-body-medium);
-	box-shadow:
-		0 0 0 0.5px #0000000f,
-		0 1px 1px -1px #0000001a,
-		0 1px 2px 0 #0000000d;
+	box-shadow: var(--shadow-chip);
 }
 .dark .compass-chip {
 	box-shadow: 0 0 0 0.5px #ffffff12 inset;

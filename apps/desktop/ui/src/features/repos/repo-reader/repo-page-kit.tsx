@@ -111,7 +111,7 @@ export function SkillLink({ name }: { name: string }) {
 				"inline-flex h-6 max-w-full items-center",
 				"corner-full px-l",
 				"truncate text-body-s",
-				"bg-canvas text-ink/90 shadow-(--shadow-control)",
+				"bg-canvas text-ink/90 shadow-control",
 				"hover:text-ink dark:bg-card",
 			)}
 		>
@@ -188,11 +188,8 @@ export function PushStrip({
 }
 
 const CHIP_TONE = {
-	rose: "bg-rose-500/12 text-rose-700 dark:text-rose-300",
-	amber: "bg-amber-500/14 text-amber-700 dark:text-amber-300",
-	emerald: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300",
-	sky: "bg-sky-500/12 text-sky-700 dark:text-sky-300",
-	violet: "bg-violet-500/12 text-violet-700 dark:text-violet-300",
+	error: "bg-error-tint text-error",
+	warning: "bg-warning-tint text-warning",
 	muted: "bg-field text-ink-3",
 } as const;
 
@@ -234,12 +231,12 @@ export function StruggleChips({
 	return (
 		<span className="inline-flex flex-wrap gap-xs">
 			{frustration > 0 ? (
-				<Chip tone="rose" title="Member swore at the agent">
+				<Chip tone="error" title="Member swore at the agent">
 					{frustration} frustrated
 				</Chip>
 			) : null}
 			{apologies > 0 ? (
-				<Chip tone="amber" title="The model apologised">
+				<Chip tone="warning" title="The model apologised">
 					{apologies} apologies
 				</Chip>
 			) : null}

@@ -47,7 +47,7 @@ export function ThemeSwitcher() {
 							<motion.span
 								layoutId={pillId}
 								transition={MORPH}
-								className="absolute inset-0 corner-full bg-line-strong/50 shadow-(--shadow-card)"
+								className="absolute inset-0 corner-full bg-line-strong/50 shadow-card"
 							/>
 						) : null}
 						<Icon aria-hidden="true" className="relative z-10 size-3.5" />

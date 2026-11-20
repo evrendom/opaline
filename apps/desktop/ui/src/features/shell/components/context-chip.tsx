@@ -21,7 +21,7 @@ export function ContextChip({
 				"inline-flex h-8 max-w-xs shrink-0 items-center gap-s",
 				"corner-full pr-l pl-l",
 				"text-body-xl whitespace-nowrap",
-				"bg-canvas shadow-(--shadow-control)",
+				"bg-canvas shadow-control",
 				"dark:bg-card [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg:not([class*='text-'])]:text-ink-3 dark:[&>svg:not([class*='text-'])]:text-neutral-400",
 			)}
 		>

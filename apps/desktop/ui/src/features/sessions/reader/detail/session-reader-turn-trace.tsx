@@ -208,7 +208,7 @@ export const TurnTrace = memo(function TurnTrace({
 						className={cn(
 							"flex flex-col overflow-hidden",
 							"corner-m corner-squircle",
-							"bg-card shadow-(--shadow-card)",
+							"bg-card shadow-card",
 							"squircle:corner-xl",
 							step &&
 								"h-[calc(100cqh-var(--reader-pane-top,var(--reader-top,1rem))-var(--frozen-subagents,0px)-0.5rem)]",

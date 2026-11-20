@@ -54,7 +54,7 @@ export function BillingManagementCard({
 		<WorkspaceSettingsGroup title="Billing">
 			<WorkspaceSettingsRow label={planLabel} description={planDescription}>
 				{/* Plan badge. */}
-				<span className="inline-flex h-5 items-center corner-full bg-success/10 px-m text-body-m font-medium text-success dark:bg-emerald-500/15 dark:text-success">
+				<span className="inline-flex h-5 items-center corner-full bg-success-tint px-m text-body-m font-medium text-success">
 					{currentPlan}
 				</span>
 			</WorkspaceSettingsRow>

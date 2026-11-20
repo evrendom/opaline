@@ -175,7 +175,7 @@ export function SkillPage({
 				) : pick?.kind === "skill" ? (
 					<SkillFileCard key={pick.name} name={pick.name} />
 				) : null}
-				<div className="flex min-h-0 flex-1 flex-col overflow-hidden corner-m bg-card shadow-(--shadow-card) corner-squircle squircle:corner-xl dark:bg-ink-3/10">
+				<div className="flex min-h-0 flex-1 flex-col overflow-hidden corner-m bg-card shadow-card corner-squircle squircle:corner-xl dark:bg-ink-3/10">
 					<HistoricalSkillDetailContent
 						key={skillName}
 						detail={skill.data}
@@ -274,7 +274,7 @@ function SkillFileCard({ name }: { name: string }) {
 	return (
 		<section
 			aria-label={`${name} skill file`}
-			className="flex min-h-0 flex-1 flex-col overflow-hidden corner-m bg-card shadow-(--shadow-card) corner-squircle squircle:corner-xl dark:bg-ink-3/10"
+			className="flex min-h-0 flex-1 flex-col overflow-hidden corner-m bg-card shadow-card corner-squircle squircle:corner-xl dark:bg-ink-3/10"
 		>
 			<HistoricalSkillDetailContent
 				detail={skill.data}

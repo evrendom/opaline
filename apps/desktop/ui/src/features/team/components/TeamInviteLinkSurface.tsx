@@ -137,7 +137,7 @@ export function TeamInviteLinkSurface({
 			<div className="flex min-w-0 items-center gap-m">
 				{teamInviteLink ? (
 					// The link in a pill like the toolbar's search, copied from inside.
-					<div className="flex h-8 min-w-0 items-center gap-s corner-full bg-card pr-xs pl-l shadow-(--shadow-control)">
+					<div className="flex h-8 min-w-0 items-center gap-s corner-full bg-card pr-xs pl-l shadow-control">
 						<IconLink
 							aria-hidden="true"
 							className="size-3.5 shrink-0 stroke-ink-3"

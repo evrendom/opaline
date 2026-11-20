@@ -4,19 +4,25 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+// An invalid button's edge is the full error colour in light and half of it
+// in dark; error-line is a ring-strength tint, so that edge stays a dark: pair.
 const buttonVariants = cva(
-	"group/button inline-flex shrink-0 items-center justify-center corner-full bg-clip-padding text-body-xl font-medium whitespace-nowrap transition-all hover:duration-150 outline-none select-none active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-error aria-invalid:ring-[1.5px] aria-invalid:ring-error/20 dark:aria-invalid:border-error/50 dark:aria-invalid:ring-error/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
+	"group/button inline-flex shrink-0 items-center justify-center corner-full bg-clip-padding text-body-xl font-medium whitespace-nowrap transition-all hover:duration-150 outline-none select-none active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-error aria-invalid:ring-[1.5px] aria-invalid:ring-error-line dark:aria-invalid:border-error/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
 	{
 		variants: {
 			variant: {
+				// The fill lightens on hover by mode (80% light, 90% dark); no
+				// role holds a per-mode opacity, so the step stays a dark: pair.
 				default:
-					"bg-primary dark:bg-ink shadow-[var(--shadow-primary)] text-primary-fg hover:bg-primary/80 dark:hover:bg-primary/90 [&_svg:not([class*='text-'])]:text-ink-disabled dark:[&_svg:not([class*='text-'])]:text-ink-disabled",
+					"bg-primary shadow-primary text-primary-fg hover:bg-primary/80 dark:hover:bg-primary/90 [&_svg:not([class*='text-'])]:text-ink-disabled",
 				outline:
-					"shadow-(--shadow-control) bg-canvas hover:bg-hover hover:text-ink aria-expanded:bg-hover aria-expanded:text-ink dark:bg-card dark:hover:bg-hover [&_svg:not([class*='text-'])]:text-ink-3 dark:[&_svg:not([class*='text-'])]:text-neutral-400",
+					"shadow-control bg-card hover:bg-hover hover:text-ink aria-expanded:bg-hover aria-expanded:text-ink [&_svg:not([class*='text-'])]:text-ink-3",
 				ghost:
-					"hover:bg-hover hover:text-ink aria-expanded:bg-hover aria-expanded:text-ink [&_svg:not([class*='text-'])]:text-ink-3 dark:[&_svg:not([class*='text-'])]:text-neutral-400",
+					"hover:bg-hover hover:text-ink aria-expanded:bg-hover aria-expanded:text-ink [&_svg:not([class*='text-'])]:text-ink-3",
+				// The error fill is stronger in dark (10/20% light, 20/30% dark);
+				// error-tint is 11/17%, so the fill keeps its own dark: steps.
 				destructive:
-					"bg-error/10 shadow-[var(--shadow-destructive)] text-error hover:bg-error/20 dark:bg-error/20 dark:hover:bg-error/30",
+					"bg-error/10 shadow-destructive text-error hover:bg-error/20 dark:bg-error/20 dark:hover:bg-error/30",
 				// Underline stays rendered but transparent at rest, fading its opacity
 				// in on hover — the base `transition-all` animates the decoration color.
 				link: "text-ink underline decoration-ink/20 underline-offset-4 hover:decoration-ink",
@@ -25,7 +31,7 @@ const buttonVariants = cva(
 				// e.g. filters applied) or open lifts it to foreground text on the
 				// stronger shadow.
 				toolbar:
-					"bg-card font-regular text-ink-3 shadow-(--shadow-control) hover:bg-hover aria-expanded:bg-hover data-popup-open:bg-hover aria-pressed:text-ink aria-pressed:shadow-(--shadow-raised) data-active:text-ink data-active:shadow-(--shadow-raised) [&>svg]:size-3.5",
+					"bg-card font-regular text-ink-3 shadow-control hover:bg-hover aria-expanded:bg-hover data-popup-open:bg-hover aria-pressed:text-ink aria-pressed:shadow-raised data-active:text-ink data-active:shadow-raised [&>svg]:size-3.5",
 			},
 			size: {
 				xs: "h-6 gap-xs corner-full px-l text-body-m in-data-[slot=button-group]:corner-full has-[>svg:first-child]:pl-m has-[>svg:last-child]:pr-m [&_svg:not([class*='size-'])]:size-[11px]",

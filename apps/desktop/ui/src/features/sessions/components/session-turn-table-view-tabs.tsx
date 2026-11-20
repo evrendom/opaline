@@ -151,7 +151,7 @@ export function SessionTurnTableSpeakerVisibilityControls({
 				</DropdownMenuTrigger>
 				<DropdownMenuContent
 					align="start"
-					className="w-auto min-w-40 corner-m bg-canvas p-xs text-ink shadow-lg ring-1 ring-black/10 dark:bg-surface dark:text-ink dark:shadow-none dark:ring-white/10"
+					className="w-auto min-w-40 corner-m bg-canvas p-xs text-ink shadow-float ring-1 ring-black/10 dark:bg-surface dark:text-ink dark:ring-white/10"
 					sideOffset={4}
 				>
 					{SESSION_TURN_TABLE_SPEAKERS.map((speaker) => {
