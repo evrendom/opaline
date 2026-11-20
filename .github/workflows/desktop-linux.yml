@@ -1,0 +1,93 @@
+name: Desktop Linux
+
+# Builds the Linux AppImage and .deb, then launches the app under Xvfb and waits
+# for its local server (ClickHouse, Postgres, Bun) to come up.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - apps/desktop/shell/**
+      - packages/local-server/**
+      - .github/workflows/desktop-linux.yml
+  push:
+    branches:
+      - main
+    paths:
+      - apps/desktop/shell/**
+      - packages/local-server/**
+      - .github/workflows/desktop-linux.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-linux-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  package:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup
+
+      - name: Cache pinned downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/opaline-desktop/runtimes
+          key: desktop-linux-runtimes-${{ hashFiles('packages/local-server/src/pinned-runtimes.ts', 'apps/desktop/shell/scripts/electron.ts', 'apps/desktop/shell/package-linux.sh') }}
+          restore-keys: desktop-linux-runtimes-
+
+      - name: Package
+        run: apps/desktop/shell/package-linux.sh
+
+      - name: Install the .deb
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb "$HOME"/.cache/opaline-desktop/package-linux/opaline_*_amd64.deb
+
+      - name: Launch the installed app and wait for its local server
+        run: |
+          home=$(mktemp -d)
+          log="$home/.config/Opaline/logs/local-stack.log"
+          HOME="$home" XDG_CONFIG_HOME="$home/.config" xvfb-run -a opaline >"$home/stdout.log" 2>&1 &
+          app=$!
+          for _ in $(seq 1 120); do
+            if grep -q "mark server-ready" "$log" 2>/dev/null; then
+              echo "server ready:"
+              grep "mark " "$log"
+              kill "$app" 2>/dev/null || true
+              exit 0
+            fi
+            if ! kill -0 "$app" 2>/dev/null; then
+              echo "the app exited before its server was ready"
+              break
+            fi
+            sleep 5
+          done
+          echo "--- stdout"; cat "$home/stdout.log" || true
+          echo "--- local-stack.log"; cat "$log" || true
+          exit 1
+
+      - name: Check the AppImage starts
+        run: |
+          appimage=$(ls "$HOME"/.cache/opaline-desktop/package-linux/Opaline-*-linux-x86_64.AppImage)
+          chmod +x "$appimage"
+          "$appimage" --appimage-extract >/dev/null
+          test -x squashfs-root/AppRun
+          test -x squashfs-root/resources/runtimes/"$(jq -r .clickhouse.path squashfs-root/resources/runtimes/runtimes.json)"
+          home=$(mktemp -d)
+          HOME="$home" XDG_CONFIG_HOME="$home/.config" timeout 60 xvfb-run -a squashfs-root/AppRun >"$home/stdout.log" 2>&1 &
+          for _ in $(seq 1 24); do
+            grep -q "mark ready" "$home/.config/Opaline/logs/local-stack.log" 2>/dev/null && exit 0
+            sleep 5
+          done
+          cat "$home/stdout.log"
+          exit 1
