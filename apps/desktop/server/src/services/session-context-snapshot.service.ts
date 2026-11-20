@@ -40,6 +40,12 @@ export function contextSnapshotOf(
 		sessionCost: derivation.overviewBase.session.estimatedCost,
 		setup,
 		setupRuns: setupRuns.runs,
+		subagentCosts: new Map(
+			(derivation.overviewBase.subagents ?? []).map((each) => [
+				each.subagentId,
+				each.estimatedCost,
+			]),
+		),
 		turns: derivation.turnSummaries,
 	});
 }

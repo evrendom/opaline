@@ -24,6 +24,7 @@ import {
 	compactionWords,
 } from "./session-reader-context-compaction";
 import { tileName } from "./session-reader-context-fold";
+import { FollowPicked } from "./session-reader-context-follow";
 import { ContextMapFrame } from "./session-reader-context-frame";
 import { filterKind } from "./session-reader-context-groups";
 import {
@@ -107,6 +108,7 @@ export function ContextTiles({
 	costOutside,
 	footer,
 	cost,
+	costed: stored,
 	map,
 	measure: asked,
 	memory,
@@ -132,6 +134,8 @@ export function ContextTiles({
 	costOutside?: string;
 	footer?: ReactNode;
 	cost?: number | null;
+	/** A cost map made elsewhere (a stored snapshot's), when there are no calls. */
+	costed?: ContextMap | null;
 	subagentCosts?: ReadonlyMap<string, number | null>;
 	map: ContextMap;
 	whole: boolean;
@@ -144,8 +148,8 @@ export function ContextTiles({
 				? keptBy(costMaps, map, () =>
 						costMap(map, calls, cost, subagentCosts, costOutside),
 					)
-				: null,
-		[calls, cost, costOutside, map, subagentCosts],
+				: (stored ?? null),
+		[calls, cost, costOutside, map, stored, subagentCosts],
 	);
 	const timed = useMemo(() => keptBy(timeMaps, map, () => timeMap(map)), [map]);
 	const [showCompacted] = useState(whole);
@@ -243,6 +247,8 @@ export function ContextTiles({
 		(picked !== null
 			? (map.parts.find((part) => part.key === picked) ?? null)
 			: null);
+	const pickMaps = { byRun, context: map, cost: costed, time: timed };
+	const pickRuns = { figures: runFigures, ofPart: partRuns };
 	const { openAt, zoomOpen } = useContextOpen({ map, runs, subagent });
 	const pickedProblems = problemsOf(problems, pickedTile?.part);
 	const keepPick = useCallback(
@@ -433,12 +439,7 @@ export function ContextTiles({
 					value={
 						pickedPart
 							? {
-									figures: pickedFigures(
-										pickedPart,
-										{ byRun, context: map, cost: costed, time: timed },
-										{ figures: runFigures, ofPart: partRuns },
-										thing,
-									),
+									figures: pickedFigures(pickedPart, pickMaps, pickRuns, thing),
 									glyph: tileGlyph(pickedPart),
 									kind: pickedPart.kind,
 									label: pickedPart.label,
@@ -510,6 +511,14 @@ export function ContextTiles({
 						</div>
 					</ContextMapFrame>
 				</PickedBoxContext.Provider>
+				<FollowPicked
+					maps={pickMaps}
+					memory={memory}
+					onClear={() => setPicked(null)}
+					part={pickedPart}
+					runs={pickRuns}
+					thing={thing}
+				/>
 			</div>
 		</MeasureContext.Provider>
 	);

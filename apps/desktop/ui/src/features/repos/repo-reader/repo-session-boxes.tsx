@@ -2,7 +2,11 @@ import type { DashboardMetric, RepositorySessionBox } from "@rudel/api-routes";
 import { IconClick } from "@tabler/icons-react";
 import {
 	type CSSProperties,
+	createContext,
+	type Dispatch,
 	type RefObject,
+	type SetStateAction,
+	useContext,
 	useEffect,
 	useLayoutEffect,
 	useMemo,
@@ -35,6 +39,10 @@ import {
 	GhostTiles,
 	useTileMorph,
 } from "@/features/sessions/reader/context/session-reader-context-morph";
+import {
+	type PickedPart,
+	PickedPartSink,
+} from "@/features/sessions/reader/context/session-reader-context-pick";
 import {
 	GAP,
 	type Placed,
@@ -213,6 +221,13 @@ export function RepoSessionBoxes({ fill = false }: { fill?: boolean }) {
 	const pickedSession =
 		sessions.find((session) => session.sessionId === pickedKey) ?? null;
 	const pickedTile = tiles.find((tile) => tile.key === pickedKey) ?? null;
+	// A box picked in the session's map below narrows the rail further, to
+	// that part of the session.
+	const [sunkPart, setSunkPart] = useState<PickedPart | null>(null);
+	const pickedPart =
+		pickedSession && sunkPart?.memory === `session:${pickedSession.sessionId}`
+			? sunkPart
+			: null;
 	usePickedMove(list, pickedTile, morphSource);
 	useEffect(() => {
 		if (!pickedSession) return;
@@ -224,25 +239,48 @@ export function RepoSessionBoxes({ fill = false }: { fill?: boolean }) {
 	}, [pickedSession]);
 	const railFilter = useMemo<RailFilter | null>(
 		() =>
-			pickedSession
+			pickedSession && pickedPart
 				? {
 						days: null,
 						figures: {
 							sessions: 1,
-							agentRuns: pickedSession.agentRuns,
-							cost: pickedSession.cost,
-							unpricedRuns: pickedSession.unpricedRuns,
-							signals: pickedSession.signals,
-							mergedPullRequests: pickedSession.mergedPullRequests,
-							ciRuns: pickedSession.ciRuns,
+							agentRuns: pickedPart.runs,
+							cost: pickedPart.cost,
+							unpricedRuns: null,
+							signals: null,
+							mergedPullRequests: null,
+							ciRuns: null,
 						},
 						sessionIds: [pickedSession.sessionId],
-						name: shortId(pickedSession.sessionId),
+						// Plan usage is shared out by cost, so a part's usage is its
+						// share of the session's cost.
+						usageShare:
+							pickedPart.cost !== null && pickedSession.cost > 0
+								? Math.min(1, pickedPart.cost / pickedSession.cost)
+								: null,
+						name: `${shortId(pickedSession.sessionId)} · ${pickedPart.label}`,
 						focus: pickedSession.startedAt.slice(0, 10),
-						onClear: () => setPickedKey(null),
+						onClear: pickedPart.clear,
 					}
-				: null,
-		[pickedSession],
+				: pickedSession
+					? {
+							days: null,
+							figures: {
+								sessions: 1,
+								agentRuns: pickedSession.agentRuns,
+								cost: pickedSession.cost,
+								unpricedRuns: pickedSession.unpricedRuns,
+								signals: pickedSession.signals,
+								mergedPullRequests: pickedSession.mergedPullRequests,
+								ciRuns: pickedSession.ciRuns,
+							},
+							sessionIds: [pickedSession.sessionId],
+							name: shortId(pickedSession.sessionId),
+							focus: pickedSession.startedAt.slice(0, 10),
+							onClear: () => setPickedKey(null),
+						}
+					: null,
+		[pickedPart, pickedSession],
 	);
 	useRailFilter(railFilter);
 	const look = lookOf(view);
@@ -344,7 +382,11 @@ export function RepoSessionBoxes({ fill = false }: { fill?: boolean }) {
 						style={{ "--tint": look.color } as CSSProperties}
 					>
 						{pickedSession ? (
-							<SessionPreview sessionId={pickedSession.sessionId} />
+							<SetSunkPart.Provider value={setSunkPart}>
+								<PickedPartSink.Provider value={PartFollower}>
+									<SessionPreview sessionId={pickedSession.sessionId} />
+								</PickedPartSink.Provider>
+							</SetSunkPart.Provider>
 						) : (
 							<EmptyState
 								icon={IconClick}
@@ -358,6 +400,31 @@ export function RepoSessionBoxes({ fill = false }: { fill?: boolean }) {
 			</ContextMapFrame>
 		</section>
 	);
+}
+
+const SetSunkPart = createContext<Dispatch<SetStateAction<PickedPart | null>>>(
+	() => {},
+);
+
+const samePart = (a: PickedPart | null, b: PickedPart | null) =>
+	a === b ||
+	(a !== null &&
+		b !== null &&
+		a.memory === b.memory &&
+		a.key === b.key &&
+		a.label === b.label &&
+		a.cost === b.cost &&
+		a.runs === b.runs);
+
+/** Rendered inside the session's map with the box picked there: hands it up
+ * to the boxes, whose rail filter then follows it. */
+function PartFollower({ part }: { part: PickedPart | null }) {
+	const setPart = useContext(SetSunkPart);
+	useEffect(() => {
+		setPart((current) => (samePart(current, part) ? current : part));
+	}, [part, setPart]);
+	useEffect(() => () => setPart(null), [setPart]);
+	return null;
 }
 
 function placedOf(tile: Tile): Placed {

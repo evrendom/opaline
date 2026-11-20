@@ -17,6 +17,11 @@ import {
 	getContextMap,
 } from "./session-reader-context-map.js";
 import {
+	costMap,
+	runsByPart,
+	storedCost,
+} from "./session-reader-context-part-figures.js";
+import {
 	compactedRuns,
 	contextRuns,
 	fullestCall,
@@ -28,6 +33,19 @@ import {
 import { getReaderWaterfall } from "./session-reader-run-steps.js";
 
 type Turn = SessionDetailTurnSummary;
+
+/** The snapshot's shape. Version 2 added each view's `figures`; the backfill
+ * rebuilds snapshots that do not start with this version. */
+export const CONTEXT_SNAPSHOT_VERSION = 2;
+
+/** What each part of a view cost and which runs touched it, read from the
+ * map's trail before it is dropped: `cost` in millionths of a dollar by part
+ * key and by `pairKey(part, item)`, or null when no call was priced; `runs`
+ * the indexes of the view's runs by part key and by `thingKey(part, item)`. */
+export type SessionContextFigures = {
+	cost: Record<string, number> | null;
+	runs: Record<string, number[]>;
+};
 
 export function contextTarget(
 	turns: readonly Turn[],
@@ -103,12 +121,34 @@ export type SessionContextView = {
 	map: ContextMap;
 	segmentCost: number;
 	withCompaction: boolean | null;
+	/** Missing on snapshots built before version 2. */
+	figures?: SessionContextFigures;
 };
 
 export type SessionContextSnapshot = {
+	/** Missing before version 2. Kept first, so the stored JSON starts with it. */
+	version?: number;
 	sessionCost: number | null;
 	views: SessionContextView[];
 };
+
+function figuresOf(
+	map: ContextMap,
+	runs: readonly Turn[],
+	segment: readonly Turn[],
+	total: number | null,
+	subagentCosts: ReadonlyMap<string, number | null> | undefined,
+): SessionContextFigures {
+	const calls = segment.flatMap((run) => run.usageCalls);
+	const costed =
+		calls.length > 0 ? costMap(map, calls, total, subagentCosts) : null;
+	return {
+		cost: costed ? storedCost(costed) : null,
+		runs: Object.fromEntries(
+			[...runsByPart(map, runs)].map(([key, at]) => [key, [...at]]),
+		),
+	};
+}
 
 export function sessionContextSnapshot({
 	bodyOf,
@@ -116,6 +156,7 @@ export function sessionContextSnapshot({
 	sessionCost,
 	setup,
 	setupRuns,
+	subagentCosts,
 	turns,
 }: {
 	bodyOf: (turnId: string) => ReadyBody<Turn>["body"] | null;
@@ -123,6 +164,7 @@ export function sessionContextSnapshot({
 	sessionCost: number | null;
 	setup: readonly SessionSetupFile[];
 	setupRuns: readonly SessionSetupRun[];
+	subagentCosts?: ReadonlyMap<string, number | null>;
 	turns: readonly Turn[];
 }): SessionContextSnapshot | null {
 	const ready = (runs: readonly Turn[]) => {
@@ -167,17 +209,27 @@ export function sessionContextSnapshot({
 		});
 		if (!map) continue;
 		const segment = segmentOf(turns, target);
+		const segmentCost = segment.reduce(
+			(sum, turn) => sum + (turn.estimatedCost ?? 0),
+			0,
+		);
 		views.push({
 			compactedRuns: compactedTurns.map((turn) => `run:${turn.turnId}`),
 			compacting: [...compactedLater(turns, runs)],
 			later: segment.length - 1 - segment.indexOf(target),
 			map: drawnContextMap(map),
-			segmentCost: segment.reduce(
-				(sum, turn) => sum + (turn.estimatedCost ?? 0),
-				0,
-			),
+			segmentCost,
 			withCompaction,
+			figures: figuresOf(
+				map,
+				runs,
+				segment,
+				sides ? segmentCost : sessionCost,
+				subagentCosts,
+			),
 		});
 	}
-	return views.length > 0 ? { sessionCost, views } : null;
+	return views.length > 0
+		? { version: CONTEXT_SNAPSHOT_VERSION, sessionCost, views }
+		: null;
 }

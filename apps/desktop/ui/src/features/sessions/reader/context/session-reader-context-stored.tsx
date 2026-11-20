@@ -1,4 +1,8 @@
 import type { SessionContextSnapshot } from "@rudel/api-routes/session-context/session-context-snapshot";
+import {
+	storedCostMap,
+	storedPartRuns,
+} from "@rudel/api-routes/session-context/session-reader-context-part-figures";
 import { useQuery } from "@tanstack/react-query";
 import { useContext, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
@@ -49,6 +53,17 @@ export function StoredSessionContext({
 					(each) => each.withCompaction === withCompaction,
 				)) ?? first;
 	const compacting = useMemo(() => new Set(view?.compacting), [view]);
+	// Snapshots from version 2 carry each part's cost and runs, for the box
+	// picked in them; older ones show those as unknown.
+	const costed = useMemo(
+		() =>
+			view?.figures?.cost ? storedCostMap(view.map, view.figures.cost) : null,
+		[view],
+	);
+	const partRuns = useMemo(
+		() => (view?.figures ? storedPartRuns(view.figures.runs) : undefined),
+		[view],
+	);
 	const toggleSlot = useContext(ContextToggleSlot);
 	if (!view) return null;
 	const sides = snapshot.views.length > 1;
@@ -64,11 +79,13 @@ export function StoredSessionContext({
 				compactedRuns={view.compactedRuns}
 				compacting={compacting}
 				cost={sides ? view.segmentCost : snapshot.sessionCost}
+				costed={costed}
 				costOutside={`After its fullest moment${view.later > 0 ? ` · ${view.later} ${view.later === 1 ? "run" : "runs"}` : ""}`}
 				footer={toggleSlot ? null : toggle}
 				map={view.map}
 				measure="context"
 				memory={`session:${sessionId}`}
+				partRuns={partRuns}
 				whole
 			/>
 			{toggleSlot && toggle ? createPortal(toggle, toggleSlot) : null}

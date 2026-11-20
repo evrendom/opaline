@@ -1,4 +1,5 @@
 import { getLogger } from "@logtape/logtape";
+import { CONTEXT_SNAPSHOT_VERSION } from "@rudel/api-routes/session-context/session-context-snapshot";
 import { SESSION_CONTEXT_SNAPSHOTS_TABLE } from "@rudel/ch-schema/session-context-snapshots";
 import type postgres from "postgres";
 import { z } from "zod";
@@ -58,6 +59,7 @@ export function buildContextSnapshotCandidatesStatement(input: {
 				SELECT organization_id, user_id, session_id
 				FROM ${snapshots} FINAL
 				WHERE index_version >= {indexVersion:UInt16}
+					AND startsWith(snapshot, {shape:String})
 			) AS s
 				ON s.organization_id = r.organization_id
 				AND s.user_id = r.user_id
@@ -69,6 +71,9 @@ export function buildContextSnapshotCandidatesStatement(input: {
 			skipped: [...input.skippedOrganizationIds],
 			limit: input.limit,
 			indexVersion: RUN_INDEX_VERSION,
+			// A snapshot of an older shape is rebuilt; the version is the JSON's
+			// first field (no column carries it).
+			shape: `{"version":${CONTEXT_SNAPSHOT_VERSION},`,
 		},
 	};
 }

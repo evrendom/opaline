@@ -138,7 +138,7 @@ function FitContext({ children }: { children: ReactNode }) {
 					sampleId="repo-session-preview"
 				>
 					{() => (
-						<div ref={content} inert>
+						<div ref={content}>
 							<ContextPreview.Provider value>
 								<ContextAreaHeight.Provider value={areaHeight}>
 									{children}

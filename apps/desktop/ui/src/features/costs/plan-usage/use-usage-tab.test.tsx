@@ -3,7 +3,10 @@ import { renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { expect, test, vi } from "vitest";
-import { UsageSessionsContext } from "../cost-rail-override";
+import {
+	type UsageSessions,
+	UsageSessionsContext,
+} from "../cost-rail-override";
 import type { PlanUsageReport, UsageWindow } from "./use-plan-usage";
 import { planUsageQueryKey } from "./use-plan-usage";
 import { useUsageTab } from "./use-usage-tab";
@@ -43,7 +46,7 @@ const report: PlanUsageReport = {
 	titles: {},
 };
 
-function usageValue(picked: readonly string[] | null | undefined) {
+function usageValue(picked: UsageSessions | null | undefined) {
 	const client = new QueryClient();
 	client.setQueryData(planUsageQueryKey(range, repositories), report);
 	const wrapper = ({ children }: { children: ReactNode }) => (
@@ -64,8 +67,15 @@ function usageValue(picked: readonly string[] | null | undefined) {
 
 test("the repo Usage card follows the session the rail is filtered to", () => {
 	expect(usageValue(undefined)).toBe("255%");
-	expect(usageValue(["session-a"])).toBe("12%");
-	expect(usageValue(["session-a", "session-b"])).toBe("42%");
-	expect(usageValue(["session-unused"])).toBe("0%");
+	expect(usageValue({ sessionIds: ["session-a"], share: 1 })).toBe("12%");
+	expect(usageValue({ sessionIds: ["session-a", "session-b"], share: 1 })).toBe(
+		"42%",
+	);
+	expect(usageValue({ sessionIds: ["session-unused"], share: 1 })).toBe("0%");
 	expect(usageValue(null)).toBe("—");
+});
+
+test("a part of a session takes its share of the session's usage", () => {
+	expect(usageValue({ sessionIds: ["session-b"], share: 0.25 })).toBe("8%");
+	expect(usageValue({ sessionIds: ["session-a"], share: 0.05 })).toBe("0.6%");
 });

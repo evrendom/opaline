@@ -44,6 +44,9 @@ export type RailFilter = {
 	/** The whole sessions the filter picks, for the Usage card; without them
 	 * a filter with figures shows its usage as unknown. */
 	sessionIds?: readonly string[];
+	/** The share of those sessions' usage the filter covers (a part of one
+	 * session): 1 when left out, unknown when null. */
+	usageShare?: number | null;
 	loading?: boolean;
 	onClear?: () => void;
 };
@@ -121,9 +124,18 @@ export function RailHighlightProvider({
 		[filter?.figures],
 	);
 	const loading = filter?.loading ?? false;
-	const usageSessions = filter?.figures
-		? (filter.sessionIds ?? null)
-		: undefined;
+	const figured = filter?.figures != null;
+	const sessionIds = filter?.sessionIds;
+	const usageShare = filter?.usageShare;
+	const usageSessions = useMemo(
+		() =>
+			!figured
+				? undefined
+				: sessionIds && usageShare !== null
+					? { sessionIds, share: usageShare ?? 1 }
+					: null,
+		[figured, sessionIds, usageShare],
+	);
 	const onClear = filter?.onClear;
 	const name = filter?.name ?? repoTabLabel(tab);
 	const TabIcon = repoTabIcon(onClear && tab === "summary" ? "sessions" : tab);

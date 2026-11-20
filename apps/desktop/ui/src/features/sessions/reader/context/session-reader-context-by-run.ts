@@ -10,9 +10,6 @@ import type {
 	RunThing,
 } from "./session-reader-context-map";
 
-export const thingKey = (part: string, label: string) =>
-	`${part}\u0000${label}`;
-
 type RunStart = Pick<SessionDetailTurnSummary, "startedAt" | "turnId">;
 
 const ownKey = (key: string) => key.replace(/^(?:compacted|earlier):/u, "");
@@ -43,34 +40,6 @@ export function placeOf(
 	for (const run of runs)
 		if (run.startedAt && Date.parse(run.startedAt) <= step.start) at = run;
 	return at ? { run: at.turnId, step: step.id } : null;
-}
-
-export function runsByPart(
-	map: ContextMap,
-	runs: readonly Pick<SessionDetailTurnSummary, "startedAt" | "turnId">[],
-): Map<string, ReadonlySet<number>> {
-	const starts = runs.map((run) =>
-		run.startedAt ? Date.parse(run.startedAt) : Number.NaN,
-	);
-	const runAt = (ms: number) => {
-		let at = 0;
-		starts.forEach((start, index) => {
-			if (start <= ms) at = index;
-		});
-		return at;
-	};
-	const seen = new Map<string, Set<number>>();
-	for (const step of map.trail) {
-		const at = runAt(step.start);
-		seen.set(step.key, (seen.get(step.key) ?? new Set()).add(at));
-		for (const item of step.items) {
-			const key = thingKey(step.key, item);
-			seen.set(key, (seen.get(key) ?? new Set()).add(at));
-		}
-	}
-	const out = new Map<string, ReadonlySet<number>>(seen);
-	out.set("you", new Set(runs.map((_, index) => index)));
-	return out;
 }
 
 export function byRunMap(
@@ -192,3 +161,8 @@ export function byRunMap(
 		window: Math.max(used, map.window),
 	};
 }
+
+export {
+	runsByPart,
+	thingKey,
+} from "@rudel/api-routes/session-context/session-reader-context-part-figures";

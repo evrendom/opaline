@@ -49,7 +49,8 @@ export function useUsageTab(
 				? (window?.repositoryPoints ?? null)
 				: picked === null || !window
 					? null
-					: picked.reduce(
+					: picked.share *
+						picked.sessionIds.reduce(
 							(sum, sessionId) =>
 								sum + (window.sessionPoints?.[sessionId] ?? 0),
 							0,

@@ -1,4 +1,4 @@
-import { createContext, useContext } from "react";
+import { type ComponentType, createContext, useContext } from "react";
 import type { Figure } from "@/lib/figure";
 import { shareOfFigure, unitFigure } from "@/lib/format";
 import type { TileGlyph } from "./session-reader-context-bar";
@@ -32,20 +32,50 @@ export const PickedBoxContext = createContext<PickedBox | null>(null);
 
 export const usePickedBox = () => useContext(PickedBoxContext);
 
-export function pickedFigures(
+/** The picked box as a page outside the map reads it: the repo page's rail
+ * follows it. `memory` names the session the map shows, `cost` is in dollars,
+ * and `runs` counts the runs that touched it; either is null when unknown. */
+export type PickedPart = {
+	memory: string | undefined;
+	key: string;
+	label: string;
+	cost: number | null;
+	runs: number | null;
+	clear: () => void;
+};
+
+/** Set by a page that follows the picked box from outside the map: the map
+ * renders it with the box it has picked, or null. */
+export const PickedPartSink = createContext<ComponentType<{
+	part: PickedPart | null;
+}> | null>(null);
+
+export type PickedMaps = {
+	byRun: ContextMap | null | undefined;
+	context: ContextMap;
+	cost: ContextMap | null;
+	time: ContextMap | null;
+};
+
+export type PickedRuns = {
+	figures?: ReadonlyMap<string, { cost: number | null; ms: number | null }>;
+	ofPart?: ReadonlyMap<string, ReadonlySet<number>>;
+};
+
+/** The picked box's own numbers: tokens of its window, cost in millionths of
+ * a dollar, time in milliseconds and the runs that touched it. */
+export function pickedValues(
 	part: Pick<ContextPart, "folded" | "key">,
-	maps: {
-		byRun: ContextMap | null | undefined;
-		context: ContextMap;
-		cost: ContextMap | null;
-		time: ContextMap | null;
-	},
-	runs: {
-		figures?: ReadonlyMap<string, { cost: number | null; ms: number | null }>;
-		ofPart?: ReadonlyMap<string, ReadonlySet<number>>;
-	},
+	maps: PickedMaps,
+	runs: PickedRuns,
 	thing?: string | null,
-): Partial<Record<ContextMeasure, Figure>> {
+): {
+	tokens: number | undefined;
+	window: number;
+	cost: number | null | undefined;
+	ms: number | null | undefined;
+	runs: number | undefined;
+} {
 	const { key } = part;
 	const run = key.startsWith("run:") ? key.slice("run:".length) : null;
 	const keys = part.folded ?? [key];
@@ -81,6 +111,43 @@ export function pickedFigures(
 						runKeys.flatMap((each) => [...(runs.ofPart?.get(each) ?? [])]),
 					).size
 				: undefined;
+	return { tokens, window, cost, ms, runs: inRuns };
+}
+
+export function pickedPart(
+	part: Pick<ContextPart, "folded" | "key" | "label"> | null,
+	maps: PickedMaps,
+	runs: PickedRuns,
+	thing: string | null,
+	named: string | null,
+	memory: string | undefined,
+	clear: () => void,
+): PickedPart | null {
+	if (!part) return null;
+	const values = pickedValues(part, maps, runs, thing);
+	return {
+		memory,
+		key: thing ? thingKey(part.key, thing) : part.key,
+		label: named ?? part.label,
+		cost: typeof values.cost === "number" ? values.cost / 1e6 : null,
+		runs: values.runs ?? null,
+		clear,
+	};
+}
+
+export function pickedFigures(
+	part: Pick<ContextPart, "folded" | "key">,
+	maps: PickedMaps,
+	runs: PickedRuns,
+	thing?: string | null,
+): Partial<Record<ContextMeasure, Figure>> {
+	const {
+		tokens,
+		window,
+		cost,
+		ms,
+		runs: inRuns,
+	} = pickedValues(part, maps, runs, thing);
 	return {
 		...(tokens !== undefined
 			? {

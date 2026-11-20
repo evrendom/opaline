@@ -98,9 +98,13 @@ describe("context snapshot backfill", () => {
 			skipped: ["internal"],
 			limit: 40,
 			indexVersion: RUN_INDEX_VERSION,
+			shape: '{"version":2,',
 		});
 		expect(statement.query).toContain(
 			"WHERE index_version >= {indexVersion:UInt16}",
+		);
+		expect(statement.query).toContain(
+			"AND startsWith(snapshot, {shape:String})",
 		);
 		expect(
 			readContextSnapshotBackfillSkippedOrgIds({
