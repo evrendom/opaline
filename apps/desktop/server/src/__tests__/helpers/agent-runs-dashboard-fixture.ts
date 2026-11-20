@@ -256,7 +256,11 @@ export function setUpAgentRunsDashboard(members: readonly string[]) {
 				}),
 			},
 		);
-		expect(response.status, await response.clone().text()).toBe(200);
+		// A 500 says only "Internal Server Error"; the server's log has the cause.
+		expect(
+			response.status,
+			`${await response.clone().text()}\n${endpoint.readOutput()}`,
+		).toBe(200);
 		return z.object({ json: CostDashboardSchema }).parse(await response.json())
 			.json;
 	}
