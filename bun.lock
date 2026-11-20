@@ -17,23 +17,12 @@
       "name": "@opalinehq/cli",
       "version": "0.17.1",
       "bin": {
-        "opaline": "./dist/cli.js",
-      },
-      "dependencies": {
-        "@clack/prompts": "^1.0.1",
-        "@logtape/file": "^2.0.4",
-        "@logtape/logtape": "^2.0.4",
-        "@orpc/client": "^1.13.5",
-        "@orpc/contract": "^1.13.5",
-        "@stricli/core": "^1.2.5",
-        "p-map": "^7.0.4",
-        "posthog-node": "5.46.1",
-        "smol-toml": "^1.6.0",
-        "zod": "^4.6.5",
+        "opaline": "dist/cli.js",
       },
       "devDependencies": {
         "@types/node": "^22",
         "bun-types": "latest",
+        "smol-toml": "^1.6.0",
         "typescript": "5.9.2",
       },
     },
@@ -696,10 +685,6 @@
     "@orpc/tanstack-query": ["@orpc/tanstack-query@1.16.2", "", { "dependencies": { "@orpc/shared": "1.16.2" }, "peerDependencies": { "@orpc/client": "1.16.2", "@tanstack/query-core": ">=5.80.2" } }, "sha512-BKtNPbR8PS0nMSJjf0HAUR6pnP5WtJilvFKlHluXH5gKX3cWm3yktsJSxEoEAyrNZ3ia/ICPmrjJUJVrFUMWhQ=="],
 
     "@playwright/test": ["@playwright/test@1.61.1", "", { "dependencies": { "playwright": "1.61.1" }, "bin": { "playwright": "cli.js" } }, "sha512-8nKv6+0RJSL9FE4jYOEGXnPeM/Hg12qZpmqzZjRh3qM0Y7c3z1mrOTfFLids72RDQYVh9WpLEfR5WdpNX4fkig=="],
-
-    "@posthog/core": ["@posthog/core@1.45.1", "", { "dependencies": { "@posthog/types": "^1.398.0" } }, "sha512-tLtvzomavb2PPWdGYKsusyIzIeL2Px47v348Smibkay7sMy/83TyPk+Ptsp2NdeOgJsbuwSxWkR2+XA0aSCAaA=="],
-
-    "@posthog/types": ["@posthog/types@1.398.0", "", {}, "sha512-sJMkl4k+u8yS/0fjHsKqE9xTdsAh30a2WvgChiptellnVoE0e8QJKFgqOMD2sk8FaEArPdeFklAhXvmENAt3Sg=="],
 
     "@prisma/client": ["@prisma/client@7.5.0", "", { "dependencies": { "@prisma/client-runtime-utils": "7.5.0" }, "peerDependencies": { "prisma": "*", "typescript": ">=5.4.0" }, "optionalPeers": ["prisma", "typescript"] }, "sha512-h4hF9ctp+kSRs7ENHGsFQmHAgHcfkOCxbYt6Ti9Xi8x7D+kP4tTi9x51UKmiTH/OqdyJAO+8V+r+JA5AWdav7w=="],
 
@@ -1888,8 +1873,6 @@
     "postcss-selector-parser": ["postcss-selector-parser@7.1.1", "", { "dependencies": { "cssesc": "^3.0.0", "util-deprecate": "^1.0.2" } }, "sha512-orRsuYpJVw8LdAwqqLykBj9ecS5/cRHlI5+nvTo8LcCKmzDmqVORXtOIYEEQuL9D4BxtA1lm5isAqzQZCoQ6Eg=="],
 
     "postgres": ["postgres@3.4.8", "", {}, "sha512-d+JFcLM17njZaOLkv6SCev7uoLaBtfK86vMUXhW1Z4glPWh4jozno9APvW/XKFJ3CCxVoC7OL38BqRydtu5nGg=="],
-
-    "posthog-node": ["posthog-node@5.46.1", "", { "dependencies": { "@posthog/core": "^1.45.1" }, "peerDependencies": { "rxjs": "^7.0.0" }, "optionalPeers": ["rxjs"] }, "sha512-WjCqExq44pBdyg9MSsH6UAE0tNZ88p4aIuVFicgqhjf2Fbws6IhS4ioYUa4aBrbUPS9EDRXtBTtF5DpP1ml8Pw=="],
 
     "powershell-utils": ["powershell-utils@0.1.0", "", {}, "sha512-dM0jVuXJPsDN6DvRpea484tCUaMiXWjuCn++HGTqUWzGDjv5tZkEZldAJ/UMlqRYGFrD/etByo4/xOuC/snX2A=="],
 
