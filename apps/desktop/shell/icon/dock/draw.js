@@ -16,8 +16,8 @@ const WARN = [
 ];
 const LOW = 0.3;
 // Development builds look like Xcode, so they are never mistaken for the
-// installed app: a blueprint-blue face with a light grid, white ring and
-// digits, and a cyan glow.
+// installed app: a blueprint face with a grid (blue in light appearance,
+// black in dark), white ring and digits, and a cyan glow.
 const XCODE_SHEEN = [
 	[0.86, 0.11, 218],
 	[0.8, 0.14, 230],
@@ -25,9 +25,10 @@ const XCODE_SHEEN = [
 	[0.82, 0.12, 214],
 	[0.92, 0.07, 205],
 ];
-const BLUEPRINT_TOP = [31, 194, 255];
-const BLUEPRINT_BOTTOM = [23, 102, 242];
-const GRID = "rgba(205, 240, 255, 0.42)";
+const BLUEPRINT = {
+	light: { top: [31, 194, 255], bottom: [23, 102, 242], grid: "rgba(205, 240, 255, 0.42)" },
+	dark: { top: [46, 48, 54], bottom: [6, 7, 9], grid: "rgba(120, 190, 255, 0.28)" },
+};
 
 function mix(stops, t) {
 	const x = Math.min(0.9999, Math.max(0, t)) * (stops.length - 1);
@@ -110,7 +111,8 @@ function colorAt(left, dark, along, dev) {
  * the blue of its row, kept as light or dark as the base was there (so the
  * glass window stays lighter), with a grid over the face.
  */
-function blueprint(base, size) {
+function blueprint(base, size, dark) {
+	const colors = dark ? BLUEPRINT.dark : BLUEPRINT.light;
 	const canvas = document.createElement("canvas");
 	canvas.width = size;
 	canvas.height = size;
@@ -124,7 +126,7 @@ function blueprint(base, size) {
 	let right = 0;
 	for (let y = 0; y < size; y++) {
 		const t = y / (size - 1);
-		const row = BLUEPRINT_TOP.map((value, k) => value + (BLUEPRINT_BOTTOM[k] - value) * t);
+		const row = colors.top.map((value, k) => value + (colors.bottom[k] - value) * t);
 		for (let x = 0; x < size; x++) {
 			const i = (y * size + x) * 4;
 			if (data[i + 3] < 200) continue;
@@ -139,7 +141,7 @@ function blueprint(base, size) {
 	}
 	context.putImageData(pixels, 0, 0);
 	context.globalCompositeOperation = "source-atop";
-	context.strokeStyle = GRID;
+	context.strokeStyle = colors.grid;
 	context.lineWidth = Math.max(1, size / 340);
 	for (let k = 1; k < 4; k++) {
 		const x = Math.round(left + ((right - left) * k) / 4) + 0.5;
@@ -178,7 +180,7 @@ async function draw({ left, dark, size, layers, dev = false }) {
 	canvas.width = size;
 	canvas.height = size;
 	const context = canvas.getContext("2d");
-	context.drawImage(dev ? blueprint(base, size) : base, 0, 0, size, size);
+	context.drawImage(dev ? blueprint(base, size, dark) : base, 0, 0, size, size);
 	const scale = (size / 1024) * 0.9375 * 1.15 * 0.512;
 	const offset = (size / 1024) * (32 + 0.9375 * 512 * (1 - 1.15));
 	const glow = document.createElement("canvas");
