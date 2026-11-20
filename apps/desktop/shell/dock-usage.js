@@ -115,7 +115,7 @@ function systemIsDark() {
 	);
 }
 
-function createDockUsage({ agents, dataDir }) {
+function createDockUsage({ agents, dataDir, development = false }) {
 	const usageFile = path.join(dataDir, "data", "plan-usage.jsonl");
 	const modeFile = path.join(app.getPath("userData"), "dock-usage");
 	const drawPage = path.join(__dirname, "icon", "dock", "draw.html");
@@ -183,22 +183,26 @@ function createDockUsage({ agents, dataDir }) {
 		clearTimeout(idle);
 		const window = await withTimeout(drawWindow());
 		try {
-			const folder = path.join(
-				__dirname,
-				"icon",
-				"dock",
-				dark ? "dark" : "light",
-			);
-			const source = (name) =>
-				`data:image/png;base64,${fs.readFileSync(path.join(folder, `${name}.png`)).toString("base64")}`;
+			// The development icon is drawn on the light face (recoloured blue)
+			// with the dark icon's white ring and digits, in both appearances.
+			const theme = (layer) =>
+				development
+					? layer === "base"
+						? "light"
+						: "dark"
+					: dark
+						? "dark"
+						: "light";
+			const source = (layer, name = layer) =>
+				`data:image/png;base64,${fs.readFileSync(path.join(__dirname, "icon", "dock", theme(layer), `${name}.png`)).toString("base64")}`;
 			const layers = {
 				base: source("base"),
 				ring: source("ring"),
-				number: source(String(left)),
+				number: source("number", String(left)),
 			};
 			const url = await withTimeout(
 				window.webContents.executeJavaScript(
-					`window.draw(${JSON.stringify({ left: left / 100, dark, size: ICON_SIZE, layers })})`,
+					`window.draw(${JSON.stringify({ left: left / 100, dark, size: ICON_SIZE, layers, dev: development })})`,
 				),
 			);
 			return nativeImage.createFromDataURL(url);

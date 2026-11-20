@@ -15,6 +15,20 @@ const WARN = [
 	[0.852, 0.199, 91.9],
 ];
 const LOW = 0.3;
+// Development builds look like Xcode, so they are never mistaken for the
+// installed app: a blueprint face with a grid (blue in light appearance,
+// black in dark), white ring and digits, and a cyan glow.
+const XCODE_SHEEN = [
+	[0.86, 0.11, 218],
+	[0.8, 0.14, 230],
+	[0.74, 0.16, 242],
+	[0.82, 0.12, 214],
+	[0.92, 0.07, 205],
+];
+const BLUEPRINT = {
+	light: { top: [31, 194, 255], bottom: [23, 102, 242], grid: "rgba(205, 240, 255, 0.42)" },
+	dark: { top: [46, 48, 54], bottom: [6, 7, 9], grid: "rgba(120, 190, 255, 0.28)" },
+};
 
 function mix(stops, t) {
 	const x = Math.min(0.9999, Math.max(0, t)) * (stops.length - 1);
@@ -84,14 +98,65 @@ function image(src) {
 	});
 }
 
-function colorAt(left, dark, along) {
+function colorAt(left, dark, along, dev) {
 	if (left <= 0) return dark ? "#FF5A66" : "#D93A4A";
 	if (left < LOW) return oklch(mix(WARN, left / LOW));
+	if (dev) return oklch(mix(XCODE_SHEEN, along / left));
 	const [l, c, h] = mix(SHEEN, along / left);
 	return oklch([Math.min(0.95, l + (dark ? 0.14 : 0)), c, h]);
 }
 
-function strokeGlow(context, left, dark, width, blur, alpha) {
+/**
+ * The icon's own face, in blueprint blue: every opaque pixel of the base takes
+ * the blue of its row, kept as light or dark as the base was there (so the
+ * glass window stays lighter), with a grid over the face.
+ */
+function blueprint(base, size, dark) {
+	const colors = dark ? BLUEPRINT.dark : BLUEPRINT.light;
+	const canvas = document.createElement("canvas");
+	canvas.width = size;
+	canvas.height = size;
+	const context = canvas.getContext("2d");
+	context.drawImage(base, 0, 0, size, size);
+	const pixels = context.getImageData(0, 0, size, size);
+	const data = pixels.data;
+	let top = size;
+	let bottom = 0;
+	let left = size;
+	let right = 0;
+	for (let y = 0; y < size; y++) {
+		const t = y / (size - 1);
+		const row = colors.top.map((value, k) => value + (colors.bottom[k] - value) * t);
+		for (let x = 0; x < size; x++) {
+			const i = (y * size + x) * 4;
+			if (data[i + 3] < 200) continue;
+			top = Math.min(top, y);
+			bottom = Math.max(bottom, y);
+			left = Math.min(left, x);
+			right = Math.max(right, x);
+			const light = (data[i] + data[i + 1] + data[i + 2]) / (3 * 255);
+			const shade = 0.55 + 0.5 * light;
+			for (let k = 0; k < 3; k++) data[i + k] = Math.min(255, row[k] * shade);
+		}
+	}
+	context.putImageData(pixels, 0, 0);
+	context.globalCompositeOperation = "source-atop";
+	context.strokeStyle = colors.grid;
+	context.lineWidth = Math.max(1, size / 340);
+	for (let k = 1; k < 4; k++) {
+		const x = Math.round(left + ((right - left) * k) / 4) + 0.5;
+		const y = Math.round(top + ((bottom - top) * k) / 4) + 0.5;
+		context.beginPath();
+		context.moveTo(x, top);
+		context.lineTo(x, bottom);
+		context.moveTo(left, y);
+		context.lineTo(right, y);
+		context.stroke();
+	}
+	return canvas;
+}
+
+function strokeGlow(context, left, dark, width, blur, alpha, dev) {
 	context.save();
 	context.filter = `blur(${blur}px)`;
 	context.globalAlpha = alpha;
@@ -100,7 +165,7 @@ function strokeGlow(context, left, dark, width, blur, alpha) {
 	const { points, at } = WINDOW;
 	for (let j = 1; j < points.length; j++) {
 		if (left > 0 && at[j] > left + 1e-6) continue;
-		context.strokeStyle = colorAt(left, dark, at[j]);
+		context.strokeStyle = colorAt(left, dark, at[j], dev);
 		context.beginPath();
 		context.moveTo(...points[j - 1]);
 		context.lineTo(...points[j]);
@@ -109,13 +174,13 @@ function strokeGlow(context, left, dark, width, blur, alpha) {
 	context.restore();
 }
 
-async function draw({ left, dark, size, layers }) {
+async function draw({ left, dark, size, layers, dev = false }) {
 	const [base, ring, digits] = await Promise.all([image(layers.base), image(layers.ring), image(layers.number)]);
 	const canvas = document.createElement("canvas");
 	canvas.width = size;
 	canvas.height = size;
 	const context = canvas.getContext("2d");
-	context.drawImage(base, 0, 0, size, size);
+	context.drawImage(dev ? blueprint(base, size, dark) : base, 0, 0, size, size);
 	const scale = (size / 1024) * 0.9375 * 1.15 * 0.512;
 	const offset = (size / 1024) * (32 + 0.9375 * 512 * (1 - 1.15));
 	const glow = document.createElement("canvas");
@@ -127,10 +192,10 @@ async function draw({ left, dark, size, layers }) {
 	WINDOW.points.forEach(([x, y], j) => (j ? windowPath.lineTo(x, y) : windowPath.moveTo(x, y)));
 	windowPath.closePath();
 	glowContext.clip(windowPath);
-	strokeGlow(glowContext, left, dark, 87, 29 * scale, dark ? 1 : 0.85);
-	if (dark) {
-		strokeGlow(glowContext, left, dark, 87, 29 * scale, 1);
-		strokeGlow(glowContext, left, dark, 30, 9 * scale, 0.9);
+	strokeGlow(glowContext, left, dark, 87, 29 * scale, dark || dev ? 1 : 0.85, dev);
+	if (dark || dev) {
+		strokeGlow(glowContext, left, dark, 87, 29 * scale, 1, dev);
+		strokeGlow(glowContext, left, dark, 30, 9 * scale, 0.9, dev);
 	}
 	context.drawImage(glow, 0, 0);
 	context.drawImage(ring, 0, 0, size, size);
