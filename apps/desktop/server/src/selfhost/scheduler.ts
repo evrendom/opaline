@@ -174,8 +174,9 @@ export function selfHostedJobs(env: Environment = process.env): SchedulerJob[] {
 			firstAfterMs: 5_000,
 			when: true,
 			handler: async () =>
-				(await import("../handlers/l1-edges-maintenance.js"))
-					.handleL1EdgesMaintenanceRequest,
+				(
+					await import("../services/maintenance-job-thread.js")
+				).offThreadHandler("l1-edges"),
 		},
 		{
 			name: "run-index-heal",
@@ -183,8 +184,9 @@ export function selfHostedJobs(env: Environment = process.env): SchedulerJob[] {
 			firstAfterMs: 30_000,
 			when: true,
 			handler: async () =>
-				(await import("../handlers/run-index-heal-maintenance.js"))
-					.handleRunIndexHealMaintenanceRequest,
+				(
+					await import("../services/maintenance-job-thread.js")
+				).offThreadHandler("run-index-heal"),
 		},
 		{
 			name: "session-retirement",
