@@ -633,7 +633,7 @@ app.whenReady().then(() => {
 				window: mainWindow,
 				openWindow: () => createWindow(),
 				quitCompletely,
-				updates: isMac ? undefined : updates,
+				updates,
 			}),
 		);
 	if (onboarding) {
