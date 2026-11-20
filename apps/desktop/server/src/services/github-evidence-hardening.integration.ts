@@ -15,7 +15,6 @@ import { FakeEvidenceR2 } from "../__tests__/helpers/fake-evidence-r2.js";
 import { sqlClient } from "../db.js";
 import type { GitHubEvidenceSource } from "./github-evidence-collector.service.js";
 import { collectAndPersistGitHubCommitEvidence } from "./github-evidence-persistence.service.js";
-import { recordGitHubWebhookDelivery } from "./github-webhook-delivery.service.js";
 
 const suffix = randomUUID();
 const userId = `github-hardening-user-${suffix}`;
@@ -23,9 +22,10 @@ const organizationId = `github-hardening-org-${suffix}`;
 const installationId = `github-hardening-installation-${suffix}`;
 const repositoryId = `github-hardening-repository-${suffix}`;
 const config = {
-	appId: "1",
-	privateKeyPem: "unused because the installation token is injected",
-	slug: "github-hardening-integration",
+	kind: "token" as const,
+	host: "github.com",
+	apiBaseUrl: "https://api.github.com",
+	read: async () => "token",
 };
 const COMPLETE: SourceCoverage = { reasons: [], state: "complete" };
 const PROVENANCE: SourceProvenance = {
@@ -107,7 +107,6 @@ describe("GitHub pull request file credential paths", () => {
 			commitSha,
 			config,
 			contextId: null,
-			createInstallationToken: async () => "token",
 			database: sqlClient,
 			initiatedByUserId: userId,
 			organizationId,
@@ -160,7 +159,6 @@ describe("GitHub pull request file credential paths", () => {
 			commitSha,
 			config,
 			contextId: null,
-			createInstallationToken: async () => "token",
 			database: sqlClient,
 			initiatedByUserId: userId,
 			organizationId,
@@ -450,76 +448,6 @@ describe("GitHub enumeration duplicates", () => {
 	});
 });
 
-describe("GitHub webhook refresh during collection", () => {
-	async function collectResolved(
-		commitSha: string,
-		onCollecting: () => Promise<void>,
-	) {
-		const result = await collectAndPersistGitHubCommitEvidence({
-			commitSha,
-			config,
-			contextId: null,
-			createInstallationToken: async () => "token",
-			database: sqlClient,
-			initiatedByUserId: userId,
-			organizationId,
-			r2: new FakeEvidenceR2(),
-			repositoryId,
-			sessionId: `session-${randomUUID()}`,
-			sessionSource: "claude_code",
-			sessionUserId: userId,
-			sourceFactory: () =>
-				createSource(commitSha, {
-					async getCommit(repository, ref) {
-						await onCollecting();
-						return createSource(commitSha, {}).getCommit(repository, ref);
-					},
-					listCommitPullRequests: async () =>
-						availablePage([pullRequestFixture(`pr-${commitSha}`, 11)], null),
-				}),
-		});
-		const [row] = await sqlClient.unsafe<
-			Array<{ due: string | null; status: string }>
-		>(
-			"SELECT status, refresh_due_at::text AS due FROM github_evidence_collection WHERE id = $1",
-			[result.collectionId],
-		);
-		return row;
-	}
-
-	test("keeps a refresh requested while collecting, even when the outcome is resolved", async () => {
-		const resolved = await collectResolved("5".repeat(40), async () => {});
-		expect(resolved).toEqual({ due: null, status: "complete" });
-
-		const commitSha = "6".repeat(40);
-		let delivery: Awaited<
-			ReturnType<typeof recordGitHubWebhookDelivery>
-		> | null = null;
-		const requested = await collectResolved(commitSha, async () => {
-			delivery = await recordGitHubWebhookDelivery({
-				action: "completed",
-				database: sqlClient,
-				deliveryId: randomUUID(),
-				event: "check_suite",
-				intent: {
-					kind: "refresh",
-					installationId,
-					repositoryId,
-					commitShas: [commitSha],
-					pullRequestIds: [],
-				},
-			});
-		});
-		expect(delivery).toMatchObject({
-			affectedRows: 1,
-			outcome: "refresh_scheduled",
-			status: "recorded",
-		});
-		expect(requested?.status).toBe("complete");
-		expect(requested?.due).not.toBeNull();
-	});
-});
-
 async function persist(input: {
 	readonly commitSha: string;
 	readonly r2: FakeEvidenceR2;
@@ -530,7 +458,6 @@ async function persist(input: {
 		commitSha: input.commitSha,
 		config,
 		contextId: randomUUID(),
-		createInstallationToken: async () => "installation-token",
 		database: sqlClient,
 		initiatedByUserId: userId,
 		organizationId,

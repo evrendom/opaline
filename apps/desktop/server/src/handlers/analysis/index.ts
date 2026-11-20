@@ -69,7 +69,6 @@ import {
 } from "../../services/session-visibility.js";
 import {
 	createSearchAccess,
-	postgresSubscriptions,
 	type SearchAccess,
 } from "../../services/transcript-search/access.js";
 import {
@@ -116,7 +115,7 @@ interface AnalysisEnv {
 	githubRepositories?: (workspaceId: string) => Promise<readonly string[]>;
 	/** The per-workspace OpenAI quota of search; Postgres by default. */
 	embeddingQuota?: EmbeddingQuota;
-	/** Which workspaces are indexed for search; Postgres subscriptions by default. */
+	/** Which workspaces are indexed for search. */
 	searchAccess?: SearchAccess;
 	checks?: CheckStore;
 }
@@ -223,8 +222,7 @@ export function createAnalysisRouter(
 		sqlQuota,
 		limiter: queryLimiter,
 		embedderFor: transcriptEmbedder,
-		access:
-			env.searchAccess ?? createSearchAccess(postgresSubscriptions(sqlClient)),
+		access: env.searchAccess ?? createSearchAccess(),
 	};
 	const sqlEnv = {
 		executor: env.executor,

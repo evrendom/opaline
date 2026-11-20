@@ -1,11 +1,7 @@
 import { getLogger } from "@logtape/logtape";
 import type { ClickHouseExecutor } from "../../clickhouse.js";
 import { isSelfHosted } from "../../lib/self-hosted.js";
-import {
-	createSearchAccess,
-	postgresSubscriptions,
-	type SearchAccess,
-} from "./access.js";
+import { createSearchAccess, type SearchAccess } from "./access.js";
 import {
 	readEmbeddingQuotaLimits,
 	type TranscriptEmbedder,
@@ -32,8 +28,7 @@ let postgresDeps: Promise<UploadIndexDeps> | null = null;
 /**
  * Indexes an uploaded session for search after its transcript records are
  * written (and again on a duplicate upload, which goes on where an earlier
- * pass stopped). Only workspaces search indexes (`access.ts`: listed as
- * internal, or paid where paid plans are on); history is indexed by
+ * pass stopped). Only workspaces search indexes (`access.ts`); history is indexed by
  * `backfill:transcript-search` (`history-backfill.service.ts`). Best effort: never fails the
  * upload.
  */
@@ -61,14 +56,14 @@ export async function indexUploadedSessionBestEffort(
 	}
 }
 
-/** Postgres holds the subscriptions and the quota: without it nothing is indexed. */
+/** Postgres holds the quota: without it nothing is indexed. */
 async function defaultDeps(): Promise<UploadIndexDeps | null> {
 	if (!process.env.PG_CONNECTION_STRING) return null;
 	postgresDeps ??= (async () => {
 		// Loaded only here, so modules that import this one open no Postgres pool.
 		const { sqlClient } = await import("../../db.js");
 		return {
-			access: createSearchAccess(postgresSubscriptions(sqlClient)),
+			access: createSearchAccess(),
 			embedder: transcriptEmbedder(),
 			quota: createPostgresEmbeddingQuota(
 				sqlClient,

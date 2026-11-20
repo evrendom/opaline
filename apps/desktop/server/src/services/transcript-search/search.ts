@@ -101,7 +101,7 @@ export interface SearchEnv {
 	readonly limiter: AgentQueryLimiter;
 	/** The embedder, or null where text is not embedded (no OpenAI key). */
 	readonly embedderFor: (workspaceId: string) => TranscriptEmbedder | null;
-	/** Whether a workspace is indexed for search: listed, or paid where paid plans are on. */
+	/** Whether a workspace is indexed for search (`access.ts`). */
 	readonly access: SearchAccess;
 	readonly now?: () => Date;
 	/** Overrides `SEARCH_LIMITS.embeddingMs`. */

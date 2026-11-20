@@ -6,11 +6,15 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const previews = path.join(here, "..", "onboarding-window", "previews");
-const target = new URL(process.argv[2] ?? "http://localhost:4633/dashboard");
+if (!process.argv[2]) {
+	console.error(
+		"Usage: node scripts/grab-previews.mjs <dashboard-url> [sign-in-link from opaline server open --json]",
+	);
+	process.exit(1);
+}
+const target = new URL(process.argv[2]);
 const login = process.argv[3];
-const cookiesFile =
-	process.env.OPALINE_PREVIEW_COOKIES ??
-	path.join(os.homedir(), ".cache", "athena-preview", "cookies.json");
+const cookiesFile = process.env.OPALINE_PREVIEW_COOKIES;
 const { chromium } = await import(
 	process.env.PLAYWRIGHT_CORE
 		? pathToFileURL(process.env.PLAYWRIGHT_CORE).href
@@ -19,20 +23,21 @@ const { chromium } = await import(
 const clip = { x: 0, y: 0, width: 380, height: 243 };
 const WIDTH = 624;
 
-const stored = fs.existsSync(cookiesFile)
-	? JSON.parse(fs.readFileSync(cookiesFile, "utf8"))
-			.filter(
-				(cookie) =>
-					cookie.name.includes("better-auth") ||
-					cookie.name === "sidebar_state",
-			)
-			.map(({ expires, ...cookie }) => ({
-				...cookie,
-				domain: target.hostname,
-				path: "/",
-				...(expires > 0 ? { expires } : {}),
-			}))
-	: [];
+const stored =
+	cookiesFile && fs.existsSync(cookiesFile)
+		? JSON.parse(fs.readFileSync(cookiesFile, "utf8"))
+				.filter(
+					(cookie) =>
+						cookie.name.includes("better-auth") ||
+						cookie.name === "sidebar_state",
+				)
+				.map(({ expires, ...cookie }) => ({
+					...cookie,
+					domain: target.hostname,
+					path: "/",
+					...(expires > 0 ? { expires } : {}),
+				}))
+		: [];
 
 const browser = await chromium.launch({ channel: "chrome" });
 const cookies = login ? await signIn(login) : stored;

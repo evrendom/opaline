@@ -3,7 +3,6 @@ import {
 	isGitHubEvidenceUiEnabled,
 	readBooleanEnv,
 	readNonNegativeSafeIntegerEnv,
-	readProductAnalyticsExcludedOrgIds,
 	readRequiredSecretEnv,
 	readSkillAnalyticsCutoverConfig,
 	readUsageEventAnalyticsCutoverConfig,
@@ -233,25 +232,5 @@ describe("GitHub evidence UI dark-launch switch", () => {
 			expect(isGitHubEvidenceUiEnabled({ OPALINE_SELF_HOSTED: value })).toBe(
 				false,
 			);
-	});
-});
-
-describe("product analytics excluded workspaces", () => {
-	test("excludes nobody when the list is missing or blank", () => {
-		for (const value of [undefined, "", " , "]) {
-			expect(
-				readProductAnalyticsExcludedOrgIds({
-					PRODUCT_ANALYTICS_EXCLUDED_ORG_IDS: value,
-				}),
-			).toEqual([]);
-		}
-	});
-
-	test("trims and deduplicates organization IDs", () => {
-		expect(
-			readProductAnalyticsExcludedOrgIds({
-				PRODUCT_ANALYTICS_EXCLUDED_ORG_IDS: " org-a, org-b,org-a, ",
-			}),
-		).toEqual(["org-a", "org-b"]);
 	});
 });

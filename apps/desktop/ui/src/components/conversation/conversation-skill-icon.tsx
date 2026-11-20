@@ -39,7 +39,6 @@ export const SKILL_ICONS: Record<SkillIconName, Icon> = {
 	experiment: IconTestPipe,
 };
 
-/** The skill's icon; the choice is shared with the usage digest emails. */
 export function getSkillIcon(skill: string) {
 	const name = skillIconName(skill);
 	return { name, icon: SKILL_ICONS[name] };

@@ -4,13 +4,10 @@ import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SettingsLayout } from "@/features/settings/SettingsLayout";
-import { WorkspaceSettingsSection } from "@/features/settings/workspace/WorkspaceSettingsSection";
-import { SupportEmailButton } from "@/features/support/SupportEmailButton";
 import { McpSettingsView } from "./McpSettingsPage";
 import { SelfHostContext, type SelfHostInfo } from "./self-host-info";
 import {
 	linkableProviders,
-	sendsEmail,
 	showsGitHubSettings,
 	workspaceUrlPrefix,
 } from "./surfaces";
@@ -37,41 +34,6 @@ vi.mock("@/features/workspace/organization/useOrganization", () => {
 vi.mock("@/features/settings/github/use-github-connection", () => ({
 	useGitHubConnection: () => ({ query: { data: github.status } }),
 }));
-
-vi.mock("@/features/settings/workspace/use-workspace-settings-data", () => ({
-	useWorkspaceSettingsData: () => ({
-		state: { isPending: false, isError: false, hasOrganization: true },
-		activeOrg: { id: "org-acme", name: "Acme", slug: "acme" },
-		currentUserRole: "owner",
-		canManage: true,
-		fullOrg: { members: [] },
-		pendingInvitations: [],
-		invalidate: () => {},
-	}),
-}));
-
-vi.mock("@/features/analytics/tracking/useTrackProductPageView", () => ({
-	useTrackProductPageView: () => {},
-}));
-
-vi.mock(
-	"@/features/settings/workspace/components/BillingManagementCard",
-	() => ({ BillingManagementCard: () => <div>Billing</div> }),
-);
-
-vi.mock("@/features/settings/workspace/components/BillingSandboxCard", () => ({
-	BillingSandboxCard: () => <div>Billing sandbox</div>,
-}));
-
-vi.mock(
-	"@/features/settings/workspace/components/WorkspaceIdentityCard",
-	() => ({ WorkspaceIdentityCard: () => <div>Workspace identity</div> }),
-);
-
-vi.mock(
-	"@/features/settings/workspace/components/WorkspaceDangerZoneCard",
-	() => ({ WorkspaceDangerZoneCard: () => <div>Danger zone</div> }),
-);
 
 const info: SelfHostInfo = {
 	selfHosted: true,
@@ -118,23 +80,16 @@ afterEach(() => {
 describe("surface rules", () => {
 	it("keep every cloud surface on opaline.so", () => {
 		expect(workspaceUrlPrefix(null)).toBe("opaline.so/");
-		expect(sendsEmail(null)).toBe(true);
 		expect(linkableProviders(null, ["google", "github"])).toEqual([
 			"google",
 			"github",
 		]);
-		expect(showsGitHubSettings(null, connection(false))).toBe(true);
-		expect(showsGitHubSettings(null, { visibility: "hidden" })).toBe(false);
 	});
 
 	it("follow what a self-hosted server configured", () => {
 		expect(workspaceUrlPrefix(info, "opaline.acme.lan")).toBe(
 			"opaline.acme.lan/",
 		);
-		expect(sendsEmail(info)).toBe(false);
-		expect(
-			sendsEmail({ ...info, auth: { ...info.auth, emailCodes: true } }),
-		).toBe(true);
 		expect(linkableProviders(info, ["google", "github"])).toEqual([]);
 		expect(
 			linkableProviders(
@@ -142,39 +97,9 @@ describe("surface rules", () => {
 				["google", "github"],
 			),
 		).toEqual(["github"]);
-		expect(showsGitHubSettings(info, connection(false))).toBe(false);
-		expect(showsGitHubSettings(info, connection(true))).toBe(true);
-	});
-});
-
-describe("workspace settings", () => {
-	it("show billing to the owner on opaline.so", () => {
-		render(withSelfHost(null, <WorkspaceSettingsSection />));
-		expect(screen.getByText("Billing")).toBeVisible();
-		expect(screen.getByText("Billing sandbox")).toBeVisible();
-	});
-
-	it("hide billing on a self-hosted server", () => {
-		render(withSelfHost(info, <WorkspaceSettingsSection />));
-		expect(screen.getByText("Workspace identity")).toBeVisible();
-		expect(screen.queryByText("Billing")).not.toBeInTheDocument();
-		expect(screen.queryByText("Billing sandbox")).not.toBeInTheDocument();
-	});
-});
-
-describe("support email button", () => {
-	it("emails Opaline support on opaline.so", () => {
-		render(withSelfHost(null, <SupportEmailButton />));
-		expect(
-			screen.getByRole("link", { name: "Email Opaline support" }),
-		).toHaveAttribute("href", expect.stringContaining("mailto:"));
-	});
-
-	it("is gone on a self-hosted server", () => {
-		render(withSelfHost(info, <SupportEmailButton />));
-		expect(
-			screen.queryByRole("link", { name: "Email Opaline support" }),
-		).not.toBeInTheDocument();
+		expect(showsGitHubSettings(connection(false))).toBe(false);
+		expect(showsGitHubSettings(connection(true))).toBe(true);
+		expect(showsGitHubSettings({ visibility: "hidden" })).toBe(false);
 	});
 });
 
@@ -185,9 +110,9 @@ describe("settings navigation", () => {
 			.map((link) => link.textContent?.trim() ?? "");
 	}
 
-	it("keeps the cloud tabs on opaline.so", () => {
+	it("shows GitHub once the server has a token configured", () => {
 		github.status = connection(true);
-		render(withSelfHost(null, <SettingsLayout />));
+		render(withSelfHost(info, <SettingsLayout />));
 		expect(tabs()).toEqual([
 			"Workspace",
 			"GitHub",
@@ -195,6 +120,7 @@ describe("settings navigation", () => {
 			"Reports",
 			"Members",
 			"Account",
+			"MCP",
 		]);
 	});
 

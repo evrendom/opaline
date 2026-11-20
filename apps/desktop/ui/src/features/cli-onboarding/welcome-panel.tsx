@@ -5,7 +5,7 @@ import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import { ProductBrand } from "@/features/shell/components/product-brand";
 
 const ProgressTarget = createContext<HTMLDivElement | null>(null);
-const STEPS = ["Sign in", "Workspace", "Profile", "Invite"];
+const STEPS = ["Sign in", "Workspace", "Profile"];
 
 export function WelcomePanel({ children }: { children: ReactNode }) {
 	const selfHost = useSelfHost();
@@ -71,25 +71,16 @@ export function WelcomeBack({
 	);
 }
 
-export function WelcomeProgress({
-	step,
-	includeGitHub = false,
-}: {
-	step: 1 | 2 | 3 | 4 | 5;
-	includeGitHub?: boolean;
-}) {
-	const steps = includeGitHub
-		? ["Sign in", "Workspace", "GitHub", "Profile", "Invite"]
-		: STEPS;
+export function WelcomeProgress({ step }: { step: 1 | 2 | 3 }) {
 	const target = useContext(ProgressTarget);
 	if (!target) return null;
 	return createPortal(
 		<nav
 			className="cli-welcome-progress"
-			aria-label={`Step ${step} of ${steps.length}: ${steps[step - 1]}`}
+			aria-label={`Step ${step} of ${STEPS.length}: ${STEPS[step - 1]}`}
 		>
 			<ol aria-label="Setup progress">
-				{steps.map((label, index) => (
+				{STEPS.map((label, index) => (
 					<li
 						key={label}
 						aria-label={label}

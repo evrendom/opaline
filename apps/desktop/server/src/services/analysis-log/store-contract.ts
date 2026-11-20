@@ -26,7 +26,7 @@ import type {
 
 const MODEL = "text-embedding-3-small";
 
-/** Behavior every `AnalysisStore` shares; run against memory and Convex. */
+/** Behavior every `AnalysisStore` shares; run against memory and Postgres. */
 export function analysisStoreContract(
 	name: string,
 	createStore: () => AnalysisStore,

@@ -3,8 +3,6 @@ import {
 	INGEST_AGGREGATE_CONTENT_MAX_BYTES,
 	INGEST_DIRECT_CONTENT_MAX_BYTES,
 } from "@rudel/api-routes";
-import { isVercelRuntime } from "../lib/api-runtime.js";
-import { LARGE_INGEST_MIN_BYTES } from "../lib/ingest-size.js";
 
 const logger = getLogger(["rudel", "api", "r2-ingest-materialization-gate"]);
 
@@ -285,41 +283,9 @@ export function createR2IngestMaterializationGate(input: {
 	};
 }
 
-/**
- * Whether this process's own recovery materializes sessions above
- * `LARGE_INGEST_MIN_BYTES`:
- * only a resident Bun server (self-hosted, local, or a Fly-style worker).
- * Vercel functions of the main project never do, whatever their environment
- * says (fail closed).
- */
-export function canMaterializeLargeR2IngestJobs(
-	environment: Readonly<Record<string, string | undefined>> = process.env,
-): boolean {
-	return !isVercelRuntime(environment);
-}
-
-/**
- * Job sizes this process's own gate admits. A resident Bun server runs every
- * session (large ones alone); a main-project Vercel function admits only jobs
- * up to `LARGE_INGEST_MIN_BYTES`, so its commit queues larger ones and its
- * recovery never selects them: they are left to the large-ingest worker.
- */
-export function getProcessR2IngestGateBytes(
-	environment: Readonly<Record<string, string | undefined>> = process.env,
-): {
-	readonly largeJobMaxBytes: number | undefined;
-	readonly maxBytes: number;
-} {
-	return canMaterializeLargeR2IngestJobs(environment)
-		? {
-				largeJobMaxBytes: INGEST_AGGREGATE_CONTENT_MAX_BYTES,
-				maxBytes: INGEST_DIRECT_CONTENT_MAX_BYTES,
-			}
-		: { largeJobMaxBytes: undefined, maxBytes: LARGE_INGEST_MIN_BYTES };
-}
-
 const r2IngestMaterializationGate = createR2IngestMaterializationGate({
-	...getProcessR2IngestGateBytes(),
+	largeJobMaxBytes: INGEST_AGGREGATE_CONTENT_MAX_BYTES,
+	maxBytes: INGEST_DIRECT_CONTENT_MAX_BYTES,
 	maxJobs: 1,
 	maxQueuedJobs: 8,
 	operationTimeoutMs: 20 * 60_000,

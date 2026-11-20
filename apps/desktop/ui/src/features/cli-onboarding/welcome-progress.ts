@@ -2,9 +2,8 @@ import { z } from "zod";
 import type { CliConnectionSnapshot } from "../../../../../../packages/api-routes/src/cli-connection";
 
 const ProgressSchema = z.object({
-	step: z.enum(["workspace", "github", "profile", "invite", "done"]),
+	step: z.enum(["workspace", "profile", "done"]),
 	organizationId: z.string().nullable(),
-	github: z.enum(["pending", "connected", "skipped"]).default("pending"),
 });
 export type WelcomeSetupProgress = z.infer<typeof ProgressSchema>;
 
@@ -25,7 +24,6 @@ export function readWelcomeProgress(
 				: "workspace",
 		organizationId:
 			snapshot.state === "awaiting_login" ? null : snapshot.organizationId,
-		github: "pending",
 	};
 }
 

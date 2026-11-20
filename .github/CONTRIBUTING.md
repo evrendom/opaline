@@ -58,14 +58,20 @@ This runs linting, type checking, tests, and builds across the entire monorepo. 
 
 ```
 apps/
-  api/          HTTP API server (Bun)
-  cli/          The published CLI (npm opaline, @opalinehq/cli, rudel)
-  web/          React SPA (Vite + Tailwind + shadcn)
+  cli/            The published CLI (npm opaline, @opalinehq/cli, rudel)
+  desktop/
+    shell/        The Mac app (Electron), packaging and release
+    server/       The local server the app runs (Bun)
+    ui/           The app's interface (React, Vite, Tailwind)
 
 packages/
-  api-routes/   Shared RPC contract
-  ch-schema/    ClickHouse schemas, migrations, codegen
-  sql-schema/   Drizzle ORM schema for Postgres
+  api-routes/     Shared RPC contract
+  ch-schema/      ClickHouse schemas, migrations, codegen
+  sql-schema/     Drizzle ORM schema for Postgres
+  local-server/   Starts and supervises the local server for the app
+  cli-harness/    Server integration and version-skew tests
+  agent-adapters/ Claude Code and Codex transcript readers
+  secret-filter/  Removes secrets before anything is stored
   typescript-config/  Shared tsconfig bases
 ```
 

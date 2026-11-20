@@ -18,7 +18,6 @@ const UNCHANGED_PROCEDURES = [
 	"analysis.history",
 	"analytics.moments.access",
 	"analytics.moments.settings",
-	"billing",
 	"cli",
 	"repositorySettings",
 	"sessionAccess",

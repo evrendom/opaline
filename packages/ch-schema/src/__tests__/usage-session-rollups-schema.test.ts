@@ -115,7 +115,7 @@ describe("usage session rollups migration", () => {
 		expect(table?.comment).toBe(USAGE_SESSION_ROLLUPS_COMMENT);
 	});
 
-	test("bootstrap and the production gate run its runner for both migrations", () => {
+	test("bootstrap runs its runner for both migrations", () => {
 		expect(USAGE_SESSION_ROLLUPS_MIGRATIONS).toEqual([
 			USAGE_SESSION_ROLLUPS_MIGRATION,
 			USAGE_SESSION_ROLLUP_COSTS_MIGRATION,
@@ -124,8 +124,5 @@ describe("usage session rollups migration", () => {
 			expect(read("../../scripts/bootstrap.ts")).toContain(
 				`"${migration}",\n\t\t"migrate-usage-session-rollups.ts",`,
 			);
-		expect(read("../../package.json")).toMatch(
-			/"ch:migrate:production": "[^"]* ch:migrate:usage-session-rollups[ "]/u,
-		);
 	});
 });

@@ -1,14 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import {
-	buildBillingUpgradeRequestEmailContent,
 	buildClickHousePurgeFailureAlertContent,
 	buildEmailVerificationOtpEmailContent,
 	buildInvitationEmailContent,
 	buildInvitationLink,
-	getBillingUpgradeRequestEmailIdempotencyKey,
 	getClickHousePurgeFailureAlertIdempotencyKey,
 	getResendConfigWarnings,
-	sendBillingUpgradeRequestEmail,
 	sendEmailVerificationOtpEmail,
 	sendOrganizationInvitationEmail,
 	syncSignupContact,
@@ -45,33 +42,6 @@ describe("email helpers", () => {
 		);
 		expect(message.html).toContain("Team &amp; &quot;Co&quot;");
 		expect(message.html).not.toContain("<script>");
-	});
-
-	test("buildBillingUpgradeRequestEmailContent escapes names and links to the selected plan", () => {
-		const data = {
-			billingPeriod: "yearly" as const,
-			organizationName: 'Team & "Co"',
-			ownerEmail: "owner@example.com",
-			plan: "business" as const,
-			requesterName: "Alice <script>",
-			upgradeUrl:
-				"https://opaline.so/pricing/?workspace=team&billing=yearly#business",
-		};
-		const message = buildBillingUpgradeRequestEmailContent(data);
-
-		expect(message.subject).toBe(
-			'Alice <script> requested an Opaline upgrade for Team & "Co"',
-		);
-		expect(message.html).toContain("Alice &lt;script&gt;");
-		expect(message.html).toContain("Team &amp; &quot;Co&quot;");
-		expect(message.text).toContain("Business yearly plan");
-		expect(message.text).toContain(data.upgradeUrl);
-		expect(getBillingUpgradeRequestEmailIdempotencyKey(data)).toBe(
-			getBillingUpgradeRequestEmailIdempotencyKey(data),
-		);
-		expect(
-			getBillingUpgradeRequestEmailIdempotencyKey(data).length,
-		).toBeLessThan(257);
 	});
 
 	test("buildEmailVerificationOtpEmailContent escapes the verification code", () => {
@@ -169,22 +139,6 @@ describe("email helpers", () => {
 			sendEmailVerificationOtpEmail(
 				{ apiKey: "test-key" },
 				{ email: "person@example.com", otp: "123456", type: "sign-in" },
-			),
-		).resolves.toBe(false);
-	});
-
-	test("sendBillingUpgradeRequestEmail reports failure when config is incomplete", async () => {
-		await expect(
-			sendBillingUpgradeRequestEmail(
-				{},
-				{
-					billingPeriod: "monthly",
-					organizationName: "Team",
-					ownerEmail: "owner@example.com",
-					plan: "basic",
-					requesterName: "Alice",
-					upgradeUrl: "https://opaline.so/pricing/#basic",
-				},
 			),
 		).resolves.toBe(false);
 	});

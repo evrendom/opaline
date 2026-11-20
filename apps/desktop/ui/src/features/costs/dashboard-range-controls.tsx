@@ -24,7 +24,6 @@ export function DashboardRangeControls({
 		>
 			<FluidMenuHover items="button" />
 			<DashboardDateControls
-				sourceComponent="cost_dashboard_date_picker"
 				compact={compact}
 				triggerSuffix={
 					CHART_INTERVALS.find((option) => option.value === interval)?.label

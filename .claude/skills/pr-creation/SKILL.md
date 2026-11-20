@@ -1,7 +1,7 @@
 ---
 name: pr-creation
 description: Use when creating a pull request. Runs verification, reviews changes, and creates the PR with correct metadata. Invoke BEFORE pushing code.
-allowed-tools: [Read, Edit, Write, Bash, Glob, Grep, mcp__conductor__GetWorkspaceDiff]
+allowed-tools: [Read, Edit, Write, Bash, Glob, Grep]
 metadata:
   internal: true
 ---
@@ -22,7 +22,7 @@ This runs type checking, linting, and tests across the monorepo.
 
 ## 2. Review the Workspace Diff
 
-Use `mcp__conductor__GetWorkspaceDiff` with `stat: true` to see all changed files, then review the full diff to understand the scope of changes.
+Run `git diff --stat origin/main...HEAD` to see all changed files, then review the full diff (`git diff origin/main...HEAD`) to understand the scope of changes.
 
 ## 3. Commit All Changes
 

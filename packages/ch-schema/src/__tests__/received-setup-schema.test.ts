@@ -58,10 +58,9 @@ describe("received setup migration", () => {
 			);
 	});
 
-	test("bootstrap and the production gate run its runner", () => {
+	test("bootstrap runs its runner", () => {
 		expect(read("../../scripts/bootstrap.ts")).toContain(
 			'["20261013120000_received_setup.sql", "migrate-received-setup.ts"]',
 		);
-		expect(read("../../package.json")).toMatch(/ ch:migrate:received-setup /u);
 	});
 });

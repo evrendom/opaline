@@ -2,27 +2,15 @@ import { getLogger, withContext } from "@logtape/logtape";
 import { ORPCError, onError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 import { SESSION_ARRIVALS_PATH } from "@rudel/api-routes";
-import { TRENDS_SOURCES_PATH } from "@rudel/api-routes/trends-sources";
-import { TRENDS_USAGE_PATH } from "@rudel/api-routes/trends-usage";
-import { user } from "@rudel/sql-schema";
-import { and, eq, sql } from "drizzle-orm";
 import type { Session as AuthSession } from "./auth.js";
 import { createAuth } from "./auth.js";
 import { db, sqlClient } from "./db.js";
 import { getResendConfigWarnings } from "./email.js";
-import { getFrontendOrigin } from "./frontend-origin.js";
 import {
 	handleAvatarGetRequest,
 	handleAvatarUploadRequest,
 } from "./handlers/avatar-http.js";
 import { handleCliConnectionRequest } from "./handlers/cli-connection-http.js";
-import { handleCustomerActivityRequest } from "./handlers/customer-activity-http.js";
-import { handleGitHubRepositorySetupRequest } from "./handlers/github-repository-evidence-http.js";
-import {
-	GITHUB_WEBHOOK_PATH,
-	handleConfiguredGitHubWebhookRequest,
-} from "./handlers/github-webhook-http.js";
-import { handleInvitationPresentationRequest } from "./handlers/invitation-presentation-http.js";
 import {
 	handleLocalObjectStoreRoute,
 	isLocalObjectStorePath,
@@ -31,17 +19,6 @@ import { handleMcpRoute } from "./handlers/mcp-http.js";
 import { handleSelfHostRoute, selfHostAuth } from "./handlers/selfhost-http.js";
 import { handleSessionArrivalsRequest } from "./handlers/session-arrivals-http.js";
 import { handleSessionDetailStatsRequest } from "./handlers/session-detail-stats-http.js";
-import {
-	handleStripeWebhookRequest,
-	STRIPE_WEBHOOK_PATH,
-} from "./handlers/stripe-webhook-http.js";
-import {
-	getTeamInviteRoute,
-	handleTeamInviteImageRequest,
-} from "./handlers/team-invite-page-http.js";
-import { handleTrendsSourcesRequest } from "./handlers/trends-sources-http.js";
-import { handleTrendsUsageRequest } from "./handlers/trends-usage-http.js";
-import { handleUsageDigestUnsubscribeRequest } from "./handlers/usage-digest-unsubscribe-http.js";
 import {
 	API_RESPONSE_MAX_BYTES,
 	enforceApiResponseSize,
@@ -54,7 +31,6 @@ import {
 	readCliDeviceVerificationUrl,
 	readNonNegativeSafeIntegerEnv,
 	readPositiveSafeIntegerEnv,
-	readVercelDeploymentOrigins,
 } from "./lib/env.js";
 import { maybeCompressSessionDetailRpcResponse } from "./lib/http-compression.js";
 import {
@@ -81,8 +57,6 @@ import {
 	isIngestStillProcessingBody,
 	isIngestStillProcessingReply,
 } from "./services/r2-ingest-http-error.js";
-import { UNSUBSCRIBE_PATH as USAGE_DIGEST_UNSUBSCRIBE_PATH } from "./services/usage-digest/unsubscribe-token.js";
-import { getStripeWebhookConfig } from "./stripe-client.js";
 
 await setupLogging();
 
@@ -90,9 +64,7 @@ const logger = getLogger(["rudel", "api", "http"]);
 type AuthUser = AuthSession["user"];
 const betterAuthSecret = readBetterAuthSecret();
 const port = process.env.PORT ?? "4010";
-const IS_PRODUCTION =
-	process.env.NODE_ENV === "production" ||
-	process.env.FLY_APP_NAME !== undefined;
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const IS_TEST = process.env.NODE_ENV === "test";
 const DEFAULT_DEV_API_ORIGIN = `http://localhost:${port}`;
 const DEFAULT_DEV_ORIGIN = "http://localhost:4011";
@@ -145,7 +117,6 @@ const trustedOrigins = [
 	...new Set([
 		preferredFrontendOrigin,
 		...configuredTrustedOrigins,
-		...readVercelDeploymentOrigins(),
 		...DEFAULT_DEV_ORIGINS,
 	]),
 ];
@@ -377,7 +348,6 @@ export async function fetchHandler(
 		});
 	}
 
-	// Health check for Fly.io (must be GET-accessible)
 	if (url.pathname === "/health") {
 		return applyHttpResponsePolicy(Response.json({ status: "ok" }), {
 			pathname: url.pathname,
@@ -387,9 +357,6 @@ export async function fetchHandler(
 
 	const start = performance.now();
 	const publicLookupSource = resolvePublicLookupSource({
-		flyClientIp: process.env.FLY_APP_NAME
-			? request.headers.get("fly-client-ip")
-			: null,
 		forwardedFor: request.headers.get("x-forwarded-for"),
 		socketIp: options.socketIp ?? null,
 		trustedProxyHops: TRUSTED_PROXY_HOPS,
@@ -483,9 +450,6 @@ async function handleRequest(
 	publicLookupSource: string,
 	fallback: FetchHandlerOptions["fallback"],
 ): Promise<Response> {
-	if (url.pathname === GITHUB_WEBHOOK_PATH) {
-		return handleConfiguredGitHubWebhookRequest(request);
-	}
 	const objectStoreResponse = handleLocalObjectStoreRoute(request, url);
 	if (objectStoreResponse) return objectStoreResponse;
 	const selfHostResponse = handleSelfHostRoute(
@@ -501,70 +465,6 @@ async function handleRequest(
 		requestId,
 	});
 	if (mcpResponse) return mcpResponse;
-	if (url.pathname === STRIPE_WEBHOOK_PATH) {
-		const stripeConfig = getStripeWebhookConfig();
-		if (!stripeConfig) {
-			return Response.json(
-				{ error: "Stripe billing is not configured" },
-				{ status: 503 },
-			);
-		}
-		return handleStripeWebhookRequest(request, stripeConfig);
-	}
-	if (
-		/^\/(?:wrapped|dev\/wrapped|resume)(?:\/|$)/u.test(url.pathname) ||
-		/^\/rpc\/(?:wrappedShare|wrappedResume|wrappedDecimalClaim|analytics\/wrapped)(?:\/|$)/u.test(
-			url.pathname,
-		)
-	) {
-		return new Response("Wrapped has been retired.", {
-			status: 410,
-			headers: cors,
-		});
-	}
-	if (
-		url.pathname === "/api/home" &&
-		(request.method === "GET" || request.method === "HEAD")
-	) {
-		const session = await auth.api.getSession({ headers: request.headers });
-		let destination = "/";
-		if (session) {
-			// The session was already authenticated above. Query its landing state
-			// directly instead of re-running auth inside listOrganizations.
-			const [workspace] = await sqlClient<
-				{ has_uploaded_sessions: boolean; slug: string }[]
-			>`
-				SELECT
-					o.slug,
-					EXISTS (
-						SELECT 1
-						FROM session_ownership s
-						WHERE s.user_id = ${session.user.id}
-							AND s.last_ingested_at IS NOT NULL
-					) AS has_uploaded_sessions
-				FROM organization o
-				INNER JOIN member m ON m.organization_id = o.id
-				WHERE m.user_id = ${session.user.id}
-				ORDER BY (o.id = ${session.session.activeOrganizationId ?? ""}) DESC,
-					m.created_at ASC, o.id ASC
-				LIMIT 1
-			`;
-
-			destination =
-				workspace?.has_uploaded_sessions === true
-					? `/${encodeURIComponent(workspace.slug)}/sessions`
-					: "/welcome";
-		}
-		return new Response(null, {
-			status: 302,
-			headers: {
-				"Cache-Control": "private, no-store",
-				Location: destination,
-				Vary: "Cookie",
-				"X-Robots-Tag": "noindex, nofollow",
-			},
-		});
-	}
 	if (
 		url.pathname === "/api/cli/connections" ||
 		url.pathname.startsWith("/api/cli/connections/")
@@ -591,50 +491,6 @@ async function handleRequest(
 			response.headers.set(key, value);
 		return response;
 	}
-	if (url.pathname === "/api/customer-activity") {
-		return handleCustomerActivityRequest({
-			cors,
-			getUser: async () => {
-				const session = await auth.api.getSession({ headers: request.headers });
-				return session?.user ?? null;
-			},
-			saveTimeZone: async (userId, timeZone) => {
-				await db
-					.update(user)
-					.set({ timeZone })
-					.where(
-						and(
-							eq(user.id, userId),
-							sql`${user.timeZone} IS DISTINCT FROM ${timeZone}`,
-						),
-					);
-			},
-			request,
-		});
-	}
-	const invitationPresentationMatch =
-		/^\/api\/invitations\/([^/]+)\/presentation$/u.exec(url.pathname);
-	if (invitationPresentationMatch?.[1]) {
-		return handleInvitationPresentationRequest({
-			cors,
-			getSession: (req) => auth.api.getSession({ headers: req.headers }),
-			invitationId: invitationPresentationMatch[1],
-			request,
-		});
-	}
-	if (url.pathname === "/api/github/setup") {
-		const response = await handleGitHubRepositorySetupRequest({
-			database: sqlClient,
-			frontendOrigin: preferredFrontendOrigin,
-			getSession: async (req) =>
-				(await auth.api.getSession({ headers: req.headers })) ?? null,
-			request,
-		});
-		for (const [key, value] of Object.entries(cors)) {
-			response.headers.set(key, value);
-		}
-		return response;
-	}
 	if (IS_TEST && url.pathname === "/api/__test/oversized-response") {
 		return Response.json({ payload: "x".repeat(API_RESPONSE_MAX_BYTES) });
 	}
@@ -646,9 +502,6 @@ async function handleRequest(
 			}),
 		});
 	}
-	const invite = getTeamInviteRoute(url.pathname);
-	if (invite?.image) return handleTeamInviteImageRequest(request, invite.token);
-
 	// Defense in depth: block Better Auth's built-in org deletion route.
 	// Opaline has its own guarded deletion path via the RPC router.
 	if (url.pathname === "/api/auth/organization/delete") {
@@ -660,33 +513,6 @@ async function handleRequest(
 			response.headers.set(key, value);
 		}
 		return response;
-	}
-
-	if (url.pathname === USAGE_DIGEST_UNSUBSCRIBE_PATH) {
-		return handleUsageDigestUnsubscribeRequest(request, {
-			secret: process.env.BETTER_AUTH_SECRET ?? "",
-			settingsUrl: `${getFrontendOrigin()}/settings/account#email-digests`,
-		});
-	}
-
-	if (url.pathname === TRENDS_USAGE_PATH) {
-		if (request.method !== "GET" && request.method !== "HEAD") {
-			return new Response("Method Not Allowed", {
-				headers: { ...cors, Allow: "GET, HEAD" },
-				status: 405,
-			});
-		}
-		return handleTrendsUsageRequest({ cors, method: request.method });
-	}
-
-	if (url.pathname === TRENDS_SOURCES_PATH) {
-		if (request.method !== "GET" && request.method !== "HEAD") {
-			return new Response("Method Not Allowed", {
-				headers: { ...cors, Allow: "GET, HEAD" },
-				status: 405,
-			});
-		}
-		return handleTrendsSourcesRequest({ cors, method: request.method });
 	}
 
 	if (url.pathname.startsWith("/api/avatar/")) {

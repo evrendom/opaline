@@ -1,9 +1,6 @@
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { useTheme } from "@/app/providers/ThemeProvider";
-import { readPendingEmailCodeDraft } from "@/features/auth/email-code-auth";
-import { LoginForm } from "@/features/auth/LoginForm";
-import { SignupForm } from "@/features/auth/SignupForm";
 import { SelfHostedAuthForm } from "@/features/self-hosted/SelfHostedAuthForm";
 import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import {
@@ -29,12 +26,10 @@ export function GuestApp(props: GuestAppProps = {}) {
 	const selfHost = useSelfHost();
 	useRootMark("data-auth-shell");
 	const [page, setPage] = useState<Page>(() =>
-		selfHost
-			? initialSelfHostedAuthMode(selfHost, window.location.pathname) ===
-				"sign-up"
-				? "signup"
-				: "login"
-			: (readPendingEmailCodeDraft()?.mode ?? "login"),
+		selfHost &&
+		initialSelfHostedAuthMode(selfHost, window.location.pathname) === "sign-up"
+			? "signup"
+			: "login",
 	);
 	const selfHostedCopy = selfHost
 		? selfHostedAuthCopy(page === "login" ? "sign-in" : "sign-up", {
@@ -83,11 +78,7 @@ export function GuestApp(props: GuestAppProps = {}) {
 								setPage((current) => (current === "login" ? "signup" : "login"))
 							}
 						/>
-					) : page === "login" ? (
-						<LoginForm />
-					) : (
-						<SignupForm onSwitchToLogin={() => setPage("login")} />
-					)}
+					) : null}
 				</div>
 			</main>
 		</div>

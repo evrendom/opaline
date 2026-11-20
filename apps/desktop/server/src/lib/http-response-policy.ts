@@ -1,7 +1,7 @@
 export const CONTENT_SECURITY_POLICY = [
 	"default-src 'self'",
 	"base-uri 'self'",
-	"connect-src 'self' https://*.posthog.com",
+	"connect-src 'self'",
 	"font-src 'self' data:",
 	"form-action 'self'",
 	"frame-ancestors 'none'",
@@ -9,7 +9,7 @@ export const CONTENT_SECURITY_POLICY = [
 	"img-src 'self' data: blob: https:",
 	"media-src 'self' blob: https:",
 	"object-src 'none'",
-	"script-src 'self' https://*.posthog.com",
+	"script-src 'self'",
 	"style-src 'self' 'unsafe-inline'",
 	"worker-src 'self' blob:",
 ].join("; ");

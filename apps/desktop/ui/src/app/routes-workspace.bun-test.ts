@@ -36,7 +36,6 @@ describe("Workspace product URLs", () => {
 			["/settings/reports", "/acme/settings/reports"],
 			["/settings/members", "/acme/settings/members"],
 			["/settings/account", "/acme/settings/account"],
-			["/settings/invitations", "/acme/settings/invitations"],
 			["/settings/create-workspace", "/acme/settings/create-workspace"],
 		])
 			expect(getWorkspaceAppPath("acme", input ?? "")).toBe(expected);
@@ -45,10 +44,6 @@ describe("Workspace product URLs", () => {
 	test("keeps public flows, previews and already scoped destinations intact", () => {
 		for (const path of [
 			"/welcome?connect=123",
-			"/wrapped/abc",
-			"/team/invite/abc",
-			"/acme/join/abc",
-			"/invitation/abc",
 			"/device",
 			"/login",
 			"/dev/left-sidebar/session",
@@ -87,9 +82,9 @@ describe("Workspace product URLs", () => {
 		expect(
 			getWorkspacePathAfterSwitch(
 				"beta",
-				"/acme/settings/account#workspace-invitations",
+				"/acme/settings/account#delete-account",
 			),
-		).toBe("/beta/settings/account#workspace-invitations");
+		).toBe("/beta/settings/account#delete-account");
 		expect(
 			getWorkspacePathAfterSwitch(
 				"beta",

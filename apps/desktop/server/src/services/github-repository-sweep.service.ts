@@ -7,7 +7,6 @@ import type postgres from "postgres";
 import { z } from "zod";
 import { getClickhouse } from "../clickhouse.js";
 import { readGitHubSyncSkippedOrgIds } from "../lib/env.js";
-import { createGitHubInstallationAccessToken } from "./github-app.service.js";
 import { latestGitHubEvidenceAttempt } from "./github-evidence-maintenance.service.js";
 import {
 	flushGitHubOutcomesBatch,
@@ -22,10 +21,7 @@ import {
 	persistGitHubStatuses,
 } from "./github-outcomes-persistence.service.js";
 import { refreshPrTotalsReadiness } from "./github-outcomes-readiness.service.js";
-import {
-	type GitHubRepositoryCredentials,
-	isGitHubTokenCredentials,
-} from "./github-token.service.js";
+import type { GitHubRepositoryCredentials } from "./github-token.service.js";
 import { L1_EDGE_SESSION_DEBOUNCE_MS } from "./l1-edges/l1-edge-enqueue.js";
 import { enqueueL1EdgeScope } from "./l1-edges/l1-edge-queue.service.js";
 import {
@@ -205,7 +201,6 @@ export async function runGitHubRepositorySweep(input: {
 	readonly environment?: Readonly<Record<string, string | undefined>>;
 	readonly historyDays?: number;
 	readonly fetch?: typeof globalThis.fetch;
-	readonly createToken?: typeof createGitHubInstallationAccessToken;
 	readonly now?: () => Date;
 	readonly signal?: AbortSignal;
 	readonly maxRequests?: number;
@@ -273,41 +268,7 @@ export async function runGitHubRepositorySweep(input: {
 								break;
 							}
 							const requestFetch = input.fetch ?? globalThis.fetch;
-							const tokenFetch: typeof globalThis.fetch = Object.assign(
-								async (url: string | URL | Request, init?: RequestInit) => {
-									const response = await requestFetch(url, {
-										...init,
-										signal: AbortSignal.any([
-											AbortSignal.timeout(Math.max(1, deadline - Date.now())),
-											signal,
-										]),
-									});
-									if (response.status === 403 || response.status === 404) {
-										await response.body?.cancel();
-										throw new GitHubSourceError({
-											kind: response.status === 403 ? "forbidden" : "not-found",
-											status: response.status,
-											message: "GitHub installation token is unavailable",
-											endpoint: "/app/installations/access_tokens",
-											requestId: response.headers.get("x-github-request-id"),
-											retryAfterMs: null,
-										});
-									}
-									return response;
-								},
-								{ preconnect: requestFetch.preconnect },
-							);
-							const credentials = input.config;
-							const token = isGitHubTokenCredentials(credentials)
-								? await credentials.read()
-								: await (
-										input.createToken ?? createGitHubInstallationAccessToken
-									)({
-										config: credentials,
-										installationId: binding.installation_id,
-										fetch: tokenFetch,
-										now: now(),
-									});
+							const token = await input.config.read();
 							const boundedFetch: typeof globalThis.fetch = Object.assign(
 								async (url: string | URL | Request, init?: RequestInit) => {
 									if (
@@ -349,9 +310,7 @@ export async function runGitHubRepositorySweep(input: {
 							);
 							source = createGitHubSweepSource({
 								authorization: createGitHubAuthorization(token),
-								baseUrl: isGitHubTokenCredentials(credentials)
-									? credentials.apiBaseUrl
-									: undefined,
+								baseUrl: input.config.apiBaseUrl,
 								fetch: boundedFetch,
 							});
 						}

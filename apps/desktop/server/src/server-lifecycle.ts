@@ -1,5 +1,4 @@
 import { readBooleanEnv } from "./lib/env.js";
-import { shutdownApiProductAnalytics } from "./lib/product-analytics.js";
 import { readResendConfig } from "./resend-config.js";
 import {
 	registerClickHousePurgeWorker,
@@ -68,7 +67,6 @@ export function startServerLifecycle(): ServerLifecycle {
 			shutdownSessionLanguageSignalScanner();
 			await Promise.all([
 				githubEvidenceWorker?.stop(),
-				shutdownApiProductAnalytics(),
 				clickHousePurgeWorker.stop(),
 				sessionLanguageSignalReconciliationWorker?.stop(),
 				sessionLineageReconciliationWorker?.stop(),

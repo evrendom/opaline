@@ -73,12 +73,9 @@ describe("session context snapshots migration", () => {
 		);
 	});
 
-	test("bootstrap and the production gate run its runner", () => {
+	test("bootstrap runs its runner", () => {
 		expect(read("../../scripts/bootstrap.ts")).toContain(
 			'"20261107120000_session_context_snapshots.sql",\n\t\t"migrate-session-context-snapshots.ts",',
-		);
-		expect(read("../../package.json")).toMatch(
-			/"ch:migrate:production": "[^"]* ch:migrate:session-context-snapshots[ "]/u,
 		);
 	});
 });

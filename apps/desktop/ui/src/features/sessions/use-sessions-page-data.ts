@@ -4,10 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDateRange } from "@/features/analytics/date-range/useDateRange";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
 import {
-	type PageViewSection,
-	useTrackProductPageView,
-} from "@/features/analytics/tracking/useTrackProductPageView";
-import {
 	sessionUsageShares,
 	usePlanUsage,
 } from "@/features/costs/plan-usage/use-plan-usage";
@@ -49,7 +45,6 @@ export function useSessionsPageData({
 	detail = false,
 	detailReady = false,
 	focus = null,
-	trackPageView,
 	paginated = true,
 }: {
 	detail?: boolean;
@@ -58,7 +53,6 @@ export function useSessionsPageData({
 	 * whole range it already holds; otherwise they are asked for. */
 	focus?: DayRange | null;
 	paginated?: boolean;
-	trackPageView: boolean;
 }) {
 	const demo = useDemoRuntime();
 	const queryClient = useQueryClient();
@@ -311,47 +305,6 @@ export function useSessionsPageData({
 		() => buildDashboardSessionTabMetrics(summaryComparison),
 		[summaryComparison],
 	);
-	const sessionsSections = useMemo<PageViewSection[]>(
-		() => [
-			{
-				id: "summary_cards",
-				state:
-					isSummaryError || isSnapshotSessionsError
-						? "error"
-						: headlineMetrics.length > 0 &&
-								(snapshotSessionsData?.length ?? 0) > 0
-							? "populated"
-							: "empty",
-				itemCount: headlineMetrics.length,
-			},
-		],
-		[
-			headlineMetrics.length,
-			isSnapshotSessionsError,
-			isSummaryError,
-			snapshotSessionsData,
-		],
-	);
-
-	useTrackProductPageView({
-		isLoading: !trackPageView || isSummaryPending || isSnapshotSessionsPending,
-		isError: trackPageView && (isSummaryError || isSnapshotSessionsError),
-		hasData: trackPageView && (snapshotSessionsData?.length ?? 0) > 0,
-		sections: trackPageView ? sessionsSections : [],
-		metrics: trackPageView
-			? [
-					{
-						id: "total_sessions",
-						value: summaryComparison?.current.total_sessions,
-					},
-					{
-						id: "avg_session_duration_min",
-						value: summaryComparison?.current.avg_session_duration_min,
-					},
-				]
-			: [],
-	});
-
 	const useRolling24Hours = activeDateRangeOptionId === "24-hours";
 	const liveSessions = useLiveSessionList({
 		enabled: listed || !coldDetail || idleAfterDetail,

@@ -1,9 +1,4 @@
-import { createHash } from "node:crypto";
 import { getLogger } from "@logtape/logtape";
-import type {
-	OpalineBillingPeriod,
-	OpalineBillingPlan,
-} from "@rudel/api-routes";
 import { Resend } from "resend";
 
 const logger = getLogger(["rudel", "api", "email"]);
@@ -29,21 +24,6 @@ export interface InvitationEmailContent {
 	inviteLink: string;
 	subject: string;
 	html: string;
-	text: string;
-}
-
-export interface BillingUpgradeRequestEmailData {
-	billingPeriod: OpalineBillingPeriod;
-	organizationName: string;
-	ownerEmail: string;
-	plan: OpalineBillingPlan;
-	requesterName: string;
-	upgradeUrl: string;
-}
-
-export interface BillingUpgradeRequestEmailContent {
-	html: string;
-	subject: string;
 	text: string;
 }
 
@@ -155,51 +135,6 @@ export function buildInvitationEmailContent(
 `,
 		text: `${inviterName} invited you to join ${organizationName} on Opaline.\n\nAccept the invitation here: ${inviteLink}`,
 	};
-}
-
-export function buildBillingUpgradeRequestEmailContent(
-	data: BillingUpgradeRequestEmailData,
-): BillingUpgradeRequestEmailContent {
-	const requesterName = normalizeText(data.requesterName);
-	const organizationName = normalizeText(data.organizationName);
-	const planName = data.plan === "business" ? "Business" : "Basic";
-	const billingPeriod = data.billingPeriod === "yearly" ? "yearly" : "monthly";
-	const upgradeUrl = normalizeText(data.upgradeUrl);
-
-	return {
-		subject: `${requesterName} requested an Opaline upgrade for ${organizationName}`,
-		html: `
-<p>Hi,</p>
-<p><strong>${escapeHtml(requesterName)}</strong> would like to upgrade <strong>${escapeHtml(organizationName)}</strong> to the ${planName} ${billingPeriod} plan.</p>
-<p>Only a workspace owner can approve billing changes.</p>
-<p>
-  <a href="${escapeHtml(upgradeUrl)}" style="display:inline-block;padding:12px 24px;background:#000;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">
-    Review upgrade
-  </a>
-</p>
-<p>Or copy this link into your browser:</p>
-<p>${escapeHtml(upgradeUrl)}</p>
-`,
-		text: `${requesterName} would like to upgrade ${organizationName} to the ${planName} ${billingPeriod} plan.\n\nOnly a workspace owner can approve billing changes.\n\nReview the upgrade: ${upgradeUrl}`,
-	};
-}
-
-export function getBillingUpgradeRequestEmailIdempotencyKey(
-	data: BillingUpgradeRequestEmailData,
-): string {
-	const digest = createHash("sha256")
-		.update(
-			JSON.stringify([
-				data.billingPeriod,
-				data.organizationName,
-				data.ownerEmail,
-				data.plan,
-				data.requesterName,
-				data.upgradeUrl,
-			]),
-		)
-		.digest("hex");
-	return `billing-upgrade-request/${digest}`;
 }
 
 export function buildPasswordResetEmailContent(
@@ -366,50 +301,6 @@ export async function sendOrganizationInvitationEmail(
 			email: data.inviteeEmail,
 			error: err,
 		});
-	}
-}
-
-export async function sendBillingUpgradeRequestEmail(
-	config: ResendConfig,
-	data: BillingUpgradeRequestEmailData,
-): Promise<boolean> {
-	if (!config.apiKey || !config.fromEmail) {
-		return false;
-	}
-
-	const message = buildBillingUpgradeRequestEmailContent(data);
-	try {
-		const resend = new Resend(config.apiKey);
-		const response = await resend.emails.send(
-			{
-				from: config.fromEmail,
-				replyTo: config.replyTo,
-				to: data.ownerEmail,
-				subject: message.subject,
-				html: message.html,
-				text: message.text,
-			},
-			{
-				idempotencyKey: getBillingUpgradeRequestEmailIdempotencyKey(data),
-			},
-		);
-		if (response.error) {
-			logger.error(
-				"Resend rejected a billing upgrade request email for {email}: {error}",
-				{ email: data.ownerEmail, error: response.error },
-			);
-			return false;
-		}
-		logger.info("Billing upgrade request email sent to {email}", {
-			email: data.ownerEmail,
-		});
-		return true;
-	} catch (err) {
-		logger.error(
-			"Failed to send billing upgrade request email to {email}: {error}",
-			{ email: data.ownerEmail, error: err },
-		);
-		return false;
 	}
 }
 

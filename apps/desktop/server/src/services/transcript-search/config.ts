@@ -89,16 +89,6 @@ export function embedsWorkspace(workspaceId: string): boolean {
 }
 
 /**
- * Whether workspaces on a paid plan (subscription active or past due) are
- * indexed for search without being listed: only when
- * `TRANSCRIPT_EMBEDDINGS_PAID_PLANS` is exactly `true`. Off by default, so
- * only `TRANSCRIPT_EMBEDDINGS_WORKSPACES` is indexed.
- */
-export function embedsPaidPlans(): boolean {
-	return process.env.TRANSCRIPT_EMBEDDINGS_PAID_PLANS === "true";
-}
-
-/**
  * Tokens a workspace may embed per 30 days: `TRANSCRIPT_EMBEDDINGS_QUOTA_TOKENS`,
  * 1 billion by default (about $20 of text-embedding-3-small).
  */

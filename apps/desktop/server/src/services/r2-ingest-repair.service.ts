@@ -22,7 +22,6 @@ import {
 	type R2IngestProcessor,
 	repairRecoverableR2IngestJobs,
 } from "./r2-ingest-commit.service.js";
-import { canMaterializeLargeR2IngestJobs } from "./r2-ingest-materialization-gate.js";
 import type { R2MultipartUploadClient } from "./r2-ingest-storage.service.js";
 import {
 	getNextEvidenceWorkDueAt,
@@ -170,13 +169,11 @@ function earliest(first: Date | null, second: Date | null): Date | null {
 }
 
 /**
- * Large sessions are committed on Vercel but materialized only by the resident
- * worker, which otherwise learns of new work at its next scheduled pass. This
- * polls one indexed row every 15 seconds and wakes the worker when a large job
- * is due. A no-op where large jobs cannot be materialized.
+ * Large sessions are materialized only by the resident worker, which otherwise
+ * learns of new work at its next scheduled pass. This polls one indexed row
+ * every 15 seconds and wakes the worker when a large job is due.
  */
 export function startLargeR2IngestWatcher(): LargeR2IngestWatcher {
-	if (!canMaterializeLargeR2IngestJobs()) return { stop() {} };
 	let checking = false;
 	const timer = setInterval(() => {
 		if (checking) return;

@@ -28,7 +28,6 @@ type CliSignInProps =
 	| {
 			mode: "paired";
 			authorization: CliAuthorization;
-			invitedWorkspaceId: string | null;
 			snapshot: CliConnectionSnapshot;
 			onFinish: () => void;
 	  }
@@ -141,19 +140,13 @@ export function CliSignIn(props: CliSignInProps) {
 			</>
 		);
 	if (session && props.mode === "device")
-		return (
-			<CliDeviceAuthorization
-				userCode={props.userCode}
-				userId={session.user.id}
-			/>
-		);
+		return <CliDeviceAuthorization userCode={props.userCode} />;
 	if (session && props.mode === "paired")
 		return (
 			<WelcomeSteps
 				key={session.user.id}
 				session={session}
 				authorization={props.authorization}
-				invitedWorkspaceId={props.invitedWorkspaceId}
 				snapshot={props.snapshot}
 				onFinish={props.onFinish}
 				onSignOut={async () => {

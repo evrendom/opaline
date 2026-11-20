@@ -19,7 +19,6 @@ import {
 	relativeUrlReferences,
 } from "./selfhost-artifact";
 
-const LEFT_OUT_NATIVE_MODULES = ["@resvg/resvg-js"];
 const WEB_BUILD_ENV_DROPPED = /^(VITE_|SENTRY_|POSTHOG_|PUBLIC_POSTHOG_)/u;
 
 const root = resolve(import.meta.dir, "..");
@@ -42,24 +41,6 @@ const outDir = resolve(root, values.out ?? "dist-selfhost");
 const stage = join(outDir, `.stage-${version}`);
 const pkg = join(stage, "package");
 const serverDir = join(pkg, "server");
-
-const leaveOutNativeModules: BunPlugin = {
-	name: "leave-out-native-modules",
-	setup(build) {
-		const filter = new RegExp(
-			`^(${LEFT_OUT_NATIVE_MODULES.map((name) => name.replace(/[/.]/gu, "\\$&")).join("|")})$`,
-			"u",
-		);
-		build.onResolve({ filter }, (args) => ({
-			path: args.path,
-			namespace: "left-out",
-		}));
-		build.onLoad({ filter: /.*/u, namespace: "left-out" }, (args) => ({
-			contents: `throw new Error(${JSON.stringify(`${args.path} is a native module and is not part of the packaged Opaline server`)});`,
-			loader: "js",
-		}));
-	},
-};
 
 const inlinePackageVersions: BunPlugin = {
 	name: "inline-package-versions",
@@ -90,7 +71,7 @@ async function bundle(
 		target: "bun",
 		format: "esm",
 		naming: "[name].[ext]",
-		plugins: [leaveOutNativeModules, inlinePackageVersions],
+		plugins: [inlinePackageVersions],
 	});
 	for (const log of result.logs)
 		if (log.level === "error" || log.level === "warning")
@@ -190,11 +171,6 @@ async function buildServer(): Promise<void> {
 	await cp(
 		join(services, "demo-repository-files.json.gz"),
 		join(serverDir, "demo-repository-files.json.gz"),
-	);
-	await cp(
-		join(root, "apps/desktop/server/src/assets/team-invite"),
-		join(pkg, "assets/team-invite"),
-		{ recursive: true },
 	);
 
 	const references = new Set<string>();

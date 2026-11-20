@@ -11,7 +11,6 @@ import {
 import { getActiveOrganizationId } from "../cli-workspace.service.js";
 import { SessionAgentMetadataConflictError } from "../session-ownership.service.js";
 import type { SessionImportDependencies } from "./dependencies.js";
-import { rethrowAgentRunLimitAsForbidden } from "./errors.js";
 import type { SessionImportRequest } from "./import-session.js";
 import type { AdmittedSession, ClaimedSession } from "./scope.js";
 
@@ -23,14 +22,12 @@ export async function claimSession(
 	admitted: AdmittedSession,
 ): Promise<ClaimedSession> {
 	const { filteredInput, timestamps } = admitted;
-	const { organizationId: orgId, ownership } = await deps.control
-		.claim({
-			requestedOrganizationId:
-				input.organizationId ?? getActiveOrganizationId(context.session),
-			sessionId: input.sessionId,
-			userId: context.user.id,
-		})
-		.catch(rethrowAgentRunLimitAsForbidden);
+	const { organizationId: orgId, ownership } = await deps.control.claim({
+		requestedOrganizationId:
+			input.organizationId ?? getActiveOrganizationId(context.session),
+		sessionId: input.sessionId,
+		userId: context.user.id,
+	});
 	if (!ownership.owned) {
 		throw errorFactories.sessionOwnershipConflict();
 	}

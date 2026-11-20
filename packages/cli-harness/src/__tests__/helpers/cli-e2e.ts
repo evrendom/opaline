@@ -243,7 +243,6 @@ export async function runBuiltCli(
 			HOME: options.home,
 			USERPROFILE: options.home,
 			RUDEL_CONFIG_DIR: options.configDir,
-			POSTHOG_ENABLED: "false",
 			...options.env,
 		},
 		stdin: "pipe",

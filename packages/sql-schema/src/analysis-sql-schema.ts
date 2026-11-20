@@ -101,7 +101,7 @@ export const analysisQuerySlot = pgTable("analysis_query_slot", {
 /**
  * Saved analyses whose finding impact rows (ClickHouse
  * `analysis_finding_runs`) must follow a visibility change made in the
- * analysis log (Convex, authoritative). A share or unshare requests a sync
+ * analysis log (authoritative). A share or unshare requests a sync
  * here before it changes the analysis; the sync copies the analysis's current
  * visibility and revision to the rows and then clears the request, unless a
  * newer one (a higher `ticket`) arrived meanwhile. Requests left by a failed

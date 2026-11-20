@@ -2,10 +2,6 @@ import { isLoopbackHostname, parseSafeBrowserUrl } from "@rudel/api-routes";
 import { isSelfHosted } from "./self-hosted.js";
 
 const MINIMUM_AUTH_SECRET_LENGTH = 32;
-const VERCEL_DEPLOYMENT_HOST_ENV_VARS = [
-	"VERCEL_URL",
-	"VERCEL_BRANCH_URL",
-] as const;
 
 export type UsageEventAnalyticsCutoverMode = "all" | "canary" | "off";
 
@@ -25,42 +21,6 @@ export interface CliDeviceVerificationUrlConfig {
 	url: string;
 	/** Non-fatal configuration concern for the caller to log. */
 	warning: string | undefined;
-}
-
-/**
- * Return the exact Vercel preview origins assigned to this deployment.
- *
- * Vercel exposes hostnames without a protocol. Restricting them to
- * `*.vercel.app` keeps the auth allowlist fail-closed if one of these
- * environment variables is accidentally overridden.
- */
-export function readVercelDeploymentOrigins(
-	environment: Readonly<Record<string, string | undefined>> = process.env,
-): string[] {
-	const origins = new Set<string>();
-
-	for (const name of VERCEL_DEPLOYMENT_HOST_ENV_VARS) {
-		const hostname = environment[name]?.trim().toLowerCase();
-		if (!hostname?.endsWith(".vercel.app")) continue;
-
-		try {
-			const url = new URL(`https://${hostname}`);
-			if (
-				url.hostname !== hostname ||
-				url.pathname !== "/" ||
-				url.port !== "" ||
-				url.search !== "" ||
-				url.hash !== ""
-			) {
-				continue;
-			}
-			origins.add(url.origin);
-		} catch {
-			// Ignore malformed platform values rather than weakening auth startup.
-		}
-	}
-
-	return [...origins];
 }
 
 /**
@@ -356,8 +316,8 @@ export function shouldReadSessionLineage(
 /**
  * Dark-launch switch for every user-facing GitHub evidence surface: the Merged
  * PRs dashboard metric (with its CI-errors-per-PR companion) and the workspace
- * settings GitHub section. Collection, persistence, cron, and webhook paths do
- * not read it and keep running regardless.
+ * settings GitHub section. Collection, persistence and cron paths do not
+ * read it and keep running regardless.
  *
  * Only the exact string "true" enables the UI. Missing, "false", and any
  * invalid value fail closed to hidden: a typo must never expose a half-rolled
@@ -392,24 +352,6 @@ export function readGitHubSyncSkippedOrgIds(
 ): string[] {
 	const demo = environment.DEMO_ORGANIZATION_ID?.trim();
 	return demo ? [demo] : [];
-}
-
-/**
- * Workspaces whose members never reach PostHog from the API: test and seed
- * workspaces would otherwise create a person per member on every signup and on
- * every daily billing traits refresh.
- */
-export function readProductAnalyticsExcludedOrgIds(
-	environment: Readonly<Record<string, string | undefined>> = process.env,
-): string[] {
-	return [
-		...new Set(
-			(environment.PRODUCT_ANALYTICS_EXCLUDED_ORG_IDS ?? "")
-				.split(",")
-				.map((value) => value.trim())
-				.filter(Boolean),
-		),
-	];
 }
 
 function readBooleanFromEnvironment(

@@ -31,14 +31,8 @@ const { isL1EdgeWorkerEnabled } = await import(
 const { readRunIndexHealConfig } = await import(
 	"../services/l1-edges/run-index-heal.service.js"
 );
-const { assertCanStartOrganizationAgentRun } = await import(
-	"../services/billing-entitlements.service.js"
-);
 const { mcpOpenToEveryone } = await import("../mcp/mcp-availability.js");
 const { mcpStatsTool } = await import("../mcp/self-analytics-tools.js");
-const { getStripeBillingConfiguration, getStripeClient } = await import(
-	"../stripe-client.js"
-);
 
 const TOUCHED = [
 	"OPALINE_SELF_HOSTED",
@@ -56,8 +50,6 @@ const TOUCHED = [
 	"RUN_CI_WORKSPACES",
 	"L1_EDGES_WORKER_ENABLED",
 	"MCP_PLUGIN_PUBLIC",
-	"STRIPE_SECRET_KEY",
-	"STRIPE_BILLING_MODE",
 	"ANTHROPIC_API_KEY",
 	"SUBQ_API_KEY",
 	"TYPESAFE_API_KEY",
@@ -86,7 +78,7 @@ function withSwitch(value: string | undefined) {
 
 describe("switch off: every gate answers as before", () => {
 	for (const value of OFF_VALUES) {
-		test(`OPALINE_SELF_HOSTED=${value ?? "(unset)"}`, async () => {
+		test(`OPALINE_SELF_HOSTED=${value ?? "(unset)"}`, () => {
 			withSwitch(value);
 			process.env.VITE_ADMIN_ORGANIZATION_ID = "team";
 			process.env.RETRO_TOOLS_WORKSPACES = "listed";
@@ -99,8 +91,6 @@ describe("switch off: every gate answers as before", () => {
 			expect(embedsWorkspace("other")).toBe(false);
 
 			expect(analysisLogStore()).toBeNull();
-			process.env.ANALYSIS_LOG_STORE = "convex";
-			expect(analysisLogStore()).toBe("convex");
 			process.env.ANALYSIS_LOG_STORE = "memory";
 			expect(analysisLogStore()).toBe("memory");
 			process.env.ANALYSIS_LOG_STORE = "postgres";
@@ -143,17 +133,9 @@ describe("switch off: every gate answers as before", () => {
 			expect(heal.workerEnabled).toBe(false);
 			expect(heal.retroOrganizationIds).toEqual(new Set(["listed"]));
 
-			await expect(
-				assertCanStartOrganizationAgentRun("org", "session"),
-			).rejects.toThrow("Postgres reached");
-
 			expect(mcpOpenToEveryone()).toBe(false);
 			process.env.MCP_PLUGIN_PUBLIC = "true";
 			expect(mcpOpenToEveryone()).toBe(true);
-
-			process.env.STRIPE_BILLING_MODE = "live";
-			process.env.STRIPE_SECRET_KEY = "sk_live_123";
-			expect(getStripeClient()).not.toBeNull();
 		});
 	}
 });
@@ -169,7 +151,7 @@ describe("switch on: a single-team install", () => {
 		expect(embedsWorkspace("any")).toBe(true);
 		expect(embedsWorkspace("")).toBe(false);
 		expect(analysisLogStore()).toBe("postgres");
-		process.env.ANALYSIS_LOG_STORE = "convex";
+		process.env.ANALYSIS_LOG_STORE = "other";
 		expect(analysisLogStore()).toBe("postgres");
 		process.env.ANALYSIS_LOG_STORE = "memory";
 		expect(analysisLogStore()).toBe("memory");
@@ -191,7 +173,7 @@ describe("switch on: a single-team install", () => {
 		expect(environmentDefault("moment_observations", "any")).toBe(true);
 	});
 
-	test("password sign-in, the L1 worker, MCP and the run limit are open", async () => {
+	test("password sign-in, the L1 worker and MCP are open", () => {
 		expect(readPasswordAuthAllowlist()).toEqual({ kind: "everyone" });
 		process.env.L1_EDGES_WORKER_ENABLED = "false";
 		expect(isL1EdgeWorkerEnabled()).toBe(true);
@@ -199,16 +181,6 @@ describe("switch on: a single-team install", () => {
 		expect(heal.workerEnabled).toBe(true);
 		expect(heal.retroOrganizationIds).toBe("all");
 		expect(mcpOpenToEveryone()).toBe(true);
-		await expect(
-			assertCanStartOrganizationAgentRun("org", "session"),
-		).resolves.toBeUndefined();
-	});
-
-	test("Stripe is never configured or constructed", () => {
-		process.env.STRIPE_BILLING_MODE = "live";
-		process.env.STRIPE_SECRET_KEY = "sk_live_123";
-		expect(getStripeClient()).toBeNull();
-		expect(getStripeBillingConfiguration().configured).toBe(false);
 	});
 });
 

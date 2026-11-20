@@ -120,67 +120,6 @@ html[data-auth-shell],
 	background: var(--auth-control);
 }
 
-.opaline-auth-stage {
-	animation: opaline-auth-stage-enter 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.opaline-email-verification {
-	display: flex;
-	flex-direction: column;
-	gap: 24px;
-}
-
-.opaline-email-verification-intro {
-	display: flex;
-	min-width: 0;
-	flex-direction: column;
-	align-items: center;
-	gap: 6px;
-	text-align: center;
-}
-
-.opaline-email-verification-intro p {
-	max-width: 36ch;
-	margin: 0;
-	color: var(--auth-muted);
-	font-size: 14px;
-	line-height: 1.6;
-	overflow-wrap: anywhere;
-	text-wrap: pretty;
-}
-
-.opaline-auth-email-switch {
-	position: relative;
-	padding: 0;
-	border: 0;
-	background: transparent;
-	color: var(--auth-muted);
-	font: inherit;
-	font-size: 13px;
-	line-height: 1.5;
-	text-decoration: underline;
-	text-underline-offset: 3px;
-}
-
-.opaline-auth-email-switch:hover:not(:disabled) {
-	color: var(--auth-text);
-}
-
-.opaline-auth-email-switch:disabled {
-	opacity: 0.55;
-	cursor: default;
-}
-
-.opaline-auth-email-switch > span {
-	position: absolute;
-	top: 50%;
-	left: 50%;
-	width: max(100%, 48px);
-	height: max(100%, 48px);
-	pointer-events: none;
-	transform: translate(-50%, -50%);
-}
-
 .opaline-auth-content [data-slot="input"].opaline-auth-code-input {
 	min-height: 56px;
 	border: 0;
@@ -195,17 +134,6 @@ html[data-auth-shell],
 	text-align: center;
 }
 
-@keyframes opaline-auth-stage-enter {
-	from {
-		opacity: 0;
-		transform: translateY(8px);
-	}
-	to {
-		opacity: 1;
-		transform: translateY(0);
-	}
-}
-
 @media (max-width: 899px) {
 	.opaline-auth-main {
 		padding-block: 40px;
@@ -213,10 +141,6 @@ html[data-auth-shell],
 
 	.opaline-auth-content [data-slot="button"],
 	.opaline-auth-content [data-slot="input"] {
-		font-size: 16px;
-	}
-
-	.opaline-email-verification-intro p {
 		font-size: 16px;
 	}
 }
@@ -230,9 +154,5 @@ html[data-auth-shell],
 @media (prefers-reduced-motion: reduce) {
 	.opaline-auth-content [data-slot="button"] {
 		transition: none;
-	}
-
-	.opaline-auth-stage {
-		animation: none;
 	}
 }

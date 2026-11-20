@@ -13,7 +13,6 @@ import { Button } from "@/app/ui/button";
 import { Calendar } from "@/app/ui/calendar";
 import { Popover, PopoverTrigger } from "@/app/ui/popover";
 import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
-import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
 import { SessionMenuPopoverContent } from "@/features/sessions/components/session-menu-popover-content";
 import "./analytics-date-range-picker.css";
 import { getSupportedAnalyticsDateRange } from "@/lib/analytics-date-range";
@@ -37,7 +36,6 @@ export type AnalyticsDateRangePickerProps = {
 	contentClassName?: string;
 	calendarControls?: ReactNode;
 	align?: "start" | "center" | "end";
-	sourceComponent?: string;
 	variant?: "default" | "linear";
 };
 
@@ -92,10 +90,8 @@ export function AnalyticsDateRangePicker({
 	contentClassName,
 	calendarControls,
 	align = "end",
-	sourceComponent,
 	variant = "default",
 }: AnalyticsDateRangePickerProps) {
-	const { trackFilterChange } = useAnalyticsTracking();
 	const [open, setOpen] = useState(false);
 	const popoverScrollRegionRef = useRef<HTMLDivElement>(null);
 	const popoverElementRef = useRef<HTMLDivElement>(null);
@@ -149,8 +145,6 @@ export function AnalyticsDateRangePicker({
 				.replace(/\s+-\s+/, "–")
 				.replace(/^(\p{L}+) (\d+)–\1 (\d+)$/u, "$1 $2–$3")
 		: displayValue;
-	const analyticsSourceComponent =
-		sourceComponent ?? "analytics_date_range_picker";
 	const isLinear = variant === "linear";
 
 	function resetDraftDateRange() {
@@ -173,17 +167,7 @@ export function AnalyticsDateRangePicker({
 	function handlePresetApply(
 		resolvedStartDate: string,
 		resolvedEndDate: string,
-		valueKey: string,
-		changeAction: string,
 	) {
-		trackFilterChange({
-			filterName: "date_range",
-			filterCategory: "date",
-			changeAction,
-			sourceComponent: analyticsSourceComponent,
-			valueKey,
-			affectedScope: "page",
-		});
 		onDateRangeApply(resolvedStartDate, resolvedEndDate);
 		setOpen(false);
 	}
@@ -290,12 +274,7 @@ export function AnalyticsDateRangePicker({
 
 	function applyPreset(preset: (typeof presets)[number]) {
 		const resolvedRange = preset.resolveRange(today);
-		handlePresetApply(
-			resolvedRange.startDate,
-			resolvedRange.endDate,
-			preset.id,
-			"preset",
-		);
+		handlePresetApply(resolvedRange.startDate, resolvedRange.endDate);
 	}
 
 	function applyDraftDateRange() {
@@ -306,8 +285,6 @@ export function AnalyticsDateRangePicker({
 		handlePresetApply(
 			formatIsoDate(draftDateRange.from),
 			formatIsoDate(draftDateRange.to),
-			"custom",
-			"set",
 		);
 	}
 

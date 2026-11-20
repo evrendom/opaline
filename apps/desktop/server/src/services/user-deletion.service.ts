@@ -1,5 +1,4 @@
 import type postgres from "postgres";
-import { cancelOrganizationBillingSubscription } from "./billing.service.js";
 import {
 	deleteSnapshottedRepositoryEvidenceObjects,
 	enqueueClickHousePurge,
@@ -39,9 +38,6 @@ export async function deleteUserPostgresData(
 			userId,
 			transaction,
 		);
-		for (const organizationId of candidateOrganizationIds) {
-			await cancelOrganizationBillingSubscription(organizationId);
-		}
 		await enqueueClickHousePurge(
 			{ targetId: userId, targetType: "account" },
 			transaction,

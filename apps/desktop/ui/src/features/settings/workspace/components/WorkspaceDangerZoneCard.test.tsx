@@ -66,12 +66,6 @@ vi.mock("sonner", () => ({
 	toast: { success: mockToastSuccess },
 }));
 
-vi.mock("@/features/analytics/tracking/useAnalyticsTracking", () => ({
-	useAnalyticsTracking: () => ({
-		trackOrganizationAction: vi.fn(),
-	}),
-}));
-
 function renderCard(
 	props: Partial<React.ComponentProps<typeof WorkspaceDangerZoneCard>> = {},
 ) {

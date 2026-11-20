@@ -6,13 +6,11 @@ import {
 	type ResendConfig,
 	sendClickHousePurgeFailureAlert,
 } from "../email.js";
-import { isVercelRuntime } from "../lib/api-runtime.js";
 import {
 	hasMaintenanceTimeRemaining,
 	type MaintenanceDeadline,
 } from "../lib/bounded-maintenance.js";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
-import { readResendConfig } from "../resend-config.js";
 import { createPostgresSqlResultStore } from "./analysis/sql-results.js";
 import { purgeAnalysisLogs } from "./analysis-log/config.js";
 import { purgeFindingImpact } from "./analysis-log/finding-impact-clickhouse.js";
@@ -181,17 +179,6 @@ export function registerClickHousePurgeWorker(
 export async function wakeClickHousePurgeWorker(): Promise<void> {
 	if (registeredClickHousePurgeWorker) {
 		void registeredClickHousePurgeWorker.wake();
-		return;
-	}
-	if (isVercelRuntime()) {
-		try {
-			await runClickHousePurgeWorkerPass({ resend: readResendConfig() });
-		} catch (error) {
-			logger.error(
-				"Inline ClickHouse purge pass failed; the daily repair will retry: {error}",
-				{ error: sanitizeClickHousePurgeError(error) },
-			);
-		}
 	}
 }
 

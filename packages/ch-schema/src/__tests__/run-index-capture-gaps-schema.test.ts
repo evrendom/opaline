@@ -78,7 +78,7 @@ describe("run index capture gaps migration", () => {
 			).toEqual(added);
 	});
 
-	test("bootstrap and the production gate run its runner", () => {
+	test("bootstrap runs its runner", () => {
 		expect(
 			readFileSync(
 				new URL("../../scripts/bootstrap.ts", import.meta.url),
@@ -87,9 +87,6 @@ describe("run index capture gaps migration", () => {
 		).toMatch(
 			/\[\s*"20261016150000_run_index_capture_gaps\.sql",\s*"migrate-run-index-capture-gaps\.ts",?\s*\]/u,
 		);
-		expect(
-			readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
-		).toMatch(/ ch:migrate:run-index-capture-gaps[ "]/u);
 	});
 
 	test("publication proof rejects lagging replicas and other definitions", () => {

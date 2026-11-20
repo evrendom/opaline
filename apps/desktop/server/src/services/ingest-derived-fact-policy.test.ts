@@ -53,15 +53,14 @@ describe("ingest derived-fact policy", () => {
 		).toBe(false);
 	});
 
-	test("durable uploads scan their signals where no resident reconciler runs: Vercel and self-hosted servers", () => {
-		expect(awaitsDurableLanguageSignals({ VERCEL: "1" })).toBe(true);
+	test("durable uploads scan their signals where no resident reconciler runs: self-hosted servers", () => {
 		expect(awaitsDurableLanguageSignals({ OPALINE_SELF_HOSTED: "1" })).toBe(
 			true,
 		);
 		expect(awaitsDurableLanguageSignals({})).toBe(false);
-		expect(
-			awaitsDurableLanguageSignals({ VERCEL: "0", OPALINE_SELF_HOSTED: "0" }),
-		).toBe(false);
+		expect(awaitsDurableLanguageSignals({ OPALINE_SELF_HOSTED: "0" })).toBe(
+			false,
+		);
 	});
 
 	test("never consumes a durable target receipt for diagnostic usage output", () => {

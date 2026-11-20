@@ -51,7 +51,7 @@ test("refuses a request without the cron secret", async () => {
 test("leaves Postgres alone while analyses live elsewhere", async () => {
 	process.env.CRON_SECRET = SECRET;
 	delete process.env.OPALINE_SELF_HOSTED;
-	for (const store of [undefined, "memory", "convex"]) {
+	for (const store of [undefined, "memory"]) {
 		if (store === undefined) delete process.env.ANALYSIS_LOG_STORE;
 		else process.env.ANALYSIS_LOG_STORE = store;
 		const response = await handleAnalysisLogRetentionMaintenanceRequest(

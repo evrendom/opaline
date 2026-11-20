@@ -1,11 +1,8 @@
 import { getLogger } from "@logtape/logtape";
 import { sqlClient } from "../db.js";
 import { isSelfHosted } from "../lib/self-hosted.js";
-import { readGitHubRepositoryAppConfig } from "./github-app.service.js";
 import { runGitHubEvidenceCollectionMaintenance } from "./github-evidence-maintenance.service.js";
-import { runGitHubRepositorySweep } from "./github-repository-sweep.service.js";
 import { readGitHubRepositoryCredentials } from "./github-token.service.js";
-import { pruneGitHubWebhookDeliveries } from "./github-webhook-delivery.service.js";
 import {
 	createR2MultipartUploadClient,
 	readR2IngestAvailability,
@@ -25,25 +22,20 @@ export interface GitHubEvidenceWorker {
 let registeredWorker: GitHubEvidenceWorker | undefined;
 
 /**
- * Wakes the resident worker after a collection was durably enqueued, or at the
- * moment a webhook-requested refresh falls due. Without a resident worker (for
- * example on Vercel) the durable request is picked up by the resident worker
- * of another process or by the next scheduled maintenance pass.
+ * Wakes the resident worker after a collection was durably enqueued. Without a
+ * resident worker the durable request is picked up by the resident worker of
+ * another process or by the next scheduled maintenance pass.
  */
 export function wakeGitHubEvidenceWorker(delayMs = 0): void {
 	registeredWorker?.wake(delayMs);
 }
 
 export async function runConfiguredGitHubRepositorySweep(signal?: AbortSignal) {
-	if (isSelfHosted()) {
-		const { runGitHubTokenRepositorySweep } = await import(
-			"./github-token-repositories.service.js"
-		);
-		return runGitHubTokenRepositorySweep({ database: sqlClient, signal });
-	}
-	const config = readGitHubRepositoryAppConfig();
-	if (!config) return { enabled: false, requests: 0, hasMore: false };
-	return runGitHubRepositorySweep({ config, database: sqlClient, signal });
+	if (!isSelfHosted()) return { enabled: false, requests: 0, hasMore: false };
+	const { runGitHubTokenRepositorySweep } = await import(
+		"./github-token-repositories.service.js"
+	);
+	return runGitHubTokenRepositorySweep({ database: sqlClient, signal });
 }
 
 export async function runConfiguredGitHubEvidenceMaintenance(
@@ -53,8 +45,6 @@ export async function runConfiguredGitHubEvidenceMaintenance(
 ) {
 	const config = await readGitHubRepositoryCredentials();
 	if (!config) return { enabled: false as const, hasMore: false };
-	if (!collectionIds)
-		await pruneGitHubWebhookDeliveries({ database: sqlClient });
 	const storage = readR2IngestAvailability();
 	if (!storage.enabled) {
 		const [work] = await sqlClient.unsafe<Array<{ pending: boolean }>>(

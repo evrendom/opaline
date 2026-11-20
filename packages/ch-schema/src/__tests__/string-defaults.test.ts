@@ -114,13 +114,10 @@ describe("string defaults", () => {
 		expect(stringDefaultExpression("it's")).toBe("'it\\'s'");
 	});
 
-	test("production and bootstrap apply the string defaults migration", () => {
+	test("bootstrap applies the string defaults migration", () => {
 		const manifest = JSON.parse(
 			readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
 		) as { scripts: Record<string, string> };
-		expect(manifest.scripts["ch:migrate:production"]).toContain(
-			"ch:migrate:string-defaults",
-		);
 		expect(manifest.scripts["ch:migrate:string-defaults"]).toBe(
 			"bun scripts/migrate-string-defaults.ts",
 		);

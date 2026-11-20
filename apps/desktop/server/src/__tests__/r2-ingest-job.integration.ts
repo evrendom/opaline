@@ -60,10 +60,7 @@ import {
 	type R2IngestProcessorResult,
 	repairRecoverableR2IngestJobs,
 } from "../services/r2-ingest-commit.service.js";
-import {
-	createR2IngestMaterializationGate,
-	getProcessR2IngestGateBytes,
-} from "../services/r2-ingest-materialization-gate.js";
+import { createR2IngestMaterializationGate } from "../services/r2-ingest-materialization-gate.js";
 import { R2IngestCommitQueuedError } from "../services/r2-ingest-processing-error.js";
 import { runR2IngestRepairPass } from "../services/r2-ingest-repair.service.js";
 import {
@@ -499,79 +496,6 @@ describe("R2 ingest commit lifecycle", () => {
 		});
 	});
 
-	test("a main Vercel function queues a 60 MiB commit and main recovery leaves it after an expired lease", async () => {
-		const midsize = await initializeUploadedJob(
-			crypto.randomUUID(),
-			"m".repeat(60 * 1024 * 1024),
-		);
-		const small = await initializeUploadedJob(
-			crypto.randomUUID(),
-			"small transcript on the main project",
-		);
-		const vercelGate = createR2IngestMaterializationGate({
-			...getProcessR2IngestGateBytes({ VERCEL: "1" }),
-			maxJobs: 1,
-			maxQueuedJobs: 1,
-			operationTimeoutMs: 60_000,
-			queueTimeoutMs: 1_000,
-		});
-
-		const queued = commitR2IngestJob({
-			gate: vercelGate,
-			input: buildCompletionInput(midsize),
-			process: async () => {
-				throw new Error("a main Vercel function materialized a 60 MiB job");
-			},
-			r2: fakeR2,
-			userId: USER_ID,
-		});
-		// CLI 0.11 and 0.12 poll status on this reason instead of failing.
-		await expect(queued).rejects.toMatchObject({
-			code: "R2_INGEST_JOB_RETRY_LATER",
-			retryable: true,
-		});
-		await expect(queued).rejects.toBeInstanceOf(R2IngestCommitQueuedError);
-		expect(vercelGate.getStats()).toMatchObject({ activeJobs: 0 });
-		expect(await getR2IngestJobStatus(midsize.jobId, USER_ID)).toMatchObject({
-			attempts: 0,
-			error: { code: "R2_INGEST_COMMIT_QUEUED" },
-			status: "pending",
-		});
-
-		// Sessions up to 48 MiB still materialize inside the commit.
-		expect(
-			await commitR2IngestJob({
-				gate: vercelGate,
-				input: buildCompletionInput(small),
-				process: async (input) => processorResult(input.sessionId),
-				r2: fakeR2,
-				userId: USER_ID,
-			}),
-		).toMatchObject({ status: "completed" });
-
-		// The production failure: a commit claimed the job and was killed, so the
-		// job stays running until its lease lapses.
-		await sqlClient`
-			UPDATE ingest_job
-			SET
-				status = 'running',
-				attempts = 1,
-				lease_token = 'killed-commit-lease',
-				lease_expires_at = NOW() - INTERVAL '1 second'
-			WHERE id = ${midsize.jobId}
-		`;
-		await expect(
-			repairRecoverableR2IngestJobs({
-				database: sqlClient,
-				gate: vercelGate,
-				process: async () => {
-					throw new Error("main recovery claimed a 60 MiB job");
-				},
-				r2: fakeR2,
-			}),
-		).resolves.toMatchObject({ attempted: 0, completed: 0 });
-	}, 120_000);
-
 	test("a session above the standard size is queued at commit and materialized only where large jobs are admitted", async () => {
 		const initialized = await initializeUploadedJob(
 			crypto.randomUUID(),
@@ -587,8 +511,6 @@ describe("R2 ingest commit lifecycle", () => {
 				operationTimeoutMs: 60_000,
 				queueTimeoutMs: 1_000,
 			});
-		// Vercel functions admit only standard jobs; the resident worker also
-		// admits large ones.
 		const standardGate = createGate(undefined);
 		const residentGate = createGate(256 * 1024 * 1024);
 
@@ -700,7 +622,6 @@ describe("R2 ingest commit lifecycle", () => {
 			SKILL_EXTRACTION_ENABLED: "false",
 			TRANSCRIPT_RECORDS_EXTRACTION_ENABLED: "false",
 			USAGE_EVENT_EXTRACTION_ENABLED: "false",
-			VERCEL: "1",
 		};
 		const previousEnvironment = new Map(
 			Object.keys(environment).map((name) => [name, process.env[name]]),
@@ -1735,7 +1656,7 @@ describe("R2 ingest commit lifecycle", () => {
 		).toBe(true);
 	});
 
-	test("Vercel commit reports retry-later, status stays pending, and the minute cron completes after recovery", async () => {
+	test("a commit reports retry-later, status stays pending, and the minute cron completes after recovery", async () => {
 		const clickhouseUrl = process.env.CLICKHOUSE_URL;
 		if (!clickhouseUrl) throw new Error("CLICKHOUSE_URL is required");
 		let unavailable = false;
@@ -1761,7 +1682,6 @@ describe("R2 ingest commit lifecycle", () => {
 		const server = await startApiTestServer({
 			...r2Environment,
 			CLICKHOUSE_URL: proxy.url.origin,
-			VERCEL: "1",
 			SKILL_EXTRACTION_ENABLED: "false",
 			TRANSCRIPT_RECORDS_EXTRACTION_ENABLED: "false",
 			USAGE_EVENT_EXTRACTION_ENABLED: "false",
@@ -1770,7 +1690,6 @@ describe("R2 ingest commit lifecycle", () => {
 		const environment = {
 			...r2Environment,
 			CRON_SECRET: "r2-ingest-test-cron-secret",
-			VERCEL: "1",
 		};
 		const previousEnvironment = new Map(
 			Object.keys(environment).map((name) => [name, process.env[name]]),

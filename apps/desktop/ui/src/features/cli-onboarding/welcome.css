@@ -44,9 +44,6 @@
 	--welcome-placeholder: oklch(0.556 0 0);
 }
 
-.cli-welcome-field textarea {
-	overscroll-behavior: none;
-}
 .cli-welcome-panel-content {
 	display: flex;
 	flex-direction: column;
@@ -347,7 +344,6 @@
 	font-size: 13px;
 }
 .cli-welcome-field input:not([type="file"]),
-.cli-welcome-field textarea,
 .cli-welcome-field select,
 .cli-welcome-form .cli-onboarding-email input {
 	width: 100%;
@@ -359,12 +355,6 @@
 	background: var(--welcome-field);
 	color: var(--welcome-text);
 	font: inherit;
-}
-.cli-welcome-field textarea {
-	resize: none;
-	height: 82px;
-	min-height: 82px;
-	max-height: 220px;
 }
 .cli-welcome-url-input {
 	display: flex;
@@ -409,12 +399,10 @@
 .cli-welcome-field #welcome-workspace-name {
 	border-radius: 12px;
 }
-.cli-welcome-field input::placeholder,
-.cli-welcome-field textarea::placeholder {
+.cli-welcome-field input::placeholder {
 	color: var(--welcome-placeholder);
 }
 .cli-welcome-field input:focus-visible,
-.cli-welcome-field textarea:focus-visible,
 .cli-welcome-field select:focus-visible,
 .cli-welcome-form .cli-onboarding-email input:focus-visible {
 	outline: 2px solid var(--welcome-text);
@@ -466,27 +454,6 @@
 	opacity: 0;
 	width: 100%;
 }
-.cli-welcome-invite-label {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 12px;
-}
-.cli-welcome-form .cli-welcome-copy-link {
-	display: flex;
-	gap: 6px;
-	align-items: center;
-	background: transparent;
-	border: 1px solid var(--welcome-border);
-	color: var(--welcome-text);
-	font-size: 12px;
-	font-weight: 500;
-	min-height: 32px;
-	padding: 6px 10px;
-}
-.cli-welcome-form .cli-welcome-copy-link:hover:not(:disabled) {
-	background: var(--welcome-hover);
-}
 .cli-welcome-step-content {
 	animation: welcome-form-enter 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -511,8 +478,7 @@
 	}
 	.cli-welcome-form p,
 	.cli-welcome-form button,
-	.cli-welcome-field input:not([type="file"]),
-	.cli-welcome-field textarea {
+	.cli-welcome-field input:not([type="file"]) {
 		font-size: 16px;
 	}
 	.cli-welcome-form h1,

@@ -11,18 +11,6 @@ export function workspaceUrlPrefix(
 	return `${host ?? window.location.host}/`;
 }
 
-export function showsBilling(selfHost: SelfHostInfo | null): boolean {
-	return selfHost === null;
-}
-
-export function showsSupportEmail(selfHost: SelfHostInfo | null): boolean {
-	return selfHost === null;
-}
-
-export function sendsEmail(selfHost: SelfHostInfo | null): boolean {
-	return selfHost === null || selfHost.auth.emailCodes;
-}
-
 export function linkableProviders<T extends string>(
 	selfHost: SelfHostInfo | null,
 	providers: readonly T[],
@@ -33,9 +21,7 @@ export function linkableProviders<T extends string>(
 }
 
 export function showsGitHubSettings(
-	selfHost: SelfHostInfo | null,
 	status: GitHubRepositoryEvidenceStatus | undefined,
 ): boolean {
-	if (status?.visibility !== "visible") return false;
-	return selfHost === null || status.connection.configured;
+	return status?.visibility === "visible" && status.connection.configured;
 }

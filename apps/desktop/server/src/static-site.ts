@@ -1,9 +1,5 @@
 import { join, resolve, sep } from "node:path";
 import type { FetchHandlerFallbackInput } from "./handler.js";
-import {
-	getTeamInviteRoute,
-	handleTeamInvitePageRequest,
-} from "./handlers/team-invite-page-http.js";
 
 export type StaticFallback = (
 	input: FetchHandlerFallbackInput,
@@ -21,7 +17,7 @@ export function createStaticFallback(
 	const directory = resolve(options.directory);
 	const excluded = options.spaExcludedPrefixes ?? [];
 
-	return async ({ request, url }) => {
+	return async ({ url }) => {
 		if (url.pathname.startsWith("/plugin/")) {
 			return servePluginAsset(
 				directory,
@@ -45,14 +41,6 @@ export function createStaticFallback(
 			return null;
 		}
 
-		const invite = getTeamInviteRoute(url.pathname);
-		if (invite && !invite.image) {
-			return handleTeamInvitePageRequest({
-				request,
-				token: invite.token,
-				indexHtml: await indexFile.text(),
-			});
-		}
 		return new Response(indexFile);
 	};
 }

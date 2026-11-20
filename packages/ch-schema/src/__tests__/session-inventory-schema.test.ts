@@ -73,8 +73,5 @@ describe("session inventory migration", () => {
 		expect(read("../../scripts/bootstrap.ts")).toContain(
 			`["${SESSION_INVENTORY_MIGRATION}", "migrate-session-inventory.ts"],`,
 		);
-		expect(read("../../package.json")).toMatch(
-			/"ch:migrate:production": "[^"]* ch:migrate:session-inventory[ "]/u,
-		);
 	});
 });

@@ -32,8 +32,8 @@ vi.mock("./cli-onboarding-auth", () => ({
 }));
 
 vi.mock("./cli-device-authorization", () => ({
-	CliDeviceAuthorization: ({ userId }: { userId: string }) => (
-		<div>Authorize CLI for {userId}</div>
+	CliDeviceAuthorization: ({ userCode }: { userCode: string }) => (
+		<div>Authorize CLI code {userCode}</div>
 	),
 }));
 
@@ -80,7 +80,7 @@ describe("CLI device sign-in", () => {
 		await user.click(screen.getByRole("button", { name: "Sign in" }));
 
 		expect(
-			await screen.findByText("Authorize CLI for reviewer-1"),
+			await screen.findByText("Authorize CLI code ABCD-1234"),
 		).toBeInTheDocument();
 		expect(mockSignInCliWithPassword).toHaveBeenCalledWith(
 			"openai-review@opaline.so",

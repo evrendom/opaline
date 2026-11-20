@@ -1,6 +1,6 @@
 # L1 judge round 2 and Track 1
 
-Offline review, 2026-10-09. Binding input: `~/l1-work/judge2/rulings.md`,
+Offline review, 2026-10-09. Binding input: the round's written rulings,
 with both reviewers' JSON decisions and count-only witnesses. Parser behavior
 is unchanged; incorrect extraction remains `wrong`, with parser-9 plans.
 

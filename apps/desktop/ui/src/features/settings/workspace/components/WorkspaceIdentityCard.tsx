@@ -8,7 +8,6 @@ import {
 } from "@/app/routes";
 import { Button } from "@/app/ui/button";
 import { Input } from "@/app/ui/input";
-import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
 import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import { workspaceUrlPrefix } from "@/features/self-hosted/surfaces";
 import {
@@ -30,9 +29,6 @@ export function WorkspaceIdentityCard({
 	const navigate = useNavigate();
 	const selfHost = useSelfHost();
 	const { pathname, search, hash } = useLocation();
-	const { trackOrganizationAction } = useAnalyticsTracking({
-		pageName: "organization",
-	});
 	const [isEditingName, setIsEditingName] = useState(false);
 	const [editedName, setEditedName] = useState("");
 	const [editedSlug, setEditedSlug] = useState("");
@@ -48,12 +44,6 @@ export function WorkspaceIdentityCard({
 	);
 
 	const startEditing = () => {
-		trackOrganizationAction({
-			actionName: "start_rename_organization",
-			targetType: "organization",
-			sourceComponent: "workspace_settings_section",
-			targetId: organization.id,
-		});
 		setEditedName(organization.name);
 		setEditedSlug(organization.slug);
 		setRenameError(null);
@@ -61,12 +51,6 @@ export function WorkspaceIdentityCard({
 	};
 
 	const cancelEditing = () => {
-		trackOrganizationAction({
-			actionName: "cancel_rename_organization",
-			targetType: "organization",
-			sourceComponent: "workspace_settings_section",
-			targetId: organization.id,
-		});
 		setIsEditingName(false);
 		setRenameError(null);
 	};
@@ -82,12 +66,6 @@ export function WorkspaceIdentityCard({
 			return;
 		}
 
-		trackOrganizationAction({
-			actionName: "rename_organization",
-			targetType: "organization",
-			sourceComponent: "workspace_settings_section",
-			targetId: organization.id,
-		});
 		setIsSavingName(true);
 		setRenameError(null);
 
