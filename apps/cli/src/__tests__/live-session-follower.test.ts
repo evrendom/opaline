@@ -36,26 +36,29 @@ import { readProcessStartIdentities } from "../lib/process-identity.js";
 import { createTranscriptSlimmer } from "../lib/transcript-slim.js";
 import {
 	type LiveSessionStub,
+	type LiveStubAppend,
 	orpcError,
 	startLiveSessionStub,
 } from "./helpers/live-session-stub.js";
 
+// Each value only needs to exceed the steps of the tests that depend on it.
 const FAST_TIMING: Partial<LiveSessionFollowerTiming> = {
 	backoffInitialMs: 50,
 	backoffMaxMs: 200,
-	debounceMs: 100,
+	debounceMs: 20,
 	finalFlushMs: 5_000,
-	finalReadDelayMs: 50,
+	finalReadDelayMs: 20,
 	identityCheckMs: 100,
-	idleExitMs: 300,
-	leaseWaitMs: 300,
+	idleExitMs: 20,
+	leaseMarkerGraceMs: 100,
+	leaseWaitMs: 50,
 	authBackoffInitialMs: 300,
 	capabilityCheckMs: 200,
 	rateLimitBackoffMs: 600,
 	requestTimeoutMs: 3_000,
 	resetBackoffInitialMs: 100,
 	settingsCheckMs: 200,
-	tickMs: 50,
+	tickMs: 20,
 };
 const SECRET = `ghp_${"a".repeat(36)}`;
 
@@ -248,7 +251,10 @@ test("streams the main and subagent transcripts, filters secrets, and ends with 
 	await waitFor(
 		() => stub.lines(id).length === 3 && stub.lines(id, "b2").length === 1,
 	);
-	await Bun.sleep(300);
+	// A later pass over the session (it sends every pending line) still
+	// leaves the unterminated line unsent.
+	await appendFile(join(subagents, "agent-b2.jsonl"), jsonl(record(201)));
+	await waitFor(() => stub.lines(id, "b2").length === 2);
 	expect(stub.lines(id)).toHaveLength(3);
 	await appendFile(transcriptPath(fixture, id), `${record(3).slice(10)}\n`);
 	await waitFor(() => stub.lines(id).length === 4);
@@ -527,7 +533,9 @@ test.skipIf(process.platform === "win32")(
 		await writeFile(locked, jsonl(record(1)));
 		await chmod(locked, 0o000);
 		await register(fixture, id, agent.pid);
-		const running = follow(fixture);
+		// The removed file is never read to its end, so the ended session is
+		// dropped at the final flush deadline; nothing is left to flush then.
+		const running = follow(fixture, { finalFlushMs: 100 });
 		await waitFor(() => stub.lines(id).length === 1);
 		await appendFile(transcriptPath(fixture, id), jsonl(record(2)));
 		await waitFor(() => stub.lines(id).length === 2);
@@ -568,9 +576,11 @@ test.skipIf(process.platform !== "linux" && process.platform !== "darwin")(
 		});
 		const running = follow(fixture);
 		await waitFor(() => stub.session("reused", "codex").ended);
-		await Bun.sleep(300);
+		// Still followed afterwards: a new line arrives, and the session goes on.
+		await appendFile(transcriptPath(fixture, "real"), jsonl(record(2)));
+		await waitFor(() => stub.lines("real").length === 2);
 		expect(stub.session("real").ended).toBe(false);
-		expect(stub.lines("real")).toEqual([record(0)]);
+		expect(stub.lines("real")).toEqual([record(0), record(2)]);
 		agent.kill();
 		await running;
 	},
@@ -585,14 +595,23 @@ test("without the agent process, follows until the transcript is idle", async ()
 	await wrapper.exited;
 	const path = transcriptPath(fixture, "orphan");
 	await writeFile(path, jsonl(record(0)));
-	await register(fixture, "orphan", wrapper.pid, { agentPidSource: "parent" });
-	const running = follow(fixture, { orphanIdleMs: 1_500 });
+	const orphanIdleMs = 400;
+	const registeredAt = Date.now();
+	await register(fixture, "orphan", wrapper.pid, {
+		agentPidSource: "parent",
+		startedAt: registeredAt,
+	});
+	const running = follow(fixture, { orphanIdleMs });
 	await waitFor(() => stub.lines("orphan").length === 1);
-	for (let index = 1; index <= 3; index += 1) {
-		await Bun.sleep(400);
-		await appendFile(path, jsonl(record(index)));
+	// The transcript keeps growing for well past the idle limit: each new
+	// line keeps the session open.
+	let lines = 1;
+	while (Date.now() - registeredAt < orphanIdleMs * 1.5) {
+		await appendFile(path, jsonl(record(lines)));
+		lines += 1;
+		await waitFor(() => stub.lines("orphan").length === lines);
 	}
-	await waitFor(() => stub.lines("orphan").length === 4);
+	expect(lines).toBeGreaterThan(2);
 	expect(stub.session("orphan").ended).toBe(false);
 	expect((await running).reason).toBe("idle");
 	expect(stub.session("orphan").ended).toBe(true);
@@ -603,9 +622,18 @@ test("waits for the transcript to appear, and gives up when it never does", asyn
 	const fixture = await createFixture(stub);
 	const agent = startAgent();
 	await register(fixture, "late", agent.pid);
-	await register(fixture, "never", agent.pid, { source: "codex" });
-	const running = follow(fixture, { transcriptWaitMs: 1_000 });
-	await Bun.sleep(300);
+	// Inside the Codex sessions directory, so only the wait gives up on it.
+	await register(fixture, "never", agent.pid, {
+		source: "codex",
+		transcriptPath: await codexPath(fixture, "never"),
+	});
+	// A sub-agent transcript shows when the session was looked at while its
+	// main transcript was still missing.
+	const lateSubagents = await subagentDirectory(fixture, "late");
+	await writeFile(join(lateSubagents, "agent-probe.jsonl"), jsonl(record(1)));
+	const running = follow(fixture, { transcriptWaitMs: 500 });
+	await waitFor(() => stub.lines("late", "probe").length === 1);
+	expect(stub.lines("late")).toEqual([]);
 	await writeFile(transcriptPath(fixture, "late"), jsonl(record(0)));
 	await waitFor(() => stub.lines("late").length === 1);
 	await waitFor(
@@ -693,7 +721,11 @@ test("a workspace pause drops that workspace's sessions and is honoured next tim
 	);
 	// A new registration of the paused workspace is not followed.
 	await register(fixture, "paused-again", agent.pid);
-	await Bun.sleep(300);
+	// The follower removes it without following it.
+	await waitFor(
+		async () =>
+			(await listLiveSessionRegistrations(fixture.configDir)).length === 1,
+	);
 	expect(
 		stub.appends.filter((append) => append.sessionId === "paused-again"),
 	).toEqual([]);
@@ -751,7 +783,10 @@ test("an ownership conflict drops only that session", async () => {
 			(await listLiveSessionRegistrations(fixture.configDir)).length === 1,
 	);
 	await appendFile(transcriptPath(fixture, "taken"), jsonl(record(2)));
-	await Bun.sleep(300);
+	// A line written afterwards to the other session is read and sent; the
+	// dropped session's new line is not.
+	await appendFile(transcriptPath(fixture, "mine"), jsonl(record(3)));
+	await waitFor(() => stub.lines("mine").length === 2);
 	expect(conflicts).toBe(1);
 	agent.kill();
 	other.kill();
@@ -761,9 +796,11 @@ test("an ownership conflict drops only that session", async () => {
 test("backs off on server errors and rate limits, then delivers", async () => {
 	let failures = 0;
 	let limited = 0;
+	const appendedAt: number[] = [];
 	const stub = startStub({
 		intercept: ({ pathname }) => {
 			if (pathname !== "/rpc/liveSession/append") return undefined;
+			appendedAt.push(performance.now());
 			if (failures < 2) {
 				failures += 1;
 				// A proxy's plain 503, then the API's typed retryable one.
@@ -782,32 +819,41 @@ test("backs off on server errors and rate limits, then delivers", async () => {
 	const agent = startAgent();
 	await writeFile(transcriptPath(fixture, "busy"), jsonl(record(0)));
 	await register(fixture, "busy", agent.pid);
-	const running = follow(fixture);
-	const started = Date.now();
+	// Twice the longest error backoff (200 ms here).
+	const rateLimitBackoffMs = 400;
+	const running = follow(fixture, { rateLimitBackoffMs });
 	await waitFor(() => stub.lines("busy").length === 1);
 	expect(failures).toBe(2);
 	expect(limited).toBe(1);
-	// The 429 waited the rate-limit backoff (600 ms here).
-	expect(Date.now() - started).toBeGreaterThanOrEqual(550);
+	// The request after the 429 waited the rate-limit backoff.
+	expect(appendedAt).toHaveLength(4);
+	expect(
+		(appendedAt[3] as number) - (appendedAt[2] as number),
+	).toBeGreaterThanOrEqual(rateLimitBackoffMs);
 	agent.kill();
 	expect((await running).reason).toBe("idle");
 }, 30_000);
 
 test("a 401 re-reads credentials and continues with a new token, forgetting nothing", async () => {
+	let refused = 0;
 	const stub = startStub({
-		intercept: ({ pathname, headers }) =>
-			pathname.startsWith("/rpc/liveSession/") &&
-			headers.get("x-api-key") === "live-test-token"
-				? orpcError(401, "UNAUTHORIZED")
-				: undefined,
+		intercept: ({ pathname, headers }) => {
+			if (
+				!pathname.startsWith("/rpc/liveSession/") ||
+				headers.get("x-api-key") !== "live-test-token"
+			)
+				return undefined;
+			refused += 1;
+			return orpcError(401, "UNAUTHORIZED");
+		},
 	});
 	const fixture = await createFixture(stub);
 	const agent = startAgent();
 	await writeFile(transcriptPath(fixture, "rotated"), jsonl(record(0)));
 	await register(fixture, "rotated", agent.pid);
-	const running = follow(fixture);
-	await waitFor(() => stub.paths.includes("/rpc/liveSession/state"));
-	await Bun.sleep(500);
+	const running = follow(fixture, { authBackoffInitialMs: 100 });
+	// Refused, and refused again after the backoff.
+	await waitFor(() => refused >= 2);
 	expect(stub.lines("rotated")).toEqual([]);
 	expect(await listLiveSessionRegistrations(fixture.configDir)).toHaveLength(1);
 	// A new login replaces the token.
@@ -862,7 +908,8 @@ test("stops when the user logs out or the repository is turned off", async () =>
 	const agent = startAgent();
 	await writeFile(transcriptPath(fixture, "off"), jsonl(record(0)));
 	await register(fixture, "off", agent.pid);
-	const running = follow(fixture);
+	// Briefly without sessions in between: the follower must not idle out.
+	const running = follow(fixture, { idleExitMs: 10_000 });
 	await waitFor(() => stub.lines("off").length === 1);
 	await writeFile(
 		join(fixture.configDir, "auto-upload.json"),
@@ -986,7 +1033,7 @@ test("streams a Codex thread and its sub-agent rollouts, ending once idle withou
 		source: "codex",
 		transcriptPath: main,
 	});
-	const running = follow(fixture, { codexOrphanIdleMs: 2_000 });
+	const running = follow(fixture, { codexOrphanIdleMs: 500 });
 	await waitFor(() => stub.lines(thread, "", "codex").length === 2);
 	await writeFile(
 		codex.rollout(child, {}),
@@ -1051,7 +1098,16 @@ test("a resumed Codex stream slims later records exactly like an uninterrupted o
 // Hardening -----------------------------------------------------------------------
 
 test("a server that never agrees cannot cause a reset storm", async () => {
+	const resetAt: number[] = [];
 	const stub = startStub({
+		intercept: ({ pathname, body }) => {
+			if (
+				pathname === "/rpc/liveSession/append" &&
+				(body as LiveStubAppend).streams.some((stream) => stream.reset)
+			)
+				resetAt.push(performance.now());
+			return undefined;
+		},
 		// Always one line ahead of what was sent.
 		transformAppendResult: (streams) =>
 			streams.map((stream) => ({
@@ -1064,8 +1120,8 @@ test("a server that never agrees cannot cause a reset storm", async () => {
 	const agent = startAgent();
 	await writeFile(transcriptPath(fixture, "liar"), jsonl(record(0), record(1)));
 	await register(fixture, "liar", agent.pid);
-	const started = Date.now();
-	const result = follow(fixture, { resetBackoffInitialMs: 200 });
+	const resetBackoffInitialMs = 25;
+	const result = follow(fixture, { resetBackoffInitialMs });
 	await waitFor(
 		async () =>
 			(await listLiveSessionRegistrations(fixture.configDir)).length === 0,
@@ -1075,7 +1131,12 @@ test("a server that never agrees cannot cause a reset storm", async () => {
 	// Five resets with growing pauses, then the session is dropped.
 	expect(appends.filter((append) => append.streams[0]?.reset)).toHaveLength(5);
 	expect(appends.length).toBeLessThanOrEqual(20);
-	expect(Date.now() - started).toBeGreaterThanOrEqual(200 + 400 + 800);
+	expect(resetAt).toHaveLength(5);
+	// After the first reset, each waits twice as long as the one before.
+	for (let index = 1; index < resetAt.length; index += 1)
+		expect(
+			(resetAt[index] as number) - (resetAt[index - 1] as number),
+		).toBeGreaterThanOrEqual(resetBackoffInitialMs * 2 ** (index - 1));
 	agent.kill();
 	expect((await result).reason).toBe("idle");
 }, 40_000);
@@ -1102,7 +1163,9 @@ test.skipIf(process.platform === "win32")(
 		await register(fixture, "crafted", startAgent().pid, {
 			transcriptPath: outside,
 		});
-		const running = follow(fixture);
+		// The swapped file is never read to its end, so the ended session is
+		// dropped at the final flush deadline; nothing is left to flush then.
+		const running = follow(fixture, { finalFlushMs: 100 });
 		await waitFor(
 			() => stub.lines(id).length === 1 && stub.lines(id, "swap").length === 1,
 		);
@@ -1110,7 +1173,9 @@ test.skipIf(process.platform === "win32")(
 		await symlink(outside, swapped);
 		await appendFile(transcriptPath(fixture, id), jsonl(record(2)));
 		await waitFor(() => stub.lines(id).length === 2);
-		await Bun.sleep(300);
+		// A later pass over the session still leaves the swapped file unread.
+		await appendFile(transcriptPath(fixture, id), jsonl(record(3)));
+		await waitFor(() => stub.lines(id).length === 3);
 		expect(stub.lines(id, "swap")).toEqual([record(1)]);
 		expect(stub.session(id).streams.has("fifo")).toBe(false);
 		expect(stub.appends.some((append) => append.sessionId === "crafted")).toBe(
@@ -1184,13 +1249,16 @@ test("a hanging request of one session does not delay another session", async ()
 	const hanging = new Promise<void>((resolve) => {
 		release = resolve;
 	});
+	let slowArrived = false;
 	const stub = startStub({
 		intercept: async ({ pathname, body }) => {
 			if (
 				pathname === "/rpc/liveSession/append" &&
 				(body as { sessionId: string }).sessionId === "slow"
-			)
+			) {
+				slowArrived = true;
 				await hanging;
+			}
 			return undefined;
 		},
 	});
@@ -1203,8 +1271,7 @@ test("a hanging request of one session does not delay another session", async ()
 	await register(fixture, "slow", slowAgent.pid);
 	await register(fixture, "fast", fastAgent.pid);
 	const running = follow(fixture, { requestTimeoutMs: 20_000 });
-	await waitFor(() => stub.lines("fast").length === 1);
-	await Bun.sleep(200);
+	await waitFor(() => stub.lines("fast").length === 1 && slowArrived);
 	const killedAt = Date.now();
 	fastAgent.kill();
 	await waitFor(() => stub.session("fast").ended);
@@ -1289,7 +1356,7 @@ test.skipIf(
 		const path = transcriptPath(fixture, "foreign");
 		await writeFile(path, jsonl(record(0)));
 		await register(fixture, "foreign", Number(root));
-		const result = await follow(fixture, { orphanIdleMs: 1_000 });
+		const result = await follow(fixture, { orphanIdleMs: 100 });
 		expect(result.reason).toBe("idle");
 		expect(stub.lines("foreign")).toEqual([record(0)]);
 		expect(stub.session("foreign").ended).toBe(true);
