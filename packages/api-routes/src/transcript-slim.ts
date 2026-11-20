@@ -172,25 +172,46 @@ export interface InlineImage {
 }
 
 export function collectInlineImagesFromLine(line: string): InlineImage[] {
-	if (!mayContainInlineImage(line)) return [];
-	const stripped = stripInlineImagesFromLine(line);
-	if (stripped === line) return [];
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(line);
-	} catch {
-		return [];
-	}
+	return stripAndCollectInlineImages(line).images;
+}
+
+/**
+ * `stripInlineImagesFromLine` and `collectInlineImagesFromLine` in one parse
+ * of the line: the stripped text, and each image it replaced, decoded once.
+ * Slimming the returned text gives the same bytes as slimming the line.
+ */
+export function stripAndCollectInlineImages(line: string): {
+	readonly text: string;
+	readonly images: InlineImage[];
+} {
+	const unchanged = { text: line, images: [] };
+	if (!mayContainInlineImage(line)) return unchanged;
 	const replacements: ImageReplacements = {
 		dataUrls: new Map(),
 		payloads: new Map(),
 	};
-	collectImageReplacements(parsed, replacements, 0);
+	try {
+		collectImageReplacements(JSON.parse(line), replacements, 0);
+	} catch {
+		return unchanged;
+	}
+	let text = line;
+	for (const group of [replacements.dataUrls, replacements.payloads]) {
+		for (const [payload, marker] of group) {
+			text = replaceDelimitedOccurrences(text, payload, marker);
+		}
+	}
+	if (text === line) return unchanged;
+	try {
+		JSON.parse(text);
+	} catch {
+		return unchanged;
+	}
 	const images = new Map<string, InlineImage>();
 	for (const group of [replacements.dataUrls, replacements.payloads]) {
 		for (const [key, marker] of group) {
 			const found = parseInlineImageMarker(marker);
-			if (!found || images.has(found.sha256) || !stripped.includes(marker))
+			if (!found || images.has(found.sha256) || !text.includes(marker))
 				continue;
 			const payload = key.startsWith("data:")
 				? key.slice(key.indexOf(",") + 1)
@@ -202,7 +223,7 @@ export function collectInlineImagesFromLine(line: string): InlineImage[] {
 			});
 		}
 	}
-	return [...images.values()];
+	return { text, images: [...images.values()] };
 }
 
 function collectImageReplacements(

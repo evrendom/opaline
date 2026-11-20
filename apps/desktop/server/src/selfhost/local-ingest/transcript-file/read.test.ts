@@ -2,8 +2,10 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import {
 	appendFileSync,
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readFileSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
@@ -82,12 +84,14 @@ test("reading a transcript slimmed line by line gives the bytes and images of sl
 			expect(session.content).toBe(slimTranscriptText(text));
 			expect(session.content.length).toBeLessThan(text.length / 2);
 			expect(
-				session.images().map(({ sha256, mediaType, bytes, references }) => ({
-					sha256,
-					mediaType,
-					bytes: bytes.byteLength,
-					references,
-				})),
+				session
+					.images()
+					.map(({ sha256, mediaType, byteLength, references }) => ({
+						sha256,
+						mediaType,
+						bytes: byteLength,
+						references,
+					})),
 			).toEqual([
 				{
 					sha256: pngSha256(1),
@@ -105,6 +109,14 @@ test("reading a transcript slimmed line by line gives the bytes and images of sl
 					references: [["", 4]],
 				},
 			]);
+			for (const image of session.images())
+				expect(
+					createHash("sha256").update(readFileSync(image.file)).digest("hex"),
+				).toBe(image.sha256);
+			const directory = session.imageDirectory();
+			expect(directory && existsSync(directory)).toBe(true);
+			session.discardImages();
+			expect(existsSync(directory ?? "")).toBe(false);
 		}
 	}
 });

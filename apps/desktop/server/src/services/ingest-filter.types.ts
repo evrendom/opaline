@@ -6,6 +6,11 @@ type IngestSubagent = NonNullable<IngestSessionInput["subagents"]>[number];
 export interface IngestFilterFields {
 	readonly content: string;
 	readonly subagents: IngestSessionInput["subagents"];
+	/**
+	 * The text was slimmed with the same rules already (local import), so
+	 * slimming it again would only cost another full copy and parse.
+	 */
+	readonly slimmed?: boolean;
 }
 
 export interface IngestFilterResult

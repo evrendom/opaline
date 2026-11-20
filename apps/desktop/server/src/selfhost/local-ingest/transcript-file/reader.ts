@@ -1,7 +1,10 @@
 import { open } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { createZstdDecompress } from "node:zlib";
-import { createTranscriptSlimmer } from "@rudel/api-routes/transcript-slim";
+import {
+	createTranscriptSlimmer,
+	stripAndCollectInlineImages,
+} from "@rudel/api-routes/transcript-slim";
 import {
 	FINGERPRINT_BYTES,
 	type FileIdentity,
@@ -174,8 +177,9 @@ export function slimmedLines(
 	const parts: string[] = [];
 	return {
 		add(segment) {
-			images.add(agentId, parts.length + 1, segment);
-			parts.push(slimmer.slimRecord(segment));
+			const { text, images: found } = stripAndCollectInlineImages(segment);
+			images.add(agentId, parts.length + 1, found);
+			parts.push(slimmer.slimRecord(text));
 		},
 		lines: () => parts,
 	};

@@ -8,6 +8,12 @@ import { isSelfHosted } from "./self-hosted.js";
  */
 export const WORKER_RECYCLE_BYTES = 32 * 1024 * 1024;
 
+/** Jobs adding up to this many bytes end a worker too, so mid-size jobs cannot ratchet its heap up. */
+export const WORKER_RECYCLE_TOTAL_BYTES = 256 * 1024 * 1024;
+
+/** An import worker without work this long ends; a new one starts in about 130 ms. */
+export const WORKER_IDLE_MS = 30_000;
+
 export function recyclesWorkerAfter(
 	bytes: number,
 	env: Readonly<Record<string, string | undefined>> = process.env,

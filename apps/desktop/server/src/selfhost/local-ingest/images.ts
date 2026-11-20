@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import type { RudelSessionImagesRow } from "@rudel/ch-schema/generated";
 import type postgres from "postgres";
 import type { ClickHouseExecutor } from "../../clickhouse.js";
@@ -50,7 +51,7 @@ export async function storeSessionImages(input: {
 				agent_id: agentId,
 				record_idx: recordIdx,
 				media_type: image.mediaType,
-				bytes: String(image.bytes.byteLength),
+				bytes: String(image.byteLength),
 				image_source: "inline",
 				root_id: "",
 				path: "",
@@ -82,7 +83,7 @@ export async function storeSessionImages(input: {
 		if (known.has(objectId)) continue;
 		const objectKey = createEvidenceObjectKey(target.organizationId, objectId);
 		await input.store.putObject({
-			body: image.bytes,
+			body: await readFile(image.file),
 			contentType: image.mediaType,
 			metadata: { "opaline-sha256": image.sha256 },
 			objectKey,
@@ -102,14 +103,14 @@ export async function storeSessionImages(input: {
 				target.organizationId,
 				objectId,
 				objectKey,
-				image.bytes.byteLength,
+				image.byteLength,
 				image.mediaType,
 				input.now.toISOString(),
 			],
 		);
 		if (inserted.length > 0) {
 			stored += 1;
-			bytesStored += image.bytes.byteLength;
+			bytesStored += image.byteLength;
 		}
 	}
 	await persistSessionImageRows({

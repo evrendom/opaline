@@ -218,6 +218,30 @@ test("imports every session once, newest first, and reports progress", async () 
 	await service.stop();
 });
 
+test("during the first import, a session big enough to run alone waits until the smaller ones are in", async () => {
+	const giant = await session("giant", 1, "g".repeat(400));
+	const small = await session("small", 60);
+	const older = await session("older", 300);
+	const ingest = ingestor();
+	const service = create(memoryStore(), ingest, {
+		settings: {
+			concurrency: 1,
+			quietMs: 1,
+			liveIntervalMs: 0,
+			retryBaseMs: 20,
+			exclusiveBytes: 200,
+		},
+	});
+	await service.start();
+	await settle(service);
+	expect(ingest.calls.map((call) => call.sessionPath)).toEqual([
+		small,
+		older,
+		giant,
+	]);
+	await service.stop();
+});
+
 test("counts sessions written in the last five minutes as running until their turn stops", async () => {
 	const working = await session("working", 1);
 	await session("quiet", 10);

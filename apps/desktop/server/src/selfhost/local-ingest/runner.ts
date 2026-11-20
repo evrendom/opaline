@@ -1,3 +1,4 @@
+import { rm } from "node:fs/promises";
 import { LOCAL_INGEST_CONTENT_MAX_BYTES } from "@rudel/api-routes";
 import type postgres from "postgres";
 import type { ClickHouseExecutor } from "../../clickhouse.js";
@@ -91,106 +92,115 @@ export function createSessionRunner(
 				};
 			}
 			if (prepared.kind === "skipped") return prepared;
-			const { input, files } = prepared;
-			const request = {
-				aggregateContentMaxBytes: LOCAL_INGEST_CONTENT_MAX_BYTES,
-				awaitLanguageSignals: true,
-				context: {
-					apiKeyId: null,
-					session: { activeOrganizationId: owner.organizationId } as never,
-					user: { id: owner.userId },
-				},
-				enforceRateLimits: false,
-				input,
-			};
-			const waitedSince = now().getTime();
-			let imported = await timedIngestPhase("local.ingest_total", () =>
-				deps.importSession(request),
-			);
-			while (
-				imported.kind === "retry" &&
-				imported.reason === "queue_full" &&
-				now().getTime() - waitedSince < BUSY_WAIT_LIMIT_MS
-			) {
-				await sleep(BUSY_WAIT_MS);
-				imported = await timedIngestPhase("local.ingest_total", () =>
-					deps.importSession(request),
-				);
+			const ready = prepared;
+			try {
+				return await (async (): Promise<SessionOutcome> => {
+					const { input, files } = ready;
+					const request = {
+						aggregateContentMaxBytes: LOCAL_INGEST_CONTENT_MAX_BYTES,
+						awaitLanguageSignals: true,
+						contentSlimmed: true,
+						context: {
+							apiKeyId: null,
+							session: { activeOrganizationId: owner.organizationId } as never,
+							user: { id: owner.userId },
+						},
+						enforceRateLimits: false,
+						input,
+					};
+					const waitedSince = now().getTime();
+					let imported = await timedIngestPhase("local.ingest_total", () =>
+						deps.importSession(request),
+					);
+					while (
+						imported.kind === "retry" &&
+						imported.reason === "queue_full" &&
+						now().getTime() - waitedSince < BUSY_WAIT_LIMIT_MS
+					) {
+						await sleep(BUSY_WAIT_MS);
+						imported = await timedIngestPhase("local.ingest_total", () =>
+							deps.importSession(request),
+						);
+					}
+					const project = {
+						projectPath: input.projectPath ?? "",
+						gitRemote: input.gitRemote ?? null,
+						gitBranch: input.gitBranch ?? null,
+					};
+					if (imported.kind === "kept")
+						return {
+							kind: "kept",
+							sessionId: input.sessionId,
+							bytes: 0,
+							reason: KEPT_REASON,
+							files,
+							project,
+						};
+					if (imported.kind === "skipped" || imported.kind === "retry")
+						return { kind: imported.kind, reason: imported.message, files };
+					const store = deps.objectStore();
+					if (store && ready.images.length > 0) {
+						try {
+							await timedIngestPhase("local.images", () =>
+								storeSessionImages({
+									target: {
+										organizationId: owner.organizationId,
+										userId: owner.userId,
+										sessionId: input.sessionId,
+										source: input.source,
+									},
+									images: ready.images,
+									sql: deps.sql,
+									clickhouse: deps.clickhouse(),
+									store,
+									captureId: `local:${input.sessionId}`,
+									now: now(),
+								}),
+							);
+						} catch (error) {
+							deps.log?.(
+								`images of ${input.sessionId} were not stored: ${error instanceof Error ? error.message : String(error)}`,
+							);
+						}
+					}
+					const setupPaths = deps.setupPaths;
+					if (setupPaths) {
+						try {
+							await timedIngestPhase("local.setup", () =>
+								storeLocalSetup({
+									clickhouse: deps.clickhouse(),
+									session: {
+										organizationId: owner.organizationId,
+										userId: owner.userId,
+										sessionId: input.sessionId,
+										source: input.source,
+										projectPath: input.projectPath ?? "",
+										repository: input.gitRemote ?? input.projectPath ?? "",
+									},
+									paths: setupPaths,
+									now: now(),
+								}),
+							);
+						} catch (error) {
+							deps.log?.(
+								`settings of ${input.sessionId} were not stored: ${error instanceof Error ? error.message : String(error)}`,
+							);
+						}
+					}
+					return {
+						kind: "ingested",
+						sessionId: input.sessionId,
+						bytes: ready.bytes,
+						files,
+						project,
+						...(imported.usage === "incomplete"
+							? { reason: USAGE_INCOMPLETE_REASON }
+							: {}),
+					};
+				})();
+			} finally {
+				const directory = ready.imageDirectory;
+				if (directory) await rm(directory, { recursive: true, force: true });
 			}
-			const project = {
-				projectPath: input.projectPath ?? "",
-				gitRemote: input.gitRemote ?? null,
-				gitBranch: input.gitBranch ?? null,
-			};
-			if (imported.kind === "kept")
-				return {
-					kind: "kept",
-					sessionId: input.sessionId,
-					bytes: 0,
-					reason: KEPT_REASON,
-					files,
-					project,
-				};
-			if (imported.kind === "skipped" || imported.kind === "retry")
-				return { kind: imported.kind, reason: imported.message, files };
-			const store = deps.objectStore();
-			if (store && prepared.images.length > 0) {
-				try {
-					await timedIngestPhase("local.images", () =>
-						storeSessionImages({
-							target: {
-								organizationId: owner.organizationId,
-								userId: owner.userId,
-								sessionId: input.sessionId,
-								source: input.source,
-							},
-							images: prepared.images,
-							sql: deps.sql,
-							clickhouse: deps.clickhouse(),
-							store,
-							captureId: `local:${input.sessionId}`,
-							now: now(),
-						}),
-					);
-				} catch (error) {
-					deps.log?.(
-						`images of ${input.sessionId} were not stored: ${error instanceof Error ? error.message : String(error)}`,
-					);
-				}
-			}
-			const setupPaths = deps.setupPaths;
-			if (setupPaths) {
-				try {
-					await timedIngestPhase("local.setup", () =>
-						storeLocalSetup({
-							clickhouse: deps.clickhouse(),
-							session: {
-								organizationId: owner.organizationId,
-								userId: owner.userId,
-								sessionId: input.sessionId,
-								source: input.source,
-								projectPath: input.projectPath ?? "",
-								repository: input.gitRemote ?? input.projectPath ?? "",
-							},
-							paths: setupPaths,
-							now: now(),
-						}),
-					);
-				} catch (error) {
-					deps.log?.(
-						`settings of ${input.sessionId} were not stored: ${error instanceof Error ? error.message : String(error)}`,
-					);
-				}
-			}
-			return {
-				kind: "ingested",
-				sessionId: input.sessionId,
-				bytes: prepared.bytes,
-				files,
-				project,
-				...(imported.usage === "incomplete"
-					? { reason: USAGE_INCOMPLETE_REASON }
-					: {}),
-			};
 		});
 }

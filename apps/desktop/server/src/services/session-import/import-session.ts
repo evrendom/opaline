@@ -34,6 +34,8 @@ export interface SessionImportRequest {
 	readonly analysisUploads?: AnalysisUploadEnv;
 	readonly awaitBestEffortLanguageSignals?: boolean;
 	readonly awaitLanguageSignals: boolean;
+	/** `input` was slimmed by the caller with the same rules (local import). */
+	readonly contentSlimmed?: boolean;
 	readonly context: {
 		readonly apiKeyId: string | null;
 		readonly session: AppContext["session"];

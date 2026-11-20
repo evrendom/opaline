@@ -38,6 +38,7 @@ export async function admitSession(
 	{
 		aggregateContentMaxBytes,
 		allowQuiescedIngest = false,
+		contentSlimmed = false,
 		context,
 		enforceRateLimits,
 		errorFactories,
@@ -79,6 +80,7 @@ export async function admitSession(
 			fields: {
 				content: input.content,
 				subagents: input.subagents,
+				slimmed: contentSlimmed,
 			},
 			signal,
 			userId: context.user.id,
