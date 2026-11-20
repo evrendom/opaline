@@ -28,7 +28,7 @@ This file is the instructions for every coding agent: Codex reads `AGENTS.md`, a
 ## Tests
 
 - Keep a test only if it catches something no other test catches. `bun run test:kill-matrix <module.ts>` builds the mutation-testing kill matrix and lists the tests that kill no unique mutant; see `.claude/skills/testing-bun/SKILL.md` ("Every Test Earns Its Place").
-- CI finds tests through each workspace's `test` and `test:integration` scripts, splits them across shards by recorded run time, and on pull requests runs only the tests the diff can reach (`scripts/ci-tests.ts`). A new test file is picked up without touching CI; a test that reads another workspace's files through a relative path is rerun when those files change.
+- CI finds tests through each workspace's `test` and `test:integration` scripts, splits them across shards by recorded run time, and on pull requests runs only the tests the diff can reach (`scripts/ci-tests.ts`). A new test file is picked up without touching CI, and a path in a test script that does not exist fails the plan. A test that reads another workspace's files through a relative path reruns when those files change; any change outside the workspaces other than agent setup and Markdown no code names reruns everything.
 
 ## Retired code
 

@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
 	type Item,
 	itemKey,
@@ -39,48 +42,54 @@ describe("reach", () => {
 	const graph = {
 		dirs: ["apps/server", "apps/ui", "packages/routes"],
 		reads: new Map([
-			["apps/server", new Set(["packages/routes", "/plugin"])],
+			["apps/server", new Set(["packages/routes"])],
 			["apps/ui", new Set(["packages/routes"])],
-			["packages/routes", new Set(["/docs"])],
+			["packages/routes", new Set<string>()],
 		]),
 		testReads: new Map([
 			["apps/server/src/links.test.ts", new Set(["apps/ui"])],
+			["apps/ui/src/server-links.test.ts", new Set(["apps/server", "/docs"])],
 		]),
 	};
 	const reached = (changed: string[]) => {
 		const scope = reach(changed, graph);
 		return scope && [...scope.packages].sort();
 	};
+	const command: Item = {
+		kind: "command",
+		pkg: "apps/ui",
+		command: "vitest run",
+		env: {},
+	};
 
-	test("a package change reaches the package and everything that reads it", () => {
+	test("a package change reaches the package and everything that depends on it", () => {
 		expect(reached(["packages/routes/src/a.ts"])).toEqual([
 			"apps/server",
 			"apps/ui",
 			"packages/routes",
 		]);
-		expect(reached(["docs/facts.md"])).toEqual([
-			"apps/server",
-			"apps/ui",
-			"packages/routes",
-		]);
 	});
 
-	test("a test file's own reference reaches that test, not its package", () => {
-		const scope = reach(["apps/ui/src/a.tsx"], graph);
-		expect(scope?.packages).toEqual(new Set(["apps/ui"]));
+	test("a test file's own reference reaches that test, or the command that runs it", () => {
+		const ui = reach(["apps/ui/src/a.tsx"], graph);
+		expect(ui?.packages).toEqual(new Set(["apps/ui"]));
+		expect(reaches(file("apps/server", "src/links.test.ts"), ui, graph)).toBe(
+			true,
+		);
+		expect(reaches(file("apps/server", "src/other.test.ts"), ui, graph)).toBe(
+			false,
+		);
 		expect(
-			reaches(file("apps/server", "src/links.test.ts"), scope, graph),
+			reaches(command, reach(["apps/server/src/a.ts"], graph), graph),
 		).toBe(true);
-		expect(
-			reaches(file("apps/server", "src/other.test.ts"), scope, graph),
-		).toBe(false);
 	});
 
-	test("Markdown and agent setup reach nothing; root files and unread folders reach everything", () => {
-		expect(reached(["README.md", ".claude/x.json"])).toEqual([]);
+	test("outside the workspaces only agent setup and unnamed Markdown are free", () => {
+		expect(reached(["README.md", ".claude/x.json", "notes/x.md"])).toEqual([]);
+		expect(reached(["docs/facts.md"])).toBeNull();
+		expect(reached(["plugin/.claude-plugin/plugin.json"])).toBeNull();
 		expect(reached(["bun.lock"])).toBeNull();
 		expect(reached([".github/workflows/ci.yml"])).toBeNull();
-		expect(reached(["scripts/build.ts"])).toBeNull();
 	});
 });
 
@@ -106,4 +115,24 @@ test("JUnit suite times are keyed by the file bun ran", () => {
 		"src/a.test.ts": 1.5,
 		"src/b.test.ts": 0.25,
 	});
+});
+
+test("a test script naming a missing file fails the plan instead of skipping it", () => {
+	const root = mkdtempSync(join(tmpdir(), "ci-tests-"));
+	writeFileSync(
+		join(root, "package.json"),
+		JSON.stringify({ workspaces: ["pkg"] }),
+	);
+	mkdirSync(join(root, "pkg"));
+	writeFileSync(join(root, "pkg", "a.integration.ts"), "");
+	writeFileSync(
+		join(root, "pkg", "package.json"),
+		JSON.stringify({
+			name: "pkg",
+			scripts: {
+				"test:integration": "bun test ./a.integration.ts ./gone.integration.ts",
+			},
+		}),
+	);
+	expect(() => suiteItems("integration", root)).toThrow("gone.integration.ts");
 });

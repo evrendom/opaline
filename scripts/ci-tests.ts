@@ -51,6 +51,7 @@ const SCRIPT_FOR: Record<Suite, string> = {
 };
 const TEST_FILE =
 	/(\.test|_test|\.spec|_spec)\.(ts|tsx|js|jsx|mjs|cjs|mts|cts)$/;
+const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
 const SKIPPED_DIRS = new Set(["node_modules", "dist", ".turbo", ".git"]);
 const FLAGS_WITH_VALUE = new Set([
 	"--preload",
@@ -72,9 +73,8 @@ const INTEGRATION_ORDER = [
 	"apps/cli",
 	"packages/ch-schema",
 ];
-// Files outside every workspace that no test reads: changing only these runs
-// no tests. Every other file outside a workspace runs everything.
-const INERT_OUTSIDE_WORKSPACES = [/\.md$/, /^\.claude\//, /^\.agents\//];
+// Agent setup outside the workspaces, which no test reads.
+const AGENT_SETUP = /^\.(claude|agents)\//;
 
 export function itemKey(item: Item): string {
 	return item.kind === "file"
@@ -190,12 +190,14 @@ export function scriptItems(
 						flags.push(tokens[++i] as string);
 				} else positional.push(token);
 			}
-			const explicit =
-				positional.length > 0 &&
-				positional.every(
-					(p) => TEST_FILE.test(p) || /\.(ts|tsx|js)$/.test(p),
-				) &&
-				positional.every((p) => existsSync(join(root, pkg, p)));
+			// A path names a file, which must exist: `bun test` skips a missing
+			// one quietly, and so would CI. Anything else is a name filter.
+			const explicit = positional.some((p) => SOURCE_FILE.test(p));
+			for (const p of explicit ? positional : [])
+				if (!existsSync(join(root, pkg, p)))
+					throw new Error(
+						`${pkg}: the "${scriptName}" script names ${p}, which does not exist`,
+					);
 			const files = explicit
 				? positional.map(normalizeFilter)
 				: discoverTestFiles(join(root, pkg), positional);
@@ -253,16 +255,19 @@ export function readGraph(root = ROOT): Graph {
 			if (!/\.(ts|tsx|js|jsx|mjs|cjs|mts|cts)$/.test(path)) return;
 			const source = readFileSync(path, "utf8");
 			const relFile = relative(absDir, path).split(sep).join("/");
+			const add = (read: string) => {
+				if (read === dir) return;
+				if (TEST_SOURCE.test(relFile)) {
+					const key = `${dir}/${relFile}`;
+					testReads.set(key, (testReads.get(key) ?? new Set()).add(read));
+				} else reads.get(dir)?.add(read);
+			};
 			for (const match of source.matchAll(literal)) {
 				const target = normalize(join(dirname(path), match[1] as string));
 				if (target === absDir || target.startsWith(absDir + sep)) continue;
 				const rel = relative(root, target).split(sep).join("/");
 				if (!rel || rel.startsWith("..") || BUILD_OUTPUT.test(rel)) continue;
-				const read = ownerOf(rel, dirs) ?? `/${rel.split("/")[0]}`;
-				if (TEST_SOURCE.test(relFile)) {
-					const key = `${dir}/${relFile}`;
-					testReads.set(key, (testReads.get(key) ?? new Set()).add(read));
-				} else reads.get(dir)?.add(read);
+				add(ownerOf(rel, dirs) ?? `/${rel.split("/")[0]}`);
 			}
 		});
 	}
@@ -284,9 +289,11 @@ export interface Reach {
 
 /**
  * What a diff can reach, or `null` for everything. A change to a workspace
- * reaches it and every workspace that depends on it or reads it; a change to
- * a top-level folder reaches the workspaces that read that folder; anything
- * else (root config, the lockfile, CI, scripts) reaches everything.
+ * reaches it and every workspace that depends on it or reads it. Agent setup,
+ * and Markdown in a folder (or a root file) no code names, reach nothing.
+ * Every other change outside the workspaces reaches everything: code can
+ * build a path to any of it (`join(root, "..", "plugin")`) where no scan
+ * would see it.
  */
 export function reach(changedFiles: string[], graph: Graph): Reach | null {
 	const { dirs, reads } = graph;
@@ -297,10 +304,10 @@ export function reach(changedFiles: string[], graph: Graph): Reach | null {
 	const changed = new Set<string>();
 	for (const file of changedFiles) {
 		const owner = ownerOf(file, dirs);
-		const folder = file.includes("/") ? `/${file.split("/")[0]}` : null;
 		if (owner) changed.add(owner);
-		else if (folder && read.has(folder)) changed.add(folder);
-		else if (INERT_OUTSIDE_WORKSPACES.some((re) => re.test(file))) continue;
+		else if (AGENT_SETUP.test(file)) continue;
+		else if (file.endsWith(".md") && !read.has(`/${file.split("/")[0]}`))
+			continue;
 		else return null;
 	}
 	const packages = new Set<string>();
@@ -318,9 +325,16 @@ export function reach(changedFiles: string[], graph: Graph): Reach | null {
 
 export function reaches(item: Item, scope: Reach | null, graph: Graph) {
 	if (scope === null || scope.packages.has(item.pkg)) return true;
-	if (item.kind !== "file") return false;
-	const testReads = graph.testReads.get(itemKey(item));
-	return [...(testReads ?? [])].some((t) => scope.changed.has(t));
+	// A command (vitest, a wrapper) runs files we cannot pick out, so it
+	// sees what any test file of its workspace reads.
+	const testReads = [...graph.testReads].filter(([key]) =>
+		item.kind === "file"
+			? key === itemKey(item)
+			: key.startsWith(`${item.pkg}/`),
+	);
+	return testReads.some(([, reads]) =>
+		[...reads].some((t) => scope.changed.has(t)),
+	);
 }
 
 /** Longest-first greedy fill: each item goes to the least-loaded shard. */
@@ -366,20 +380,32 @@ function packageOrder(pkg: string) {
 }
 
 function changedFiles(base: string): string[] {
-	const result = spawnSync("git", ["diff", "--name-only", `${base}...HEAD`], {
-		cwd: ROOT,
-		encoding: "utf8",
-	});
+	const result = spawnSync(
+		"git",
+		["diff", "--name-only", "--no-renames", `${base}...HEAD`],
+		{
+			cwd: ROOT,
+			encoding: "utf8",
+		},
+	);
 	if (result.status !== 0) throw new Error(`git diff failed: ${result.stderr}`);
 	return result.stdout.split("\n").filter(Boolean);
 }
 
 const TIMINGS_MARKER = "ci-tests timings: ";
 
+// Reading old logs may take this long in all, and one call 20s, before the
+// plan settles for the times it has.
+const RECORDED_BUDGET_MS = 60_000;
+let recordedDeadline = 0;
+
 function gh(args: string[]): string | null {
+	const left = recordedDeadline - Date.now();
+	if (left <= 0) return null;
 	const result = spawnSync("gh", args, {
 		encoding: "utf8",
 		maxBuffer: 256 * 1024 * 1024,
+		timeout: Math.min(left, 20_000),
 	});
 	return result.status === 0 ? result.stdout : null;
 }
@@ -392,6 +418,7 @@ function gh(args: string[]): string | null {
 export function recordedTimings(fallback: Timings, runs = 3): Timings {
 	const repo = process.env.GITHUB_REPOSITORY;
 	if (!repo) return fallback;
+	recordedDeadline = Date.now() + RECORDED_BUDGET_MS;
 	const ids =
 		gh([
 			"api",
