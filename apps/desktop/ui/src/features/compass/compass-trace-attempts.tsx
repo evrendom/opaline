@@ -385,7 +385,7 @@ function Bubble({
 		<div
 			className={cn(
 				"min-w-0 flex-1 corner-m px-l py-l corner-squircle squircle:corner-xl",
-				!tint && "bg-wash dark:bg-wash",
+				!tint && "bg-wash",
 			)}
 			style={tint ? tintedGround(tint) : undefined}
 		>

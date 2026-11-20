@@ -30,7 +30,7 @@
 	width: 100%;
 	max-width: 1600px;
 	margin-inline: auto;
-	padding: 12px var(--cost-page-gutter, 32px) 24px;
+	padding: var(--space-l) var(--cost-page-gutter, 32px) var(--space-xxl);
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-xxl);
@@ -139,7 +139,7 @@
 	overflow: hidden;
 	text-align: left;
 	transition:
-		box-shadow 150ms ease,
+		box-shadow var(--motion-duration) ease,
 		--metric-tint 200ms ease;
 }
 .cost-metric[data-primary="true"] {
@@ -176,7 +176,7 @@
 	border-radius: inherit;
 	pointer-events: none;
 	box-shadow: inset 0 0 0 1px transparent;
-	transition: box-shadow 150ms ease;
+	transition: box-shadow var(--motion-duration) ease;
 }
 .cost-metric[data-primary="true"]::after {
 	box-shadow: inset 0 0 0 1px
@@ -258,7 +258,7 @@
 	flex: 0 1 32px;
 	min-height: 0;
 	width: calc(100% + 2 * var(--metric-pad-x));
-	margin: 6px calc(-1 * var(--metric-pad-x)) 0;
+	margin: var(--space-s) calc(-1 * var(--metric-pad-x)) 0;
 	overflow: visible;
 	color: color-mix(in oklch, var(--metric-tint) 50%, transparent);
 }
@@ -270,10 +270,10 @@
    at full strength. Only the colour and the stroke's opacity move: easing a
    stroke into a color-mix() of currentColor fades it out and back in. */
 .cost-metric-sparkline {
-	transition: color 150ms ease;
+	transition: color var(--motion-duration) ease;
 }
 .cost-metric-trend-line {
-	transition: stroke-opacity 150ms ease;
+	transition: stroke-opacity var(--motion-duration) ease;
 }
 .cost-metric:is([data-primary="true"], :hover)
 	.cost-metric-sparkline:not([data-placeholder]) {
@@ -291,7 +291,7 @@
 .cost-metric-wave [data-session-chart-loading-flow] path.fill-none {
 	stroke: currentColor;
 	stroke-opacity: 0.5;
-	transition: stroke-opacity 150ms ease;
+	transition: stroke-opacity var(--motion-duration) ease;
 }
 .cost-metric-wave [data-session-chart-loading-flow] stop {
 	stop-color: currentColor;
@@ -605,7 +605,7 @@
 	height: 40px;
 	pointer-events: none;
 	opacity: 0;
-	transition: opacity 150ms ease;
+	transition: opacity var(--motion-duration) ease;
 }
 .cost-scroll-fade-edge[data-edge="top"] {
 	top: 0;
@@ -631,7 +631,7 @@
 	letter-spacing: var(--letter-spacing-xl);
 	border-radius: var(--radius-zero);
 	border-top: var(--border-m) solid var(--line);
-	transition: background-color 150ms ease;
+	transition: background-color var(--motion-duration) ease;
 }
 /* Of-type, not child: the fluid hover's layer sits among the rows. */
 .cost-breakdown-list .cost-breakdown-row:first-of-type,
@@ -766,7 +766,7 @@
 	transform: scale(0.25);
 	transition:
 		transform 200ms ease,
-		opacity 150ms ease;
+		opacity var(--motion-duration) ease;
 	padding: var(--space-xs);
 }
 .cost-breakdown:hover .cost-tools,
@@ -813,7 +813,7 @@
 	flex: 1;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: 6px;
+	gap: var(--space-s);
 	min-width: 0;
 	padding-inline: 1px;
 }
@@ -1090,7 +1090,7 @@
 @container (max-width: 560px) {
 	.cost-metric {
 		--metric-pad-x: 12px;
-		padding: 16px var(--metric-pad-x) 0;
+		padding: var(--space-xl) var(--metric-pad-x) 0;
 	}
 	.cost-metric-value {
 		font-size: var(--display-size-xxs);
@@ -1178,7 +1178,7 @@
 /* While newer numbers load, only the chart line dims, and only if the load
    outlasts a beat, so quick refreshes never flicker. Cards stay crisp. */
 .cost-chart-canvas {
-	transition: opacity 150ms ease;
+	transition: opacity var(--motion-duration) ease;
 }
 .cost-page[data-updating="true"] .cost-chart-canvas {
 	opacity: 0.55;
@@ -1317,7 +1317,7 @@
 }
 .cost-ci-day rect {
 	fill: var(--ci-run);
-	transition: opacity 150ms ease;
+	transition: opacity var(--motion-duration) ease;
 }
 .cost-ci-day rect[data-failed] {
 	fill: var(--error);

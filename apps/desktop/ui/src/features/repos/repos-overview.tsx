@@ -351,14 +351,14 @@ const RepoRow = memo(function RepoRow({
 					<div className="flex min-w-0 flex-1 flex-col gap-xxs">
 						<div className="flex min-w-0 items-center gap-m">
 							<p
-								className="min-w-0 truncate text-base/5 font-medium text-ink sm:text-sm/5"
+								className="min-w-0 truncate text-body-xl font-medium text-ink"
 								title={identity.repoLabel}
 							>
 								{identity.repoLabel}
 							</p>
 							<RepoSignals repo={repo} />
 						</div>
-						<div className="flex min-w-0 items-center gap-s text-xs/4 text-ink-3">
+						<div className="flex min-w-0 items-center gap-s text-body-m text-ink-3">
 							<OverviewMembers
 								avatarMap={avatarMap}
 								topUserIds={repo.topUsers.map((user) => user.userId)}

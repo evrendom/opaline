@@ -766,7 +766,7 @@ function ReadCommand({ bash, text }: { bash: boolean; text: string }) {
 
 function SelectorMark({ open }: { open: boolean }) {
 	const turn = cn(
-		"[transform-box:fill-box] origin-center transition-transform duration-150 ease-out motion-reduce:transition-none",
+		"[transform-box:fill-box] origin-center transition-transform duration-(--motion-duration) ease-out motion-reduce:transition-none",
 		open && "-scale-y-100",
 	);
 	return (

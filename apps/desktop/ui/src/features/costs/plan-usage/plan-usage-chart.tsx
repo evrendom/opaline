@@ -256,7 +256,7 @@ export function PlanUsageChart({
 				<PillTabs
 					className="h-8 shrink-0 bg-transparent"
 					label="Provider"
-					pillClassName="bg-card shadow-card dark:bg-ink-3/10"
+					pillClassName="bg-card-soft shadow-card"
 					onChange={onProviderChange}
 					tabs={PROVIDER_TABS}
 					value={provider}

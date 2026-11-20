@@ -22,11 +22,11 @@ export function SkillMark({
 }) {
 	const mark = getSkillMarkLook(skill);
 	return (
-		<span skullet-block="" className="inline-flex shrink-0 rounded-full">
+		<span skullet-block="" className="inline-flex shrink-0 corner-full">
 			<OpalChip
 				tint={mark.tint}
 				open={expandable ? expanded : undefined}
-				className={cn("size-9 text-xl text-ink-3", className)}
+				className={cn("size-9 text-display-xxs text-ink-3", className)}
 			>
 				<span aria-hidden="true">{emoji ?? mark.emoji}</span>
 			</OpalChip>

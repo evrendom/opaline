@@ -80,7 +80,7 @@ function LaneMark({
 }) {
 	const Glyph = look.glyph;
 	const glyph = opens ? (
-		<span className="grid place-items-center *:col-start-1 *:row-start-1 *:transition-[opacity,scale] *:duration-150 *:ease-out">
+		<span className="grid place-items-center *:col-start-1 *:row-start-1 *:transition-[opacity,scale] *:duration-(--motion-duration) *:ease-out">
 			<Glyph
 				aria-hidden="true"
 				className="size-2.5 group-hover/open:scale-50 group-hover/open:opacity-0 group-focus-visible/open:scale-50 group-focus-visible/open:opacity-0"

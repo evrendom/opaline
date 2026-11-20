@@ -29,8 +29,7 @@ export const signalMarkClassName = (
 ) =>
 	`${SIGNAL_MARK_BASE_CLASS_NAME} ${SIGNAL_MARK_CATEGORY_CLASS_NAMES[category]}`;
 
-const SEARCH_MARK_CLASS_NAME =
-	"bg-warning-translucent text-inherit dark:bg-warning-translucent";
+const SEARCH_MARK_CLASS_NAME = "bg-warning-translucent text-inherit";
 const SignalTextSearchQueryContext = createContext<string | undefined>(
 	undefined,
 );

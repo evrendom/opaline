@@ -129,7 +129,7 @@ export function SkillRunWaterfall({
 
 	if (body.isLoading)
 		return (
-			<div className="flex flex-col gap-2 p-3">
+			<div className="flex flex-col gap-m p-l">
 				<Skeleton className="h-5 w-full" />
 				<Skeleton className="h-5 w-5/6" />
 				<Skeleton className="h-5 w-2/3" />
@@ -137,7 +137,9 @@ export function SkillRunWaterfall({
 		);
 	if (body.isError || !body.data || !waterfall)
 		return (
-			<p className="p-3 text-xs text-ink-3">This run’s steps couldn’t load.</p>
+			<p className="p-l text-body-m text-ink-3">
+				This run’s steps couldn’t load.
+			</p>
 		);
 	const runView = {
 		filter,
@@ -171,7 +173,7 @@ export function SkillRunWaterfall({
 		// top padding covers the reader's inset) keeps just a sliver of it.
 		<div
 			ref={revealSelection}
-			className="isolate min-w-0 px-3 pt-1 pb-3 [&_[data-frozen-header]]:-mt-1 [&_[data-frozen-header]]:pt-1"
+			className="isolate min-w-0 px-l pt-xs pb-l [&_[data-frozen-header]]:-mt-xs [&_[data-frozen-header]]:pt-xs"
 		>
 			<SessionReaderWaterfallView
 				collapse={{ onToggle: onClose, open: true }}

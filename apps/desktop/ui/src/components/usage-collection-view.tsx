@@ -58,8 +58,7 @@ const USAGE_GRID_CLASS_NAME =
 // Card: a squircle on its soft hairline shadow, no border.
 const USAGE_CARD_CLASS_NAME =
 	"relative flex h-full w-full min-w-0 flex-col overflow-hidden corner-m bg-card text-left text-ink shadow-card squircle:corner-xl corner-squircle";
-const USAGE_METADATA_ICON_CLASS_NAME =
-	"size-3.5 shrink-0 text-ink-3 dark:text-ink-3";
+const USAGE_METADATA_ICON_CLASS_NAME = "size-3.5 shrink-0 text-ink-3";
 
 type SkillAttribution = NonNullable<HistoricalSkillSummary["attribution"]>;
 
@@ -299,10 +298,7 @@ function UsageCardGrid({
 						hover.setActiveIndex(null);
 				}}
 			>
-				<FluidHoverHighlight
-					hover={hover}
-					className="z-10 corner-m bg-wash dark:bg-wash"
-				/>
+				<FluidHoverHighlight hover={hover} className="z-10 corner-m bg-wash" />
 				{/* biome-ignore lint/a11y/useSemanticElements: An explicit role preserves this list in Safari with list-style none. */}
 				<ul
 					// biome-ignore lint/a11y/noRedundantRoles: Preserve list semantics in Safari with list-style none.
@@ -376,7 +372,7 @@ const UsageCard = memo(function UsageCard({
 						{skill.name}
 					</h2>
 				</header>
-				<footer className="shrink-0 edge-t-m border-line px-xxl py-xl dark:border-line">
+				<footer className="shrink-0 edge-t-m border-line px-xxl py-xl">
 					<UsageSummary
 						avatarMap={avatarMap}
 						attribution={skill.attribution}
@@ -424,7 +420,7 @@ function UsageSummary({
 								? formatUserCount(attribution.userCount)
 								: "Skill users"
 						}
-						className="shrink-0 *:data-[slot=avatar]:ring-white dark:*:data-[slot=avatar]:ring-canvas"
+						className="shrink-0 *:data-[slot=avatar]:ring-canvas"
 					>
 						{visibleUsers.length > 0 ? (
 							visibleUsers.map((user) => (
@@ -442,7 +438,7 @@ function UsageSummary({
 							<UsageUserAvatar avatarUrl={undefined} title={undefined} />
 						)}
 						{hiddenUserCount > 0 ? (
-							<AvatarGroupCount className="bg-hover font-body text-body-m text-ink-3 ring-white tabular-nums dark:ring-canvas">
+							<AvatarGroupCount className="bg-hover font-body text-body-m text-ink-3 ring-canvas tabular-nums">
 								+{hiddenUserCount.toLocaleString()}
 								<span className="sr-only"> more users</span>
 							</AvatarGroupCount>
@@ -499,11 +495,7 @@ function UsageUserAvatar({
 	title: string | undefined;
 }) {
 	return (
-		<Avatar
-			title={title}
-			size="sm"
-			className="bg-canvas after:border-line dark:bg-canvas dark:after:border-line"
-		>
+		<Avatar title={title} size="sm" className="bg-canvas after:border-line">
 			{avatarUrl ? (
 				<AvatarImage alt="" src={avatarUrl} decoding="async" loading="lazy" />
 			) : null}
@@ -543,7 +535,6 @@ function RepositoryChip({
 					"edge-l-m pl-s",
 					"font-body tabular-nums",
 					"border-line text-ink-3",
-					"dark:border-line",
 				)}
 			>
 				{sessionCount.toLocaleString()}
@@ -563,7 +554,7 @@ function UsageCollectionSkeleton({ kind }: { kind: "skills" | "repos" }) {
 							<Skeleton className="size-9 shrink-0 [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]" />
 							<Skeleton className="h-5 min-w-0 flex-1" />
 						</div>
-						<div className="grid gap-s edge-t-m border-line px-xl py-l dark:border-line">
+						<div className="grid gap-s edge-t-m border-line px-xl py-l">
 							<div className="flex items-center gap-m">
 								<Skeleton className="size-6 corner-full" />
 								<Skeleton className="h-4 w-8" />

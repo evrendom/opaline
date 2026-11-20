@@ -338,11 +338,11 @@ export function AnalyticsDateRangePicker({
 					button_previous: "session-date-picker-nav-button",
 					caption_label: "session-date-picker-month-label",
 					month: "flex min-w-0 flex-1 flex-col gap-2.5",
-					month_caption: "flex h-8 w-full items-center justify-center px-0",
+					month_caption: "flex h-8 w-full items-center justify-center px-zero",
 					months: "relative flex flex-col gap-5 md:flex-row md:gap-[0.96rem]",
 					// Layout: the arrows at the outer edges of the months.
 					nav: "pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between *:pointer-events-auto",
-					week: "mt-1 flex w-full",
+					week: "mt-xs flex w-full",
 					weekday: "session-date-picker-weekday",
 				}}
 				disabled={(date) =>

@@ -529,7 +529,7 @@
 	box-shadow: var(--shadow-chip);
 }
 .dark .compass-chip {
-	box-shadow: 0 0 0 0.5px #ffffff12 inset;
+	box-shadow: var(--shadow-inset);
 }
 .compass-chip > i {
 	width: 6px;

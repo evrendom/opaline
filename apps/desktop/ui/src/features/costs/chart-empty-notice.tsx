@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 export function ChartEmptyNotice({ title }: { title: string }) {
 	return (
 		<div className="cost-chart-empty">
-			<EmptyMedia variant="icon" className="mb-0">
+			<EmptyMedia variant="icon" className="mb-zero">
 				<OpalineShape
 					className={cn(
 						"absolute inset-0",

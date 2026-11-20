@@ -255,7 +255,7 @@ export function useTurnFlags(
 }
 
 const FLAG_TRIGGER =
-	"inline-flex h-7 w-fit min-w-7 shrink-0 items-center justify-center gap-xs corner-full bg-card px-m text-body-m font-medium shadow-card transition-colors hover:bg-hover/60 data-popup-open:bg-hover dark:bg-ink-3/10";
+	"inline-flex h-7 w-fit min-w-7 shrink-0 items-center justify-center gap-xs corner-full bg-card-soft px-m text-body-m font-medium shadow-card transition-colors hover:bg-hover/60 data-popup-open:bg-hover";
 
 function SessionFlagFilter({
 	byKind,
@@ -289,7 +289,7 @@ function SessionFlagFilter({
 				aria-label="Loading flags"
 				className={cn(
 					FLAG_TRIGGER,
-					"cursor-default text-ink-3 opacity-40 hover:bg-card dark:hover:bg-ink-3/10",
+					"cursor-default text-ink-3 opacity-40 hover:bg-card-soft",
 					className,
 				)}
 			>

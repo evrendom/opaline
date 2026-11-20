@@ -695,8 +695,8 @@ function VersionChange({
 			className="shrink-0 tabular-nums"
 			title="Lines added and removed since the version before"
 		>
-			<span className="text-success dark:text-success">+{change.added}</span>{" "}
-			<span className="text-error dark:text-error">−{change.removed}</span>
+			<span className="text-success">+{change.added}</span>{" "}
+			<span className="text-error">−{change.removed}</span>
 		</span>
 	);
 }

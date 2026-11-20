@@ -190,7 +190,7 @@ export function SortableHead<K extends string>({
 			className={cn("group select-none outline-none", className)}
 		>
 			{/* The arrow sits after the label but takes no layout space on
-			    right-aligned columns (-mr-5 = its size-3.5 + gap-1.5 footprint,
+			    right-aligned columns (-mr-5 = its size-3.5 + gap-s footprint,
 			    hanging into the cell's right padding), so the label's right edge
 			    lines up exactly with the numbers below. It only appears on hover
 			    or when the column is actively sorted. */}
