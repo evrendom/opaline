@@ -39,7 +39,7 @@ function DropdownMenuContent({
 					className={cn(
 						"z-50 max-h-(--available-height) w-(--anchor-width) min-w-32 overflow-x-hidden overflow-y-auto",
 						"corner-s corner-squircle p-xs",
-						"origin-(--transform-origin) bg-surface text-ink shadow-card duration-100 outline-none",
+						"origin-(--transform-origin) bg-surface text-ink shadow-card duration-(--motion-quick-duration) outline-none",
 						"squircle:corner-xl",
 						"data-[side=bottom]:slide-in-from-top-2",
 						"data-[side=inline-end]:slide-in-from-left-2",

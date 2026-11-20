@@ -13,7 +13,7 @@
 .copy-button {
 	--copy-shape-duration: 120ms;
 	--copy-shape-return-delay: 130ms;
-	--copy-check-duration: 100ms;
+	--copy-check-duration: var(--motion-quick-duration);
 	--copy-check-delay: 90ms;
 }
 

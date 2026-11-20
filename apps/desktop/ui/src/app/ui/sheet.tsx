@@ -18,7 +18,7 @@ function SheetOverlay({ className, ...props }: SheetPrimitive.Backdrop.Props) {
 			data-slot="sheet-overlay"
 			className={cn(
 				"fixed inset-0 z-50",
-				"bg-ink/30 transition-opacity duration-150",
+				"bg-ink/30 transition-opacity duration-(--motion-duration)",
 				"data-ending-style:opacity-0 data-starting-style:opacity-0 supports-backdrop-filter:backdrop-blur-sm",
 				className,
 			)}
@@ -48,7 +48,7 @@ function SheetContent({
 				className={cn(
 					"fixed z-50 flex flex-col",
 					"text-body-xl",
-					"bg-surface bg-clip-padding text-ink shadow-xl transition duration-200 ease-in-out",
+					"bg-surface bg-clip-padding text-ink shadow-sheet transition duration-(--motion-medium-duration) ease-in-out",
 					"data-ending-style:opacity-0",
 					"data-starting-style:opacity-0",
 					"data-[side=bottom]:inset-x-0 data-[side=bottom]:bottom-0 data-[side=bottom]:h-auto data-[side=bottom]:edge-t-m data-[side=bottom]:data-ending-style:translate-y-[2.5rem] data-[side=bottom]:data-starting-style:translate-y-[2.5rem]",

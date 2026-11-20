@@ -376,7 +376,7 @@ function SidebarGroupLabel({
 					"flex h-8 shrink-0 items-center",
 					"corner-s px-m",
 					"text-body-m font-medium",
-					"text-sidebar-foreground/70 ring-sidebar-ring outline-hidden transition-[margin,opacity] duration-200 ease-linear",
+					"text-sidebar-foreground/70 ring-sidebar-ring outline-hidden transition-[margin,opacity] duration-(--motion-medium-duration) ease-linear",
 					"group-data-[collapsible=icon]:-mt-[calc(var(--space-xxl)*4/3)] group-data-[collapsible=icon]:opacity-0 [&>svg]:size-4 [&>svg]:shrink-0",
 					className,
 				),
@@ -438,7 +438,7 @@ const sidebarMenuButtonVariants = cva(
 				default:
 					"hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground",
 				outline:
-					"bg-canvas shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]",
+					"bg-canvas hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
 			},
 			size: {
 				default: "h-8 text-body-xl",

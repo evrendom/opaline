@@ -106,7 +106,7 @@
 	line-height: var(--line-xl);
 	letter-spacing: var(--letter-spacing-xl);
 	outline: none;
-	transition: box-shadow 150ms ease;
+	transition: box-shadow var(--motion-duration) ease;
 }
 .toolbar-search::placeholder {
 	color: var(--ink-3);
@@ -282,7 +282,7 @@
 	white-space: nowrap;
 	outline: none;
 	user-select: none;
-	transition: color 100ms ease-in-out;
+	transition: color var(--motion-quick-duration) ease-in-out;
 }
 .menu-row::before {
 	content: "";
@@ -446,7 +446,7 @@
 }
 /* Category changes keep the flyout's icons and text on fixed pixel positions. */
 .menu-flyout {
-	animation: menu-flyout-enter 100ms ease-out both;
+	animation: menu-flyout-enter var(--motion-quick-duration) ease-out both;
 }
 @keyframes menu-flyout-enter {
 	from {
@@ -593,7 +593,7 @@
 .menu-picks .menu-row::before {
 	background: var(--hover);
 	opacity: 0;
-	transition: opacity 100ms ease-in-out;
+	transition: opacity var(--motion-quick-duration) ease-in-out;
 	will-change: opacity;
 }
 .menu-picks .menu-row[data-checked]::before {

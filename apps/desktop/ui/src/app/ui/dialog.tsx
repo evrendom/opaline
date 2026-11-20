@@ -23,7 +23,7 @@ function DialogOverlay({
 			data-slot="dialog-overlay"
 			className={cn(
 				"fixed inset-0 isolate z-50",
-				"bg-ink/20 duration-100",
+				"bg-ink/20 duration-(--motion-quick-duration)",
 				"supports-backdrop-filter:backdrop-blur-[2px] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
 				className,
 			)}
@@ -49,7 +49,7 @@ function DialogContent({
 					"fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] gap-xxl",
 					"corner-xl corner-squircle p-xxl",
 					"text-body-xl",
-					"-translate-x-1/2 -translate-y-1/2 bg-surface text-ink shadow-card duration-100 outline-none",
+					"-translate-x-1/2 -translate-y-1/2 bg-surface text-ink shadow-card duration-(--motion-quick-duration) outline-none",
 					"squircle:corner-xl",
 					"sm:max-w-md",
 					"data-open:animate-in data-open:fade-in-0 data-open:zoom-in-[96%]",
@@ -121,6 +121,7 @@ function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
 		<DialogPrimitive.Title
 			data-slot="dialog-title"
 			className={cn(
+				// design-escape-ok: the title's line box hugs its text (shadcn)
 				"font-body text-body-xxl leading-none font-medium",
 				className,
 			)}

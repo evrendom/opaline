@@ -59,7 +59,7 @@ export function WorkspaceMenuButton({
 						data-sidebar-workspace-row
 						className={cn(
 							isHeaderVariant
-								? "relative flex size-7 shrink-0 items-center justify-center corner-s text-ink outline-none hover:bg-black/4 active:scale-95 dark:text-ink dark:hover:bg-white/6"
+								? "relative flex size-7 shrink-0 items-center justify-center corner-s text-ink outline-none hover:bg-hover active:scale-95"
 								: getUtilityRailItemClassName(),
 							isBottomRailVariant &&
 								"!size-9 !w-9 self-auto overflow-visible corner-m",
@@ -85,7 +85,6 @@ export function WorkspaceMenuButton({
 								className={cn(
 									"relative flex h-[var(--sidebar-avatar-size)] min-h-[var(--sidebar-avatar-size)] w-[var(--sidebar-avatar-size)] min-w-[var(--sidebar-avatar-size)] shrink-0 items-center justify-center",
 									"text-ink",
-									"dark:text-ink",
 								)}
 							>
 								<OpalineMark />

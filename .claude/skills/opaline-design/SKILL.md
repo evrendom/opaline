@@ -45,7 +45,7 @@ Tailwind reads the same roles as colours: `bg-surface`, `text-ink-3`, `border-li
   - lines: `line` (hairlines, dividers, rails), `line-strong` (opaque edges), `line-soft` (chart grids, quiet dividers);
   - action: `primary`, `primary-hover`, `primary-fg`, `focus`; `accent`, `accent-tint`, `accent-line`;
   - state: `success`, `warning`, `error`, each with `-tint` (a pastel fill) and `-line` (its edge);
-  - elevation: `card` (cards, panels, tooltips), `control` (buttons, inputs, toolbar pills), `raised` (a pressed or active control), `overlay` (menus, popovers, dialogs), `primary` and `destructive` (those buttons), `chip` (chips, tags, pills, the reader's light cards), `selected` (a picked row lifted off its shelf), `inset` (a shelf's inner hairline), `label` (a small label floating over content), `float` (something free of any surface: a floating button, a toast; dark keeps only its ring). Tailwind reads each as `shadow-<role>` (`shadow-card`, `aria-pressed:shadow-raised`), CSS as `var(--shadow-<role>)`. A recurring shadow is a role, not a `shadow-[…]`; Tailwind's `shadow-sm…xl` and the theme's `shadow-s/m/l` are not used in screens.
+  - elevation: `card` (cards, panels, tooltips), `control` (buttons, inputs, toolbar pills), `raised` (a pressed or active control), `overlay` (menus, popovers, dialogs), `primary` and `destructive` (those buttons), `chip` (chips, tags, pills, the reader's light cards), `selected` (a picked row lifted off its shelf), `inset` (a shelf's inner hairline), `label` (a small label floating over content), `float` (something free of any surface: a floating button, a toast; dark keeps only its ring), `sheet` (a sheet sliding in from an edge), `contact` (the contact shadow under a checkbox). Tailwind reads each as `shadow-<role>` (`shadow-card`, `aria-pressed:shadow-raised`), CSS as `var(--shadow-<role>)`. A recurring shadow is a role, not a `shadow-[…]`; Tailwind's `shadow-sm…xl` and the theme's `shadow-s/m/l` are not used in screens.
 - Dark is not an inversion. Roles keep their names; Layer 1 swaps the ramp, `surface` steps one up from `canvas`, `line-strong` becomes the translucent `line`, and every shadow trades its soft drop for an inset highlight edge.
 - The role shadows live in `tokens.css`, not the theme: each is a stack of hairline, contact and ambient layers, and dark swaps in inset highlights over black drops. A theme shadow is one layer coloured from one neutral that flips with the mode, so it can't hold them; the theme's `shadow-s/m/l` stay as Graphical emits them, unused. `shadow-destructive` mixes from `--error`.
 - Plugin mode (the widget build, `src/widget/plugin.css`) overrides two roles with other roles for the chat host: `primary` is `ink`, and `card` is `canvas`. Every other role keeps its app value.
@@ -61,7 +61,20 @@ Tailwind reads the same roles as colours: `bg-surface`, `text-ink-3`, `border-li
 7. **Data in the data face.** Money, times, counts, percentages and code are Geist Mono (`font-data`) with `tabular-nums`. Headings that need a voice use the display face, Nunito (`font-display`).
 8. **Controls have fixed heights.** Toolbar pills 32 (`Button variant="toolbar"`), inputs 36, buttons 24 / 28 / 32 by size, menu rows 32. Toolbar controls hold a choice with `aria-pressed` or `data-active`.
 9. **It's a Mac app.** No pointer cursor on controls. The sidebar stays translucent so the window's vibrancy shows through. Small controls get a `TouchTarget`.
-10. **Motion is quiet.** Buttons press to .97, menus share the fluid hover highlight, numbers count with `FlowNumber`, skeletons reveal with `Bones`. The theme's timings are `--motion-duration` (150ms, `--motion-easing`) for small changes and `--motion-large-duration` (300ms, `--motion-large-easing`) for large ones; popups scale from `--motion-popup-scale`. Respect reduced motion.
+10. **Motion is quiet.** Buttons press to .97, menus share the fluid hover highlight, numbers count with `FlowNumber`, skeletons reveal with `Bones`. Popups scale from `--motion-popup-scale`. Respect reduced motion. Time everything with a motion role, never a literal:
+
+   | Role | Value | Used for |
+   |---|---|---|
+   | `--motion-quick-duration` | 100ms | hover tints, a check appearing, flyouts |
+   | `--motion-duration` (theme) | 150ms | small changes, with `--motion-easing` |
+   | `--motion-medium-duration` | 200ms | fades, sheets, a panel's width |
+   | `--motion-large-duration` (theme) | 300ms | large changes, with `--motion-large-easing` |
+   | `--motion-slow-duration` | 650ms | a chart drawing in, a skeleton leaving |
+   | `--motion-strong-easing` (`ease-strong`) | cubic-bezier(.23, 1, .32, 1) | presses, things entering |
+   | `--motion-drawer-easing` (`ease-drawer`) | cubic-bezier(.32, .72, 0, 1) | drawers, rails, rings settling |
+   | `--motion-wave-easing` (`ease-wave`) | cubic-bezier(.455, .03, .515, .955) | strips growing, loops |
+
+   The theme holds only its two timings, so the others are Layer 2 roles in `tokens.css` (with literal values, like the role shadows). In Tailwind: `duration-(--motion-medium-duration) ease-strong`.
 
 ## Adding a pattern
 
@@ -69,7 +82,12 @@ Tailwind reads the same roles as colours: `bg-surface`, `text-ink-3`, `border-li
 - Name states as attributes (`aria-pressed`, `aria-selected`, `data-active`, `data-popup-open`, `data-inactive`) or classes, so every state renders at rest for review.
 - A new colour is a new role first: in `tokens.css` on a Layer 1 token, registered as a Tailwind colour, and in Graphical's role map (`graphical/role-map.json`, and `graphical/install/import.mjs` for re-imports) so the editor's theme edits reach it. A new shadow is a role in `tokens.css` (light in `:root`, dark in `.dark`), registered in its `@theme inline reference` block and in `ROLE_SHADOWS` in `src/lib/utils.ts` so `cn()` merges it.
 - Backgrounds from the ground roles, text from the inks, edges from the lines or a role shadow. Never a hex, `rgb()` or `oklch()` outside a token definition or data paint.
+- Add it to the system page, `/dev/design-system` in development (`src/app/system/DesignSystemPage.tsx`), with each state at rest; it shows light beside dark, each in its own frame. The page is the spec.
 - Review it in light and dark before merging.
+
+## The check
+
+`bun run check:design` (from the repo root or `apps/desktop/ui`; `tools/design-escapes.ts`) reads the class strings under `src` and lists every escape: Tailwind's default type (`text-sm`, `text-[13px]`, `leading-*`, `tracking-wide`), spacing (`p-3`, `gap-[10px]`), every `rounded-*`, palette colours (`bg-rose-500`, `text-white`), a hex, `rgb()` or `oklch()` in a class, and Tailwind's or literal shadows. It fails only on the path prefixes in `ENFORCED`; widen that list as areas are cleaned, until it is `["src/"]`. Data paint passes by a whole-file entry in `DATA_PAINT` (with its reason and the rules it lifts) or a `design-escape-ok: <reason>` comment on the line or the line above. The web tests and CI run it.
 
 ## Levers
 

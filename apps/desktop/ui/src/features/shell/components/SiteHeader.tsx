@@ -206,14 +206,14 @@ export function SiteHeader({
 					>
 						<FluidMenuHover items='button, a[href], [role="button"]' />
 						{showSidebarTrigger ? (
-							<SidebarTrigger className="size-7 shrink-0 corner-s text-ink-2 hover:bg-[#ececed] hover:text-[#1b1b1b]" />
+							<SidebarTrigger className="size-7 shrink-0 corner-s text-ink-2 hover:bg-hover-strong hover:text-ink" />
 						) : (
 							<SiteHeaderLeadingControls
 								showSidebarTrigger={showSidebarTrigger}
 								showWorkspaceMenu={showWorkspaceMenu}
 							/>
 						)}
-						<h1 className="truncate text-[0.8125rem]/5 font-medium tracking-m text-balance text-ink">
+						<h1 className="truncate text-body-l font-medium tracking-m text-balance text-ink">
 							Sessions
 						</h1>
 						<div
@@ -228,8 +228,7 @@ export function SiteHeader({
 						className={cn(
 							"relative z-10 flex min-w-0 flex-1 items-center gap-m",
 							"edge-l-m px-m",
-							"border-line bg-[var(--canvas)]",
-							"dark:border-line",
+							"border-line bg-canvas",
 						)}
 					>
 						<FluidMenuHover items='button, a[href], [role="button"]' />
