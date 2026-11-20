@@ -12,5 +12,9 @@
 		"build:number-flow": "./build-number-flow.sh",
 		"previews": "node scripts/grab-previews.mjs",
 		"test": "bun test test"
+	},
+	"devDependencies": {
+		"opentype.js": "1.3.4",
+		"three": "0.187.0"
 	}
 }

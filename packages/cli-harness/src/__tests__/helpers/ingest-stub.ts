@@ -231,7 +231,6 @@ export async function runCli(
 			HOME: fixture.home,
 			USERPROFILE: fixture.home,
 			RUDEL_CONFIG_DIR: join(fixture.home, ".rudel"),
-			POSTHOG_ENABLED: "false",
 			...options.env,
 		},
 		stdin: "pipe",

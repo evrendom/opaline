@@ -257,10 +257,9 @@ export async function commitR2IngestJob(
 	}
 
 	// A session above the standard size, or above what this process's gate
-	// admits (main Vercel functions: `LARGE_INGEST_MIN_BYTES`), never
-	// materializes inside the commit request: it holds several copies of the
-	// transcript for minutes, and only the large-ingest worker (or a resident
-	// server) is sized for that. Store the receipt and let recovery there run
+	// admits, never materializes inside the commit request: it holds several
+	// copies of the transcript for minutes, and only the large-ingest worker
+	// (or a resident server) is sized for that. Store the receipt and let recovery there run
 	// it alone; the client polls `ingest.status`.
 	const gate = options.gate ?? getR2IngestMaterializationGate();
 	if (

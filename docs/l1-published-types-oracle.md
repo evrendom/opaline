@@ -8,7 +8,7 @@ Regenerate offline from the unpacked published package, without installing it:
 
 ```sh
 bun run --cwd packages/api-routes facts:claude-types -- \
-  --source ~/l1-work/npm/sdk/package/sdk-tools.d.ts
+  --source <unpacked-sdk>/package/sdk-tools.d.ts
 ```
 
 This writes the compact `claude-types-0.3.287.json` declaration snapshot and

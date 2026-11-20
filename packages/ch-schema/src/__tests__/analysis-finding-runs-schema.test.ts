@@ -52,7 +52,7 @@ test("the finding runs migration creates only the table, with every defined colu
 	expect(sql).not.toMatch(/\bDROP\b|\bDELETE\b|\bTRUNCATE\b|\bALTER\b/u);
 });
 
-test("production and local bootstrap apply the finding runs migration through its runner", () => {
+test("bootstrap applies the finding runs migration through its runner", () => {
 	expect(
 		readFileSync(
 			new URL("../../scripts/bootstrap.ts", import.meta.url),
@@ -64,9 +64,6 @@ test("production and local bootstrap apply the finding runs migration through it
 	const manifest = JSON.parse(
 		readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
 	) as { scripts: Record<string, string> };
-	expect(manifest.scripts["ch:migrate:production"]).toContain(
-		"ch:migrate:analysis-finding-runs",
-	);
 	expect(manifest.scripts["ch:migrate:analysis-finding-runs"]).toBe(
 		"bun scripts/migrate-analysis-finding-runs.ts",
 	);

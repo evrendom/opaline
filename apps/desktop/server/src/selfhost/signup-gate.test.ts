@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { createHash } from "node:crypto";
 import type postgres from "postgres";
 import {
 	createSignUpGate,
@@ -65,20 +64,14 @@ describe("self-hosted sign-up gate", () => {
 		).toBeNull();
 	});
 
-	test("an invite is a live team link token or a pending invitation for that email", async () => {
+	test("an invite is a pending invitation for that email", async () => {
 		const { sql, queries } = fakeSql(true);
 		expect(await hasValidInvite(sql, "token-1", " Bob@Example.com ")).toBe(
 			true,
 		);
-		expect(queries[0]?.query).toContain("FROM team_invite_link");
-		expect(queries[0]?.query).toContain("revoked_at IS NULL");
 		expect(queries[0]?.query).toContain("FROM invitation");
 		expect(queries[0]?.query).toContain("status = 'pending'");
-		expect(queries[0]?.values).toEqual([
-			createHash("sha256").update("token-1").digest("base64url"),
-			"token-1",
-			"bob@example.com",
-		]);
+		expect(queries[0]?.values).toEqual(["token-1", "bob@example.com"]);
 		expect(await hasValidInvite(fakeSql(false).sql, "token-1", "b@x.io")).toBe(
 			false,
 		);

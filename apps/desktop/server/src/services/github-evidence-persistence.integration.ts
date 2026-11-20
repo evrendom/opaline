@@ -1,37 +1,24 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { generateKeyPairSync, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { sqlClient } from "../db.js";
-import { handleGitHubRepositorySetupRequest } from "../handlers/github-repository-evidence-http.js";
-import {
-	createGitHubInstallState,
-	verifyGitHubUserAuthorizationState,
-} from "./github-app.service.js";
 import { collectAndPersistGitHubCommitEvidence } from "./github-evidence-persistence.service.js";
-import {
-	getGitHubRepositoryConnectionStatus,
-	persistGitHubRepositoryInstallation,
-} from "./github-repository-binding.service.js";
+import { getGitHubRepositoryConnectionStatus } from "./github-repository-binding.service.js";
 import {
 	createR2MultipartUploadClient,
 	R2_INGEST_BUCKET,
 } from "./r2-ingest-storage.service.js";
 
 const suffix = randomUUID();
-const callbackOrganizationIds: string[] = [];
 const userId = `github-lease-user-${suffix}`;
 const organizationId = `github-lease-org-${suffix}`;
 const installationId = `github-lease-installation-${suffix}`;
 const repositoryId = `github-lease-repository-${suffix}`;
 const commitSha = "a".repeat(40);
-const callbackInstallationId = BigInt(
-	`0x${suffix.replaceAll("-", "")}`,
-).toString();
-const verifiedOrganizationId = `github-verified-org-${suffix}`;
-const verifiedInstallationId = `github-verified-installation-${suffix}`;
 const config = {
-	appId: "1",
-	privateKeyPem: "unused because lease reservation stops before GitHub auth",
-	slug: "github-lease-integration",
+	kind: "token" as const,
+	host: "github.com",
+	apiBaseUrl: "https://api.github.com",
+	read: async () => "token",
 };
 const r2 = createR2MultipartUploadClient({
 	accessKeyId: "unused",
@@ -41,20 +28,6 @@ const r2 = createR2MultipartUploadClient({
 	forcePathStyle: true,
 	secretAccessKey: "unused",
 });
-const callbackPrivateKey = generateKeyPairSync("rsa", { modulusLength: 2048 })
-	.privateKey.export({ format: "pem", type: "pkcs8" })
-	.toString();
-const callbackStateSecret = "github-callback-integration-secret".repeat(2);
-const callbackEnvironment = {
-	GITHUB_REPOSITORY_APP_CALLBACK_URL: "http://127.0.0.1:41239/api/github/setup",
-	GITHUB_REPOSITORY_APP_CLIENT_ID: "Iv1.integration",
-	GITHUB_REPOSITORY_APP_CLIENT_SECRET: "integration-client-secret",
-	GITHUB_REPOSITORY_APP_ID: "12345",
-	GITHUB_REPOSITORY_APP_PRIVATE_KEY: callbackPrivateKey,
-	GITHUB_REPOSITORY_APP_SLUG: "opaline-integration",
-	GITHUB_REPOSITORY_APP_STATE_SECRET: callbackStateSecret,
-};
-
 beforeAll(async () => {
 	const connectionString = process.env.PG_CONNECTION_STRING;
 	if (!connectionString) {
@@ -76,10 +49,6 @@ beforeAll(async () => {
 	await sqlClient.unsafe(
 		"INSERT INTO organization (id, name, slug) VALUES ($1, 'GitHub Lease', $1)",
 		[organizationId],
-	);
-	await sqlClient.unsafe(
-		"INSERT INTO organization (id, name, slug) VALUES ($1, 'GitHub Verified', $1)",
-		[verifiedOrganizationId],
 	);
 	await sqlClient.unsafe(
 		"INSERT INTO member (id, organization_id, user_id, role) VALUES ($1, $2, $3, 'owner')",
@@ -104,13 +73,6 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-	await sqlClient.unsafe(
-		"DELETE FROM organization WHERE id = ANY($1::text[])",
-		[callbackOrganizationIds],
-	);
-	await sqlClient.unsafe("DELETE FROM organization WHERE id = $1", [
-		verifiedOrganizationId,
-	]);
 	await sqlClient.unsafe("DELETE FROM organization WHERE id = $1", [
 		organizationId,
 	]);
@@ -118,177 +80,6 @@ afterAll(async () => {
 });
 
 describe("GitHub evidence lease timestamps", () => {
-	test("serializes concurrent callback persistence by installation and enforces tenant foreign keys", async () => {
-		const organizations = [randomUUID(), randomUUID()];
-		callbackOrganizationIds.push(...organizations);
-		for (const organization of organizations)
-			await sqlClient.unsafe(
-				"INSERT INTO organization (id, name, slug) VALUES ($1, 'Callback race', $1)",
-				[organization],
-			);
-		const installationId = randomUUID();
-		const details = {
-			installationId,
-			accountId: "1",
-			accountLogin: "opalinehq",
-			accountType: "Organization" as const,
-			repositorySelection: "selected" as const,
-			permissions: { contents: "read" },
-		};
-		const repository = {
-			id: randomUUID(),
-			nodeId: randomUUID(),
-			owner: "opalinehq",
-			name: "callback",
-			fullName: "opalinehq/callback",
-			defaultBranch: "main",
-			isPrivate: true,
-		};
-		const callbacks = await Promise.allSettled(
-			organizations.map((organizationId) =>
-				persistGitHubRepositoryInstallation({
-					database: sqlClient,
-					details,
-					installedByUserId: userId,
-					now: new Date(),
-					organizationId,
-					repositories: [repository],
-				}),
-			),
-		);
-		expect(
-			callbacks.filter((result) => result.status === "fulfilled"),
-		).toHaveLength(1);
-		expect(
-			callbacks.filter((result) => result.status === "rejected"),
-		).toHaveLength(1);
-		const [installation] = await sqlClient.unsafe<
-			Array<{ organization_id: string }>
-		>(
-			"SELECT organization_id FROM github_app_installation WHERE installation_id = $1",
-			[installationId],
-		);
-		if (!installation) throw new Error("Expected one installation owner");
-		const other = organizations.find(
-			(organizationId) => organizationId !== installation.organization_id,
-		);
-		if (!other) throw new Error("Expected another workspace");
-		expect(
-			await sqlClient.unsafe(
-				"SELECT organization_id FROM github_repository_binding WHERE installation_id = $1",
-				[installationId],
-			),
-		).toHaveLength(1);
-		await expect(
-			sqlClient
-				.unsafe(
-					"INSERT INTO github_repository_binding (organization_id, repository_id, installation_id, node_id, owner, name, full_name, default_branch, is_private) VALUES ($1, $2, $3, 'cross', 'opalinehq', 'cross', 'opalinehq/cross', 'main', true)",
-					[other, randomUUID(), installationId],
-				)
-				.then(),
-		).rejects.toMatchObject({ code: "23503" });
-		await expect(
-			sqlClient
-				.unsafe(
-					"INSERT INTO github_evidence_collection (id, organization_id, repository_id, installation_id, commit_sha, status, source_version, coverage) VALUES ($1, $2, $3, $4, $5, 'queued', 'fixture', '{}'::jsonb)",
-					[randomUUID(), other, repository.id, installationId, commitSha],
-				)
-				.then(),
-		).rejects.toMatchObject({ code: "23503" });
-	});
-
-	test("requires user authorization before binding a setup callback installation", async () => {
-		const setupState = createGitHubInstallState({
-			organizationId,
-			stateSecret: callbackStateSecret,
-			userId,
-			workspaceSlug: organizationId,
-		});
-		const setupUrl = new URL("http://127.0.0.1:41239/api/github/setup");
-		setupUrl.searchParams.set("installation_id", callbackInstallationId);
-		setupUrl.searchParams.set("setup_action", "install");
-		setupUrl.searchParams.set("state", setupState);
-
-		const response = await handleGitHubRepositorySetupRequest({
-			database: sqlClient,
-			environment: callbackEnvironment,
-			frontendOrigin: "http://127.0.0.1:4011",
-			getSession: async () => ({ user: { id: userId } }),
-			request: new Request(setupUrl.toString()),
-		});
-
-		expect(response.status).toBe(302);
-		const authorizationUrl = new URL(response.headers.get("Location") ?? "");
-		expect(authorizationUrl.origin).toBe("https://github.com");
-		expect(
-			verifyGitHubUserAuthorizationState({
-				state: authorizationUrl.searchParams.get("state") ?? "",
-				stateSecret: callbackStateSecret,
-			}),
-		).toMatchObject({ installationId: callbackInstallationId });
-		const bindings = await sqlClient.unsafe(
-			"SELECT installation_id FROM github_app_installation WHERE installation_id = $1",
-			[callbackInstallationId],
-		);
-		expect(bindings).toHaveLength(0);
-	});
-
-	test("reconnect keeps only the user-verified repository snapshot", async () => {
-		const repositoryA = {
-			defaultBranch: "main",
-			fullName: "opalinehq/verified-a",
-			id: `verified-a-${suffix}`,
-			isPrivate: true,
-			name: "verified-a",
-			nodeId: `verified-node-a-${suffix}`,
-			owner: "opalinehq",
-		};
-		const repositoryB = {
-			...repositoryA,
-			fullName: "opalinehq/app-only-b",
-			id: `app-only-b-${suffix}`,
-			name: "app-only-b",
-			nodeId: `app-only-node-b-${suffix}`,
-		};
-		const details = {
-			accountId: `verified-account-${suffix}`,
-			accountLogin: "opalinehq",
-			accountType: "Organization" as const,
-			installationId: verifiedInstallationId,
-			permissions: { contents: "read" },
-			repositorySelection: "all" as const,
-		};
-		await persistGitHubRepositoryInstallation({
-			database: sqlClient,
-			details,
-			installedByUserId: userId,
-			now: new Date("2026-09-20T12:00:00.000Z"),
-			organizationId: verifiedOrganizationId,
-			repositories: [repositoryA, repositoryB],
-		});
-		await persistGitHubRepositoryInstallation({
-			database: sqlClient,
-			details,
-			installedByUserId: userId,
-			now: new Date("2026-09-20T12:01:00.000Z"),
-			organizationId: verifiedOrganizationId,
-			repositories: [repositoryA],
-		});
-
-		const status = await getGitHubRepositoryConnectionStatus({
-			database: sqlClient,
-			organizationId: verifiedOrganizationId,
-		});
-		expect(
-			status.repositories.map((repository) => repository.repositoryId),
-		).toEqual([repositoryA.id]);
-		const removed = await sqlClient.unsafe<Array<{ status: string }>>(
-			"SELECT status FROM github_repository_binding WHERE organization_id = $1 AND repository_id = $2",
-			[verifiedOrganizationId, repositoryB.id],
-		);
-		expect([...removed]).toEqual([{ status: "removed" }]);
-	});
-
 	test("reads the organization-scoped installation and repository settings", async () => {
 		expect(
 			await getGitHubRepositoryConnectionStatus({

@@ -32,9 +32,10 @@ setDefaultTimeout(60_000);
 const RUN_ID = randomUUID().slice(0, 8);
 const COMMIT_SHA = "b".repeat(40);
 const CONFIG = {
-	appId: "1",
-	privateKeyPem: "unused",
-	slug: "github-fence-integration",
+	kind: "token" as const,
+	host: "github.com",
+	apiBaseUrl: "https://api.github.com",
+	read: async () => "token",
 };
 const COMPLETE: SourceCoverage = { reasons: [], state: "complete" };
 const PROVENANCE: SourceProvenance = {
@@ -274,7 +275,6 @@ function collect(
 		commitSha: COMMIT_SHA,
 		config: CONFIG,
 		contextId: null,
-		createInstallationToken: async () => "token",
 		database: sqlClient,
 		initiatedByUserId: workspace.userId,
 		organizationId: workspace.organizationId,
@@ -313,7 +313,6 @@ describe("GitHub evidence queue and attribution", () => {
 		const runPass = () =>
 			runGitHubEvidenceCollectionMaintenance({
 				config: CONFIG,
-				createInstallationToken: async () => "token",
 				database: sqlClient,
 				limit: 5,
 				r2,
@@ -363,7 +362,6 @@ describe("GitHub evidence queue and attribution", () => {
 				commitSha: COMMIT_SHA,
 				config: CONFIG,
 				contextId: null,
-				createInstallationToken: async () => "token",
 				database: sqlClient,
 				initiatedByUserId: workspace.userId,
 				now: () => new Date("2026-09-30T10:00:00Z"),
@@ -478,7 +476,6 @@ describe("GitHub evidence queue and attribution", () => {
 			commitSha: COMMIT_SHA,
 			config: CONFIG,
 			contextId: randomUUID(),
-			createInstallationToken: async () => "token",
 			database: sqlClient,
 			initiatedByUserId: workspace.userId,
 			now: () => initialAt,
@@ -500,7 +497,6 @@ describe("GitHub evidence queue and attribution", () => {
 		);
 		const result = await runGitHubEvidenceCollectionMaintenance({
 			config: CONFIG,
-			createInstallationToken: async () => "token",
 			database: sqlClient,
 			now: () => new Date("2026-09-02T10:01:00Z"),
 			r2,
@@ -539,7 +535,6 @@ describe("GitHub evidence queue and attribution", () => {
 			commitSha: COMMIT_SHA,
 			config: CONFIG,
 			contextId: null,
-			createInstallationToken: async () => "token",
 			database: sqlClient,
 			initiatedByUserId: workspace.userId,
 			now: () => new Date("2026-09-01T10:00:00Z"),
@@ -556,7 +551,6 @@ describe("GitHub evidence queue and attribution", () => {
 		});
 		await runGitHubEvidenceCollectionMaintenance({
 			config: CONFIG,
-			createInstallationToken: async () => "token",
 			database: sqlClient,
 			now: () => new Date("2026-09-15T10:00:00Z"),
 			r2,
@@ -599,7 +593,6 @@ describe("GitHub evidence queue and attribution", () => {
 			commitSha: COMMIT_SHA,
 			config: CONFIG,
 			contextId: null,
-			createInstallationToken: async () => "token",
 			database: sqlClient,
 			initiatedByUserId: workspace.userId,
 			organizationId: workspace.organizationId,
@@ -721,7 +714,6 @@ describe("GitHub evidence queue and attribution", () => {
 		const maintenance = (source: GitHubEvidenceSource) =>
 			runGitHubEvidenceCollectionMaintenance({
 				config: CONFIG,
-				createInstallationToken: async () => "token",
 				database: sqlClient,
 				limit: 25,
 				r2,
@@ -764,7 +756,6 @@ describe("GitHub evidence queue and attribution", () => {
 		await collectAndPersistGitHubCommitEvidence({
 			...identity,
 			config: CONFIG,
-			createInstallationToken: async () => "token",
 			database: sqlClient,
 			organizationId: workspace.organizationId,
 			r2,
@@ -777,7 +768,6 @@ describe("GitHub evidence queue and attribution", () => {
 		await collectAndPersistGitHubCommitEvidence({
 			...identity,
 			config: CONFIG,
-			createInstallationToken: async () => "token",
 			database: sqlClient,
 			organizationId: workspace.organizationId,
 			r2,

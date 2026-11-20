@@ -11,7 +11,6 @@ import {
 	// biome-ignore lint/style/noRestrictedImports: the tab title must update when async session details reveal the model and when client-side navigation changes the session id.
 	useEffect,
 	useRef,
-	useState,
 } from "react";
 import { Link } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
@@ -21,7 +20,6 @@ import { EmptyState } from "@/components/dashboard/page-parts";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
 import type { SessionNavigation } from "@/features/sessions/session-navigation";
 import { getSessionUploadFailure } from "@/features/sessions/session-upload-failure";
-import { useSessionOpenTracking } from "@/features/sessions/use-session-open-tracking";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { useShellHeaderPortal } from "@/features/shell/shell-header-portal";
 import { useUserMap } from "@/features/workspace/hooks/useUserMap";
@@ -113,12 +111,6 @@ export function SessionDetailView({
 		[getShellRoutePath, sessionId],
 	);
 	const queryClient = useQueryClient();
-	const [cacheHit] = useState(
-		() =>
-			queryClient.getQueryData(
-				sessionDetailInitialQueryOptions(sessionId).queryKey,
-			) !== undefined,
-	);
 	const handleHeaderWheel = useCallback((event: WheelEvent) => {
 		if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) {
 			return;
@@ -229,16 +221,6 @@ export function SessionDetailView({
 			document.title = previousTitle;
 		};
 	}, [sessionTabTitle]);
-
-	useSessionOpenTracking({
-		sessionId,
-		isLoading: isDetailLoading,
-		error: failure ? null : overviewQuery.error,
-		hasData: Boolean(failure || overview),
-		cacheHit,
-		requestTiming: overviewQuery.data?.loadingTiming,
-		turnCount: overview?.turnPage.total,
-	});
 
 	function handleStaleRevision(error: unknown, selectedTurnId?: string) {
 		preservedTurnIdRef.current = selectedTurnId;

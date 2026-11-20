@@ -7,7 +7,6 @@ export type SettingsRouteId =
 	| "reports"
 	| "members"
 	| "team"
-	| "invitations"
 	| "account"
 	| "mcp"
 	| "create-workspace";
@@ -58,12 +57,6 @@ export const settingsRouteMap: Record<
 		label: "Team",
 		segment: "team",
 		path: appRoutes.settingsTeam(),
-	},
-	invitations: {
-		id: "invitations",
-		label: "Invitations",
-		segment: "invitations",
-		path: appRoutes.settingsInvitations(),
 	},
 	account: {
 		id: "account",
@@ -117,7 +110,7 @@ export function getActiveSettingsRouteId(
 				canonicalPathname.startsWith(`${route.path}/`),
 		)?.id ?? "workspace";
 
-	if (matchedRoute === "account" || matchedRoute === "invitations") {
+	if (matchedRoute === "account") {
 		return "account";
 	}
 
@@ -142,10 +135,6 @@ export function getSettingsPathFromLegacyTab(tab: string | null): string {
 
 	if (tab === "members" || tab === "team") {
 		return settingsRouteMap.members.path;
-	}
-
-	if (tab === "invitations") {
-		return `${settingsRouteMap.account.path}#workspace-invitations`;
 	}
 
 	return settingsRouteMap.workspace.path;

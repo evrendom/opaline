@@ -92,14 +92,10 @@ describe("session analytics drop retired migration", () => {
 		).toEqual([...DROPPED_SESSION_ANALYTICS_COLUMNS]);
 	});
 
-	test("production runs it after the view retirement and the string defaults, and bootstrap applies it", () => {
+	test("bootstrap applies it", () => {
 		const manifest = JSON.parse(
 			readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
 		) as { scripts: Record<string, string> };
-		const steps = manifest.scripts["ch:migrate:production"]?.split(" ") ?? [];
-		expect(steps.at(-1)).toBe("ch:migrate:session-analytics-drop-retired");
-		expect(steps).toContain("ch:migrate:session-analytics-retirement");
-		expect(steps).toContain("ch:migrate:string-defaults");
 		expect(manifest.scripts["ch:migrate:session-analytics-drop-retired"]).toBe(
 			"bun scripts/migrate-session-analytics-drop-retired.ts",
 		);

@@ -18,11 +18,6 @@ import { readGitHubSyncSkippedOrgIds } from "../lib/env.js";
 import { isSelfHosted } from "../lib/self-hosted.js";
 import { demoRepositoryFilesDependencies } from "./demo-repository-files.js";
 import {
-	createGitHubInstallationAccessToken,
-	type GitHubRepositoryAppConfig,
-	readGitHubRepositoryAppConfig,
-} from "./github-app.service.js";
-import {
 	GitHubTokenUnavailableError,
 	readResolvedGitHubTokenCredentials,
 } from "./github-token.service.js";
@@ -30,8 +25,6 @@ import {
 // Both caps keep a response well under the API's 3.75 MB limit.
 export const MAX_TREE_ENTRIES = 20_000;
 export const MAX_FILE_BYTES = 512 * 1024;
-// Installation tokens live an hour; renew well before GitHub expires them.
-const TOKEN_TTL_MS = 50 * 60_000;
 
 interface RepositoryFilesBinding {
 	readonly defaultBranch: string;
@@ -174,8 +167,6 @@ function isBinary(bytes: Uint8Array) {
 	return bytes.subarray(0, 8000).includes(0);
 }
 
-const tokens = new Map<string, { token: Promise<string>; expiresAt: number }>();
-
 function dependenciesFor(organizationId: string): RepositoryFilesDependencies {
 	return readGitHubSyncSkippedOrgIds().includes(organizationId)
 		? demoRepositoryFilesDependencies()
@@ -188,41 +179,19 @@ function defaultDependencies(): RepositoryFilesDependencies {
 			const { sqlClient } = await import("../db.js");
 			return findGitHubRepositoryBindingByName(sqlClient, input);
 		},
-		sourceFor: (installationId) => {
-			if (isSelfHosted())
-				return readResolvedGitHubTokenCredentials().then((credentials) => {
-					if (!credentials) throw new GitHubTokenUnavailableError();
-					return credentials.read().then((token) =>
-						createGitHubFileSource({
-							authorization: createGitHubAuthorization(token),
-							baseUrl: credentials.apiBaseUrl,
-						}),
-					);
-				});
-			const config = readGitHubRepositoryAppConfig();
-			if (!config) return null;
-			return installationToken(config, installationId).then((token) =>
-				createGitHubFileSource({
-					authorization: createGitHubAuthorization(token),
-				}),
-			);
+		sourceFor: () => {
+			if (!isSelfHosted()) return null;
+			return readResolvedGitHubTokenCredentials().then((credentials) => {
+				if (!credentials) throw new GitHubTokenUnavailableError();
+				return credentials.read().then((token) =>
+					createGitHubFileSource({
+						authorization: createGitHubAuthorization(token),
+						baseUrl: credentials.apiBaseUrl,
+					}),
+				);
+			});
 		},
 	};
-}
-
-function installationToken(
-	config: GitHubRepositoryAppConfig,
-	installationId: string,
-) {
-	const cached = tokens.get(installationId);
-	if (cached && cached.expiresAt > Date.now()) return cached.token;
-	const token = createGitHubInstallationAccessToken({ config, installationId });
-	tokens.set(installationId, {
-		token,
-		expiresAt: Date.now() + TOKEN_TTL_MS,
-	});
-	token.catch(() => tokens.delete(installationId));
-	return token;
 }
 
 async function findGitHubRepositoryBindingByName(

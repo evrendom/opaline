@@ -12,7 +12,6 @@ import {
 } from "@/app/ui/dialog";
 import { Field, FieldLabel } from "@/app/ui/field";
 import { Input } from "@/app/ui/input";
-import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
 import { client } from "@/lib/orpc";
 
 function DeleteWorkspaceDialogBody({
@@ -24,9 +23,6 @@ function DeleteWorkspaceDialogBody({
 	organization: { id: string; name: string };
 	onDeleted: () => Promise<void>;
 }) {
-	const { trackOrganizationAction } = useAnalyticsTracking({
-		organizationId: organization.id,
-	});
 	const { data: sessionCount, isLoading } = useQuery({
 		queryKey: ["org-session-count", organization.id],
 		queryFn: async () => {
@@ -45,12 +41,6 @@ function DeleteWorkspaceDialogBody({
 			organization.name.trim().toLowerCase() && !isDeleting;
 
 	const handleDelete = async () => {
-		trackOrganizationAction({
-			actionName: "delete_organization",
-			targetType: "organization",
-			sourceComponent: "delete_workspace_dialog",
-			targetId: organization.id,
-		});
 		setIsDeleting(true);
 		setError(null);
 

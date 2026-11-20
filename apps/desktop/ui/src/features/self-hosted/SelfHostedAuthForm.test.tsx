@@ -29,14 +29,6 @@ vi.mock("@/features/auth/auth-navigation", () => ({
 	navigateToDestination: auth.navigate,
 }));
 
-vi.mock("@/features/auth/LoginForm", () => ({
-	LoginForm: () => <div>Cloud login form</div>,
-}));
-
-vi.mock("@/features/auth/SignupForm", () => ({
-	SignupForm: () => <div>Cloud signup form</div>,
-}));
-
 const info: SelfHostInfo = {
 	selfHosted: true,
 	version: "dev",
@@ -46,7 +38,7 @@ const info: SelfHostInfo = {
 	auth: { password: true, emailCodes: false, social: [], openSignup: false },
 };
 
-function renderGuest(selfHost: SelfHostInfo | null = info) {
+function renderGuest(selfHost: SelfHostInfo = info) {
 	return render(
 		<SelfHostContext value={selfHost}>
 			<GuestApp />
@@ -81,7 +73,6 @@ describe("GuestApp on a self-hosted server", () => {
 		expect(screen.queryByText(/Google/)).not.toBeInTheDocument();
 		expect(screen.queryByText(/email code/i)).not.toBeInTheDocument();
 		expect(screen.queryByText(/Terms of Service/)).not.toBeInTheDocument();
-		expect(screen.queryByText("Cloud login form")).not.toBeInTheDocument();
 		expect(screen.getByText("opaline server open")).toBeVisible();
 	});
 
@@ -251,14 +242,5 @@ describe("GuestApp on a self-hosted server", () => {
 		expect(
 			screen.getByRole("button", { name: "Email me a sign-in code instead" }),
 		).toBeVisible();
-	});
-});
-
-describe("GuestApp on opaline.so", () => {
-	it("keeps the cloud sign-in", () => {
-		renderGuest(null);
-
-		expect(screen.getByText("Cloud login form")).toBeVisible();
-		expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
 	});
 });

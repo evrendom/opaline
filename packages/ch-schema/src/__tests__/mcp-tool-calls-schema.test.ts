@@ -86,12 +86,9 @@ describe("MCP tool calls migration", () => {
 		);
 	});
 
-	test("bootstrap and the production gate run its runner", () => {
+	test("bootstrap runs its runner", () => {
 		expect(read("../../scripts/bootstrap.ts")).toContain(
 			`["${MCP_TOOL_CALLS_MIGRATION}", "migrate-mcp-tool-calls.ts"],`,
-		);
-		expect(read("../../package.json")).toMatch(
-			/"ch:migrate:production": "[^"]* ch:migrate:mcp-tool-calls[ "]/u,
 		);
 	});
 });

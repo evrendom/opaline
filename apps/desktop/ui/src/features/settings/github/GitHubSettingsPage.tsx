@@ -1,5 +1,4 @@
 import { Navigate } from "react-router-dom";
-import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import { showsGitHubSettings } from "@/features/self-hosted/surfaces";
 import { SettingsPageReveal } from "@/features/settings/components/settings-page-skeleton";
 import { settingsRouteMap } from "@/features/settings/config/settings-routes";
@@ -13,13 +12,9 @@ export function GitHubSettingsPage() {
 	const organizationId = state.activeOrg?.id ?? null;
 	const { query } = useGitHubConnection(organizationId);
 	const getShellRoutePath = useShellRoutePath();
-	const selfHost = useSelfHost();
 
 	const loading = state.isLoading || Boolean(organizationId && query.isPending);
-	if (
-		!loading &&
-		(!organizationId || !showsGitHubSettings(selfHost, query.data))
-	) {
+	if (!loading && (!organizationId || !showsGitHubSettings(query.data))) {
 		return (
 			<Navigate
 				replace

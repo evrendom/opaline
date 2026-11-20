@@ -9,7 +9,7 @@ import type {
  * The analysis log: an analysis (one asked question), its steps (one per
  * find/read call, labelled from its arguments, or a question to the asker), the queries with their
  * exact results, and the final answer. Records are plain documents with ids
- * generated here, so the store can be Convex (ADR 0001) or memory in tests.
+ * generated here, so the store can be Postgres or memory in tests.
  *
  * find/read calls build a private draft (`draft`); saving publishes it once
  * (`status` finished) and nothing about it changes afterwards. A revision is

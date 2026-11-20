@@ -24,7 +24,6 @@ import {
 } from "@/features/sessions/session-arrivals-live";
 import { getSessionTimestamp } from "@/features/sessions/session-ordering";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
-import { DockedSupportEmailButton } from "@/features/support/SupportEmailButton";
 import { PLAIN_NUMBER } from "@/lib/figure";
 import { orpc } from "@/lib/orpc";
 
@@ -211,7 +210,6 @@ export function LastSessionUploadBar() {
 					</span>
 				</Link>
 			) : null}
-			{demo === null ? <DockedSupportEmailButton className="ml-auto" /> : null}
 		</div>
 	);
 }

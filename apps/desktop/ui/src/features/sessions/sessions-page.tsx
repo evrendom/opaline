@@ -14,7 +14,6 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
 import { DateRangeOverride } from "@/features/analytics/date-range/DateRangeProvider";
 import { useDateRange } from "@/features/analytics/date-range/useDateRange";
-import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
 import {
 	DotPickContext,
 	DotPreviewContext,
@@ -35,7 +34,6 @@ import {
 	getLoadedSessionReaderView,
 	loadSessionReaderView,
 } from "./session-detail-prefetch";
-import { markSessionOpen } from "./session-open-timing";
 import { transcriptSubagentId } from "./session-row-key";
 import { SessionsRail } from "./sessions-rail";
 
@@ -80,14 +78,12 @@ export function SessionsPage() {
 		detail: activeSessionId !== null,
 		detailReady,
 		focus: activeSessionId === null ? shownRange : null,
-		trackPageView: activeSessionId === null,
 	});
 	const canViewSession = useCanViewSession();
 	const location = useLocation();
 	const navigate = useNavigate();
 	const getShellRoutePath = useShellRoutePath();
 	const shellBottomNavigationPortal = useShellBottomNavigationPortal();
-	const { trackDrilldown } = useAnalyticsTracking();
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 
 	useLayoutEffect(() => {
@@ -150,23 +146,6 @@ export function SessionsPage() {
 	const sessionPosition =
 		selectedSessionIndex === -1 ? undefined : selectedSessionIndex + 1;
 
-	function handleSessionClick(session: SessionAnalytics) {
-		if (!canViewSession(session.user_id)) {
-			return;
-		}
-
-		const targetPath = getShellRoutePath(
-			appRoutes.sessionDetail(session.session_id),
-		);
-		trackDrilldown({
-			drilldownMethod: "table_row",
-			sourceComponent: "sessions_snapshot_table",
-			targetType: "session",
-			targetId: session.session_id,
-			targetPath,
-		});
-	}
-
 	function closeSession() {
 		navigate(getShellRoutePath(appRoutes.session()));
 	}
@@ -176,7 +155,6 @@ export function SessionsPage() {
 			if (!targetSession) {
 				return;
 			}
-			markSessionOpen(targetSession.session_id);
 
 			const targetPath = getShellRoutePath(
 				appRoutes.sessionDetail(targetSession.session_id),
@@ -249,7 +227,6 @@ export function SessionsPage() {
 										)
 									}
 									layout="workspace"
-									onSessionClick={handleSessionClick}
 									showPlace
 									showSkillsColumn={false}
 									scrollContainerRef={scrollContainerRef}

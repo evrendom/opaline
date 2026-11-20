@@ -29,7 +29,7 @@ type Scenario = {
 	search: string;
 	connection: ConnectionState;
 	/** Saved welcome progress, for the signed-in setup steps. */
-	step?: "workspace" | "github" | "profile" | "invite" | "done";
+	step?: "workspace" | "profile" | "done";
 };
 
 const paired = `?connect=${CONNECTION_ID}&user_code=${USER_CODE}`;
@@ -85,14 +85,6 @@ export const ONBOARDING_SCENARIOS = {
 		connection: "ready",
 		step: "workspace",
 	},
-	github: {
-		label: "GitHub",
-		group: "Setup",
-		signedIn: true,
-		search: paired,
-		connection: "ready",
-		step: "github",
-	},
 	profile: {
 		label: "Profile",
 		group: "Setup",
@@ -100,14 +92,6 @@ export const ONBOARDING_SCENARIOS = {
 		search: paired,
 		connection: "ready",
 		step: "profile",
-	},
-	invite: {
-		label: "Invite",
-		group: "Setup",
-		signedIn: true,
-		search: paired,
-		connection: "ready",
-		step: "invite",
 	},
 	done: {
 		label: "Done",
@@ -326,25 +310,6 @@ export function handleOnboardingRequest(
 		sendJson(response, snapshot(scenario, connection[1] ?? CONNECTION_ID));
 	} else if (path.endsWith("/events")) {
 		sendEvents(request, response);
-	} else if (path.startsWith("/rpc/githubRepositoryEvidence/status")) {
-		sendJson(response, {
-			json: {
-				visibility: "visible",
-				dashboard: "notConnected",
-				connection: {
-					accountLogin: null,
-					accountType: null,
-					canManage: true,
-					configurationError: null,
-					configured: true,
-					connected: false,
-					installationId: null,
-					manageUrl: null,
-					repositories: [],
-					repositorySelection: null,
-				},
-			},
-		});
 	} else {
 		// The welcome page needs nothing else; the dashboard behind "Done"
 		// shows its error states instead of reaching a real API.
@@ -389,7 +354,7 @@ export function onboardingPickerScript() {
 			for (const key of Object.keys(localStorage))
 				if (key.startsWith("opaline.welcome.") || key.startsWith("opaline.cli")) localStorage.removeItem(key);
 			if (scenario.step)
-				localStorage.setItem(progressKey, JSON.stringify({ step: scenario.step, organizationId: scenario.step === "workspace" ? null : "${USER_ID}", github: "pending" }));
+				localStorage.setItem(progressKey, JSON.stringify({ step: scenario.step, organizationId: scenario.step === "workspace" ? null : "${USER_ID}" }));
 		} catch {}
 		location.href = "/welcome" + scenario.search;
 	};

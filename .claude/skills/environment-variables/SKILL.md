@@ -38,17 +38,9 @@ jobs:
 
 Secrets must exist in repository settings → Secrets → Actions first.
 
-### 3. Frontend `VITE_*` Variables (Dockerfile)
+### 3. Frontend `VITE_*` Variables
 
-Frontend variables prefixed with `VITE_` are baked into the web app at build time by Vite. They must be declared in the `Dockerfile`:
-
-**A) `Dockerfile`** — Add an `ARG` declaration so Docker receives the value:
-
-```dockerfile
-ARG VITE_ADMIN_ORGANIZATION_ID=""
-```
-
-If it is missing, the variable will be empty in the built frontend.
+Frontend variables prefixed with `VITE_` are baked into the UI by Vite when `apps/desktop/ui` is built (`bun run build:selfhost` builds it for the app). Set them in the environment of that build, and declare their types in `apps/desktop/ui/src/vite-env.d.ts`.
 
 ### 4. Package-Specific turbo.json
 
@@ -71,7 +63,7 @@ If it is missing, the variable will be empty in the built frontend.
 - [ ] Set the local value in an untracked `.env` file or the current shell
 - [ ] Add to GitHub Secrets (if used in CI)
 - [ ] Add to `.github/workflows/ci.yml` (if used in CI)
-- [ ] If `VITE_*`: Add `ARG` in `Dockerfile` and `--build-arg` in CI deploy step
+- [ ] If `VITE_*`: declare it in `apps/desktop/ui/src/vite-env.d.ts`
 - [ ] Add to package-specific `turbo.json` → `passThroughEnv`
 - [ ] Validate tests pass locally and in CI
 
@@ -89,4 +81,4 @@ Check in order:
 ## Common Mistakes
 
 ❌ Adding to root `turbo.json` instead of package-specific
-❌ Adding a `VITE_*` var to CI deploy `--build-arg` but not as `ARG` in Dockerfile (or vice versa)
+❌ Reading a `VITE_*` var at runtime: it is fixed when the UI is built

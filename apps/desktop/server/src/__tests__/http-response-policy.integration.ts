@@ -34,26 +34,6 @@ afterAll(async () => {
 });
 
 describe("production HTTP response policy", () => {
-	test("retired story, sharing, and RPC routes cannot fall through to the app", async () => {
-		for (const path of [
-			"/wrapped",
-			"/wrapped/old-share",
-			"/wrapped/old-share/x-card.png",
-			"/dev/wrapped",
-			"/resume/old-token",
-			"/rpc/wrappedShare/getPublic",
-			"/rpc/wrappedResume/create",
-			"/rpc/wrappedDecimalClaim/redeem",
-			"/rpc/analytics/wrapped/v1",
-		]) {
-			for (const method of ["GET", "POST"]) {
-				const response = await fetch(`${baseUrl}${path}`, { method });
-				expect(response.status).toBe(410);
-				expect(await response.text()).toBe("Wrapped has been retired.");
-			}
-		}
-	});
-
 	test("returns a stable minimal health response", async () => {
 		const response = await fetch(`${baseUrl}/health`);
 
@@ -71,7 +51,7 @@ describe("production HTTP response policy", () => {
 			"frame-ancestors 'none'",
 		);
 		expect(response.headers.get("Content-Security-Policy")).toContain(
-			"script-src 'self' https://*.posthog.com",
+			"script-src 'self'",
 		);
 		expect(response.headers.get("Strict-Transport-Security")).toBe(
 			"max-age=31536000; includeSubDomains",

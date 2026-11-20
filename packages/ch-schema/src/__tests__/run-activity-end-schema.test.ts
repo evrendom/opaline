@@ -61,13 +61,10 @@ test("the run activity end migration only comments, as the tables define them", 
 			expect(commentOf(columns, name) ?? "").not.toContain("non-meta");
 });
 
-test("production and bootstrap apply the run activity end migration", () => {
+test("bootstrap applies the run activity end migration", () => {
 	const manifest = JSON.parse(
 		readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
 	) as { scripts: Record<string, string> };
-	expect(manifest.scripts["ch:migrate:production"]).toContain(
-		"ch:migrate:run-activity-end",
-	);
 	expect(manifest.scripts["ch:migrate:run-activity-end"]).toBe(
 		"bun scripts/migrate-run-activity-end.ts",
 	);

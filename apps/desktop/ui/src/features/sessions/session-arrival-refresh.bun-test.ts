@@ -38,7 +38,6 @@ test("a new session leaves other sessions, settings and other workspaces alone",
 		["org", org, "skill-runs", "open", "skill"],
 		procedure("repositorySettings.list"),
 		procedure("analytics.moments.settings"),
-		procedure("billing.summary", { organizationId: org }),
 		["org", "org-2", ["analytics", "sessions", "list"], { type: "query" }],
 		["session-detail-v2", "initial", "open"],
 	])

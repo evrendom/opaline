@@ -1,6 +1,5 @@
 import * as p from "@clack/prompts";
 import { type AgentAdapter, getAvailableAdapters } from "@rudel/agent-adapters";
-import type { Source } from "@rudel/api-routes";
 import { buildCommand } from "@stricli/core";
 import { describeSavedCredentialsApiBaseRisk } from "../lib/api-base.js";
 import { createApiClient } from "../lib/api-client.js";
@@ -8,47 +7,12 @@ import { verifyAuth } from "../lib/auth.js";
 import type { BatchUploadItem } from "../lib/batch-upload.js";
 import { renderBatchSummary, runBatchUpload } from "../lib/batch-upload-ui.js";
 import { getGitInfo } from "../lib/git-info.js";
-import {
-	CliProductAnalyticsEvents,
-	captureCliProductAnalyticsEvent,
-	getBaseCliEventPayload,
-	getCliDistinctId,
-	normalizeFailureReason,
-	shouldDisableCliPersonProfile,
-} from "../lib/product-analytics.js";
 import { getProjectOrgId, setProjectOrgId } from "../lib/project-config.js";
 import { allowsInsecureEndpointFromEnv } from "../lib/upload-endpoint.js";
 import { uploadSession } from "../lib/uploader.js";
 
 async function runEnable(): Promise<undefined | Error> {
 	p.intro("rudel enable");
-
-	const captureEnableFailure = (options: {
-		agentSource?: Source | "unknown";
-		failureStage:
-			| "auth_verify"
-			| "organization_fetch"
-			| "organization_select"
-			| "hook_install";
-		error: unknown;
-		organizationId?: string;
-		userId?: string;
-	}) => {
-		captureCliProductAnalyticsEvent({
-			distinctId: getCliDistinctId(options.userId),
-			event: CliProductAnalyticsEvents.AUTO_UPLOAD_ENABLE_FAILED,
-			surface: "cli",
-			disablePersonProfile: shouldDisableCliPersonProfile(options.userId),
-			payload: {
-				agent_source: options.agentSource ?? "unknown",
-				failure_stage: options.failureStage,
-				failure_reason: normalizeFailureReason(options.error),
-				organization_id: options.organizationId,
-				user_id: options.userId,
-				...getBaseCliEventPayload(),
-			},
-		});
-	};
 
 	// Before verifyAuth, which sends the stored token to the stored base.
 	const storedApiBaseRisk = describeSavedCredentialsApiBaseRisk();
@@ -59,10 +23,6 @@ async function runEnable(): Promise<undefined | Error> {
 	// Verify auth (loads credentials + pings API)
 	const auth = await verifyAuth();
 	if (!auth.authenticated) {
-		captureEnableFailure({
-			failureStage: "auth_verify",
-			error: auth.reason,
-		});
 		p.outro("Run `rudel login` to authenticate.");
 		return new Error(auth.message);
 	}
@@ -77,24 +37,12 @@ async function runEnable(): Promise<undefined | Error> {
 		const client = createApiClient(credentials);
 		try {
 			orgs = await client.listMyOrganizations();
-		} catch (error) {
-			captureEnableFailure({
-				agentSource: "unknown",
-				failureStage: "organization_fetch",
-				error,
-				userId: auth.user.id,
-			});
+		} catch {
 			return new Error("Failed to fetch organizations. Check your connection.");
 		}
 	}
 
 	if (orgs.length === 0) {
-		captureEnableFailure({
-			agentSource: "unknown",
-			failureStage: "organization_fetch",
-			error: new Error("No organizations found"),
-			userId: auth.user.id,
-		});
 		p.outro("Create one at opaline.so first.");
 		return new Error("No organizations found.");
 	}
@@ -190,32 +138,11 @@ async function runEnable(): Promise<undefined | Error> {
 				);
 			} catch (error) {
 				hookInstallFailures++;
-				captureEnableFailure({
-					agentSource: adapter.source,
-					failureStage: "hook_install",
-					error,
-					organizationId: selectedOrgId,
-					userId: auth.user.id,
-				});
 				p.log.error(
 					`${adapter.name}: failed to enable auto-upload hook (${error instanceof Error ? error.message : String(error)})`,
 				);
-				continue;
 			}
 		}
-
-		captureCliProductAnalyticsEvent({
-			distinctId: auth.user.id,
-			event: CliProductAnalyticsEvents.AUTO_UPLOAD_ENABLED,
-			surface: "cli",
-			payload: {
-				organization_id: selectedOrgId,
-				user_id: auth.user.id,
-				agent_source: adapter.source,
-				is_already_enabled: isAlreadyEnabled || undefined,
-				...getBaseCliEventPayload(),
-			},
-		});
 	}
 
 	// Check for existing sessions to upload from all enabled agents

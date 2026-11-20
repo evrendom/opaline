@@ -14,10 +14,6 @@ vi.mock("@/lib/auth-client", () => ({
 	},
 }));
 
-vi.mock("@/features/analytics/tracking/ProductAnalyticsSessionSync", () => ({
-	ProductAnalyticsSessionSync: () => null,
-}));
-
 vi.mock("@/features/auth/GuestApp", () => ({
 	GuestApp: () => <div>Guest App</div>,
 }));
@@ -37,10 +33,6 @@ vi.mock("@/features/auth/AuthenticatedApp", () => ({
 
 vi.mock("@/features/auth/ResetPasswordApp", () => ({
 	ResetPasswordApp: () => <div>Reset Password App</div>,
-}));
-
-vi.mock("@/features/support/SupportEmailButton", () => ({
-	SupportEmailButton: () => null,
 }));
 
 describe("App routing", () => {
@@ -120,24 +112,4 @@ it.each([
 	expect(
 		await screen.findByText("/welcome?connect=pairing-id&user_code=ABCD-1234"),
 	).toBeInTheDocument();
-});
-
-it.each([
-	"/wrapped",
-	"/wrapped/share-id",
-	"/dev/wrapped",
-	"/resume/old-token",
-])("shows a missing page for retired %s links without redirecting", (pathname) => {
-	mockUseSession.mockReturnValue({ data: null, isPending: false });
-	render(
-		<MemoryRouter initialEntries={[pathname]}>
-			<App />
-			<CurrentLocation />
-		</MemoryRouter>,
-	);
-	expect(
-		screen.getByRole("heading", { name: "Page not found" }),
-	).toBeInTheDocument();
-	expect(screen.getByText(pathname)).toBeInTheDocument();
-	expect(screen.queryByText("Guest App")).toBeNull();
 });

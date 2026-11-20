@@ -3,7 +3,6 @@ import {
 	SecretFilterConvergenceError,
 	SecretFilterJsonIntegrityError,
 } from "@rudel/secret-filter";
-import { FreeWorkspaceMonthlyAgentRunLimitExceededError } from "../billing-entitlements.service.js";
 import {
 	IngestFilterQueueAbortedError,
 	IngestFilterQueueClosedError,
@@ -37,13 +36,6 @@ export interface IngestErrorFactories {
 		previousAssistantLineCount: number;
 		previousContentBytes: number;
 	}) => unknown;
-}
-
-export function rethrowAgentRunLimitAsForbidden(error: unknown): never {
-	if (error instanceof FreeWorkspaceMonthlyAgentRunLimitExceededError) {
-		throw new ORPCError("FORBIDDEN", { message: error.message });
-	}
-	throw error;
 }
 
 export function createBackgroundIngestErrorFactories(): IngestErrorFactories {

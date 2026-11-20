@@ -22,8 +22,7 @@ setDefaultTimeout(30_000);
 beforeAll(async () => {
 	server = await startApiTestServer({
 		CLICKHOUSE_URL: "http://127.0.0.1:1",
-		FLY_APP_NAME: "rudel-test",
-		POSTHOG_API_KEY: undefined,
+		NODE_ENV: "production",
 		RESEND_API_KEY: undefined,
 		SLACK_WEBHOOK_URL: undefined,
 	});

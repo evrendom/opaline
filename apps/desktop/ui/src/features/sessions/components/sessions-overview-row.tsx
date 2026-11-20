@@ -45,7 +45,6 @@ import {
 	intendSessionDetail,
 	startSessionDetail,
 } from "../session-detail-prefetch";
-import { markSessionOpenFromClick } from "../session-open-timing";
 import {
 	sessionRowKey,
 	transcriptSubagentId,
@@ -555,10 +554,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 					className={rowClassName}
 					data-dashboard-grid-row-scope="session"
 					data-selected={isActive ? "true" : undefined}
-					onClick={(event) => {
-						markSessionOpenFromClick(session.session_id, isActive, event);
-						onSessionClick?.(session);
-					}}
+					onClick={() => onSessionClick?.(session)}
 					onFocus={() => intendSessionDetail(sessionHref)}
 					onPointerDown={() => startSessionDetail(sessionHref)}
 					onPointerEnter={() => intendSessionDetail(sessionHref)}

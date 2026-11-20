@@ -1,8 +1,7 @@
 # L1 judge round 3
 
-Offline review, 2026-10-09. Binding input: `~/l1-work/judge3/rulings.md`;
-per-item evidence: `judge3/{sol,sonnet}/{ignored,mappings}.json` and
-`judge3/comparison.json`. The compact decision ledger is
+Offline review, 2026-10-09. Binding input: the round's written rulings and
+per-item reviewer evidence. The compact decision ledger is
 [l1-judge-round3-decisions.json](l1-judge-round3-decisions.json).
 No parser behavior changes; gaps remain parser-9 work.
 

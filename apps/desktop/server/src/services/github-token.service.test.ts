@@ -10,7 +10,6 @@ import {
 	gitHubApiBaseUrl,
 	inspectGitHubToken,
 	isGitHubRepositoryCollectionConfigured,
-	isGitHubTokenCredentials,
 	readGitHubHost,
 	readGitHubRepositoryCredentials,
 	readGitHubTokenStatus,
@@ -269,7 +268,7 @@ describe("the status shown in settings, the CLI and the log", () => {
 });
 
 describe("which credentials the collectors use", () => {
-	test("production keeps the GitHub App; a self-hosted server reads the token", async () => {
+	test("only a self-hosted server reads the token", async () => {
 		expect(await readGitHubRepositoryCredentials({})).toBeNull();
 		expect(isGitHubRepositoryCollectionConfigured({})).toBe(false);
 		expect(
@@ -279,15 +278,9 @@ describe("which credentials the collectors use", () => {
 			OPALINE_SELF_HOSTED: "1",
 			GITHUB_TOKEN: "env-token",
 		});
-		expect(credentials && isGitHubTokenCredentials(credentials)).toBe(true);
-		if (!credentials || !isGitHubTokenCredentials(credentials))
-			throw new Error("expected token credentials");
+		if (!credentials) throw new Error("expected token credentials");
+		expect(credentials.kind).toBe("token");
 		expect(credentials.apiBaseUrl).toBe("https://api.github.com");
 		expect(await credentials.read()).toBe("env-token");
-		await expect(
-			readGitHubRepositoryCredentials({ GITHUB_REPOSITORY_APP_ID: "x" }),
-		).rejects.toThrow(
-			"GITHUB_REPOSITORY_APP_ID must be a positive integer string",
-		);
 	});
 });

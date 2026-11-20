@@ -83,12 +83,9 @@ describe("session saved outputs migration", () => {
 		);
 	});
 
-	test("bootstrap and the production gate run its runner", () => {
+	test("bootstrap runs its runner", () => {
 		expect(read("../../scripts/bootstrap.ts")).toContain(
 			'"20261016130000_session_saved_outputs.sql",\n\t\t"migrate-session-saved-outputs.ts",',
-		);
-		expect(read("../../package.json")).toMatch(
-			/"ch:migrate:production": "[^"]* ch:migrate:session-saved-outputs[ "]/u,
 		);
 	});
 });

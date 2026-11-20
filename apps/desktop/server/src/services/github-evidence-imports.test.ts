@@ -2,8 +2,6 @@ import { expect, test } from "bun:test";
 
 test.each([
 	"./github-evidence-persistence.service.ts",
-	"./github-webhook-delivery.service.ts",
-	"../handlers/github-webhook-http.ts",
 	"./github-outcomes-dashboard.service.ts",
 	"./github-outcomes-readiness.service.ts",
 ])("imports %s without database configuration or module mocks", async (module) => {

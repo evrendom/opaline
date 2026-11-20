@@ -6,7 +6,6 @@ import {
 	DeviceCodeResponseSchema,
 	DeviceFlowErrorResponseSchema,
 	DeviceTokenResponseSchema,
-	type ProductAnalyticsLoginFailureStage,
 	parseSafeBrowserUrl,
 	sanitizeForTerminalDisplay,
 } from "@rudel/api-routes";
@@ -19,15 +18,6 @@ import {
 import { createApiClient } from "../lib/api-client.js";
 import { openUrl } from "../lib/browser-opener.js";
 import { loadCredentials, saveCredentials } from "../lib/credentials.js";
-import {
-	CliProductAnalyticsEvents,
-	captureCliProductAnalyticsEvent,
-	getBaseCliEventPayload,
-	getCliDistinctId,
-	getNextCliLoginAttemptNumber,
-	normalizeFailureReason,
-	shouldDisableCliPersonProfile,
-} from "../lib/product-analytics.js";
 
 const PRODUCTION_APP_URL = "https://opaline.so";
 const DEVICE_CLIENT_ID = "rudel-cli";
@@ -199,28 +189,6 @@ async function runLogin(flags: {
 	allowInsecureApiBase: boolean;
 	noBrowser: boolean;
 }): Promise<undefined | Error> {
-	const openedBrowser = !flags.noBrowser;
-	const attemptNumber = getNextCliLoginAttemptNumber();
-	const captureLoginFailure = (
-		failureStage: ProductAnalyticsLoginFailureStage,
-		error: unknown,
-	) => {
-		captureCliProductAnalyticsEvent({
-			distinctId: getCliDistinctId(),
-			event: CliProductAnalyticsEvents.CLI_LOGIN_FAILED,
-			surface: "cli",
-			disablePersonProfile: shouldDisableCliPersonProfile(),
-			payload: {
-				auth_flow: "device_authorization",
-				failure_stage: failureStage,
-				failure_reason: normalizeFailureReason(error),
-				opened_browser: openedBrowser,
-				attempt_number: attemptNumber,
-				...getBaseCliEventPayload(),
-			},
-		});
-	};
-
 	p.intro("rudel login");
 
 	const existing = loadCredentials();
@@ -241,7 +209,6 @@ async function runLogin(flags: {
 		const error = new Error(
 			`Refusing to use --api-base ${sanitizeForTerminalDisplay(flags.apiBase)}: ${describeApiBaseRejection(apiBaseResult)}`,
 		);
-		captureLoginFailure("api_base_rejected", error);
 		return error;
 	}
 	const apiBase = apiBaseResult.url;
@@ -250,7 +217,6 @@ async function runLogin(flags: {
 	try {
 		deviceCode = await requestDeviceCode(apiBase);
 	} catch (error) {
-		captureLoginFailure("device_code_request", error);
 		return error instanceof Error ? error : new Error(String(error));
 	}
 	// The verification URL is server-controlled. Validate it before it reaches the
@@ -262,23 +228,9 @@ async function runLogin(flags: {
 		const error = new Error(
 			`Refusing the verification URL returned by ${sanitizeForTerminalDisplay(apiBase)}: ${verifyUrlResult.detail}. Received: ${sanitizeForTerminalDisplay(rawVerifyUrl)}`,
 		);
-		captureLoginFailure("verification_url_rejected", error);
 		return error;
 	}
 	const verifyUrl = verifyUrlResult.url;
-
-	captureCliProductAnalyticsEvent({
-		distinctId: getCliDistinctId(),
-		event: CliProductAnalyticsEvents.CLI_LOGIN_STARTED,
-		surface: "cli",
-		disablePersonProfile: shouldDisableCliPersonProfile(),
-		payload: {
-			auth_flow: "device_authorization",
-			opened_browser: openedBrowser,
-			attempt_number: attemptNumber,
-			...getBaseCliEventPayload(),
-		},
-	});
 
 	p.log.info(`If the browser doesn't open, visit:\n${verifyUrl}`);
 	// `user_code` is server-controlled and printed raw to the terminal, so it is
@@ -296,13 +248,6 @@ async function runLogin(flags: {
 	try {
 		accessToken = await pollForAccessToken(apiBase, deviceCode);
 	} catch (error) {
-		const failureReason = normalizeFailureReason(error);
-		captureLoginFailure(
-			failureReason === "timeout"
-				? "browser_approval_timeout"
-				: "token_exchange",
-			error,
-		);
 		spin.stop("Authentication failed");
 		return error instanceof Error ? error : new Error(String(error));
 	}
@@ -312,7 +257,6 @@ async function runLogin(flags: {
 	try {
 		ingestKey = await createIngestApiKey(apiBase, accessToken);
 	} catch (error) {
-		captureLoginFailure("api_key_create", error);
 		spin.stop("Authentication failed");
 		return error instanceof Error ? error : new Error(String(error));
 	}
@@ -336,8 +280,7 @@ async function runLogin(flags: {
 			name: org.name,
 			slug: org.slug,
 		}));
-	} catch (error) {
-		captureLoginFailure("account_fetch", error);
+	} catch {
 		spin.stop("Authentication failed");
 		return new Error("Login failed: unable to fetch account details");
 	}
@@ -351,23 +294,11 @@ async function runLogin(flags: {
 			user,
 			organizations,
 		});
-	} catch (error) {
-		captureLoginFailure("account_fetch", error);
+	} catch {
 		spin.stop("Authentication failed");
 		return new Error("Login failed: unable to persist credentials");
 	}
 
-	captureCliProductAnalyticsEvent({
-		distinctId: user.id,
-		event: CliProductAnalyticsEvents.CLI_LOGIN_APPROVED,
-		surface: "cli",
-		payload: {
-			user_id: user.id,
-			auth_flow: "device_authorization",
-			opened_browser: openedBrowser,
-			...getBaseCliEventPayload(),
-		},
-	});
 	spin.stop("Authenticated");
 	p.log.success(`Logged in as ${user.name} (${user.email})`);
 	p.outro("Done!");

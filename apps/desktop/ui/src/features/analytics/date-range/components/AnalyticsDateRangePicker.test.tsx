@@ -8,16 +8,6 @@ import { ChartIntervalPicker } from "@/features/costs/chart-interval-picker";
 import { formatIsoDate } from "@/lib/format";
 import { AnalyticsDateRangePicker } from "./AnalyticsDateRangePicker";
 
-const { mockTrackFilterChange } = vi.hoisted(() => ({
-	mockTrackFilterChange: vi.fn(),
-}));
-
-vi.mock("@/features/analytics/tracking/useAnalyticsTracking", () => ({
-	useAnalyticsTracking: () => ({
-		trackFilterChange: mockTrackFilterChange,
-	}),
-}));
-
 vi.mock("@/app/ui/calendar", () => ({
 	Calendar: ({
 		onSelect,
@@ -155,7 +145,7 @@ describe("AnalyticsDateRangePicker", () => {
 		).toBeInTheDocument();
 	});
 
-	it("applies a preset immediately and tracks it", async () => {
+	it("applies a preset immediately", async () => {
 		const user = userEvent.setup();
 		const onDateRangeApply = vi.fn();
 		const today = new Date();
@@ -167,7 +157,6 @@ describe("AnalyticsDateRangePicker", () => {
 				startDate="2026-03-01"
 				endDate="2026-03-05"
 				onDateRangeApply={onDateRangeApply}
-				sourceComponent="dashboard_date_picker"
 			/>,
 		);
 
@@ -179,13 +168,6 @@ describe("AnalyticsDateRangePicker", () => {
 		expect(onDateRangeApply).toHaveBeenCalledWith(
 			expectedStartDate,
 			expectedEndDate,
-		);
-		expect(mockTrackFilterChange).toHaveBeenCalledWith(
-			expect.objectContaining({
-				changeAction: "preset",
-				valueKey: "last-7-days",
-				sourceComponent: "dashboard_date_picker",
-			}),
 		);
 		await waitFor(() => {
 			expect(screen.queryByText("Presets")).not.toBeInTheDocument();
@@ -216,12 +198,6 @@ describe("AnalyticsDateRangePicker", () => {
 		await user.click(screen.getByRole("button", { name: /Apply/i }));
 
 		expect(onDateRangeApply).toHaveBeenCalledWith("2026-04-01", "2026-04-08");
-		expect(mockTrackFilterChange).toHaveBeenCalledWith(
-			expect.objectContaining({
-				changeAction: "set",
-				valueKey: "custom",
-			}),
-		);
 	});
 
 	it("resets draft selection after cancel", async () => {

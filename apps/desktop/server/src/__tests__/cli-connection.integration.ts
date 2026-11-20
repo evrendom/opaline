@@ -28,10 +28,7 @@ beforeAll(async () => {
 	const pgUrl = new URL(process.env.PG_CONNECTION_STRING ?? "");
 	expect(["127.0.0.1", "localhost"]).toContain(pgUrl.hostname);
 	servers.push(
-		...(await Promise.all([
-			startApiTestServer({ POSTHOG_ENABLED: "false" }),
-			startApiTestServer({ POSTHOG_ENABLED: "false" }),
-		])),
+		...(await Promise.all([startApiTestServer(), startApiTestServer()])),
 	);
 });
 

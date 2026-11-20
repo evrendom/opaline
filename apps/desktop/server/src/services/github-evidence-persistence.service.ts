@@ -10,10 +10,6 @@ import type postgres from "postgres";
 import { readGitHubSyncSkippedOrgIds } from "../lib/env.js";
 import { assertNoClickHousePurgeTombstone } from "./clickhouse-purge-tombstone.service.js";
 import {
-	createGitHubInstallationAccessToken,
-	type GitHubRepositoryAppConfig,
-} from "./github-app.service.js";
-import {
 	type CollectedGitHubCommitEvidence,
 	collectGitHubCommitEvidence,
 	type GitHubMetadataPage,
@@ -28,10 +24,7 @@ import {
 	type GitHubRepositoryBinding,
 	getGitHubRepositoryBinding,
 } from "./github-repository-binding.service.js";
-import {
-	type GitHubRepositoryCredentials,
-	isGitHubTokenCredentials,
-} from "./github-token.service.js";
+import type { GitHubRepositoryCredentials } from "./github-token.service.js";
 import { L1_EDGE_SESSION_DEBOUNCE_MS } from "./l1-edges/l1-edge-enqueue.js";
 import { enqueueL1EdgeScope } from "./l1-edges/l1-edge-queue.service.js";
 import { toPostgresJson } from "./postgres-json.js";
@@ -121,10 +114,6 @@ export async function collectAndPersistGitHubCommitEvidence(
 type CollectAndPersistInput = {
 	readonly commitSha: string;
 	readonly config: GitHubRepositoryCredentials;
-	readonly createInstallationToken?: (
-		config: GitHubRepositoryAppConfig,
-		installationId: string,
-	) => Promise<string>;
 	readonly contextId: string | null;
 	readonly database: postgres.Sql;
 	readonly environment?: Readonly<Record<string, string | undefined>>;
@@ -196,26 +185,12 @@ async function runCollection(
 		const abortableFetch = input.signal
 			? createAbortableFetch(input.signal)
 			: undefined;
-		const credentials = input.config;
-		const token = isGitHubTokenCredentials(credentials)
-			? await credentials.read()
-			: input.createInstallationToken
-				? await input.createInstallationToken(
-						credentials,
-						binding.installationId,
-					)
-				: await createGitHubInstallationAccessToken({
-						config: credentials,
-						fetch: abortableFetch,
-						installationId: binding.installationId,
-					});
+		const token = await input.config.read();
 		const source =
 			input.sourceFactory?.(token) ??
 			createGitHubRepositorySource({
 				authorization: createGitHubAuthorization(token),
-				baseUrl: isGitHubTokenCredentials(credentials)
-					? credentials.apiBaseUrl
-					: undefined,
+				baseUrl: input.config.apiBaseUrl,
 				fetch: abortableFetch,
 			});
 		const fence: GitHubObjectWriteFence = {

@@ -33,7 +33,6 @@ export interface GitHubEvidenceMaintenanceResult {
 export async function runGitHubEvidenceCollectionMaintenance(input: {
 	readonly config: GitHubRepositoryCredentials;
 	readonly collectionIds?: readonly string[];
-	readonly createInstallationToken?: CollectInput["createInstallationToken"];
 	readonly database: postgres.Sql;
 	readonly limit?: number;
 	readonly now?: () => Date;
@@ -122,7 +121,6 @@ export async function runGitHubEvidenceCollectionMaintenance(input: {
 			await collectAndPersistGitHubCommitEvidence({
 				commitSha: candidate.commit_sha,
 				config: input.config,
-				createInstallationToken: input.createInstallationToken,
 				contextId: candidate.context_id || null,
 				database: input.database,
 				initiatedByUserId: candidate.initiated_by_user_id,

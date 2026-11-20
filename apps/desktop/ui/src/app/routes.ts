@@ -14,7 +14,6 @@ const COMPASS_PATH = "/compass";
 const DASHBOARD_GET_STARTED_LEGACY_PATH = `${LEGACY_DASHBOARD_PATH}/get-started`;
 const GET_STARTED_PATH = "/get-started";
 const TEAM_PATH = "/team";
-const TEAM_INVITE_PATH = `${TEAM_PATH}/invite`;
 const SETTINGS_ROOT_PATH = "/settings";
 const SETTINGS_WORKSPACE_PATH = `${SETTINGS_ROOT_PATH}/workspace`;
 const SETTINGS_GITHUB_PATH = `${SETTINGS_ROOT_PATH}/github`;
@@ -22,12 +21,11 @@ const SETTINGS_SESSIONS_PATH = `${SETTINGS_ROOT_PATH}/sessions`;
 const SETTINGS_REPORTS_PATH = `${SETTINGS_ROOT_PATH}/reports`;
 const SETTINGS_MEMBERS_PATH = `${SETTINGS_ROOT_PATH}/members`;
 const SETTINGS_TEAM_PATH = `${SETTINGS_ROOT_PATH}/team`;
-const SETTINGS_INVITATIONS_PATH = `${SETTINGS_ROOT_PATH}/invitations`;
 const SETTINGS_ACCOUNT_PATH = `${SETTINGS_ROOT_PATH}/account`;
 const SETTINGS_MCP_PATH = `${SETTINGS_ROOT_PATH}/mcp`;
 const SETTINGS_CREATE_WORKSPACE_PATH = `${SETTINGS_ROOT_PATH}/create-workspace`;
 
-// Canonical routes shared by navigation, authentication, and analytics.
+// Canonical routes shared by navigation and authentication.
 export const appRoutes = {
 	home: () => HOME_PATH,
 	admin: () => ADMIN_PATH,
@@ -66,10 +64,6 @@ export const appRoutes = {
 	getStarted: () => GET_STARTED_PATH,
 	dashboardGetStartedLegacy: () => DASHBOARD_GET_STARTED_LEGACY_PATH,
 	team: () => TEAM_PATH,
-	teamInvite: (token: string, workspaceSlug?: string) =>
-		workspaceSlug
-			? `/${encodeURIComponent(workspaceSlug)}/join/${encodeURIComponent(token)}`
-			: `${TEAM_INVITE_PATH}/${encodeURIComponent(token)}`,
 	settings: () => SETTINGS_ROOT_PATH,
 	settingsRoot: () => SETTINGS_ROOT_PATH,
 	settingsWorkspace: () => SETTINGS_WORKSPACE_PATH,
@@ -78,7 +72,6 @@ export const appRoutes = {
 	settingsReports: () => SETTINGS_REPORTS_PATH,
 	settingsMembers: () => SETTINGS_MEMBERS_PATH,
 	settingsTeam: () => SETTINGS_TEAM_PATH,
-	settingsInvitations: () => SETTINGS_INVITATIONS_PATH,
 	settingsAccount: () => SETTINGS_ACCOUNT_PATH,
 	settingsMcp: () => SETTINGS_MCP_PATH,
 	settingsCreateWorkspace: () => SETTINGS_CREATE_WORKSPACE_PATH,

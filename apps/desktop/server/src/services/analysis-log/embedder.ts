@@ -74,7 +74,7 @@ export async function requestOpenAiEmbeddings(
 /**
  * Deterministic bag-of-words vectors for tests and the in-process store
  * without an API key. It matches shared words only; real similarity needs
- * OpenAI, which the Convex store requires.
+ * OpenAI.
  */
 export function createLocalEmbedder(): Embedder {
 	return {

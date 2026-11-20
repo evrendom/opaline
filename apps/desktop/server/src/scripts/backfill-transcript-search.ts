@@ -1,10 +1,7 @@
 import { getClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
 import { assertNoClickHousePurgeTombstone } from "../services/clickhouse-purge-tombstone.service.js";
-import {
-	createSearchAccess,
-	postgresSubscriptions,
-} from "../services/transcript-search/access.js";
+import { createSearchAccess } from "../services/transcript-search/access.js";
 import {
 	readEmbeddingQuotaLimits,
 	transcriptEmbedder,
@@ -46,7 +43,7 @@ process.on("SIGINT", () => {
 const executor = getClickhouse();
 const env: TranscriptSearchBackfillEnv = {
 	executor,
-	access: createSearchAccess(postgresSubscriptions(sqlClient)),
+	access: createSearchAccess(),
 	quota: createPostgresEmbeddingQuota(sqlClient, readEmbeddingQuotaLimits()),
 	listWorkspaces: async () =>
 		(

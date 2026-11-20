@@ -14,7 +14,7 @@ import {
 	createMemorySqlQuota,
 	createMemorySqlResultStore,
 } from "../analysis/sql-results.js";
-import { createSearchAccess } from "./access.js";
+import type { SearchAccess } from "./access.js";
 import type { TranscriptEmbedder } from "./config.js";
 import { createMemoryEmbeddingQuota } from "./quota.js";
 import {
@@ -93,7 +93,7 @@ function environment(
 		embedder?: TranscriptEmbedder | null;
 		embeddingDeadlineMs?: number;
 		/** Workspaces with an active subscription; ws-1 by default. */
-		paid?: readonly string[];
+		indexed?: readonly string[];
 	} = {},
 ) {
 	const statements: ClickHouseStatement[] = [];
@@ -114,13 +114,12 @@ function environment(
 		tokens: options.quotaTokens ?? 1_000,
 		windowMs: 86_400_000,
 	});
-	const access = createSearchAccess(
-		{
-			subscriptionStatus: async (workspaceId) =>
-				(options.paid ?? ["ws-1"]).includes(workspaceId) ? "active" : null,
-		},
-		{ paidPlans: true },
-	);
+	const access: SearchAccess = {
+		notIndexed:
+			"search is not enabled for this workspace yet: its uploads are not indexed for search",
+		indexes: async (workspaceId) =>
+			(options.indexed ?? ["ws-1"]).includes(workspaceId),
+	};
 	const sqlQuota = createMemorySqlQuota({ queries: 100, windowMs: 3_600_000 });
 	const taken: string[] = [];
 	return {
@@ -488,7 +487,7 @@ test("when one search() call cannot run, the other calls' embedding requests are
 
 test("the search tool counts coverage once for a window, not with every search, and binds its text without credentials", async () => {
 	const { env, statements, embedder, quota, access } = environment({
-		paid: ["ws-coverage"],
+		indexed: ["ws-coverage"],
 	});
 	const caller: SqlCaller = { ...teammate, workspaceId: "ws-coverage" };
 	const search = (text: string) =>
@@ -518,9 +517,9 @@ test("the search tool counts coverage once for a window, not with every search, 
 	expect(JSON.stringify(second)).not.toContain(TOKEN);
 });
 
-test("a workspace without a paid plan is told search by meaning is on paid plans; its searches embed nothing and find exact strings in every session", async () => {
+test("a workspace that is not indexed is told search by meaning is not enabled; its searches embed nothing and find exact strings in every session", async () => {
 	const { env, statements, embedder, quota, access } = environment({
-		paid: [],
+		indexed: [],
 	});
 
 	const inSql = ok(
@@ -550,17 +549,19 @@ test("a workspace without a paid plan is told search by meaning is on paid plans
 	);
 
 	expect(inSql.notices).toContain(
-		"search('flaky login'): only exact matches: search by meaning is not available (search is available on paid plans: this workspace's uploads are not indexed for search).",
+		"search('flaky login'): only exact matches: search by meaning is not available (search is not enabled for this workspace yet: its uploads are not indexed for search).",
 	);
 	expect(meaning.message).toBe(
-		"Search by meaning is not available: search is available on paid plans: this workspace's uploads are not indexed for search.",
+		"Search by meaning is not available: search is not enabled for this workspace yet: its uploads are not indexed for search.",
 	);
 	expect(agentStatement(statements)?.query_params).toMatchObject({
 		opaline_search0_meaning: 0,
 	});
 	if (!tool.ok) throw new Error(tool.error.message);
 	expect(tool.result).toMatchObject({ mode: "exact", quota: null });
-	expect(tool.result.notices[0]).toContain("search is available on paid plans");
+	expect(tool.result.notices[0]).toContain(
+		"search is not enabled for this workspace",
+	);
 	const exact = await searchTranscripts(
 		teammate,
 		{ text: "--legacy", mode: "exact" },
@@ -665,7 +666,7 @@ function toolEnv(
 }
 
 test("the search tool reads every record of the window, hides injected context unless asked, and reports partly kept sessions and hidden matches", async () => {
-	const parts = environment({ paid: ["ws-records"] });
+	const parts = environment({ indexed: ["ws-records"] });
 	const statements: ClickHouseStatement[] = [];
 	const row = (runId: string, visible: number) => ({
 		run_id: runId,
@@ -740,7 +741,7 @@ test("the search tool reads every record of the window, hides injected context u
 });
 
 test("a regex RE2 cannot compile and a search over the read limits come back as recoverable errors", async () => {
-	const parts = environment({ paid: ["ws-regex"] });
+	const parts = environment({ indexed: ["ws-regex"] });
 	const failing = (message: string): ClickHouseExecutor => ({
 		...parts.env.executor,
 		query: async () => {

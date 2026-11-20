@@ -10,10 +10,6 @@ import {
 const organizationHooks = createOrganizationPlugin(
 	{ frontendURL: "http://localhost:4011" },
 	{
-		enqueueBillingTraitsForUser: async () => {},
-		logBillingTraitsError: () => {},
-		logSeatReconciliationError: () => {},
-		reconcileOrganizationBillingSeats: async () => false,
 		sendOrganizationInvitationEmail: async () => {},
 	},
 ).options.organizationHooks;

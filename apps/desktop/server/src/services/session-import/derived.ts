@@ -1,13 +1,7 @@
 import { getLogger } from "@logtape/logtape";
 import { ORPCError } from "@orpc/server";
-import { PRODUCT_ANALYTICS_EVENTS } from "@rudel/api-routes";
 import { SESSION_INGEST_FILTER_VERSION } from "@rudel/api-routes/transcript-slim";
 import type { UsageExtractionResult } from "@rudel/usage-events";
-import {
-	bucketContentSize,
-	captureApiProductAnalyticsEvent,
-	hashProjectPath,
-} from "../../lib/product-analytics.js";
 import {
 	shouldAwaitBestEffortLanguageSignals,
 	shouldPersistUsageExtractionFailureReceipt,
@@ -373,45 +367,5 @@ async function extractAndStoreFacts(
 		});
 	}
 	response.usageChecksum = usageExtraction.receipt.checksum;
-	const uploadCompletedPayload = uploadCompletedEvent(
-		filteredInput,
-		orgId,
-		context.user.id,
-	);
-	if (uploadCompletedPayload) {
-		await captureApiProductAnalyticsEvent({
-			distinctId: context.user.id,
-			eventId: claimedLedger?.id,
-			event: PRODUCT_ANALYTICS_EVENTS.SESSION_UPLOAD_COMPLETED,
-			payload: uploadCompletedPayload,
-		});
-	}
 	return storedResult(run);
-}
-
-function uploadCompletedEvent(
-	input: ImportRun["prepared"]["filteredInput"],
-	organizationId: string,
-	userId: string,
-) {
-	if (
-		!input.client_surface ||
-		!input.upload_mode ||
-		!input.cli_version ||
-		!input.platform_os
-	) {
-		return null;
-	}
-	return {
-		organization_id: organizationId,
-		user_id: userId,
-		client_surface: input.client_surface,
-		upload_mode: input.upload_mode,
-		agent_source: input.source,
-		cli_version: input.cli_version,
-		platform_os: input.platform_os,
-		project_id_hash: hashProjectPath(input.projectPath),
-		session_tag: input.tag,
-		content_size_bucket: bucketContentSize(input.content.length),
-	};
 }

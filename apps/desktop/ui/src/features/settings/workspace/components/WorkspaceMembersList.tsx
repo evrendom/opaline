@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
 import {
 	canCopySignInLink,
 	describeLinkLifetime,
@@ -34,20 +33,11 @@ export function WorkspaceMembersList({
 	onInvalidate: () => void;
 	signInLinks?: { viewerId: string; viewerRole: string | null } | null;
 }) {
-	const { trackOrganizationAction } = useAnalyticsTracking({
-		pageName: "organization",
-	});
 	const [pendingMemberKey, setPendingMemberKey] = useState<string | null>(null);
 	const organizationId = useOptionalOrganization()?.state.activeOrg?.id;
 
 	const removeMember = async (memberId: string) => {
 		setPendingMemberKey(`remove:${memberId}`);
-		trackOrganizationAction({
-			actionName: "remove_member",
-			targetType: "member",
-			sourceComponent: "workspace_settings_section",
-			targetId: memberId,
-		});
 
 		try {
 			await authClient.organization.removeMember({
@@ -66,13 +56,6 @@ export function WorkspaceMembersList({
 
 	const updateRole = async (memberId: string, role: "member" | "admin") => {
 		setPendingMemberKey(`role:${memberId}`);
-		trackOrganizationAction({
-			actionName: "update_member_role",
-			targetType: "member",
-			sourceComponent: "workspace_settings_section",
-			targetId: memberId,
-			targetRole: role,
-		});
 
 		try {
 			await authClient.organization.updateMemberRole({

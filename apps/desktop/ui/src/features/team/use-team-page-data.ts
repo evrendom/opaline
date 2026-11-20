@@ -281,7 +281,7 @@ export function useTeamPageData() {
 		authClient.useSession();
 	const { data: activeMember } = authClient.useActiveMember();
 	const { state: dateRangeState, meta: dateRangeMeta } = useDateRange();
-	const { meta: workspaceMeta, state: workspaceState } = useOrganization();
+	const { state: workspaceState } = useOrganization();
 	const useFixtures = isFrontendFixturesEnabled();
 	announceFrontendFixturesEnabled("team");
 	const selectedDays = dateRangeMeta.dayCount;
@@ -289,10 +289,6 @@ export function useTeamPageData() {
 	const activeOrganizationId = workspaceState.activeOrg?.id ?? null;
 	const currentUserId =
 		getSessionUserId(session) ?? getActiveMemberUserId(activeMember);
-	const canInviteTeamMembers =
-		import.meta.env.MODE !== "plugin" &&
-		activeOrganizationId !== null &&
-		workspaceMeta?.isOrgAdmin === true;
 	const {
 		data: fullOrganization,
 		isLoading: isOrganizationPending,
@@ -426,7 +422,6 @@ export function useTeamPageData() {
 				isOrganizationError),
 		isPending: isInitialTeamDataPending,
 		teamMemberRows,
-		canInviteTeamMembers,
 		currentUserId,
 		requestedDays,
 		refetch: async () => {

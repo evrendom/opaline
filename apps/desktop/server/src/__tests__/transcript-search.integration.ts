@@ -28,7 +28,7 @@ import {
 	buildTranscriptRecordsReceiptRow,
 	hashTranscriptContent,
 } from "../services/transcript-records-ingest.service.js";
-import { createSearchAccess } from "../services/transcript-search/access.js";
+import type { SearchAccess } from "../services/transcript-search/access.js";
 import type { TranscriptEmbedder } from "../services/transcript-search/config.js";
 import {
 	createMemoryEmbeddingQuota,
@@ -238,11 +238,10 @@ function index(
 	);
 }
 
-/** Every workspace of this suite is indexed as if on a paid plan. */
-const access = createSearchAccess(
-	{ subscriptionStatus: async () => "active" },
-	{ paidPlans: true },
-);
+const access: SearchAccess = {
+	notIndexed: "not indexed",
+	indexes: async () => true,
+};
 
 const countRows = async (table: string, column: string, value: string) => {
 	const [row] = await clickhouse.query<{ rows: string }>({

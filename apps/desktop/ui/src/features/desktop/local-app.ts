@@ -5,7 +5,6 @@ export const LOCAL_APP_HIDDEN_SETTINGS: ReadonlySet<SettingsRouteId> = new Set([
 	"account",
 	"members",
 	"team",
-	"invitations",
 	"sessions",
 	"mcp",
 ]);

@@ -33,13 +33,7 @@ function buildTeamMemberRow(
 
 describe("TeamMemberOverviewTable", () => {
 	it("renders the requested teammate metrics in a semantic table", () => {
-		render(
-			<TeamMemberOverviewTable
-				canInviteTeamMembers={false}
-				organizationId="org-1"
-				rows={[buildTeamMemberRow()]}
-			/>,
-		);
+		render(<TeamMemberOverviewTable rows={[buildTeamMemberRow()]} />);
 
 		expect(
 			screen.getByRole("columnheader", { name: "Teammate" }),
@@ -77,37 +71,8 @@ describe("TeamMemberOverviewTable", () => {
 		expect(screen.getByTitle("Last active Apr 22, 2026")).toBeVisible();
 	});
 
-	it("invites from the toolbar, the roster holding only teammates", () => {
-		render(
-			<TeamMemberOverviewTable
-				canInviteTeamMembers
-				organizationId="org-1"
-				rows={[buildTeamMemberRow()]}
-			/>,
-		);
-
-		const tableRows = screen.getAllByRole("row");
-		expect(tableRows).toHaveLength(2);
-		expect(within(tableRows[1]).getByText("Ada Lovelace")).toBeVisible();
-		expect(tableRows[1]).toHaveClass("h-16");
-
-		// Inline in the toolbar, not behind a menu.
-		expect(
-			screen.getByRole("button", { name: "Create invite link" }),
-		).toBeVisible();
-		expect(
-			screen.getByRole("button", { name: "Revoke existing links" }),
-		).toBeVisible();
-	});
-
 	it("lines its outer cells up with the settings column's 8px gutter", () => {
-		render(
-			<TeamMemberOverviewTable
-				canInviteTeamMembers={false}
-				organizationId="org-1"
-				rows={[buildTeamMemberRow()]}
-			/>,
-		);
+		render(<TeamMemberOverviewTable rows={[buildTeamMemberRow()]} />);
 
 		const table = screen.getByRole("table");
 		expect(table.parentElement).not.toHaveClass("px-16");
@@ -118,8 +83,6 @@ describe("TeamMemberOverviewTable", () => {
 	it("shows the top three models and collapses the remainder into a count", () => {
 		render(
 			<TeamMemberOverviewTable
-				canInviteTeamMembers={false}
-				organizationId="org-1"
 				rows={[
 					buildTeamMemberRow({
 						modelUsage: [
@@ -152,8 +115,6 @@ describe("TeamMemberOverviewTable", () => {
 		const user = userEvent.setup();
 		render(
 			<TeamMemberOverviewTable
-				canInviteTeamMembers
-				organizationId="org-1"
 				rows={[
 					buildTeamMemberRow({
 						activityTrend: [3, 8],
@@ -207,8 +168,6 @@ describe("TeamMemberOverviewTable", () => {
 		const user = userEvent.setup();
 		render(
 			<TeamMemberOverviewTable
-				canInviteTeamMembers={false}
-				organizationId="org-1"
 				rows={[
 					buildTeamMemberRow(),
 					buildTeamMemberRow({ displayName: "Grace Hopper", userId: "user-2" }),
