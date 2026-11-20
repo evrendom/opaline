@@ -56,7 +56,7 @@ function usageValue(picked: readonly string[] | null | undefined) {
 		</MemoryRouter>
 	);
 	const { result } = renderHook(
-		() => useUsageTab(range, "day", true, repositories),
+		() => useUsageTab(range, "daily", true, repositories),
 		{ wrapper },
 	);
 	return result.current.tab?.value;
