@@ -1,5 +1,14 @@
 name: "Setup Bun"
 description: "Setup Bun and install dependencies with caching"
+inputs:
+  filter:
+    description: >-
+      Install only the dependencies of the workspaces this matches (bun
+      install --filter), without the shared package cache. Restoring that
+      cache unpacks every package of the monorepo, which on Windows takes
+      longer than downloading the few a single workspace needs.
+    required: false
+    default: ""
 runs:
   using: "composite"
   steps:
@@ -8,6 +17,7 @@ runs:
         bun-version: 1.3.14
 
     - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      if: inputs.filter == ''
       name: Setup bun cache
       with:
         path: ~/.bun/install/cache
@@ -16,5 +26,13 @@ runs:
           ${{ runner.os }}-bun-store-
 
     - name: Install dependencies
+      if: inputs.filter == ''
       run: bun install --frozen-lockfile
+      shell: bash
+
+    - name: Install the filtered workspaces' dependencies
+      if: inputs.filter != ''
+      env:
+        FILTER: ${{ inputs.filter }}
+      run: bun install --frozen-lockfile --filter "${FILTER}"
       shell: bash

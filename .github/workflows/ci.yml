@@ -391,8 +391,12 @@ jobs:
           node-version: ${{ matrix.node }}
           package-manager-cache: false
 
+      # The CLI depends on no other workspace, and its npm launchers have no
+      # dependencies of their own.
       - name: Setup Bun
         uses: ./.github/actions/setup
+        with:
+          filter: "@opalinehq/cli"
 
       - name: Verify settings recovery and hook migration
         env:
