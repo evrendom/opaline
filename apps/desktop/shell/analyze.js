@@ -44,6 +44,11 @@ function scanSessions() {
 	return { claude, codex, folders: claudeFolders.length, ms: Date.now() - started };
 }
 
+// Two threads keep the parse of a few GB of transcripts near 1 GB of memory
+// (all cores took 3.6 GB on 3.8 GB of Claude Code sessions) and leave the
+// cores to the intro animation and the server starting beside it.
+const ANALYSIS_THREADS = 2;
+
 function runQuery(binary, template, glob) {
 	const sql = TEMPLATES[template].replace("{GLOB}", glob);
 	const file = path.join(os.tmpdir(), `opaline-${process.pid}-${template}`);
@@ -51,7 +56,7 @@ function runQuery(binary, template, glob) {
 	return new Promise((resolve) => {
 		execFile(
 			"/usr/bin/nice",
-			["-n", "10", binary, "local", "--queries-file", file],
+			["-n", "10", binary, "local", `--max_threads=${ANALYSIS_THREADS}`, "--queries-file", file],
 			{ cwd: os.tmpdir(), maxBuffer: 16 * 1024 * 1024, timeout: 120_000 },
 			(error, stdout, stderr) => {
 				fs.rmSync(file, { force: true });
@@ -115,10 +120,11 @@ async function analyzeSessions() {
 	if (!hasClaude && !hasCodex) return { claude: null, codex: null, ms: Date.now() - started };
 	const binary = findClickhouse();
 	if (!binary) return { error: `ClickHouse is not available on this ${process.platform === "darwin" ? "Mac" : "PC"}.` };
-	const [claude, codex] = await Promise.all([
-		hasClaude ? runQuery(binary, "claude.sql", `${claudeRoot}/**/*.jsonl`) : null,
-		hasCodex ? runQuery(binary, "codex.sql", `${codexRoot}/{${codexFolders().join(",")}}/*.{jsonl,jsonl.zst}`) : null,
-	]);
+	// One after the other, so the two parses never hold memory at the same time.
+	const claude = hasClaude ? await runQuery(binary, "claude.sql", `${claudeRoot}/**/*.jsonl`) : null;
+	const codex = hasCodex
+		? await runQuery(binary, "codex.sql", `${codexRoot}/{${codexFolders().join(",")}}/*.{jsonl,jsonl.zst}`)
+		: null;
 	return { claude: priced(claude), codex: priced(codex), ms: Date.now() - started };
 }
 
