@@ -2,74 +2,96 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
+<!--
+	Transparent on purpose: Finder paints its own window color behind the
+	picture, so the install window follows the system's light or dark
+	appearance, like the icon labels Finder draws on top. The onboarding's
+	dot field and wave are drawn as light only (no card fill) and turned into
+	alpha, and the rest is a mid gray that reads on both.
+-->
 <style>
 @font-face{font-family:InterVariable;src:url(__FONT__) format("woff2");font-weight:100 900}
-.stage{position:relative;width:660px;height:400px;background:#1e1e1e;overflow:hidden;font-family:InterVariable,system-ui;font-feature-settings:"cv11","ss01";-webkit-font-smoothing:antialiased}
-.card{position:absolute;left:8px;top:8px;right:8px;bottom:52px;border-radius:24px;corner-shape:squircle;overflow:hidden;background:#000;box-shadow:inset 0 0 0 .75px rgb(255 255 255/6%),0 0 0 .75px rgb(0 0 0/30%),0 4px 10px rgb(0 0 0/25%)}
+html,body{margin:0;background:transparent}
+.stage{position:relative;width:660px;height:400px;overflow:hidden;font-family:InterVariable,system-ui;font-feature-settings:"cv11","ss01";-webkit-font-smoothing:antialiased;--ink:rgb(128 128 134)}
+.card{position:absolute;left:8px;top:8px;right:8px;bottom:52px;border-radius:24px;corner-shape:squircle;overflow:hidden;background:rgb(128 128 134/5%);box-shadow:inset 0 0 0 1px rgb(128 128 134/16%)}
 .card canvas{width:100%;height:100%;display:block}
-.foot{position:absolute;left:22px;right:22px;bottom:16px;display:flex;justify-content:center;align-items:center;gap:8px;font-size:12.5px;color:#919299;white-space:nowrap}
-.chip{position:relative;display:grid;width:18px;height:18px;place-items:center;color:oklch(0.59 0 0)}
-.peb{position:absolute;inset:0;width:100%;height:100%;filter:drop-shadow(0 1.5px 2px color-mix(in oklch, oklch(0.59 0 0) 25%, transparent))}
+.foot{position:absolute;left:22px;right:22px;bottom:16px;display:flex;justify-content:center;align-items:center;gap:8px;font-size:12.5px;color:var(--ink);white-space:nowrap}
+.foot strong{font-weight:600}
+.chip{position:relative;display:grid;width:18px;height:18px;place-items:center;color:var(--ink)}
+.peb{position:absolute;inset:0;width:100%;height:100%}
 .glyph{position:relative;width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-[data-mode=light] .stage{background:#ffffff}
-[data-mode=light] .card{background:#fcfcfc;box-shadow:0 0 0 .5px rgb(0 0 0/8%),0 1px 2px -0.5px rgb(0 0 0/8%),0 2px 6px rgb(0 0 0/5%)}
-[data-mode=light] .foot{color:#828387}
-[data-mode=light] .foot span span{color:#292a2f!important}
-[data-mode=light] .chip{color:oklch(0.55 0 0)}
-[data-mode=light] .peb path:first-of-type{fill:oklch(0.96 0 0)}
-html,body{margin:0;background:#1e1e1e}
-[data-mode=light],[data-mode=light] body{background:#ffffff}
 </style>
 </head>
 <body>
 <div class="stage">
 <div class="card"><canvas id="c"></canvas></div>
-<svg id="arc" style="position:absolute;left:0;top:0" width="660" height="400"></svg>
-<div class="foot"><span class="chip"><svg class="peb" viewBox="0 0 1049 1042" aria-hidden="true"><clipPath id="pc"><path d="M524.532 0C661.725 4.52425 793.956 20.3892 890.19 103.494C986.746 183.313 1047.24 330.329 1049 520.65C1047.24 710.913 986.746 857.99 890.19 937.817C793.956 1020.92 661.79 1036.79 524.532 1041.3C387.274 1036.79 255.1 1020.92 158.866 937.817C62.3182 857.99 1.76716 711.006 0 520.684C1.75876 330.245 62.3185 183.245 158.866 103.494C255.1 20.3892 387.274 4.52426 524.532 0Z"/></clipPath><path d="M524.532 0C661.725 4.52425 793.956 20.3892 890.19 103.494C986.746 183.313 1047.24 330.329 1049 520.65C1047.24 710.913 986.746 857.99 890.19 937.817C793.956 1020.92 661.79 1036.79 524.532 1041.3C387.274 1036.79 255.1 1020.92 158.866 937.817C62.3182 857.99 1.76716 711.006 0 520.684C1.75876 330.245 62.3185 183.245 158.866 103.494C255.1 20.3892 387.274 4.52426 524.532 0Z" fill="oklch(0.28 0 0)"/><path d="M524.532 0C661.725 4.52425 793.956 20.3892 890.19 103.494C986.746 183.313 1047.24 330.329 1049 520.65C1047.24 710.913 986.746 857.99 890.19 937.817C793.956 1020.92 661.79 1036.79 524.532 1041.3C387.274 1036.79 255.1 1020.92 158.866 937.817C62.3182 857.99 1.76716 711.006 0 520.684C1.75876 330.245 62.3185 183.245 158.866 103.494C255.1 20.3892 387.274 4.52426 524.532 0Z" clip-path="url(#pc)" fill="none" stroke="color-mix(in oklch, oklch(0.59 0 0) 20%, transparent)" stroke-width="2" vector-effect="non-scaling-stroke"/></svg><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6"/><path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0"/><path d="M8 11v-4a4 4 0 1 1 8 0v4"/></svg></span><span><span style="color:#e6e6e9">Local agent session analyzer.</span> Nothing leaves this Mac.</span></div>
+<svg id="arrow" style="position:absolute;left:0;top:0" width="660" height="400"></svg>
+<div class="foot"><span class="chip"><svg class="peb" viewBox="0 0 1049 1042" aria-hidden="true"><clipPath id="pc"><path d="M524.532 0C661.725 4.52425 793.956 20.3892 890.19 103.494C986.746 183.313 1047.24 330.329 1049 520.65C1047.24 710.913 986.746 857.99 890.19 937.817C793.956 1020.92 661.79 1036.79 524.532 1041.3C387.274 1036.79 255.1 1020.92 158.866 937.817C62.3182 857.99 1.76716 711.006 0 520.684C1.75876 330.245 62.3185 183.245 158.866 103.494C255.1 20.3892 387.274 4.52426 524.532 0Z"/></clipPath><path d="M524.532 0C661.725 4.52425 793.956 20.3892 890.19 103.494C986.746 183.313 1047.24 330.329 1049 520.65C1047.24 710.913 986.746 857.99 890.19 937.817C793.956 1020.92 661.79 1036.79 524.532 1041.3C387.274 1036.79 255.1 1020.92 158.866 937.817C62.3182 857.99 1.76716 711.006 0 520.684C1.75876 330.245 62.3185 183.245 158.866 103.494C255.1 20.3892 387.274 4.52426 524.532 0Z" fill="rgb(128 128 134/14%)"/><path d="M524.532 0C661.725 4.52425 793.956 20.3892 890.19 103.494C986.746 183.313 1047.24 330.329 1049 520.65C1047.24 710.913 986.746 857.99 890.19 937.817C793.956 1020.92 661.79 1036.79 524.532 1041.3C387.274 1036.79 255.1 1020.92 158.866 937.817C62.3182 857.99 1.76716 711.006 0 520.684C1.75876 330.245 62.3185 183.245 158.866 103.494C255.1 20.3892 387.274 4.52426 524.532 0Z" clip-path="url(#pc)" fill="none" stroke="rgb(128 128 134/30%)" stroke-width="2" vector-effect="non-scaling-stroke"/></svg><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6"/><path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0"/><path d="M8 11v-4a4 4 0 1 1 8 0v4"/></svg></span><span><strong>Local agent session analyzer.</strong> Nothing leaves this Mac.</span></div>
 </div>
 <script>
-const P = new URLSearchParams(location.search);
 const FRAG = __FRAGMENT__;
-const LIGHT = P.get("mode") === "light";
-if (LIGHT) document.documentElement.dataset.mode = "light";
+// Icon centers match package.sh: Opaline.app at x 170, Applications at x 490, both at y 178, 128px icons.
 const ICON_RIGHT = 170 - 64 + 232 / 2 + 0.5, FOLDER_LEFT = 490 - 64 + 10 / 2;
 const MID = (ICON_RIGHT + FOLDER_LEFT) / 2;
-const SXU = 10.5;
-const SHIFTX = 0.08 - (MID - 330) * SXU / 644;
+const SX = 10.5;
+const SHIFTX = 0.08 - (MID - 330) * SX / 644;
 const GAMMA = 1.6;
+// Light only: the onboarding's dark fill under the wave is dropped, so what is left is dots and the wave line on black.
+const frag = FRAG
+	.replace("vec2 p = (vUv - 0.5) * uSize;", "vec2 p = (vUv - 0.5) * uSize + vec2(" + SHIFTX.toFixed(5) + ", 0.08);")
+	.replace(/vec3 color = mix\(vec3\(0\.0905\)[^;]*;/, "vec3 color = vec3(0.0);")
+	.replace("color += vec3(0.0905) * under * 0.5;", "")
+	.replace("color += dotTone * tide * pip", "vec3 extra = dotTone * tide * pip")
+	.replace("color += lineTone * fringe * 0.42;", "extra += lineTone * fringe * 0.42; color += pow(max(extra, 0.0), vec3(" + (1 / GAMMA).toFixed(4) + "));");
 const cv = document.getElementById("c"), r = cv.getBoundingClientRect(), dpr = 2;
-cv.width = r.width * dpr; cv.height = r.height * dpr;
-const gl = cv.getContext("webgl", { preserveDrawingBuffer: true, antialias: true });
+const W = cv.width = r.width * dpr, H = cv.height = r.height * dpr;
+const glc = document.createElement("canvas");
+glc.width = W; glc.height = H;
+const gl = glc.getContext("webgl", { preserveDrawingBuffer: true, antialias: true, premultipliedAlpha: false });
 const sh = (type, code) => { const o = gl.createShader(type); gl.shaderSource(o, code); gl.compileShader(o); return o; };
 const prog = gl.createProgram();
 gl.attachShader(prog, sh(gl.VERTEX_SHADER, "attribute vec2 a; varying vec2 vUv; void main(){ vUv = a * 0.5 + 0.5; gl_Position = vec4(a, 0.0, 1.0); }"));
-gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FRAG.replace("vec2 p = (vUv - 0.5) * uSize;", "vec2 p = (vUv - 0.5) * uSize + vec2(" + SHIFTX.toFixed(5) + ", 0.08);").replace("color += dotTone * tide * pip", "vec3 extra = dotTone * tide * pip").replace("color += lineTone * fringe * 0.42;", "extra += lineTone * fringe * 0.42; color += pow(max(extra, 0.0), vec3(" + (1 / GAMMA).toFixed(4) + "));")));
+gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, "precision highp float;\n" + frag));
 gl.linkProgram(prog); gl.useProgram(prog);
 const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
 gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
 const loc = gl.getAttribLocation(prog, "a"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
 const U = n => gl.getUniformLocation(prog, n);
-const SX = 10.5;
 gl.uniform2f(U("uSize"), SX, SX * r.height / r.width);
 gl.uniform1f(U("uTime"), 30);
 gl.uniform1f(U("uPhase"), 5);
 gl.uniform1f(U("uLift"), 1.7);
-gl.uniform1f(U("uOpacity"), 1); gl.uniform1f(U("uLight"), LIGHT ? 1 : 0); gl.uniform1f(U("uHand"), 0);
+gl.uniform1f(U("uOpacity"), 1); gl.uniform1f(U("uLight"), 0); gl.uniform1f(U("uHand"), 0);
 gl.uniform1f(U("uLit"), 1); gl.uniform1f(U("uLine"), 1);
 gl.uniform1f(U("uWave"), 1); gl.uniform1f(U("uCurve"), 0); gl.uniform1f(U("uDaysMix"), 0);
 gl.uniform3f(U("uTone"), 1, 1, 1); gl.uniform1f(U("uToneMix"), 0); gl.uniform1f(U("uSessions"), 0); gl.uniform1f(U("uTint"), 0);
 gl.uniform3f(U("uPage"), 0.988, 0.988, 0.988); gl.uniform2f(U("uFieldSize"), 1, 1);
 gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-const cell = 0.16 * r.width / SX, cx = 8 + r.width / 2, cy = 8 + r.height / 2;
-const half = 6 * cell;
-const a = MID - half, b = MID + half, y = cy;
-const [L0, L1] = LIGHT ? [0.9, 0.38] : [0.3, 0.95];
-const stops = [0, 0.25, 0.5, 0.75, 1].map(t => `<stop offset="${t}" stop-color="oklch(${(L0 + (L1 - L0) * t).toFixed(3)} 0.004 285)"/>`).join("");
-const endColor = `oklch(${L1} 0.004 285)`;
-let s = `<defs><linearGradient id="lg" gradientUnits="userSpaceOnUse" x1="${a}" x2="${b}">${stops}</linearGradient></defs>`;
-s += `<path d="M${a} ${y} L${b} ${y}" stroke="url(#lg)" stroke-width="1.75" stroke-linecap="round" fill="none"/>`;
-s += `<path d="M${b - 6.5} ${y - 6.5} L${b} ${y} L${b - 6.5} ${y + 6.5}" stroke="${endColor}" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`;
-document.getElementById("arc").innerHTML = s;
+// Light on black becomes color with alpha: the brightest channel is the coverage, the hue stays full.
+const px = new Uint8Array(W * H * 4);
+gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px);
+const ctx = cv.getContext("2d");
+const out = ctx.createImageData(W, H);
+const BOOST = 1.6;
+for (let y = 0; y < H; y++) {
+	for (let x = 0; x < W; x++) {
+		const i = ((H - 1 - y) * W + x) * 4, o = (y * W + x) * 4;
+		const m = Math.max(px[i], px[i + 1], px[i + 2]);
+		if (m === 0) continue;
+		out.data[o] = px[i] * 255 / m;
+		out.data[o + 1] = px[i + 1] * 255 / m;
+		out.data[o + 2] = px[i + 2] * 255 / m;
+		out.data[o + 3] = Math.min(255, m * BOOST);
+	}
+}
+ctx.putImageData(out, 0, 0);
+const half = 6 * (0.16 * r.width / SX), y = 8 + r.height / 2;
+const a = MID - half, b = MID + half;
+const stops = [0, 0.5, 1].map(t => `<stop offset="${t}" stop-color="rgb(128 128 134)" stop-opacity="${(0.15 + 0.75 * t).toFixed(3)}"/>`).join("");
+document.getElementById("arrow").innerHTML =
+	`<defs><linearGradient id="lg" gradientUnits="userSpaceOnUse" x1="${a}" x2="${b}">${stops}</linearGradient></defs>` +
+	`<path d="M${a} ${y} L${b} ${y}" stroke="url(#lg)" stroke-width="1.75" stroke-linecap="round" fill="none"/>` +
+	`<path d="M${b - 6.5} ${y - 6.5} L${b} ${y} L${b - 6.5} ${y + 6.5}" stroke="rgb(128 128 134/90%)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`;
 </script>
 </body>
 </html>

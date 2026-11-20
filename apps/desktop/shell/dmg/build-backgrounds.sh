@@ -7,14 +7,12 @@ python3 -I - "$here/background.html" "$here/../glass3d/entry.js" "$here/../onboa
 import json, re, sys
 template, entry, font, out = sys.argv[1:]
 fragment = re.search(r"const BACKDROP_FRAGMENT = `(.*?)`;", open(entry).read(), re.S).group(1)
-page = open(template).read().replace("__FRAGMENT__", json.dumps("precision highp float;\n" + fragment)).replace("__FONT__", "file://" + font)
+page = open(template).read().replace("__FRAGMENT__", json.dumps(fragment)).replace("__FONT__", "file://" + font)
 open(out, "w").write(page)
 PY
-for mode in dark light; do
-	for scale in 1 2; do
-		name=background-$mode; [ $scale = 2 ] && name=$name@2x
-		"$chrome" --headless=new --hide-scrollbars --enable-unsafe-swiftshader --use-angle=swiftshader --force-device-scale-factor=$scale --window-size=1200,900 --virtual-time-budget=5000 --screenshot="$t/$name.png" "file://$t/page.html?mode=$mode" 2>/dev/null
-	done
-	tiffutil -cathidpicheck "$t/background-$mode.png" "$t/background-$mode@2x.png" -out "$here/background-$mode.tiff" >/dev/null 2>&1
+for scale in 1 2; do
+	name=background; [ $scale = 2 ] && name=$name@2x
+	"$chrome" --headless=new --hide-scrollbars --default-background-color=00000000 --enable-unsafe-swiftshader --use-angle=swiftshader --force-device-scale-factor=$scale --window-size=660,400 --virtual-time-budget=5000 --screenshot="$t/$name.png" "file://$t/page.html" 2>/dev/null
 done
+tiffutil -cathidpicheck "$t/background.png" "$t/background@2x.png" -out "$here/background.tiff" >/dev/null 2>&1
 rm -rf "$t"

@@ -14,7 +14,6 @@ electron_app="${ELECTRON_APP:-$here/node_modules/electron/dist/Electron.app}"
 version=$(sed -n 's/^[[:space:]]*"version": "\(.*\)",$/\1/p' "$here/package.json" | head -n 1)
 app="$out/Opaline.app"
 dmg="$out/Opaline.dmg"
-dmg_theme="${OPALINE_DMG_THEME:-dark}"
 work="$out/.work"
 
 step() { printf '%s %s\n' "$(date +%H:%M:%S)" "$*"; }
@@ -25,7 +24,7 @@ for file in onboarding-window/vendor/glass3d.js onboarding-window/dots/dots.js o
 done
 
 if [ "${OPALINE_DMG:-1}" != 0 ]; then
-	[ -f "$here/dmg/background-$dmg_theme.tiff" ] || { echo "No DMG background for OPALINE_DMG_THEME=$dmg_theme (dark or light)." >&2; exit 1; }
+	[ -f "$here/dmg/background.tiff" ] || { echo "No DMG background (run dmg/build-backgrounds.sh)." >&2; exit 1; }
 fi
 
 rm -rf "$app" "$dmg" "$work"
@@ -139,7 +138,7 @@ build_dmg() {
 	done
 	mkdir -p "$stage/.background"
 	cp -cR "$app" "$stage/" 2>/dev/null || { rm -rf "$stage/Opaline.app"; ditto "$app" "$stage/Opaline.app"; }
-	cp "$here/dmg/background-$dmg_theme.tiff" "$stage/.background/background.tiff"
+	cp "$here/dmg/background.tiff" "$stage/.background/background.tiff"
 	size=$(($(du -sm "$stage" | cut -f1) * 11 / 10 + 64))
 	hdiutil create -srcfolder "$stage" -volname Opaline -fs HFS+ -format UDRW -size "${size}m" "$rw" >/dev/null
 	attached=$(hdiutil attach "$rw" -readwrite -noverify -noautoopen)
@@ -199,7 +198,7 @@ APPLESCRIPT
 }
 
 if [ "${OPALINE_DMG:-1}" != 0 ]; then
-	step "dmg: $dmg ($dmg_theme)"
+	step "dmg: $dmg"
 	build_dmg
 fi
 rm -rf "$work"
