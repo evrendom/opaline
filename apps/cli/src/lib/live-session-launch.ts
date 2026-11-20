@@ -62,15 +62,17 @@ export async function writeFollowerMarker(configDir: string): Promise<void> {
 /**
  * Whether a working follower holds the lease: renewed recently by its main
  * loop, and owned by the process its marker names (on Linux also with the
- * same start time). A lease without a marker gets two seconds to show one.
+ * same start time). A lease without a marker gets `markerGraceMs` (two
+ * seconds) to show one.
  */
 export async function isHealthyFollowerRunning(
 	configDir: string,
+	markerGraceMs = 2_000,
 ): Promise<boolean> {
 	const lease = getLiveSessionFollowerLeasePath(configDir);
 	if (!(await isFileLeaseHeld(lease, LIVE_FOLLOWER_LEASE_OPTIONS)))
 		return false;
-	const deadline = performance.now() + 2_000;
+	const deadline = performance.now() + markerGraceMs;
 	while (true) {
 		const [owner, marker] = await Promise.all([
 			readFile(join(lease, "owner"), "utf8").catch(() => undefined),
