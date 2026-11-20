@@ -81,20 +81,35 @@ type HookKind = "claude-start" | "claude-end" | "codex";
 
 describe("sidecar delivery under faults", () => {
 	test("a slow network that exceeds the hook budget hands the spooled capture to the background deliverer", async () => {
+		// Object PUTs hang until the network recovers; the hook's 30 s inline
+		// delivery budget is shortened so it runs out sooner.
 		let slow = true;
+		let recover = () => undefined;
+		const recovered = new Promise<void>((resolve) => {
+			recover = resolve;
+		});
 		const stub = startEvidenceProtocolStub({
-			put: () => (slow ? { delayMs: 20_000 } : undefined),
+			put: () => (slow ? { hang: recovered } : undefined),
 		});
 		try {
 			const workspace = await createWorkspace(stub, ["alpha"]);
 			const startedAt = performance.now();
-			const result = await runHook(workspace, "codex", "alpha", "slow-session");
+			const result = await runHook(
+				workspace,
+				"codex",
+				"alpha",
+				"slow-session",
+				{
+					env: { OPALINE_TEST_EVIDENCE_INLINE_DELIVERY_BUDGET_MS: "2000" },
+				},
+			);
 			expect(result.exitCode).toBe(0);
 			// The hook returns once its own delivery budget is spent.
 			expect(performance.now() - startedAt).toBeLessThan(60_000);
 			expect(await readHookLog(workspace)).toContain(
 				"delivered in the background",
 			);
+			expect(stub.counts.put).toBeGreaterThan(0);
 			expect(stub.committed.size).toBe(0);
 			const [pending] = await readPendingRepositoryEvidence(
 				workspace.configDir,
@@ -102,7 +117,9 @@ describe("sidecar delivery under faults", () => {
 			assert(pending);
 			// A budget cut is not a server failure: no backoff, delivery stays due.
 			expect(pending.next_attempt_at).toBeUndefined();
+			// PUTs the background deliverer sent meanwhile fail and are retried.
 			slow = false;
+			recover();
 			await waitFor(
 				async () =>
 					stub.committed.size === 1 && (await countPending(workspace)) === 0,
@@ -112,6 +129,7 @@ describe("sidecar delivery under faults", () => {
 			await expectNothingDropped(workspace, stub);
 		} finally {
 			slow = false;
+			recover();
 			stub.stop();
 		}
 	}, 150_000);
@@ -185,13 +203,22 @@ describe("sidecar delivery under faults", () => {
 	);
 
 	test("a commit that times out is re-planned and committed once inside the hook", async () => {
+		// The first commit never answers; the 15 s request timeout is shortened.
+		let release = () => undefined;
+		const unanswered = new Promise<void>((resolve) => {
+			release = resolve;
+		});
 		const stub = startEvidenceProtocolStub({
-			commit: (index) => (index === 0 ? { delayMs: 20_000 } : undefined),
+			commit: (index) => (index === 0 ? { hang: unanswered } : undefined),
 		});
 		try {
 			const workspace = await createWorkspace(stub, ["alpha"]);
 			expect(
-				(await runHook(workspace, "codex", "alpha", "commit-timeout")).exitCode,
+				(
+					await runHook(workspace, "codex", "alpha", "commit-timeout", {
+						env: { OPALINE_TEST_EVIDENCE_REQUEST_TIMEOUT_MS: "2000" },
+					})
+				).exitCode,
 			).toBe(0);
 			expect(stub.counts.commit).toBe(2);
 			const capture = only(stub);
@@ -201,6 +228,7 @@ describe("sidecar delivery under faults", () => {
 			);
 			await expectNothingDropped(workspace, stub);
 		} finally {
+			release();
 			stub.stop();
 		}
 	}, 60_000);
@@ -940,14 +968,18 @@ async function runHook(
 	kind: HookKind,
 	repository: string,
 	sessionId: string,
-	options: { readonly now?: number; readonly transcriptWritten?: boolean } = {},
+	options: {
+		readonly env?: Readonly<Record<string, string>>;
+		readonly now?: number;
+		readonly transcriptWritten?: boolean;
+	} = {},
 ) {
 	if (!options.transcriptWritten)
 		await writeTranscript(workspace, kind, repository, sessionId);
 	const invocation = buildHook(workspace, kind, repository, sessionId);
 	return runCli(invocation.args, fixtureFor(workspace), {
 		stdin: invocation.stdin,
-		env: cliEnvironmentOverrides(options.now),
+		env: { ...cliEnvironmentOverrides(options.now), ...options.env },
 		preload: options.now === undefined ? undefined : workspace.clockPreload,
 	});
 }

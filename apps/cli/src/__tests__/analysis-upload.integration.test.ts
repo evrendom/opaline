@@ -887,13 +887,16 @@ describe("hook uploads the server is still processing", () => {
 				? { errorCode: "R2_INGEST_COMMIT_QUEUED", kind: "pending" }
 				: { kind: "completed" };
 
+		// The hook still polls the queued job its ten times, without the
+		// second between polls.
+		const env = { OPALINE_TEST_R2_STATUS_POLL_INTERVAL_MS: "0" };
 		const started = performance.now();
-		const queued = await cli(fixture, [
-			"hooks",
-			"codex",
-			"turn-complete",
-			hookPayload(fixture, firstId),
-		]);
+		const queued = await cli(
+			fixture,
+			["hooks", "codex", "turn-complete", hookPayload(fixture, firstId)],
+			undefined,
+			env,
+		);
 		const elapsedMs = performance.now() - started;
 
 		expect(queued.exitCode).toBe(0);
@@ -902,18 +905,21 @@ describe("hook uploads the server is still processing", () => {
 		expect(
 			r2.calls.filter((call) => call.pathname === "/rpc/ingest/commit"),
 		).toHaveLength(1);
+		expect(
+			r2.calls.filter((call) => call.pathname === "/rpc/ingest/status"),
+		).toHaveLength(10);
 		expect(await readFailedUploads(fixture)).toMatchObject([
 			{ jobId: firstJob, sessionId: firstId, status: "pending" },
 		]);
 
 		firstJobDone = true;
 		r2.nextJobId = "00000000-0000-4000-8000-00000000000b";
-		const next = await cli(fixture, [
-			"hooks",
-			"codex",
-			"turn-complete",
-			hookPayload(fixture, secondId),
-		]);
+		const next = await cli(
+			fixture,
+			["hooks", "codex", "turn-complete", hookPayload(fixture, secondId)],
+			undefined,
+			env,
+		);
 
 		expect(next.exitCode).toBe(0);
 		expect(next.stderr).toBe("");
