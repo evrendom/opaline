@@ -5,10 +5,11 @@
 **See where your Claude Code and Codex agents get stuck, what they cost, and what to fix in your setup.**
 
 [![Download for macOS (Apple Silicon)](https://img.shields.io/badge/Download-macOS%20(Apple%20Silicon)-black?logo=apple)](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-macOS-arm64.dmg)
+[![Download for macOS (Intel)](https://img.shields.io/badge/Download-macOS%20(Intel)-black?logo=apple)](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-macOS-x64.dmg)
 [![Latest Release](https://img.shields.io/github/v/release/evrendom/opaline?label=release)](https://github.com/evrendom/opaline/releases)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-[**Download Opaline for Mac**](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-macOS-arm64.dmg) *(Apple Silicon)* · [opaline.so](https://opaline.so)
+**Download Opaline for Mac:** [**Apple Silicon**](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-macOS-arm64.dmg) · [**Intel**](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-macOS-x64.dmg) · [opaline.so](https://opaline.so)
 
 </div>
 
@@ -61,7 +62,7 @@ Everything runs on your machine. Opaline brings its own local server, Postgres, 
 
 ## Quick Start
 
-1. [**Download Opaline for Mac (Apple Silicon)**](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-macOS-arm64.dmg) and move it to Applications.
+1. Download Opaline for Mac ([**Apple Silicon**](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-macOS-arm64.dmg) or [**Intel**](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-macOS-x64.dmg)) and move it to Applications.
 2. Launch Opaline—it automatically starts its bundled local stack and reads your existing Claude Code and Codex sessions.
 3. *(Optional)* Click **"Connect your agents"** inside the app to enable the local MCP plugin for Claude Code and Codex.
 

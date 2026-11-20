@@ -12,20 +12,24 @@ const INSTALL_FALLBACK_MS = 30_000;
 const QUIET_STATUSES = new Set([401, 403, 404]);
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
 
-function feedAssetName(arch = process.arch) {
-	return `desktop-update-darwin-${arch}.json`;
+function feedAssetName(arch = process.arch, platform = process.platform) {
+	return `desktop-update-${platform}-${arch}.json`;
 }
 
-function updateZipName(version, arch = process.arch) {
-	return `Opaline-${version}-darwin-${arch}.zip`;
+function updateZipName(
+	version,
+	arch = process.arch,
+	platform = process.platform,
+) {
+	return `Opaline-${version}-${platform}-${arch}.zip`;
 }
 
 function releaseTag(version) {
 	return `desktop-v${version}`;
 }
 
-function defaultFeedUrl(arch = process.arch) {
-	return `https://github.com/${REPOSITORY}/releases/download/${FEED_TAG}/${feedAssetName(arch)}`;
+function defaultFeedUrl(arch = process.arch, platform = process.platform) {
+	return `https://github.com/${REPOSITORY}/releases/download/${FEED_TAG}/${feedAssetName(arch, platform)}`;
 }
 
 function parseVersion(text) {
@@ -217,6 +221,7 @@ function createUpdater(options) {
 		currentVersion,
 		env = process.env,
 		arch = process.arch,
+		platform = process.platform,
 		fetch = globalThis.fetch,
 		log = () => {},
 		ui,
@@ -225,7 +230,8 @@ function createUpdater(options) {
 		feedFile,
 		timers = { setTimeout, clearTimeout, setInterval, clearInterval },
 	} = options;
-	const feedUrl = env.OPALINE_UPDATE_FEED_URL?.trim() || defaultFeedUrl(arch);
+	const feedUrl =
+		env.OPALINE_UPDATE_FEED_URL?.trim() || defaultFeedUrl(arch, platform);
 	const token = env.OPALINE_UPDATE_GITHUB_TOKEN?.trim() || undefined;
 	const fetcher = createFetcher({ fetch, token });
 	const emitter = new EventEmitter();

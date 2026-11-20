@@ -1,16 +1,19 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, relative } from "node:path";
+import { basename, join, relative } from "node:path";
 import {
 	createProgressLine,
 	ensureVerifiedDownload,
 } from "../../../../packages/local-server/src/download.ts";
 import {
+	BUN_VERSION,
+	CLICKHOUSE_VERSION,
 	detectHostPlatform,
 	getBunAsset,
 	getClickHouseAsset,
 	getPostgresAsset,
 	type HostPlatform,
+	POSTGRES_VERSION,
 } from "../../../../packages/local-server/src/pinned-runtimes.ts";
 import {
 	createRuntimeContext,
@@ -23,7 +26,7 @@ import {
 const [mode, cacheDir, outDir, platformArgument] = process.argv.slice(2);
 if ((mode !== "download" && mode !== "unpack") || !cacheDir || !outDir) {
 	process.stderr.write(
-		"usage: bun runtimes.ts download|unpack <verified download cache> <out dir> [darwin-arm64|darwin-x64]\n",
+		"usage: bun runtimes.ts download|unpack <verified download cache> <out dir> [darwin-arm64|darwin-x64|linux-x64|linux-arm64]\n",
 	);
 	process.exit(2);
 }
@@ -54,7 +57,7 @@ if (mode === "download") {
 	);
 	process.stdout.write(`${JSON.stringify(files)}\n`);
 } else {
-	const context = createRuntimeContext({
+	const native = createRuntimeContext({
 		dataDir: outDir,
 		env: {
 			...process.env,
@@ -68,6 +71,20 @@ if (mode === "download") {
 		platform,
 		log: (line) => process.stderr.write(`${line}\n`),
 	});
+	// Packaging for another platform (an Intel build on Apple silicon) cannot run
+	// its binaries, or only slowly (Rosetta translates ClickHouse for minutes).
+	// The downloads are checked against their pinned digests, so report the
+	// pinned versions instead of running them.
+	const pinnedVersion = (command: string) =>
+		({
+			clickhouse: `ClickHouse ${CLICKHOUSE_VERSION}`,
+			postgres: `postgres (PostgreSQL) ${POSTGRES_VERSION}`,
+			bun: BUN_VERSION,
+		})[basename(command)];
+	const context =
+		platform === detected
+			? native
+			: { ...native, probe: async (command: string) => pinnedVersion(command) };
 	const runtimes = [
 		await resolveClickHouse(context),
 		await resolvePostgres(context),

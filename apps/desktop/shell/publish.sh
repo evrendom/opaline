@@ -5,7 +5,7 @@ repo=$(cd "$here/../../.." && pwd)
 
 usage() {
 	cat <<'USAGE'
-usage: apps/desktop/shell/publish.sh [--dry-run] [--notes TEXT | --notes-file FILE] [--target REF]
+usage: apps/desktop/shell/publish.sh [--dry-run] [--arch arm64|x64] [--notes TEXT | --notes-file FILE] [--target REF]
 
 Publishes the Opaline desktop app that package.sh built as a GitHub release, and
 points installed apps at it.
@@ -13,21 +13,25 @@ points installed apps at it.
 Release procedure:
   1. Bump "version" in apps/desktop/shell/package.json (semver, higher than the last
      desktop-v* release), commit, and push the commit.
-  2. Build, sign and notarize from that commit:
+  2. Build, sign and notarize from that commit, once per architecture (an x64 build
+     on Apple silicon needs Rosetta for the runtime checks):
        OPALINE_SIGN_IDENTITY="Developer ID Application: Evren Dombak (M8L5AS39YN)" \
        OPALINE_NOTARY_PROFILE=opaline-notary apps/desktop/shell/package.sh
+       OPALINE_ARCH=x64 OPALINE_SIGN_IDENTITY=... OPALINE_NOTARY_PROFILE=... apps/desktop/shell/package.sh
   3. apps/desktop/shell/publish.sh --dry-run    checks everything, writes the zip and feed
   4. apps/desktop/shell/publish.sh              creates release desktop-v<version> with the
                                           DMG, the update zip and the feed, then
                                           replaces the feed and Opaline-macOS-<arch>.dmg
                                           on release desktop-latest (the download link)
+  5. apps/desktop/shell/publish.sh --arch x64   adds the x64 build to the same release
 
 Installed apps read
   https://github.com/<repository>/releases/download/desktop-latest/desktop-update-darwin-<arch>.json
 and download the zip it names from the versioned release.
 
 Environment:
-  OPALINE_DIST          folder with Opaline.app and Opaline.dmg (default ~/.cache/opaline-desktop/package)
+  OPALINE_DIST          folder with Opaline.app and Opaline.dmg (default ~/.cache/opaline-desktop/package,
+                        or package-<arch> for the architecture this Mac is not)
   OPALINE_RELEASE_REPO  GitHub repository (default: the one the app reads updates from)
   OPALINE_TEAM_ID       Developer ID team the app must be signed by (default M8L5AS39YN)
   OPALINE_RELEASE_WORK  where the zip and feed are written (default ~/.cache/opaline-desktop/release)
@@ -37,6 +41,7 @@ USAGE
 }
 
 dry_run=0
+want_arch=""
 notes=""
 notes_file=""
 target=""
@@ -53,6 +58,10 @@ while [ $# -gt 0 ]; do
 		;;
 	--target)
 		target="$2"
+		shift
+		;;
+	--arch)
+		want_arch="$2"
 		shift
 		;;
 	-h | --help)
@@ -74,7 +83,12 @@ fail() {
 step() { printf '%s %s\n' "$(date +%H:%M:%S)" "$*"; }
 updates_js() { bun -e "const u = require('$here/updates.js'); $1"; }
 
-dist="${OPALINE_DIST:-$HOME/.cache/opaline-desktop/package}"
+host_arch=$(uname -m | sed 's/^x86_64$/x64/; s/^aarch64$/arm64/')
+want_arch="${want_arch:-$host_arch}"
+case "$want_arch" in arm64 | x64) ;; *) fail "--arch must be arm64 or x64, not $want_arch" ;; esac
+default_dist="$HOME/.cache/opaline-desktop/package"
+[ "$want_arch" = "$host_arch" ] || default_dist="$default_dist-$want_arch"
+dist="${OPALINE_DIST:-$default_dist}"
 app="$dist/Opaline.app"
 dmg="$dist/Opaline.dmg"
 team="${OPALINE_TEAM_ID:-M8L5AS39YN}"
@@ -101,6 +115,7 @@ arm64) arch=arm64 ;;
 x86_64) arch=x64 ;;
 *) fail "the app must be built for one architecture, found: $(lipo -archs "$app/Contents/MacOS/Opaline")" ;;
 esac
+[ "$arch" = "$want_arch" ] || fail "$app is built for $arch, not $want_arch"
 
 step "signature and notarization"
 codesign --verify --deep --strict "$app" || fail "$app does not pass codesign --verify --deep --strict"
@@ -127,10 +142,19 @@ commit=$(git -C "$repo" rev-parse --verify --quiet "$target^{commit}") || fail "
 
 step "GitHub: $repository"
 gh auth status >/dev/null 2>&1 || fail "gh is not signed in"
-if gh release view "$tag" -R "$repository" >/dev/null 2>&1 || gh api "repos/$repository/git/ref/tags/$tag" >/dev/null 2>&1; then
+feed_name=$(updates_js "console.log(u.feedAssetName('$arch', 'darwin'))")
+existing=0
+if gh release view "$tag" -R "$repository" >/dev/null 2>&1; then
+	# Another architecture of this version is already out: add this one to it.
+	gh release view "$tag" -R "$repository" --json assets --jq '.assets[].name' | grep -qx "$feed_name" &&
+		fail "$tag already has $feed_name; bump apps/desktop/shell/package.json"
+	released=$(gh api "repos/$repository/git/ref/tags/$tag" --jq .object.sha 2>/dev/null) || fail "$tag has a release but no tag"
+	[ "$(git -C "$repo" rev-parse --verify --quiet "$released^{commit}")" = "$commit" ] ||
+		fail "$tag was released from ${released:-another commit}, this app from $commit; build $arch from that commit"
+	existing=1
+elif gh api "repos/$repository/git/ref/tags/$tag" >/dev/null 2>&1; then
 	fail "$tag already exists on $repository; bump apps/desktop/shell/package.json"
 fi
-feed_name=$(updates_js "console.log(u.feedAssetName('$arch'))")
 work="${OPALINE_RELEASE_WORK:-$HOME/.cache/opaline-desktop/release}/$version"
 rm -rf "$work"
 mkdir -p "$work/current"
@@ -144,14 +168,15 @@ else
 fi
 rm -rf "$work/current"
 
-zip_name=$(updates_js "console.log(u.updateZipName('$version', '$arch'))")
+zip_name=$(updates_js "console.log(u.updateZipName('$version', '$arch', 'darwin'))")
 step "update zip: $zip_name"
 ditto -c -k --sequesterRsrc --keepParent "$app" "$work/$zip_name"
 mkdir -p "$work/check"
 ditto -x -k "$work/$zip_name" "$work/check"
 codesign --verify --deep --strict "$work/check/Opaline.app" || fail "the app inside $zip_name does not pass codesign"
 rm -rf "$work/check"
-cp -c "$dmg" "$work/Opaline-$version.dmg" 2>/dev/null || cp "$dmg" "$work/Opaline-$version.dmg"
+versioned_dmg="Opaline-$version-macOS-$arch.dmg"
+cp -c "$dmg" "$work/$versioned_dmg" 2>/dev/null || cp "$dmg" "$work/$versioned_dmg"
 stable_dmg="Opaline-macOS-$arch.dmg"
 cp -c "$dmg" "$work/$stable_dmg" 2>/dev/null || cp "$dmg" "$work/$stable_dmg"
 
@@ -168,7 +193,7 @@ else
 fi
 
 if [ "$dry_run" = 1 ]; then
-	step "dry run: would create $tag at $commit with:"
+	if [ "$existing" = 1 ]; then step "dry run: would add to $tag at $commit:"; else step "dry run: would create $tag at $commit with:"; fi
 	ls -l "$work" | sed 1d
 	step "dry run: then replace $feed_name on $feed_tag. Nothing was published."
 	exit 0
@@ -194,9 +219,14 @@ if [ -n "$stats_repository" ]; then
 	fi
 fi
 
-step "creating release $tag"
-gh release create "$tag" -R "$repository" --target "$commit" --title "Opaline $version" --latest "$@" \
-	"$work/Opaline-$version.dmg" "$work/$zip_name" "$work/$feed_name"
+if [ "$existing" = 1 ]; then
+	step "adding $arch to release $tag"
+	gh release upload "$tag" -R "$repository" "$work/$versioned_dmg" "$work/$zip_name" "$work/$feed_name"
+else
+	step "creating release $tag"
+	gh release create "$tag" -R "$repository" --target "$commit" --title "Opaline $version" --latest "$@" \
+		"$work/$versioned_dmg" "$work/$zip_name" "$work/$feed_name"
+fi
 if gh release view "$feed_tag" -R "$repository" >/dev/null 2>&1; then
 	step "replacing $feed_name and $stable_dmg on $feed_tag"
 	gh release upload "$feed_tag" -R "$repository" --clobber "$work/$feed_name" "$work/$stable_dmg"

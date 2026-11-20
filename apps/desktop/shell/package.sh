@@ -3,14 +3,19 @@ set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 repo=$(cd "$here/../../.." && pwd)
 cache_root="$HOME/.cache/opaline-desktop"
-out="${OPALINE_DIST:-$cache_root/package}"
+host_arch=$(uname -m | sed 's/^x86_64$/x64/; s/^aarch64$/arm64/')
+arch="${OPALINE_ARCH:-$host_arch}"
+case "$arch" in arm64 | x64) ;; *) echo "OPALINE_ARCH must be arm64 or x64, not $arch." >&2; exit 1 ;; esac
+default_out="$cache_root/package"
+[ "$arch" = "$host_arch" ] || default_out="$cache_root/package-$arch"
+out="${OPALINE_DIST:-$default_out}"
 cache="${OPALINE_RUNTIME_CACHE:-$cache_root/runtimes}"
 server_dir="${OPALINE_SERVER_PACKAGE_DIR:-$cache_root/server-package}"
 server_version="${OPALINE_SERVER_VERSION:-0.18.0-desktop.$(git -C "$repo" rev-parse --short=8 HEAD)}"
 layout="${OPALINE_RUNTIMES_LAYOUT:-unpacked}"
 identity="${OPALINE_SIGN_IDENTITY:--}"
 notary="${OPALINE_NOTARY_PROFILE:-}"
-electron_app="${ELECTRON_APP:-$here/node_modules/electron/dist/Electron.app}"
+electron_app="${ELECTRON_APP:-}"
 version=$(sed -n 's/^[[:space:]]*"version": "\(.*\)",$/\1/p' "$here/package.json" | head -n 1)
 app="$out/Opaline.app"
 dmg="$out/Opaline.dmg"
@@ -18,7 +23,13 @@ work="$out/.work"
 
 step() { printf '%s %s\n' "$(date +%H:%M:%S)" "$*"; }
 
-[ -d "$electron_app" ] || { echo "No Electron.app at $electron_app (symlink node_modules/electron)." >&2; exit 1; }
+if [ -z "$electron_app" ]; then
+	step "electron: verified download for darwin-$arch"
+	electron_app="$(bun "$here/scripts/electron.ts" "$cache" "darwin-$arch" | tail -n 1)/Electron.app"
+fi
+[ -d "$electron_app" ] || { echo "No Electron.app at $electron_app." >&2; exit 1; }
+[ "$(lipo -archs "$electron_app/Contents/MacOS/Electron")" = "$(echo "$arch" | sed 's/^x64$/x86_64/')" ] ||
+	{ echo "$electron_app is $(lipo -archs "$electron_app/Contents/MacOS/Electron"), not $arch." >&2; exit 1; }
 for file in onboarding-window/vendor/glass3d.js onboarding-window/dots/dots.js onboarding-window/dots/dots.css onboarding-window/previews/dark.png onboarding-window/previews/light.png; do
 	[ -f "$here/$file" ] || { echo "Missing $file (see build-glass3d.sh, build-dots.sh, scripts/grab-previews.mjs)." >&2; exit 1; }
 done
@@ -42,11 +53,11 @@ fi
 server_tarball="$server_dir/$(sed -n 's/^[[:space:]]*"file": "\(.*\)",*$/\1/p' "$server_manifest" | head -n 1)"
 [ -f "$server_tarball" ] || { echo "No tarball for $server_manifest" >&2; exit 1; }
 
-step "runtimes: verified downloads in $cache ($layout)"
+step "runtimes: verified downloads for darwin-$arch in $cache ($layout)"
 if [ "$layout" = unpacked ]; then
-	bun "$here/scripts/runtimes.ts" unpack "$cache" "$work/unpacked" >/dev/null
+	bun "$here/scripts/runtimes.ts" unpack "$cache" "$work/unpacked" "darwin-$arch" >/dev/null
 else
-	bun "$here/scripts/runtimes.ts" download "$cache" "$work/runtimes" >/dev/null
+	bun "$here/scripts/runtimes.ts" download "$cache" "$work/runtimes" "darwin-$arch" >/dev/null
 fi
 
 step "pricing.js from packages/api-routes/src/model-pricing.ts"
@@ -202,5 +213,5 @@ if [ "${OPALINE_DMG:-1}" != 0 ]; then
 	build_dmg
 fi
 rm -rf "$work"
-step "done: $app ($(du -sh "$app" | cut -f1)), server $(basename "$server_tarball"), runtimes $layout"
+step "done: $app for $arch ($(du -sh "$app" | cut -f1)), server $(basename "$server_tarball"), runtimes $layout"
 [ ! -f "$dmg" ] || step "done: $dmg ($(du -sh "$dmg" | cut -f1))"
