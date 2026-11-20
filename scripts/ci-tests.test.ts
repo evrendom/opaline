@@ -109,6 +109,29 @@ test("the CLI's test script expands into its files plus the two scripts it chain
 	);
 });
 
+test("a vitest run becomes slices that vitest itself splits, so each lands on any shard", () => {
+	const root = mkdtempSync(join(tmpdir(), "ci-tests-"));
+	writeFileSync(
+		join(root, "package.json"),
+		JSON.stringify({ workspaces: ["ui"] }),
+	);
+	mkdirSync(join(root, "ui"));
+	writeFileSync(
+		join(root, "ui", "package.json"),
+		JSON.stringify({
+			name: "ui",
+			scripts: { test: "vitest run && vitest run --shard=1/2" },
+		}),
+	);
+	expect(suiteItems("unit", root).map(itemKey)).toEqual([
+		"ui: vitest run --shard=1/4",
+		"ui: vitest run --shard=2/4",
+		"ui: vitest run --shard=3/4",
+		"ui: vitest run --shard=4/4",
+		"ui: vitest run --shard=1/2",
+	]);
+});
+
 test("JUnit suite times are keyed by the file bun ran", () => {
 	const xml = `<testsuites><testsuite name="a.test.ts" file="src/a.test.ts" time="1.5"><testcase time="1.5"/></testsuite><testsuite name="b" file="src/b.test.ts" time="0.25"/></testsuites>`;
 	expect(junitSuiteTimes(xml)).toEqual({

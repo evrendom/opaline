@@ -73,6 +73,9 @@ const INTEGRATION_ORDER = [
 	"apps/cli",
 	"packages/ch-schema",
 ];
+// The dashboard's `vitest run` took 81s on a shard as one item; in four
+// slices each lands near the 20s a single item should stay under.
+const VITEST_SLICES = 4;
 // Agent setup outside the workspaces, which no test reads.
 const AGENT_SETUP = /^\.(claude|agents)\//;
 
@@ -204,6 +207,23 @@ export function scriptItems(
 			const run = `${scriptName}#${index}`;
 			for (const file of files)
 				items.push({ kind: "file", pkg, file, run, flags, env });
+			continue;
+		}
+		if (
+			tokens[0] === "vitest" &&
+			tokens[1] === "run" &&
+			!tokens.some((t) => t.startsWith("--shard"))
+		) {
+			// Vitest's own --shard splits the files, and together its slices
+			// run each file once, so no slice has to be the longest item of a
+			// shard. A slice still sees every test file of its workspace.
+			for (let slice = 1; slice <= VITEST_SLICES; slice++)
+				items.push({
+					kind: "command",
+					pkg,
+					command: `${part} --shard=${slice}/${VITEST_SLICES}`,
+					env,
+				});
 			continue;
 		}
 		items.push({ kind: "command", pkg, command: part, env });
