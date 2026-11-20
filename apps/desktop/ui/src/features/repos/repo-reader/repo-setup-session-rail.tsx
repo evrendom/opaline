@@ -77,12 +77,13 @@ export function RepoSetupSessionRail({
 						]),
 					)
 				: undefined,
+			sessionIds: rows ? sessions.map((row) => row.sessionId) : undefined,
 			loading: query.isPending,
 			name: versionLabel
 				? `${setupName(file)} · ${versionLabel}`
 				: setupName(file),
 		}),
-		[file, query.isPending, rows, sessions.length, versionLabel],
+		[file, query.isPending, rows, sessions, versionLabel],
 	);
 	useRailFilter(filter);
 	return (

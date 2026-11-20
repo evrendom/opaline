@@ -22,6 +22,7 @@ import {
 	MetricLoadingContext,
 	MetricOverrideContext,
 	RangeLeadContext,
+	UsageSessionsContext,
 } from "@/features/costs/cost-rail-override";
 import type { Figure } from "@/lib/figure";
 import {
@@ -40,6 +41,9 @@ export type RailFilter = {
 	name?: string;
 	focus?: string;
 	focusDays?: ReadonlySet<string>;
+	/** The whole sessions the filter picks, for the Usage card; without them
+	 * a filter with figures shows its usage as unknown. */
+	sessionIds?: readonly string[];
 	loading?: boolean;
 	onClear?: () => void;
 };
@@ -117,6 +121,9 @@ export function RailHighlightProvider({
 		[filter?.figures],
 	);
 	const loading = filter?.loading ?? false;
+	const usageSessions = filter?.figures
+		? (filter.sessionIds ?? null)
+		: undefined;
 	const onClear = filter?.onClear;
 	const name = filter?.name ?? repoTabLabel(tab);
 	const TabIcon = repoTabIcon(onClear && tab === "summary" ? "sessions" : tab);
@@ -164,9 +171,11 @@ export function RailHighlightProvider({
 									<MetricLoadingContext.Provider value={loading}>
 										<DotLoadingContext.Provider value={loading}>
 											<MetricEmptyContext.Provider value={empty}>
-												<RangeLeadContext.Provider value={lead}>
-													{children}
-												</RangeLeadContext.Provider>
+												<UsageSessionsContext.Provider value={usageSessions}>
+													<RangeLeadContext.Provider value={lead}>
+														{children}
+													</RangeLeadContext.Provider>
+												</UsageSessionsContext.Provider>
 											</MetricEmptyContext.Provider>
 										</DotLoadingContext.Provider>
 									</MetricLoadingContext.Provider>
