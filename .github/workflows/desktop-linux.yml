@@ -1,7 +1,8 @@
 name: Desktop Linux
 
 # Builds the Linux AppImage and .deb, then launches the app under Xvfb and waits
-# for its local server (ClickHouse, Postgres, Bun) to come up.
+# for its local server (ClickHouse, Postgres, Bun) to come up. The packages are
+# kept as workflow artifacts; apps/desktop/shell/publish-linux.sh releases them.
 
 on:
   workflow_dispatch:
@@ -91,3 +92,14 @@ jobs:
           done
           cat "$home/stdout.log"
           exit 1
+
+      - name: Upload packages
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: opaline-linux-x64
+          path: |
+            ~/.cache/opaline-desktop/package-linux/*.AppImage
+            ~/.cache/opaline-desktop/package-linux/*.deb
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
