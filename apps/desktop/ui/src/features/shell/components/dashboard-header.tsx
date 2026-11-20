@@ -14,7 +14,7 @@ export function DashboardHeader({
 			className={cn(
 				"flex h-(--dashboard-01-header-height) shrink-0 items-center",
 				"edge-b-s",
-				"font-body",
+				"font-body antialiased",
 				"border-line bg-canvas",
 				className,
 			)}

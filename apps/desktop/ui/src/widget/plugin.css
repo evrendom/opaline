@@ -31,17 +31,11 @@ html[data-app-mode="plugin"] .dashboard-01-preview {
 	--dashboard-01-chrome-surface: var(--canvas);
 }
 /* Page surfaces take the host's main colour, as the dashboard already does. */
-/* In dark mode tooltips look like the menus instead of an inverted pill. */
+/* Host theme over the popup primitives: on a dark host a tooltip keeps only
+   a hairline in the host's border colour. (A mode theme, like .dark; the
+   tooltip's surface and ink are already its own.) */
 html[data-app-mode="plugin"].dark [data-slot="tooltip-content"] {
-	background: var(--surface);
-	color: var(--ink);
 	box-shadow: 0 0 0 1px var(--line-strong);
-}
-html[data-app-mode="plugin"].dark
-	[data-slot="tooltip-content"]
-	[class*="bg-foreground"] {
-	background: var(--surface);
-	fill: var(--surface);
 }
 /* The dashboard's cards sit on a soft black shadow, invisible on a dark host:
    a hairline in the host's border colour outlines them instead. */

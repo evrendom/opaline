@@ -72,15 +72,6 @@
 	align-items: center;
 	gap: var(--space-m);
 }
-.sessions-settings-list-heading [data-slot="button"][data-variant="outline"] {
-	border: 0;
-	background: var(--canvas);
-	box-shadow: var(--shadow-control);
-}
-.sessions-settings-list-heading
-	[data-slot="button"][data-variant="outline"]:hover {
-	background: var(--field);
-}
 .sessions-settings-count {
 	color: var(--ink-3);
 	font-weight: var(--weight-body-regular);

@@ -117,20 +117,33 @@ function SidebarNavTile({
 	);
 }
 
-export function AppSidebar() {
+export function AppSidebar({
+	fillHeight = false,
+}: {
+	/** Fill the parent's height instead of the viewport's (the welcome
+	 *  window frame). */
+	fillHeight?: boolean;
+} = {}) {
 	const currentShellRoute = useCurrentShellRoute();
 	const localApp = useLocalDesktopApp();
 	const visibleRoutes = primaryRoutes;
 
 	return (
-		<Sidebar variant="inset" collapsible="offcanvas">
+		<Sidebar
+			variant="inset"
+			collapsible="offcanvas"
+			rootClassName={fillHeight ? "h-full" : undefined}
+		>
 			{/* One highlight glides between rows on hover (Opaline's fluid
 			    hover), tinted like a row hover. */}
-			<div data-fluid-menu-root="" className="flex min-h-0 flex-1 flex-col">
+			<div
+				data-fluid-menu-root=""
+				className="flex min-h-0 flex-1 flex-col antialiased"
+			>
 				<FluidMenuHover items="[data-sidebar-interactive]" bridgeGap={12} />
 				{/* The plugin's host already titles it "Opaline". */}
 				{import.meta.env.MODE === "plugin" ? null : (
-					<SidebarHeader>
+					<SidebarHeader className="desktop-drag-header">
 						<DesktopWindowBar />
 						<IntroReveal label="Workspace">
 							<SidebarWorkspaceSwitcher />

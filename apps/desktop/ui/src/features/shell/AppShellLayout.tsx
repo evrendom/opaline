@@ -223,10 +223,10 @@ export function LeftSidebarAppShellLayout() {
 									inert={isWelcome || undefined}
 								>
 									<SidebarProvider
-										className="group/shell dashboard-01-chrome-frame relative h-full min-h-0 overflow-clip overscroll-none"
+										className="group/shell dashboard-01-chrome-frame desktop-drag-wrapper relative h-full min-h-0 overflow-clip overscroll-none"
 										style={shellChromeStyle}
 									>
-										<AppSidebar />
+										<AppSidebar fillHeight={isWelcome} />
 										<ShellWindowColumn
 											footer={
 												showLastSessionUpload ? <LastSessionUploadBar /> : null

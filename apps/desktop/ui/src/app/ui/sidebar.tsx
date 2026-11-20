@@ -54,6 +54,11 @@ type SidebarContextProps = {
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null);
 
+/** The sidebar's state where a provider may be absent (null outside one). */
+function useOptionalSidebar() {
+	return React.useContext(SidebarContext);
+}
+
 function useSidebar() {
 	const context = React.useContext(SidebarContext);
 	if (!context) {
@@ -159,6 +164,7 @@ function Sidebar({
 	variant = "sidebar",
 	collapsible = "offcanvas",
 	className,
+	rootClassName,
 	children,
 	dir,
 	...props
@@ -166,6 +172,9 @@ function Sidebar({
 	side?: "left" | "right";
 	variant?: "sidebar" | "floating" | "inset";
 	collapsible?: "offcanvas" | "icon" | "none";
+	/** Classes for the outer element that holds the sidebar's place in the
+	 *  layout (`className` goes to the sliding container). */
+	rootClassName?: string;
 }) {
 	const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
 	const isExpandedSidebar = state === "expanded";
@@ -226,6 +235,7 @@ function Sidebar({
 			className={cn(
 				"group peer relative hidden h-svh shrink-0 text-sidebar-foreground md:block",
 				offcanvas && "overflow-hidden",
+				rootClassName,
 			)}
 			data-state={state}
 			data-collapsible={resolvedCollapsible}
@@ -263,7 +273,9 @@ function Sidebar({
 					data-sidebar="sidebar"
 					data-slot="sidebar-inner"
 					className={cn(
-						"flex size-full min-w-0 flex-col overflow-hidden bg-sidebar group-data-[variant=sidebar]:edge-r-m",
+						// The inset sidebar sits in the window chrome: no fill of its
+						// own, so the window's vibrancy shows through.
+						"flex size-full min-w-0 flex-col overflow-hidden bg-sidebar group-data-[variant=inset]:bg-transparent group-data-[variant=sidebar]:edge-r-m",
 						"group-data-[variant=floating]:corner-m group-data-[variant=floating]:shadow-label group-data-[variant=floating]:ring-1 group-data-[variant=floating]:ring-sidebar-border",
 					)}
 				>
@@ -521,5 +533,6 @@ export {
 	SidebarMenuItem,
 	SidebarProvider,
 	SidebarTrigger,
+	useOptionalSidebar,
 	useSidebar,
 };
