@@ -42,6 +42,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          # History without file contents: the diffs read trees, and the
+          # few blobs a check needs are fetched when it reads them.
+          filter: blob:none
 
       # Integration exercises the server, the CLI, the packages and the
       # scripts. The dashboard, the MCP plugin code (no integration test
@@ -97,6 +100,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          # History without file contents: the diffs read trees, and the
+          # few blobs a check needs are fetched when it reads them.
+          filter: blob:none
 
       - name: Setup Bun
         uses: ./.github/actions/setup
