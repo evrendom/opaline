@@ -1,261 +1,65 @@
-import { afterAll, beforeAll, expect, setDefaultTimeout, test } from "bun:test";
+import { expect, setDefaultTimeout, test } from "bun:test";
 import assert from "node:assert/strict";
-import { getAdapter } from "@rudel/agent-adapters";
-import {
-	type CostDashboardInput,
-	CostDashboardSchema,
-} from "@rudel/api-routes";
-import { ingestRudelUsageEvents } from "@rudel/ch-schema/generated";
-import { extractUsageEvents } from "@rudel/usage-events";
-import { z } from "zod";
+import type { CostDashboardInput } from "@rudel/api-routes";
 import { getClickhouse } from "../clickhouse.js";
-import { sqlClient } from "../db.js";
-import { persistSessionLanguageSignalsWithExecutor } from "../services/session-language-signal-persistence.service.js";
-import { buildUsageEventRows } from "../services/usage-event-ingest.service.js";
 import {
-	type ApiTestServer,
-	startApiTestServer,
-} from "./helpers/api-test-server.js";
-import {
-	seedGitHubPull,
-	seedGitHubRepository,
-	seedGitHubRun,
-} from "./helpers/github-outcomes-fixture.js";
+	setUpAgentRunsDashboard,
+	start,
+	transcript,
+	unknownDurationTranscript,
+} from "./helpers/agent-runs-dashboard-fixture.js";
 
+// Agent run headlines, filters, duration statistics and coverage. The pull
+// request headlines are in agent-runs-dashboard-pull-requests.integration.ts.
 setDefaultTimeout(60_000);
-let server: ApiTestServer;
-let eventServer: ApiTestServer;
-const users: { id: string; token: string }[] = [];
-const run = crypto.randomUUID();
-const day = new Date().toISOString().slice(0, 10);
-const start = Date.parse(`${day}T00:00:00Z`);
-let revision = Date.now();
-const ch = getClickhouse();
-
-beforeAll(async () => {
-	server = await startApiTestServer({
-		GITHUB_EVIDENCE_UI_ENABLED: "true",
-		USAGE_EVENT_ANALYTICS_CUTOVER_MODE: "off",
-	});
-	eventServer = await startApiTestServer({
-		GITHUB_EVIDENCE_UI_ENABLED: "true",
-		USAGE_EVENT_ANALYTICS_CUTOVER_MODE: "all",
-	});
-	for (const name of ["owner", "outsider", "model-owner"]) {
-		const response = await fetch(`${server.baseUrl}/api/auth/sign-up/email`, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				name,
-				email: `${name}-${run}@example.test`,
-				password: `test-${run}`,
-			}),
-		});
-		expect(response.status, server.readOutput()).toBe(200);
-		const result = z
-			.object({ token: z.string(), user: z.object({ id: z.string() }) })
-			.parse(await response.json());
-		users.push({ id: result.user.id, token: result.token });
-	}
-});
-afterAll(async () => {
-	await server?.stop();
-	await eventServer?.stop();
-	for (const user of users) {
-		for (const table of [
-			"claude_sessions",
-			"session_analytics",
-			"session_language_signals",
-			"usage_events",
-		])
-			await ch.execute({
-				query: `ALTER TABLE rudel.${table} DELETE WHERE organization_id = {org:String}`,
-				query_params: { org: user.id },
-			});
-		await sqlClient`DELETE FROM organization WHERE id = ${user.id}`;
-		await sqlClient`DELETE FROM "user" WHERE id = ${user.id}`;
-	}
-});
-
-function transcript(
-	duration: number,
-	feedback?: string,
-	skills = false,
-	begin = start,
-	model = "claude-sonnet-4-5",
-) {
-	const lines: unknown[] = [
-		{
-			type: "user",
-			uuid: "u1",
-			sessionId: "runs",
-			timestamp: new Date(begin).toISOString(),
-			message: { role: "user", content: "Implement the task" },
-		},
-	];
-	if (skills)
-		lines.push({
-			type: "assistant",
-			uuid: "skill",
-			sessionId: "runs",
-			timestamp: new Date(begin + 1000).toISOString(),
-			message: {
-				role: "assistant",
-				model,
-				content: [
-					{
-						type: "tool_use",
-						id: "skill1",
-						name: "Skill",
-						input: { skill: "design" },
-					},
-				],
-			},
-		});
-	lines.push({
-		type: "assistant",
-		uuid: "a1",
-		sessionId: "runs",
-		timestamp: new Date(begin + duration * 1000).toISOString(),
-		message: {
-			role: "assistant",
-			id: "m1",
-			model,
-			usage: { input_tokens: 10, output_tokens: 5 },
-			content: [{ type: "text", text: "Done" }],
-		},
-	});
-	if (feedback !== undefined)
-		lines.push({
-			type: "user",
-			uuid: "u2",
-			sessionId: "runs",
-			timestamp: new Date(begin + duration * 1000 + 1000).toISOString(),
-			message: { role: "user", content: feedback },
-		});
-	return lines.map((line) => JSON.stringify(line)).join("\n");
-}
-
-function unknownDurationTranscript(
-	duration: number,
-	feedback: string,
-	skills = false,
-	begin = start,
-) {
-	return transcript(duration, feedback, skills, begin).replace(
-		`"timestamp":"${new Date(begin + duration * 1000).toISOString()}"`,
-		`"timestamp":"${new Date(begin - 1000).toISOString()}"`,
-	);
-}
-async function ingest(
-	sessionId: string,
-	content: string,
-	userIndex = 0,
-	indexed = true,
-	projectPath = "/test/agent-runs",
-	gitRemote?: string,
-) {
-	const user = users[userIndex];
-	assert(user);
-	const adapter = getAdapter("claude_code");
-	const timestamps = adapter.extractTimestamps(content);
-	assert(timestamps);
-	const ingestedAt = new Date(++revision);
-	const rawRevision = (BigInt(ingestedAt.getTime()) << 16n).toString();
-	const input = {
-		content,
-		sessionId,
-		projectPath,
-		gitRemote,
-		source: "claude_code" as const,
-	};
-	await adapter.ingest(ch, input, {
-		ingestedAt,
-		organizationId: user.id,
-		revision: rawRevision,
-		timestamps,
-		userId: user.id,
-	});
-	if (indexed)
-		await persistSessionLanguageSignalsWithExecutor(
-			{
-				content,
-				organizationId: user.id,
-				rawIngestedAt: ingestedAt,
-				rawRevision,
-				sessionDate: timestamps.sessionDate,
-				sessionId,
-				source: "claude_code",
-				userId: user.id,
-			},
-			ch,
-		);
-	return { ingestedAt, rawRevision };
-}
-async function dashboard(
-	filters: Partial<CostDashboardInput> = {},
-	userIndex = 0,
-	endpoint = server,
-) {
-	const user = users[userIndex];
-	assert(user);
-	const response = await fetch(
-		`${endpoint.baseUrl}/rpc/analytics/overview/costs`,
-		{
-			method: "POST",
-			headers: {
-				Authorization: `Bearer ${user.token}`,
-				"Content-Type": "application/json",
-			},
-			body: JSON.stringify({
-				json: {
-					startDate: day,
-					endDate: day,
-					requestedMetric: "agentRuns",
-					...filters,
-				},
-			}),
-		},
-	);
-	expect(response.status, await response.clone().text()).toBe(200);
-	return z.object({ json: CostDashboardSchema }).parse(await response.json())
-		.json;
-}
+const { run, servers, user, workspace, ingest, dashboard } =
+	setUpAgentRunsDashboard(["owner"]);
 
 test("HTTP dashboard counts runs once across all fixed buckets, filters and tenants", async () => {
-	for (const [i, duration] of [
-		0, 60, 300, 900, 1800, 3600, 10800, 43200,
-	].entries())
-		await ingest(
-			`buckets-${run}-${i}`,
-			transcript(
-				duration,
-				i === 0 ? "Great" : i === 1 ? "Please continue" : undefined,
-				i === 1,
+	const [owner, outsider] = await Promise.all([
+		workspace("buckets-owner"),
+		workspace("buckets-outsider"),
+	]);
+	await Promise.all([
+		...[0, 60, 300, 900, 1800, 3600, 10800, 43200].map((duration, i) =>
+			ingest(
+				`buckets-${run}-${i}`,
+				transcript(
+					duration,
+					i === 0 ? "Great" : i === 1 ? "Please continue" : undefined,
+					i === 1,
+				),
+				owner,
 			),
-		);
-	await ingest(`other-${run}`, transcript(60, "Great"), 1);
-	const result = await dashboard({ splitBy: "durations" });
+		),
+		ingest(`other-${run}`, transcript(60, "Great"), outsider),
+	]);
+	const [result, events, filtered, outsiderView, sessionsView, mergedView] =
+		await Promise.all([
+			dashboard({ splitBy: "durations" }, owner),
+			dashboard({ splitBy: "durations" }, owner, servers().events),
+			dashboard(
+				{
+					skillsUsed: ["yes"],
+					runSignals: ["none"],
+					durations: ["1to5m"],
+				},
+				owner,
+			),
+			dashboard({}, outsider),
+			dashboard({ requestedMetric: "sessions" }, owner),
+			dashboard({ requestedMetric: "mergedPullRequests" }, owner),
+		]);
 	assert(result.metrics.agentRuns);
 	expect(result.metrics.agentRuns.total).toBe(8);
-	expect(
-		(await dashboard({ splitBy: "durations" }, 0, eventServer)).metrics
-			.agentRuns,
-	).toEqual(result.metrics.agentRuns);
+	expect(events.metrics.agentRuns).toEqual(result.metrics.agentRuns);
 	expect(
 		result.metrics.agentRuns.breakdowns.durations.map((entry) => entry.value),
 	).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 0]);
 	expect(result.metrics.agentRuns.series).toHaveLength(9);
-	const filtered = await dashboard({
-		skillsUsed: ["yes"],
-		runSignals: ["none"],
-		durations: ["1to5m"],
-	});
 	expect(filtered.metrics.agentRuns?.total).toBe(1);
 	expect(filtered.metrics.agentRuns?.breakdowns.durations).toHaveLength(9);
-	expect((await dashboard({}, 1)).metrics.agentRuns?.total).toBe(1);
-	const sessionsView = await dashboard({ requestedMetric: "sessions" });
-	const mergedView = await dashboard({ requestedMetric: "mergedPullRequests" });
+	expect(outsiderView.metrics.agentRuns?.total).toBe(1);
 	expect(mergedView.requestedMetric).toBe("cost");
 	expect(mergedView.metrics.agentRuns?.total).toBe(8);
 	expect(mergedView.metrics.sessions?.total).toBeGreaterThan(0);
@@ -268,289 +72,6 @@ test("HTTP dashboard counts runs once across all fixed buckets, filters and tena
 		12,
 	);
 });
-
-async function seedPullRequestActivity(
-	repositoryId: string,
-	model = "claude-sonnet-4-5",
-	userIndex = 0,
-	bindingFullName = `opalinehq/headline-${repositoryId}-${userIndex}-${run}`,
-	remoteFullName = bindingFullName,
-) {
-	const user = users[userIndex];
-	assert(user);
-	const [owner, repositoryName] = bindingFullName.split("/");
-	assert(owner && repositoryName);
-	const repository = `github.com/${remoteFullName}`;
-	const sessionId = `pr-${repositoryId}-${userIndex}-${run}`;
-	const content = transcript(60, "Great", false, start, model);
-	const { ingestedAt, rawRevision } = await ingest(
-		sessionId,
-		content,
-		userIndex,
-		true,
-		`/test/${repositoryName}`,
-		userIndex === 0
-			? `git@github.com:${remoteFullName}.git`
-			: `https://github.com/${remoteFullName}.git`,
-	);
-	const extraction = extractUsageEvents({
-		content,
-		organizationId: user.id,
-		userId: user.id,
-		sessionId,
-		source: "claude_code",
-		subagents: {},
-	});
-	expect(extraction.status).toBe("complete");
-	await ingestRudelUsageEvents(
-		ch,
-		[
-			...buildUsageEventRows(
-				{
-					contentSha256: "a".repeat(64),
-					extraction,
-					filterVersion: 1,
-					generation: rawRevision,
-					ingestedAt,
-					organizationId: user.id,
-					sessionDate: new Date(start),
-					sessionId,
-					source: "claude_code",
-					userId: user.id,
-				},
-				[],
-			),
-		],
-		{ validate: true },
-	);
-	await seedGitHubRepository(user.id, repositoryId, bindingFullName);
-	await seedGitHubPull(
-		user.id,
-		repositoryId,
-		148,
-		new Date(start - 3600000).toISOString(),
-		new Date(start).toISOString(),
-	);
-	for (const id of ["lint", "test"])
-		await seedGitHubRun(
-			user.id,
-			repositoryId,
-			id,
-			new Date(start - 1800000).toISOString(),
-			{ conclusion: "failure", pullNumber: 148 },
-		);
-	return repository;
-}
-
-test("PR repository IDs scope every headline like the default metric in both cutover modes", async () => {
-	const repository = await seedPullRequestActivity("148001");
-	await seedPullRequestActivity("148001", "claude-sonnet-4-5", 1);
-	await seedPullRequestActivity("148002");
-	await seedPullRequestActivity("148003", "claude-sonnet-4-5", 1);
-	for (const endpoint of [server, eventServer]) {
-		const baseline = await dashboard(
-			{ requestedMetric: "cost", repositories: [repository] },
-			0,
-			endpoint,
-		);
-		expect(baseline.metrics.cost?.total).toBeGreaterThan(0);
-		expect(baseline.metrics.sessions?.total).toBe(1);
-		expect(baseline.metrics.signals?.total).toBe(0);
-		expect(baseline.metrics.agentRuns?.total).toBe(1);
-		for (const requestedMetric of [
-			"mergedPullRequests",
-			"ciFailuresPerPullRequest",
-			"ciRuns",
-		] as const) {
-			const result = await dashboard(
-				{ requestedMetric, repositories: ["148001"] },
-				0,
-				endpoint,
-			);
-			for (const metric of [
-				"cost",
-				"sessions",
-				"signals",
-				"agentRuns",
-			] as const) {
-				expect(result.metrics[metric]?.total).toBe(
-					baseline.metrics[metric]?.total,
-				);
-				expect(result.metrics[metric]?.incomplete).toBe(
-					baseline.metrics[metric]?.incomplete,
-				);
-			}
-			expect(result.metrics.mergedPullRequests?.total).toBe(1);
-			expect(result.metrics.ciFailuresPerPullRequest?.total).toBe(2);
-			expect(
-				result.metrics.mergedPullRequests?.breakdowns.repositories[0]?.id,
-			).toBe("148001");
-			// A stat card's request leaves the session metrics out.
-			const card = await dashboard(
-				{ requestedMetric, repositories: ["148001"], sessionMetrics: false },
-				0,
-				endpoint,
-			);
-			for (const metric of [
-				"cost",
-				"sessions",
-				"signals",
-				"agentRuns",
-			] as const)
-				expect(card.metrics[metric]).toBeNull();
-			expect(card.metrics.mergedPullRequests).toEqual(
-				result.metrics.mergedPullRequests,
-			);
-			for (const repositories of [
-				["148003"],
-				["999999"],
-				["148003", "999999"],
-			]) {
-				const unmatched = await dashboard(
-					{ requestedMetric, repositories },
-					0,
-					endpoint,
-				);
-				for (const metric of [
-					"cost",
-					"sessions",
-					"signals",
-					"agentRuns",
-					"mergedPullRequests",
-					"ciFailuresPerPullRequest",
-				] as const)
-					expect(unmatched.metrics[metric]?.total).toBe(0);
-			}
-			const multiple = await dashboard(
-				{ requestedMetric, repositories: ["148001", "148002", "999999"] },
-				0,
-				endpoint,
-			);
-			expect(multiple.metrics.sessions?.total).toBe(2);
-			expect(multiple.metrics.mergedPullRequests?.total).toBe(2);
-			expect(multiple.metrics.ciFailuresPerPullRequest?.total).toBe(2);
-		}
-	}
-});
-
-test("PR canonical model filters retain legacy aliases and unknown identities in both cutover modes", async () => {
-	await seedPullRequestActivity("148004", "claude-sonnet-4-5", 2);
-	await seedPullRequestActivity("148005", "mystery-model", 2);
-	for (const endpoint of [server, eventServer]) {
-		for (const [alias, canonical] of [
-			["claude-sonnet-4-5", "claude-sonnet-4-5-20250929"],
-			["mystery-model", "mystery-model"],
-		]) {
-			assert(alias && canonical);
-			const baseline = await dashboard(
-				{ requestedMetric: "cost", models: [alias] },
-				2,
-				endpoint,
-			);
-			expect(baseline.metrics.sessions?.total).toBe(1);
-			expect(baseline.metrics.signals?.total).toBe(0);
-			expect(baseline.metrics.agentRuns?.total).toBe(1);
-			if (alias !== canonical)
-				expect(baseline.metrics.cost?.total).toBeGreaterThan(0);
-			for (const model of [canonical, alias]) {
-				for (const requestedMetric of [
-					"mergedPullRequests",
-					"ciFailuresPerPullRequest",
-				] as const) {
-					const result = await dashboard(
-						{ requestedMetric, models: [model] },
-						2,
-						endpoint,
-					);
-					for (const metric of [
-						"cost",
-						"sessions",
-						"signals",
-						"agentRuns",
-					] as const) {
-						expect(result.metrics[metric]?.total).toBe(
-							baseline.metrics[metric]?.total,
-						);
-						expect(result.metrics[metric]?.incomplete).toBe(
-							baseline.metrics[metric]?.incomplete,
-						);
-					}
-					expect(result.metrics.mergedPullRequests?.total).toBe(2);
-					expect(result.metrics.ciFailuresPerPullRequest?.total).toBe(2);
-				}
-			}
-		}
-	}
-});
-
-for (const requestedMetric of [
-	"mergedPullRequests",
-	"ciFailuresPerPullRequest",
-] as const) {
-	test(`PR ${requestedMetric} mixed-case GitHub repository filters retain every headline in both cutover modes`, async () => {
-		for (const [index, repositoryId] of (requestedMetric ===
-		"mergedPullRequests"
-			? ["148006", "148007"]
-			: ["148008", "148009"]
-		).entries()) {
-			const fullName = `opalinehq/headline-${repositoryId}-${run}`;
-			const repository = await seedPullRequestActivity(
-				repositoryId,
-				"claude-sonnet-4-5",
-				0,
-				index === 0 ? fullName.toUpperCase() : fullName,
-				index === 0 ? fullName : fullName.toUpperCase(),
-			);
-			await ingest(
-				`local-case-${repositoryId}-${run}`,
-				transcript(60, "Great"),
-				0,
-				true,
-				repository.toUpperCase(),
-			);
-			for (const endpoint of [server, eventServer]) {
-				const baseline = await dashboard(
-					{ requestedMetric: "cost", repositories: [repository] },
-					0,
-					endpoint,
-				);
-				expect(baseline.metrics.cost?.total).toBeGreaterThan(0);
-				expect(baseline.metrics.sessions?.total).toBe(1);
-				expect(baseline.metrics.signals?.total).toBe(0);
-				expect(baseline.metrics.agentRuns?.total).toBe(1);
-				const wrongCase = await dashboard(
-					{
-						requestedMetric: "cost",
-						repositories: [repository.replace("github.com", "GitHub.com")],
-					},
-					0,
-					endpoint,
-				);
-				const result = await dashboard(
-					{ requestedMetric, repositories: [repositoryId] },
-					0,
-					endpoint,
-				);
-				for (const metric of [
-					"cost",
-					"sessions",
-					"signals",
-					"agentRuns",
-				] as const) {
-					expect(wrongCase.metrics[metric]?.total).toBe(0);
-					expect(result.metrics[metric]?.total).toBe(
-						baseline.metrics[metric]?.total,
-					);
-					expect(result.metrics[metric]?.incomplete).toBe(
-						baseline.metrics[metric]?.incomplete,
-					);
-				}
-				expect(result.metrics.mergedPullRequests?.total).toBe(1);
-				expect(result.metrics.ciFailuresPerPullRequest?.total).toBe(2);
-			}
-		}
-	});
-}
 
 test("returns exact median and P95 durations for filtered runs and UTC periods", async () => {
 	const repository = `/test/duration-stats-${run}`;
@@ -570,42 +91,99 @@ test("returns exact median and P95 durations for filtered runs and UTC periods",
 		.toISOString()
 		.slice(0, 10);
 	const statsMonth = `${statsDay.slice(0, 7)}-01`;
-	await ingest(
-		`duration-previous-${run}`,
-		transcript(40, "Great", false, statsPreviousStart),
-		0,
-		true,
-		repository,
-	);
-	for (const [index, duration] of [0, 10, 20, 30, 100].entries())
-		await ingest(
-			`duration-${run}-${index}`,
-			transcript(
-				duration,
-				index < 2 ? "Great" : undefined,
-				index === 1,
-				statsStart,
-			),
+	await Promise.all([
+		ingest(
+			`duration-previous-${run}`,
+			transcript(40, "Great", false, statsPreviousStart),
 			0,
 			true,
 			repository,
-		);
-	await ingest(
-		`duration-unknown-${run}`,
-		unknownDurationTranscript(50, "Great", true, statsStart),
-		0,
-		true,
-		repository,
-	);
+		),
+		...[0, 10, 20, 30, 100].map((duration, index) =>
+			ingest(
+				`duration-${run}-${index}`,
+				transcript(
+					duration,
+					index < 2 ? "Great" : undefined,
+					index === 1,
+					statsStart,
+				),
+				0,
+				true,
+				repository,
+			),
+		),
+		ingest(
+			`duration-unknown-${run}`,
+			unknownDurationTranscript(50, "Great", true, statsStart),
+			0,
+			true,
+			repository,
+		),
+	]);
 
-	const stats = (
-		await dashboard({
+	const durationStats = async (filters: Partial<CostDashboardInput>) =>
+		(await dashboard(filters)).metrics.agentRuns?.durationStats;
+	const [
+		stats,
+		filtered,
+		underOneMinute,
+		underOneMinuteSplit,
+		weekly,
+		monthly,
+		unknownOnly,
+		empty,
+	] = await Promise.all([
+		durationStats({
 			startDate: statsPreviousDay,
 			endDate: statsDay,
 			durationInterval: "daily",
 			repositories: [repository],
-		})
-	).metrics.agentRuns?.durationStats;
+		}),
+		durationStats({
+			startDate: statsDay,
+			endDate: statsDay,
+			repositories: [repository],
+			runSignals: ["positive"],
+			skillsUsed: ["yes"],
+		}),
+		durationStats({
+			startDate: statsPreviousDay,
+			endDate: statsDay,
+			repositories: [repository],
+			durations: ["under1m"],
+		}),
+		durationStats({
+			startDate: statsPreviousDay,
+			endDate: statsDay,
+			repositories: [repository],
+			durations: ["under1m"],
+			splitBy: "durations",
+		}),
+		durationStats({
+			startDate: statsPreviousDay,
+			endDate: statsDay,
+			durationInterval: "weekly",
+			repositories: [repository],
+		}),
+		durationStats({
+			startDate: statsPreviousDay,
+			endDate: statsDay,
+			durationInterval: "monthly",
+			repositories: [repository],
+		}),
+		durationStats({
+			startDate: statsDay,
+			endDate: statsDay,
+			repositories: [repository],
+			durations: ["unknown"],
+		}),
+		durationStats({
+			startDate: statsDay,
+			endDate: statsDay,
+			repositories: [`/test/absent-${run}`],
+		}),
+	]);
 	expect(stats).toEqual({
 		interval: "daily",
 		sampleCount: 6,
@@ -633,58 +211,23 @@ test("returns exact median and P95 durations for filtered runs and UTC periods",
 			},
 		],
 	});
-	const filtered = (
-		await dashboard({
-			startDate: statsDay,
-			endDate: statsDay,
-			repositories: [repository],
-			runSignals: ["positive"],
-			skillsUsed: ["yes"],
-		})
-	).metrics.agentRuns?.durationStats;
 	expect(filtered).toMatchObject({
 		sampleCount: 1,
 		unknownCount: 1,
 		medianSeconds: 10,
 		p95Seconds: 10,
 	});
-	const underOneMinute = (
-		await dashboard({
-			startDate: statsPreviousDay,
-			endDate: statsDay,
-			repositories: [repository],
-			durations: ["under1m"],
-		})
-	).metrics.agentRuns?.durationStats;
 	expect(underOneMinute).toMatchObject({
 		sampleCount: 5,
 		unknownCount: 0,
 		medianSeconds: 20,
 		p95Seconds: 40,
 	});
-	expect(
-		(
-			await dashboard({
-				startDate: statsPreviousDay,
-				endDate: statsDay,
-				repositories: [repository],
-				durations: ["under1m"],
-				splitBy: "durations",
-			})
-		).metrics.agentRuns?.durationStats,
-	).toEqual(underOneMinute);
-	for (const [durationInterval, date] of [
-		["weekly", statsPreviousDay],
-		["monthly", statsMonth],
+	expect(underOneMinuteSplit).toEqual(underOneMinute);
+	for (const [durationInterval, date, grouped] of [
+		["weekly", statsPreviousDay, weekly],
+		["monthly", statsMonth, monthly],
 	] as const) {
-		const grouped = (
-			await dashboard({
-				startDate: statsPreviousDay,
-				endDate: statsDay,
-				durationInterval,
-				repositories: [repository],
-			})
-		).metrics.agentRuns?.durationStats;
 		expect(grouped).toMatchObject({
 			interval: durationInterval,
 			sampleCount: 6,
@@ -704,14 +247,6 @@ test("returns exact median and P95 durations for filtered runs and UTC periods",
 			],
 		});
 	}
-	const unknownOnly = (
-		await dashboard({
-			startDate: statsDay,
-			endDate: statsDay,
-			repositories: [repository],
-			durations: ["unknown"],
-		})
-	).metrics.agentRuns?.durationStats;
 	expect(unknownOnly).toMatchObject({
 		sampleCount: 0,
 		unknownCount: 1,
@@ -726,13 +261,6 @@ test("returns exact median and P95 durations for filtered runs and UTC periods",
 			},
 		],
 	});
-	const empty = (
-		await dashboard({
-			startDate: statsDay,
-			endDate: statsDay,
-			repositories: [`/test/absent-${run}`],
-		})
-	).metrics.agentRuns?.durationStats;
 	expect(empty).toMatchObject({
 		sampleCount: 0,
 		unknownCount: 0,
@@ -750,17 +278,31 @@ test("returns exact median and P95 durations for filtered runs and UTC periods",
 });
 
 test("requested detail metric does not change filtered headline totals", async () => {
+	const member = await workspace("detail-owner");
+	// Runs each filter keeps and runs each one drops, all indexed: the legacy
+	// all-or-nothing contract hides agent runs while any session is indexing.
+	await Promise.all([
+		ingest(`detail-positive-${run}`, transcript(60, "Great"), member),
+		ingest(`detail-skills-${run}`, transcript(300, "Great", true), member),
+		ingest(`detail-silent-${run}`, transcript(900), member),
+		ingest(
+			`detail-other-model-${run}`,
+			transcript(60, "Great", false, start, "mystery-model"),
+			member,
+		),
+	]);
 	const filters = {
 		models: ["claude-sonnet-4-5"],
 		signalTypes: ["userPositive" as const],
 		runSignals: ["positive" as const],
 	};
-	const results = await Promise.all(
-		(["cost", "sessions", "signals", "agentRuns"] as const).map(
-			(requestedMetric) => dashboard({ ...filters, requestedMetric }),
+	const [legacy, ...results] = await Promise.all([
+		dashboard({ ...filters, requestedMetric: undefined }, member),
+		...(["cost", "sessions", "signals", "agentRuns"] as const).map(
+			(requestedMetric) => dashboard({ ...filters, requestedMetric }, member),
 		),
-	);
-	const legacy = await dashboard({ ...filters, requestedMetric: undefined });
+	]);
+	assert(legacy);
 	const totals = results.map((result) => ({
 		cost: result.metrics.cost?.total,
 		sessions: result.metrics.sessions?.total,
@@ -809,20 +351,22 @@ test("requested detail metric does not change filtered headline totals", async (
 
 test("returns matched indexed runs while another selected session is indexing", async () => {
 	const repository = `/test/partial-coverage-${run}`;
-	await ingest(
-		`partial-indexed-${run}`,
-		transcript(60, "Great", true),
-		0,
-		true,
-		repository,
-	);
-	await ingest(
-		`partial-stale-${run}`,
-		transcript(60, "Great", true),
-		0,
-		false,
-		repository,
-	);
+	await Promise.all([
+		ingest(
+			`partial-indexed-${run}`,
+			transcript(60, "Great", true),
+			0,
+			true,
+			repository,
+		),
+		ingest(
+			`partial-stale-${run}`,
+			transcript(60, "Great", true),
+			0,
+			false,
+			repository,
+		),
+	]);
 	const runs = (
 		await dashboard({
 			repositories: [repository],
@@ -870,11 +414,10 @@ test("reports a stale session without its current raw revision as unavailable", 
 	const sessionId = `coverage-unavailable-${run}`;
 	await ingest(sessionId, transcript(60, "Great"), 0, true, repository);
 	await ingest(sessionId, transcript(300, "Great"), 0, false, repository);
-	const user = users[0];
-	assert(user);
-	await ch.execute({
+	const owner = user(0);
+	await getClickhouse().execute({
 		query: `ALTER TABLE rudel.claude_sessions DELETE WHERE organization_id = {org:String} AND session_id = {sessionId:String} SETTINGS mutations_sync = 2`,
-		query_params: { org: user.id, sessionId },
+		query_params: { org: owner.id, sessionId },
 	});
 	const runs = (
 		await dashboard({ repositories: [repository], runSignals: ["positive"] })
@@ -889,14 +432,17 @@ test("reports a stale session without its current raw revision as unavailable", 
 });
 
 test("later revisions replace no-reply feedback without duplicating the run", async () => {
+	const member = await workspace("revision-owner");
 	const id = `revision-${run}`;
-	await ingest(id, transcript(60));
+	await ingest(id, transcript(60), member);
 	expect(
-		(await dashboard({ runSignals: ["negative"] })).metrics.agentRuns?.total,
+		(await dashboard({ runSignals: ["negative"] }, member)).metrics.agentRuns
+			?.total,
 	).toBe(0);
-	await ingest(id, transcript(60, "It didn’t work"));
+	await ingest(id, transcript(60, "It didn’t work"), member);
 	expect(
-		(await dashboard({ runSignals: ["negative"] })).metrics.agentRuns?.total,
+		(await dashboard({ runSignals: ["negative"] }, member)).metrics.agentRuns
+			?.total,
 	).toBe(1);
 });
 
@@ -909,11 +455,15 @@ test("includes today's runs from a session opened before the date range", async 
 			.replaceAll('"a1"', '"a3"')
 			.replaceAll('"u2"', '"u4"')
 			.replaceAll('"m1"', '"m3"');
-	await ingest(`cross-day-${run}`, content);
-	const result = await dashboard({
-		runSignals: ["positive"],
-		durations: ["1to3h"],
-	});
+	const member = await workspace("cross-day-owner");
+	await ingest(`cross-day-${run}`, content, member);
+	const result = await dashboard(
+		{
+			runSignals: ["positive"],
+			durations: ["1to3h"],
+		},
+		member,
+	);
 	expect(result.metrics.agentRuns?.total).toBe(1);
 });
 
