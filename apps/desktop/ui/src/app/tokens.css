@@ -172,7 +172,6 @@
 	/* a faint edge ringing a small avatar or logo on any ground */
 	--line-faint: color-mix(in oklab, var(--ink) 5%, transparent);
 	/* text and counts on an accent fill: white in both modes */
-	--accent-fg: var(--neutral-1);
 	/* a window or lens floating over a chart: a 1px ring and a soft drop;
 	   dark keeps only the ring */
 	--shadow-window:
@@ -224,7 +223,6 @@
 	--track: color-mix(in oklab, var(--field) 50%, transparent);
 	--shelf: var(--card);
 	--line-faint: color-mix(in oklab, var(--ink) 10%, transparent);
-	--accent-fg: var(--neutral-10);
 	--shadow-window: 0 0 0 1px rgb(255 255 255 / 0.15);
 	/* --- end product --- */
 }
@@ -272,7 +270,6 @@
 	--color-track: var(--track);
 	--color-shelf: var(--shelf);
 	--color-line-faint: var(--line-faint);
-	--color-accent-fg: var(--accent-fg);
 	/* --- end product --- */
 }
 
