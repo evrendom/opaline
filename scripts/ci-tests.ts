@@ -605,6 +605,7 @@ export function recordedTimings(
 	fallback: Timings,
 	runs = 3,
 	currentRun?: string,
+	read: { current: number; expected: number } = { current: 0, expected: 0 },
 ): Timings {
 	const repo = process.env.GITHUB_REPOSITORY;
 	if (!repo) return fallback;
@@ -620,22 +621,31 @@ export function recordedTimings(
 			.filter(Boolean) ?? [];
 	// The run recording them is still going, so it is not among the passing
 	// runs yet; its finished shards are the newest times.
+	// Once it has passed it is also among them; each run is read once.
 	if (currentRun) ids.unshift(currentRun);
 	const merged: Timings = { ...fallback };
-	for (const runId of ids.reverse()) {
+	for (const runId of [...new Set(ids)].reverse()) {
 		const jobs =
 			gh([
 				"api",
 				`repos/${repo}/actions/runs/${runId}/jobs?per_page=100`,
 				"--jq",
-				'.jobs[] | select(.conclusion == "success") | select(.name | test("^(unit|integration) \\(")) | .id',
+				// Not a regex: in a jq string `\(` starts interpolation, which
+				// failed this query, and the snapshot stood in for every time.
+				'.jobs[] | select(.conclusion == "success") | select(.name | startswith("unit (") or startswith("integration (")) | .id',
 			])
 				?.split("\n")
 				.filter(Boolean) ?? [];
 		for (const jobId of jobs) {
 			const log = jobLog(repo, jobId, false);
+			if (runId === currentRun && log) {
+				// A shard whose slice of the plan was empty ran nothing to time.
+				const plan = markedJson<PlanRecord>(log, PLAN_MARKER);
+				if (plan?.plan[plan.index]?.length) read.expected++;
+			}
 			const line = log?.split("\n").find((l) => l.includes(TIMINGS_MARKER));
 			if (!line) continue;
+			if (runId === currentRun) read.current++;
 			try {
 				Object.assign(
 					merged,
@@ -905,10 +915,28 @@ function main() {
 		const current = new Set(
 			[...suiteItems("unit"), ...suiteItems("integration")].map(itemKey),
 		);
+		const read = { current: 0, expected: 0 };
+		const recorded = recordedTimings(
+			readTimings(options.timings),
+			3,
+			options.run,
+			read,
+		);
+		// The run recording is on main after its shards passed: each shard
+		// with tests printed its times, so reading fewer (or finding no shard
+		// at all) means this reader broke, and the snapshot would silently
+		// stand in for every time again.
+		if (options.run) {
+			console.error(
+				`read the times of ${read.current} of this run's ${read.expected} shards with tests`,
+			);
+			if (read.expected === 0 || read.current < read.expected)
+				throw new Error(
+					`read the times of ${read.current} of ${read.expected} shards with tests in run ${options.run}`,
+				);
+		}
 		const timings = Object.fromEntries(
-			Object.entries(
-				recordedTimings(readTimings(options.timings), 3, options.run),
-			)
+			Object.entries(recorded)
 				.filter(([key]) => current.has(key))
 				.sort(([a], [b]) => a.localeCompare(b))
 				.map(([key, seconds]) => [key, Math.round(seconds * 100) / 100]),
