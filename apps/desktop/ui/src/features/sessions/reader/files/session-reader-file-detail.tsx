@@ -14,7 +14,9 @@ import { ChangeBlock, Cut } from "./session-reader-file-change";
 import {
 	Crumb,
 	CrumbSeparator,
-	ScrollColumn,
+	ReaderPane,
+	ReaderPaneHeader,
+	ReaderPaneScroll,
 	ViewToggle,
 } from "./session-reader-files-parts";
 
@@ -122,27 +124,30 @@ export function FileDetail({
 	const language = languageForPath(file.path);
 	const { directory, name } = splitPath(file.path);
 	return (
-		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-s pt-xl pr-xl pl-xxl">
-			<div className="flex min-h-7 shrink-0 flex-wrap items-center gap-x-l gap-y-xs">
-				<div className="flex min-w-0 flex-1 items-center gap-s">
-					{run ? (
-						<RunCrumbs
-							agent={agent}
-							onClearAgent={onClearAgent}
-							onClearRun={onClearRun}
-							run={run}
-						/>
-					) : null}
-					<Crumb onClear={run ? onClearFile : undefined} title={file.path}>
-						{name}
-						{file.movedTo ? (
-							<span className="font-regular text-ink-3">
-								{" "}
-								→ {file.movedTo.split("/").at(-1)}
-							</span>
+		<ReaderPane>
+			<ReaderPaneHeader
+				crumbs={
+					<>
+						{run ? (
+							<RunCrumbs
+								agent={agent}
+								onClearAgent={onClearAgent}
+								onClearRun={onClearRun}
+								run={run}
+							/>
 						) : null}
-					</Crumb>
-				</div>
+						<Crumb onClear={run ? onClearFile : undefined} title={file.path}>
+							{name}
+							{file.movedTo ? (
+								<span className="font-regular text-ink-3">
+									{" "}
+									→ {file.movedTo.split("/").at(-1)}
+								</span>
+							) : null}
+						</Crumb>
+					</>
+				}
+			>
 				<span className="text-body-m whitespace-nowrap text-ink-3 tabular-nums">
 					<LineCounts {...totals} />
 					{" · "}
@@ -165,7 +170,7 @@ export function FileDetail({
 					]}
 					value={view}
 				/>
-			</div>
+			</ReaderPaneHeader>
 			<span
 				className="-mt-xs truncate pl-m text-left text-body-m text-ink-3/70 [direction:rtl]"
 				title={directory}
@@ -180,7 +185,7 @@ export function FileDetail({
 					className="mt-l mb-xl"
 				/>
 			) : (
-				<ScrollColumn className="-mr-xl -ml-s pr-xl pl-s">
+				<ReaderPaneScroll>
 					{view === "file" && file.content !== null ? (
 						<div className="flex flex-col gap-m pt-m pb-xl">
 							<DiffView hunks={wholeText(file.content)} language={language} />
@@ -200,8 +205,8 @@ export function FileDetail({
 							))}
 						</ol>
 					)}
-				</ScrollColumn>
+				</ReaderPaneScroll>
 			)}
-		</div>
+		</ReaderPane>
 	);
 }

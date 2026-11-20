@@ -50,7 +50,7 @@ export function SentMessage({
 				<div
 					className={cn(
 						"min-w-0 corner-m px-l py-l shadow-card corner-squircle squircle:corner-xl",
-						!tint && "bg-wash dark:bg-wash",
+						!tint && "bg-wash",
 						selected && "ring-[1.5px] ring-(--sent-tint)/40",
 					)}
 					style={

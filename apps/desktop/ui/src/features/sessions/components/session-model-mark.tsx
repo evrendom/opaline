@@ -22,16 +22,8 @@ const MODEL_ICON_CLASS_NAME =
 
 export function SessionModelLoadingMark() {
 	return (
-		<span
-			aria-hidden="true"
-			className={cn(MODEL_MARK_CLASS_NAME, "text-ink dark:text-ink")}
-		>
-			<span
-				className={cn(
-					MODEL_BACKGROUND_CLASS_NAME,
-					"bg-wash dark:bg-hover-strong",
-				)}
-			>
+		<span aria-hidden="true" className={cn(MODEL_MARK_CLASS_NAME, "text-ink")}>
+			<span className={cn(MODEL_BACKGROUND_CLASS_NAME, "bg-mark-fill")}>
 				<SessionModelProgressRing progress="loading" />
 			</span>
 			<span className={MODEL_ICON_SHELL_CLASS_NAME}>
@@ -126,7 +118,7 @@ export function SessionModelMark({
 				MODEL_MARK_CLASS_NAME,
 				"corner-full",
 				tone.icon === "claude" && "text-warning",
-				tone.icon === "codex" && "text-ink dark:text-ink",
+				tone.icon === "codex" && "text-ink",
 				tone.icon === null && "text-ink-3",
 			)}
 		>
@@ -135,7 +127,7 @@ export function SessionModelMark({
 				className={cn(
 					MODEL_BACKGROUND_CLASS_NAME,
 					tone.icon === "claude" && "bg-warning/10",
-					tone.icon !== "claude" && "bg-wash dark:bg-hover-strong",
+					tone.icon !== "claude" && "bg-mark-fill",
 					progress && tone.identityIconClassName,
 				)}
 				data-session-model-background
@@ -153,7 +145,7 @@ export function SessionModelMark({
 				className={cn(
 					MODEL_ICON_SHELL_CLASS_NAME,
 					disclosure &&
-						"grid place-items-center *:col-start-1 *:row-start-1 *:transition-[opacity,rotate,scale] *:duration-150 *:ease-out",
+						"grid place-items-center *:col-start-1 *:row-start-1 *:transition-[opacity,rotate,scale] *:duration-(--motion-duration) *:ease-out",
 				)}
 				data-session-detail-model-mark
 			>

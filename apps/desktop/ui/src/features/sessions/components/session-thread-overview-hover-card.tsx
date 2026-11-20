@@ -184,7 +184,7 @@ function SessionOverviewActivityTag({
 }) {
 	return (
 		<div
-			className="flex h-4 shrink-0 items-center gap-xxs rounded-(--activity-tag-radius) bg-[color-mix(in_srgb,var(--ink)_6%,transparent)] pr-xs pl-xxs [--activity-tag-inset:--spacing(0.5)] [--activity-tag-radius:var(--radius-lg)]"
+			className="flex h-4 shrink-0 items-center gap-xxs rounded-(--activity-tag-radius) bg-[color-mix(in_srgb,var(--ink)_6%,transparent)] pr-xs pl-xxs [--activity-tag-inset:--spacing(0.5)] [--activity-tag-radius:var(--radius-m)]"
 			data-session-overview-activity-tag={kind}
 			title={title}
 		>

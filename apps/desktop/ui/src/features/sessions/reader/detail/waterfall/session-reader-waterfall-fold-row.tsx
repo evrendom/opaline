@@ -76,7 +76,7 @@ export function FoldRow({
 					<span className="tabular-nums">
 						{steps.length} {variant === "filtered" ? "hidden" : "steps"}
 					</span>
-					<span className="ml-1.5 text-ink-3">{summarizeSteps(steps)}</span>
+					<span className="ml-s text-ink-3">{summarizeSteps(steps)}</span>
 				</>
 			)}
 		</span>
@@ -112,7 +112,7 @@ export function FoldRow({
 				...steps.map((step) => step.backgroundFromMs ?? step.endMs),
 			)}
 			className={cn(
-				"relative rounded-md group/toggle",
+				"relative corner-s group/toggle",
 				rowState(!expanded && holdsSelection),
 				variant === "filtered" && !expanded && "opacity-60",
 			)}
@@ -125,7 +125,7 @@ export function FoldRow({
 				className={cn(totals ? GRID : GRID_UNTIMED, ROW)}
 			>
 				<div
-					className={cn("flex min-w-0 items-center gap-2 pr-3", INDENT)}
+					className={cn("flex min-w-0 items-center gap-m pr-l", INDENT)}
 					style={{ "--depth": row.depth } as CSSProperties}
 				>
 					{chip}

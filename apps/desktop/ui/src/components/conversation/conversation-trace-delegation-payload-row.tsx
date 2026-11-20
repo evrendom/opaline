@@ -17,7 +17,7 @@ export function ConversationTraceDelegationPayloadRow({
 			fullPreviewText={undefined}
 			label={<p className={conversationTraceLabelClassName}>Input / Output</p>}
 			leading={<TraceIcon icon={TraceExchangeIcon} tone="cyan" />}
-			treeBodyClassName="-ml-3"
+			treeBodyClassName="-ml-l"
 			body={
 				<ToolCallBody
 					input={event.input}

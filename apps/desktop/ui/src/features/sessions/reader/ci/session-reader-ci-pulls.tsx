@@ -25,11 +25,11 @@ import {
 import { pullRequestUrl } from "./session-reader-run-ci";
 
 const TONE: Record<CiLinePart["tone"], string> = {
-	failed: "text-error dark:text-error",
-	flaky: "text-warning dark:text-warning",
+	failed: "text-error",
+	flaky: "text-warning",
 	muted: "text-ink-3",
-	passed: "text-success dark:text-success",
-	running: "text-warning dark:text-warning",
+	passed: "text-success",
+	running: "text-warning",
 };
 
 export type CiPullRow = {

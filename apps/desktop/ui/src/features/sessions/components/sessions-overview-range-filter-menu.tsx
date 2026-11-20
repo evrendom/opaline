@@ -119,7 +119,7 @@ export function SessionOverviewTokenRangeFilterPanel({
 						aria-label={label}
 						className="min-h-0 flex-1"
 					>
-						<div className="px-l pt-s text-[0.6875rem]/4 font-medium tracking-l text-ink-3">
+						<div className="px-l pt-s text-body-s font-medium tracking-l text-ink-3">
 							{label}
 						</div>
 						<SessionOverviewRangeFilterPanel

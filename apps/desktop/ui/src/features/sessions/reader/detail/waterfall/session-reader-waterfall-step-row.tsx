@@ -137,7 +137,7 @@ export const StepRowView = memo(function StepRowView({
 					data-mark=""
 					data-width={width}
 					className={cn(
-						"absolute top-1/2 min-w-0.5 -translate-y-1/2 rounded-xs",
+						"absolute top-1/2 min-w-0.5 -translate-y-1/2 corner-xs",
 						bar.className,
 						runsOn && !subagent ? `h-0.5 ${DASHED}` : "h-2",
 						running && !runsOn && "opacity-35",
@@ -161,7 +161,7 @@ export const StepRowView = memo(function StepRowView({
 				data-step-failed={step.isError ? "" : undefined}
 				data-talks-to={subagentTalkedTo(step) ?? undefined}
 				className={cn(
-					"relative -my-0.5 bg-(--dashboard-01-content-background,var(--canvas)) py-0.5",
+					"relative -my-xxs bg-(--dashboard-01-content-background,var(--canvas)) py-xxs",
 					MESSAGE_INDENT,
 				)}
 				style={{ "--depth": depth } as CSSProperties}
@@ -185,7 +185,7 @@ export const StepRowView = memo(function StepRowView({
 			data-step-tags={railTagKeysOf(step).join(" ") || undefined}
 			data-talks-to={subagentTalkedTo(step) ?? undefined}
 			className={cn(
-				"relative rounded-md",
+				"relative corner-s",
 				onToggleSubtrace && "group/toggle",
 				rowState(selected),
 				step.ci?.dimmed && "opacity-60",
@@ -201,7 +201,7 @@ export const StepRowView = memo(function StepRowView({
 				className={cn(totals ? GRID : GRID_UNTIMED, ROW, "group/steprow")}
 			>
 				<div
-					className={cn("flex min-w-0 items-center gap-2 pr-3", INDENT)}
+					className={cn("flex min-w-0 items-center gap-m pr-l", INDENT)}
 					style={{ "--depth": depth } as CSSProperties}
 				>
 					<StepIconChip
@@ -209,7 +209,7 @@ export const StepRowView = memo(function StepRowView({
 						step={step}
 						tip={false}
 					/>
-					<div className="flex min-w-0 items-center gap-1.5">
+					<div className="flex min-w-0 items-center gap-s">
 						<span className="truncate">
 							{subagentRole ? "Subagent" : step.name}
 						</span>
@@ -218,7 +218,7 @@ export const StepRowView = memo(function StepRowView({
 							<span
 								role="img"
 								aria-label="Error"
-								className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-rose-500/10 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400"
+								className="inline-flex size-5 shrink-0 items-center justify-center corner-full bg-rose-500/10 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400"
 							>
 								<IconAlertTriangle aria-hidden="true" className="size-3" />
 							</span>

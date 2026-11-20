@@ -95,7 +95,7 @@ export function SessionsListSurface({
 					{isSnapshotSessionsError ? (
 						<div
 							className={cn(
-								"edge-b-m border-line px-xxl py-[calc(var(--space-xxl)*2)] text-center text-ink-3 dark:border-line",
+								"edge-b-m border-line px-xxl py-[calc(var(--space-xxl)*2)] text-center text-ink-3",
 								layout === "page" && "text-body-xl",
 								layout === "pane" && "text-body-xxl sm:text-body-xl",
 							)}

@@ -80,7 +80,7 @@ function StepFigure({
 			}
 		>
 			<div className="flex min-w-0 flex-col gap-xs">
-				<span className="truncate text-xs/4 text-ink-3">{title}</span>
+				<span className="truncate text-body-m text-ink-3">{title}</span>
 				<span className="flex min-w-0 items-baseline gap-s text-[13px]/4 tabular-nums">
 					<span className="truncate text-ink">{value ?? "—"}</span>
 					{share === null ? null : (

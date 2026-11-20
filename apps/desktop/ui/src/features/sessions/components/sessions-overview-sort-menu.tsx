@@ -83,19 +83,19 @@ export function ToolbarSortMenu<K extends string>({
 			>
 				<IconSortDescending
 					aria-hidden="true"
-					className="size-4 h-lh shrink-0 text-ink-2 dark:text-ink-3"
+					className="size-4 h-lh shrink-0 text-ink-soft"
 				/>
 				<span className="text-ink-3">Sorted by</span>
 				<span>{activeSortLabel}</span>
 				{sort.direction === "asc" ? (
 					<IconChevronUp
 						aria-hidden="true"
-						className="size-4 shrink-0 text-ink-2 dark:text-ink-3"
+						className="size-4 shrink-0 text-ink-soft"
 					/>
 				) : (
 					<IconChevronDown
 						aria-hidden="true"
-						className="size-4 shrink-0 text-ink-2 dark:text-ink-3"
+						className="size-4 shrink-0 text-ink-soft"
 					/>
 				)}
 				<TouchTarget className="size-12" />

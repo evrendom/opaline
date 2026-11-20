@@ -191,7 +191,7 @@ export type RailSubagent = {
 };
 
 const COPY_REVEAL =
-	"duration-300 ease-out group-hover/line:delay-300 motion-reduce:transition-none";
+	"duration-(--motion-large-duration) ease-out group-hover/line:delay-300 motion-reduce:transition-none";
 
 const FADES_UNDER_COPY = cn(
 	"[mask-image:linear-gradient(to_right,black_67.5%,transparent_82.5%)] [mask-position:0%_0] [mask-repeat:no-repeat] [mask-size:200%_100%] transition-[mask-position] group-hover/line:[mask-position:100%_0]",

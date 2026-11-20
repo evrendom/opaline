@@ -22,7 +22,7 @@ export function RowTotals({
 	tokens: number;
 }) {
 	return (
-		<div className="flex flex-col items-end pr-1 text-right">
+		<div className="flex flex-col items-end pr-xs text-right">
 			{durationMs !== null ? (
 				<span className="text-[11px] font-medium text-ink/80 tabular-nums">
 					{formatSpanDuration(durationMs)}
@@ -105,7 +105,7 @@ export function ProgressBar({
 			data-mark=""
 			data-progress-host=""
 			data-width={width}
-			className="group/host absolute top-1/2 h-2 min-w-0.5 -translate-y-1/2 overflow-hidden rounded-xs *:absolute *:inset-y-0 *:duration-300 *:ease-out"
+			className="group/host absolute top-1/2 h-2 min-w-0.5 -translate-y-1/2 overflow-hidden corner-xs *:absolute *:inset-y-0 *:duration-(--motion-large-duration) *:ease-out"
 			style={{ left: `${left}%`, width: `${width}%` }}
 		>
 			<div
@@ -136,7 +136,7 @@ export function ProgressBar({
 
 export function RanOnChip({ ms }: { ms: number }) {
 	return (
-		<span className="absolute top-1/2 right-0 -translate-y-1/2 rounded-sm bg-canvas px-1 text-[10px] leading-4 text-ink-3 tabular-nums">
+		<span className="absolute top-1/2 right-0 -translate-y-1/2 corner-xs bg-canvas px-xs text-[10px] leading-4 text-ink-3 tabular-nums">
 			+{formatRanOn(ms)}
 		</span>
 	);
@@ -153,7 +153,7 @@ export function RunningBar({
 		<div
 			aria-hidden="true"
 			className={cn(
-				"pointer-events-none absolute top-1/2 h-2 min-w-0.5 -translate-y-1/2 rounded-xs",
+				"pointer-events-none absolute top-1/2 h-2 min-w-0.5 -translate-y-1/2 corner-xs",
 				bar.className,
 			)}
 			style={{ ...bar.style, left: `${span.offset}%`, width: `${span.width}%` }}
@@ -189,10 +189,10 @@ export function TrackLabel({
 		<span
 			aria-hidden="true"
 			className={cn(
-				"pointer-events-none absolute top-1/2 -translate-y-1/2 truncate text-[11px] leading-4 text-ink-3",
+				"pointer-events-none absolute top-1/2 -translate-y-1/2 truncate text-body-s text-ink-3",
 				end > 70 &&
 					offset < 30 &&
-					"rounded-sm bg-(--dashboard-01-content-background,var(--canvas)) px-1",
+					"corner-xs bg-(--dashboard-01-content-background,var(--canvas)) px-xs",
 				className,
 			)}
 			style={place}

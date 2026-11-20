@@ -343,7 +343,7 @@ describe("SessionsOverviewTable", () => {
 		);
 		expect(repositoryLabel).toHaveClass(
 			"text-ink-3",
-			"text-xs/4",
+			"text-body-m",
 			"font-regular",
 			"truncate",
 			"text-left",
@@ -366,7 +366,7 @@ describe("SessionsOverviewTable", () => {
 		);
 		expect(branchLabel).toHaveClass(
 			"text-ink-3",
-			"text-xs/4",
+			"text-body-m",
 			"font-regular",
 			"tabular-nums",
 			"truncate",

@@ -10,13 +10,13 @@ export const SESSION_OVERVIEW_ROW_CLASS_NAME =
 	"group/session grid h-12 w-full text-left outline-none focus-visible:z-20 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent";
 
 export const SESSION_OVERVIEW_MODEL_LABEL_CLASS_NAME =
-	"text-base/5 font-medium tracking-m text-ink sm:text-[0.8125rem]/5";
+	"text-base/5 font-medium tracking-m text-ink sm:text-body-l";
 
 export const SESSION_OVERVIEW_CELL_CLASS_NAME =
 	"flex min-w-0 items-center px-l";
 
 export const SESSION_OVERVIEW_METADATA_CLASS_NAME =
-	"whitespace-nowrap text-left text-body-m font-regular text-ink-3 tabular-nums [font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe_UI_Variable_Display','Segoe_UI',Helvetica,Arial,sans-serif] dark:text-ink-3";
+	"whitespace-nowrap text-left text-body-m font-regular text-ink-3 tabular-nums [font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe_UI_Variable_Display','Segoe_UI',Helvetica,Arial,sans-serif]";
 
 export const SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME =
 	"flex min-w-0 shrink items-center gap-xs corner-xs px-s py-xxs text-body-xs font-regular tabular-nums";

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 const KIND_COLOR = {
-	number: "text-warning dark:text-warning",
+	number: "text-warning",
 	literal: "text-color-3 dark:text-color-2",
 } as const;
 

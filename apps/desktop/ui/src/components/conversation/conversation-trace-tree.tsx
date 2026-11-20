@@ -891,10 +891,10 @@ export function ConversationTraceRootNode({
 // Timeline metadata: quiet 12/16 text, tabular numerals, and
 // semantic foreground hierarchy without pill surfaces or tracking changes.
 const traceRequestTagClassName =
-	"inline-flex min-w-0 max-w-full items-center font-body text-[calc(var(--spacing)*3)]/[1rem] font-regular tracking-m text-ink-3 tabular-nums";
+	"inline-flex min-w-0 max-w-full items-center font-body text-body-m font-regular tracking-m text-ink-3 tabular-nums";
 
 const traceRequestSeparatorClassName =
-	"shrink-0 font-body text-[calc(var(--spacing)*3)]/[1rem] font-regular tracking-m text-ink-3";
+	"shrink-0 font-body text-body-m font-regular tracking-m text-ink-3";
 
 type TraceRequestPresentation =
 	| "header"

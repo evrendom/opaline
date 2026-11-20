@@ -87,7 +87,7 @@ function SessionDetailActivityMenuItem({
 				aria-expanded={flyoutsEnabled ? isOpen : undefined}
 				aria-haspopup={flyoutsEnabled ? "menu" : undefined}
 				className={cn(
-					"session-detail-opaline-trigger relative inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border-[0.5px] border-black/20 bg-white px-2.5 py-1 text-[0.8125rem]/5 font-medium text-black/60 disabled:pointer-events-none dark:border-white/25 dark:bg-canvas dark:text-white/70",
+					"session-detail-opaline-trigger relative inline-flex shrink-0 items-center justify-center gap-s corner-s border-[0.5px] border-black/20 bg-white px-2.5 py-xs text-body-l font-medium text-black/60 disabled:pointer-events-none dark:border-white/25 dark:bg-canvas dark:text-white/70",
 					flyoutsEnabled &&
 						"hover:bg-black/[0.063] hover:text-black/90 dark:hover:bg-white/[0.071] dark:hover:text-white/95",
 					flyoutsEnabled &&
@@ -497,7 +497,7 @@ export function SessionDetailActivityStrip({
 	return (
 		<header
 			ref={stripElementRef}
-			className="relative z-[60] flex h-11 shrink-0 items-center border-y-[0.5px] border-line-strong bg-canvas p-2"
+			className="relative z-[60] flex h-11 shrink-0 items-center border-y-[0.5px] border-line-strong bg-canvas p-m"
 		>
 			<nav
 				aria-label="Session detail activity"
@@ -505,7 +505,7 @@ export function SessionDetailActivityStrip({
 			>
 				<ul
 					ref={triggerListElementRef}
-					className="flex w-max items-center gap-2"
+					className="flex w-max items-center gap-m"
 					data-session-detail-activity-items
 				>
 					{groups.map((group) => (
@@ -531,7 +531,7 @@ export function SessionDetailActivityStrip({
 				</ul>
 				{flyoutsEnabled && panelFrames.length > 0 ? (
 					<div
-						className="session-detail-opaline-menu absolute top-[calc(100%+1px)] right-0 left-0 overflow-hidden rounded-xl bg-white/90 text-[#282a30] shadow-[0_8px_32px_#08090a0d] ring-1 ring-black/8 backdrop-blur-2xl outline-none dark:bg-[#08090ae6] dark:text-[#f7f8f8] dark:shadow-[0_8px_32px_#08090a] dark:ring-white/8"
+						className="session-detail-opaline-menu absolute top-[calc(100%+1px)] right-0 left-0 overflow-hidden corner-l bg-white/90 text-[#282a30] shadow-[0_8px_32px_#08090a0d] ring-1 ring-black/8 backdrop-blur-2xl outline-none dark:bg-[#08090ae6] dark:text-[#f7f8f8] dark:shadow-[0_8px_32px_#08090a] dark:ring-white/8"
 						data-state={popupState}
 						onPointerEnter={() => clearTimer(closeTimerRef.current)}
 						onPointerLeave={scheduleClose}
