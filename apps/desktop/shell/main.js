@@ -314,6 +314,12 @@ async function revealApp(from, duration) {
 let quitting = false;
 let onboardingDone = false;
 
+// macOS briefly reports a transparent, frameless window as hidden while it
+// settles in, and Chromium then stops its vsync: the intro froze for ~1 s about
+// 1.5 s in on 6 of 6 launches. Without background throttling the onboarding
+// windows keep drawing (0 of 6 froze).
+const ONBOARDING_RENDERING = { backgroundThrottling: false };
+
 function createOnboardingWindow(page = "") {
 	const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
 	const nativeShadow = process.platform === "darwin";
@@ -329,7 +335,7 @@ function createOnboardingWindow(page = "") {
 		show: false,
 		transparent: true,
 		backgroundColor: "#00000000",
-		webPreferences: { spellcheck: false, devTools: isDev, preload: path.join(__dirname, "onboarding-preload.js"), additionalArguments: isDev ? ["--opaline-debug"] : [] },
+		webPreferences: { ...ONBOARDING_RENDERING, spellcheck: false, devTools: isDev, preload: path.join(__dirname, "onboarding-preload.js"), additionalArguments: isDev ? ["--opaline-debug"] : [] },
 	});
 	onboardingWindow.setIgnoreMouseEvents(true, { forward: true });
 	onboardingWindow.on("close", (event) => {
@@ -365,7 +371,7 @@ function createOnboarding() {
 		backgroundColor: "#00000000",
 		vibrancy: "fullscreen-ui",
 		visualEffectState: "active",
-		webPreferences: { spellcheck: false, devTools: isDev, preload: path.join(__dirname, "onboarding-preload.js") },
+		webPreferences: { ...ONBOARDING_RENDERING, spellcheck: false, devTools: isDev, preload: path.join(__dirname, "onboarding-preload.js") },
 	});
 	onboardingWindow.setAlwaysOnTop(true, "screen-saver");
 	onboardingWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
