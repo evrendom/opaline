@@ -295,21 +295,19 @@ test("Connect adds the line to every connected agent's file without asking, late
 	expect(fs.existsSync(instructionFile("claude", env))).toBe(false);
 });
 
-test("a no given in the earlier dialog still holds: nothing is written or removed", () => {
+test("a no from the old dialog no longer blocks the line", () => {
 	const env = fakeHome();
 	const answers = path.join(root, "userData", "agents", "instructions.json");
 	fs.mkdirSync(path.dirname(answers), { recursive: true });
 	fs.writeFileSync(answers, JSON.stringify({ answer: "declined" }));
-	expect(offerInstructionLine({ keys: ["claude", "codex"], env })).toEqual({
-		answer: "declined",
-		added: [],
+	expect(offerInstructionLine({ keys: ["codex"], env })).toEqual({
+		answer: "accepted",
+		added: [instructionFile("codex", env)],
 	});
-	expect(fs.existsSync(path.join(root, "home"))).toBe(false);
-	const file = instructionFile("claude", env);
-	fs.mkdirSync(path.dirname(file), { recursive: true });
-	fs.writeFileSync(file, `${INSTRUCTION_LINE}\n`);
-	expect(removeInstructionLines({ keys: ["claude"], env })).toEqual([]);
-	expect(text(file)).toBe(`${INSTRUCTION_LINE}\n`);
+	expect(text(instructionFile("codex", env))).toBe(`${INSTRUCTION_LINE}\n`);
+	expect(removeInstructionLines({ keys: ["codex"], env })).toEqual([
+		instructionFile("codex", env),
+	]);
 });
 
 test("without a CLAUDE.md none is created: only AGENTS.md is written", () => {

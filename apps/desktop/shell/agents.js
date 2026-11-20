@@ -335,17 +335,13 @@ function instructionTargets(keys, env) {
 
 function offerInstructionLine({ keys, env }) {
 	const targets = instructionTargets(keys, env);
-	const remembered = instructionsAnswer();
-	if (remembered)
+	if (instructionsAnswer() === "accepted")
 		return {
-			answer: remembered,
-			added:
-				remembered === "accepted"
-					? targets
-							.filter(({ key }) => key === keys[0])
-							.map(({ file }) => file)
-							.filter(addInstructionLine)
-					: [],
+			answer: "accepted",
+			added: targets
+				.filter(({ key }) => key === keys[0])
+				.map(({ file }) => file)
+				.filter(addInstructionLine),
 		};
 	if (targets.length === 0) return { answer: "no file", added: [] };
 	writeIfChanged(
