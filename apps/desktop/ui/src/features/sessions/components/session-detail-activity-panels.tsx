@@ -25,7 +25,7 @@ export function SessionDetailActivityPanel({
 						{group.occurrences.map((occurrence) => (
 							<li key={occurrence.key}>
 								<button
-									className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-l corner-s px-xl py-l text-left hover:bg-black/3 dark:hover:bg-white/3"
+									className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-l corner-s px-xl py-l text-left hover:bg-ink/3"
 									onClick={() => onSelectOccurrence(occurrence)}
 									type="button"
 								>
@@ -95,7 +95,7 @@ export function SessionDetailActivityOccurrencePanel({
 			<div className="flex h-9 items-center edge-b-m border-line px-xs">
 				<button
 					aria-label={`Back to ${group.label}`}
-					className="flex size-7 shrink-0 items-center justify-center corner-s text-ink-2 outline-none hover:bg-black/4 dark:hover:bg-white/6"
+					className="flex size-7 shrink-0 items-center justify-center corner-s text-ink-2 outline-none hover:bg-ink/4 dark:hover:bg-ink/6"
 					onClick={onBack}
 					type="button"
 				>

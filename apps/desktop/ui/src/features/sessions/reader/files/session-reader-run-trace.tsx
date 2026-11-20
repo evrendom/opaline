@@ -287,6 +287,7 @@ function ReadRuler({
 			title={title}
 			className="flex w-10 shrink-0 flex-col items-end gap-xxs"
 		>
+			{/* design-escape-ok: a one-line count beside a glyph */}
 			<span className="text-body-xs leading-none text-ink-3/70 tabular-nums">
 				{count === null
 					? "all lines"
@@ -435,6 +436,7 @@ function StepRow({
 						"size-3 shrink-0",
 						step.kind === "check" &&
 							!step.failed &&
+							// design-escape-ok: a passed check's green; dark lifts it for contrast and no role holds it (listed)
 							"text-success dark:text-green-400",
 						step.kind === "edit" && "text-color-3",
 						!failedCheck &&
@@ -475,9 +477,11 @@ function StepRow({
 				) : null}
 				{edit ? (
 					<span className="shrink-0 text-body-s tabular-nums">
+						{/* design-escape-ok: diff paint: added lines */}
 						<span className="text-success dark:text-green-400">
 							+{edit.added}
 						</span>{" "}
+						{/* design-escape-ok: diff paint: removed lines */}
 						<span className="text-error dark:text-red-400">
 							−{edit.removed}
 						</span>

@@ -103,6 +103,7 @@ function getCodeLineKind(
 function getCodeHeaderIcon(filename: string, language: string) {
 	if (/\.(?:cts|mts|ts|tsx)$/i.test(filename)) {
 		return {
+			// design-escape-ok: TypeScript's brand colour
 			className: "text-[#3178c6]",
 			context: "typescript",
 			Icon: TraceTypeScriptIcon,
@@ -110,7 +111,7 @@ function getCodeHeaderIcon(filename: string, language: string) {
 	}
 	if (/\.(?:markdown|md)$/i.test(filename)) {
 		return {
-			className: "text-[color:var(--ink-3,rgba(0,0,0,0.447))]",
+			className: "text-ink-3",
 			context: "markdown",
 			Icon: TraceMarkdownIcon,
 		};
@@ -119,7 +120,7 @@ function getCodeHeaderIcon(filename: string, language: string) {
 	const isNamedFile = !/^(?:error output|input|output)$/i.test(filename);
 	if (isNamedFile && language.toLowerCase() !== "text") {
 		return {
-			className: "text-[color:var(--ink-3,rgba(0,0,0,0.447))]",
+			className: "text-ink-3",
 			context: "code",
 			Icon: TraceCodeIcon,
 		};

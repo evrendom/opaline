@@ -12,7 +12,7 @@
 ::view-transition-new(column-slide) {
 	mix-blend-mode: normal;
 	animation-duration: 360ms;
-	animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+	animation-timing-function: var(--motion-drawer-easing);
 	animation-fill-mode: both;
 }
 ::view-transition-old(column-slide) {

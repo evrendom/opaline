@@ -324,7 +324,7 @@ export function ContextTiles({
 						className={cn(
 							"group/tile absolute overflow-hidden corner-s corner-squircle squircle:corner-l edge-m",
 							look.className,
-							"transition-opacity duration-200",
+							"transition-opacity duration-(--motion-medium-duration)",
 							(picked !== null || lits.length > 0) && !focused && "opacity-40",
 							inGroup.has(tile.key)
 								? focused
@@ -334,8 +334,10 @@ export function ContextTiles({
 							its && !markedInside && !focused && markGlow(its.tone),
 							focused &&
 								(tile.part
-									? "bg-[color-mix(in_oklab,var(--tint)_34%,transparent)] shadow-[0_2px_10px_-2px_color-mix(in_oklab,var(--tint)_45%,transparent)] dark:bg-[color-mix(in_oklab,var(--tint)_40%,transparent)] dark:shadow-[0_2px_12px_-2px_color-mix(in_oklab,var(--tint)_55%,transparent)]"
-									: "bg-wash shadow-[0_2px_10px_-2px_rgba(0,0,0,0.2)] dark:bg-[rgba(255,255,255,0.06)] dark:shadow-[0_2px_12px_-2px_rgba(0,0,0,0.6)]"),
+									? // design-escape-ok: the focused tile's glow is tinted from its category
+										"bg-[color-mix(in_oklab,var(--tint)_34%,transparent)] shadow-[0_2px_10px_-2px_color-mix(in_oklab,var(--tint)_45%,transparent)] dark:bg-[color-mix(in_oklab,var(--tint)_40%,transparent)] dark:shadow-[0_2px_12px_-2px_color-mix(in_oklab,var(--tint)_55%,transparent)]"
+									: // design-escape-ok: the focused untinted tile's lift pairs with the tinted tiles' glow
+										"bg-wash shadow-[0_2px_10px_-2px_rgba(0,0,0,0.2)] dark:bg-ink/6 dark:shadow-[0_2px_12px_-2px_rgba(0,0,0,0.6)]"),
 						)}
 						style={{
 							...look.style,
@@ -351,7 +353,8 @@ export function ContextTiles({
 							aria-pressed={tile.key === picked}
 							aria-label={`Show what's in ${name}`}
 							onClick={(event) => pickBox(tile.key, event.shiftKey)}
-							className="absolute inset-0 rounded-[calc(var(--radius-md)-1px)] corner-squircle outline-none transition-colors hover:bg-black/[0.03] squircle:rounded-[calc(var(--radius-xl)-1px)] dark:hover:bg-white/[0.04]"
+							// design-escape-ok: the hit area sits 1px inside its tile's corner
+							className="absolute inset-0 rounded-[calc(var(--radius-md)-1px)] corner-squircle outline-none transition-colors hover:bg-ink/3 squircle:rounded-[calc(var(--radius-xl)-1px)] dark:hover:bg-ink/4"
 						/>
 						<span
 							aria-hidden="true"

@@ -10,6 +10,7 @@ export const SESSION_OVERVIEW_ROW_CLASS_NAME =
 	"group/session grid h-12 w-full text-left outline-none focus-visible:z-20 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent";
 
 export const SESSION_OVERVIEW_MODEL_LABEL_CLASS_NAME =
+	// design-escape-ok: 16/20 applies below sm only
 	"text-base/5 font-medium tracking-m text-ink sm:text-body-l";
 
 export const SESSION_OVERVIEW_CELL_CLASS_NAME =

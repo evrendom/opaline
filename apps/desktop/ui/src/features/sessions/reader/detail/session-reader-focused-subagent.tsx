@@ -87,7 +87,7 @@ export function FocusedSubagent({
 		>
 			<div
 				ref={stripRef}
-				className="sticky top-[calc(var(--stage-top,var(--reader-top,1rem))+0.5rem)] z-40 -mt-[calc(var(--reader-top,1rem)-var(--stage-top,var(--reader-top,1rem)))] xl:-mr-(--scrollbar,0px) bg-(--dashboard-01-content-background,var(--canvas)) before:pointer-events-none before:absolute before:-z-10 before:inset-x-0 before:bottom-full before:h-2 before:bg-(--dashboard-01-content-background,var(--canvas)) after:pointer-events-none after:absolute after:-z-10 after:inset-x-0 after:top-full after:h-4 after:bg-linear-to-b after:from-(--dashboard-01-content-background,var(--canvas)) after:to-transparent"
+				className="sticky top-[calc(var(--stage-top,var(--reader-top,1rem))+0.5rem)] z-40 -mt-[calc(var(--reader-top,var(--space-xl))-var(--stage-top,var(--reader-top,var(--space-xl))))] xl:-mr-(--scrollbar,0px) bg-(--dashboard-01-content-background,var(--canvas)) before:pointer-events-none before:absolute before:-z-10 before:inset-x-0 before:bottom-full before:h-2 before:bg-(--dashboard-01-content-background,var(--canvas)) after:pointer-events-none after:absolute after:-z-10 after:inset-x-0 after:top-full after:h-4 after:bg-linear-to-b after:from-(--dashboard-01-content-background,var(--canvas)) after:to-transparent"
 			>
 				<SubagentStrip
 					launch={launch}

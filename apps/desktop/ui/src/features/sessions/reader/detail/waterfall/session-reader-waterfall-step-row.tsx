@@ -47,6 +47,7 @@ const DASHED =
 function SubagentRoleMark({ role }: { role: SubagentRole }) {
 	const { Icon, className, label } = {
 		finish: {
+			// design-escape-ok: the finish glyph's green predates the success role (#16a34a); listed
 			className: "text-emerald-500",
 			Icon: IconCircleCheckFilled,
 			label: "Finished",
@@ -114,7 +115,8 @@ export const StepRowView = memo(function StepRowView({
 	const subagentTint = useSubagentTint(step);
 	const subagentRole = useSubagentRole(step);
 	const bar = step.isError
-		? { className: "bg-rose-500" }
+		? // design-escape-ok: an error step's bar beside the lane-tinted bars
+			{ className: "bg-rose-500" }
 		: { style: { backgroundColor: subagentTint ?? stepTint(step) } };
 	const timed = isToolStep(step) || step.kind === "ci" || durationMs > 0;
 	const running = subagent ? null : solidSpan(step, startMs, total);
@@ -218,6 +220,7 @@ export const StepRowView = memo(function StepRowView({
 							<span
 								role="img"
 								aria-label="Error"
+								// design-escape-ok: rose error badge predates error-tint; listed
 								className="inline-flex size-5 shrink-0 items-center justify-center corner-full bg-rose-500/10 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400"
 							>
 								<IconAlertTriangle aria-hidden="true" className="size-3" />

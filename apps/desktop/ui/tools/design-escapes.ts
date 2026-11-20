@@ -98,6 +98,28 @@ export const DATA_PAINT: Record<string, { rules: Rule[]; why: string }> = {
 		rules: ["colour"],
 		why: "activity lanes",
 	},
+	"src/features/sessions/reader/detail/waterfall/session-reader-waterfall-chips.tsx":
+		{
+			rules: ["colour", "shadow"],
+			why: "step bars and chips take their lane, CI or model colour; the opal chip's drop is artwork",
+		},
+	"src/features/sessions/reader/model/session-reader-model.ts": {
+		rules: ["colour"],
+		why: "cost heat: green for the cheapest turn to red for the priciest",
+	},
+	"src/features/sessions/reader/summary/session-reader-summary-figures-model.ts":
+		{
+			rules: ["colour"],
+			why: "each summary figure's category mark",
+		},
+	"src/features/sessions/components/session-thread-overview-event-dots.tsx": {
+		rules: ["colour"],
+		why: "event dots: one colour per event kind",
+	},
+	"src/components/pierre/diff-view.tsx": {
+		rules: ["colour"],
+		why: "diff paint: added and removed lines and words",
+	},
 };
 
 const UI_ROOT = path.resolve(import.meta.dirname, "..");

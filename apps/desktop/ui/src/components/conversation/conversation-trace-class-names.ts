@@ -1,5 +1,5 @@
 export const conversationTraceLabelClassName =
-	"shrink-0 font-body text-body-m font-regular [color:color(display-p3_0_0_0/.608)] dark:[color:color(display-p3_1_1_1/.685)]";
+	"shrink-0 font-body text-body-m font-regular text-ink/[0.608] dark:text-ink/[0.685]";
 
 // Sticky headers alone need an opaque pane-colored surface: it masks rails
 // that keep scrolling underneath without turning ordinary rows into cards.

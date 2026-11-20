@@ -190,7 +190,7 @@ export const ReaderMap = memo(function ReaderMap({
 				className={cn(
 					"sticky top-0 z-40 flex h-[100cqh] flex-col",
 					focus
-						? "pt-[calc(var(--focused-strip-bottom,1rem)+1rem)]"
+						? "pt-[calc(var(--focused-strip-bottom,var(--space-xl))+var(--space-xl))]"
 						: "pt-(--reader-pane-top,0.875rem)",
 				)}
 			>

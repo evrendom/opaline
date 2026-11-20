@@ -235,7 +235,7 @@ function GroupToggle({
 			<IconChevronDown
 				aria-hidden="true"
 				className={cn(
-					"size-3.5 transition-transform duration-200",
+					"size-3.5 transition-transform duration-(--motion-medium-duration)",
 					!open && "-rotate-90",
 				)}
 			/>

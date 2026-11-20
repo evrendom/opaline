@@ -165,6 +165,7 @@ export function SessionTurnTableBody({
 						>
 							<td
 								aria-hidden="true"
+								// design-escape-ok: the progress dot's bevel is artwork
 								className="block size-full corner-full bg-color-1 shadow-[inset_0_0_1px_#00000012,inset_0_1px_1px_#00000012,inset_0_-1px_0_#ffffff0a] dark:shadow-none"
 							/>
 						</motion.tr>

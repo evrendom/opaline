@@ -207,6 +207,7 @@ export function ContextZoom({
 								mark && !picked.has(item.label) && markGlow(mark),
 								picked.size > 0 && !picked.has(item.label) && "opacity-40",
 								picked.has(item.label) &&
+									// design-escape-ok: the picked tile's glow is tinted from its category
 									"shadow-[0_2px_10px_-2px_color-mix(in_oklab,var(--tint)_55%,transparent)] ring-2 ring-[color-mix(in_oklab,var(--tint)_55%,transparent)]",
 							)}
 							style={{
@@ -228,7 +229,8 @@ export function ContextZoom({
 								onClick={(event) =>
 									item.more ? open.go() : onPick(item.label, event.shiftKey)
 								}
-								className="absolute inset-0 rounded-[calc(var(--radius-md)-1px)] corner-squircle outline-none transition-colors hover:bg-black/[0.03] squircle:rounded-[calc(var(--radius-xl)-1px)] dark:hover:bg-white/[0.04]"
+								// design-escape-ok: the hit area sits 1px inside its tile's corner
+								className="absolute inset-0 rounded-[calc(var(--radius-md)-1px)] corner-squircle outline-none transition-colors hover:bg-ink/3 squircle:rounded-[calc(var(--radius-xl)-1px)] dark:hover:bg-ink/4"
 							/>
 							<span
 								className={cn(

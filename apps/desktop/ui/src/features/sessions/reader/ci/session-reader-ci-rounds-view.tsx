@@ -117,6 +117,7 @@ export function CiRoundMarks({
 				<span
 					className={cn(
 						"text-ink-3 tabular-nums",
+						// design-escape-ok: a one-line compact badge
 						compact ? "text-body-xs leading-none" : "text-body-xs",
 					)}
 				>

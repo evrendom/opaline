@@ -102,7 +102,7 @@ export function SessionOverviewFilterOptionsPanel({
 								{variant === "linear" && isChecked ? (
 									<IconCheck
 										aria-hidden="true"
-										className="size-3.5 shrink-0 text-ink dark:text-[#f4f4f5]"
+										className="size-3.5 shrink-0 text-ink"
 									/>
 								) : null}
 							</label>

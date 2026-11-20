@@ -244,10 +244,15 @@ function TimeDistribution({
 			format={formatDuration}
 			total={totalMs}
 			parts={[
+				// design-escape-ok: legend swatches repeat the activity lanes' colours
 				{ label: "Thinking", swatch: "bg-violet-500", value: thinking },
+				// design-escape-ok: legend swatches repeat the activity lanes' colours
 				{ label: "Writing", swatch: "bg-violet-300", value: writing },
+				// design-escape-ok: legend swatches repeat the activity lanes' colours
 				{ label: "Tools", swatch: "bg-blue-500", value: tools },
+				// design-escape-ok: legend swatches repeat the activity lanes' colours
 				{ label: "Waiting on you", swatch: "bg-amber-400", value: you },
+				// design-escape-ok: legend swatches repeat the activity lanes' colours
 				{ label: "Compacting", swatch: "bg-green-500", value: compacting },
 				{
 					label: "Waiting",

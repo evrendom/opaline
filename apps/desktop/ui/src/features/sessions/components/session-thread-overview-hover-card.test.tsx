@@ -123,7 +123,7 @@ describe("SessionThreadOverviewHoverCard", () => {
 		expect(markup).toContain("h-14");
 		expect(markup).toContain("corner-s");
 		expect(markup).toContain("shadow-md");
-		expect(markup).toContain("ring-black/10");
+		expect(markup).toContain("ring-ink/10");
 		expect(markup).toContain(
 			'data-session-overview-hover-card-placement="right"',
 		);
@@ -149,7 +149,7 @@ describe("SessionThreadOverviewHoverCard", () => {
 		expect(markup).toContain("Writes 1");
 		expect(markup).toContain("Edits 3");
 		expect(markup).not.toContain("Subagents 1");
-		expect(markup).toContain("rounded-(--activity-tag-radius)");
+		expect(markup).toContain("h-4 shrink-0 items-center gap-xxs corner-m");
 		expect(markup).toContain("w-full");
 		expect(markup).toContain("justify-start");
 		expect(markup).toContain(

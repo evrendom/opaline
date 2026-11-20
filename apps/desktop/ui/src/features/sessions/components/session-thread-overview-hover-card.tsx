@@ -29,7 +29,8 @@ import {
 import type { SessionOverviewZoomWindow } from "./session-thread-overview-zoom";
 
 const SESSION_OVERVIEW_HOVER_CARD_SURFACE_CLASSES =
-	"absolute top-0 z-50 w-80 max-w-[calc(100%-1.5rem)] corner-s bg-canvas font-body text-body-m text-ink shadow-md ring-1 ring-black/10 dark:ring-white/10";
+	// design-escape-ok: the hover card's drop; no shadow role matches (listed)
+	"absolute top-0 z-50 w-80 max-w-[calc(100%-1.5rem)] corner-s bg-canvas font-body text-body-m text-ink shadow-md ring-1 ring-ink/10";
 
 interface SessionContextUtilizationRingStyle extends CSSProperties {
 	"--session-context-ring-color-dark": string;
@@ -184,13 +185,13 @@ function SessionOverviewActivityTag({
 }) {
 	return (
 		<div
-			className="flex h-4 shrink-0 items-center gap-xxs rounded-(--activity-tag-radius) bg-[color-mix(in_srgb,var(--ink)_6%,transparent)] pr-xs pl-xxs [--activity-tag-inset:--spacing(0.5)] [--activity-tag-radius:var(--radius-m)]"
+			className="flex h-4 shrink-0 items-center gap-xxs corner-m bg-[color-mix(in_srgb,var(--ink)_6%,transparent)] pr-xs pl-xxs"
 			data-session-overview-activity-tag={kind}
 			title={title}
 		>
 			<span
 				aria-hidden="true"
-				className={`size-1.5 shrink-0 rounded-[calc(var(--activity-tag-radius)-var(--activity-tag-inset))] ${getSessionOverviewEventDotColorClassName(kind)}`}
+				className={`size-1.5 shrink-0 corner-s ${getSessionOverviewEventDotColorClassName(kind)}`}
 			/>
 			<span>{`${label} ${count.toLocaleString()}`}</span>
 		</div>

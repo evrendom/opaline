@@ -98,7 +98,7 @@ export function ToolCard({
 						<IconChevronRight
 							aria-hidden="true"
 							className={cn(
-								"size-3 transition-transform duration-200",
+								"size-3 transition-transform duration-(--motion-medium-duration)",
 								open && "rotate-90",
 							)}
 						/>

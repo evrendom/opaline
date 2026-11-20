@@ -6,6 +6,7 @@ export const INDENT =
 	"pl-[calc(var(--depth)*var(--space-m)+var(--space-xs))] @lg:pl-[calc(var(--depth)*var(--space-l)+var(--space-xs))]";
 
 export const MESSAGE_INDENT =
+	// design-escape-ok: 1px puts the rail on its parent's hairline
 	"ml-[calc(var(--depth)*8px+1px)] @lg:ml-[calc(var(--depth)*12px+1px)]";
 
 export const GRID =
