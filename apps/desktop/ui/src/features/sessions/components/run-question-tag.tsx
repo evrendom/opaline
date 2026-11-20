@@ -27,11 +27,11 @@ export function RunQuestionTag({
 		>
 			<IconMessageQuestion
 				aria-hidden="true"
-				className="size-3.5 shrink-0 text-warning dark:text-warning"
+				className="size-3.5 shrink-0 text-warning"
 			/>
 			<span className="truncate font-body">{runQuestionTagLabel(tag)}</span>
 			{tag.runs > 1 ? (
-				<span className="shrink-0 font-regular text-ink-3 tabular-nums dark:text-ink-3">
+				<span className="shrink-0 font-regular text-ink-3 tabular-nums">
 					×{tag.runs}
 				</span>
 			) : null}

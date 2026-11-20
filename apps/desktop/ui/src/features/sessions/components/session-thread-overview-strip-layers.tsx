@@ -45,7 +45,7 @@ export function SessionOverviewViewportPane({
 			aria-valuemin={0}
 			aria-valuenow={selectedIndex}
 			aria-valuetext={valueText}
-			className="absolute inset-y-0.5 left-(--session-overview-viewport-left) z-20 w-(--session-overview-viewport-width) cursor-crosshair touch-none bg-warning/10 outline-none dark:bg-warning/10"
+			className="absolute inset-y-0.5 left-(--session-overview-viewport-left) z-20 w-(--session-overview-viewport-width) cursor-crosshair touch-none bg-warning/10 outline-none"
 			data-session-overview-viewport-band
 			data-session-overview-viewport-pane
 			style={style}

@@ -243,7 +243,7 @@ export function ReaderMinimap({
 			ref={mapRef}
 			aria-hidden="true"
 			className={cn(
-				"relative isolate min-h-0 flex-1 touch-none select-none transition-opacity duration-300",
+				"relative isolate min-h-0 flex-1 touch-none select-none transition-opacity duration-(--motion-large-duration)",
 				focus && "overflow-y-clip",
 				drawn.parts.length === 0 && "opacity-0",
 			)}
@@ -290,13 +290,13 @@ export function ReaderMinimap({
 					<path
 						// biome-ignore lint/suspicious/noArrayIndexKey: lanes are their order
 						key={index}
-						className="stroke-line dark:stroke-line"
+						className="stroke-line"
 						d={`M${share * drawn.width} 0V${drawn.height}`}
 						strokeWidth={1}
 					/>
 				))}
 				<path
-					className="fill-none stroke-color-2/30 dark:stroke-color-2/30"
+					className="fill-none stroke-color-2/30"
 					d={`${line.rail} ${line.branches}`}
 					strokeLinecap="round"
 					strokeWidth={1.5}
@@ -319,7 +319,7 @@ export function ReaderMinimap({
 						clipPath={`url(#${litId})`}
 					>
 						<path
-							className="fill-none stroke-color-2 dark:stroke-color-2"
+							className="fill-none stroke-color-2"
 							d={`${line.rail} ${line.branches}`}
 							strokeLinecap="round"
 							strokeWidth={1.75}
@@ -384,7 +384,7 @@ export function ReaderMinimap({
 				))}
 				{line.errors ? (
 					<path
-						className="fill-none stroke-error dark:stroke-error"
+						className="fill-none stroke-error"
 						d={line.errors}
 						strokeLinecap="round"
 						strokeWidth={2.75}
@@ -397,8 +397,8 @@ export function ReaderMinimap({
 							node.kind === "subagent"
 								? "fill-canvas"
 								: node.alert
-									? "fill-error stroke-error dark:fill-error dark:stroke-error"
-									: "fill-canvas stroke-color-2/60 dark:stroke-color-2/60"
+									? "fill-error stroke-error"
+									: "fill-canvas stroke-color-2/60"
 						}
 						style={
 							node.kind === "subagent"

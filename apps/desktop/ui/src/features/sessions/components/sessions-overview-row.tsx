@@ -114,7 +114,7 @@ type SessionsOverviewRowProps = {
 
 const MAX_SESSION_OVERVIEW_SKILL_TAGS = 7;
 const SESSION_OVERVIEW_TOOLTIP_CLASS_NAME =
-	"whitespace-nowrap corner-s edge-m border-line bg-canvas px-l py-s text-xs/4 font-medium text-ink shadow-[0_8px_20px_-10px_rgba(0,0,0,0.4),0_2px_6px_rgba(0,0,0,0.1)] tabular-nums dark:border-line dark:bg-field dark:text-ink";
+	"whitespace-nowrap corner-s edge-m border-line bg-canvas px-l py-s text-body-m font-medium text-ink shadow-[0_8px_20px_-10px_rgba(0,0,0,0.4),0_2px_6px_rgba(0,0,0,0.1)] tabular-nums dark:bg-field";
 // CSS selects both tags and the matching count, including before demo hydration.
 // Column widths grow continuously; only the number of skill tags changes in tiers.
 const SESSION_OVERVIEW_SKILL_OVERFLOW_TIERS = [
@@ -426,7 +426,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 					<SessionPlaceLabel session={session} showPlace={showPlace} />
 					{branchLabel ? (
 						<p
-							className="min-w-0 truncate text-left font-body text-xs/4 font-regular tracking-m text-ink-3 tabular-nums"
+							className="min-w-0 truncate text-left font-body text-body-m font-regular tracking-m text-ink-3 tabular-nums"
 							data-session-overview-branch-label
 							dir="rtl"
 							title={branchLabel}

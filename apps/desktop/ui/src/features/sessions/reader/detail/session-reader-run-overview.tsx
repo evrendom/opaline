@@ -137,7 +137,7 @@ function BreakdownStrip({
 						)}
 					>
 						<span
-							className={cn("size-2 rounded-xs", part.swatch)}
+							className={cn("size-2 corner-xs", part.swatch)}
 							style={{ backgroundColor: part.color }}
 						/>
 						{part.label} {format(part.value)}
@@ -399,7 +399,7 @@ function StepKinds({
 									×{option.count}
 								</span>
 								{option.errorCount > 0 ? (
-									<span className="shrink-0 text-body-s text-error tabular-nums dark:text-error">
+									<span className="shrink-0 text-body-s text-error tabular-nums">
 										{option.errorCount} failed
 									</span>
 								) : null}

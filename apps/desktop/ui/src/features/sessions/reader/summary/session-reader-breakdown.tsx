@@ -96,7 +96,7 @@ export function Breakdown({
 	const total = parts.reduce((sum, part) => sum + part.value, 0);
 	const shown = parts.filter((part) => part.value > 0);
 	const heading = (
-		<span className="truncate text-xs/4 text-ink-3">
+		<span className="truncate text-body-m text-ink-3">
 			{title}
 			{toggle?.label ? (
 				<span className="text-ink-3/70"> · {toggle.label}</span>

@@ -202,7 +202,7 @@ describe("ConversationTraceEventRow shell calls", () => {
 		expect(
 			markup.indexOf("data-trace-content-disclosure-icon"),
 		).toBeGreaterThan(markup.indexOf("data-trace-shell-command-preview"));
-		expect(markup).toContain("text-[0.75rem]/4");
+		expect(markup).toContain("text-body-m");
 		expect(markup).toContain("select-none");
 		expect(markup.match(/data-trace-glyph/g)).toHaveLength(1);
 		expect(markup).toContain('data-trace-tag-context="terminal"');
@@ -436,7 +436,9 @@ describe("ConversationTraceEventRow shell calls", () => {
 		expect(markup).toContain("items-center gap-xs");
 		expect(markup).toContain("items-center gap-zero text-left");
 		expect(markup).toContain("pointer-events-none -ml-xxs size-4");
-		expect(markup).toContain("transition-transform duration-150");
+		expect(markup).toContain(
+			"transition-transform duration-(--motion-duration)",
+		);
 		expect(markup).toContain('aria-hidden="true"');
 		expect(markup).toContain(
 			"oklch(from var(--ink-3, color(display-p3 0 0 0 / 60.8%)) calc(l + 0.16) c h)",

@@ -198,7 +198,7 @@ export function DetailColumnsSample() {
 					<TurnSample />
 				</div>
 			</div>
-			<div className="grid w-14 xl:col-start-2 xl:row-start-1 xl:mr-[calc(var(--reader-card)+2rem)] xl:justify-self-end">
+			<div className="grid w-14 xl:col-start-2 xl:row-start-1 xl:mr-[calc(var(--reader-card)+var(--space-xxl)*4/3)] xl:justify-self-end">
 				<MapSample />
 			</div>
 		</>

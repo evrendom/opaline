@@ -286,7 +286,7 @@ export function CodeBlock({
 							"flex shrink-0 items-center gap-s dashboardy-mono",
 							"ml-auto",
 							"font-medium tabular-nums",
-							"text-[0.6875rem]/4",
+							"text-body-s",
 						)}
 						data-trace-code-additions={changeSummary.additions}
 						data-trace-code-change-summary

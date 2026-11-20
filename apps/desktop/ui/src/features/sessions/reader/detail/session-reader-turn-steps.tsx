@@ -171,7 +171,7 @@ function StepStrip({
 	return (
 		<span
 			aria-hidden="true"
-			className="relative h-2 w-full shrink-0 overflow-hidden rounded-xs bg-ink-3/10"
+			className="relative h-2 w-full shrink-0 overflow-hidden corner-xs bg-ink-3/10"
 		>
 			{steps.map((step) => {
 				const { offset, width } = barGeometry(
@@ -417,10 +417,7 @@ function RunAlertTags({
 						onHover ? (turn.errorCount === 1 ? "error" : "errors") : undefined
 					}
 				>
-					<OpalChip
-						tint="var(--color-rose-500)"
-						className="size-4 text-error dark:text-error"
-					>
+					<OpalChip tint="var(--color-rose-500)" className="size-4 text-error">
 						<IconAlertTriangle aria-hidden="true" className="size-2.5" />
 					</OpalChip>
 					{turn.errorCount}
@@ -434,7 +431,7 @@ function RunAlertTags({
 				>
 					<OpalChip
 						tint="var(--color-amber-500)"
-						className="size-4 text-warning dark:text-warning"
+						className="size-4 text-warning"
 					>
 						<IconAlertTriangle aria-hidden="true" className="size-2.5" />
 					</OpalChip>

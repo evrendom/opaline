@@ -6,7 +6,7 @@ import type { SessionNavigation } from "@/features/sessions/session-navigation";
 import { cn } from "@/lib/utils";
 
 const sessionTraceDockPressClassName =
-	"scale-100 transition-transform duration-150 ease-out active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100";
+	"scale-100 transition-transform duration-(--motion-duration) ease-out active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100";
 
 const sessionTraceDockButtonClassName = cn(
 	"group relative flex size-9 shrink-0 items-center justify-center rounded-[calc(var(--dock-radius)-var(--dock-padding))] text-ink outline-none hover:bg-neutral-950/4 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:active:scale-100 dark:hover:bg-white/6",
@@ -88,10 +88,7 @@ export function SessionTraceDock({
 				<span>Back</span>
 				<TouchTarget className="size-12" />
 			</button>
-			<div
-				aria-hidden="true"
-				className="h-5 w-px shrink-0 bg-hover-strong dark:bg-hover-strong"
-			/>
+			<div aria-hidden="true" className="h-5 w-px shrink-0 bg-hover-strong" />
 			<SessionTraceNavigationButton
 				disabled={!navigation.hasPreviousSession}
 				icon={

@@ -3,7 +3,7 @@ import type { SessionReaderStep } from "../../model/session-reader-run-steps";
 export const FROZEN_ROW_REM = 2.625;
 
 export const INDENT =
-	"pl-[calc(var(--depth)*8px+4px)] @lg:pl-[calc(var(--depth)*12px+4px)]";
+	"pl-[calc(var(--depth)*var(--space-m)+var(--space-xs))] @lg:pl-[calc(var(--depth)*var(--space-l)+var(--space-xs))]";
 
 export const MESSAGE_INDENT =
 	"ml-[calc(var(--depth)*8px+1px)] @lg:ml-[calc(var(--depth)*12px+1px)]";
@@ -19,7 +19,7 @@ export const GRID_UNTIMED =
 export const GRID_UNTIMED_TRACK = "right-4 left-35 @lg:left-52";
 
 export const ROW =
-	"min-h-10 w-full items-center rounded-md py-1 text-left text-sm";
+	"min-h-10 w-full items-center corner-s py-xs text-left text-body-xl";
 
 export function rowState(selected: boolean): string {
 	return selected

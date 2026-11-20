@@ -217,7 +217,7 @@ export function SessionReaderWaterfallView({
 									subagentsWhole?.get(node.row.step.id)?.until ?? undefined,
 							}
 						: {})}
-					className="flex flex-col gap-0.5"
+					className="flex flex-col gap-xxs"
 				>
 					<div
 						data-frozen-row={frozen ? "" : undefined}
@@ -245,7 +245,7 @@ export function SessionReaderWaterfallView({
 		<div
 			data-active-row={marked === WHOLE_TURN_ID ? "" : undefined}
 			className={cn(
-				"relative rounded-l-md rounded-r-sm",
+				"relative corner-l-s corner-r-xs",
 				collapse && "group/toggle",
 				rowState(marked === WHOLE_TURN_ID),
 			)}
@@ -257,9 +257,9 @@ export function SessionReaderWaterfallView({
 					if (collapse && marked === WHOLE_TURN_ID) collapse.onToggle();
 					else setSelected(WHOLE_TURN_ID);
 				}}
-				className={cn(GRID, ROW, "py-0.5")}
+				className={cn(GRID, ROW, "py-xxs")}
 			>
-				<div className="flex min-w-0 items-center gap-2 pr-3 pl-1">
+				<div className="flex min-w-0 items-center gap-m pr-l pl-xs">
 					<OpalChip
 						open={collapse ? open : undefined}
 						sidebar={marked === WHOLE_TURN_ID ? "active" : "resting"}
@@ -281,7 +281,7 @@ export function SessionReaderWaterfallView({
 			</button>
 			{collapse ? (
 				<ChipToggle
-					className="pl-1"
+					className="pl-xs"
 					label="the run's steps"
 					onToggle={collapse.onToggle}
 					open={open}
@@ -298,7 +298,7 @@ export function SessionReaderWaterfallView({
 				<span
 					ref={cursorLabelRef}
 					style={{ display: "none" }}
-					className="pointer-events-none absolute top-0 z-10 rounded-sm border bg-canvas px-1.5 py-0.5 text-[10px] whitespace-nowrap text-ink-3 tabular-nums shadow-label"
+					className="pointer-events-none absolute top-0 z-10 corner-xs border bg-canvas px-s py-xxs text-[10px] whitespace-nowrap text-ink-3 tabular-nums shadow-label"
 				/>
 			</div>
 			<div />
@@ -315,7 +315,7 @@ export function SessionReaderWaterfallView({
 								<div
 									ref={progress.headerRef}
 									data-frozen-header=""
-									className="sticky top-[var(--frozen-offset,calc(var(--reader-top,1rem)-1rem))] z-30 -mt-4 flex flex-col gap-1.5 bg-(--dashboard-01-content-background,var(--canvas)) pt-4"
+									className="sticky top-[var(--frozen-offset,calc(var(--reader-top,1rem)-1rem))] z-30 -mt-xl flex flex-col gap-s bg-(--dashboard-01-content-background,var(--canvas)) pt-xl"
 								>
 									{header}
 									{rootRow}
@@ -327,7 +327,7 @@ export function SessionReaderWaterfallView({
 								<div
 									className={cn(
 										"@container relative flex flex-col",
-										collapse && "mt-0.5",
+										collapse && "mt-xxs",
 									)}
 									onMouseMove={moveCursor}
 									onMouseLeave={hideCursor}
@@ -370,7 +370,7 @@ export function SessionReaderWaterfallView({
 												/>
 											))}
 											{bare ? (
-												<div className="absolute inset-x-0 top-0 flex justify-between px-1 text-[9px] leading-3 text-ink-3/70 tabular-nums">
+												<div className="absolute inset-x-0 top-0 flex justify-between px-xs text-[9px] leading-3 text-ink-3/70 tabular-nums">
 													<span>0s</span>
 													<span>{formatWholeDuration(total)}</span>
 												</div>
@@ -379,7 +379,7 @@ export function SessionReaderWaterfallView({
 
 										<div
 											ref={progress.rowsRef}
-											className="relative z-10 flex flex-col gap-0.5"
+											className="relative z-10 flex flex-col gap-xxs"
 										>
 											{collapse || bare ? null : rootRow}
 											{renderNodes(nodes, 0)}

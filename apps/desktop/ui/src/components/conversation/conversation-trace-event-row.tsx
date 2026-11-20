@@ -98,7 +98,7 @@ export function ConversationTraceInteractionEpisodeRow({
 				/>
 			}
 			trailing={trailing}
-			treeBodyClassName="-ml-3"
+			treeBodyClassName="-ml-l"
 			body={
 				<ConversationTraceInteractionEpisodeEvents
 					agentModel={agentModel}
@@ -435,7 +435,7 @@ export function ConversationTraceEventRow({
 				}
 				leading={<TraceIcon icon={TraceBrainIcon} tone="violet" />}
 				trailing={trailing}
-				treeBodyClassName="-ml-3"
+				treeBodyClassName="-ml-l"
 				textDisclosure
 				body={
 					<p className="whitespace-pre-wrap font-body text-body-l font-regular text-ink text-pretty">
@@ -468,7 +468,7 @@ export function ConversationTraceEventRow({
 				label={<p className={conversationTraceLabelClassName}>Message</p>}
 				leading={<TraceIcon icon={TraceMessageIcon} tone="blue" />}
 				trailing={trailing}
-				treeBodyClassName="-ml-3"
+				treeBodyClassName="-ml-l"
 				textDisclosure
 				body={<MessageContent content={event.content} />}
 			/>
@@ -496,7 +496,7 @@ export function ConversationTraceEventRow({
 					/>
 				}
 				trailing={trailing}
-				treeBodyClassName="-ml-3"
+				treeBodyClassName="-ml-l"
 				body={<ToolResultBody result={event.result} />}
 			>
 				<p className={conversationTracePreviewClassName} data-trace-preview>
@@ -578,7 +578,7 @@ export function ConversationTraceEventRow({
 					/>
 				}
 				trailing={trailing}
-				treeBodyClassName="-ml-3"
+				treeBodyClassName="-ml-l"
 				body={
 					<ShellToolCallBody command={shellCommand} result={event.result} />
 				}
@@ -616,7 +616,7 @@ export function ConversationTraceEventRow({
 					/>
 				}
 				trailing={trailing}
-				treeBodyClassName="-ml-3"
+				treeBodyClassName="-ml-l"
 				body={
 					event.skillContent ? (
 						<SkillToolCallBody skillContent={event.skillContent} />
@@ -689,7 +689,7 @@ export function ConversationTraceEventRow({
 				)
 			}
 			trailing={trailing}
-			treeBodyClassName="-ml-3"
+			treeBodyClassName="-ml-l"
 			body={
 				codexTranslation ? (
 					<CodexToolCallBody

@@ -16,7 +16,7 @@ export function ModelAvatar({
 	solid?: boolean;
 }) {
 	if (loading) {
-		return <Skeleton className="size-6 shrink-0 rounded-full" />;
+		return <Skeleton className="size-6 shrink-0 corner-full" />;
 	}
 	return (
 		<ModelChip

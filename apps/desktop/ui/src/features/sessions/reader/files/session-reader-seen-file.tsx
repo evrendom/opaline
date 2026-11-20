@@ -11,7 +11,12 @@ import type { DiffHunk } from "@/components/pierre/line-diff";
 import { formatPaddedTimeOfDay } from "@/lib/format";
 import { wholeText } from "./session-files-model";
 import { RunCrumbs } from "./session-reader-file-detail";
-import { Crumb, ScrollColumn } from "./session-reader-files-parts";
+import {
+	Crumb,
+	ReaderPane,
+	ReaderPaneHeader,
+	ReaderPaneScroll,
+} from "./session-reader-files-parts";
 
 function splitByRanges(
 	text: string,
@@ -85,27 +90,30 @@ export function SeenFile({
 	const others = step.paths.length - 1;
 	const time = formatPaddedTimeOfDay(step.at);
 	return (
-		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-s pt-xl pr-xl pl-xxl">
-			<div className="flex min-h-7 shrink-0 flex-wrap items-center gap-x-l gap-y-xs">
-				<div className="flex min-w-0 flex-1 items-center gap-s">
-					{run ? (
-						<RunCrumbs
-							agent={agent}
-							onClearAgent={onClearAgent}
-							onClearRun={onClearRun}
-							run={run}
-						/>
-					) : null}
-					<Crumb onClear={onClearRead} title={path}>
-						<span className="inline-flex items-center gap-xs">
-							<IconEyeFilled
-								aria-hidden="true"
-								className="size-3.5 text-ink-3"
+		<ReaderPane>
+			<ReaderPaneHeader
+				crumbs={
+					<>
+						{run ? (
+							<RunCrumbs
+								agent={agent}
+								onClearAgent={onClearAgent}
+								onClearRun={onClearRun}
+								run={run}
 							/>
-							{name}
-						</span>
-					</Crumb>
-				</div>
+						) : null}
+						<Crumb onClear={onClearRead} title={path}>
+							<span className="inline-flex items-center gap-xs">
+								<IconEyeFilled
+									aria-hidden="true"
+									className="size-3.5 text-ink-3"
+								/>
+								{name}
+							</span>
+						</Crumb>
+					</>
+				}
+			>
 				<span className="text-body-m whitespace-nowrap text-ink-3 tabular-nums">
 					{said}
 					{others > 0
@@ -113,8 +121,8 @@ export function SeenFile({
 						: ""}
 					{` · seen at ${time}`}
 				</span>
-			</div>
-			<ScrollColumn className="-mr-xl -ml-s pr-xl pl-s">
+			</ReaderPaneHeader>
+			<ReaderPaneScroll>
 				<div className="flex flex-col gap-m pt-m pb-xl">
 					<DiffView hunks={hunks} language={languageForPath(path)} />
 					{seen.cut ? (
@@ -124,7 +132,7 @@ export function SeenFile({
 						</p>
 					) : null}
 				</div>
-			</ScrollColumn>
-		</div>
+			</ReaderPaneScroll>
+		</ReaderPane>
 	);
 }

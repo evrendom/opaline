@@ -515,7 +515,7 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 															turns={turns}
 														/>
 													</div>
-													<div className="col-start-3 row-start-1 grid w-14 xl:col-start-2 xl:mr-[calc(var(--reader-card)+2rem)] xl:justify-self-end">
+													<div className="col-start-3 row-start-1 grid w-14 xl:col-start-2 xl:mr-[calc(var(--reader-card)+var(--space-xxl)*4/3)] xl:justify-self-end">
 														<ReaderMap
 															focus={readFocus}
 															mapKey={mapKey}

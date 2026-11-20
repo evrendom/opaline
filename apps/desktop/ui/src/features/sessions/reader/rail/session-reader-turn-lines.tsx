@@ -156,7 +156,7 @@ export function MemberFactLine({
 										? quotes(negative)
 										: "Tracked as frustrated: the run before it is flagged"
 								}
-								className={cn(PILL, "bg-error/10 text-error dark:text-error")}
+								className={cn(PILL, "bg-error/10 text-error")}
 							>
 								<IconMoodSad aria-hidden="true" />
 								Frustration
@@ -165,10 +165,7 @@ export function MemberFactLine({
 						{positive.length > 0 ? (
 							<span
 								title={quotes(positive)}
-								className={cn(
-									PILL,
-									"bg-success/10 text-success dark:text-success",
-								)}
+								className={cn(PILL, "bg-success/10 text-success")}
 							>
 								<IconMoodSmile aria-hidden="true" />
 								Positive

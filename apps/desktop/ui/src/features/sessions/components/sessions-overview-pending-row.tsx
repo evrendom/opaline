@@ -105,7 +105,7 @@ export function SessionsOverviewPendingRow({
 						{placeholderOnly ? null : "$"}
 						<span
 							className={cn(
-								"inline-block h-1.5 corner-xs bg-hover-strong dark:bg-hover-strong",
+								"inline-block h-1.5 corner-xs bg-hover-strong",
 								index % 2 === 0 ? "w-4" : "w-5",
 							)}
 						/>
@@ -133,21 +133,21 @@ export function SessionsOverviewPendingRow({
 					>
 						{sourceLabel ? (
 							<p
-								className="min-w-0 max-w-28 shrink-0 truncate text-base/5 font-medium tracking-m text-ink sm:text-[0.8125rem]/5"
+								className="min-w-0 max-w-28 shrink-0 truncate text-base/5 font-medium tracking-m text-ink sm:text-body-l"
 								data-session-overview-model-label
 							>
 								{sourceLabel}
 							</p>
 						) : (
-							<span className="inline-block h-2 w-16 shrink-0 corner-xs bg-hover-strong dark:bg-hover-strong" />
+							<span className="inline-block h-2 w-16 shrink-0 corner-xs bg-hover-strong" />
 						)}
 						<p
-							className="min-w-0 truncate text-left font-body text-xs/4 font-regular tracking-m text-ink-3"
+							className="min-w-0 truncate text-left font-body text-body-m font-regular tracking-m text-ink-3"
 							data-session-overview-repository-label
 						>
 							{repositoryName}
 						</p>
-						<span className="inline-block h-1.5 w-12 shrink-0 corner-xs bg-wash dark:bg-hover-strong" />
+						<span className="inline-block h-1.5 w-12 shrink-0 corner-xs bg-mark-fill" />
 					</div>
 					<SessionOverviewSubagentCountTag
 						session={{
@@ -192,7 +192,7 @@ export function SessionsOverviewPendingRow({
 							>
 								<span
 									className={cn(
-										"my-s inline-block h-1.5 max-w-full corner-xs bg-hover-strong dark:bg-hover-strong",
+										"my-s inline-block h-1.5 max-w-full corner-xs bg-hover-strong",
 										skill.width,
 									)}
 								/>
@@ -242,7 +242,7 @@ export function SessionsOverviewPendingRow({
 					className={cn(cellClassName, "justify-end px-m")}
 					data-session-overview-column="time"
 				>
-					<span className="inline-block h-1.5 w-6 corner-xs bg-hover-strong dark:bg-hover-strong" />
+					<span className="inline-block h-1.5 w-6 corner-xs bg-hover-strong" />
 				</div>
 			</div>
 		</li>

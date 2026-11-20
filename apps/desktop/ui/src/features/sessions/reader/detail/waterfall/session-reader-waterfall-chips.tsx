@@ -152,7 +152,7 @@ export function OpalChip({
 		<span
 			skullet-block=""
 			className={cn(
-				"rounded-full",
+				"corner-full",
 				sidebar
 					? cn(
 							"relative grid size-4.5 shrink-0 place-items-center transition-colors duration-100 ease-in-out",
@@ -184,7 +184,7 @@ export function OpalChip({
 			{open === undefined ? (
 				<span className="relative flex">{children}</span>
 			) : (
-				<span className="relative grid place-items-center *:col-start-1 *:row-start-1 *:transition-[opacity,rotate,scale] *:duration-150 *:ease-out">
+				<span className="relative grid place-items-center *:col-start-1 *:row-start-1 *:transition-[opacity,rotate,scale] *:duration-(--motion-duration) *:ease-out">
 					<span
 						className={cn(
 							"flex",
@@ -320,7 +320,7 @@ export function ChipToggle({
 					aria-expanded={open}
 					aria-label={open ? `Fold ${label}` : `Show ${label}`}
 					onClick={onToggle}
-					className="pointer-events-auto size-4.5 rounded-full"
+					className="pointer-events-auto size-4.5 corner-full"
 				/>
 			</Tip>
 		</div>

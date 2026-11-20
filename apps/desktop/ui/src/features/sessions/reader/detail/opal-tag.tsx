@@ -126,7 +126,7 @@ export function OpalTag({
 			onPointerEnter={onHover ? () => onHover(true) : undefined}
 			onPointerLeave={onHover ? () => onHover(false) : undefined}
 			className={cn(
-				"group/tag relative inline-flex h-5 items-center pr-1.5 pl-0.5 text-ink/80 tabular-nums",
+				"group/tag relative inline-flex h-5 items-center pr-s pl-xxs text-ink/80 tabular-nums",
 				className,
 			)}
 		>
@@ -139,13 +139,13 @@ export function OpalTag({
 				<path
 					ref={pathRef}
 					strokeWidth={0.5}
-					className="fill-canvas stroke-black/10 dark:fill-card dark:stroke-white/10"
+					className="fill-card stroke-black/10 dark:stroke-white/10"
 				/>
 			</svg>
-			<span className="relative inline-flex items-center gap-1">
+			<span className="relative inline-flex items-center gap-xs">
 				{children}
 				{word ? (
-					<span className="-ml-1 grid grid-cols-[0fr] transition-[grid-template-columns] duration-200 ease-out group-hover/tag:grid-cols-[1fr]">
+					<span className="-ml-xs grid grid-cols-[0fr] transition-[grid-template-columns] duration-200 ease-out group-hover/tag:grid-cols-[1fr]">
 						<span className="overflow-hidden whitespace-nowrap">
 							{"\u00a0"}
 							{word}

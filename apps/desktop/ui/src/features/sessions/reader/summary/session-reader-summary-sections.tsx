@@ -279,7 +279,7 @@ export function SummaryActivityLine({
 						<span
 							className={cn(
 								"text-ink tabular-nums",
-								label === "errors" && "text-error dark:text-error",
+								label === "errors" && "text-error",
 							)}
 						>
 							{formatCompactNumber(value)}

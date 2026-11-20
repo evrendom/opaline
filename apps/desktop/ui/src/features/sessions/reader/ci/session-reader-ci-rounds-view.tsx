@@ -193,9 +193,7 @@ export function CiPushDetail({
 					<span
 						className={cn(
 							"min-w-0 truncate",
-							round.outcome === "failed"
-								? "text-error dark:text-error"
-								: "text-ink-3",
+							round.outcome === "failed" ? "text-error" : "text-ink-3",
 						)}
 					>
 						{look.label}
@@ -262,15 +260,12 @@ function PushRun({ run }: { run: SummaryCiRun }) {
 								target="_blank"
 								rel="noreferrer"
 								title={`Open ${job.name}'s log on GitHub`}
-								className="truncate text-error underline-offset-2 hover:underline dark:text-error"
+								className="truncate text-error underline-offset-2 hover:underline"
 							>
 								{job.name}
 							</a>
 						) : (
-							<span
-								key={job.jobId}
-								className="truncate text-error dark:text-error"
-							>
+							<span key={job.jobId} className="truncate text-error">
 								{job.name}
 							</span>
 						);
@@ -392,8 +387,8 @@ export function CiRounds({
 												className={cn(
 													"min-w-0 truncate",
 													round.outcome === "failed"
-														? "text-error dark:text-error"
-														: "text-warning dark:text-warning",
+														? "text-error"
+														: "text-warning",
 												)}
 											>
 												{pushOutcomeWords(round)}

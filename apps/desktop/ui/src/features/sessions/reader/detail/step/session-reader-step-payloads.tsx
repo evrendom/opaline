@@ -114,9 +114,7 @@ export function HighlightedCode({
 								aria-hidden="true"
 								className={cn(
 									"mr-m shrink-0 select-none",
-									kind === "addition"
-										? "text-success dark:text-success"
-										: "text-error dark:text-error",
+									kind === "addition" ? "text-success" : "text-error",
 								)}
 							>
 								{kind === "addition" ? "+" : "−"}

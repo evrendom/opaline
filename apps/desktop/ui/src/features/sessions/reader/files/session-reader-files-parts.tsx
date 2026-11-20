@@ -39,7 +39,7 @@ export function ViewToggle<View extends string>({
 					ref={pillRef}
 					aria-hidden="true"
 					skullet-ignore=""
-					className="pointer-events-none absolute top-1/2 left-0 h-6 origin-left corner-s bg-card shadow-card corner-squircle will-change-transform squircle:corner-l dark:bg-ink-3/10"
+					className="pointer-events-none absolute top-1/2 left-0 h-6 origin-left corner-s bg-picked shadow-card corner-squircle will-change-transform squircle:corner-l"
 					style={{
 						transform: `translate(${pill.left}px, -50%)`,
 						width: pill.width,
@@ -101,6 +101,43 @@ export function ScrollColumn({
 		>
 			{children}
 		</div>
+	);
+}
+
+/**
+ * The reader's detail pane: the column a picked file, read or call opens in,
+ * with a header row (`ReaderPaneHeader`) and a scrolling body
+ * (`ReaderPaneScroll`). Every detail pane shares this frame so their headers
+ * and edges line up when the reader swaps one for another.
+ */
+export function ReaderPane({ children }: { children: ReactNode }) {
+	return (
+		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-s pt-xl pr-xl pl-xxl">
+			{children}
+		</div>
+	);
+}
+
+/** The pane's header row: crumbs on the left, then meta and toggles. */
+export function ReaderPaneHeader({
+	children,
+	crumbs,
+}: {
+	children?: ReactNode;
+	crumbs: ReactNode;
+}) {
+	return (
+		<div className="flex min-h-7 shrink-0 flex-wrap items-center gap-x-l gap-y-xs">
+			<div className="flex min-w-0 flex-1 items-center gap-s">{crumbs}</div>
+			{children}
+		</div>
+	);
+}
+
+/** The pane's body, bled to the pane's edges so its scroll fade reaches them. */
+export function ReaderPaneScroll({ children }: { children: ReactNode }) {
+	return (
+		<ScrollColumn className="-mr-xl -ml-s pr-xl pl-s">{children}</ScrollColumn>
 	);
 }
 

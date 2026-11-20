@@ -411,7 +411,7 @@ export function SessionsOverviewTable({
 									<SessionsOverviewFluidList
 										fillHeight={!pagination?.hasNextPage}
 										highlightClassName={cn(
-											"in-data-rail-beside:rounded-lg in-data-rail-beside:corner-squircle in-data-rail-beside:squircle:rounded-2xl",
+											"in-data-rail-beside:corner-m in-data-rail-beside:corner-squircle in-data-rail-beside:squircle:rounded-2xl",
 											highlightClassName,
 										)}
 									>

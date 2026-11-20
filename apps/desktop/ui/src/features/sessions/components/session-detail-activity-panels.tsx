@@ -30,17 +30,17 @@ export function SessionDetailActivityPanel({
 									type="button"
 								>
 									<div className="min-w-0">
-										<p className="whitespace-pre-wrap break-words text-[0.8125rem]/5 font-medium tracking-s text-ink-2 dark:text-ink-2">
+										<p className="whitespace-pre-wrap break-words text-body-l font-medium tracking-s text-ink-2">
 											{occurrence.detail}
 										</p>
 										{occurrence.supportingDetail ? (
-											<p className="mt-xxs text-[0.75rem]/4 tracking-s text-ink-3 tabular-nums dark:text-color-1-translucent">
+											<p className="mt-xxs text-body-m tracking-s text-ink-meta tabular-nums">
 												{occurrence.supportingDetail}
 											</p>
 										) : null}
 									</div>
-									<div className="flex min-w-0 items-center gap-s text-ink-3 dark:text-color-1-translucent">
-										<p className="truncate text-[0.8125rem]/5 tracking-s tabular-nums">
+									<div className="flex min-w-0 items-center gap-s text-ink-meta">
+										<p className="truncate text-body-l tracking-s tabular-nums">
 											{occurrence.turnLabel}
 											{occurrence.time ? ` · ${occurrence.time}` : ""}
 										</p>
@@ -54,22 +54,22 @@ export function SessionDetailActivityPanel({
 						))}
 					</ul>
 					{group.omittedCount > 0 ? (
-						<p className="edge-t-m border-line px-xl py-m text-[0.75rem]/4 text-ink-3 tabular-nums dark:border-line dark:text-color-1-translucent">
+						<p className="edge-t-m border-line px-xl py-m text-body-m text-ink-meta tabular-nums">
 							+{group.omittedCount.toLocaleString()} more not shown
 						</p>
 					) : null}
 					{isLoading ? (
-						<p className="edge-t-m border-line px-xl py-m text-[0.75rem]/4 text-ink-3 dark:border-line dark:text-color-1-translucent">
+						<p className="edge-t-m border-line px-xl py-m text-body-m text-ink-meta">
 							Loading more signal occurrences…
 						</p>
 					) : null}
 				</div>
 			) : isLoading ? (
-				<p className="px-xl py-l text-body-xxl text-ink-3 sm:text-[0.8125rem]/5 dark:text-color-1-translucent">
+				<p className="px-xl py-l text-body-xxl text-ink-meta sm:text-body-l">
 					Loading signal occurrences…
 				</p>
 			) : (
-				<p className="px-xl py-l text-body-xxl text-ink-3 sm:text-[0.8125rem]/5 dark:text-color-1-translucent">
+				<p className="px-xl py-l text-body-xxl text-ink-meta sm:text-body-l">
 					{group.emptyLabel}
 				</p>
 			)}
@@ -92,29 +92,29 @@ export function SessionDetailActivityOccurrencePanel({
 }) {
 	return (
 		<div className="min-h-0 overflow-hidden corner-s">
-			<div className="flex h-9 items-center edge-b-m border-line px-xs dark:border-line">
+			<div className="flex h-9 items-center edge-b-m border-line px-xs">
 				<button
 					aria-label={`Back to ${group.label}`}
-					className="flex size-7 shrink-0 items-center justify-center corner-s text-ink-2 outline-none hover:bg-black/4 dark:text-ink-2 dark:hover:bg-white/6"
+					className="flex size-7 shrink-0 items-center justify-center corner-s text-ink-2 outline-none hover:bg-black/4 dark:hover:bg-white/6"
 					onClick={onBack}
 					type="button"
 				>
 					<IconArrowLeft aria-hidden="true" className="size-3.5" />
 				</button>
-				<p className="min-w-0 flex-1 truncate px-xs text-[0.8125rem]/5 font-medium">
+				<p className="min-w-0 flex-1 truncate px-xs text-body-l font-medium">
 					{group.label}
 				</p>
 			</div>
 			<div className="p-xl">
-				<p className="whitespace-pre-wrap break-words text-[0.8125rem]/5 font-medium tracking-s text-ink-2 dark:text-ink-2">
+				<p className="whitespace-pre-wrap break-words text-body-l font-medium tracking-s text-ink-2">
 					{occurrence.detail}
 				</p>
 				{occurrence.supportingDetail ? (
-					<p className="mt-xs text-[0.75rem]/4 tracking-s text-ink-3 tabular-nums dark:text-color-1-translucent">
+					<p className="mt-xs text-body-m tracking-s text-ink-meta tabular-nums">
 						{occurrence.supportingDetail}
 					</p>
 				) : null}
-				<p className="mt-m text-[0.75rem]/4 tracking-s text-ink-3 tabular-nums dark:text-color-1-translucent">
+				<p className="mt-m text-body-m tracking-s text-ink-meta tabular-nums">
 					{occurrence.turnLabel}
 					{occurrence.time ? ` · ${occurrence.time}` : ""}
 				</p>

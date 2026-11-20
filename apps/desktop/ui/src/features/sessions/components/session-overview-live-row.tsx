@@ -61,7 +61,7 @@ export function SessionOverviewLiveLabel({
 }) {
 	return (
 		<span
-			className="inline-flex shrink-0 items-center gap-s text-xs/4 font-medium text-ink"
+			className="inline-flex shrink-0 items-center gap-s text-body-m font-medium text-ink"
 			data-session-overview-live={state}
 			title={
 				state === "running"

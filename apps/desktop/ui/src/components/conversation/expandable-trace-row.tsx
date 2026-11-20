@@ -143,7 +143,7 @@ export function TraceTextDisclosureIcon({ expanded }: { expanded: boolean }) {
 		<svg
 			aria-hidden="true"
 			className={cn(
-				"pointer-events-none -ml-xxs size-4 shrink-0 transition-transform duration-150 will-change-transform",
+				"pointer-events-none -ml-xxs size-4 shrink-0 transition-transform duration-(--motion-duration) will-change-transform",
 				expanded && "rotate-90",
 			)}
 			data-trace-content-disclosure-icon
