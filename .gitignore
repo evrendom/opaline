@@ -83,3 +83,6 @@ dist-plugin/
 
 # Self-hosted server artifacts
 dist-selfhost/
+
+# CI scratch (test shards, packed CLI smoke)
+.tmp/
