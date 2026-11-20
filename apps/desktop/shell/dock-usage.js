@@ -186,7 +186,13 @@ function createDockUsage({ agents, dataDir, development = false }) {
 			// The development icon is drawn on the light face (recoloured blue)
 			// with the dark icon's white ring and digits, in both appearances.
 			const theme = (layer) =>
-				development ? (layer === "base" ? "light" : "dark") : dark ? "dark" : "light";
+				development
+					? layer === "base"
+						? "light"
+						: "dark"
+					: dark
+						? "dark"
+						: "light";
 			const source = (layer, name = layer) =>
 				`data:image/png;base64,${fs.readFileSync(path.join(__dirname, "icon", "dock", theme(layer), `${name}.png`)).toString("base64")}`;
 			const layers = {
