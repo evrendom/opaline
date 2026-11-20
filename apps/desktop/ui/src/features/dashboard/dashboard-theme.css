@@ -354,7 +354,7 @@
 }
 
 .dashboardy-status-footer > svg {
-	transition: opacity 150ms ease;
+	transition: opacity var(--motion-duration) ease;
 }
 
 .dashboardy-status-footer:hover > svg {

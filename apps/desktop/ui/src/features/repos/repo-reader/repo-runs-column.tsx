@@ -98,7 +98,7 @@ export function usePickedRun() {
 export const RAIL_SHELF =
 	"-mr-xxl flex min-h-0 shrink-0 flex-col gap-xs corner-m bg-field/60 pr-xxl shadow-inset corner-squircle squircle:corner-xl dark:bg-field/15";
 
-export const PICKED_ROW = "bg-card shadow-selected dark:bg-ink-3/10";
+export const PICKED_ROW = "bg-card-soft shadow-selected";
 
 const COLUMN = cn(RAIL_SHELF, "w-[120px]");
 

@@ -59,8 +59,8 @@ export function PillTabs<T extends string>({
 					className={cn(
 						"absolute top-1/2 left-0 h-8",
 						"corner-s corner-squircle",
-						"pointer-events-none origin-left bg-field will-change-transform",
-						"squircle:corner-l dark:bg-field/50",
+						"pointer-events-none origin-left bg-track will-change-transform",
+						"squircle:corner-l",
 						pillClassName,
 					)}
 					style={{
@@ -89,7 +89,7 @@ export function PillTabs<T extends string>({
 							"text-body-xl font-medium",
 							"transition-colors outline-none",
 							"squircle:corner-l",
-							active && !pill && cn("bg-field dark:bg-field/50", pillClassName),
+							active && !pill && cn("bg-track", pillClassName),
 							active
 								? empty
 									? "text-ink/45"

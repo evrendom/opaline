@@ -81,7 +81,7 @@
 }
 .cost-page[data-variant="compact"] .cost-metric {
 	--metric-pad-x: 16px;
-	padding: 12px var(--metric-pad-x) 12px;
+	padding: var(--space-l) var(--metric-pad-x) var(--space-l);
 }
 .cost-page[data-variant="compact"] .cost-metric-sparkline {
 	display: none;
@@ -172,7 +172,7 @@
 }
 .cost-page[data-variant="rail-card"] .cost-metric {
 	--metric-pad-x: 14px;
-	padding: 12px var(--metric-pad-x) 0;
+	padding: var(--space-l) var(--metric-pad-x) 0;
 	background: var(--wash);
 	box-shadow: none;
 }
@@ -367,7 +367,7 @@
 .cost-page:is([data-variant="dot-rail"], [data-variant="rail-chat"])
 	.cost-metric {
 	--metric-pad-x: 14px;
-	padding: 12px var(--metric-pad-x) 0;
+	padding: var(--space-l) var(--metric-pad-x) 0;
 	background: var(--wash);
 	box-shadow: none;
 }
@@ -497,7 +497,8 @@
 		"rail";
 	grid-template-columns: minmax(0, 1fr);
 	width: auto;
-	margin: 12px 6px 24px var(--cost-page-gutter, 32px);
+	margin: var(--space-l) var(--space-s) var(--space-xxl)
+		var(--cost-page-gutter, 32px);
 }
 .cost-page[data-variant="rail-chat"] .cost-breakdowns-container {
 	display: none;
@@ -654,14 +655,14 @@
 		position: absolute;
 		z-index: 2;
 		box-sizing: border-box;
-		padding: var(--sheet-card) 14px 12px;
+		padding: var(--sheet-card) 14px var(--space-l);
 		border-radius: var(--radius-xl);
 		background: var(--card);
 		box-shadow: var(--shadow-overlay);
 		animation: cost-metric-sheet-in 180ms ease-out;
 	}
 	& .cost-metric-sheet[data-upward] {
-		padding: 12px 14px var(--sheet-card);
+		padding: var(--space-l) 14px var(--sheet-card);
 	}
 }
 @keyframes cost-metric-sheet-in {

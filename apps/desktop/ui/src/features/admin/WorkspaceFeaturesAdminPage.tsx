@@ -238,7 +238,7 @@ function FeatureSwitch({
 			<span
 				className={cn(
 					"text-body-m",
-					state.enabled ? "text-success dark:text-success" : "text-ink-3",
+					state.enabled ? "text-success" : "text-ink-3",
 				)}
 			>
 				{state.enabled ? "Enabled" : "Disabled"}

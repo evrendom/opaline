@@ -209,7 +209,7 @@ export function RepoSkillSessions({
 				<div className="pl-xl">
 					<SessionsOverviewFluidList
 						fillHeight={false}
-						highlightClassName="rounded-lg corner-squircle squircle:rounded-2xl"
+						highlightClassName="corner-m corner-squircle squircle:rounded-2xl"
 					>
 						{({ registerItem, setActiveIndex }) =>
 							rows.map((trace, index) => {
@@ -243,7 +243,7 @@ export function RepoSkillSessions({
 											// one, though the pointer is on neither.
 											// biome-ignore lint/a11y/noStaticElementInteractions: only keeps the list's decorative hover out; the panel's own controls are buttons.
 											<div
-												className="corner-b-m bg-field px-xl pb-xl corner-squircle squircle:corner-b-xl dark:bg-card"
+												className="corner-b-m bg-shelf px-xl pb-xl corner-squircle squircle:corner-b-xl"
 												onMouseEnter={() => setActiveIndex(null)}
 												onMouseMove={(event) => event.stopPropagation()}
 											>
@@ -344,8 +344,7 @@ function AgentTraceRow({
 						"group/toggle",
 						// An open row shares the tint of the panel folded out beneath it,
 						// rounding the top of the block the panel rounds at the bottom.
-						open &&
-							"corner-t-m bg-field corner-squircle squircle:corner-t-xl dark:bg-card",
+						open && "corner-t-m bg-shelf corner-squircle squircle:corner-t-xl",
 					)}
 				>
 					<div className={SESSION_OVERVIEW_CELL_CLASS_NAME}>
@@ -425,7 +424,7 @@ function AgentTraceRow({
 					// the row, so the card keeps its top while the rest of it scrolls
 					// under the frozen header; only its top and sides show, meeting
 					// the card's body (which shows the rest) seamlessly.
-					<div className="h-4 bg-field px-xl pt-xs dark:bg-card">
+					<div className="h-4 bg-shelf px-xl pt-xs">
 						<div className="h-5 corner-t-m bg-(--dashboard-01-content-background,var(--canvas)) shadow-control [clip-path:inset(-8px_-8px_7px_-8px)] corner-squircle squircle:corner-t-l" />
 					</div>
 				) : null}

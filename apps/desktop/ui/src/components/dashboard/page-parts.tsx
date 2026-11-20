@@ -368,14 +368,14 @@ export function ScrollFade({
 			</div>
 			<div
 				className={cn(
-					"pointer-events-none absolute inset-x-0 top-0 h-10 bg-linear-to-b to-transparent transition-opacity duration-150",
+					"pointer-events-none absolute inset-x-0 top-0 h-10 bg-linear-to-b to-transparent transition-opacity duration-(--motion-duration)",
 					fromClassName,
 					edges.top ? "opacity-100" : "opacity-0",
 				)}
 			/>
 			<div
 				className={cn(
-					"pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-linear-to-t to-transparent transition-opacity duration-150",
+					"pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-linear-to-t to-transparent transition-opacity duration-(--motion-duration)",
 					fromClassName,
 					edges.bottom ? "opacity-75" : "opacity-0",
 				)}

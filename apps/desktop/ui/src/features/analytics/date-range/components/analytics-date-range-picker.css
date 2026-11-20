@@ -108,14 +108,14 @@
    its own segment rather than running off the grid edge. */
 .session-date-picker-calendar td:first-child[data-selected="true"]
 	button[data-range-middle="true"] {
-	border-top-left-radius: 8px;
-	border-bottom-left-radius: 8px;
+	border-top-left-radius: var(--radius-s);
+	border-bottom-left-radius: var(--radius-s);
 }
 .session-date-picker-calendar
 	td:last-child[data-selected="true"]
 	button[data-range-middle="true"] {
-	border-top-right-radius: 8px;
-	border-bottom-right-radius: 8px;
+	border-top-right-radius: var(--radius-s);
+	border-bottom-right-radius: var(--radius-s);
 }
 
 /* Selected today must keep the same range cap as any other endpoint. */
@@ -244,7 +244,7 @@
 .session-date-picker .menu-list .menu-row::before,
 .menu-surface.session-date-picker .menu-list .fluid-menu-hover-fill::before {
 	inset: 0;
-	border-radius: 6px;
+	border-radius: var(--radius-xs);
 }
 .session-date-picker .menu-list .menu-row[aria-pressed="true"]::before,
 .session-date-picker .menu-list .menu-row:has(:checked)::before {

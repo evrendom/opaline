@@ -220,7 +220,7 @@ export function RepoDetailPage({
 							sessionFilter={{ repoKey }}
 							range={range}
 							sessionCount={undefined}
-							rowHighlightClassName="rounded-lg corner-squircle squircle:rounded-2xl"
+							rowHighlightClassName="corner-m corner-squircle squircle:rounded-2xl"
 							detailHref={(id) =>
 								id
 									? appRoutes.repoDetail(repoKey, id)
@@ -277,7 +277,7 @@ export function RepoDetailPage({
 			? { startDate: pickedRange.start, endDate: pickedRange.end }
 			: range,
 		sessionCount: undefined,
-		rowHighlightClassName: "rounded-lg corner-squircle squircle:rounded-2xl",
+		rowHighlightClassName: "corner-m corner-squircle squircle:rounded-2xl",
 		detailHref: (id) =>
 			id
 				? appRoutes.repoDetail(repoKey, id)
@@ -287,7 +287,7 @@ export function RepoDetailPage({
 	};
 	const sessions = <UsageSessionsPane {...sessionsProps} />;
 	return (
-		<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-inset text-ink [--reader-page:var(--canvas,#fcfcfc)]">
+		<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-inset text-ink [--reader-page:var(--canvas)]">
 			<RepoDetailHeader
 				repoKey={repoKey}
 				name={name}

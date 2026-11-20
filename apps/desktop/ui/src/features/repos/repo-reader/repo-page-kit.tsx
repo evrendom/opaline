@@ -111,8 +111,8 @@ export function SkillLink({ name }: { name: string }) {
 				"inline-flex h-6 max-w-full items-center",
 				"corner-full px-l",
 				"truncate text-body-s",
-				"bg-canvas text-ink/90 shadow-control",
-				"hover:text-ink dark:bg-card",
+				"bg-card text-ink/90 shadow-control",
+				"hover:text-ink",
 			)}
 		>
 			{name}

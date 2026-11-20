@@ -124,7 +124,7 @@ export function OverviewMembers({
 
 function MemberAvatar({ avatarUrl }: { avatarUrl: string | undefined }) {
 	return (
-		<Avatar className="size-4 bg-canvas ring-1 ring-canvas after:border-line dark:after:border-line">
+		<Avatar className="size-4 bg-canvas ring-1 ring-canvas after:border-line">
 			{avatarUrl ? (
 				<AvatarImage alt="" src={avatarUrl} decoding="async" loading="lazy" />
 			) : null}

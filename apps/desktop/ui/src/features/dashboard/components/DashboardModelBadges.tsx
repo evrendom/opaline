@@ -31,35 +31,35 @@ function getModelBadgeSizeClasses(
 	if (size === "md") {
 		return {
 			badgeClassName:
-				"h-8 gap-2 text-[0.8125rem] font-medium tracking-[-0.01em]",
+				"h-8 gap-m text-[0.8125rem] font-medium tracking-[-0.01em]",
 			chipClassName: "size-5",
 			glyphClassName: "size-3",
 			labelClassName:
 				"flex min-w-0 items-center leading-none [text-box-edge:cap_alphabetic] [text-box-trim:trim-both]",
-			paddingClassName: "px-3",
+			paddingClassName: "px-l",
 		};
 	}
 
 	if (size === "table") {
 		return {
 			badgeClassName:
-				"h-5 gap-1 text-base font-medium tracking-[-0.01em] sm:text-sm",
+				"h-5 gap-xs text-base font-medium tracking-[-0.01em] sm:text-sm",
 			chipClassName: "size-4",
 			glyphClassName: "size-2.5",
 			labelClassName:
 				"flex min-w-0 items-center leading-none [text-box-edge:cap_alphabetic] [text-box-trim:trim-both]",
-			paddingClassName: "px-2",
+			paddingClassName: "px-m",
 		};
 	}
 
 	return {
 		badgeClassName:
-			"h-5 gap-1 text-[0.6875rem] font-semibold tracking-[-0.01em]",
+			"h-5 gap-xs text-[0.6875rem] font-semibold tracking-[-0.01em]",
 		chipClassName: "size-4",
 		glyphClassName: "size-2.5",
 		labelClassName:
 			"flex min-w-0 items-center leading-none [text-box-edge:cap_alphabetic] [text-box-trim:trim-both]",
-		paddingClassName: "px-2",
+		paddingClassName: "px-m",
 	};
 }
 

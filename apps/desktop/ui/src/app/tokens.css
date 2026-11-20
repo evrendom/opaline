@@ -117,6 +117,18 @@
 		--radius-m
 	); /* shadcn's base radius; its sm…4xl multiples scale from it */
 	--scrollbar-thumb: var(--line);
+
+	/* --- roles added by product --- */
+	/* a card that sits on a recessed ground (a tab track's active pill, a
+	   toolbar flag button, the reader's picked row); dark softens it to a
+	   translucent ink wash instead of the solid surface */
+	--card-soft: var(--card);
+	/* a segmented track and the highlight that slides along it */
+	--track: var(--field);
+	/* the ground of a list's expanded row and its frozen cap: the field in
+	   light, the card in dark */
+	--shelf: var(--field);
+	/* --- end product --- */
 }
 
 .dark {
@@ -151,6 +163,12 @@
 	--shadow-selected: var(--shadow-card);
 	--shadow-inset: inset 0 0 0 0.5px rgb(255 255 255 / 0.06);
 	--shadow-float: 0 0 #0000;
+
+	/* --- roles added by product --- */
+	--card-soft: color-mix(in oklab, var(--ink-3) 10%, transparent);
+	--track: color-mix(in oklab, var(--field) 50%, transparent);
+	--shelf: var(--card);
+	/* --- end product --- */
 }
 
 /* Layer 2 as Tailwind colours: `bg-surface`, `text-ink-3`, `border-line`. */
@@ -184,6 +202,12 @@
 	--color-warning-line: var(--warning-line);
 	--color-error-tint: var(--error-tint);
 	--color-error-line: var(--error-line);
+
+	/* --- roles added by product --- */
+	--color-card-soft: var(--card-soft);
+	--color-track: var(--track);
+	--color-shelf: var(--shelf);
+	/* --- end product --- */
 }
 
 /* Layer 2 elevation as Tailwind shadows: `shadow-card`, `shadow-control`,

@@ -212,7 +212,7 @@ export function TeamInviteLinkSurface({
 	if (layout === "row") {
 		return (
 			<div className="flex w-full min-w-0 items-center gap-m">
-				<div className="grid h-10 min-w-0 flex-1 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-xs corner-full edge-m border-line bg-canvas p-xs dark:border-line">
+				<div className="grid h-10 min-w-0 flex-1 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-xs corner-full edge-m border-line bg-canvas p-xs">
 					<IconLink
 						aria-hidden="true"
 						className="size-4 h-lh shrink-0 justify-self-center stroke-ink-3"
@@ -263,7 +263,7 @@ export function TeamInviteLinkSurface({
 
 	return (
 		<div className="flex w-full min-w-0 flex-col gap-m">
-			<div className="grid h-11 w-full min-w-0 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-xs corner-full edge-m border-line bg-canvas p-xs dark:border-line">
+			<div className="grid h-11 w-full min-w-0 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-xs corner-full edge-m border-line bg-canvas p-xs">
 				<IconLink
 					aria-hidden="true"
 					className="size-4 h-lh shrink-0 justify-self-center stroke-ink-3"

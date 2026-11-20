@@ -290,17 +290,17 @@ function TeamMemberRow({
 		<tr ref={rowRef} className="relative z-10 h-16">
 			<td className="h-16 py-zero pr-l pl-zero align-middle">
 				<div className="flex min-w-0 items-center gap-l">
-					<Avatar className="size-8 overflow-hidden bg-canvas outline-(length:--border-m) -outline-offset-1 outline-line dark:outline-line">
+					<Avatar className="size-8 overflow-hidden bg-canvas outline-(length:--border-m) -outline-offset-1 outline-line">
 						{row.imageUrl ? <AvatarImage alt="" src={row.imageUrl} /> : null}
 						<AvatarFallback className="bg-field font-medium text-ink">
 							{getMemberInitials(row.displayName)}
 						</AvatarFallback>
 					</Avatar>
 					<div className="min-w-0">
-						<p className="truncate text-sm/5 font-medium text-ink">
+						<p className="truncate text-body-xl font-medium text-ink">
 							{row.displayName}
 						</p>
-						<p className="truncate text-xs/4 text-ink-3">{row.role}</p>
+						<p className="truncate text-body-m text-ink-3">{row.role}</p>
 					</div>
 				</div>
 			</td>
