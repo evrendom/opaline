@@ -102,6 +102,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
 				// cells (same color as the body row borders) and drop the row's own
 				// border so the two don't stack into a thicker line at rest.
 				stickyHeader &&
+					// design-escape-ok: a 1px bottom rule drawn as a colourless shadow, coloured by line-soft
 					"sticky top-0 z-10 bg-canvas [&_tr]:edge-b-none [&_th]:shadow-[inset_0_-1px_0_0] [&_th]:shadow-line-soft",
 				className,
 			)}

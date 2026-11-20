@@ -10,6 +10,7 @@ function Empty({ className, ...props }: React.ComponentProps<"div">) {
 				"flex w-full min-w-0 flex-1 flex-col items-center justify-center gap-xl",
 				"corner-l corner-squircle border-dashed edge-m p-[calc(var(--space-xxl)*2)] py-[calc(var(--space-xxl)*8/3)]",
 				"text-center text-balance",
+				// design-escape-ok: 26px squircle, between corner steps; no step holds it yet
 				"squircle:rounded-4xl dark:border-line/50",
 				className,
 			)}
@@ -34,7 +35,7 @@ const emptyMediaVariants = cva(
 		variants: {
 			variant: {
 				default: "bg-transparent",
-				icon: "relative grid size-8 shrink-0 place-items-center text-ink-3 dark:text-neutral-400 [&_svg:not([class*='size-'])]:size-4",
+				icon: "relative grid size-8 shrink-0 place-items-center text-ink-3 [&_svg:not([class*='size-'])]:size-4",
 			},
 		},
 		defaultVariants: {
@@ -73,6 +74,7 @@ function EmptyDescription({ className, ...props }: React.ComponentProps<"p">) {
 		<div
 			data-slot="empty-description"
 			className={cn(
+				// design-escape-ok: 12 / 19.5 description; body-m's 16 line would tighten it
 				"text-xs/relaxed text-ink-3 [&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary",
 				className,
 			)}

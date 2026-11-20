@@ -72,7 +72,7 @@ export function ShellNavIcon({
 	tone?: ShellNavTone;
 }) {
 	const fade =
-		"transition-opacity duration-100 ease-in-out will-change-[opacity]";
+		"transition-opacity duration-(--motion-quick-duration) ease-in-out will-change-[opacity]";
 	// The sidebar forces `[&_svg]:size-4.5`; the important sizes below win.
 	const glyphClassName = tone ? "size-3.5!" : "size-4.5!";
 	const glyphCell = cn("relative flex [grid-area:1/1]", fade);
@@ -82,7 +82,7 @@ export function ShellNavIcon({
 			skullet-own=""
 			data-nav-icon=""
 			className={cn(
-				"relative grid size-4.5 shrink-0 place-items-center transition-colors duration-100 ease-in-out",
+				"relative grid size-4.5 shrink-0 place-items-center transition-colors duration-(--motion-quick-duration) ease-in-out",
 				active && tone ? tone.glyph : restingGlyphClassName,
 			)}
 		>

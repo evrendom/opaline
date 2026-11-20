@@ -95,6 +95,39 @@
 	   toast. Its edge is a ring at the call site; dark keeps only the ring. */
 	--shadow-float:
 		0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+	/* a sheet sliding over the window from an edge */
+	--shadow-sheet:
+		0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+	/* the contact shadow under a small box control: checkbox */
+	--shadow-contact: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+
+	/* -- Motion. The theme holds two timings: --motion-duration (150ms) and
+	   --motion-easing for small changes, --motion-large-duration (300ms) and
+	   --motion-large-easing for large ones. The roles below are the other
+	   timings the app really uses, named so call sites stop writing literals.
+	   Tailwind reads the easings as `ease-strong`, `ease-drawer`, `ease-wave`;
+	   durations as `duration-(--motion-medium-duration)`. */
+	--motion-quick-duration: 100ms; /* hover tints, a check appearing, flyouts */
+	--motion-medium-duration: 200ms; /* fades, sheets, a panel's width */
+	--motion-slow-duration: 650ms; /* a chart drawing in, a skeleton leaving */
+	--motion-strong-easing: cubic-bezier(
+		0.23,
+		1,
+		0.32,
+		1
+	); /* a strong ease-out: presses, things entering */
+	--motion-drawer-easing: cubic-bezier(
+		0.32,
+		0.72,
+		0,
+		1
+	); /* drawers, rails and rings settling */
+	--motion-wave-easing: cubic-bezier(
+		0.455,
+		0.03,
+		0.515,
+		0.955
+	); /* a symmetric in-out: strips growing, loops */
 
 	/* -- Third-party names (shadcn registry code, the sidebar primitive).
 	   Our code reads the roles above; these exist for code we don't own. */
@@ -202,6 +235,15 @@
 	--shadow-inset: var(--shadow-inset);
 	--shadow-label: var(--shadow-label);
 	--shadow-float: var(--shadow-float);
+	--shadow-sheet: var(--shadow-sheet);
+	--shadow-contact: var(--shadow-contact);
+}
+
+/* Motion roles as Tailwind easings: `ease-strong`, `ease-drawer`, `ease-wave`. */
+@theme reference {
+	--ease-strong: var(--motion-strong-easing);
+	--ease-drawer: var(--motion-drawer-easing);
+	--ease-wave: var(--motion-wave-easing);
 }
 
 /* -- Kept as authored: chart series (data paint) and the sidebar primitive's

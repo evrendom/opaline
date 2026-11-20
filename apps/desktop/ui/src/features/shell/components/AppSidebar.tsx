@@ -97,7 +97,7 @@ function SidebarNavTile({
 				className={cn(
 					"flex h-10 w-full items-center justify-center",
 					"corner-l corner-squircle edge-m",
-					"border-(--opal-ring) bg-(--opal-fill) outline-none transition-[background-color,border-color] duration-150",
+					"border-(--opal-ring) bg-(--opal-fill) outline-none transition-[background-color,border-color] duration-(--motion-duration)",
 					"squircle:corner-xl focus-visible:ring-2 focus-visible:ring-focus/50",
 					active && route.tone ? route.tone.chip : restingChipClassName,
 					!active &&
@@ -107,7 +107,7 @@ function SidebarNavTile({
 				<Glyph
 					aria-hidden="true"
 					className={cn(
-						"size-[18px] transition-colors duration-150",
+						"size-[18px] transition-colors duration-(--motion-duration)",
 						active && route.tone ? route.tone.glyph : restingGlyphClassName,
 					)}
 				/>

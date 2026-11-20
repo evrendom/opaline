@@ -66,6 +66,15 @@ const TranscriptMaskFixturePage = import.meta.env.DEV
 		)
 	: null;
 
+// The system page: every role, step, primitive and pattern, light and dark.
+const DesignSystemPage = import.meta.env.DEV
+	? lazy(() =>
+			import("@/app/system/DesignSystemPage").then((module) => ({
+				default: module.DesignSystemPage,
+			})),
+		)
+	: null;
+
 function FullscreenRouteLoadingScreen() {
 	return <AppLoadingScreen />;
 }
@@ -189,6 +198,14 @@ function App() {
 		location.pathname === "/dev/session-detail-fast-integration/v2";
 	const isTranscriptMaskFixturePath =
 		location.pathname === "/dev/transcript-mask";
+
+	if (location.pathname === "/dev/design-system" && DesignSystemPage) {
+		return (
+			<Suspense fallback={<FullscreenRouteLoadingScreen />}>
+				<DesignSystemPage />
+			</Suspense>
+		);
+	}
 
 	if (isTranscriptMaskFixturePath && TranscriptMaskFixturePage) {
 		return (

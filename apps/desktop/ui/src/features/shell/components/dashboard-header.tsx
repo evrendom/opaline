@@ -15,8 +15,7 @@ export function DashboardHeader({
 				"flex h-(--dashboard-01-header-height) shrink-0 items-center",
 				"edge-b-s",
 				"font-body",
-				"border-line bg-[var(--canvas)]",
-				"dark:border-line",
+				"border-line bg-canvas",
 				className,
 			)}
 			{...props}

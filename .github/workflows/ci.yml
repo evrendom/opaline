@@ -85,6 +85,11 @@ jobs:
       - name: Test the self-hosted artifact packer
         run: bun test ./scripts/selfhost-artifact.test.ts
 
+      # Lists every design-system escape in the Mac app UI; fails on the
+      # enforced scope (ENFORCED in apps/desktop/ui/tools/design-escapes.ts).
+      - name: Check design-system escapes
+        run: bun run check:design
+
       - name: Check pull request disclosure channels
         if: github.event_name == 'pull_request'
         env:

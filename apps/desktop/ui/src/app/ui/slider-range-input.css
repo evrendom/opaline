@@ -68,7 +68,7 @@
 	background: var(--neutral-6-transparent);
 	border-radius: inherit;
 	pointer-events: none;
-	transition: background 150ms ease;
+	transition: background var(--motion-duration) ease;
 }
 
 .slider-range-input-strip[data-active="true"] .slider-range-input-fill {
@@ -95,7 +95,7 @@
 	background: transparent;
 	border-radius: var(--radius-full);
 	transform: translate(-50%, -50%);
-	transition: background 200ms ease;
+	transition: background var(--motion-medium-duration) ease;
 }
 
 .slider-range-input-strip[data-active="true"] .slider-range-input-hashmark {
@@ -113,7 +113,7 @@
 	pointer-events: none;
 	transition:
 		opacity 150ms ease,
-		transform 250ms cubic-bezier(0.16, 1, 0.3, 1);
+		transform 250ms var(--motion-large-easing);
 }
 
 .slider-range-input-handle-minimum {
@@ -147,7 +147,7 @@
 	font-size: var(--size-l);
 	letter-spacing: var(--letter-spacing-l);
 	line-height: 1;
-	transition: color 150ms ease;
+	transition: color var(--motion-duration) ease;
 }
 
 .slider-range-input-label > span {

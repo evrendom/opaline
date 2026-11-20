@@ -154,7 +154,7 @@ html[data-host-styles]
 	min-height: max(120px, 100vh);
 	/* CSS URLs resolve from our origin even where a host ignores <base>. */
 	background: url("/favicon-light.svg") center / 48px no-repeat;
-	animation: plugin-loading-in 200ms ease-out 400ms both;
+	animation: plugin-loading-in var(--motion-medium-duration) ease-out 400ms both;
 }
 html.dark .plugin-loading {
 	background-image: url("/favicon-dark.svg");

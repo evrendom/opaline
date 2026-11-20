@@ -14,7 +14,7 @@ export function WorkspaceRoleLabel({ value }: { value: "member" | "admin" }) {
 
 export function WorkspaceOwnerBadge() {
 	return (
-		<span className="inline-flex h-5 items-center gap-xs corner-full bg-warning/10 px-m text-body-m font-medium text-warning dark:bg-warning/15 dark:text-warning">
+		<span className="inline-flex h-5 items-center gap-xs corner-full bg-warning/10 px-m text-body-m font-medium text-warning dark:bg-warning/15">
 			<IconCrown aria-hidden="true" className="size-3" />
 			Owner
 		</span>

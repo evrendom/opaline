@@ -23,9 +23,7 @@ export function DetailIdentityBreadcrumb({
 					const current = index === items.length - 1;
 					const className = cn(
 						"max-w-80 truncate",
-						current
-							? "text-neutral-10/87.5 dark:text-ink"
-							: "text-ink-3 dark:text-ink-3",
+						current ? "text-neutral-10/87.5 dark:text-ink" : "text-ink-3",
 						item.mono && "tabular-nums",
 					);
 					return (
@@ -34,7 +32,7 @@ export function DetailIdentityBreadcrumb({
 							className={cn(
 								"flex min-w-0 shrink-0 items-center gap-xs",
 								"font-medium tracking-m",
-								"text-[0.8125rem]/5",
+								"text-body-l",
 							)}
 							title={`${item.label}: ${item.title ?? item.value}`}
 						>
@@ -60,7 +58,7 @@ export function DetailIdentityBreadcrumb({
 							{!current ? (
 								<IconChevronRight
 									aria-hidden="true"
-									className="size-4 shrink-0 text-ink-disabled dark:text-ink-disabled"
+									className="size-4 shrink-0 text-ink-disabled"
 								/>
 							) : null}
 						</li>
