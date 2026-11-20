@@ -25,6 +25,9 @@ import { wholeText } from "@/features/sessions/reader/files/session-files-model"
 import {
 	CARD,
 	Crumb,
+	ReaderPane,
+	ReaderPaneHeader,
+	ReaderPaneScroll,
 	ScrollColumn,
 	ViewToggle,
 } from "@/features/sessions/reader/files/session-reader-files-parts";
@@ -298,11 +301,8 @@ function RepoFileDetail({
 		.map(encodeURIComponent)
 		.join("/")}`;
 	return (
-		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-s pt-xl pr-xl pl-xxl">
-			<div className="flex min-h-7 shrink-0 flex-wrap items-center gap-x-l gap-y-xs">
-				<div className="flex min-w-0 flex-1 items-center gap-s">
-					<Crumb title={path}>{name}</Crumb>
-				</div>
+		<ReaderPane>
+			<ReaderPaneHeader crumbs={<Crumb title={path}>{name}</Crumb>}>
 				<a
 					href={githubUrl}
 					target="_blank"
@@ -319,7 +319,7 @@ function RepoFileDetail({
 					<IconBrandGithub aria-hidden="true" className="size-3.5" />
 					{repository.commitSha.slice(0, 7)}
 				</a>
-			</div>
+			</ReaderPaneHeader>
 			<span
 				className={cn(
 					"shrink-0 [direction:rtl]",
@@ -339,7 +339,7 @@ function RepoFileDetail({
 					className="mt-l"
 				/>
 			) : !file || hunks ? (
-				<ScrollColumn className="-mr-xl -ml-s pr-xl pl-s">
+				<ReaderPaneScroll>
 					<div className="flex flex-col gap-m pt-m pb-xl">
 						<Reveal
 							label="Loading the file"
@@ -354,11 +354,11 @@ function RepoFileDetail({
 							}
 						</Reveal>
 					</div>
-				</ScrollColumn>
+				</ReaderPaneScroll>
 			) : file.status !== "text" ? (
 				<FileNotShown file={file} />
 			) : null}
-		</div>
+		</ReaderPane>
 	);
 }
 
@@ -475,11 +475,11 @@ function FileDetailSkeleton() {
 				<Skeleton className="ml-auto h-4 w-32" />
 			</div>
 			<Skeleton className="h-3 w-56 shrink-0" />
-			<ScrollColumn className="-mr-xl -ml-s pr-xl pl-s">
+			<ReaderPaneScroll>
 				<div className="flex flex-col gap-m pt-m pb-xl">
 					<CodeSkeleton label="Loading the file" />
 				</div>
-			</ScrollColumn>
+			</ReaderPaneScroll>
 		</div>
 	);
 }

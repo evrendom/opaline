@@ -106,6 +106,7 @@ function ShelfOutline() {
 	return (
 		<span
 			aria-hidden="true"
+			// design-escape-ok: the dashed drop outline follows the 26px squircle of the shelf it sits in; no corner step
 			className="pointer-events-none absolute inset-y-4 right-0 left-4 corner-l edge-m edge-r-none border-dashed corner-squircle squircle:rounded-4xl dark:border-line/50"
 		/>
 	);

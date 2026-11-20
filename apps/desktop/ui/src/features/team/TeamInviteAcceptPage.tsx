@@ -100,7 +100,10 @@ function TeamInviteStateScreen(props: { body: string; title?: string }) {
 	return (
 		<section className="flex min-h-svh items-center justify-center bg-canvas px-xl py-xxl sm:px-xxl lg:px-[calc(var(--space-xxl)*4/3)]">
 			<div className="mx-auto w-full max-w-xl space-y-l text-center">
-				<p className="text-body-m font-heavy uppercase tracking-[0.24em] text-ink-3">
+				<p
+					// design-escape-ok: an uppercase eyebrow, letter-spaced wider than any tracking step
+					className="text-body-m font-heavy uppercase tracking-[0.24em] text-ink-3"
+				>
 					Opaline team
 				</p>
 				<h1 className="text-display-s font-heavy text-ink">{title}</h1>

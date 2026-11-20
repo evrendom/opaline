@@ -48,6 +48,7 @@ import { ToolCard } from "@/features/sessions/reader/detail/step/session-reader-
 import { ModelChip } from "@/features/sessions/reader/detail/waterfall/session-reader-waterfall-chips";
 import {
 	CARD,
+	ReaderPane,
 	ScrollColumn,
 } from "@/features/sessions/reader/files/session-reader-files-parts";
 import { mcpResult } from "@/features/sessions/reader/model/session-reader-mcp-tool";
@@ -530,7 +531,7 @@ function McpRunCalls({
 	const calls = query.data?.calls;
 	const tag = version ? ` · v${version}` : "";
 	return (
-		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-s pt-xl pr-xl pl-xxl">
+		<ReaderPane>
 			<PickStrip
 				agent={run.agentId || null}
 				model={run.model ?? null}
@@ -581,7 +582,7 @@ function McpRunCalls({
 					)}
 				</Reveal>
 			)}
-		</div>
+		</ReaderPane>
 	);
 }
 
@@ -767,7 +768,7 @@ function RunTrace({
 				: `Loaded ${name}${tag}${steps.length > 1 ? `, ${steps.length} times` : ""}`
 			: undefined;
 	return (
-		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-s pt-xl pr-xl pl-xxl">
+		<ReaderPane>
 			<PickStrip
 				agent={agent}
 				model={model}
@@ -802,7 +803,7 @@ function RunTrace({
 				userId={userId}
 				uses={uses}
 			/>
-		</div>
+		</ReaderPane>
 	);
 }
 
@@ -1083,7 +1084,10 @@ function SkillTraceBody() {
 					</div>
 				</div>
 			</div>
-			<div className="flex flex-col gap-xl pl-[calc(2.25rem+9px)]">
+			<div
+				// design-escape-ok: skeleton rows indent past the trace's 36px glyph column and its 9px rule
+				className="flex flex-col gap-xl pl-[calc(2.25rem+9px)]"
+			>
 				{TRACE_ROWS.map((row) => (
 					<div key={row.id} className="flex h-6 items-center gap-m">
 						<Bone className="size-5 shrink-0 corner-s" />

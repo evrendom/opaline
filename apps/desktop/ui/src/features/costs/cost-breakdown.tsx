@@ -425,12 +425,12 @@ function EntryIcon({
 				alt=""
 				width={16}
 				height={16}
-				className="size-4 shrink-0 corner-full object-cover ring-1 ring-black/5 dark:ring-white/10"
+				className="size-4 shrink-0 corner-full object-cover ring-1 ring-line-faint"
 			/>
 		);
 	if (dimension === "members")
 		return (
-			<Avatar className="size-4 shrink-0 corner-full ring-1 ring-black/5 dark:ring-white/10">
+			<Avatar className="size-4 shrink-0 corner-full ring-1 ring-line-faint">
 				<AvatarImage src={image ?? undefined} alt="" />
 				<AvatarFallback className="cost-member-initial">
 					{entry.label

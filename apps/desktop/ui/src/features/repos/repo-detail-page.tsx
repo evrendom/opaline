@@ -220,6 +220,7 @@ export function RepoDetailPage({
 							sessionFilter={{ repoKey }}
 							range={range}
 							sessionCount={undefined}
+							// design-escape-ok: row highlight's 18px squircle; the card pair's 22 would round it visibly more
 							rowHighlightClassName="corner-m corner-squircle squircle:rounded-2xl"
 							detailHref={(id) =>
 								id
@@ -277,6 +278,7 @@ export function RepoDetailPage({
 			? { startDate: pickedRange.start, endDate: pickedRange.end }
 			: range,
 		sessionCount: undefined,
+		// design-escape-ok: row highlight's 18px squircle; the card pair's 22 would round it visibly more
 		rowHighlightClassName: "corner-m corner-squircle squircle:rounded-2xl",
 		detailHref: (id) =>
 			id

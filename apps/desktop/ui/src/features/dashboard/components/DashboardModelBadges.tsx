@@ -25,40 +25,43 @@ function shouldHideModelBadge(model: string) {
 	return normalizedModel.includes("synthetic");
 }
 
+// Model badges set their type solid and a hair tight so the cap-trimmed label
+// centres in a fixed-height pill.
+const BADGE_TRACKING =
+	// design-escape-ok: the badge's -1% tracking; no text step carries it
+	"tracking-[-0.01em]";
+const CAP_TRIM_LABEL =
+	// design-escape-ok: solid line height for the label's cap trim
+	"flex min-w-0 items-center leading-none [text-box-edge:cap_alphabetic] [text-box-trim:trim-both]";
+
 function getModelBadgeSizeClasses(
 	size: DashboardModelBadgeSize,
 ): ModelBadgeSizeClasses {
 	if (size === "md") {
 		return {
-			badgeClassName:
-				"h-8 gap-m text-[0.8125rem] font-medium tracking-[-0.01em]",
+			badgeClassName: `h-8 gap-m text-body-l font-medium ${BADGE_TRACKING}`,
 			chipClassName: "size-5",
 			glyphClassName: "size-3",
-			labelClassName:
-				"flex min-w-0 items-center leading-none [text-box-edge:cap_alphabetic] [text-box-trim:trim-both]",
+			labelClassName: CAP_TRIM_LABEL,
 			paddingClassName: "px-l",
 		};
 	}
 
 	if (size === "table") {
 		return {
-			badgeClassName:
-				"h-5 gap-xs text-base font-medium tracking-[-0.01em] sm:text-sm",
+			badgeClassName: `h-5 gap-xs text-body-xxl font-medium ${BADGE_TRACKING} sm:text-body-xl`,
 			chipClassName: "size-4",
 			glyphClassName: "size-2.5",
-			labelClassName:
-				"flex min-w-0 items-center leading-none [text-box-edge:cap_alphabetic] [text-box-trim:trim-both]",
+			labelClassName: CAP_TRIM_LABEL,
 			paddingClassName: "px-m",
 		};
 	}
 
 	return {
-		badgeClassName:
-			"h-5 gap-xs text-[0.6875rem] font-semibold tracking-[-0.01em]",
+		badgeClassName: `h-5 gap-xs text-body-s font-semibold ${BADGE_TRACKING}`,
 		chipClassName: "size-4",
 		glyphClassName: "size-2.5",
-		labelClassName:
-			"flex min-w-0 items-center leading-none [text-box-edge:cap_alphabetic] [text-box-trim:trim-both]",
+		labelClassName: CAP_TRIM_LABEL,
 		paddingClassName: "px-m",
 	};
 }
@@ -156,6 +159,7 @@ export function DashboardModelBadges({
 				return (
 					<span
 						key={model}
+						// design-escape-ok: solid line height so the cap-trimmed label centres in the fixed-height badge
 						className={`inline-flex max-w-full items-center justify-center corner-full edge-m leading-none tabular-nums ${sizeClasses.badgeClassName} ${sizeClasses.paddingClassName} ${badgeTone.chipClassName}`}
 					>
 						{badgeTone.icon ? (

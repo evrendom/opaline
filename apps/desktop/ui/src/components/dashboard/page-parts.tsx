@@ -51,6 +51,7 @@ export function EmptyState({
 						className={cn(
 							"absolute inset-0",
 							restingChipClassName,
+							// design-escape-ok: the opal shape's ring is artwork
 							"[--opal-ring:rgb(17_24_39/0.08)]",
 						)}
 					/>
@@ -208,6 +209,7 @@ export function StatCard({
 					aria-label={label}
 					aria-pressed={selected}
 					onClick={onSelect}
+					// design-escape-ok: the hit area follows its card's corner
 					className={cn("absolute inset-0 z-10 rounded-[inherit] outline-none")}
 				/>
 			) : null}
