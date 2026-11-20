@@ -9,6 +9,7 @@ const {
 	compareVersions,
 	createUpdater,
 	defaultFeedUrl,
+	feedAssetName,
 	githubAsset,
 	isQuietFailure,
 	parseFeed,
@@ -16,7 +17,7 @@ const {
 	updateZipName,
 } = require("../updates");
 
-const FEED_URL = defaultFeedUrl("arm64");
+const FEED_URL = defaultFeedUrl("arm64", "darwin");
 const ZIP_URL =
 	"https://github.com/evrendom/opaline/releases/download/desktop-v0.2.0/Opaline-0.2.0-darwin-arm64.zip";
 
@@ -88,6 +89,7 @@ function setup({
 		currentVersion,
 		env,
 		arch: "arm64",
+		platform: "darwin",
 		fetch,
 		log: (line) => lines.push(line),
 		ui,
@@ -120,9 +122,16 @@ describe("versions", () => {
 
 	test("release names follow the version", () => {
 		expect(releaseTag("0.2.0")).toBe("desktop-v0.2.0");
-		expect(updateZipName("0.2.0", "arm64")).toBe(
+		expect(updateZipName("0.2.0", "arm64", "darwin")).toBe(
 			"Opaline-0.2.0-darwin-arm64.zip",
 		);
+		expect(updateZipName("0.2.0", "x64", "darwin")).toBe(
+			"Opaline-0.2.0-darwin-x64.zip",
+		);
+		expect(feedAssetName("x64", "darwin")).toBe(
+			"desktop-update-darwin-x64.json",
+		);
+		expect(feedAssetName("x64", "linux")).toBe("desktop-update-linux-x64.json");
 		expect(FEED_URL).toBe(
 			"https://github.com/evrendom/opaline/releases/download/desktop-latest/desktop-update-darwin-arm64.json",
 		);
