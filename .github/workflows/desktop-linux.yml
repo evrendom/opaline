@@ -57,7 +57,7 @@ jobs:
         run: |
           home=$(mktemp -d)
           log="$home/.config/Opaline/logs/local-stack.log"
-          HOME="$home" xvfb-run -a opaline >"$home/stdout.log" 2>&1 &
+          HOME="$home" XDG_CONFIG_HOME="$home/.config" xvfb-run -a opaline >"$home/stdout.log" 2>&1 &
           app=$!
           for _ in $(seq 1 120); do
             if grep -q "mark server-ready" "$log" 2>/dev/null; then
@@ -84,7 +84,7 @@ jobs:
           test -x squashfs-root/AppRun
           test -x squashfs-root/resources/runtimes/"$(jq -r .clickhouse.path squashfs-root/resources/runtimes/runtimes.json)"
           home=$(mktemp -d)
-          HOME="$home" timeout 60 xvfb-run -a squashfs-root/AppRun >"$home/stdout.log" 2>&1 &
+          HOME="$home" XDG_CONFIG_HOME="$home/.config" timeout 60 xvfb-run -a squashfs-root/AppRun >"$home/stdout.log" 2>&1 &
           for _ in $(seq 1 24); do
             grep -q "mark ready" "$home/.config/Opaline/logs/local-stack.log" 2>/dev/null && exit 0
             sleep 5
