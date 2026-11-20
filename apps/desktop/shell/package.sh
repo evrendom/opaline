@@ -124,7 +124,10 @@ else
 			codesign --force --timestamp --options runtime --entitlements "$entitlements" --sign "$identity" "$binary"
 		fi
 	done
-	find "$app/Contents/Frameworks" -type f -perm -u+x ! -name '*.dylib' | while read -r binary; do
+	# Deepest first: codesign refuses a binary whose bundle holds unsigned code,
+	# and Electron's x64 build ships its helpers unsigned (arm64 binaries are
+	# always ad-hoc signed, which hid the order).
+	find "$app/Contents/Frameworks" -type f -perm -u+x ! -name '*.dylib' | awk '{ print gsub("/", "/"), $0 }' | sort -rn | cut -d' ' -f2- | while read -r binary; do
 		if file "$binary" | grep -q Mach-O; then
 			codesign --force --timestamp --options runtime --entitlements "$entitlements" --sign "$identity" "$binary"
 		fi
