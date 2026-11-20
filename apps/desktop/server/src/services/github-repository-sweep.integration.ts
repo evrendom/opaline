@@ -53,9 +53,26 @@ const config = {
 	read: async () => "fixture",
 };
 type Route = (url: URL) => Response | Promise<Response>;
+const GITHUB_FACT_TABLES = [
+	"github_pull_requests",
+	"github_pull_request_details",
+	"github_pull_request_commits",
+	"github_ci_runs",
+	"github_ci_jobs",
+	"github_ci_run_pull_requests",
+];
 
 afterAll(async () => {
-	for (const organizationId of ids) await deleteOrgSessions(organizationId);
+	// The sweep writes only these facts: one delete per table covers every
+	// fixture workspace. The deletion test exercises the real purge.
+	await Promise.all(
+		GITHUB_FACT_TABLES.map((table) =>
+			getClickhouse().execute({
+				query: `DELETE FROM rudel.${table} WHERE workspace_id IN {ids:Array(String)}`,
+				query_params: { ids },
+			}),
+		),
+	);
 	await sqlClient.unsafe(
 		"DELETE FROM clickhouse_purge_job WHERE target_id = ANY($1::text[])",
 		[[...ids, ...users]],
@@ -342,6 +359,7 @@ test("jobs of successful runs are collected once; only unsettled jobs are fetche
 		"/repos/fixture/repo/actions/runs/1/attempts/1/jobs",
 		"/repos/fixture/repo/actions/runs/2/attempts/1/jobs",
 	]);
+	await recordRetentionBoundary(scope.organizationId);
 	const later = new Date(NOW.getTime() + 2 * 86_400_000);
 	await enqueueGitHubRepositorySweep(scope, later, sqlClient);
 	// Run 1's jobs settled before this pass: only run 2, still running at the
@@ -679,7 +697,7 @@ test("an installation lease left by a crashed worker is taken over once it expir
 	const blocked = await execute(scope.organizationId, defaults);
 	expect(blocked.requests).toBe(0);
 	expect(blocked.hasMore).toBe(true);
-	await Bun.sleep(1_500);
+	await leaseExpired(lease);
 	const resumed = await execute(scope.organizationId, defaults);
 	expect(resumed.requests).toBeGreaterThan(0);
 	const [remaining] = await sqlClient<Array<{ count: number }>>`
@@ -732,6 +750,7 @@ test("a worker whose lease was taken over cannot commit its sweep cursor", async
 test("daily reconciliation finds re-runs on old commits without refetching unchanged commit maps", async () => {
 	const scope = await seed();
 	await execute(scope.organizationId, deletionFixture);
+	await recordRetentionBoundary(scope.organizationId);
 	await enqueueGitHubRepositorySweep(
 		scope,
 		new Date(NOW.getTime() + 2 * 86_400_000),
@@ -763,6 +782,7 @@ test("incremental PRs stop at the previous complete pass start minus one hour", 
 			? json([pr(1), pr(2), pr(3)])
 			: defaults(url),
 	);
+	await recordRetentionBoundary(scope.organizationId);
 	const nextPass = new Date(NOW.getTime() + 2 * 86_400_000);
 	await enqueueGitHubRepositorySweep(scope, nextPass, sqlClient);
 	const cutoff = new Date(NOW.getTime() - 3_600_000);
@@ -1384,6 +1404,30 @@ async function seedCompletedHistory() {
 	return scope;
 }
 
+/**
+ * Records what a first pass that met the retention cliff stores: GitHub keeps
+ * Actions history only from the seeded window on. A daily pass then re-sweeps
+ * CI from there, not across two years of windows the seed never covered.
+ */
+async function recordRetentionBoundary(organizationId: string, days = 2) {
+	await sqlClient.unsafe(
+		"UPDATE github_repository_sweep SET retention_boundary = $2 WHERE organization_id = $1",
+		[organizationId, new Date(NOW.getTime() - days * 86_400_000).toISOString()],
+	);
+}
+
+/** Waits until the database clock, which every lease decision reads, passes the lease's expiry. */
+async function leaseExpired(name: string) {
+	for (;;) {
+		const [lease] = await sqlClient<Array<{ expired: boolean }>>`
+			SELECT expires_at <= now() AS expired FROM coordination_lease WHERE name = ${name}
+		`;
+		expect(lease).toBeDefined();
+		if (lease?.expired) return;
+		await Bun.sleep(25);
+	}
+}
+
 async function repositoryReadiness(
 	scope: { organizationId: string; repositoryId: string },
 	now: Date,
@@ -1517,14 +1561,7 @@ async function expectPopulated(organizationId: string) {
 	await expectFactCounts(organizationId, true);
 }
 async function expectFactCounts(organizationId: string, populated: boolean) {
-	for (const table of [
-		"github_pull_requests",
-		"github_pull_request_details",
-		"github_pull_request_commits",
-		"github_ci_runs",
-		"github_ci_jobs",
-		"github_ci_run_pull_requests",
-	]) {
+	for (const table of GITHUB_FACT_TABLES) {
 		const [row] = await queryFacts<{ count: number }>(
 			`SELECT count() AS count FROM rudel.${table} FINAL WHERE workspace_id = {workspace:String}`,
 			organizationId,
