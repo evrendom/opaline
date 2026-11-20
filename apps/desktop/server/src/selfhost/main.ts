@@ -142,6 +142,10 @@ async function main(): Promise<void> {
 		stopping = true;
 		status(`stopping (${signal})`);
 		const timedOut = Symbol("timeout");
+		// A job on the maintenance thread stops at once instead of holding the grace period.
+		void import("../services/maintenance-job-thread.js").then((module) =>
+			module.closeMaintenanceJobThread(),
+		);
 		const [settled] = await Promise.all([
 			Promise.race([
 				Promise.all([
