@@ -311,7 +311,7 @@ export function SignupForm(props: SignupFormProps) {
 							aria-describedby="signup-code-delivery"
 							autoComplete="one-time-code"
 							autoFocus
-							className="opaline-auth-code-input"
+							className="form-input opaline-auth-code-input"
 							id={SIGNUP_CODE_INPUT_ID}
 							inputMode="numeric"
 							name="code"
@@ -323,7 +323,7 @@ export function SignupForm(props: SignupFormProps) {
 							}}
 							required
 						/>
-						<Button type="submit" disabled={loading}>
+						<Button className="form-button" type="submit" disabled={loading}>
 							{loading ? "Verifying..." : "Verify code"}
 						</Button>
 					</form>
@@ -336,12 +336,13 @@ export function SignupForm(props: SignupFormProps) {
 					<div className="flex flex-col gap-m">
 						<Button
 							type="button"
-							className="opaline-website-primary-button"
+							className="form-button opaline-website-primary-button"
 							onClick={() => handleSocialSignIn("github")}
 						>
 							<span>Create account with GitHub</span>
 						</Button>
 						<Button
+							className="form-button"
 							type="button"
 							variant="outline"
 							onClick={() => handleSocialSignIn("google")}
@@ -378,6 +379,7 @@ export function SignupForm(props: SignupFormProps) {
 									Email
 								</Label>
 								<Input
+									className="form-input"
 									autoComplete="email"
 									disabled={emailCodeStage === "code"}
 									id="email"
@@ -391,12 +393,13 @@ export function SignupForm(props: SignupFormProps) {
 									required
 								/>
 							</div>
-							<Button type="submit" disabled={loading}>
+							<Button className="form-button" type="submit" disabled={loading}>
 								{loading ? "Sending code..." : "Send code"}
 							</Button>
 						</form>
 					) : (
 						<Button
+							className="form-button"
 							type="button"
 							variant="outline"
 							onClick={() => {

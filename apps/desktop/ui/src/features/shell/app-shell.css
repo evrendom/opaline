@@ -6,17 +6,6 @@
 	box-shadow: var(--shadow-card);
 }
 
-.dashboard-01-chrome-frame [data-slot="sidebar-inner"] {
-	background: transparent;
-}
-
-[data-slot="sidebar"],
-[data-slot="dashboard-header"] {
-	font-family: var(--font-sans);
-	-webkit-font-smoothing: antialiased;
-	-moz-osx-font-smoothing: grayscale;
-}
-
 .desktop-window-bar {
 	display: none;
 }
@@ -80,21 +69,22 @@
 	padding-left: var(--space-zero);
 }
 
-:root[data-desktop]
-	:is([data-slot="sidebar-header"], [data-slot="dashboard-header"]) {
+/* The window drags by the sidebar's header, the page header and the shell's
+   gaps; their controls stay clickable. */
+:root[data-desktop] :is(.desktop-drag-header, [data-slot="dashboard-header"]) {
 	-webkit-app-region: drag;
 }
 
-:root[data-desktop] [data-slot="sidebar-wrapper"] {
+:root[data-desktop] .desktop-drag-wrapper {
 	-webkit-app-region: drag;
 }
 
-:root[data-desktop] [data-slot="sidebar-wrapper"] > * {
+:root[data-desktop] .desktop-drag-wrapper > * {
 	-webkit-app-region: no-drag;
 }
 
 :root[data-desktop]
-	:is([data-slot="sidebar-header"], [data-slot="dashboard-header"])
+	:is(.desktop-drag-header, [data-slot="dashboard-header"])
 	:is(
 		a,
 		button,
@@ -110,8 +100,7 @@
 }
 
 :root[data-desktop]:not([data-fullscreen])
-	[data-slot="sidebar"][data-state="collapsed"]
-	+ *
+	[data-sidebar-state="collapsed"]
 	[data-slot="dashboard-header"] {
 	padding-left: calc(var(--space-xxl) * 11 / 3);
 }
@@ -122,6 +111,6 @@
 
 :root[data-desktop]
 	.product-window-frame
-	:is([data-slot="sidebar-header"], [data-slot="dashboard-header"]) {
+	:is(.desktop-drag-header, [data-slot="dashboard-header"]) {
 	-webkit-app-region: no-drag;
 }

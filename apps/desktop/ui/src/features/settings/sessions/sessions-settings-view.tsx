@@ -108,6 +108,7 @@ export function SessionsSettingsView({
 							type="button"
 							variant="outline"
 							size="sm"
+							className="bg-canvas hover:bg-field"
 							disabled={fetching}
 							onClick={onRefresh}
 						>

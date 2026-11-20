@@ -218,7 +218,7 @@ export function AcceptInvitationPage() {
 							) : null}
 							<Button
 								type="button"
-								className="opaline-website-primary-button w-full"
+								className="form-button opaline-website-primary-button w-full"
 								onClick={handleAccept}
 								disabled={status === "accepting"}
 							>
@@ -229,7 +229,7 @@ export function AcceptInvitationPage() {
 							<Button
 								type="button"
 								variant="outline"
-								className="w-full"
+								className="form-button w-full"
 								onClick={handleReject}
 								disabled={status === "accepting"}
 							>

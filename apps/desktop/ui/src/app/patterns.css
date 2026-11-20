@@ -113,6 +113,60 @@
 	opacity: 1;
 }
 
+/* Form controls: the tall buttons and fields of the sign-in, sign-up and
+   invitation screens. Put on Button / Input with className; Button's outline
+   variant sits on the surface with the control shadow. Text inherits the
+   form's. */
+.form-button {
+	min-height: 42px;
+	border-radius: var(--radius-s);
+	font: inherit;
+	transition:
+		background-color 140ms ease,
+		border-color 140ms ease,
+		color 140ms ease;
+}
+.form-button[data-variant="outline"] {
+	border-color: transparent;
+	padding: var(--space-l) var(--space-xl);
+	background: var(--surface);
+	box-shadow: var(--shadow-control);
+}
+.form-button[data-variant="outline"]:hover:not(:disabled) {
+	background: var(--hover);
+}
+.form-input {
+	min-height: 44px;
+	border: var(--border-m) solid var(--line);
+	border-radius: var(--radius-s);
+	background: var(--surface);
+}
+@media (max-width: 899px) {
+	.form-button,
+	.form-input {
+		font-size: var(--size-xxl);
+		line-height: var(--line-xxl);
+		letter-spacing: var(--letter-spacing-xxl);
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.form-button {
+		transition: none;
+	}
+}
+
+/* Tab pill: the highlight that slides along a tab row or a segmented control
+   (PillTabs' `pillClassName`). On a track it takes the track's tone
+   (`.tab-track`, the same as `bg-track`); lifted off the page it is a soft
+   card on the card shadow (`.tab-pill`). Both modes come from the roles. */
+.tab-track {
+	background: var(--track);
+}
+.tab-pill {
+	background: var(--card-soft);
+	box-shadow: var(--shadow-card);
+}
+
 /* ---- Part B · Opaline patterns ---- */
 
 /* Surface card: the app's card. Surface, card shadow, squircle corners where

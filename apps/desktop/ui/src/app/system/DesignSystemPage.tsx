@@ -26,6 +26,11 @@ import {
 	EmptyTitle,
 } from "@/app/ui/empty";
 import { Input } from "@/app/ui/input";
+import {
+	InputGroup,
+	InputGroupAddon,
+	InputGroupInput,
+} from "@/app/ui/input-group";
 import { Label } from "@/app/ui/label";
 import { Separator } from "@/app/ui/separator";
 import {
@@ -49,13 +54,25 @@ const GROUND = [
 	"canvas",
 	"surface",
 	"card",
+	"card-soft",
 	"inset",
 	"field",
+	"track",
+	"shelf",
 	"hover",
 	"hover-strong",
 	"wash",
+	"mark-fill",
 ];
-const INK = ["ink", "ink-2", "ink-3", "ink-disabled", "ink-inverse"];
+const INK = [
+	"ink",
+	"ink-2",
+	"ink-3",
+	"ink-disabled",
+	"ink-inverse",
+	"ink-soft",
+	"ink-meta",
+];
 const LINES = ["line", "line-strong", "line-soft"];
 const ACTION = [
 	"primary",
@@ -65,6 +82,7 @@ const ACTION = [
 	"accent",
 	"accent-tint",
 	"accent-line",
+	"accent-fg",
 ];
 const STATE = [
 	"success",
@@ -470,6 +488,39 @@ function Patterns() {
 					<span className="filter-chip-dimension">Repo</span>
 					inactive
 				</span>
+			</Row>
+			<Row label="InputGroup toolbar">
+				<InputGroup variant="toolbar" className="w-56">
+					<InputGroupAddon>
+						<IconSearch />
+					</InputGroupAddon>
+					<InputGroupInput placeholder="Search" />
+				</InputGroup>
+			</Row>
+			<Row label="form controls">
+				<div className="flex w-64 flex-col gap-m">
+					<Input className="form-input" placeholder="you@example.com" />
+					<Button className="form-button">Continue</Button>
+					<Button className="form-button" variant="outline">
+						Continue with Google
+					</Button>
+				</div>
+			</Row>
+			<Row label="tab pills">
+				<span className="tab-track inline-flex h-8 items-center corner-s px-l text-body-xl">
+					On a track
+				</span>
+				<span className="tab-pill inline-flex h-8 items-center corner-s px-l text-body-xl">
+					Lifted
+				</span>
+				<span className="inline-flex h-8 items-center corner-s bg-accent px-l text-body-xl text-accent-fg">
+					accent-fg
+				</span>
+			</Row>
+			<Row label="inset corner">
+				<div className="relative size-16 corner-s bg-card shadow-card corner-squircle squircle:corner-xl">
+					<div className="absolute inset-px corner-s-inset bg-hover-strong corner-squircle squircle:corner-xl-inset" />
+				</div>
 			</Row>
 			<Row label="toolbar-search">
 				<div className="relative w-56">

@@ -68,10 +68,6 @@
 	min-height: 0;
 }
 
-.product-window-frame [data-slot="sidebar"] {
-	height: 100%;
-}
-
 /* Full-bleed in the product; the colours stay the demo's. */
 .product-app-shell.dashboard-01-preview,
 .product-app-shell .dashboard-01-chrome-frame {

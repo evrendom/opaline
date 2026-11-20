@@ -76,7 +76,11 @@ html[data-auth-shell],
 	text-transform: uppercase;
 }
 
-.opaline-auth-content [data-slot="button"] {
+/* Buttons and fields here take the form-button / form-input pattern
+   (patterns.css). Transitional: the self-hosted forms (features/self-hosted)
+   don't carry those classes yet, so the same look reaches them from here.
+   Delete this block once they do. */
+.opaline-auth-content [data-slot="button"]:not(.form-button) {
 	min-height: 42px;
 	border-radius: var(--radius-s);
 	font: inherit;
@@ -86,7 +90,8 @@ html[data-auth-shell],
 		color 140ms ease;
 }
 
-.opaline-auth-content [data-slot="button"][data-variant="outline"] {
+.opaline-auth-content
+	[data-slot="button"][data-variant="outline"]:not(.form-button) {
 	border-color: transparent;
 	padding: var(--space-l) var(--space-xl);
 	background: var(--surface);
@@ -94,11 +99,13 @@ html[data-auth-shell],
 }
 
 .opaline-auth-content
-	[data-slot="button"][data-variant="outline"]:hover:not(:disabled) {
+	[data-slot="button"][data-variant="outline"]:not(.form-button):hover:not(
+		:disabled
+	) {
 	background: var(--hover);
 }
 
-.opaline-auth-content [data-slot="input"] {
+.opaline-auth-content [data-slot="input"]:not(.form-input) {
 	min-height: 44px;
 	border: var(--border-m) solid var(--line);
 	border-radius: var(--radius-s);
@@ -168,7 +175,9 @@ html[data-auth-shell],
 	transform: translate(-50%, -50%);
 }
 
-.opaline-auth-content [data-slot="input"].opaline-auth-code-input {
+.form-input.opaline-auth-code-input,
+.opaline-auth-content
+	[data-slot="input"].opaline-auth-code-input:not(.form-input) {
 	min-height: 56px;
 	border: 0;
 	padding-inline: var(--space-xl);
@@ -199,8 +208,8 @@ html[data-auth-shell],
 		padding-block: calc(var(--space-xxl) * 5 / 3);
 	}
 
-	.opaline-auth-content [data-slot="button"],
-	.opaline-auth-content [data-slot="input"] {
+	.opaline-auth-content [data-slot="button"]:not(.form-button),
+	.opaline-auth-content [data-slot="input"]:not(.form-input) {
 		font-size: var(--size-xxl);
 		line-height: var(--line-xxl);
 		letter-spacing: var(--letter-spacing-xxl);
@@ -220,7 +229,7 @@ html[data-auth-shell],
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.opaline-auth-content [data-slot="button"] {
+	.opaline-auth-content [data-slot="button"]:not(.form-button) {
 		transition: none;
 	}
 

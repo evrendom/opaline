@@ -272,7 +272,7 @@ export function LoginForm(props: LoginFormProps = {}) {
 							aria-describedby="login-code-delivery"
 							autoComplete="one-time-code"
 							autoFocus
-							className="opaline-auth-code-input"
+							className="form-input opaline-auth-code-input"
 							id={LOGIN_CODE_INPUT_ID}
 							inputMode="numeric"
 							name="code"
@@ -284,7 +284,7 @@ export function LoginForm(props: LoginFormProps = {}) {
 							}}
 							required
 						/>
-						<Button type="submit" disabled={loading}>
+						<Button className="form-button" type="submit" disabled={loading}>
 							{loading ? "Verifying..." : "Verify code"}
 						</Button>
 					</form>
@@ -297,12 +297,13 @@ export function LoginForm(props: LoginFormProps = {}) {
 					<div className="flex flex-col gap-m">
 						<Button
 							type="button"
-							className="opaline-website-primary-button"
+							className="form-button opaline-website-primary-button"
 							onClick={() => handleSocialSignIn("github")}
 						>
 							<span>Log in with GitHub</span>
 						</Button>
 						<Button
+							className="form-button"
 							type="button"
 							variant="outline"
 							onClick={() => handleSocialSignIn("google")}
@@ -340,6 +341,7 @@ export function LoginForm(props: LoginFormProps = {}) {
 									Email
 								</Label>
 								<Input
+									className="form-input"
 									disabled={emailCodeStage === "code"}
 									id="email"
 									name="email"
@@ -359,6 +361,7 @@ export function LoginForm(props: LoginFormProps = {}) {
 										Password
 									</Label>
 									<Input
+										className="form-input"
 										id="password"
 										name="password"
 										type="password"
@@ -374,7 +377,7 @@ export function LoginForm(props: LoginFormProps = {}) {
 									/>
 								</div>
 							) : null}
-							<Button type="submit" disabled={loading}>
+							<Button className="form-button" type="submit" disabled={loading}>
 								{passwordSignIn
 									? loading
 										? "Signing in..."
@@ -388,7 +391,7 @@ export function LoginForm(props: LoginFormProps = {}) {
 									type="button"
 									variant="ghost"
 									size="sm"
-									className="text-ink-3"
+									className="form-button text-ink-3"
 									disabled={loading}
 									onClick={() => {
 										setEmailCodeChosenFor(
@@ -406,6 +409,7 @@ export function LoginForm(props: LoginFormProps = {}) {
 						</form>
 					) : (
 						<Button
+							className="form-button"
 							type="button"
 							variant="outline"
 							onClick={() => {

@@ -47,6 +47,7 @@
 	--accent: var(--color-1); /* Opaline blue: links, selection, info */
 	--accent-tint: var(--color-1-transparent);
 	--accent-line: var(--color-1-translucent);
+	--accent-fg: #ffffff; /* text and icons on an accent fill, white in both modes */
 	--success-tint: var(--success-transparent);
 	--success-line: var(--success-translucent);
 	--warning-tint: var(--warning-transparent);
@@ -241,6 +242,7 @@
 	--color-accent: var(--accent);
 	--color-accent-tint: var(--accent-tint);
 	--color-accent-line: var(--accent-line);
+	--color-accent-fg: var(--accent-fg);
 	--color-success-tint: var(--success-tint);
 	--color-success-line: var(--success-line);
 	--color-warning-tint: var(--warning-tint);
@@ -278,6 +280,14 @@
 	--shadow-float: var(--shadow-float);
 	--shadow-sheet: var(--shadow-sheet);
 	--shadow-contact: var(--shadow-contact);
+}
+
+/* Inset corners: a child drawn 1px inside a surface keeps its corners
+   concentric with the surface's (`corner-s-inset squircle:corner-xl-inset`
+   inside a `corner-s squircle:corner-xl` tile: a hover or focus overlay). */
+@theme inline {
+	--corner-s-inset: calc(var(--radius-s) - 1px);
+	--corner-xl-inset: calc(var(--radius-xl) - 1px);
 }
 
 /* Motion roles as Tailwind easings: `ease-strong`, `ease-drawer`, `ease-wave`. */

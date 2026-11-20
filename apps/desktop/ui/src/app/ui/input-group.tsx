@@ -7,25 +7,36 @@ import { Button } from "@/app/ui/button";
 import { Input } from "@/app/ui/input";
 import { cn } from "@/lib/utils";
 
-function InputGroup({ className, ...props }: React.ComponentProps<"div">) {
+function InputGroup({
+	className,
+	variant = "default",
+	...props
+}: React.ComponentProps<"div"> & {
+	/** `toolbar`: the toolbar's 32px search pill, on the toolbar button's
+	 *  card and control shadow in both modes (a filter row's search). */
+	variant?: "default" | "toolbar";
+}) {
 	return (
 		// biome-ignore lint/a11y/useSemanticElements: A fieldset's default border and min-width would break the inline control layout.
 		<div
 			data-slot="input-group"
+			data-variant={variant}
 			role="group"
 			className={cn(
-				"group/input-group relative flex h-9 w-full min-w-0 items-center",
-				"corner-s corner-squircle",
-				"shadow-card transition-[color,box-shadow] outline-none",
-				"squircle:corner-l",
-				"dark:shadow-none dark:edge-s dark:border-line/50",
+				"group/input-group relative flex w-full min-w-0 items-center",
+				"transition-[color,box-shadow] outline-none",
+				variant === "toolbar"
+					? // The hover tint is half the hover role in light and all of it in
+						// dark; no role holds that step, so it stays a dark: pair.
+						"h-8 corner-full bg-card shadow-control hover:bg-hover/50 dark:hover:bg-hover"
+					: "h-9 corner-s corner-squircle shadow-card squircle:corner-l dark:shadow-none dark:edge-s dark:border-line/50 dark:bg-line-strong/30",
 				"in-data-[slot=combobox-content]:focus-within:border-inherit",
 				"has-[[data-slot=input-group-control]:focus-visible]:border-focus has-[[data-slot=input-group-control]:focus-visible]:ring-[1.5px] has-[[data-slot=input-group-control]:focus-visible]:ring-focus/50",
 				"has-[[data-slot][aria-invalid=true]]:border-error has-[[data-slot][aria-invalid=true]]:ring-[1.5px] has-[[data-slot][aria-invalid=true]]:ring-error/20",
 				"has-[>[data-align=block-end]]:h-auto has-[>[data-align=block-end]]:flex-col",
 				"has-[>[data-align=block-start]]:h-auto has-[>[data-align=block-start]]:flex-col",
 				"has-[>textarea]:h-auto",
-				"dark:bg-line-strong/30 dark:has-[[data-slot][aria-invalid=true]]:ring-error/40",
+				"dark:has-[[data-slot][aria-invalid=true]]:ring-error/40",
 				"has-[>[data-align=block-end]]:[&>input]:pt-l",
 				"has-[>[data-align=block-start]]:[&>input]:pb-l",
 				"has-[>[data-align=inline-end]]:[&>input]:pr-s",
