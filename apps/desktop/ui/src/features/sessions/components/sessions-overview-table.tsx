@@ -411,7 +411,7 @@ export function SessionsOverviewTable({
 									<SessionsOverviewFluidList
 										fillHeight={!pagination?.hasNextPage}
 										highlightClassName={cn(
-											// design-escape-ok: off-canon squircle pair (18px) kept as authored (listed)
+											// design-escape-ok: deliberate exception, off-canon squircle pair (18px) kept as authored
 											"in-data-rail-beside:corner-m in-data-rail-beside:corner-squircle in-data-rail-beside:squircle:rounded-2xl",
 											highlightClassName,
 										)}

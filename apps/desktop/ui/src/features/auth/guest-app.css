@@ -76,42 +76,6 @@ html[data-auth-shell],
 	text-transform: uppercase;
 }
 
-/* Buttons and fields here take the form-button / form-input pattern
-   (patterns.css). Transitional: the self-hosted forms (features/self-hosted)
-   don't carry those classes yet, so the same look reaches them from here.
-   Delete this block once they do. */
-.opaline-auth-content [data-slot="button"]:not(.form-button) {
-	min-height: 42px;
-	border-radius: var(--radius-s);
-	font: inherit;
-	transition:
-		background-color 140ms ease,
-		border-color 140ms ease,
-		color 140ms ease;
-}
-
-.opaline-auth-content
-	[data-slot="button"][data-variant="outline"]:not(.form-button) {
-	border-color: transparent;
-	padding: var(--space-l) var(--space-xl);
-	background: var(--surface);
-	box-shadow: var(--shadow-control);
-}
-
-.opaline-auth-content
-	[data-slot="button"][data-variant="outline"]:not(.form-button):hover:not(
-		:disabled
-	) {
-	background: var(--hover);
-}
-
-.opaline-auth-content [data-slot="input"]:not(.form-input) {
-	min-height: 44px;
-	border: var(--border-m) solid var(--line);
-	border-radius: var(--radius-s);
-	background: var(--surface);
-}
-
 .opaline-auth-stage {
 	animation: opaline-auth-stage-enter 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -175,9 +139,7 @@ html[data-auth-shell],
 	transform: translate(-50%, -50%);
 }
 
-.form-input.opaline-auth-code-input,
-.opaline-auth-content
-	[data-slot="input"].opaline-auth-code-input:not(.form-input) {
+.form-input.opaline-auth-code-input {
 	min-height: 56px;
 	border: 0;
 	padding-inline: var(--space-xl);
@@ -208,13 +170,6 @@ html[data-auth-shell],
 		padding-block: calc(var(--space-xxl) * 5 / 3);
 	}
 
-	.opaline-auth-content [data-slot="button"]:not(.form-button),
-	.opaline-auth-content [data-slot="input"]:not(.form-input) {
-		font-size: var(--size-xxl);
-		line-height: var(--line-xxl);
-		letter-spacing: var(--letter-spacing-xxl);
-	}
-
 	.opaline-email-verification-intro p {
 		font-size: var(--size-xxl);
 		line-height: var(--line-xxl);
@@ -229,10 +184,6 @@ html[data-auth-shell],
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.opaline-auth-content [data-slot="button"]:not(.form-button) {
-		transition: none;
-	}
-
 	.opaline-auth-stage {
 		animation: none;
 	}

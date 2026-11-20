@@ -57,10 +57,6 @@
 	text-align: right;
 }
 
-.desktop-repository-picker td:last-child [data-slot="checkbox"] {
-	margin-left: auto;
-}
-
 .desktop-repository-more {
 	align-self: flex-start;
 	padding: var(--space-zero);

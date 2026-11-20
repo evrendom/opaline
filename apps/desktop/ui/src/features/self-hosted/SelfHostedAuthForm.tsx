@@ -218,9 +218,10 @@ export function SelfHostedAuthForm({
 								key={provider}
 								type="button"
 								variant={index === 0 ? "default" : "outline"}
-								className={
-									index === 0 ? "opaline-website-primary-button" : undefined
-								}
+								className={cn(
+									"form-button",
+									index === 0 && "opaline-website-primary-button",
+								)}
 								disabled={loading}
 								onClick={() => void signInWithProvider(provider)}
 							>
@@ -262,7 +263,7 @@ export function SelfHostedAuthForm({
 					<Input
 						autoComplete="one-time-code"
 						autoFocus
-						className="opaline-auth-code-input"
+						className="form-input opaline-auth-code-input"
 						id="self-hosted-code"
 						inputMode="numeric"
 						name="code"
@@ -275,14 +276,14 @@ export function SelfHostedAuthForm({
 						}}
 						required
 					/>
-					<Button type="submit" disabled={loading}>
+					<Button className="form-button" type="submit" disabled={loading}>
 						{loading ? "Verifying..." : "Verify code"}
 					</Button>
 					<Button
 						type="button"
 						variant="ghost"
 						size="sm"
-						className="text-ink-3"
+						className="form-button text-ink-3"
 						disabled={loading}
 						onClick={() => {
 							setCodeSentTo(null);
@@ -304,6 +305,7 @@ export function SelfHostedAuthForm({
 								Name
 							</Label>
 							<Input
+								className="form-input"
 								id="self-hosted-name"
 								name="name"
 								autoComplete="name"
@@ -320,6 +322,7 @@ export function SelfHostedAuthForm({
 							Email
 						</Label>
 						<Input
+							className="form-input"
 							id="self-hosted-email"
 							name="email"
 							type="email"
@@ -339,6 +342,7 @@ export function SelfHostedAuthForm({
 							Password
 						</Label>
 						<Input
+							className="form-input"
 							id="self-hosted-password"
 							name="password"
 							type="password"
@@ -360,7 +364,7 @@ export function SelfHostedAuthForm({
 							required
 						/>
 					</div>
-					<Button type="submit" disabled={loading}>
+					<Button className="form-button" type="submit" disabled={loading}>
 						{mode === "sign-in"
 							? loading
 								? "Signing in..."
@@ -374,7 +378,7 @@ export function SelfHostedAuthForm({
 							type="button"
 							variant="ghost"
 							size="sm"
-							className="text-ink-3"
+							className="form-button text-ink-3"
 							disabled={loading}
 							onClick={() => void sendCode()}
 						>

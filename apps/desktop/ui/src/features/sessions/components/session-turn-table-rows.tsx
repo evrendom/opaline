@@ -9,7 +9,7 @@ export function SessionTurnCompactionRow({
 }) {
 	return (
 		<tr
-			// design-escape-ok: dark lifts the compaction row's warning text to amber-300; no role holds it (listed)
+			// design-escape-ok: deliberate exception, dark lifts the compaction label to amber-300 on its warning wash; dark's warning is amber-500, visibly darker
 			className="flex h-7 min-w-full items-center edge-y-m border-warning-line/70 bg-inset px-l text-body-m font-medium text-warning dark:border-warning/15 dark:bg-warning/10 dark:text-amber-300"
 			title={new Date(compaction.timestamp).toLocaleString()}
 		>

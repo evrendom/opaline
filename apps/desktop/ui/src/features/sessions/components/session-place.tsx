@@ -45,7 +45,7 @@ export function SessionPlaceLabel({
 		>
 			<span className="min-w-0 truncate">{place.label}</span>
 			{place.remote ? null : (
-				// design-escape-ok: 10/16 pill; body-xs's 14px line shrinks it (listed)
+				// design-escape-ok: deliberate exception, 10/16 pill; body-xs's 14px line shrinks it
 				<span className="shrink-0 corner-full bg-warning/12 px-s text-[0.625rem]/4 text-warning">
 					no remote
 				</span>

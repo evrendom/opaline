@@ -268,7 +268,7 @@ export function SessionDetailLayout({
 						className="pointer-events-none absolute inset-y-0 left-0 z-50 w-0"
 					>
 						<div
-							// design-escape-ok: one-off pane edge shadow; no shadow role fits (listed)
+							// design-escape-ok: deliberate exception, a shadow cast leftward off the pane's edge and clipped to that side; not an elevation
 							className="absolute -top-px right-0 bottom-0 w-px opacity-0 transition-opacity duration-(--motion-medium-duration) [background:none] [box-shadow:-6px_0px_16px_4px_rgba(0,0,0,0.12)] [clip-path:inset(0_0_0_-38px)] [transition-timing-function:ease] data-[visible=true]:opacity-100"
 							data-slot="session-detail-response-pane-edge-shadow"
 							data-visible={isResponsePaneEdgeShadowVisible ? "true" : "false"}

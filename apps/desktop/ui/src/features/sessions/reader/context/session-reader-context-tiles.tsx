@@ -353,8 +353,7 @@ export function ContextTiles({
 							aria-pressed={tile.key === picked}
 							aria-label={`Show what's in ${name}`}
 							onClick={(event) => pickBox(tile.key, event.shiftKey)}
-							// design-escape-ok: the hit area sits 1px inside its tile's corner
-							className="absolute inset-0 rounded-[calc(var(--radius-md)-1px)] corner-squircle outline-none transition-colors hover:bg-ink/3 squircle:rounded-[calc(var(--radius-xl)-1px)] dark:hover:bg-ink/4"
+							className="absolute inset-0 corner-s-inset corner-squircle outline-none transition-colors hover:bg-ink/3 squircle:corner-xl-inset dark:hover:bg-ink/4"
 						/>
 						<span
 							aria-hidden="true"

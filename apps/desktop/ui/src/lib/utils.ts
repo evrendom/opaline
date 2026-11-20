@@ -18,6 +18,9 @@ const ROLE_SHADOWS = [
 	"float",
 	"sheet",
 	"contact",
+	"jump",
+	"flyout",
+	"window",
 ];
 
 // tailwind-merge with Graphical's classes, so text styles, weights,

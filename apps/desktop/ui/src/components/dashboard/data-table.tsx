@@ -257,22 +257,7 @@ export function SearchInput({
 	className?: string;
 }) {
 	return (
-		// corner-round! drops the group's default squircle corner-shape, which
-		// otherwise flattens the fully-rounded pill ends. The shadow/bg/border
-		// overrides swap the group's default surface for the outline-Button one so
-		// it matches the sibling chips (which render that variant).
-		<InputGroup
-			className={cn(
-				// dark:bg-card explicitly: InputGroup's base sets dark:bg-line-strong/30 (a
-				// translucent wash that lands a shade lighter than card), which would
-				// otherwise win over the plain bg-card and mismatch the chips.
-				"h-8 w-56",
-				"corner-full corner-round!",
-				"shadow-control bg-card",
-				"squircle:corner-full dark:shadow-control dark:edge-none dark:bg-card hover:bg-hover/50 dark:hover:bg-hover",
-				className,
-			)}
-		>
+		<InputGroup variant="toolbar" className={cn("w-56", className)}>
 			<InputGroupAddon>
 				<IconSearch className="size-3.5 dark:text-ink-disabled text-ink-3" />
 			</InputGroupAddon>

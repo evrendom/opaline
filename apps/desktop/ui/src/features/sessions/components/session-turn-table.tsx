@@ -233,8 +233,7 @@ function SessionTurnTableViewedRowsButton({
 					? `Scroll ${direction === "above" ? "up" : "down"} to visible transcript rows`
 					: "Scroll to visible transcript rows"
 			}
-			// design-escape-ok: the jump button's drop; no shadow role matches (listed)
-			className="group absolute left-2 z-30 flex size-6 items-center justify-center corner-full bg-surface opacity-100 shadow-[0_2px_6px_#00000024] dark:ring-1 dark:ring-ink/10 outline-none data-[direction=above]:top-16 data-[direction=below]:bottom-11 data-[direction=none]:pointer-events-none data-[direction=none]:opacity-0 dark:shadow-none"
+			className="group absolute left-2 z-30 flex size-6 items-center justify-center corner-full bg-surface opacity-100 shadow-jump outline-none data-[direction=above]:top-16 data-[direction=below]:bottom-11 data-[direction=none]:pointer-events-none data-[direction=none]:opacity-0"
 			data-direction={direction ?? "none"}
 			disabled={direction === undefined}
 			onClick={scrollToViewedRows}

@@ -219,6 +219,7 @@ export function DesktopRepositoryPicker({
 									<td>{repo.uploadedCount?.toLocaleString() ?? "–"}</td>
 									<td>
 										<Checkbox
+											className="ml-auto"
 											aria-label={`Upload sessions from ${repo.name}`}
 											checked={isOn(repo.key, repo.enabled)}
 											disabled={working}

@@ -101,6 +101,12 @@
 		0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
 	/* the contact shadow under a small box control: checkbox */
 	--shadow-contact: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+	/* a small round button floating over a scrolling list (jump to the
+	   latest turn): a tight drop; dark trades it for a faint ink ring */
+	--shadow-jump: 0 2px 6px rgb(0 0 0 / 0.14);
+	/* a translucent flyout dropping from a strip (the activity strip's menu):
+	   one wide, faint drop; dark deepens it to the full near-black */
+	--shadow-flyout: 0 8px 32px rgb(8 9 10 / 0.05);
 
 	/* -- Motion. The theme holds two timings: --motion-duration (150ms) and
 	   --motion-easing for small changes, --motion-large-duration (300ms) and
@@ -212,6 +218,8 @@
 	--shadow-selected: var(--shadow-card);
 	--shadow-inset: inset 0 0 0 0.5px rgb(255 255 255 / 0.06);
 	--shadow-float: 0 0 #0000;
+	--shadow-jump: 0 0 0 1px color-mix(in oklab, var(--ink) 10%, transparent);
+	--shadow-flyout: 0 8px 32px rgb(8 9 10);
 	/* --- roles added by reader --- */
 	--mark-fill: var(--hover-strong);
 	--ink-soft: var(--ink-3);
@@ -291,6 +299,8 @@
 	--shadow-float: var(--shadow-float);
 	--shadow-sheet: var(--shadow-sheet);
 	--shadow-contact: var(--shadow-contact);
+	--shadow-jump: var(--shadow-jump);
+	--shadow-flyout: var(--shadow-flyout);
 	/* --- roles added by product --- */
 	--shadow-window: var(--shadow-window);
 	/* --- end product --- */

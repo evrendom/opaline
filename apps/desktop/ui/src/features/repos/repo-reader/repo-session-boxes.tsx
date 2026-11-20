@@ -521,8 +521,7 @@ function SessionTile({
 				onPointerEnter={onIntent}
 				onFocus={onIntent}
 				title={`${session.sessionId}\n${figure}`}
-				// design-escape-ok: the hit area sits one hairline inside the tile, so its corners are the tile's less 1px
-				className="absolute inset-0 rounded-[calc(var(--radius-s)-1px)] corner-squircle outline-none transition-colors hover:bg-hover squircle:rounded-[calc(var(--radius-xl)-1px)]"
+				className="absolute inset-0 corner-s-inset corner-squircle outline-none transition-colors hover:bg-hover squircle:corner-xl-inset"
 			/>
 			<span
 				aria-hidden="true"

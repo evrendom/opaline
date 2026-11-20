@@ -29,7 +29,7 @@ import {
 import type { SessionOverviewZoomWindow } from "./session-thread-overview-zoom";
 
 const SESSION_OVERVIEW_HOVER_CARD_SURFACE_CLASSES =
-	// design-escape-ok: the hover card's drop; no shadow role matches (listed)
+	// design-escape-ok: deliberate exception, Tailwind's md drop in both modes; label (sm) and float (lg) are visibly lighter and heavier
 	"absolute top-0 z-50 w-80 max-w-[calc(100%-1.5rem)] corner-s bg-canvas font-body text-body-m text-ink shadow-md ring-1 ring-ink/10";
 
 interface SessionContextUtilizationRingStyle extends CSSProperties {

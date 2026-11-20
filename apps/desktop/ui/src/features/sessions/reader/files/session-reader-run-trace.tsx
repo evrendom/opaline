@@ -436,7 +436,7 @@ function StepRow({
 						"size-3 shrink-0",
 						step.kind === "check" &&
 							!step.failed &&
-							// design-escape-ok: a passed check's green; dark lifts it for contrast and no role holds it (listed)
+							// design-escape-ok: deliberate exception, dark lifts a passed check to green-400 for contrast; dark's success is emerald-500, a visibly different green
 							"text-success dark:text-green-400",
 						step.kind === "edit" && "text-color-3",
 						!failedCheck &&
