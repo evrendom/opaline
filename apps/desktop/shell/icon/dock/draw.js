@@ -16,8 +16,8 @@ const WARN = [
 ];
 const LOW = 0.3;
 // Development builds look like Xcode, so they are never mistaken for the
-// installed app: a blueprint-blue face with a light grid, the graphite ring
-// and digits of the light icon, and a cyan glow.
+// installed app: a blueprint-blue face with a light grid, white ring and
+// digits, and a cyan glow.
 const XCODE_SHEEN = [
 	[0.86, 0.11, 218],
 	[0.8, 0.14, 230],
@@ -172,22 +172,13 @@ function strokeGlow(context, left, dark, width, blur, alpha, dev) {
 	context.restore();
 }
 
-/** `left` is null when there is no reading: a development build still shows its face and ring. */
 async function draw({ left, dark, size, layers, dev = false }) {
-	const [base, ring, digits] = await Promise.all([
-		image(layers.base),
-		image(layers.ring),
-		layers.number ? image(layers.number) : null,
-	]);
+	const [base, ring, digits] = await Promise.all([image(layers.base), image(layers.ring), image(layers.number)]);
 	const canvas = document.createElement("canvas");
 	canvas.width = size;
 	canvas.height = size;
 	const context = canvas.getContext("2d");
 	context.drawImage(dev ? blueprint(base, size) : base, 0, 0, size, size);
-	if (left === null) {
-		context.drawImage(ring, 0, 0, size, size);
-		return canvas.toDataURL("image/png");
-	}
 	const scale = (size / 1024) * 0.9375 * 1.15 * 0.512;
 	const offset = (size / 1024) * (32 + 0.9375 * 512 * (1 - 1.15));
 	const glow = document.createElement("canvas");
@@ -206,7 +197,7 @@ async function draw({ left, dark, size, layers, dev = false }) {
 	}
 	context.drawImage(glow, 0, 0);
 	context.drawImage(ring, 0, 0, size, size);
-	if (digits) context.drawImage(digits, 0, 0, size, size);
+	context.drawImage(digits, 0, 0, size, size);
 	return canvas.toDataURL("image/png");
 }
 
