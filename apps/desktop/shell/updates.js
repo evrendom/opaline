@@ -259,6 +259,7 @@ function createUpdater(options) {
 		log(`update ${release.version} downloaded`);
 		interactive = false;
 		set({ kind: "ready", release });
+		ui.notifyReady?.(release, () => offer({ asked: true }));
 		offer();
 	});
 
@@ -333,13 +334,21 @@ function createUpdater(options) {
 		return running;
 	}
 
+	let asking = false;
+
 	async function offer({ asked = false } = {}) {
-		if (state.kind !== "ready") return;
+		if (state.kind !== "ready" || asking) return;
 		if (!asked && !ui.canPrompt()) {
 			log(`update ${state.release.version} waits for a quit or the menu`);
 			return;
 		}
-		const restart = await ui.askToRestart(state.release);
+		asking = true;
+		let restart;
+		try {
+			restart = await ui.askToRestart(state.release);
+		} finally {
+			asking = false;
+		}
 		if (state.kind !== "ready") return;
 		if (restart) return install();
 		log(`update ${state.release.version} postponed until Opaline quits`);
@@ -468,6 +477,10 @@ function createUpdateNotifier(options) {
 		if (!asked && (!ui.canPrompt() || notifiedVersion() === release.version))
 			return;
 		remember(release.version);
+		if (!asked)
+			ui.notifyAvailable?.(release, () =>
+				openDownload(releasePageUrl(release.version)),
+			);
 		if (await ui.offerDownload(release, currentVersion))
 			openDownload(releasePageUrl(release.version));
 	}
@@ -528,15 +541,41 @@ function createUpdateNotifier(options) {
 	};
 }
 
-function createUpdateDialogs({ dialog, window, canPrompt }) {
+function createUpdateDialogs({ dialog, window, canPrompt, Notification }) {
 	const show = (options) => {
 		const parent = window();
 		return parent
 			? dialog.showMessageBox(parent, options)
 			: dialog.showMessageBox(options);
 	};
+	// A system notification, so an update is seen with Opaline in the
+	// background or behind onboarding too. Kept referenced: a collected
+	// notification loses its click handler.
+	let shown;
+	const notify = (title, body, onClick) => {
+		if (!Notification?.isSupported?.()) return;
+		shown?.close();
+		shown = new Notification({ title, body });
+		shown.on("click", () => {
+			shown = undefined;
+			onClick();
+		});
+		shown.show();
+	};
 	return {
 		canPrompt,
+		notifyReady: (release, onClick) =>
+			notify(
+				`Opaline ${release.version} is ready to install`,
+				"Click to restart Opaline now, or it updates the next time you quit.",
+				onClick,
+			),
+		notifyAvailable: (release, onClick) =>
+			notify(
+				`Opaline ${release.version} is available`,
+				"Click to open its download page.",
+				onClick,
+			),
 		upToDate: (version) =>
 			show({
 				type: "info",

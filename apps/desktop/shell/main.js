@@ -2,7 +2,7 @@ const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { app, autoUpdater, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, screen, shell } = require("electron");
+const { app, autoUpdater, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, screen, shell } = require("electron");
 
 const explicitUrl = process.env.OPALINE_URL;
 const isDev = Boolean(explicitUrl);
@@ -73,6 +73,7 @@ function createAppNotifier() {
 				return win?.isVisible() ? win : undefined;
 			},
 			canPrompt: () => !quitting && !onboardingOpen(),
+			Notification,
 		}),
 		openDownload: (url) => shell.openExternal(url),
 	});
@@ -91,6 +92,7 @@ function createAppUpdater() {
 				return win?.isVisible() ? win : undefined;
 			},
 			canPrompt: () => !quitting && !onboardingOpen(),
+			Notification,
 		}),
 		beforeInstall: stopForUpdate,
 		quit: () => app.quit(),
@@ -633,7 +635,7 @@ app.whenReady().then(() => {
 				window: mainWindow,
 				openWindow: () => createWindow(),
 				quitCompletely,
-				updates: isMac ? undefined : updates,
+				updates,
 			}),
 		);
 	if (onboarding) {
