@@ -11,6 +11,9 @@ import {
 } from "./helpers/ingest-stub.js";
 import { startLiveSessionStub } from "./helpers/live-session-stub.js";
 
+/** Shortens the follower's waits and records the processes hooks start. */
+const HOOK_PRELOAD = join(import.meta.dir, "helpers", "live-hook-preload.ts");
+
 const cleanups: (() => Promise<void> | void)[] = [];
 afterEach(async () => {
 	for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
@@ -41,6 +44,21 @@ async function followerPid(configDir: string): Promise<number | undefined> {
 	}
 }
 
+function spawnLogPath(fixture: CliFixture): string {
+	return join(fixture.home, "spawns.log");
+}
+
+/** Follower launches the hooks started so far (recorded by the preload). */
+async function followerLaunches(fixture: CliFixture): Promise<number> {
+	const log = await readFile(spawnLogPath(fixture), "utf8").catch(() => "");
+	return log
+		.split("\n")
+		.filter(Boolean)
+		.map((line) => JSON.parse(line) as string[])
+		.filter((args) => args.includes("live-follow") && args.includes("--launch"))
+		.length;
+}
+
 function startAgent() {
 	const agent = Bun.spawn(["sleep", "120"], {
 		stdio: ["ignore", "ignore", "ignore"],
@@ -67,13 +85,15 @@ async function setup(
 	const fixture = await createCliFixture(source);
 	const configDir = join(fixture.home, ".rudel");
 	cleanups.push(async () => {
-		stub.stop();
-		// The follower outlives the test's agents for a minute: end it.
+		// The follower outlives the test's agents for a minute: end it while
+		// the server still answers, so its final flush on SIGTERM need not
+		// wait out its deadline.
 		const pid = await followerPid(configDir);
 		if (pid) process.kill(pid);
 		await waitFor(async () => !(await followerPid(configDir)), 10_000).catch(
 			() => undefined,
 		);
+		stub.stop();
 		await rm(fixture.home, { force: true, recursive: true });
 	});
 	await writeFile(
@@ -116,7 +136,12 @@ function sessionStart(
 	env: Record<string, string> = { OPALINE_LIVE_SESSIONS: "1" },
 ) {
 	return runCli(["hooks", "claude", "session-start"], fixture, {
-		env: { CLAUDE_PID: String(agentPid), ...env },
+		env: {
+			CLAUDE_PID: String(agentPid),
+			OPALINE_TEST_SPAWN_LOG: spawnLogPath(fixture),
+			...env,
+		},
+		preload: HOOK_PRELOAD,
 		stdin: JSON.stringify({
 			cwd: fixture.projectPath,
 			hook_event_name: "SessionStart",
@@ -146,12 +171,15 @@ test.each([
 	);
 	expect(result.exitCode).toBe(0);
 	expect(performance.now() - startedAt).toBeLessThan(10_000);
+	expect(await followerLaunches(fixture)).toBe(1);
 	await waitFor(async () => (await followerPid(configDir)) !== undefined);
 	const follower = await followerPid(configDir);
 	expect(
 		(await sessionStart(fixture, "second-session", secondPath, second.pid))
 			.exitCode,
 	).toBe(0);
+	// The running follower picks the second session up: no second launch.
+	expect(await followerLaunches(fixture)).toBe(1);
 	// The fixture transcript's second line has no newline yet.
 	await waitFor(
 		() =>
@@ -211,7 +239,8 @@ test("SessionStart does not register when live updates are turned off locally", 
 		{},
 	);
 	expect(result.exitCode).toBe(0);
-	await Bun.sleep(1_000);
+	// The exited hook started no follower (nor anything that could).
+	expect(await followerLaunches(fixture)).toBe(0);
 	expect(await listLiveSessionRegistrations(configDir)).toEqual([]);
 	expect(await followerPid(configDir)).toBeUndefined();
 	expect(stub.paths.filter((path) => path.includes("liveSession"))).toEqual([]);
@@ -233,7 +262,7 @@ function codexNotify(fixture: CliFixture, threadId: string) {
 			}),
 		],
 		fixture,
-		{ env: { OPALINE_LIVE_SESSIONS: "1" } },
+		{ env: { OPALINE_LIVE_SESSIONS: "1" }, preload: HOOK_PRELOAD },
 	);
 }
 
@@ -313,6 +342,7 @@ test("hooks write nothing to stdout", async () => {
 	for (const hook of ["session-start", "session-end"]) {
 		const result = await runCli(["hooks", "claude", hook], claude.fixture, {
 			env,
+			preload: HOOK_PRELOAD,
 			stdin: input,
 		});
 		expect(result.exitCode).toBe(0);
@@ -339,7 +369,8 @@ test("inside a Codex sandbox, hooks register but do not start a follower", async
 		},
 	);
 	expect(result.exitCode).toBe(0);
-	await Bun.sleep(1_500);
+	// The exited hook started no follower (nor anything that could).
+	expect(await followerLaunches(fixture)).toBe(0);
 	expect(await listLiveSessionRegistrations(configDir)).toHaveLength(1);
 	expect(await followerPid(configDir)).toBeUndefined();
 	expect(stub.paths.filter((path) => path.includes("liveSession"))).toEqual([]);
