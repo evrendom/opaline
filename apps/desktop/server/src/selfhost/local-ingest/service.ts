@@ -102,6 +102,14 @@ export interface LocalIngestSettings {
 	readonly quietMs: number;
 	readonly maxDelayMs: number;
 	readonly liveIntervalMs: number;
+	/**
+	 * A changed session waits this many times as long as its last import took
+	 * before it is imported again, between `liveIntervalMs` and `liveMaxGapMs`:
+	 * a live session spends at most about 1/factor of its time importing,
+	 * however long it grows.
+	 */
+	readonly liveGapFactor: number;
+	readonly liveMaxGapMs: number;
 	readonly scanIntervalMs: number;
 	readonly partialLineGraceMs: number;
 	readonly retryBaseMs: number;
@@ -121,6 +129,8 @@ export const DEFAULT_LOCAL_INGEST_SETTINGS: LocalIngestSettings = {
 	quietMs: 1_500,
 	maxDelayMs: 60_000,
 	liveIntervalMs: 8_000,
+	liveGapFactor: 20,
+	liveMaxGapMs: 10 * 60_000,
 	scanIntervalMs: 5 * 60_000,
 	partialLineGraceMs: 30_000,
 	retryBaseMs: 10_000,
@@ -177,6 +187,8 @@ interface SessionEntry {
 	again: boolean;
 	attempts: number;
 	lastIngestAt: number | null;
+	/** How long the last import took, which sets how long a live session waits. */
+	lastImportMs: number | null;
 	sessionId: string | null;
 	project: SessionProject | null;
 }
@@ -603,6 +615,7 @@ export class LocalIngest {
 				again: false,
 				attempts: 0,
 				lastIngestAt: null,
+				lastImportMs: null,
 				sessionId: null,
 				project: null,
 			};
@@ -690,13 +703,48 @@ export class LocalIngest {
 		let due = dueAt;
 		if (!exact) {
 			entry.firstDirtyAt ??= now;
+			const gap = this.liveGap(entry);
 			if (entry.lastIngestAt !== null)
-				due = Math.max(due, entry.lastIngestAt + this.settings.liveIntervalMs);
-			due = Math.min(due, entry.firstDirtyAt + this.settings.maxDelayMs);
+				due = Math.max(due, entry.lastIngestAt + gap);
+			due = Math.min(
+				due,
+				entry.firstDirtyAt + Math.max(this.settings.maxDelayMs, gap),
+			);
 		}
 		entry.dueAt = exact ? Math.min(entry.dueAt ?? due, due) : due;
 		this.importStartedAt ??= now;
 		this.pumpSoon(0);
+	}
+
+	private liveGap(entry: SessionEntry): number {
+		const { liveIntervalMs, liveGapFactor, liveMaxGapMs } = this.settings;
+		if (entry.lastImportMs === null) return liveIntervalMs;
+		return Math.min(
+			liveMaxGapMs,
+			Math.max(liveIntervalMs, entry.lastImportMs * liveGapFactor),
+		);
+	}
+
+	/**
+	 * Someone is looking at this session (its page, or a question about it):
+	 * import its pending change now instead of after its live gap, but not
+	 * more often than `liveIntervalMs`. Returns whether a change was pending.
+	 */
+	refresh(sessionId: string): boolean {
+		for (const entry of this.sessions.values()) {
+			if (entry.sessionId !== sessionId) continue;
+			if (entry.dueAt === null && !entry.running) return false;
+			this.schedule(
+				entry,
+				Math.max(
+					this.now(),
+					(entry.lastIngestAt ?? 0) + this.settings.liveIntervalMs,
+				),
+				true,
+			);
+			return true;
+		}
+		return false;
 	}
 
 	private pumpSoon(delayMs: number): void {
@@ -856,6 +904,7 @@ export class LocalIngest {
 			entry.firstDirtyAt = null;
 			return null;
 		}
+		const importStarted = this.now();
 		const outcome = await this.deps.ingestSession(
 			{
 				sessionPath: entry.sessionPath,
@@ -866,6 +915,11 @@ export class LocalIngest {
 			owner,
 		);
 		const at = this.now();
+		entry.lastImportMs = at - importStarted;
+		if (entry.lastIngestAt !== null && outcome.kind !== "retry")
+			this.deps.log?.(
+				`local ingest re-imported ${entry.sessionPath} (${Math.round(this.sessionBytes(entry.sessionPath) / 1024)} KB) in ${entry.lastImportMs} ms; its next live import waits at least ${Math.round(this.liveGap(entry) / 1000)} s`,
+			);
 		entry.firstDirtyAt = null;
 		const gaveUp =
 			outcome.kind === "retry" &&

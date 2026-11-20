@@ -649,6 +649,7 @@ describe("local ingest endpoints", () => {
 				return paths.length;
 			},
 			wake: () => {},
+			refresh: () => false,
 			stop: async () => {},
 		});
 		try {

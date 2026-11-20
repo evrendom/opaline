@@ -89,6 +89,15 @@ const uploadFailures = os.analytics.sessions.uploadFailures
 		),
 	);
 
+/** The running session's page is open: its latest turns should not wait for the live gap. */
+async function refreshLocalSession(sessionId: string): Promise<void> {
+	if (!isSelfHosted()) return;
+	const { getLocalIngest } = await import(
+		"../../selfhost/local-ingest/index.js"
+	);
+	getLocalIngest()?.refresh(sessionId);
+}
+
 async function localLiveSessions(
 	ownerId: string | null,
 ): Promise<LiveSessionSummary[] | null> {
@@ -156,6 +165,7 @@ const liveTail = os.analytics.sessions.liveTail
 						live.sessionId === input.sessionId &&
 						(!input.source || live.source === input.source),
 				) ?? null;
+			if (running) await refreshLocalSession(running.sessionId);
 			return { session: running, streams: [], uploaded: running !== null };
 		}
 		const session = isLiveSessionsReadable(context.organizationId)

@@ -320,6 +320,83 @@ test("an appended session is imported again; a hook ping makes it due at once", 
 	await service.stop();
 });
 
+/** Imports that each take `ms`, timed when they finish. */
+function timedIngestor(ms: number) {
+	const calls: SessionJob[] = [];
+	const finished: { at: number; kind: string; path: string }[] = [];
+	return {
+		calls,
+		finished,
+		ingestSession: async (job: SessionJob): Promise<SessionOutcome> => {
+			calls.push(job);
+			await Bun.sleep(ms);
+			finished.push({
+				at: performance.now(),
+				kind: job.change.kind,
+				path: job.sessionPath,
+			});
+			return { kind: "ingested", sessionId: job.sessionPath, bytes: 10 };
+		},
+	};
+}
+
+const liveSettings = {
+	concurrency: 1,
+	quietMs: 1,
+	retryBaseMs: 20,
+	liveIntervalMs: 10,
+	liveGapFactor: 20,
+	liveMaxGapMs: 5_000,
+	maxDelayMs: 60_000,
+};
+
+test("a live session waits 20 times its last import before the next; a quick one is imported again at once", async () => {
+	for (const [importMs, atLeast, below] of [
+		[40, 750, Number.POSITIVE_INFINITY],
+		[0, 0, 400],
+	] as const) {
+		const path = await session(`live-${importMs}`, 1);
+		const ingest = timedIngestor(importMs);
+		const service = create(memoryStore(), ingest, { settings: liveSettings });
+		await service.start();
+		await settle(service);
+		await appendFile(path, line("next turn"));
+		await service.notify([path], false, true);
+		await settle(service);
+		const imports = ingest.finished.filter((call) => call.path === path);
+		expect(imports.map((call) => call.kind)).toEqual(["whole", "appended"]);
+		const [first, second] = imports;
+		const waited = (second?.at ?? 0) - (first?.at ?? 0);
+		expect(waited).toBeGreaterThanOrEqual(atLeast);
+		expect(waited).toBeLessThan(below);
+		await service.stop();
+	}
+});
+
+test("the session's end and a look at the session import at once, past the live gap", async () => {
+	const path = await session("ending", 1);
+	const ingest = timedIngestor(40);
+	const service = create(memoryStore(), ingest, { settings: liveSettings });
+	await service.start();
+	await settle(service);
+	expect(service.refresh(path)).toBe(false);
+
+	await appendFile(path, line("last turn"));
+	let asked = performance.now();
+	await service.notify([path], true, true);
+	await settle(service);
+	expect((ingest.finished[1]?.at ?? 0) - asked).toBeLessThan(400);
+
+	await appendFile(path, line("one more"));
+	await service.notify([path], false, true);
+	asked = performance.now();
+	expect(service.refresh(path)).toBe(true);
+	await settle(service);
+	expect(ingest.finished).toHaveLength(3);
+	expect((ingest.finished[2]?.at ?? 0) - asked).toBeLessThan(400);
+	await service.stop();
+});
+
 test("the stored identity is the bytes the import read, also when the file grows around the read", async () => {
 	const path = await session("growing", 1, "first");
 	const store = memoryStore();
