@@ -28,7 +28,8 @@ app.on("open-url", (event, url) => {
 	openLink(url);
 });
 
-const { analyzeSessions, scanSessions } = require("./analyze");
+const { analyzeSessions, scanSessions, sessionSources } = require("./analyze");
+const { askForSessionFolders } = require("./folder-access");
 const { createAgents } = require("./agents");
 const { createDockUsage } = require("./dock-usage");
 const { createLocalStack, introUrl } = require("./stack/local-stack");
@@ -400,7 +401,26 @@ function fromOnboarding(event) {
 	return Boolean(onboardingWindow) && event.sender === onboardingWindow.webContents;
 }
 
-ipcMain.handle("onboarding:scan", (event) => (fromOnboarding(event) ? scanSessions() : null));
+let foldersAsked = false;
+
+/** macOS asks about Documents and the like while onboarding loads, not later in the dashboard. */
+function askForFolders() {
+	if (foldersAsked) return;
+	foldersAsked = true;
+	askForSessionFolders(sessionSources()).then(
+		(answers) => {
+			for (const { folder, granted, ms } of answers)
+				stack.mark(`folder-access ${folder} ${granted === null ? "unreadable" : granted ? "granted" : "denied"} after ${ms} ms`);
+		},
+		(error) => stack.mark(`folder-access failed: ${error.message}`),
+	);
+}
+
+ipcMain.handle("onboarding:scan", (event) => {
+	if (!fromOnboarding(event)) return null;
+	askForFolders();
+	return scanSessions();
+});
 ipcMain.handle("onboarding:analyze", async (event) => {
 	if (!fromOnboarding(event)) return null;
 	process.env.OPALINE_CLICKHOUSE ??= await stack.clickhouseBinary();

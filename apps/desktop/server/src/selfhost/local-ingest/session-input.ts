@@ -9,7 +9,6 @@ import {
 	LocalIngestSessionInputSchema,
 } from "@rudel/api-routes";
 import { type GitInfo, getGitInfo, normalizeRemoteUrl } from "./git-info.js";
-import { encodesProtectedPath } from "./protected-folders.js";
 import { inferSessionRepository } from "./session-repository.js";
 import { claudeProjectDirectory, claudeSessionId } from "./sources.js";
 import {
@@ -111,15 +110,6 @@ function codexMeta(content: string): {
 	}
 }
 
-/** Decoding stats each folder of the path, so a protected one is spelled out from its name. */
-function projectPathOf(encodedDirectory: string): Promise<string> {
-	if (encodesProtectedPath(encodedDirectory))
-		return Promise.resolve(
-			`/${encodedDirectory.replace(/^-/u, "").replaceAll("-", "/")}`,
-		);
-	return decodeProjectPath(encodedDirectory);
-}
-
 function byteLength(input: IngestSessionInput): number {
 	let bytes = Buffer.byteLength(input.content, "utf8");
 	for (const subagent of input.subagents ?? [])
@@ -178,7 +168,7 @@ export async function buildLocalSessionInput(
 	const subagents = await session.subagents();
 	const projectPath =
 		firstRecordedCwd(content) ??
-		(await projectPathOf(claudeProjectDirectory(input.sessionPath)));
+		(await decodeProjectPath(claudeProjectDirectory(input.sessionPath)));
 	const gitInfo = await cachedGitInfo(projectPath, input.now);
 	const inferred = await inferSessionRepository({
 		projectPath,

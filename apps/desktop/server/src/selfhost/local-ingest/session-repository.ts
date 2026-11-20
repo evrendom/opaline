@@ -2,7 +2,6 @@ import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { type GitInfo, getGitInfo, getGitRemoteUrl, git } from "./git-info.js";
-import { isProtectedPath } from "./protected-folders.js";
 
 const WRITE_WEIGHT = 3;
 const LOCATION_WEIGHT = 1;
@@ -146,7 +145,6 @@ function pushPath(
 	const path = value.startsWith("~/")
 		? resolve(homedir(), value.slice(2))
 		: resolve(base, value);
-	if (isProtectedPath(path)) return;
 	signals.push({ path, weight });
 }
 
