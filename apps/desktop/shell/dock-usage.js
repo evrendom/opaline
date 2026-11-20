@@ -273,6 +273,7 @@ function createDockUsage({ agents, dataDir }) {
 	}
 
 	async function refreshAgents() {
+		if (!app.dock) return;
 		try {
 			const statuses = await agents.statuses();
 			connected = new Set(

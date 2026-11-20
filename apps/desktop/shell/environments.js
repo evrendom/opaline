@@ -8,7 +8,9 @@ function createEnvironmentMenu({
 	openWindow,
 	quitCompletely,
 	updates,
+	platform = process.platform,
 }) {
+	const mac = platform === "darwin";
 	let prompt;
 
 	const current = () => stack.environment() ?? { kind: "local" };
@@ -63,7 +65,7 @@ function createEnvironmentMenu({
 		const environment = current();
 		const choices = [
 			{
-				label: "This Mac",
+				label: mac ? "This Mac" : "This Computer",
 				type: "radio",
 				checked: environment.kind === "local",
 				click: () => switchTo({ kind: "local" }),
@@ -87,27 +89,44 @@ function createEnvironmentMenu({
 			{ type: "separator" },
 			{ label: "Connect to Your Server…", click: openPrompt },
 		];
-		return Menu.buildFromTemplate([
+		const quit = [
+			{ role: "quit", label: "Quit Opaline" },
 			{
-				label: "Opaline",
-				submenu: [
-					{ role: "about" },
-					...(updates ? [updates.menuItem()] : []),
-					{ type: "separator" },
-					{ role: "services" },
-					{ type: "separator" },
-					{ role: "hide" },
-					{ role: "hideOthers" },
-					{ role: "unhide" },
-					{ type: "separator" },
-					{ role: "quit", label: "Quit Opaline" },
-					{
-						label: "Quit Opaline Completely",
-						accelerator: "Alt+Command+Q",
-						click: quitCompletely,
-					},
-				],
+				label: "Quit Opaline Completely",
+				accelerator: "Alt+CommandOrControl+Q",
+				click: quitCompletely,
 			},
+		];
+		return Menu.buildFromTemplate([
+			mac
+				? {
+						label: "Opaline",
+						submenu: [
+							{ role: "about" },
+							...(updates ? [updates.menuItem()] : []),
+							{ type: "separator" },
+							{ role: "services" },
+							{ type: "separator" },
+							{ role: "hide" },
+							{ role: "hideOthers" },
+							{ role: "unhide" },
+							{ type: "separator" },
+							...quit,
+						],
+					}
+				: {
+						label: "File",
+						submenu: [
+							{
+								label: "New Window",
+								accelerator: "Control+N",
+								click: openWindow,
+							},
+							...(updates ? [updates.menuItem()] : []),
+							{ type: "separator" },
+							...quit,
+						],
+					},
 			{ role: "editMenu" },
 			{ label: "Environment", submenu: choices },
 			{ role: "viewMenu" },
