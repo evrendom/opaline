@@ -7,10 +7,14 @@ const { app, autoUpdater, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nat
 const explicitUrl = process.env.OPALINE_URL;
 const isDev = Boolean(explicitUrl);
 
-const library = path.join(os.homedir(), "Library");
-app.setPath("appData", path.join(library, "Application Support"));
-app.setPath("userData", path.join(library, "Application Support", app.getName()));
-app.setPath("logs", path.join(library, "Logs", app.getName()));
+const isMac = process.platform === "darwin";
+if (isMac) {
+	const library = path.join(os.homedir(), "Library");
+	app.setPath("appData", path.join(library, "Application Support"));
+	app.setPath("userData", path.join(library, "Application Support", app.getName()));
+	app.setPath("logs", path.join(library, "Logs", app.getName()));
+}
+// Elsewhere Electron's defaults hold: ~/.config/Opaline on Linux, %APPDATA%\Opaline on Windows.
 if (isDev) app.setPath("userData", `${app.getPath("userData")} Dev`);
 process.env.OPALINE_SERVER_DATA_DIR ||= path.join(app.getPath("userData"), "server");
 
@@ -35,7 +39,7 @@ const { createDockUsage } = require("./dock-usage");
 const { createLocalStack, introUrl } = require("./stack/local-stack");
 const { createEnvironmentMenu } = require("./environments");
 const { keepClaudeTranscripts } = require("./stack/transcripts");
-const { createUpdateDialogs, createUpdater } = require("./updates");
+const { createUpdateDialogs, createUpdateNotifier, createUpdater } = require("./updates");
 const { createWindowState } = require("./window-state");
 
 app.userAgentFallback = `${app.userAgentFallback
@@ -45,13 +49,31 @@ app.userAgentFallback = `${app.userAgentFallback
 const stack = createLocalStack({ app });
 const agents = createAgents({ stack });
 const dockUsage = createDockUsage({ agents, dataDir: process.env.OPALINE_SERVER_DATA_DIR });
-const updates = app.isPackaged && process.platform === "darwin" && !isDev ? createAppUpdater() : undefined;
+const updates = app.isPackaged && !isDev ? (isMac ? createAppUpdater() : createAppNotifier()) : undefined;
 
 function updateLog(line) {
 	try {
 		fs.mkdirSync(app.getPath("logs"), { recursive: true });
 		fs.appendFileSync(path.join(app.getPath("logs"), "updates.log"), `${new Date().toISOString()} ${line}\n`);
 	} catch {}
+}
+
+/** Linux and Windows builds cannot replace themselves: they say a new version is out and open its download page. */
+function createAppNotifier() {
+	return createUpdateNotifier({
+		currentVersion: app.getVersion(),
+		log: updateLog,
+		stateFile: path.join(app.getPath("userData"), "update", "notified.json"),
+		ui: createUpdateDialogs({
+			dialog,
+			window: () => {
+				const win = mainWindow();
+				return win?.isVisible() ? win : undefined;
+			},
+			canPrompt: () => !quitting && !onboardingOpen(),
+		}),
+		openDownload: (url) => shell.openExternal(url),
+	});
 }
 
 function createAppUpdater() {
@@ -147,8 +169,9 @@ function createWindow({ url, link, bounds, intro = false } = {}) {
 		minWidth: 800,
 		minHeight: 520,
 		title: "Opaline",
-		titleBarStyle: "hidden",
-		trafficLightPosition: { x: 15, y: 16 },
+		...(isMac
+			? { titleBarStyle: "hidden", trafficLightPosition: { x: 15, y: 16 } }
+			: { autoHideMenuBar: true, icon: path.join(__dirname, "icon", "Opaline.png") }),
 		show: false,
 		backgroundColor: pageBackground ?? (nativeTheme.shouldUseDarkColors ? "#0a0a0a" : "#efefef"),
 		webPreferences: { spellcheck: false, devTools: isDev, preload: path.join(__dirname, "preload.js"), additionalArguments: isDev ? ["--opaline-debug"] : [] },
@@ -386,6 +409,7 @@ function createOnboarding() {
 }
 
 function appIcon(bundle) {
+	if (!isMac) return null;
 	if (bundle.endsWith(".png"))
 		return fs.existsSync(bundle) ? nativeImage.createFromPath(bundle).resize({ width: 256 }).toDataURL() : null;
 	if (!fs.existsSync(bundle)) return null;
@@ -607,6 +631,7 @@ app.whenReady().then(() => {
 				window: mainWindow,
 				openWindow: () => createWindow(),
 				quitCompletely,
+				updates: isMac ? undefined : updates,
 			}),
 		);
 	if (onboarding) {
