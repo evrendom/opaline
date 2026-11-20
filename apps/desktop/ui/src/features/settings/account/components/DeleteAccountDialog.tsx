@@ -58,8 +58,8 @@ export function DeleteAccountDialog({
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent>
 				<DialogHeader>
-					<DialogTitle className="flex items-center gap-2">
-						<IconAlertTriangle className="text-destructive" />
+					<DialogTitle className="flex items-center gap-m">
+						<IconAlertTriangle className="text-error" />
 						Delete account
 					</DialogTitle>
 					<DialogDescription>
@@ -68,15 +68,15 @@ export function DeleteAccountDialog({
 					</DialogDescription>
 				</DialogHeader>
 
-				<div className="flex flex-col gap-4">
-					<p className="text-sm text-muted-foreground">
+				<div className="flex flex-col gap-xl">
+					<p className="text-body-xl text-ink-3">
 						Your account, API keys, sessions, linked logins, workspace
 						memberships, and any workspaces where you are the only member will
 						be removed. Uploaded session analytics may persist for a short time
 						in cold storage.
 					</p>
 
-					<Field className="gap-2">
+					<Field className="gap-m">
 						<FieldLabel htmlFor="delete-account-confirm">
 							Type {user.email} to confirm
 						</FieldLabel>
@@ -89,7 +89,7 @@ export function DeleteAccountDialog({
 						/>
 					</Field>
 
-					{error ? <p className="text-sm text-destructive">{error}</p> : null}
+					{error ? <p className="text-body-xl text-error">{error}</p> : null}
 				</div>
 
 				<DialogFooter>

@@ -1,4 +1,5 @@
 // biome-ignore-all lint/nursery/noExcessiveLinesPerFile: Trigger and animated panel state must remain in one coordinated menu controller.
+
 import type { SessionDetailOverview } from "@rudel/api-routes";
 import {
 	type KeyboardEvent,
@@ -11,6 +12,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { TouchTarget } from "@/app/ui/touch-target";
 import { cn } from "@/lib/utils";
 import {
 	buildSessionDetailActivityGroups,
@@ -85,7 +87,7 @@ function SessionDetailActivityMenuItem({
 				aria-expanded={flyoutsEnabled ? isOpen : undefined}
 				aria-haspopup={flyoutsEnabled ? "menu" : undefined}
 				className={cn(
-					"session-detail-opaline-trigger relative inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border-[0.5px] border-black/20 bg-white px-2.5 py-1 text-[0.8125rem]/5 font-medium text-black/60 disabled:pointer-events-none dark:border-white/25 dark:bg-(--session-overview-surface) dark:text-white/70",
+					"session-detail-opaline-trigger relative inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border-[0.5px] border-black/20 bg-white px-2.5 py-1 text-[0.8125rem]/5 font-medium text-black/60 disabled:pointer-events-none dark:border-white/25 dark:bg-canvas dark:text-white/70",
 					flyoutsEnabled &&
 						"hover:bg-black/[0.063] hover:text-black/90 dark:hover:bg-white/[0.071] dark:hover:text-white/95",
 					flyoutsEnabled &&
@@ -102,10 +104,7 @@ function SessionDetailActivityMenuItem({
 				ref={triggerRef}
 				type="button"
 			>
-				<span
-					aria-hidden="true"
-					className="pointer-events-none absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden"
-				/>
+				<TouchTarget className="pointer-events-none" />
 				<span>{group.label}</span>
 				<span className="text-black/60 tabular-nums dark:text-white/70">
 					{group.totalCount.toLocaleString()}
@@ -498,7 +497,7 @@ export function SessionDetailActivityStrip({
 	return (
 		<header
 			ref={stripElementRef}
-			className="relative z-[60] flex h-11 shrink-0 items-center border-y-[0.5px] border-(--session-overview-border) bg-(--session-overview-surface) p-2"
+			className="relative z-[60] flex h-11 shrink-0 items-center border-y-[0.5px] border-line-strong bg-canvas p-2"
 		>
 			<nav
 				aria-label="Session detail activity"

@@ -3,7 +3,7 @@
 	--transcript-mask-gap: 37px;
 	--transcript-mask-tone: color-mix(
 		in srgb,
-		var(--dashboardy-subsurface-strong, rgb(240 243 247 / 98%)) 32%,
+		var(--field, rgb(240 243 247 / 98%)) 32%,
 		transparent
 	);
 
@@ -19,13 +19,13 @@
 .dark .session-transcript-mask {
 	--transcript-mask-tone: color-mix(
 		in srgb,
-		var(--dashboardy-subsurface-strong, rgb(15 23 42 / 98%)) 42%,
+		var(--field, rgb(15 23 42 / 98%)) 42%,
 		transparent
 	);
 }
 
 .session-transcript-row-surface {
-	background-color: var(--session-overview-surface);
+	background-color: var(--canvas);
 }
 
 [data-transcript-mask-overlay] {

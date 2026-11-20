@@ -57,7 +57,7 @@ export function SidebarRepositories({ reposActive }: { reposActive: boolean }) {
 	const route = shellRouteMap.repos;
 	return (
 		<SidebarGroup>
-			<SidebarGroupLabel className="h-6 text-[0.6875rem] font-normal text-sidebar-foreground/50">
+			<SidebarGroupLabel className="h-6 text-body-s font-regular text-sidebar-foreground/50">
 				Repositories
 			</SidebarGroupLabel>
 			<SidebarGroupContent>

@@ -70,7 +70,7 @@ export function GitHubLink({
 			title={label}
 			onClick={own}
 			className={cn(
-				"shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground",
+				"shrink-0 corner-xs p-xxs text-ink-3 hover:bg-hover hover:text-ink",
 				className,
 			)}
 		>

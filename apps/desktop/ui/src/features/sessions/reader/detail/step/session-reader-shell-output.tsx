@@ -121,19 +121,19 @@ const PATH = /[./]/u;
 
 function Counts({ rows }: { rows: { count: string; name: string }[] }) {
 	return (
-		<table className="mx-3 border-collapse font-mono text-xs leading-6">
+		<table className="mx-l border-collapse font-data text-body-m">
 			<tbody>
 				{rows.map((row) => {
 					const total = row.name === "total";
 					return (
 						<tr
 							key={`${row.name}:${row.count}`}
-							className={cn(total && "border-t border-border/60")}
+							className={cn(total && "edge-t-m border-line/60")}
 						>
-							<td className="pr-3 text-right tabular-nums">{row.count}</td>
+							<td className="pr-l text-right tabular-nums">{row.count}</td>
 							<td>
 								{total ? (
-									<span className="text-muted-foreground">total</span>
+									<span className="text-ink-3">total</span>
 								) : PATH.test(row.name) ? (
 									<FileTag className="align-middle" path={row.name} />
 								) : (
@@ -172,15 +172,15 @@ function Table({
 	});
 	const seen = new Map<string, number>();
 	return (
-		<div className="overflow-x-auto px-3">
-			<table className="w-full border-collapse font-mono text-xs leading-5">
+		<div className="overflow-x-auto px-l">
+			<table className="w-full border-collapse font-data text-body-m">
 				<thead>
-					<tr className="border-b border-border/60 text-muted-foreground">
+					<tr className="edge-b-m border-line/60 text-ink-3">
 						{header.map((cell, column) => (
 							<th
 								key={columns[column]}
 								className={cn(
-									"py-1 pr-4 text-left font-normal whitespace-nowrap last:pr-0",
+									"py-xs pr-xl text-left font-regular whitespace-nowrap last:pr-zero",
 									numeric[column] && "text-right",
 								)}
 							>
@@ -197,20 +197,18 @@ function Table({
 						return (
 							<tr
 								key={`${id}#${repeat}`}
-								className="border-b border-border/30 last:border-b-0"
+								className="edge-b-m border-line/30 last:edge-b-none"
 							>
 								{columns.map((columnKey, column) => (
 									<td
 										key={columnKey}
 										className={cn(
-											"py-1 pr-4 align-top last:pr-0",
+											"py-xs pr-xl align-top last:pr-zero",
 											numeric[column] && "text-right tabular-nums",
 											wrap ? "[overflow-wrap:anywhere]" : "whitespace-nowrap",
 										)}
 									>
-										{row[column] || (
-											<span className="text-muted-foreground/40">—</span>
-										)}
+										{row[column] || <span className="text-ink-3/40">—</span>}
 									</td>
 								))}
 							</tr>
@@ -239,7 +237,7 @@ function Part({
 }) {
 	if (part.kind === "json")
 		return (
-			<div className="px-3">
+			<div className="px-l">
 				<JsonTree value={part.value} />
 			</div>
 		);
@@ -249,14 +247,17 @@ function Part({
 	if (part.kind === "numbered") {
 		const file = part.file ?? searched;
 		return (
-			<div className="flex flex-col gap-1">
+			<div className="flex flex-col gap-xs">
 				{part.file ? (
-					<div className="px-3">
+					<div className="px-l">
 						<FileTag className="align-middle" path={part.file} />
 					</div>
 				) : null}
 				<HighlightedCode
-					className={cn("rounded-none bg-transparent py-0", !wrap && UNWRAPPED)}
+					className={cn(
+						"corner-zero bg-transparent py-zero",
+						!wrap && UNWRAPPED,
+					)}
 					code={dedent(part.lines.map((line) => line?.text ?? "")).join("\n")}
 					language={languageOf(file)}
 					lineNumbers={part.lines.map((line) => line?.number ?? null)}
@@ -267,7 +268,7 @@ function Part({
 	if (part.kind === "note") return null;
 	return (
 		<HighlightedCode
-			className={cn("rounded-none bg-transparent py-0", !wrap && UNWRAPPED)}
+			className={cn("corner-zero bg-transparent py-zero", !wrap && UNWRAPPED)}
 			code={code ? dedent(part.text.split("\n")).join("\n") : part.text}
 			language={code ? languageOf(code) : "text"}
 			lineNumbers={numbers ?? undefined}
@@ -303,12 +304,12 @@ export function ShellOutput({
 					<div
 						key={`${part.text}#${repeat}`}
 						className={cn(
-							"flex flex-col gap-1",
-							index > 0 && "mt-2 border-t border-border/60 pt-2",
+							"flex flex-col gap-xs",
+							index > 0 && "mt-m edge-t-m border-line/60 pt-m",
 						)}
 					>
 						{several && label ? (
-							<p className="px-3 text-[11px] text-muted-foreground">{label}</p>
+							<p className="px-l text-body-s text-ink-3">{label}</p>
 						) : null}
 						<Part
 							code={code}

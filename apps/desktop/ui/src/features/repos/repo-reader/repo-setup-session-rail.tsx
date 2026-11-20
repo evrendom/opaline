@@ -90,13 +90,13 @@ export function RepoSetupSessionRail({
 			aria-label="Sessions that received it"
 			className={cn(RAIL_SHELF, "w-[120px]")}
 		>
-			<ScrollColumn className="px-1.5 pt-2 pb-4">
+			<ScrollColumn className="px-s pt-m pb-xl">
 				{!query.isPending && query.isError ? (
-					<p className="px-2 py-2 text-xs text-muted-foreground">
+					<p className="px-m py-m text-body-m text-ink-3">
 						Sessions could not be read.
 					</p>
 				) : !query.isPending && sessions.length === 0 ? (
-					<p className="px-2 py-2 text-xs text-muted-foreground">
+					<p className="px-m py-m text-body-m text-ink-3">
 						No session received it
 					</p>
 				) : (
@@ -104,9 +104,9 @@ export function RepoSetupSessionRail({
 						label="Reading the sessions"
 						loading={query.isPending}
 						sample={
-							<div className="flex flex-col gap-3 px-2 pt-1">
+							<div className="flex flex-col gap-l px-m pt-xs">
 								{["w-3/4", "w-2/3", "w-4/5", "w-1/2"].map((width) => (
-									<Bone key={width} className={cn("h-3 rounded-md", width)} />
+									<Bone key={width} className={cn("h-3 corner-s", width)} />
 								))}
 							</div>
 						}
@@ -114,7 +114,7 @@ export function RepoSetupSessionRail({
 					>
 						{() => (
 							<FluidList>
-								<ul className="flex flex-col gap-0.5">
+								<ul className="flex flex-col gap-xxs">
 									{sessions.map((session, index) => (
 										<li key={session.sessionId}>
 											<FluidListItem<HTMLAnchorElement> index={index}>
@@ -169,12 +169,12 @@ function SessionLink({
 				params,
 			)}
 			title={`${session.sessionId} · ${when(session.lastAt)}`}
-			className="group/session relative flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium tabular-nums outline-none corner-squircle squircle:rounded-xl focus-visible:ring-2 focus-visible:ring-ring/50"
+			className="group/session relative flex w-full items-center gap-xs corner-s px-m py-s text-body-m font-medium tabular-nums outline-none corner-squircle squircle:corner-l focus-visible:ring-2 focus-visible:ring-focus/50"
 		>
 			<span className="truncate">{shortSessionId(session.sessionId)}</span>
 			<IconArrowUpRight
 				aria-hidden="true"
-				className="size-3 shrink-0 text-muted-foreground/60 transition-colors group-hover/session:text-foreground group-focus-visible/session:text-foreground"
+				className="size-3 shrink-0 text-ink-3/60 transition-colors group-hover/session:text-ink group-focus-visible/session:text-ink"
 			/>
 		</Link>
 	);

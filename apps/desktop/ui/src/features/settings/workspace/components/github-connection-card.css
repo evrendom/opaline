@@ -1,5 +1,5 @@
 .github-connection-state {
-	color: var(--muted-foreground);
+	color: var(--ink-3);
 }
 
 .github-connection-actions {
@@ -8,40 +8,42 @@
 	white-space: nowrap;
 	align-items: center;
 	justify-content: flex-end;
-	gap: 8px;
+	gap: var(--space-m);
 }
 
 .github-connection-error {
-	padding: 12px 0;
-	color: var(--destructive);
+	padding: var(--space-l) var(--space-zero);
+	color: var(--error);
 }
 
 .github-connection-progress {
 	display: flex;
 	width: 100%;
 	align-items: center;
-	gap: 10px;
+	gap: var(--space-l);
 }
 
 .github-connection-progress-track {
 	height: 4px;
 	flex: 1;
 	overflow: hidden;
-	border-radius: 2px;
-	background: var(--border);
+	border-radius: var(--radius-xs);
+	background: var(--line-strong);
 }
 
 .github-connection-progress-fill {
 	height: 100%;
-	border-radius: 2px;
-	background: var(--foreground);
+	border-radius: var(--radius-xs);
+	background: var(--ink);
 	transition: width 300ms ease-out;
 }
 
 .github-connection-progress-value {
 	min-width: 3ch;
-	color: var(--muted-foreground);
-	font-size: 12px;
+	color: var(--ink-3);
+	font-size: var(--size-m);
+	line-height: var(--line-m);
+	letter-spacing: var(--letter-spacing-m);
 	font-variant-numeric: tabular-nums;
 	text-align: right;
 }
@@ -54,13 +56,15 @@
 
 .github-token-fix {
 	display: grid;
-	gap: 8px;
-	padding: 14px 0;
+	gap: var(--space-m);
+	padding: var(--space-xl) var(--space-zero);
 }
 
 .github-token-fix p {
-	margin: 0;
-	color: var(--muted-foreground);
-	font-size: 0.8125rem;
+	margin: var(--space-zero);
+	color: var(--ink-3);
+	font-size: var(--size-l);
+	line-height: var(--line-l);
+	letter-spacing: var(--letter-spacing-l);
 	text-wrap: pretty;
 }

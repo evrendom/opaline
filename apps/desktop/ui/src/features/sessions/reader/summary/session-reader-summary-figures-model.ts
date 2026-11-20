@@ -211,7 +211,7 @@ export function subagentFigures(
 			detail: "The model it ran on",
 			icon: IconHexagonFilled,
 			label: "Model",
-			tint: "text-muted-foreground",
+			tint: "text-ink-3",
 			value: [subagent.model ? formatModelDisplayLabel(subagent.model) : "—"],
 		},
 	];

@@ -27,8 +27,8 @@ export function MemberBubble({
 	const message = (
 		<p
 			className={cn(
-				"whitespace-pre-wrap text-sm [overflow-wrap:anywhere]",
-				preview && "text-muted-foreground",
+				"whitespace-pre-wrap text-body-xl [overflow-wrap:anywhere]",
+				preview && "text-ink-3",
 			)}
 		>
 			<SignalText
@@ -38,24 +38,28 @@ export function MemberBubble({
 		</p>
 	);
 	return (
-		<div className="flex gap-3">
+		<div className="flex gap-l">
 			{avatar ? (
-				<span className="mt-1.5 flex shrink-0">{avatar}</span>
+				<span className="mt-s flex shrink-0">{avatar}</span>
 			) : (
-				<Avatar className="mt-1.5 size-6 shrink-0 shadow-(--custom-shadow) after:hidden">
+				<Avatar className="mt-s size-6 shrink-0 shadow-(--shadow-card) after:hidden">
 					{imageUrl ? <AvatarImage src={imageUrl} alt="" /> : null}
-					<AvatarFallback className="text-[0.625rem]">
+					<AvatarFallback className="text-body-xs">
 						{label.charAt(0).toUpperCase()}
 					</AvatarFallback>
 				</Avatar>
 			)}
-			<div className="min-w-0 flex-1 rounded-lg bg-card px-3 py-2.5 shadow-(--custom-shadow) corner-squircle squircle:rounded-2xl">
-				{folded ? <TwoLines className="text-sm">{message}</TwoLines> : message}
+			<div className="min-w-0 flex-1 corner-m bg-card px-l py-l shadow-(--shadow-card) corner-squircle squircle:corner-xl">
+				{folded ? (
+					<TwoLines className="text-body-xl">{message}</TwoLines>
+				) : (
+					message
+				)}
 				{!folded && text.length > MEMBER_TEXT_CLAMP ? (
 					<button
 						type="button"
 						onClick={() => setExpanded((value) => !value)}
-						className="mt-1.5 text-xs text-muted-foreground hover:text-foreground"
+						className="mt-s text-body-m text-ink-3 hover:text-ink"
 					>
 						{expanded ? "Show less" : "Show more"}
 					</button>

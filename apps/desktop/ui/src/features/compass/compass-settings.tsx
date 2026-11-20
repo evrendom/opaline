@@ -61,7 +61,7 @@ export function CompassSettingsButton() {
 	return (
 		<Popover>
 			<PopoverTrigger
-				className="cost-text-button compass-icon-button"
+				className="text-button compass-icon-button"
 				aria-label="What Compass catches"
 				title="What Compass catches"
 			>
@@ -70,7 +70,7 @@ export function CompassSettingsButton() {
 			<PopoverContent
 				align="end"
 				sideOffset={6}
-				className="compass-settings w-[23rem] gap-2 p-2"
+				className="compass-settings w-[23rem] gap-m p-m"
 			>
 				<div className="compass-settings-heading">
 					<span className="font-medium">What Compass catches</span>
@@ -93,11 +93,11 @@ export function CompassSettingsButton() {
 							/>
 						))
 					) : query.isError ? (
-						<p className="compass-hint px-2 py-3">
+						<p className="compass-hint px-m py-l">
 							Could not load the settings.
 						</p>
 					) : (
-						<p className="compass-hint px-2 py-3">Loading…</p>
+						<p className="compass-hint px-m py-l">Loading…</p>
 					)}
 				</div>
 			</PopoverContent>

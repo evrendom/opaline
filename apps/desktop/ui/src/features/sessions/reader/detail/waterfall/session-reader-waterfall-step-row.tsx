@@ -52,12 +52,12 @@ function SubagentRoleMark({ role }: { role: SubagentRole }) {
 			label: "Finished",
 		},
 		launch: {
-			className: "text-muted-foreground",
+			className: "text-ink-3",
 			Icon: IconRocket,
 			label: "Launched",
 		},
 		message: {
-			className: "text-muted-foreground",
+			className: "text-ink-3",
 			Icon: IconMessage,
 			label: "Message",
 		},
@@ -161,7 +161,7 @@ export const StepRowView = memo(function StepRowView({
 				data-step-failed={step.isError ? "" : undefined}
 				data-talks-to={subagentTalkedTo(step) ?? undefined}
 				className={cn(
-					"relative -my-0.5 bg-(--dashboard-01-content-background,var(--background)) py-0.5",
+					"relative -my-0.5 bg-(--dashboard-01-content-background,var(--canvas)) py-0.5",
 					MESSAGE_INDENT,
 				)}
 				style={{ "--depth": depth } as CSSProperties}

@@ -156,10 +156,10 @@ function PickCrumb({
 	useShellCrumbFollows(host !== null && (agent !== null || run !== null));
 	if (!host || (!agent && !run)) return null;
 	return createPortal(
-		<div className="-order-1 mr-auto -ml-0.5 flex shrink-0 items-center gap-1.5 text-base font-medium tracking-tight tabular-nums">
+		<div className="-order-1 mr-auto -ml-xxs flex shrink-0 items-center gap-s text-body-xxl font-medium tabular-nums">
 			<IconChevronRight
 				aria-hidden="true"
-				className="size-4 shrink-0 text-muted-foreground/50"
+				className="size-4 shrink-0 text-ink-3/50"
 				stroke={1.5}
 			/>
 			{agent ? (

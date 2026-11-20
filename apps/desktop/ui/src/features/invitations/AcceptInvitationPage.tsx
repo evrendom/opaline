@@ -128,8 +128,8 @@ export function AcceptInvitationPage() {
 		(Boolean(session && invitationId) && presentationQuery.isPending)
 	) {
 		return (
-			<div className="flex min-h-dvh items-center justify-center bg-white">
-				<IconLoader2 className="size-6 animate-spin text-muted" />
+			<div className="flex min-h-dvh items-center justify-center bg-canvas">
+				<IconLoader2 className="size-6 animate-spin text-ink-3" />
 			</div>
 		);
 	}
@@ -138,8 +138,8 @@ export function AcceptInvitationPage() {
 		return (
 			<>
 				<InvitationLoginRedirectMount invitationId={invitationId} />
-				<div className="flex min-h-dvh items-center justify-center bg-white">
-					<IconLoader2 className="size-6 animate-spin text-muted" />
+				<div className="flex min-h-dvh items-center justify-center bg-canvas">
+					<IconLoader2 className="size-6 animate-spin text-ink-3" />
 				</div>
 			</>
 		);
@@ -182,9 +182,9 @@ export function AcceptInvitationPage() {
 							</>
 						) : (
 							<>
-								<h1 className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-balance">
+								<h1 className="flex flex-wrap items-center justify-center gap-x-s gap-y-xs text-balance">
 									<span>Join</span>
-									<span className="inline-flex items-center gap-1.5">
+									<span className="inline-flex items-center gap-s">
 										<Avatar size="sm">
 											{presentation?.inviter.image ? (
 												<AvatarImage
@@ -207,10 +207,10 @@ export function AcceptInvitationPage() {
 					</div>
 
 					{status === "accepted" ? null : (
-						<div className="opaline-auth-stage flex flex-col gap-2">
+						<div className="opaline-auth-stage flex flex-col gap-m">
 							{error ? (
 								<p
-									className="text-pretty rounded-lg bg-destructive/5 px-3 py-2 text-base text-destructive ring-1 ring-destructive/15 sm:text-sm"
+									className="text-pretty corner-m bg-error/5 px-l py-m text-body-xxl text-error ring-1 ring-error/15 sm:text-body-xl"
 									role="alert"
 								>
 									{error}

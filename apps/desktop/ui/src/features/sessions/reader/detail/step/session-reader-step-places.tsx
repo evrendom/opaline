@@ -86,14 +86,14 @@ export function StepPlaces({
 
 	if (found.length === 0) return null;
 	return (
-		<div className="flex shrink-0 flex-wrap gap-1.5 px-5 pt-3 pb-2">
+		<div className="flex shrink-0 flex-wrap gap-s px-xxl pt-l pb-m">
 			{found.map((place) => (
 				<Link
 					key={place.href}
 					to={place.href}
 					aria-label={place.label}
 					title={place.label}
-					className="inline-flex items-center gap-1 rounded-full bg-card py-1 pr-2 pl-2.5 text-xs font-medium shadow-(--custom-shadow) transition-colors hover:bg-muted dark:bg-muted-foreground/10"
+					className="inline-flex items-center gap-xs corner-full bg-card py-xs pr-m pl-l text-body-m font-medium shadow-(--shadow-card) transition-colors hover:bg-hover dark:bg-ink-3/10"
 				>
 					Open details
 					<IconArrowUpRight

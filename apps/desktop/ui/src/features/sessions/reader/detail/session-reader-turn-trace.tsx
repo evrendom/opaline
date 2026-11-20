@@ -171,10 +171,14 @@ export const TurnTrace = memo(function TurnTrace({
 		<div
 			ref={setRoot}
 			data-turn-trace=""
-			className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_3.5rem_var(--reader-card)]"
+			className="grid gap-[calc(var(--space-xxl)*4/3)] xl:grid-cols-[minmax(0,1fr)_3.5rem_var(--reader-card)]"
 		>
-			<div className="isolate flex min-w-0 flex-col gap-4 pl-9">
-				{headNode ? <div className="-ml-9 xl:hidden">{headNode}</div> : null}
+			<div className="isolate flex min-w-0 flex-col gap-xl pl-[calc(var(--space-xxl)*1.5)]">
+				{headNode ? (
+					<div className="-ml-[calc(var(--space-xxl)*1.5)] xl:hidden">
+						{headNode}
+					</div>
+				) : null}
 				<LaunchedSubagentsContext.Provider value={agent ? null : launchedSlot}>
 					<TraceAttempts
 						exchanges={exchanges}
@@ -190,7 +194,9 @@ export const TurnTrace = memo(function TurnTrace({
 						waterfall={waterfall}
 					/>
 				</LaunchedSubagentsContext.Provider>
-				{foot ? <div className="-ml-9">{foot}</div> : null}
+				{foot ? (
+					<div className="-ml-[calc(var(--space-xxl)*1.5)]">{foot}</div>
+				) : null}
 			</div>
 			<div className="hidden min-w-0 self-stretch xl:col-start-3 xl:-mr-(--scrollbar,0px) xl:block">
 				<div
@@ -200,18 +206,21 @@ export const TurnTrace = memo(function TurnTrace({
 					<div
 						ref={setCard}
 						className={cn(
-							"flex flex-col overflow-hidden rounded-lg bg-card shadow-(--custom-shadow) corner-squircle squircle:rounded-3xl",
+							"flex flex-col overflow-hidden",
+							"corner-m corner-squircle",
+							"bg-card shadow-(--shadow-card)",
+							"squircle:corner-xl",
 							step &&
 								"h-[calc(100cqh-var(--reader-pane-top,var(--reader-top,1rem))-var(--frozen-subagents,0px)-0.5rem)]",
 						)}
 					>
 						{headNode ? (
-							<div className="shrink-0 border-b border-border/60 px-3 py-2.5">
+							<div className="shrink-0 edge-b-m border-line/60 px-l py-l">
 								{headNode}
 							</div>
 						) : null}
 						{headNode && step ? (
-							<div className="shrink-0 border-b border-border/60 px-3 py-2">
+							<div className="shrink-0 edge-b-m border-line/60 px-l py-m">
 								<StepBreakdowns
 									model={model}
 									step={step}
@@ -223,7 +232,10 @@ export const TurnTrace = memo(function TurnTrace({
 						{headNode && !step ? (
 							<div
 								className={cn(
-									"grid shrink-0 gap-4 border-b border-border/60 px-3 py-2 empty:hidden",
+									"grid shrink-0 gap-xl",
+									"edge-b-m px-l py-m",
+									"border-line/60",
+									"empty:hidden",
 									agent ? "grid-cols-2" : "grid-cols-4",
 								)}
 							>
@@ -254,26 +266,26 @@ export const TurnTrace = memo(function TurnTrace({
 						<div
 							ref={setLanesSlot}
 							className={cn(
-								"shrink-0 px-2 pb-1.5",
-								step && expanded ? "pt-3.5" : "pt-2",
+								"shrink-0 px-m pb-s",
+								step && expanded ? "pt-xl" : "pt-m",
 							)}
 						/>
 						<div
 							ref={setRunningSlot}
 							className={cn(
-								"shrink-0 border-t border-border/60 px-2.5 py-2 empty:hidden",
+								"shrink-0 edge-t-m border-line/60 px-l py-m empty:hidden",
 								(!subagentsAtStep || expanded) && "hidden",
 							)}
 						/>
 						<div
 							ref={setSubagentSlot}
 							className={cn(
-								"shrink-0 border-t border-border/60 px-2 py-2 empty:hidden",
+								"shrink-0 edge-t-m border-line/60 px-m py-m empty:hidden",
 								step && "hidden",
 							)}
 						/>
 						{step ? (
-							<div className="flex min-h-0 flex-1 flex-col border-t border-border/60">
+							<div className="flex min-h-0 flex-1 flex-col edge-t-m border-line/60">
 								<SessionReaderStepDetail
 									bare
 									expanded={expanded}
@@ -289,8 +301,8 @@ export const TurnTrace = memo(function TurnTrace({
 					<div
 						ref={setLaunchedSlot}
 						className={cn(
-							"flex shrink-0 flex-col gap-3 empty:hidden",
-							step ? "mt-8" : "mt-3",
+							"flex shrink-0 flex-col gap-l empty:hidden",
+							step ? "mt-[calc(var(--space-xxl)*4/3)]" : "mt-l",
 						)}
 					/>
 				</div>

@@ -8,7 +8,7 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { useElementWidth } from "@/components/ui/horizontal-resize-handle";
+import { useElementWidth } from "@/app/ui/horizontal-resize-handle";
 import { MOMENT_KINDS_APPEARANCE } from "@/features/compass/moment-labels";
 import { cn } from "@/lib/utils";
 import {
@@ -322,7 +322,7 @@ export function ContextTiles({
 								: `${word} – ${tokens} tokens`
 						}
 						className={cn(
-							"group/tile absolute overflow-hidden rounded-md corner-squircle squircle:rounded-xl border",
+							"group/tile absolute overflow-hidden corner-s corner-squircle squircle:corner-l edge-m",
 							look.className,
 							"transition-opacity duration-200",
 							(picked !== null || lits.length > 0) && !focused && "opacity-40",
@@ -335,7 +335,7 @@ export function ContextTiles({
 							focused &&
 								(tile.part
 									? "bg-[color-mix(in_oklab,var(--tint)_34%,transparent)] shadow-[0_2px_10px_-2px_color-mix(in_oklab,var(--tint)_45%,transparent)] dark:bg-[color-mix(in_oklab,var(--tint)_40%,transparent)] dark:shadow-[0_2px_12px_-2px_color-mix(in_oklab,var(--tint)_55%,transparent)]"
-									: "bg-[rgba(0,0,0,0.05)] shadow-[0_2px_10px_-2px_rgba(0,0,0,0.2)] dark:bg-[rgba(255,255,255,0.06)] dark:shadow-[0_2px_12px_-2px_rgba(0,0,0,0.6)]"),
+									: "bg-wash shadow-[0_2px_10px_-2px_rgba(0,0,0,0.2)] dark:bg-[rgba(255,255,255,0.06)] dark:shadow-[0_2px_12px_-2px_rgba(0,0,0,0.6)]"),
 						)}
 						style={{
 							...look.style,
@@ -356,11 +356,11 @@ export function ContextTiles({
 						<span
 							aria-hidden="true"
 							className={cn(
-								"pointer-events-none relative flex min-w-0 flex-col text-[13px] leading-5",
-								showName ? "px-2.5 py-1" : "h-full items-center justify-center",
+								"pointer-events-none relative flex min-w-0 flex-col text-body-l",
+								showName ? "px-l py-xs" : "h-full items-center justify-center",
 							)}
 						>
-							<span className="flex min-w-0 items-center gap-1.5">
+							<span className="flex min-w-0 items-center gap-s">
 								{compacts && !showName && tile.part?.kind !== "summary" ? (
 									<CompactionMark />
 								) : (
@@ -377,13 +377,13 @@ export function ContextTiles({
 						{(its?.strokes.length ?? 0) > 0 &&
 						tile.h - GAP >= 22 &&
 						tile.w - GAP >= 22 ? (
-							<span className="pointer-events-none absolute right-1.5 bottom-1.5 z-20 flex items-center gap-1">
+							<span className="pointer-events-none absolute right-1.5 bottom-1.5 z-20 flex items-center gap-xs">
 								{(its?.strokes ?? []).map((kind) => (
 									<span
 										key={kind}
 										aria-hidden="true"
 										title={MOMENT_KINDS_APPEARANCE[kind].label}
-										className="size-2 shrink-0 rounded-full"
+										className="size-2 shrink-0 corner-full"
 										style={{
 											backgroundColor: MOMENT_KINDS_APPEARANCE[kind].color,
 										}}
@@ -419,7 +419,7 @@ export function ContextTiles({
 	);
 	return (
 		<MeasureContext.Provider value={measureLook}>
-			<div className="group/chart flex flex-col gap-3">
+			<div className="group/chart flex flex-col gap-l">
 				<ContextBar
 					map={shownBase}
 					measure={measure}
@@ -462,7 +462,7 @@ export function ContextTiles({
 						<div ref={area} className="min-w-0">
 							{boxChart}
 							{footer || markTones.size > 0 ? (
-								<div className="flex items-center gap-3 px-[3px] pt-2 pb-[3px]">
+								<div className="flex items-center gap-l px-xs pt-m pb-xs">
 									<MarkLegend tones={markTones} />
 									{footer ? <div className="ml-auto">{footer}</div> : null}
 								</div>
@@ -472,7 +472,7 @@ export function ContextTiles({
 								<div
 									ref={keepPick}
 									data-context-pick=""
-									className="relative mt-[5px] flex h-[420px] flex-col px-[3px] pb-[3px]"
+									className="relative mt-s flex h-[420px] flex-col px-xs pb-xs"
 								>
 									{pickedTile?.part?.key.startsWith("run:") ? (
 										<RunLegend

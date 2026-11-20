@@ -11,7 +11,7 @@ export function SettingsSectionCard({
 	return (
 		<Card
 			size={size}
-			className={cn("settings-section-surface py-4 ring-0", className)}
+			className={cn("surface-card py-xl ring-0", className)}
 			{...props}
 		/>
 	);

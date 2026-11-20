@@ -93,7 +93,7 @@ export function NewSessionPage() {
 	return (
 		<>
 			<main
-				className="dashboardy-page flex min-h-0 min-w-0 flex-1 overflow-hidden bg-[color:var(--dashboardy-surface-opaque)]"
+				className="dashboardy-page flex min-h-0 min-w-0 flex-1 overflow-hidden bg-canvas"
 				data-slot="session-workspace"
 			>
 				<section
@@ -116,7 +116,7 @@ export function NewSessionPage() {
 				</div>
 				<section
 					aria-label="Selected session detail"
-					className="relative z-10 flex min-h-0 min-w-0 flex-1 overflow-hidden bg-[color:var(--dashboardy-surface-opaque)]"
+					className="relative z-10 flex min-h-0 min-w-0 flex-1 overflow-hidden bg-canvas"
 					data-slot="session-detail-pane"
 					style={sessionPaneMotionStyle}
 				>
@@ -136,7 +136,7 @@ export function NewSessionPage() {
 						<div
 							aria-busy={data.isSnapshotSessionsPending}
 							aria-live="polite"
-							className="flex min-h-0 flex-1 items-center justify-center px-6 text-center text-base text-[color:var(--dashboardy-muted)] sm:text-sm"
+							className="flex min-h-0 flex-1 items-center justify-center px-xxl text-center text-body-xxl text-ink-3 sm:text-body-xl"
 						>
 							{data.isSnapshotSessionsPending
 								? "Loading session detail…"

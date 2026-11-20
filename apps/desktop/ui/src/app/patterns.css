@@ -1,0 +1,1059 @@
+/* ============================================================
+   Opaline · patterns.css
+   Part A: the controls the primitives in src/app/ui don't cover, as classes
+   for markup and feature CSS (text button, secondary button, filter chip,
+   toolbar search).
+   Part B: Opaline's recurring patterns (surface card, menu, settings group).
+   Every rule reads Layer 2 (tokens.css) only. States are attributes or
+   classes, so each one renders at rest for review.
+   ============================================================ */
+
+/* ---- Part A · controls the primitives don't cover ---- */
+
+/* Text button: a quiet action inside a toolbar or a row. Ink-3 at rest, ink on
+   hover; pressed, selected or open sits on the hover tint. */
+.text-button {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-xs);
+	padding: var(--space-xs) var(--space-s);
+	border-radius: var(--radius-xs);
+	color: var(--ink-3);
+	font-size: var(--size-m);
+	line-height: var(--line-m);
+	letter-spacing: var(--letter-spacing-m);
+	white-space: nowrap;
+}
+.text-button:hover {
+	color: var(--ink);
+}
+.text-button:is(
+		[aria-pressed="true"],
+		[aria-selected="true"],
+		[data-popup-open]
+	) {
+	color: var(--ink);
+	background: var(--hover);
+}
+.text-button:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+/* Secondary button: a bordered square-cornered action beside a form or a
+   detail pane. One line edge, hover tint. */
+.secondary-button {
+	min-height: 32px;
+	padding: var(--space-s) var(--space-l);
+	border: var(--border-m) solid var(--line);
+	border-radius: var(--radius-xs);
+	font-size: var(--size-l);
+	line-height: var(--line-l);
+	letter-spacing: var(--letter-spacing-l);
+}
+.secondary-button:hover {
+	background: var(--hover);
+}
+
+/* Filter chip: an applied filter. Its dimension in ink-3, its value in ink;
+   inactive chips fade until focused. */
+.filter-chip {
+	display: flex;
+	align-items: center;
+	gap: var(--space-s);
+	min-width: 0;
+	max-width: min(340px, 100%);
+	height: 28px;
+	padding: var(--space-xs) var(--space-m) var(--space-xs) var(--space-s);
+	border: 0;
+	border-radius: var(--radius-xs);
+	background: var(--canvas);
+	box-shadow: var(--shadow-control);
+	font-size: var(--size-xl);
+	line-height: var(--line-xl);
+	letter-spacing: var(--letter-spacing-xl);
+	font-weight: var(--weight-body-medium);
+}
+.filter-chip[data-inactive="true"] {
+	opacity: 0.6;
+}
+.filter-chip-dimension {
+	flex-shrink: 0;
+	white-space: nowrap;
+	color: var(--ink-3);
+}
+
+.text-button:focus-visible,
+.secondary-button:focus-visible,
+.filter-chip:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: -1px;
+}
+
+/* Toolbar search: the toolbar button's 32px pill and control shadow, with
+   room for a leading 14px magnifier. */
+.toolbar-search {
+	width: 100%;
+	height: 32px;
+	padding: var(--space-zero) var(--space-l) var(--space-zero)
+		calc(var(--space-xxl) * 4 / 3);
+	border: 0;
+	border-radius: var(--radius-full);
+	background: var(--card);
+	box-shadow: var(--shadow-control);
+	color: var(--ink);
+	font-size: var(--size-xl);
+	line-height: var(--line-xl);
+	letter-spacing: var(--letter-spacing-xl);
+	outline: none;
+	transition: box-shadow 150ms ease;
+}
+.toolbar-search::placeholder {
+	color: var(--ink-3);
+	opacity: 1;
+}
+
+/* ---- Part B · Opaline patterns ---- */
+
+/* Surface card: the app's card. Surface, card shadow, squircle corners where
+   the browser draws them. Independently actionable things only: white space
+   first, a line next, a card last. */
+.surface-card {
+	border-radius: var(--radius-m);
+	background: var(--card);
+	box-shadow: var(--shadow-card);
+}
+/* biome-ignore lint/correctness/noUnknownProperty: corner-shape is new (Chromium 139+); Biome does not know it yet. */
+@supports (corner-shape: squircle) {
+	.surface-card {
+		border-radius: var(--radius-xl);
+		/* biome-ignore lint/correctness/noUnknownProperty: see the @supports note above. */
+		corner-shape: squircle;
+	}
+}
+
+/* Menu: dropdowns, popovers and pickers across sessions, costs, Compass and
+   the date range. Rows, checks, search, flyouts and their states. */
+/* Menu surface (dropdown-menu / popover): a borderless
+   popover on its soft hairline shadow, squircle corners, a 4px list inset and
+   compact 14px rows. Opaline keeps its pebble checks, black accent and fluid
+   hover. These tokens are scoped to session menus. */
+.menu-popover,
+.menu-surface {
+	--menu-hairline: 1px;
+	font-family: var(--font-body);
+	font-size: var(--size-xl);
+	font-weight: var(--weight-body-regular);
+	line-height: var(--line-xl);
+	letter-spacing: var(--letter-spacing-xl);
+	color: var(--ink);
+	-webkit-font-smoothing: antialiased;
+}
+
+@media (min-resolution: 2dppx) {
+	.menu-popover,
+	.menu-surface {
+		--menu-hairline: 0.5px;
+	}
+}
+
+/* Preserve the app's dark appearance; the captured reference was light. */
+.dark .menu-popover,
+.menu-popover {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	width: calc(206px + 2 * var(--menu-hairline));
+	max-height: var(--available-height, calc(100dvh - 16px));
+	padding: var(--space-zero);
+	margin: var(--space-zero);
+	outline: none;
+	transform-origin: var(--transform-origin);
+}
+
+.menu-surface {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	border: 0;
+	border-radius: var(--radius-s);
+	background: var(--surface);
+	box-shadow: var(--shadow-card);
+	outline: none;
+}
+/* Squircle corners where supported: a dropdown's 16px (rounded-2xl). */
+/* biome-ignore lint/correctness/noUnknownProperty: corner-shape is new (Chromium 139+); Biome does not know it yet. */
+@supports (corner-shape: squircle) {
+	.menu-surface {
+		border-radius: var(--radius-l);
+		/* biome-ignore lint/correctness/noUnknownProperty: see the @supports note above. */
+		corner-shape: squircle;
+	}
+}
+
+.menu-parent {
+	width: calc(206px + 2 * var(--menu-hairline));
+}
+.menu-list {
+	min-height: 0;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	scrollbar-width: thin;
+	padding: var(--space-xs) var(--space-zero);
+}
+.menu-list > ul {
+	margin: var(--space-zero);
+	padding: var(--space-zero);
+	list-style: none;
+}
+.menu-search,
+.menu-heading {
+	display: flex;
+	flex: none;
+	align-items: center;
+	gap: var(--space-xl);
+	height: calc(36px + var(--menu-hairline));
+	padding: var(--space-zero) var(--space-l);
+	border-bottom: var(--menu-hairline) solid var(--line-strong);
+}
+.menu-search input {
+	appearance: none;
+	width: 0;
+	min-width: 0;
+	height: 36px;
+	flex: 1;
+	border: 0;
+	border-radius: var(--radius-zero);
+	padding: var(--space-l) var(--space-zero) var(--space-m);
+	background: transparent;
+	color: var(--ink);
+	font-family: var(--font-body);
+	font-size: var(--size-xl);
+	font-weight: var(--weight-body-regular);
+	line-height: var(--line-xl);
+	letter-spacing: var(--letter-spacing-xl);
+	box-shadow: none;
+	outline: none;
+}
+.menu-search input::placeholder {
+	color: var(--ink-3);
+	opacity: 1;
+}
+.menu-search input::-webkit-search-cancel-button {
+	display: none;
+}
+.menu-search kbd {
+	flex: none;
+	min-width: 18px;
+	padding: var(--space-xxs);
+	margin-top: calc(var(--space-xxs) * -1);
+	border: var(--menu-hairline) solid var(--line-strong);
+	border-radius: var(--radius-xs);
+	font-family: var(--font-body);
+	font-size: var(--size-s);
+	letter-spacing: var(--letter-spacing-s);
+	font-weight: var(--weight-body-regular);
+	line-height: var(--line-s);
+	text-align: center;
+	color: var(--ink-3);
+}
+.menu-row {
+	position: relative;
+	isolation: isolate;
+	display: flex;
+	align-items: center;
+	gap: var(--space-m);
+	width: 100%;
+	height: 32px;
+	min-height: 32px;
+	flex-shrink: 0;
+	padding: var(--space-zero) var(--space-xl) var(--space-zero) var(--space-l);
+	border: 0;
+	border-radius: var(--radius-zero);
+	background: transparent;
+	color: var(--ink);
+	font-family: var(--font-body);
+	font-size: var(--size-xl);
+	font-weight: var(--weight-body-regular);
+	line-height: var(--line-xl);
+	letter-spacing: var(--letter-spacing-xl);
+	text-align: left;
+	white-space: nowrap;
+	outline: none;
+	user-select: none;
+	transition: color 100ms ease-in-out;
+}
+.menu-row::before {
+	content: "";
+	position: absolute;
+	inset: 0 4px;
+	z-index: -1;
+	border-radius: var(--radius-xs);
+	pointer-events: none;
+}
+.menu-row:is(
+		:hover,
+		:focus-visible,
+		:focus-within,
+		[data-highlighted],
+		[data-previewed="true"]
+	) {
+	color: var(--ink);
+}
+.menu-row:is(
+		:hover,
+		:focus-visible,
+		:focus-within,
+		[data-highlighted],
+		[data-previewed="true"]
+	)::before {
+	background: var(--hover);
+}
+/* A filter that's been changed reads like the toolbar's active Filter button:
+   its icon and label take the accent, with a dot before the chevron. */
+.menu-row[data-active="true"] {
+	color: var(--ink);
+}
+.menu-row[data-active="true"] > .menu-icon:first-child {
+	color: var(--ink);
+}
+.menu-active-dot {
+	flex: none;
+	width: 6px;
+	height: 6px;
+	border-radius: 9999px;
+	background: var(--ink);
+}
+.menu-row:disabled {
+	color: var(--ink-3);
+	pointer-events: none;
+}
+.menu-icon {
+	color: var(--ink-3);
+	flex: none;
+}
+.menu-surface svg {
+	opacity: 1;
+}
+.menu-separator {
+	position: relative;
+	height: 9px;
+	flex: none;
+}
+.menu-separator::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 50%;
+	border-top: var(--menu-hairline) solid var(--line-strong);
+}
+.menu-footer {
+	flex: none;
+	padding-bottom: var(--space-s);
+}
+.menu-empty {
+	padding: var(--space-xxl) var(--space-xl);
+	color: var(--ink-3);
+	text-align: center;
+}
+.menu-check-slot {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 14px;
+	flex: none;
+	margin-right: calc(var(--space-xxs) * -1);
+}
+.menu-checkbox {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 14px;
+	height: 14px;
+	background: var(--ink-3);
+	color: var(--surface);
+	-webkit-mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
+	mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
+	transition: background-color 80ms;
+}
+.menu-checkbox::before {
+	content: "";
+	position: absolute;
+	inset: 1px;
+	background: var(--surface);
+	-webkit-mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
+	mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
+	transition: opacity 80ms;
+}
+.menu-checkbox > svg {
+	position: relative;
+}
+.menu-checkbox[data-checked="true"] {
+	background: var(--ink);
+}
+.menu-checkbox[data-checked="true"]::before {
+	opacity: 0;
+}
+.menu-row:not(:hover, :focus-within) .menu-checkbox[data-checked="false"] {
+	visibility: hidden;
+}
+.menu-flyout {
+	position: absolute;
+	z-index: 10;
+	width: max-content;
+	min-width: 175px;
+	max-width: min(340px, calc(100vw - 24px));
+	max-height: min(374px, calc(100dvh - 24px));
+	box-shadow: var(--shadow-card);
+	transform-origin: var(--menu-flyout-origin, 0 43px);
+}
+.menu-flyout[data-kind="options"] {
+	overflow: hidden;
+}
+.menu-flyout:not([data-kind="options"]) {
+	width: calc(216px + 2 * var(--menu-hairline));
+}
+.menu-flyout .menu-list {
+	max-height: 338px;
+}
+.menu-sort {
+	width: calc(206px + 2 * var(--menu-hairline));
+	max-height: var(--available-height);
+	overflow-y: auto;
+	padding: var(--space-xs) var(--space-zero);
+	transform-origin: var(--transform-origin);
+}
+.menu-sort .menu-row {
+	padding-left: calc(var(--space-xxl) * 1.5);
+}
+.menu-sort-check {
+	position: absolute;
+	left: 12px;
+	display: flex;
+	align-items: center;
+	color: var(--ink-3);
+}
+
+/* Sampled from the reference's rendered opacity/scale curve; no layout animation. */
+.menu-popover[data-open],
+.menu-sort[data-open],
+.session-date-picker[data-open] {
+	animation: menu-enter 217ms linear both;
+}
+/* Category changes keep the flyout's icons and text on fixed pixel positions. */
+.menu-flyout {
+	animation: menu-flyout-enter 100ms ease-out both;
+}
+@keyframes menu-flyout-enter {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+.menu-popover[data-closed],
+.menu-sort[data-closed],
+.session-date-picker[data-closed] {
+	animation: menu-exit 170ms linear both;
+}
+@keyframes menu-enter {
+	0% {
+		transform: scale(0.98);
+		opacity: 0;
+	}
+	7.65% {
+		transform: scale(0.982753);
+		opacity: 0.275293;
+	}
+	15.3% {
+		transform: scale(0.984423);
+		opacity: 0.442248;
+	}
+	22.6% {
+		transform: scale(0.9849);
+		opacity: 0.489984;
+	}
+	30.7% {
+		transform: scale(0.987402);
+		opacity: 0.740174;
+	}
+	38.1% {
+		transform: scale(0.990805);
+		opacity: 1;
+	}
+	46% {
+		transform: scale(0.993343);
+		opacity: 1;
+	}
+	53.7% {
+		transform: scale(0.995014);
+		opacity: 1;
+	}
+	61.4% {
+		transform: scale(0.996334);
+		opacity: 1;
+	}
+	68.7% {
+		transform: scale(0.997306);
+		opacity: 1;
+	}
+	76.2% {
+		transform: scale(0.997984);
+		opacity: 1;
+	}
+	84.4% {
+		transform: scale(0.998518);
+		opacity: 1;
+	}
+	92.1% {
+		transform: scale(0.998931);
+		opacity: 1;
+	}
+	100% {
+		transform: scale(1);
+		opacity: 1;
+	}
+}
+@keyframes menu-exit {
+	0% {
+		transform: scale(1);
+		opacity: 1;
+	}
+	10% {
+		transform: scale(0.98);
+		opacity: 0.900299;
+	}
+	20% {
+		transform: scale(0.98);
+		opacity: 0.56046;
+	}
+	30% {
+		transform: scale(0.98);
+		opacity: 0.363471;
+	}
+	40% {
+		transform: scale(0.98);
+		opacity: 0.191692;
+	}
+	50% {
+		transform: scale(0.98);
+		opacity: 0.103101;
+	}
+	60% {
+		transform: scale(0.98);
+		opacity: 0.0506555;
+	}
+	70% {
+		transform: scale(0.98);
+		opacity: 0.0256828;
+	}
+	80% {
+		transform: scale(0.98);
+		opacity: 0.0129563;
+	}
+	100% {
+		transform: scale(0.98);
+		opacity: 0;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.menu-popover[data-open],
+	.menu-popover[data-closed],
+	.menu-sort[data-open],
+	.menu-sort[data-closed],
+	.session-date-picker[data-open],
+	.session-date-picker[data-closed],
+	.menu-flyout {
+		animation: none;
+	}
+}
+
+/* Keep Opaline's spring-driven hover, with the reference's inset silhouette. */
+.menu-surface .fluid-menu-hover-fill {
+	background: transparent;
+}
+.menu-surface .fluid-menu-hover-fill::before {
+	content: "";
+	position: absolute;
+	inset: 0 4px;
+	border-radius: 6px;
+	background: var(--hover);
+}
+.menu-row[data-fluid-menu-item]::before {
+	background: transparent;
+}
+.menu-picks .menu-row {
+	padding-left: var(--space-l);
+}
+.menu-picks .menu-row::before {
+	background: var(--hover);
+	opacity: 0;
+	transition: opacity 100ms ease-in-out;
+	will-change: opacity;
+}
+.menu-picks .menu-row[data-checked]::before {
+	opacity: 1;
+}
+.menu-picks .menu-row[data-join-next]::before {
+	border-bottom-left-radius: var(--radius-zero);
+	border-bottom-right-radius: var(--radius-zero);
+}
+.menu-picks .menu-row[data-join-previous]::before {
+	border-top-left-radius: var(--radius-zero);
+	border-top-right-radius: var(--radius-zero);
+}
+.menu-list:not([data-fluid-hover-active-index])
+	.menu-row[data-previewed="true"]::before {
+	background: var(--hover);
+}
+
+/* Settings: groups of rows, fields and actions, used by every settings page. */
+.settings-page {
+	container: settings / inline-size;
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--space-xxl) * 5 / 3);
+	width: 100%;
+	min-width: 0;
+	padding-bottom: calc(var(--space-xxl) * 2);
+}
+
+.settings-group {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: var(--space-l);
+	font-size: var(--size-xl);
+	letter-spacing: var(--letter-spacing-xl);
+	line-height: var(--line-xl);
+}
+
+.settings-group-heading {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-xl);
+	padding-inline: var(--space-xxl);
+}
+
+.settings-group-title {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: var(--space-xs);
+}
+
+.settings-group-action {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	gap: var(--space-m);
+}
+
+.settings-group-heading h2 {
+	font-size: var(--size-xl);
+	line-height: var(--line-xl);
+	letter-spacing: var(--letter-spacing-xl);
+	font-weight: var(--weight-body-medium);
+}
+
+.settings-group[data-tone="danger"] .settings-group-heading h2 {
+	color: var(--error);
+}
+
+.settings-group-heading p,
+.settings-row-description {
+	color: var(--ink-3);
+}
+
+.settings-group-rows {
+	min-width: 0;
+	padding: var(--space-zero) var(--space-xxl);
+}
+
+.settings-group-rows > * + * {
+	border-top: var(--border-m) solid var(--line, #0000000f);
+}
+
+.settings-row,
+.settings-actions {
+	padding: var(--space-xl) var(--space-zero);
+}
+
+.settings-row-copy > :first-child {
+	font-weight: var(--weight-body-medium);
+}
+
+.settings-row-description {
+	font-size: var(--size-l);
+	line-height: var(--line-l);
+	letter-spacing: var(--letter-spacing-l);
+}
+
+.settings-row {
+	display: flex;
+	min-height: 60px;
+	min-width: 0;
+	flex-direction: column;
+	align-items: stretch;
+	gap: var(--space-l);
+}
+
+.settings-list > * + * {
+	border-top: var(--border-m) solid var(--line, #0000000d);
+}
+
+.settings-subsection {
+	padding-top: var(--space-xl);
+}
+
+.settings-list .settings-row {
+	min-height: 0;
+}
+
+.settings-subsection > h3 {
+	color: var(--ink-3);
+	font-weight: var(--weight-body-medium);
+}
+
+.settings-row-copy {
+	display: flex;
+	min-width: 0;
+	flex: 1;
+	flex-direction: column;
+	gap: var(--space-xs);
+}
+
+.settings-row-control {
+	display: flex;
+	min-width: 0;
+	align-items: center;
+	justify-content: flex-start;
+	gap: var(--space-m);
+}
+
+/* Input: a hairline shadow instead of a border. */
+.settings-group [data-slot="input"],
+.settings-url-field,
+.settings-group [data-slot="select-trigger"],
+.settings-link-value [data-slot="input"] {
+	height: 48px;
+	border: 0;
+	border-radius: var(--radius-s);
+	background: transparent;
+	box-shadow: var(--shadow-card);
+	font-size: inherit;
+	padding-inline: var(--space-l);
+}
+
+.settings-row-control > [data-slot="select-trigger"] {
+	width: 100%;
+}
+
+.settings-member-identity {
+	display: flex;
+	min-width: 0;
+	align-items: center;
+	gap: var(--space-l);
+}
+
+.settings-member-text {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: var(--space-xxs);
+}
+
+.settings-member-activity {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	column-gap: var(--space-l);
+	color: var(--ink-3);
+	font-size: var(--size-l);
+	line-height: var(--line-l);
+	letter-spacing: var(--letter-spacing-l);
+	font-weight: var(--weight-body-regular);
+	font-variant-numeric: tabular-nums;
+}
+
+.settings-member-copy {
+	display: flex;
+	min-width: 0;
+	align-items: baseline;
+	gap: var(--space-l);
+}
+
+.settings-member-copy > :first-child {
+	font-weight: var(--weight-body-medium);
+}
+
+.settings-member-copy > :last-child {
+	font-size: var(--size-m);
+	line-height: var(--line-m);
+	letter-spacing: var(--letter-spacing-m);
+	font-weight: var(--weight-body-regular);
+}
+
+.settings-role {
+	display: flex;
+	width: 120px;
+	flex-shrink: 0;
+	align-items: center;
+}
+
+.settings-role > [data-slot="select-trigger"] {
+	width: 100%;
+}
+
+.settings-icon-slot {
+	width: 32px;
+	flex-shrink: 0;
+}
+
+/* Secondary badge. */
+.settings-badge {
+	display: inline-flex;
+	height: 20px;
+	align-items: center;
+	border-radius: var(--radius-full);
+	padding-inline: var(--space-m);
+	background: var(--field);
+	box-shadow: var(--shadow-raised);
+	color: var(--ink);
+	font-size: var(--size-m);
+	line-height: var(--line-m);
+	letter-spacing: var(--letter-spacing-m);
+	font-weight: var(--weight-body-medium);
+}
+
+.settings-group .settings-icon-button {
+	width: 32px;
+	padding: var(--space-zero);
+	color: var(--ink-3);
+}
+
+.settings-group .settings-icon-button:hover {
+	color: var(--ink);
+}
+
+.settings-member-copy > * {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.settings-member-copy > :last-child,
+.settings-status,
+.settings-empty {
+	color: var(--ink-3);
+}
+
+.settings-empty {
+	padding: var(--space-xl) var(--space-zero);
+}
+
+.settings-group [data-slot="avatar"] {
+	flex-shrink: 0;
+}
+
+.settings-link-surface {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: var(--space-l);
+	padding: var(--space-l) var(--space-zero);
+}
+
+.settings-link-value,
+.settings-link-actions {
+	display: flex;
+	min-width: 0;
+	align-items: center;
+	gap: var(--space-m);
+}
+
+.settings-link-actions {
+	flex-wrap: wrap;
+	justify-content: flex-end;
+}
+
+.settings-link-value [data-slot="input"] {
+	min-width: 0;
+	flex: 1;
+}
+
+.settings-row-control [data-slot="skeleton"] {
+	width: 100%;
+	height: 48px;
+	border-radius: var(--radius-xs);
+}
+
+.settings-actions [data-slot="skeleton"],
+.settings-link-actions [data-slot="skeleton"] {
+	width: 136px;
+	height: 48px;
+	border-radius: var(--radius-xs);
+}
+
+.settings-row-control > [data-slot="input"][readonly],
+.settings-field > [data-slot="input"][readonly] {
+	color: var(--ink-3);
+}
+
+.settings-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: flex-end;
+	gap: var(--space-m);
+}
+
+/* Buttons: pills; outline ones sit on an outline shadow. */
+.settings-group [data-slot="button"] {
+	height: 48px;
+	border-radius: var(--radius-full);
+	font-size: inherit;
+	font-weight: var(--weight-body-medium);
+}
+
+.settings-group [data-slot="button"][data-variant="outline"] {
+	border: 0;
+	background: var(--canvas);
+	box-shadow: var(--shadow-control);
+}
+
+.settings-group [data-slot="button"][data-variant="outline"]:hover {
+	background: var(--field);
+}
+
+.settings-fields {
+	display: flex;
+	min-width: 0;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: var(--space-xl);
+	padding: var(--space-l) var(--space-zero);
+}
+
+.settings-field {
+	display: flex;
+	min-width: 0;
+	flex: 1 1 200px;
+	flex-direction: column;
+	gap: var(--space-m);
+}
+
+.settings-field[data-size="compact"] {
+	flex: 0 0 184px;
+}
+
+.settings-field > :is(label, div):first-child {
+	font-weight: var(--weight-body-medium);
+}
+
+.settings-field [data-slot="select-trigger"] {
+	width: 100%;
+}
+
+.settings-error {
+	width: 100%;
+	color: var(--error);
+}
+
+@container settings (min-width: 480px) {
+	.settings-group {
+		font-size: var(--size-xl);
+		line-height: var(--line-xl);
+		letter-spacing: var(--letter-spacing-xl);
+	}
+
+	.settings-row {
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.settings-row-control {
+		width: 256px;
+		flex-shrink: 0;
+		justify-content: flex-end;
+	}
+
+	.settings-row-control > [data-slot="input"],
+	.settings-field [data-slot="input"],
+	.settings-url-field,
+	.settings-field [data-slot="select-trigger"],
+	.settings-link-value [data-slot="input"],
+	.settings-row-control [data-slot="skeleton"] {
+		height: 36px;
+	}
+
+	.settings-row-control [data-slot="select-trigger"],
+	.settings-actions [data-slot="skeleton"],
+	.settings-link-actions [data-slot="skeleton"],
+	.settings-group [data-slot="button"] {
+		height: 32px;
+	}
+
+	/* A button sharing a row of fields matches the inputs beside it. */
+	.settings-fields > [data-slot="button"] {
+		height: 36px;
+	}
+}
+
+@media (max-width: 639px), (pointer: coarse) {
+	.settings-group {
+		font-size: var(--size-xxl);
+		line-height: var(--line-xxl);
+		letter-spacing: var(--letter-spacing-xxl);
+	}
+
+	.settings-group [data-slot="button"],
+	.settings-group [data-slot="select-trigger"],
+	.settings-link-value [data-slot="input"],
+	.settings-row-control [data-slot="skeleton"],
+	.settings-actions [data-slot="skeleton"],
+	.settings-link-actions [data-slot="skeleton"],
+	.settings-row-control > [data-slot="input"],
+	.settings-url-field {
+		min-height: 48px;
+	}
+}
+
+.settings-url-control {
+	display: flex;
+	width: 100%;
+	min-width: 0;
+	flex-direction: column;
+	gap: var(--space-m);
+}
+
+.settings-url-field {
+	display: flex;
+	align-items: center;
+}
+
+.settings-url-field > span {
+	flex-shrink: 0;
+	color: var(--ink-3);
+}
+
+.settings-url-field:focus-within {
+	border-color: var(--focus);
+	outline: 2px solid color-mix(in oklab, var(--focus) 30%, transparent);
+}
+
+.settings-url-field [data-slot="input"] {
+	height: 100%;
+	min-height: 0;
+	border: 0;
+	border-radius: var(--radius-zero);
+	padding: var(--space-zero);
+	box-shadow: none;
+}

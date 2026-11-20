@@ -30,9 +30,7 @@ describe("MessageContent code formatting", () => {
 			/>,
 		);
 
-		expect(markup).toContain(
-			'<strong class="font-semibold">important</strong>',
-		);
+		expect(markup).toContain('<strong class="font-heavy">important</strong>');
 		expect(markup).not.toContain("**important**");
 		expect(markup).toContain("data-trace-inline-code");
 		expect(markup).toContain("**literal**");

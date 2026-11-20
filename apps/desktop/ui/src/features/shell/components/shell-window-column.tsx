@@ -17,8 +17,8 @@ export function ShellWindowColumn({
 	return (
 		<div
 			className={cn(
-				"flex min-h-0 min-w-0 flex-1 flex-col md:peer-data-[variant=inset]:mx-2 md:peer-data-[variant=inset]:mt-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2",
-				!footer && "md:peer-data-[variant=inset]:mb-2",
+				"flex min-h-0 min-w-0 flex-1 flex-col md:peer-data-[variant=inset]:mx-m md:peer-data-[variant=inset]:mt-m md:peer-data-[variant=inset]:ml-zero md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-m",
+				!footer && "md:peer-data-[variant=inset]:mb-m",
 			)}
 		>
 			{children}
@@ -27,8 +27,7 @@ export function ShellWindowColumn({
 	);
 }
 
-export const shellWindowRadiusClassName =
-	"md:rounded-lg squircle:md:rounded-3xl";
+export const shellWindowRadiusClassName = "md:corner-m squircle:md:corner-xl";
 
 /** Holds the footer's height while there is nothing to show. */
 export function ShellWindowFooterPlaceholder() {

@@ -31,7 +31,7 @@ html[data-welcome-shell],
 	height: 100%;
 	max-height: 100svh;
 	overflow-y: auto;
-	padding: 24px 48px;
+	padding: var(--space-xxl) calc(var(--space-xxl) * 2);
 }
 
 .cli-welcome-shell > .product-window-frame {
@@ -45,12 +45,12 @@ html[data-welcome-shell],
 	min-height: 420px;
 	max-height: 960px;
 	align-self: center;
-	border-radius: var(--instant-v2-dashboard-window-radius, 12px);
+	border-radius: var(--radius-l);
 }
 
 @media (max-width: 1100px) and (min-width: 900px) {
 	.cli-welcome-panel {
-		padding-inline: 32px;
+		padding-inline: calc(var(--space-xxl) * 4 / 3);
 	}
 
 	.cli-welcome-shell {
@@ -63,17 +63,17 @@ html[data-welcome-shell],
 		display: flex;
 		flex-direction: column;
 		align-items: stretch;
-		gap: 40px;
+		gap: calc(var(--space-xxl) * 5 / 3);
 		height: auto;
 		min-height: 100svh;
-		padding: 24px 16px 32px;
+		padding: var(--space-xxl) var(--space-xl) calc(var(--space-xxl) * 4 / 3);
 		overflow: clip;
 	}
 
 	.cli-welcome-panel {
 		height: auto;
 		max-height: none;
-		padding: 0 8px;
+		padding: var(--space-zero) var(--space-m);
 		overflow: visible;
 	}
 
@@ -81,7 +81,7 @@ html[data-welcome-shell],
 		width: 100%;
 		height: 400px;
 		min-height: 400px;
-		margin-left: 0;
+		margin-left: var(--space-zero);
 	}
 }
 
@@ -92,10 +92,10 @@ html[data-welcome-shell],
 	}
 
 	.cli-welcome-panel {
-		padding-block: 32px;
+		padding-block: calc(var(--space-xxl) * 4 / 3);
 	}
 
 	.cli-welcome-shell > .product-window-frame {
-		margin-block: 32px;
+		margin-block: calc(var(--space-xxl) * 4 / 3);
 	}
 }

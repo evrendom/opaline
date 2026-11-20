@@ -171,7 +171,7 @@ export function RepoDetailPage({
 	const shownTab = clickedTab ? clickedTab.to : tab;
 	const summaryPane = useMemo(
 		() => (
-			<div className="flex h-full min-h-0 min-w-0 flex-col pt-2 pr-8 pb-2 pl-6">
+			<div className="flex h-full min-h-0 min-w-0 flex-col pt-m pr-[calc(var(--space-xxl)*4/3)] pb-m pl-xxl">
 				<RepoSessionBoxes fill />
 			</div>
 		),
@@ -287,7 +287,7 @@ export function RepoDetailPage({
 	};
 	const sessions = <UsageSessionsPane {...sessionsProps} />;
 	return (
-		<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-[var(--dashboard-01-content-background,#fcfcfc)] text-(--dashboardy-heading) [--reader-page:var(--dashboard-01-content-background,#fcfcfc)]">
+		<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-inset text-ink [--reader-page:var(--canvas,#fcfcfc)]">
 			<RepoDetailHeader
 				repoKey={repoKey}
 				name={name}
@@ -310,7 +310,7 @@ export function RepoDetailPage({
 									<div className="relative isolate min-h-0 min-w-0 flex-1 overflow-hidden [--dashboard-01-content-background:var(--dashboard-01-stage-background)] [--panes-top:calc(var(--stage-top)-0.125rem)] [--stage-top:--spacing(2)] [--tabs-band:--spacing(19)]">
 										<div
 											aria-hidden="true"
-											className="pointer-events-none absolute top-(--stage-top) right-0 bottom-0 left-(--reader-gutter) -z-10 -ml-6 rounded-tl-lg bg-(--dashboard-01-stage-background) corner-squircle squircle:rounded-tl-3xl"
+											className="pointer-events-none absolute top-(--stage-top) right-0 bottom-0 left-(--reader-gutter) -z-10 -ml-xxl corner-tl-m bg-(--dashboard-01-stage-background) corner-squircle squircle:corner-tl-xl"
 										/>
 										{headerControls
 											? createPortal(
@@ -413,7 +413,7 @@ function RepoDashboard({
 	);
 	if (repositories.isError || repositories.data?.length === 0)
 		return (
-			<div className="px-8 py-6">
+			<div className="px-[calc(var(--space-xxl)*4/3)] py-xxl">
 				<EmptyState
 					icon={IconFolder}
 					title={
@@ -463,11 +463,11 @@ function RepoDetailHeader({
 	const repoHue = useRepositoryHue(repoKey);
 	if (!headerPortal) return null;
 	const crumbClassName =
-		"flex items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground";
+		"flex items-center gap-s text-ink-3 transition-colors hover:text-ink";
 	const separator = (
 		<IconChevronRight
 			aria-hidden="true"
-			className="size-4 shrink-0 text-muted-foreground/50"
+			className="size-4 shrink-0 text-ink-3/50"
 			stroke={1.5}
 		/>
 	);
@@ -481,13 +481,13 @@ function RepoDetailHeader({
 		<>
 			<nav
 				aria-label="Repo breadcrumb"
-				className="flex min-w-0 flex-1 items-center gap-1.5 text-base font-medium tracking-tight"
+				className="flex min-w-0 flex-1 items-center gap-s text-body-xxl font-medium"
 			>
 				<button
 					type="button"
 					onClick={onBack}
 					data-fluid-menu-root=""
-					className={cn(crumbClassName, "shrink-0 gap-2")}
+					className={cn(crumbClassName, "shrink-0 gap-m")}
 				>
 					<ShellNavIcon
 						icon={shellRoute.icon}
@@ -511,7 +511,7 @@ function RepoDetailHeader({
 						{separator}
 						<span
 							aria-current="page"
-							className="flex min-w-0 items-center gap-1.5"
+							className="flex min-w-0 items-center gap-s"
 						>
 							{/* The Sessions section's own chip, colour included. */}
 							<ShellNavIcon
@@ -525,10 +525,7 @@ function RepoDetailHeader({
 						</span>
 					</>
 				) : (
-					<span
-						aria-current="page"
-						className="flex min-w-0 items-center gap-1.5"
-					>
+					<span aria-current="page" className="flex min-w-0 items-center gap-s">
 						{repoLabel}
 					</span>
 				)}

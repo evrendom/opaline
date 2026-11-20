@@ -11,9 +11,9 @@ import {
 } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Reveal } from "@/app/ui/bones";
+import { useElementWidth } from "@/app/ui/horizontal-resize-handle";
 import { getModelIconComponent } from "@/components/conversation/conversation-trace-model-icon";
 import { EmptyState } from "@/components/dashboard/page-parts";
-import { useElementWidth } from "@/components/ui/horizontal-resize-handle";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
 import {
 	METRIC_APPEARANCE,
@@ -250,10 +250,10 @@ export function RepoSessionBoxes({ fill = false }: { fill?: boolean }) {
 	return (
 		<section
 			aria-label="Sessions"
-			className={cn("flex flex-col gap-2", fill && "min-h-0 flex-1")}
+			className={cn("flex flex-col gap-m", fill && "min-h-0 flex-1")}
 		>
-			<div className="flex items-baseline justify-between gap-3 px-1">
-				<h2 className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+			<div className="flex items-baseline justify-between gap-l px-xs">
+				<h2 className="flex items-center gap-s text-body-xl font-medium text-ink">
 					<Icon
 						aria-hidden="true"
 						className="size-3.5"
@@ -261,7 +261,7 @@ export function RepoSessionBoxes({ fill = false }: { fill?: boolean }) {
 					/>
 					Sessions by {look.label.toLowerCase()}
 					{day ? (
-						<span className="font-normal text-muted-foreground">
+						<span className="font-regular text-ink-3">
 							{" "}
 							· {dayWords(day.start, day.end)}
 						</span>
@@ -282,7 +282,7 @@ export function RepoSessionBoxes({ fill = false }: { fill?: boolean }) {
 								icon={look.outline}
 								title={`No ${look.label.toLowerCase()} ${day ? "on this day" : "in this period"}`}
 								description="No session of this repo has any. Pick another range or metric in the rail."
-								className="h-full rounded-md corner-squircle squircle:rounded-xl"
+								className="h-full corner-s corner-squircle squircle:corner-l"
 							/>
 						</div>
 					) : (
@@ -337,7 +337,7 @@ export function RepoSessionBoxes({ fill = false }: { fill?: boolean }) {
 					<div
 						data-session-pick=""
 						className={cn(
-							"relative mt-[5px] flex flex-col",
+							"relative mt-s flex flex-col",
 							fill ? "min-h-0 flex-1" : "h-[420px]",
 						)}
 						style={{ "--tint": look.color } as CSSProperties}
@@ -349,7 +349,7 @@ export function RepoSessionBoxes({ fill = false }: { fill?: boolean }) {
 								icon={IconClick}
 								title="Pick a session"
 								description="Click a box above to see what happened in that session, with its figures in the rail."
-								className="h-full rounded-md corner-squircle squircle:rounded-xl"
+								className="h-full corner-s corner-squircle squircle:corner-l"
 							/>
 						)}
 					</div>
@@ -502,7 +502,7 @@ function SessionTile({
 			data-tile-key={tile.key}
 			aria-label={`Session ${label} – ${figure}`}
 			className={cn(
-				"group/tile absolute overflow-hidden rounded-md border corner-squircle squircle:rounded-xl",
+				"group/tile absolute overflow-hidden corner-s edge-m corner-squircle squircle:corner-l",
 				look.className,
 				"transition-opacity duration-200",
 				"transition-[filter] duration-200",
@@ -525,11 +525,11 @@ function SessionTile({
 			<span
 				aria-hidden="true"
 				className={cn(
-					"pointer-events-none relative flex min-w-0 flex-col text-[13px] leading-5",
-					showName ? "px-2.5 py-1" : "h-full items-center justify-center",
+					"pointer-events-none relative flex min-w-0 flex-col text-body-l",
+					showName ? "px-l py-xs" : "h-full items-center justify-center",
 				)}
 			>
-				<span className="flex min-w-0 items-center gap-1.5">
+				<span className="flex min-w-0 items-center gap-s">
 					{Glyph && showGlyph ? (
 						<Glyph aria-hidden="true" className="size-3.5 shrink-0" />
 					) : null}

@@ -100,18 +100,18 @@ function SnippetLines({
 	snippets: readonly Snippet[];
 }) {
 	return (
-		<span className="flex min-w-0 flex-col gap-1 border-l-2 border-border pl-3">
+		<span className="flex min-w-0 flex-col gap-xs edge-l-l border-line pl-l">
 			{snippets.slice(0, SNIPPETS).map((snippet, index) => (
 				<span
 					// biome-ignore lint/suspicious/noArrayIndexKey: a snippet's place is its key
 					key={index}
-					className="text-[13px] leading-5 [overflow-wrap:anywhere] text-muted-foreground"
+					className="text-body-l [overflow-wrap:anywhere] text-ink-3"
 				>
 					<SnippetText category={category} snippet={snippet} />
 				</span>
 			))}
 			{snippets.length > SNIPPETS ? (
-				<span className="text-xs text-muted-foreground/70 tabular-nums">
+				<span className="text-body-m text-ink-3/70 tabular-nums">
 					+{snippets.length - SNIPPETS} more
 				</span>
 			) : null}
@@ -245,7 +245,7 @@ export function SummaryFlags({
 	)
 		return null;
 	return (
-		<ul className="flex flex-col divide-y divide-border/60">
+		<ul className="flex flex-col divide-y divide-line/60">
 			{before ? (
 				<Row
 					chip={<FlagChip kind="user_frustrated" />}

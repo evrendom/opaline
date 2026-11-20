@@ -88,7 +88,7 @@ function RepoUploadDot({
 		<span
 			aria-hidden="true"
 			className={cn(
-				"pointer-events-none size-1.5 shrink-0 rounded-full bg-emerald-500",
+				"pointer-events-none size-1.5 shrink-0 corner-full bg-emerald-500",
 				live && "animate-repo-live motion-reduce:animate-none",
 				className,
 			)}

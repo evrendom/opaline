@@ -28,7 +28,7 @@ export function TraceResultBody({ result }: { result: TraceToolResult }) {
 	});
 
 	return (
-		<div className="grid gap-3" data-trace-result-blocks>
+		<div className="grid gap-l" data-trace-result-blocks>
 			{text || nonTextBlocks.length === 0 ? (
 				<TraceResultText result={result} text={text} />
 			) : null}
@@ -38,7 +38,7 @@ export function TraceResultBody({ result }: { result: TraceToolResult }) {
 					if (omitted) {
 						return (
 							<p
-								className="text-[0.8125rem] text-[color:var(--dashboardy-muted)]"
+								className="text-body-l text-ink-3"
 								data-trace-result-image-omitted
 								key={key}
 							>
@@ -51,7 +51,7 @@ export function TraceResultBody({ result }: { result: TraceToolResult }) {
 					return source ? (
 						<img
 							alt="Tool result"
-							className="max-h-[32rem] max-w-full rounded-md border border-[color:var(--dashboardy-border)] object-contain"
+							className="max-h-[32rem] max-w-full corner-s edge-m border-line object-contain"
 							data-trace-result-image
 							decoding="async"
 							key={key}
@@ -60,7 +60,7 @@ export function TraceResultBody({ result }: { result: TraceToolResult }) {
 						/>
 					) : (
 						<p
-							className="text-[0.8125rem] text-[color:var(--dashboardy-muted)]"
+							className="text-body-l text-ink-3"
 							data-trace-result-image-unavailable
 							key={key}
 						>

@@ -66,18 +66,18 @@ export function ToolCard({
 				"flex min-h-0 flex-col overflow-hidden",
 				prose
 					? null
-					: "border border-border/60 bg-muted/40 corner-squircle dark:bg-white/[0.02]",
+					: "edge-m border-line/60 bg-field/40 corner-squircle dark:bg-wash",
 				!prose &&
 					(fit
-						? "rounded-xl squircle:rounded-3xl"
-						: "flex-1 rounded-t-xl border-b-0 squircle:rounded-t-3xl"),
+						? "corner-l squircle:corner-xl"
+						: "flex-1 corner-t-l edge-b-none squircle:corner-t-xl"),
 				prose && !fit && "flex-1",
 			)}
 		>
 			<div
 				className={cn(
-					"flex min-h-0 flex-1 flex-col gap-2",
-					prose ? "px-5" : "px-3 pt-3 pb-4",
+					"flex min-h-0 flex-1 flex-col gap-m",
+					prose ? "px-xxl" : "px-l pt-l pb-xl",
 					scrolls ? "overflow-y-auto" : "overflow-hidden",
 				)}
 			>
@@ -87,7 +87,13 @@ export function ToolCard({
 						type="button"
 						aria-expanded={open}
 						onClick={() => setOpen((value) => !value)}
-						className="-mb-1 flex w-fit items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+						className={cn(
+							"flex w-fit items-center gap-xs",
+							"-mb-xs corner-s px-s py-xs",
+							"text-body-s font-medium",
+							"text-ink-3 transition-colors",
+							"hover:text-ink",
+						)}
 					>
 						<IconChevronRight
 							aria-hidden="true"
@@ -99,7 +105,7 @@ export function ToolCard({
 						Result
 						<span
 							title={size.title}
-							className="font-normal text-muted-foreground/70 tabular-nums"
+							className="font-regular text-ink-3/70 tabular-nums"
 						>
 							{size.label}
 						</span>
@@ -121,12 +127,12 @@ export function ToolCard({
 							{text ? (
 								<div
 									className={cn(
-										"group/output relative flex flex-col gap-1",
-										!prose && "pb-1",
+										"group/output relative flex flex-col gap-xs",
+										!prose && "pb-xs",
 									)}
 								>
 									{prose ? (
-										<p className="pr-8 text-[13px] leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">
+										<p className="pr-[calc(var(--space-xxl)*4/3)] text-body-l whitespace-pre-wrap [overflow-wrap:anywhere]">
 											{text}
 										</p>
 									) : text.length <= LAYOUT_CHARS ? (
@@ -134,7 +140,7 @@ export function ToolCard({
 									) : (
 										<pre
 											className={cn(
-												"px-3 font-mono text-xs leading-5",
+												"px-l font-data text-body-m",
 												wrap
 													? "whitespace-pre-wrap [overflow-wrap:anywhere]"
 													: "overflow-x-auto whitespace-pre",
@@ -147,12 +153,19 @@ export function ToolCard({
 										<button
 											type="button"
 											onClick={() => setFull(true)}
-											className="w-fit px-3 text-xs text-muted-foreground hover:text-foreground"
+											className="w-fit px-l text-body-m text-ink-3 hover:text-ink"
 										>
 											Show all {size.label}
 										</button>
 									) : null}
-									<div className="absolute top-0 right-1 flex items-center gap-0.5 rounded-md bg-background/80 opacity-0 backdrop-blur-sm transition-opacity group-hover/output:opacity-100 focus-within:opacity-100 has-[[aria-pressed=true]]:opacity-100">
+									<div
+										className={cn(
+											"absolute top-0 right-1 flex items-center gap-xxs",
+											"corner-s",
+											"bg-canvas/80 opacity-0 backdrop-blur-sm transition-opacity",
+											"group-hover/output:opacity-100 focus-within:opacity-100 has-[[aria-pressed=true]]:opacity-100",
+										)}
+									>
 										{prose ? null : (
 											<button
 												type="button"
@@ -160,8 +173,11 @@ export function ToolCard({
 												title={wrap ? "Don’t wrap lines" : "Wrap lines"}
 												onClick={() => setWrap((value) => !value)}
 												className={cn(
-													"inline-flex size-6 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground",
-													wrap && "text-foreground",
+													"inline-flex size-6 items-center justify-center",
+													"corner-xs",
+													"text-ink-3 transition-colors",
+													"hover:text-ink",
+													wrap && "text-ink",
 												)}
 											>
 												<IconTextWrap aria-hidden="true" className="size-3.5" />
@@ -175,9 +191,7 @@ export function ToolCard({
 					) : null}
 				</AnimatePresence>
 				{text ? null : (
-					<p className="px-3 pb-1 text-xs text-muted-foreground/60">
-						No output
-					</p>
+					<p className="px-l pb-xs text-body-m text-ink-3/60">No output</p>
 				)}
 			</div>
 		</section>

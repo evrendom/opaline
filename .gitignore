@@ -65,6 +65,8 @@ packages/api-routes/.fact-review/
 !.claude/skills/pr-creation/
 !.claude/skills/testing-bun/
 !.claude/skills/typescript-standards/
+# Graphical's skills, from the editor package (apps/desktop/ui/graphical/).
+!.claude/skills/graphical-*/
 
 # Private overlay files that belong in the core team's ops repo, never here.
 # `rudel hooks claude install` writes to .claude/settings.json, which is tracked —

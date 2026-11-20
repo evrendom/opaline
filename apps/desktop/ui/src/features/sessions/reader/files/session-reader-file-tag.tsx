@@ -38,7 +38,7 @@ type FileLanguage = { color: string; Icon: Icon; label: string };
 const BY_EXTENSION: Record<string, FileLanguage> = {
 	astro: { color: "#BC52EE", Icon: IconBrandAstro, label: "Astro" },
 	cjs: { color: "#CA8A04", Icon: IconBrandJavascript, label: "JavaScript" },
-	css: { color: "#1572B6", Icon: IconBrandCss3, label: "CSS" },
+	css: { color: "var(--color-1)", Icon: IconBrandCss3, label: "CSS" },
 	cts: { color: "#3178C6", Icon: IconBrandTypescript, label: "TypeScript" },
 	go: { color: "#00ADD8", Icon: IconBrandGolang, label: "Go" },
 	html: { color: "#E34F26", Icon: IconBrandHtml5, label: "HTML" },
@@ -114,14 +114,17 @@ export function FileTag({
 			<span
 				title={path}
 				className={cn(
-					"inline-flex h-6 max-w-full min-w-0 items-center gap-1.5 rounded-full bg-background pr-2.5 pl-1 shadow-(--custom-outline-shadow) dark:bg-card",
+					"inline-flex h-6 max-w-full min-w-0 items-center gap-s",
+					"corner-full pr-l pl-xs",
+					"bg-canvas shadow-(--shadow-control)",
+					"dark:bg-card",
 					className,
 				)}
 			>
 				<OpalChip tint={color} className="size-4">
 					<Icon aria-hidden="true" className="size-2.5" style={{ color }} />
 				</OpalChip>
-				<span className="truncate font-mono text-xs">{name}</span>
+				<span className="truncate font-data text-body-m">{name}</span>
 			</span>
 		</SessionFileLink>
 	);

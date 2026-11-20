@@ -60,6 +60,7 @@
 		"zod": "^4.6.5"
 	},
 	"devDependencies": {
+		"@graphical/editor": "file:./graphical/packages/editor-1.0.4.tgz",
 		"@playwright/test": "1.62.0",
 		"@rudel/typescript-config": "workspace:*",
 		"@tailwindcss/vite": "^4.1.0",

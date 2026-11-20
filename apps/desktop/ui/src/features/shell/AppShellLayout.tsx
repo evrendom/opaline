@@ -174,14 +174,14 @@ export function LeftSidebarAppShellLayout() {
 				<div
 					className={cn(
 						"@container/main flex min-h-0 flex-1 flex-col",
-						!isFixedWorkspaceRoute && "gap-2",
+						!isFixedWorkspaceRoute && "gap-m",
 					)}
 				>
 					<div
 						className={cn(
 							"flex min-h-0 flex-1 flex-col",
 							isFixedWorkspaceRoute && "overflow-hidden",
-							!isFixedWorkspaceRoute && "gap-4 py-4 md:gap-6 md:py-6",
+							!isFixedWorkspaceRoute && "gap-xl py-xl md:gap-xxl md:py-xxl",
 						)}
 					>
 						<Outlet />
@@ -204,7 +204,7 @@ export function LeftSidebarAppShellLayout() {
 						<ShellBottomNavigationPortalContext.Provider value={null}>
 							<div
 								className={cn(
-									"dashboard-01-preview h-dvh overflow-hidden overscroll-none text-foreground",
+									"dashboard-01-preview h-dvh overflow-hidden overscroll-none text-ink",
 									isWelcome && "cli-welcome-shell",
 									!demo && !isWelcome && "product-app-shell",
 								)}
@@ -234,7 +234,7 @@ export function LeftSidebarAppShellLayout() {
 										>
 											<SidebarInset
 												className={cn(
-													"dashboard-01-window min-h-0 min-w-0 overflow-hidden overscroll-none bg-[var(--dashboard-01-content-background)]",
+													"dashboard-01-window min-h-0 min-w-0 overflow-hidden overscroll-none bg-[var(--canvas)]",
 													shellWindowRadiusClassName,
 												)}
 											>

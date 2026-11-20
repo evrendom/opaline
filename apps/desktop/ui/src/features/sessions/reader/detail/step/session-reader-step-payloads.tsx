@@ -75,7 +75,10 @@ export function HighlightedCode({
 	return (
 		<pre
 			className={cn(
-				"overflow-hidden rounded-md bg-muted py-2 font-mono text-xs leading-5 whitespace-pre-wrap [overflow-wrap:anywhere]",
+				"overflow-hidden [overflow-wrap:anywhere]",
+				"corner-s py-m",
+				"font-data text-body-m whitespace-pre-wrap",
+				"bg-field",
 				className,
 			)}
 		>
@@ -92,15 +95,15 @@ export function HighlightedCode({
 					<div
 						key={`${id}#${repeat}`}
 						className={cn(
-							"flex px-3",
-							kind === "addition" && "bg-emerald-500/10",
-							kind === "deletion" && "bg-rose-500/10",
+							"flex px-l",
+							kind === "addition" && "bg-success/10",
+							kind === "deletion" && "bg-error/10",
 						)}
 					>
 						{startLine !== undefined || lineNumbers ? (
 							<span
 								aria-hidden="true"
-								className="mr-3 shrink-0 text-right text-muted-foreground/50 tabular-nums select-none"
+								className="mr-l shrink-0 text-right text-ink-3/50 tabular-nums select-none"
 								style={{ width: `${gutter}ch` }}
 							>
 								{lineNumber ?? "⋯"}
@@ -110,10 +113,10 @@ export function HighlightedCode({
 							<span
 								aria-hidden="true"
 								className={cn(
-									"mr-2 shrink-0 select-none",
+									"mr-m shrink-0 select-none",
 									kind === "addition"
-										? "text-emerald-600 dark:text-emerald-400"
-										: "text-rose-600 dark:text-rose-400",
+										? "text-success dark:text-success"
+										: "text-error dark:text-error",
 								)}
 							>
 								{kind === "addition" ? "+" : "−"}
@@ -123,7 +126,7 @@ export function HighlightedCode({
 							<span
 								aria-hidden="true"
 								className={cn(
-									"mr-2 shrink-0 text-muted-foreground select-none",
+									"mr-m shrink-0 text-ink-3 select-none",
 									index > 0 && "invisible",
 								)}
 							>
@@ -162,11 +165,9 @@ export function HighlightedCode({
 function FilePath({ path }: { path: string }) {
 	const slash = path.lastIndexOf("/");
 	return (
-		<SessionFileLink path={path} className="rounded-sm hover:underline">
-			<span className="font-mono text-xs [overflow-wrap:anywhere]">
-				<span className="text-muted-foreground">
-					{path.slice(0, slash + 1)}
-				</span>
+		<SessionFileLink path={path} className="corner-xs hover:underline">
+			<span className="font-data text-body-m [overflow-wrap:anywhere]">
+				<span className="text-ink-3">{path.slice(0, slash + 1)}</span>
 				<span className="font-medium">{path.slice(slash + 1)}</span>
 			</span>
 		</SessionFileLink>
@@ -194,8 +195,8 @@ function ArgumentField({
 	label: string;
 }) {
 	return (
-		<div className="flex min-w-0 flex-col gap-1">
-			<span className="min-w-0 text-[11px] text-muted-foreground">{label}</span>
+		<div className="flex min-w-0 flex-col gap-xs">
+			<span className="min-w-0 text-body-s text-ink-3">{label}</span>
 			{children}
 		</div>
 	);
@@ -211,15 +212,15 @@ function FieldValue({ value }: { value: unknown }) {
 	if (typeof value === "string") {
 		const long = value.length > 80 || value.includes("\n");
 		return long ? (
-			<p className="rounded-md bg-muted px-3 py-2 text-[13px] leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">
+			<p className="corner-s bg-field px-l py-m text-body-l whitespace-pre-wrap [overflow-wrap:anywhere]">
 				{value}
 			</p>
 		) : (
-			<span className="text-[13px] [overflow-wrap:anywhere]">{value}</span>
+			<span className="text-body-l [overflow-wrap:anywhere]">{value}</span>
 		);
 	}
 	if (typeof value === "number" || typeof value === "boolean") {
-		return <span className="font-mono text-xs">{String(value)}</span>;
+		return <span className="font-data text-body-m">{String(value)}</span>;
 	}
 	return (
 		<HighlightedCode
@@ -270,7 +271,7 @@ export function ToolArguments({ event }: { event: ToolEvent }) {
 	const oldLines = oldText?.split("\n") ?? [];
 	const newLines = newText === "" ? [] : newText.split("\n");
 	return (
-		<div className="flex flex-col gap-3">
+		<div className="flex flex-col gap-l">
 			{path ? (
 				<ArgumentField label={fieldLabel(pathKey ?? "path")}>
 					<FilePath path={path} />
@@ -350,7 +351,7 @@ export function ShellCommandBlock({ event }: { event: ToolEvent }) {
 	return (
 		<div className="relative">
 			<HighlightedCode
-				className="pr-8"
+				className="pr-[calc(var(--space-xxl)*4/3)]"
 				code={layoutShellCommand(parts.command)}
 				language="bash"
 				prompt
@@ -370,7 +371,7 @@ export function ShellCallFields({ event }: { event: ToolEvent }) {
 	);
 	if (rest.length === 0) return null;
 	return (
-		<div className="flex flex-col gap-3">
+		<div className="flex flex-col gap-l">
 			{rest.map(([key, value]) => (
 				<ArgumentField key={key} label={fieldLabel(key)}>
 					<FieldValue value={value} />

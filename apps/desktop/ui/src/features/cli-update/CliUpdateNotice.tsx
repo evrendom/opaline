@@ -13,7 +13,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { orpc } from "@/lib/orpc";
-import "@/features/sessions/components/session-menu.css";
 import "./cli-update-notice.css";
 
 const STATUS_STALE_MS = 60 * 60 * 1_000;
@@ -101,14 +100,14 @@ function CliUpdateNoticeView({
 		<section
 			aria-label="Opaline CLI update"
 			data-cli-update-notice=""
-			className="cli-update-notice session-menu-surface"
+			className="cli-update-notice menu-surface"
 			onKeyDown={(event) => {
 				if (event.key !== "Escape") return;
 				event.stopPropagation();
 				onDismiss();
 			}}
 		>
-			<div className="session-menu-heading">
+			<div className="menu-heading">
 				<p className="cli-update-notice-title">
 					CLI update
 					<span className="cli-update-notice-versions">
@@ -124,21 +123,21 @@ function CliUpdateNoticeView({
 					<IconX aria-hidden="true" className="size-3.5" stroke={1.8} />
 				</button>
 			</div>
-			<div className="session-menu-list">
+			<div className="menu-list">
 				<button
 					type="button"
-					className="session-menu-row"
+					className="menu-row"
 					title={CLI_UPDATE_COMMAND}
 					onClick={() => void copyCommand()}
 				>
 					{copied ? (
 						<IconCheck
 							aria-hidden="true"
-							className="session-menu-icon size-4"
+							className="menu-icon size-4"
 							stroke={1.6}
 						/>
 					) : (
-						<IconCopy aria-hidden="true" className="session-menu-icon size-4" />
+						<IconCopy aria-hidden="true" className="menu-icon size-4" />
 					)}
 					<span className="min-w-0 flex-1 truncate">
 						{copied ? "Copied" : "Copy update command"}
@@ -148,11 +147,11 @@ function CliUpdateNoticeView({
 					href={getCliReleaseUrl(latestVersion)}
 					target="_blank"
 					rel="noreferrer"
-					className="session-menu-row"
+					className="menu-row"
 				>
 					<IconArrowUpRight
 						aria-hidden="true"
-						className="session-menu-icon size-4"
+						className="menu-icon size-4"
 						stroke={1.6}
 					/>
 					<span className="min-w-0 flex-1 truncate">What's new</span>

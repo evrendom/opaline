@@ -12,8 +12,8 @@ import {
 	HorizontalResizeHandle,
 	useElementWidth,
 	useStoredPaneSize,
-} from "@/components/ui/horizontal-resize-handle";
-import { clampPaneSize } from "@/components/ui/horizontal-resize-utils";
+} from "@/app/ui/horizontal-resize-handle";
+import { clampPaneSize } from "@/app/ui/horizontal-resize-utils";
 import { formatRoundedDuration } from "@/lib/format";
 import {
 	createSessionContinuousTurnViewportStore,
@@ -232,7 +232,7 @@ export function SessionDetailLayout({
 				<section
 					ref={turnTableSectionRef}
 					aria-label="Turn table"
-					className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-(--session-turn-table-surface) [--session-turn-table-surface:var(--session-overview-surface)]"
+					className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-(--session-turn-table-surface) [--session-turn-table-surface:var(--canvas)]"
 				>
 					<SessionTurnTablePane
 						model={viewModel.displayModel}
@@ -251,7 +251,7 @@ export function SessionDetailLayout({
 				</section>
 				<HorizontalResizeHandle
 					ariaLabel="Resize turn table panel"
-					className="border-t-[0.5px] border-l border-(--session-overview-border) after:absolute after:inset-x-0 after:top-[calc(2.75rem-0.5px)] after:h-[0.5px] after:bg-(--session-overview-border) after:content-['']"
+					className="edge-t-s edge-l-m border-line-strong after:absolute after:inset-x-0 after:top-[calc(2.75rem-0.5px)] after:h-[0.5px] after:bg-line-strong after:content-['']"
 					defaultValue={DEFAULT_SESSION_TURN_TABLE_PANE_WIDTH_PX}
 					maximum={turnTablePaneMaximum}
 					minimum={MINIMUM_SESSION_TURN_TABLE_PANE_WIDTH_PX}

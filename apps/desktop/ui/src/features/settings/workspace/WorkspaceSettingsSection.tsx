@@ -53,7 +53,7 @@ export function WorkspaceSettingsSection() {
 
 	if (!data.state.isPending && !data.state.hasOrganization) {
 		return (
-			<div className="workspace-settings-page">
+			<div className="settings-page">
 				<WorkspaceEmptyStateCard />
 				<div id="new-workspace" className="scroll-mt-24">
 					<CreateWorkspaceCard
@@ -68,10 +68,10 @@ export function WorkspaceSettingsSection() {
 	return (
 		<SettingsPageReveal routeId="workspace" loading={data.state.isPending}>
 			{() => (
-				<div className="workspace-settings-page">
+				<div className="settings-page">
 					{!data.state.isPending && data.state.isError ? (
 						<SettingsSectionCard>
-							<CardContent className="text-sm text-muted-foreground">
+							<CardContent className="text-body-xl text-ink-3">
 								Organization data couldn&apos;t be loaded right now.
 							</CardContent>
 						</SettingsSectionCard>

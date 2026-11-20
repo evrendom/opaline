@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useId } from "react";
 import { toast } from "sonner";
 import { Reveal } from "@/app/ui/bones";
+import { Button } from "@/app/ui/button";
 import { Checkbox } from "@/app/ui/checkbox";
 import {
 	WorkspaceSettingsGroup,
@@ -60,13 +61,14 @@ export function EmailDigestsCard() {
 				<EmailDigestsGroup>
 					{query.isError ? (
 						<WorkspaceSettingsRow label="Could not load your email choices.">
-							<button
-								type="button"
-								className="text-sm underline"
+							<Button
+								variant="link"
+								size="inline"
+								className="text-body-xl"
 								onClick={() => void query.refetch()}
 							>
 								Try again
-							</button>
+							</Button>
 						</WorkspaceSettingsRow>
 					) : (
 						<DigestRows
@@ -109,7 +111,7 @@ function DigestRows({
 			key={workspace.organizationId}
 			label={workspace.organizationName}
 		>
-			<div className="flex items-center gap-5">
+			<div className="flex items-center gap-xxl">
 				{KINDS.map(({ kind, label }) => (
 					<DigestCheckbox
 						key={kind}
@@ -159,7 +161,7 @@ function DigestCheckbox({
 }) {
 	const id = useId();
 	return (
-		<div className="flex items-center gap-2 text-sm">
+		<div className="flex items-center gap-m text-body-xl">
 			<Checkbox id={id} checked={checked} onCheckedChange={onCheckedChange} />
 			<label htmlFor={id}>{label}</label>
 		</div>

@@ -110,7 +110,7 @@ function getCodeHeaderIcon(filename: string, language: string) {
 	}
 	if (/\.(?:markdown|md)$/i.test(filename)) {
 		return {
-			className: "text-[color:var(--trace-code-tertiary,rgba(0,0,0,0.447))]",
+			className: "text-[color:var(--ink-3,rgba(0,0,0,0.447))]",
 			context: "markdown",
 			Icon: TraceMarkdownIcon,
 		};
@@ -119,7 +119,7 @@ function getCodeHeaderIcon(filename: string, language: string) {
 	const isNamedFile = !/^(?:error output|input|output)$/i.test(filename);
 	if (isNamedFile && language.toLowerCase() !== "text") {
 		return {
-			className: "text-[color:var(--trace-code-tertiary,rgba(0,0,0,0.447))]",
+			className: "text-[color:var(--ink-3,rgba(0,0,0,0.447))]",
 			context: "code",
 			Icon: TraceCodeIcon,
 		};
@@ -171,7 +171,9 @@ export function CodeBlock({
 
 		return {
 			className: cn(
-				"relative min-h-4 min-w-full rounded-[3px] before:mx-0.5 before:inline-block before:h-3 before:w-0.5 before:rounded-full before:align-middle before:content-['']",
+				"relative min-h-4 min-w-full",
+				"corner-xs",
+				"before:mx-xxs before:inline-block before:h-3 before:w-0.5 before:corner-full before:align-middle before:content-['']",
 				kind === "neutral" && "before:bg-transparent",
 				kind === "deletion" &&
 					"bg-[linear-gradient(to_right,var(--trace-code-deletion-surface),transparent)] before:bg-[var(--trace-code-deletion-marker)]",
@@ -195,16 +197,16 @@ export function CodeBlock({
 			style={{
 				background: "transparent",
 				backgroundColor: "transparent",
-				borderRadius: 0,
-				color: "var(--trace-code-primary)",
-				fontFamily:
-					'"Geist Mono", ui-monospace, SFMono-Regular, Consolas, monospace',
-				fontSize: "12px",
-				lineHeight: "16px",
-				margin: 0,
+				borderRadius: "var(--radius-zero)",
+				color: "var(--ink)",
+				fontFamily: "var(--font-data)",
+				fontSize: "var(--size-m)",
+				letterSpacing: "var(--letter-spacing-m)",
+				lineHeight: "var(--line-m)",
+				margin: "var(--space-zero)",
 				overflow: "hidden",
 				overflowWrap: "anywhere",
-				padding: "6px 8px",
+				padding: "var(--space-s) var(--space-m)",
 				whiteSpace: "pre-wrap",
 			}}
 		>
@@ -222,9 +224,9 @@ export function CodeBlock({
 												color: "var(--trace-code-line-number)",
 												display: "inline-block",
 												fontStyle: "normal",
-												marginRight: "16px",
+												marginRight: "var(--space-xl)",
 												minWidth: `${lineNumberWidth}px`,
-												paddingRight: 0,
+												paddingRight: "var(--space-zero)",
 												textAlign: "right",
 												width: `${lineNumberWidth}px`,
 											}}
@@ -251,12 +253,16 @@ export function CodeBlock({
 
 	const card = (
 		<div
-			className={cn("trace-code-block relative rounded-lg", className)}
+			className={cn("trace-code-block relative corner-m", className)}
 			data-trace-code-block
 			data-trace-code-line-numbers={shouldShowLineNumbers}
 		>
 			<div
-				className="relative z-20 flex h-8 items-center gap-1.5 rounded-t-lg border-b-[0.5px] border-[color:var(--trace-code-border)] px-2.5"
+				className={cn(
+					"relative z-20 flex h-8 items-center gap-s",
+					"corner-t-m edge-b-s px-l",
+					"border-line",
+				)}
 				data-trace-code-block-header
 			>
 				{headerIcon ? (
@@ -269,14 +275,19 @@ export function CodeBlock({
 					</span>
 				) : null}
 				<p
-					className="min-w-0 truncate font-sans text-[0.8125rem] leading-5 font-normal text-[color:var(--trace-code-secondary)]"
+					className="min-w-0 truncate font-body text-body-l font-regular text-ink-3"
 					data-trace-code-file-label
 				>
 					{fileLabel}
 				</p>
 				{changeSummary ? (
 					<span
-						className="ml-auto flex shrink-0 items-center gap-1.5 dashboardy-mono text-[0.6875rem]/4 font-medium tabular-nums"
+						className={cn(
+							"flex shrink-0 items-center gap-s dashboardy-mono",
+							"ml-auto",
+							"font-medium tabular-nums",
+							"text-[0.6875rem]/4",
+						)}
 						data-trace-code-additions={changeSummary.additions}
 						data-trace-code-change-summary
 						data-trace-code-deletions={changeSummary.deletions}
@@ -333,7 +344,7 @@ function HighlightedCodeToken({ token }: { token: PreparedCodeToken }) {
 export function InlineCode({ children }: InlineCodeProps) {
 	return (
 		<code
-			className="trace-inline-code rounded-[4px] px-1 py-0.5 [box-decoration-break:clone] [overflow-wrap:anywhere]"
+			className="trace-inline-code corner-xs px-xs py-xxs [box-decoration-break:clone] [overflow-wrap:anywhere]"
 			data-trace-inline-code
 		>
 			{children}

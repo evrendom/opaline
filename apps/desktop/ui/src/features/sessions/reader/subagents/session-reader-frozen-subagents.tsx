@@ -260,7 +260,10 @@ export function FrozenSubagentsLayer({
 		};
 	}, [root, slot, onSlot]);
 	return (
-		<div ref={setRoot} className="relative z-30 -mb-8 hidden h-0 xl:block">
+		<div
+			ref={setRoot}
+			className="relative z-30 -mb-[calc(var(--space-xxl)*4/3)] hidden h-0 xl:block"
+		>
 			<div
 				ref={setSlot}
 				className="pointer-events-none absolute inset-x-0 top-0"

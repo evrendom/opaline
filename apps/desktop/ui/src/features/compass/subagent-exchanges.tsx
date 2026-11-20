@@ -97,16 +97,19 @@ export function SubagentMessage({
 	const tint = useSubagentTintById()(subagentId) ?? LANE_LOOK.agent.tint;
 	const toMain = exchange.direction === "to-main";
 	return (
-		<div data-exchange="" className="-ml-9 flex gap-3">
-			<span className="mt-1.5 flex h-fit shrink-0">
+		<div
+			data-exchange=""
+			className="-ml-[calc(var(--space-xxl)*1.5)] flex gap-l"
+		>
+			<span className="mt-s flex h-fit shrink-0">
 				{toMain ? (
 					<SubagentAvatar subagentId={subagentId} />
 				) : (
 					<ModelAvatar flat loading={false} model={model} />
 				)}
 			</span>
-			<div className="flex min-w-0 flex-1 flex-col gap-1.5">
-				<span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
+			<div className="flex min-w-0 flex-1 flex-col gap-s">
+				<span className="inline-flex items-center gap-xs text-body-m font-medium text-ink-3">
 					{toMain ? (
 						<>
 							To main agent
@@ -121,7 +124,7 @@ export function SubagentMessage({
 				</span>
 				<div
 					className={cn(
-						"min-w-0 rounded-lg px-3 py-2.5 shadow-(--custom-shadow) corner-squircle squircle:rounded-2xl",
+						"min-w-0 corner-m px-l py-l shadow-(--shadow-card) corner-squircle squircle:corner-xl",
 						!toMain && "bg-card",
 					)}
 					style={toMain ? tintedGround(tint) : undefined}

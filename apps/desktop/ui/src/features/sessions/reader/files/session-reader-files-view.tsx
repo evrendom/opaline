@@ -187,9 +187,9 @@ export function SessionReaderFilesView({
 	};
 
 	return (
-		<div className="h-full overflow-hidden px-8 pt-2 pb-2">
+		<div className="h-full overflow-hidden px-[calc(var(--space-xxl)*4/3)] pt-m pb-m">
 			<SessionSubagents onOpen={openSubagent} subagents={subagents}>
-				<div className="flex h-full min-h-0 gap-6">
+				<div className="flex h-full min-h-0 gap-xxl">
 					<div
 						className={cn(
 							"flex min-h-0 w-(--reader-rail) shrink-0 flex-col",
@@ -231,7 +231,7 @@ export function SessionReaderFilesView({
 							label="Reading the files this session touched"
 							loading={query.isLoading}
 							sample={
-								<div className="flex h-full min-h-0 gap-6">
+								<div className="flex h-full min-h-0 gap-xxl">
 									<FilesColumnsSample
 										agent={agent}
 										model={model ?? null}
@@ -242,7 +242,7 @@ export function SessionReaderFilesView({
 							sampleId="reader-files"
 						>
 							{() => (
-								<div className="flex h-full min-h-0 gap-6">
+								<div className="flex h-full min-h-0 gap-xxl">
 									{run ? (
 										<TouchedFiles
 											agent={agent}
@@ -310,12 +310,12 @@ export function SessionReaderFilesView({
 												run={run}
 											/>
 										) : filePath ? (
-											<p className="px-5 py-4 text-[13px] text-muted-foreground">
-												<span className="font-mono">{filePath}</span> isn't
+											<p className="px-xxl py-xl text-body-l text-ink-3">
+												<span className="font-data">{filePath}</span> isn't
 												among the files this session changed or read.
 											</p>
 										) : (
-											<div className="flex min-w-0 flex-1 flex-col p-4">
+											<div className="flex min-w-0 flex-1 flex-col p-xl">
 												<EmptyState
 													icon={IconFile}
 													title="Pick a file"

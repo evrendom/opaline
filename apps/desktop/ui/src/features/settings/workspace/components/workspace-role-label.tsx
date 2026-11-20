@@ -5,11 +5,8 @@ import { IconCrown, IconShield, IconUser } from "@tabler/icons-react";
 export function WorkspaceRoleLabel({ value }: { value: "member" | "admin" }) {
 	const Icon = value === "admin" ? IconShield : IconUser;
 	return (
-		<span className="flex items-center gap-1.5">
-			<Icon
-				aria-hidden="true"
-				className="size-3.5 shrink-0 text-muted-foreground"
-			/>
+		<span className="flex items-center gap-s">
+			<Icon aria-hidden="true" className="size-3.5 shrink-0 text-ink-3" />
 			{value === "admin" ? "Admin" : "Member"}
 		</span>
 	);
@@ -17,7 +14,7 @@ export function WorkspaceRoleLabel({ value }: { value: "member" | "admin" }) {
 
 export function WorkspaceOwnerBadge() {
 	return (
-		<span className="inline-flex h-5 items-center gap-1 rounded-full bg-orange-500/10 px-2 text-xs font-medium text-orange-600 dark:bg-orange-600/15 dark:text-orange-400">
+		<span className="inline-flex h-5 items-center gap-xs corner-full bg-warning/10 px-m text-body-m font-medium text-warning dark:bg-warning/15 dark:text-warning">
 			<IconCrown aria-hidden="true" className="size-3" />
 			Owner
 		</span>

@@ -21,7 +21,7 @@ describe("CodeBlock", () => {
 		expect(markup).toContain("data-trace-code-block-content");
 		expect(markup).toContain('data-trace-code-highlight-state="plain"');
 		expect(markup).toContain('data-trace-code-line-numbers="true"');
-		expect(markup).toContain("trace-code-block relative rounded-lg");
+		expect(markup).toContain("trace-code-block relative corner-m");
 		expect(markup).not.toContain("overflow-clip");
 		// The filename bar stays fixed within the code card but travels with the
 		// complete card during normal conversation scrolling.
@@ -32,9 +32,9 @@ describe("CodeBlock", () => {
 		expect(markup).not.toContain("data-trace-code-scroll-range");
 		expect(markup).toContain('tabindex="0"');
 		expect(markup).toContain("Scrollable code for auth/reset.ts");
-		expect(markup).toContain("rounded-lg");
+		expect(markup).toContain("corner-m");
 		expect(markup).toContain("h-8");
-		expect(markup).toContain("border-b-[0.5px]");
+		expect(markup).toContain("edge-b-s");
 		expect(markup).toContain("auth/reset.ts");
 		expect(markup).not.toContain(">Open<");
 		expect(markup).not.toContain("data-trace-code-open-label");
@@ -46,11 +46,11 @@ describe("CodeBlock", () => {
 		expect(markup).not.toContain("data-trace-code-github-icon");
 		expect(markup).toContain("data-trace-glyph");
 		expect(markup).toContain("trace-code-block");
-		expect(markup).toContain("border-[color:var(--trace-code-border)]");
-		expect(markup).toContain("padding:6px 8px");
-		expect(markup).toContain("font-size:12px");
-		expect(markup).toContain("line-height:16px");
-		expect(markup).toContain("font-family:&quot;Geist Mono&quot;");
+		expect(markup).toContain("border-line");
+		expect(markup).toContain("padding:var(--space-s) var(--space-m)");
+		expect(markup).toContain("font-size:var(--size-m)");
+		expect(markup).toContain("line-height:var(--line-m)");
+		expect(markup).toContain("font-family:var(--font-data)");
 		expect(markup).not.toContain("BerkeleyMono");
 		expect(markup).toContain("white-space:pre-wrap");
 		expect(markup).toContain("overflow-wrap:anywhere");
@@ -60,10 +60,10 @@ describe("CodeBlock", () => {
 		expect(markup.match(/data-trace-code-line=/g)).toHaveLength(3);
 		expect(markup).not.toContain('data-trace-code-line-kind="deletion"');
 		expect(markup).not.toContain('data-trace-code-line-kind="addition"');
-		expect(markup).toContain("rounded-[3px]");
+		expect(markup).toContain("corner-xs");
 		expect(markup).toContain("min-width:16px");
-		expect(markup).toContain("margin-right:16px");
-		expect(markup).not.toContain("rounded-[1rem]");
+		expect(markup).toContain("margin-right:var(--space-xl)");
+		expect(markup).not.toContain("corner-l");
 		expect(markup).not.toContain("bg-[#0f172a]");
 		expect(markup).not.toContain("padding:1.125rem");
 		expect(markup).not.toContain(">Code<");
@@ -130,10 +130,8 @@ describe("CodeBlock", () => {
 		);
 
 		// Split borders let the filename row look like the card top.
-		expect(css).toContain("border-top: 0.5px solid var(--trace-code-outline)");
-		expect(css).toContain(
-			"border-bottom: 0.5px solid var(--trace-code-outline)",
-		);
+		expect(css).toContain("border-top: var(--border-s) solid var(--line)");
+		expect(css).toContain("border-bottom: var(--border-s) solid var(--line)");
 		expect(css).toContain("[data-trace-code-block-header]::before");
 		expect(css).toContain("bottom: calc(100% + 0.5px)");
 		expect(css).toContain("height: var(--trace-code-sticky-gap, 4px)");

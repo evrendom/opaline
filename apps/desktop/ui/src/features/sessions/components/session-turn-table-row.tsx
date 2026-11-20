@@ -55,7 +55,7 @@ function SessionTurnRelativeMagnitude({
 				viewBox="0 0 16 16"
 			>
 				<circle
-					className="stroke-(--session-overview-border)"
+					className="stroke-line-strong"
 					cx="8"
 					cy="8"
 					r="6.25"
@@ -63,7 +63,7 @@ function SessionTurnRelativeMagnitude({
 				/>
 				{magnitude > 0 ? (
 					<circle
-						className="stroke-(--session-overview-accent)"
+						className="stroke-accent"
 						cx="8"
 						cy="8"
 						pathLength="100"
@@ -233,10 +233,8 @@ export const SessionTurnTableRowView = memo(function SessionTurnTableRowView({
 				aria-current={selected ? "true" : undefined}
 				className={cn(
 					"group relative isolate z-1 grid h-9 min-w-full select-none outline-none [grid-template-columns:var(--session-turn-grid-template)] focus-visible:z-10",
-					!registerHoverItem &&
-						"hover:bg-(--session-overview-hover) hover:[&>td]:bg-(--session-overview-hover)",
-					matchesLens &&
-						"[box-shadow:inset_2px_0_0_var(--session-overview-accent)]",
+					!registerHoverItem && "hover:bg-hover hover:[&>td]:bg-hover",
+					matchesLens && "[box-shadow:inset_2px_0_0_var(--accent)]",
 				)}
 				data-visible-index={visibleIndex}
 				data-turn-index={match.index}
@@ -272,7 +270,7 @@ export const SessionTurnTableRowView = memo(function SessionTurnTableRowView({
 					aria-label={
 						viewed ? "Visible in transcript" : "Outside transcript viewport"
 					}
-					className="flex h-full items-center justify-center p-0"
+					className="flex h-full items-center justify-center p-zero"
 				>
 					<div
 						aria-hidden="true"
@@ -291,7 +289,7 @@ export const SessionTurnTableRowView = memo(function SessionTurnTableRowView({
 											: ""
 									}`
 						}
-						className="flex h-full min-w-0 items-center overflow-hidden py-1.5 pl-1"
+						className="flex h-full min-w-0 items-center overflow-hidden py-s pl-xs"
 					>
 						<div className="session-constellation-tree min-w-0">
 							<div
@@ -325,7 +323,7 @@ export const SessionTurnTableRowView = memo(function SessionTurnTableRowView({
 												<span
 													key={group.icon}
 													aria-label={`${countLabel}: ${toolNames}`}
-													className="relative -ml-3 shrink-0"
+													className="relative -ml-l shrink-0"
 													role="img"
 													style={{
 														zIndex: row.toolCallGroups.length - groupIndex,
@@ -340,7 +338,12 @@ export const SessionTurnTableRowView = memo(function SessionTurnTableRowView({
 													{group.count > 1 ? (
 														<span
 															aria-hidden="true"
-															className="absolute right-0 bottom-0 z-10 min-w-2.5 rounded-[2px] bg-(--session-overview-surface) px-px text-center text-[0.5rem] leading-[0.625rem] font-semibold text-(--session-overview-text) tabular-nums shadow-[0_0_0_1px_var(--session-overview-surface)]"
+															className={cn(
+																"absolute right-0 bottom-0 z-10 min-w-2.5",
+																"corner-xs px-xxs",
+																"text-center text-body-xxs font-heavy tabular-nums",
+																"bg-canvas text-ink shadow-[0_0_0_1px_var(--canvas)]",
+															)}
 														>
 															{group.count}x
 														</span>
@@ -361,8 +364,8 @@ export const SessionTurnTableRowView = memo(function SessionTurnTableRowView({
 							key={column.key}
 							aria-label={column.label}
 							className={cn(
-								"flex h-full min-w-0 items-center overflow-hidden py-1.5",
-								column.key === "time" ? "pr-1.5 pl-0" : "px-1.5",
+								"flex h-full min-w-0 items-center overflow-hidden py-s",
+								column.key === "time" ? "pr-s pl-zero" : "px-s",
 							)}
 						>
 							<div className="min-w-0 w-full overflow-hidden">
@@ -371,8 +374,8 @@ export const SessionTurnTableRowView = memo(function SessionTurnTableRowView({
 										className={cn(
 											"flex min-w-0 flex-1 items-center overflow-hidden",
 											column.appearance === "tag"
-												? "flex-nowrap gap-1"
-												: "gap-1.5",
+												? "flex-nowrap gap-xs"
+												: "gap-s",
 										)}
 									>
 										{values.map((value) => (
@@ -382,14 +385,14 @@ export const SessionTurnTableRowView = memo(function SessionTurnTableRowView({
 													`${value.title ?? "value"}:${value.label}`
 												}
 												className={cn(
-													"min-w-0 max-w-full text-(--session-overview-muted)",
+													"min-w-0 max-w-full text-ink-3",
 													value.relativeMagnitude === undefined && "truncate",
 													column.appearance === "tag"
-														? "rounded-full bg-(--session-overview-surface) px-1.5 py-0.5 text-xs font-medium tracking-[-0.01em]"
-														: "text-xs",
+														? "corner-full bg-canvas px-s py-xxs text-body-m font-medium"
+														: "text-body-m",
 													column.appearance !== "text" && "tabular-nums",
 													column.appearance === "text" &&
-														"[&_[data-signal]]:rounded-md [&_[data-signal]]:px-0.75 [&_[data-signal]]:py-px [&_[data-signal]]:[font:inherit]",
+														"[&_[data-signal]]:corner-s [&_[data-signal]]:px-xs [&_[data-signal]]:py-xxs [&_[data-signal]]:[font:inherit]",
 												)}
 												title={value.title}
 											>
@@ -405,7 +408,7 @@ export const SessionTurnTableRowView = memo(function SessionTurnTableRowView({
 												) : value.relativeMagnitude === undefined ? (
 													value.label
 												) : (
-													<div className="flex min-w-0 items-center gap-1.5">
+													<div className="flex min-w-0 items-center gap-s">
 														<SessionTurnRelativeMagnitude
 															columnLabel={column.label}
 															value={value.relativeMagnitude}
@@ -419,7 +422,7 @@ export const SessionTurnTableRowView = memo(function SessionTurnTableRowView({
 										))}
 									</div>
 								) : (
-									<p className="text-xs text-(--session-overview-subtle)">—</p>
+									<p className="text-body-m text-ink-3">—</p>
 								)}
 							</div>
 						</td>

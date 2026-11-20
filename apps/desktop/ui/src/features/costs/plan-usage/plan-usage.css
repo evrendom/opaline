@@ -18,7 +18,7 @@
 	}
 }
 .plan-usage-bone {
-	fill: var(--bone);
+	fill: var(--hover-strong);
 }
 .plan-usage-loading-bar {
 	position: absolute;

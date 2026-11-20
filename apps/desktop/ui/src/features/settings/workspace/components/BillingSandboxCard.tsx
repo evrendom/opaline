@@ -75,16 +75,16 @@ export function BillingSandboxCard({
 				<code>4242 4242 4242 4242</code>
 			</WorkspaceSettingsRow>
 			{!configured ? (
-				<div className="workspace-settings-actions">
-					<p className="workspace-settings-error" role="alert">
+				<div className="settings-actions">
+					<p className="settings-error" role="alert">
 						Sandbox mode is selected, but its Stripe key, webhook secret, or
 						four test Price IDs are missing.
 					</p>
 				</div>
 			) : null}
 			{error ? (
-				<div className="workspace-settings-actions">
-					<p className="workspace-settings-error" role="alert">
+				<div className="settings-actions">
+					<p className="settings-error" role="alert">
 						{error}
 					</p>
 				</div>

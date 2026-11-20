@@ -84,7 +84,7 @@ export const TurnBlock = memo(function TurnBlock({
 		<div
 			{...TURN_REPLY_MARK}
 			className={cn(
-				"flex gap-3",
+				"flex gap-l",
 				body ? "w-full max-w-[33rem]" : READING_MEASURE,
 			)}
 		>
@@ -93,12 +93,12 @@ export const TurnBlock = memo(function TurnBlock({
 				{bodyState.status === "loading" ? (
 					<AssistantSkeleton />
 				) : bodyState.status === "failed" ? (
-					<p className="pt-0.5 text-sm text-muted-foreground">
+					<p className="pt-xxs text-body-xl text-ink-3">
 						This turn could not be loaded.{" "}
 						<button
 							type="button"
 							onClick={() => onRetry(turn.turnId)}
-							className="underline underline-offset-2 hover:text-foreground"
+							className="underline underline-offset-2 hover:text-ink"
 						>
 							Retry
 						</button>
@@ -106,7 +106,7 @@ export const TurnBlock = memo(function TurnBlock({
 				) : finalMessage ? (
 					<AssistantResponse text={finalMessage} />
 				) : (
-					<p className="pt-0.5 text-sm italic text-muted-foreground">
+					<p className="pt-xxs text-body-xl italic text-ink-3">
 						No response recorded.
 					</p>
 				)}
@@ -118,10 +118,10 @@ export const TurnBlock = memo(function TurnBlock({
 		<div
 			data-turn-steps={turn.toolCallCount}
 			data-turn-pending={body ? undefined : ""}
-			className="flex w-full flex-col gap-8 text-sm"
+			className="flex w-full flex-col gap-[calc(var(--space-xxl)*4/3)] text-body-xl"
 		>
 			{memberText && !hidden.has("prompts") ? (
-				<div className={cn("flex flex-col gap-2", READING_MEASURE)}>
+				<div className={cn("flex flex-col gap-m", READING_MEASURE)}>
 					<MemberFactLine
 						frustrated={frustrated}
 						questions={questions}
@@ -139,7 +139,7 @@ export const TurnBlock = memo(function TurnBlock({
 
 			<div
 				{...TURN_ANSWER_MARK}
-				className="relative flex scroll-mt-(--reader-top,1rem) flex-col gap-4"
+				className="relative flex scroll-mt-(--reader-top,1rem) flex-col gap-xl"
 			>
 				{body ? null : (
 					<PendingSubagentMarks durations={subagentDurations} turn={turn} />

@@ -13,12 +13,12 @@ describe("ExpandableTraceRow body layout", () => {
 		);
 
 		expect(rowSource).toContain(
-			'const expandedBodyClassName = "pt-1 pr-3 pb-2.5 pl-3"',
+			'const expandedBodyClassName = "pt-xs pr-l pb-l pl-l"',
 		);
-		expect(rowSource).toContain('const proseBodyClassName = "px-3 py-1"');
+		expect(rowSource).toContain('const proseBodyClassName = "px-l py-xs"');
 		expect(rowSource).not.toContain('"flex min-h-10 items-center"');
 		expect(rowSource).not.toContain('expandedBodyClassName = "-mt-');
-		expect(rowSource).not.toContain("pb-2.5 pl-10");
+		expect(rowSource).not.toContain("pb-l pl-[calc(var(--space-xxl)*5/3)]");
 		expect(rowSource).not.toContain("data-trace-prose-motion");
 		expect(rowSource).not.toContain("data-trace-details-motion");
 		expect(rowSource).not.toContain("--trace-prose-body-height");

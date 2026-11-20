@@ -23,7 +23,7 @@ export function useFilesRailTags(): RailTagsState {
 
 export function RailEmptyPane({ children }: { children: ReactNode }) {
 	return (
-		<div className="mt-(--panes-top) flex min-w-0 flex-1 flex-col pt-4">
+		<div className="mt-(--panes-top) flex min-w-0 flex-1 flex-col pt-xl">
 			{children}
 		</div>
 	);

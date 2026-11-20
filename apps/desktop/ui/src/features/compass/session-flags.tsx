@@ -183,10 +183,7 @@ function FlagTag({ kinds }: { kinds: readonly MomentKind[] }) {
 				title={labels.join(", ")}
 				className="size-4 drop-shadow-none dark:drop-shadow-none"
 			>
-				<IconAlertTriangle
-					aria-hidden="true"
-					className="size-2.5 text-rose-500"
-				/>
+				<IconAlertTriangle aria-hidden="true" className="size-2.5 text-error" />
 			</OpalChip>
 			<span className="sr-only">Flagged: {labels.join(", ")}</span>
 		</span>
@@ -258,7 +255,7 @@ export function useTurnFlags(
 }
 
 const FLAG_TRIGGER =
-	"inline-flex h-7 w-fit min-w-7 shrink-0 items-center justify-center gap-1 rounded-full bg-card px-2 text-xs font-medium shadow-(--custom-shadow) transition-colors hover:bg-muted/60 data-popup-open:bg-muted dark:bg-muted-foreground/10";
+	"inline-flex h-7 w-fit min-w-7 shrink-0 items-center justify-center gap-xs corner-full bg-card px-m text-body-m font-medium shadow-(--shadow-card) transition-colors hover:bg-hover/60 data-popup-open:bg-hover dark:bg-ink-3/10";
 
 function SessionFlagFilter({
 	byKind,
@@ -292,7 +289,7 @@ function SessionFlagFilter({
 				aria-label="Loading flags"
 				className={cn(
 					FLAG_TRIGGER,
-					"cursor-default text-muted-foreground opacity-40 hover:bg-card dark:hover:bg-muted-foreground/10",
+					"cursor-default text-ink-3 opacity-40 hover:bg-card dark:hover:bg-ink-3/10",
 					className,
 				)}
 			>
@@ -324,7 +321,7 @@ function SessionFlagFilter({
 					}
 					className={cn(
 						FLAG_TRIGGER,
-						on ? "text-foreground" : "text-muted-foreground",
+						on ? "text-ink" : "text-ink-3",
 						className,
 					)}
 				>

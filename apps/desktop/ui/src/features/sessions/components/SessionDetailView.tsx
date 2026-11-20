@@ -3,7 +3,6 @@ import {
 	type Icon,
 	IconAlertTriangle,
 	IconMessageOff,
-	IconRefresh,
 } from "@tabler/icons-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -16,8 +15,8 @@ import {
 import { Link } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
 import { ConversationSkillLinkContext } from "@/components/conversation/conversation-skill-link";
-import { Button } from "@/components/dashboard/button";
 import { EmptyState } from "@/components/dashboard/page-parts";
+import { RetryButton } from "@/components/retry-button";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
 import type { SessionNavigation } from "@/features/sessions/session-navigation";
 import { getSessionUploadFailure } from "@/features/sessions/session-upload-failure";
@@ -74,19 +73,14 @@ function SessionDetailStateMessage({
 	title: string;
 }) {
 	return (
-		<div className="flex h-full min-h-0 flex-col p-8">
+		<div className="flex h-full min-h-0 flex-col p-[calc(var(--space-xxl)*4/3)]">
 			<EmptyState description={description} icon={icon} title={title}>
 				{onRetry ? (
-					<Button
-						className="mx-auto mt-2"
-						disabled={isRetrying}
-						onClick={onRetry}
-						type="button"
-						variant="outline"
-					>
-						<IconRefresh />
-						{isRetrying ? "Trying again…" : "Try again"}
-					</Button>
+					<RetryButton
+						onRetry={onRetry}
+						retrying={isRetrying}
+						className="mx-auto mt-m"
+					/>
 				) : null}
 			</EmptyState>
 		</div>
@@ -284,7 +278,7 @@ export function SessionDetailView({
 
 	return (
 		<ConversationSkillLinkContext.Provider value={getSkillHref}>
-			<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-(--dashboardy-surface) text-(--dashboardy-heading)">
+			<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-canvas text-ink">
 				<SessionDetailHeader
 					avatarMap={avatarMap}
 					headerRef={setHeaderElement}
@@ -309,11 +303,11 @@ export function SessionDetailView({
 				relationshipsQuery.data?.children.length ? (
 					<nav
 						aria-label="Native subagent sessions"
-						className="flex min-h-9 shrink-0 items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-(--dashboardy-border) px-4 text-xs text-(--dashboardy-muted)"
+						className="flex min-h-9 shrink-0 items-center gap-m overflow-x-auto whitespace-nowrap edge-b-m border-line px-xl text-body-m text-ink-3"
 					>
 						{relationshipsQuery.data.parent ? (
 							<Link
-								className="font-medium text-(--dashboardy-heading) hover:underline"
+								className="font-medium text-ink hover:underline"
 								to={getShellRoutePath(
 									appRoutes.sessionDetail(
 										relationshipsQuery.data.parent.sessionId,
@@ -326,7 +320,7 @@ export function SessionDetailView({
 						{relationshipsQuery.data.children.map((child, index) => (
 							<Link
 								key={child.sessionId}
-								className="font-medium text-(--dashboardy-heading) hover:underline"
+								className="font-medium text-ink hover:underline"
 								to={getShellRoutePath(appRoutes.sessionDetail(child.sessionId))}
 							>
 								{child.agentPath?.split("/").at(-1) || `Subagent ${index + 1}`}
@@ -372,7 +366,7 @@ export function SessionDetailView({
 					viewModel ? (
 						<div className="flex h-full min-h-0 flex-col">
 							{hasShapeWarning ? (
-								<output className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-(--dashboardy-heading)">
+								<output className="edge-b-m border-warning/30 bg-warning/10 px-xl py-m text-body-xl text-ink">
 									Some session fields were unavailable. Safe overview values are
 									shown.
 								</output>

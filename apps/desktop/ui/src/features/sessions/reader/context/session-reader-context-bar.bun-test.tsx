@@ -3,8 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { ContextBar } from "./session-reader-context-bar";
 import type { ContextMap } from "./session-reader-context-map";
 
-const WARN_TINT = "bg-[#ff9c0024]";
-const FULL_TINT = "bg-[#f52b0018]";
+const WARN_TINT = "bg-warning-tint";
+const FULL_TINT = "bg-error-tint";
 
 function shareBadge(used: number) {
 	const map: ContextMap = {

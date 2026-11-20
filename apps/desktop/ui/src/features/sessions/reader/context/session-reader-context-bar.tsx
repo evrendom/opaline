@@ -87,7 +87,7 @@ export function tileLook(
 	if (kind === "free")
 		return {
 			className:
-				"border-dashed border-[rgba(0,0,0,0.14)] text-[rgba(0,0,0,0.45)] bg-[repeating-linear-gradient(135deg,transparent_0_6px,rgba(0,0,0,0.035)_6px_7px)] dark:border-[rgba(255,255,255,0.16)] dark:text-[rgba(255,255,255,0.45)] dark:bg-[repeating-linear-gradient(135deg,transparent_0_6px,rgba(255,255,255,0.05)_6px_7px)]",
+				"border-dashed border-line-soft text-ink-3 bg-[repeating-linear-gradient(135deg,transparent_0_6px,rgba(0,0,0,0.035)_6px_7px)] dark:border-[rgba(255,255,255,0.16)] dark:bg-[repeating-linear-gradient(135deg,transparent_0_6px,rgba(255,255,255,0.05)_6px_7px)]",
 		};
 	if (strong)
 		return {
@@ -111,7 +111,7 @@ export function ContextMark({ className }: { className?: string }) {
 			fill="none"
 			aria-hidden="true"
 			className={cn(
-				"shrink-0 text-[rgba(0,96,226,0.765)] dark:text-[#6aa6ff]",
+				"shrink-0 text-color-1-translucent dark:text-color-1",
 				className,
 			)}
 		>
@@ -180,7 +180,7 @@ export function ContextBar({
 			</span>
 		);
 	return (
-		<header className="flex min-w-0 items-center gap-2.5 text-[13px]">
+		<header className="flex min-w-0 items-center gap-l text-body-l">
 			{onMeasure ? (
 				<>
 					<ContextMark />
@@ -199,42 +199,38 @@ export function ContextBar({
 				</span>
 			)}
 			{caption ? (
-				<span className="shrink-0 text-xs text-muted-foreground">
-					{caption}
-				</span>
+				<span className="shrink-0 text-body-m text-ink-3">{caption}</span>
 			) : null}
 			{map ? (
 				<>
 					{excluded.length > 0 && !picked ? (
 						<span
 							title={`Not in the map or its total: ${excludedWords(excluded, look.format)}`}
-							className="ml-auto min-w-0 truncate text-xs text-[rgba(0,0,0,0.45)] tabular-nums dark:text-[rgba(255,255,255,0.45)]"
+							className="ml-auto min-w-0 truncate text-body-m text-ink-3 tabular-nums"
 						>
 							without {excludedWords(excluded, look.format)}
 						</span>
 					) : null}
 					<span
 						className={cn(
-							"flex shrink-0 items-center gap-2 tabular-nums",
+							"flex shrink-0 items-center gap-m tabular-nums",
 							excluded.length === 0 && "ml-auto",
 							picked && "hidden",
 						)}
 					>
-						<span className="text-[rgba(0,0,0,0.45)] dark:text-[rgba(255,255,255,0.45)]">
-							<b className="font-medium text-[rgba(0,0,0,0.88)] dark:text-[rgba(255,255,255,0.9)]">
-								{look.format(map.used)}
-							</b>
+						<span className="text-ink-3">
+							<b className="font-medium text-ink-3">{look.format(map.used)}</b>
 							{look.windowed ? ` / ${look.format(map.window)}` : null}
 						</span>
 						{share !== null ? (
 							<span
 								className={cn(
-									"rounded-md corner-squircle squircle:rounded-xl px-1.5 text-xs font-medium",
+									"corner-s corner-squircle squircle:corner-l px-s text-body-m font-medium",
 									warns && share >= CONTEXT_FULL
-										? "bg-[#f52b0018] text-[#d72400da] dark:text-[#ff7a5c]"
+										? "bg-error-tint text-error"
 										: warns && share >= CONTEXT_WARN
-											? "bg-[#ff9c0024] text-[#cc4e00] dark:text-[#ffaa55]"
-											: "bg-[rgba(0,0,0,0.05)] text-[rgba(0,0,0,0.61)] dark:bg-[rgba(255,255,255,0.08)] dark:text-[rgba(255,255,255,0.65)]",
+											? "bg-warning-tint text-warning"
+											: "bg-wash text-ink-3 dark:bg-[rgba(255,255,255,0.08)]",
 								)}
 							>
 								{share}%
@@ -298,7 +294,7 @@ function MeasureToggle({
 	onMeasure: (measure: ContextMeasure) => void;
 }) {
 	return (
-		<fieldset className="m-0 flex shrink-0 items-center gap-0.5 rounded-lg border-0 bg-[rgba(0,0,0,0.05)] p-0.5 corner-squircle squircle:rounded-2xl dark:bg-[rgba(255,255,255,0.06)]">
+		<fieldset className="m-zero flex shrink-0 items-center gap-xxs corner-m edge-none bg-wash p-xxs corner-squircle squircle:corner-xl dark:bg-[rgba(255,255,255,0.06)]">
 			<legend className="sr-only">Measure the map by</legend>
 			{MEASURES.map((each) => {
 				const pressed = each === measure;
@@ -316,10 +312,14 @@ function MeasureToggle({
 						}
 						onClick={() => onMeasure(each)}
 						className={cn(
-							"h-6 rounded-md px-2.5 text-[13px] corner-squircle outline-none disabled:cursor-default disabled:opacity-40 squircle:rounded-xl",
+							"h-6",
+							"corner-s px-l corner-squircle",
+							"text-body-l",
+							"outline-none",
+							"disabled:cursor-default disabled:opacity-40 squircle:corner-l",
 							pressed
 								? cn("bg-card font-medium", PILL_SHADOW)
-								: "text-[rgba(0,0,0,0.61)] hover:text-[rgba(0,0,0,0.88)] dark:text-[rgba(255,255,255,0.65)] dark:hover:text-white",
+								: "text-ink-3 hover:text-[rgba(0,0,0,0.88)] dark:hover:text-white",
 						)}
 					>
 						{MEASURE_LOOK[each].label}

@@ -113,7 +113,7 @@ function Unknown() {
 export function Unmapped({ children }: { children: ReactNode }) {
 	return (
 		<ContextMapFrame>
-			<p className="px-4 py-3 text-xs text-muted-foreground">{children}</p>
+			<p className="px-xl py-l text-body-m text-ink-3">{children}</p>
 		</ContextMapFrame>
 	);
 }
@@ -298,7 +298,7 @@ function RunContext({
 						<ContextMapSample />
 					</div>
 					<EmptyState
-						className="absolute inset-0 py-0"
+						className="absolute inset-0 py-zero"
 						icon={IconAlertTriangle}
 						title="No model call"
 						description="It ended before its first model call, so nothing filled its context."
@@ -313,7 +313,7 @@ function RunContext({
 			label="Reading its context"
 			loading={!body}
 			sample={
-				<div className="flex flex-col gap-3">
+				<div className="flex flex-col gap-l">
 					<ContextBar map={null} titleId={undefined} />
 					<ContextMapFrame>
 						<ContextMapSample />

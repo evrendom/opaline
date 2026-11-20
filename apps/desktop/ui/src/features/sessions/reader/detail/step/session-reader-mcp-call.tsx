@@ -25,43 +25,41 @@ function ArgumentValue({ name, value }: { name: string; value: unknown }) {
 		if (sql || code || value.includes("\n"))
 			return (
 				<HighlightedCode
-					className="rounded-none bg-transparent px-0 py-0 [&>div]:px-0"
+					className="corner-zero bg-transparent px-zero py-zero [&>div]:px-zero"
 					code={value.trim()}
 					language={sql ? "sql" : code ? "javascript" : "text"}
 				/>
 			);
 		return (
-			<span className="text-[13px] whitespace-pre-wrap [overflow-wrap:anywhere]">
+			<span className="text-body-l whitespace-pre-wrap [overflow-wrap:anywhere]">
 				{value}
 			</span>
 		);
 	}
 	if (value !== null && typeof value === "object")
 		return <JsonTree value={value} />;
-	return <span className="font-mono text-xs">{String(value)}</span>;
+	return <span className="font-data text-body-m">{String(value)}</span>;
 }
 
 export function McpCall({ event }: { event: ToolEvent }) {
 	const named = mcpTool(event.toolName);
 	const input = Object.entries(getRawToolInput(event.input));
 	return (
-		<div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-background px-3 dark:bg-black/25">
+		<div className="flex flex-col divide-y divide-line/40 corner-m edge-m border-line/60 bg-canvas px-l dark:bg-canvas/25">
 			{named ? (
-				<p className="flex min-w-0 items-baseline gap-1.5 py-2">
-					<span className="shrink-0 rounded-sm bg-muted px-1 text-[10px] leading-4 font-medium text-muted-foreground">
+				<p className="flex min-w-0 items-baseline gap-s py-m">
+					<span className="shrink-0 corner-xs bg-field px-xs text-body-xs font-medium text-ink-3">
 						{named.server}
 					</span>
-					<span className="min-w-0 truncate font-mono text-xs">
+					<span className="min-w-0 truncate font-data text-body-m">
 						{named.tool}
 					</span>
 				</p>
 			) : null}
 			{input.map(([key, value]) => (
-				<div key={key} className="flex min-w-0 flex-col gap-1 py-2">
+				<div key={key} className="flex min-w-0 flex-col gap-xs py-m">
 					{input.length > 1 ? (
-						<span className="text-[11px] text-muted-foreground">
-							{argumentLabel(key)}
-						</span>
+						<span className="text-body-s text-ink-3">{argumentLabel(key)}</span>
 					) : null}
 					<ArgumentValue name={key} value={value} />
 				</div>

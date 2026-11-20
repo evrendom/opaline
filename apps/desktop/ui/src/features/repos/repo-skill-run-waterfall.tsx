@@ -3,7 +3,7 @@ import {
 	type SessionDetailTurnSummary,
 } from "@rudel/api-routes";
 import { useCallback, useMemo, useState } from "react";
-import { Skeleton } from "@/components/dashboard/skeleton";
+import { Skeleton } from "@/app/ui/skeleton";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
 import {
 	fetchSessionDetailTurn,
@@ -137,9 +137,7 @@ export function SkillRunWaterfall({
 		);
 	if (body.isError || !body.data || !waterfall)
 		return (
-			<p className="p-3 text-xs text-muted-foreground">
-				This run’s steps couldn’t load.
-			</p>
+			<p className="p-3 text-xs text-ink-3">This run’s steps couldn’t load.</p>
 		);
 	const runView = {
 		filter,

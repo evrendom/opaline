@@ -156,23 +156,23 @@ export function CallLinks({ calls }: { calls: readonly RunCall[] }) {
 			key={call.step}
 			to={hrefOf(call)}
 			aria-label={`Open call ${shortCallId(call.native)} in the detail`}
-			className="group/call inline-flex h-6 items-center gap-0.5 rounded-md bg-muted/60 pr-1 pl-1 font-medium tabular-nums transition-colors hover:bg-muted dark:bg-muted-foreground/10 dark:hover:bg-muted-foreground/20"
+			className="group/call inline-flex h-6 items-center gap-xxs corner-s bg-field/60 pr-xs pl-xs font-medium tabular-nums transition-colors hover:bg-hover dark:bg-ink-3/10 dark:hover:bg-ink-3/20"
 		>
 			<StepIconChip size="sm" step={call.shown} tip={false} />
 			{mcpServerOf(call.shown) ? (
-				<span className="ml-1 font-normal text-muted-foreground">
+				<span className="ml-xs font-regular text-ink-3">
 					{mcpServerOf(call.shown)}
 				</span>
 			) : null}
-			<span className="ml-1 max-w-40 truncate">
+			<span className="ml-xs max-w-40 truncate">
 				{call.shown.name.replace(/^[^:\s]+:/u, "")}
 			</span>
-			<span className="ml-1 font-normal text-muted-foreground">
+			<span className="ml-xs font-regular text-ink-3">
 				{shortCallId(call.native)}
 			</span>
 			<IconArrowUpRight
 				aria-hidden="true"
-				className="size-3 text-muted-foreground transition-colors group-hover/call:text-foreground"
+				className="size-3 text-ink-3 transition-colors group-hover/call:text-ink"
 			/>
 		</Link>
 	));
@@ -182,10 +182,10 @@ function ToolCalls({ what }: { what: readonly ToolFailed[] }) {
 	return what.map((each) => (
 		<span
 			key={each.key}
-			className="inline-flex flex-wrap items-center gap-1.5 text-[13px] text-foreground"
+			className="inline-flex flex-wrap items-center gap-s text-body-l text-ink"
 		>
 			{each.ms !== null ? (
-				<span className="text-muted-foreground">
+				<span className="text-ink-3">
 					after {formatReaderDuration(each.ms / 1000)}
 				</span>
 			) : null}

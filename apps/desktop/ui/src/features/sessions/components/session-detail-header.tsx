@@ -12,6 +12,7 @@ import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Skeleton } from "@/app/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
+import { TouchTarget } from "@/app/ui/touch-target";
 import type { SessionNavigation } from "@/features/sessions/session-navigation";
 import { DetailIdentityBreadcrumb } from "@/features/shell/components/detail-identity-breadcrumb";
 import { formatRoundedDuration } from "@/lib/format";
@@ -39,21 +40,18 @@ type SessionDetailHeaderProps = {
 	where?: ReactNode;
 };
 
-const sessionInfoTouchTargetClassName =
-	"absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden";
-
 // Record pill: round segments that tint on hover inside an
 // outlined pill.
 const sessionHeaderNavigationButtonClassName =
-	"relative flex h-full items-center rounded-full p-2 text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-muted-foreground";
+	"relative flex h-full items-center corner-full p-m text-ink-3 outline-none transition-colors hover:bg-hover hover:text-ink disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-ink-3";
 
 const sessionMetricsGroupClassName =
-	"flex w-fit min-w-0 max-w-full items-center divide-x divide-[color:var(--dashboardy-divider)] overflow-x-auto";
+	"flex w-fit min-w-0 max-w-full items-center divide-x divide-line overflow-x-auto";
 
 const sessionMetricItemClassName =
-	"flex shrink-0 items-start gap-2 px-3 first:pl-0 last:pr-0";
+	"flex shrink-0 items-start gap-m px-l first:pl-zero last:pr-zero";
 
-const sessionIdentitySkeletonClassName = "flex shrink-0 items-start gap-2";
+const sessionIdentitySkeletonClassName = "flex shrink-0 items-start gap-m";
 
 function SessionHeaderNavigationButton({
 	className = sessionHeaderNavigationButtonClassName,
@@ -77,7 +75,7 @@ function SessionHeaderNavigationButton({
 			onClick={onClick}
 		>
 			{icon}
-			<span aria-hidden="true" className={sessionInfoTouchTargetClassName} />
+			<TouchTarget />
 		</button>
 	);
 }
@@ -94,14 +92,14 @@ function SessionIdentityBreadcrumb({
 	if (isLoading && !viewModel) {
 		return (
 			<nav aria-label="Session breadcrumb" className="min-w-0 flex-1">
-				<ol className="flex min-w-0 items-center gap-1 overflow-hidden">
+				<ol className="flex min-w-0 items-center gap-xs overflow-hidden">
 					{["repo", "branch", "commit", "session"].map((item, index) => (
-						<li key={item} className="flex shrink-0 items-center gap-1">
-							<Skeleton className="h-4 w-20 rounded-sm bg-[color:var(--dashboardy-subsurface-strong)]" />
+						<li key={item} className="flex shrink-0 items-center gap-xs">
+							<Skeleton className="h-4 w-20 corner-xs bg-field" />
 							{index < 3 ? (
 								<IconChevronRight
 									aria-hidden="true"
-									className="size-4 shrink-0 text-black/6 dark:text-white/8"
+									className="size-4 shrink-0 text-ink/6 dark:text-ink/8"
 								/>
 							) : null}
 						</li>
@@ -155,16 +153,26 @@ function SessionRecordNavigation({
 	return (
 		<nav
 			aria-label="Session navigation"
-			className="flex h-8 min-w-0 shrink-0 items-center rounded-full bg-card text-sm shadow-(--custom-outline-shadow)"
+			className={cn(
+				"flex h-8 min-w-0 shrink-0 items-center",
+				"corner-full",
+				"text-body-xl",
+				"bg-card shadow-(--shadow-control)",
+			)}
 		>
 			<p
 				aria-live="polite"
-				className="min-w-0 truncate pr-1 pl-3 text-sm whitespace-nowrap text-muted-foreground tabular-nums"
+				className={cn(
+					"min-w-0",
+					"pr-xs pl-l",
+					"truncate text-body-xl whitespace-nowrap tabular-nums",
+					"text-ink-3",
+				)}
 				title={positionTitle}
 			>
 				{positionLabel}
 			</p>
-			<span aria-hidden="true" className="mx-1 h-4 w-px shrink-0 bg-border" />
+			<span aria-hidden="true" className="mx-xs h-4 w-px shrink-0 bg-line" />
 			<SessionHeaderNavigationButton
 				disabled={!navigation.hasPreviousSession}
 				icon={<PreviousIcon aria-hidden="true" className="size-3.5" />}
@@ -194,25 +202,27 @@ function SessionMetric({
 }) {
 	return (
 		<Tooltip>
-			<TooltipTrigger asChild>
-				<div className={cn(sessionMetricItemClassName, "cursor-help")}>
-					<Icon
-						aria-hidden="true"
-						className="size-4 h-lh shrink-0 text-[color:var(--dashboardy-heading)]"
-					/>
-					<div className="min-w-0 flex-1">
-						<div
-							className={cn(
-								"whitespace-nowrap text-base font-semibold text-[color:var(--dashboardy-heading)] tabular-nums sm:text-[0.8125rem]",
-								mono && "font-mono",
-							)}
-						>
-							<span className="sr-only">{label}: </span>
-							{value}
+			<TooltipTrigger
+				render={
+					<div className={cn(sessionMetricItemClassName, "cursor-help")}>
+						<Icon
+							aria-hidden="true"
+							className="size-4 h-lh shrink-0 text-ink"
+						/>
+						<div className="min-w-0 flex-1">
+							<div
+								className={cn(
+									"whitespace-nowrap text-body-xxl font-heavy text-ink tabular-nums sm:text-body-l",
+									mono && "font-data",
+								)}
+							>
+								<span className="sr-only">{label}: </span>
+								{value}
+							</div>
 						</div>
 					</div>
-				</div>
-			</TooltipTrigger>
+				}
+			/>
 			<TooltipContent>{label}</TooltipContent>
 		</Tooltip>
 	);
@@ -221,14 +231,9 @@ function SessionMetric({
 function SessionMetricSkeleton({ valueClassName }: { valueClassName: string }) {
 	return (
 		<div className={sessionMetricItemClassName}>
-			<Skeleton className="size-4 shrink-0 rounded-sm bg-[color:var(--dashboardy-subsurface-strong)]" />
+			<Skeleton className="size-4 shrink-0 corner-xs bg-field" />
 			<div className="min-w-0 flex-1">
-				<Skeleton
-					className={cn(
-						"h-4 rounded-sm bg-[color:var(--dashboardy-subsurface-strong)]",
-						valueClassName,
-					)}
-				/>
+				<Skeleton className={cn("h-4 corner-xs bg-field", valueClassName)} />
 			</div>
 		</div>
 	);
@@ -266,7 +271,7 @@ function SessionMetrics({
 	return (
 		<div className={sessionMetricsGroupClassName}>
 			<SessionInteractionCounts
-				className={cn(sessionMetricItemClassName, "gap-3")}
+				className={cn(sessionMetricItemClassName, "gap-l")}
 				model={displayModel}
 				modelMessageCount={conversationSummary?.assistantMessages}
 				userDisplayName={safeUserDisplayName}
@@ -292,14 +297,14 @@ function SessionMetrics({
 function SessionMetricsSkeleton() {
 	return (
 		<div className={sessionMetricsGroupClassName}>
-			<div className={cn(sessionMetricItemClassName, "gap-3")}>
+			<div className={cn(sessionMetricItemClassName, "gap-l")}>
 				<div className={sessionIdentitySkeletonClassName}>
-					<Skeleton className="size-4 shrink-0 rounded-sm bg-[color:var(--dashboardy-subsurface-strong)]" />
-					<Skeleton className="h-4 w-4 shrink-0 rounded-sm bg-[color:var(--dashboardy-subsurface-strong)]" />
+					<Skeleton className="size-4 shrink-0 corner-xs bg-field" />
+					<Skeleton className="h-4 w-4 shrink-0 corner-xs bg-field" />
 				</div>
 				<div className={sessionIdentitySkeletonClassName}>
-					<Skeleton className="size-4 shrink-0 rounded-full bg-[color:var(--dashboardy-subsurface-strong)]" />
-					<Skeleton className="h-4 w-4 shrink-0 rounded-sm bg-[color:var(--dashboardy-subsurface-strong)]" />
+					<Skeleton className="size-4 shrink-0 corner-full bg-field" />
+					<Skeleton className="h-4 w-4 shrink-0 corner-xs bg-field" />
 				</div>
 			</div>
 			<SessionMetricSkeleton valueClassName="w-14" />
@@ -330,10 +335,10 @@ export function SessionDetailHeader({
 	return createPortal(
 		<div
 			ref={headerRef}
-			className="dashboardy-page flex min-w-0 flex-1 items-center justify-end gap-6 font-sans"
+			className="dashboardy-page flex min-w-0 flex-1 items-center justify-end gap-xxl font-body"
 		>
 			{showIdentity ? (
-				<div className="flex min-w-0 flex-1 items-center gap-1">
+				<div className="flex min-w-0 flex-1 items-center gap-xs">
 					<SessionIdentityBreadcrumb
 						isLoading={isLoading}
 						sessionId={sessionId}
@@ -350,7 +355,14 @@ export function SessionDetailHeader({
 				</div>
 			)}
 			{where ? (
-				<span className="hidden min-w-0 items-center gap-1.5 truncate text-sm text-muted-foreground md:flex">
+				<span
+					className={cn(
+						"hidden min-w-0 items-center gap-s",
+						"truncate text-body-xl",
+						"text-ink-3",
+						"md:flex",
+					)}
+				>
 					{where}
 				</span>
 			) : null}

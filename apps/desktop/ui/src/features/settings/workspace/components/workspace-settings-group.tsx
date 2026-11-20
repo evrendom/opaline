@@ -1,5 +1,4 @@
 import { type ReactNode, useId } from "react";
-import "./workspace-settings.css";
 import "../../components/settings-section.css";
 
 /** A card: the section's title and description head the
@@ -21,23 +20,19 @@ export function WorkspaceSettingsGroup({
 	const titleId = useId();
 	return (
 		<section
-			className="workspace-settings-group"
+			className="settings-group"
 			aria-labelledby={titleId}
 			data-tone={tone === "danger" ? "danger" : undefined}
 		>
-			<div className="workspace-settings-group-heading">
-				<div className="workspace-settings-group-title">
+			<div className="settings-group-heading">
+				<div className="settings-group-title">
 					<h2 id={titleId}>{title}</h2>
 					{description ? <p>{description}</p> : null}
 				</div>
-				{action ? (
-					<div className="workspace-settings-group-action">{action}</div>
-				) : null}
+				{action ? <div className="settings-group-action">{action}</div> : null}
 			</div>
 			{children ? (
-				<div className="workspace-settings-group-rows settings-section-surface">
-					{children}
-				</div>
+				<div className="settings-group-rows surface-card">{children}</div>
 			) : null}
 		</section>
 	);
@@ -55,20 +50,18 @@ export function WorkspaceSettingsRow({
 	children: ReactNode;
 }) {
 	return (
-		<div className="workspace-settings-row">
-			<div className="workspace-settings-row-copy">
+		<div className="settings-row">
+			<div className="settings-row-copy">
 				{controlId ? (
 					<label htmlFor={controlId}>{label}</label>
 				) : (
 					<div>{label}</div>
 				)}
 				{description ? (
-					<div className="workspace-settings-row-description">
-						{description}
-					</div>
+					<div className="settings-row-description">{description}</div>
 				) : null}
 			</div>
-			<div className="workspace-settings-row-control">{children}</div>
+			<div className="settings-row-control">{children}</div>
 		</div>
 	);
 }
@@ -76,7 +69,7 @@ export function WorkspaceSettingsRow({
 /** Fields: label over control, laid side by side and
  * bottom-aligned so a trailing button lines up with the inputs. */
 export function WorkspaceSettingsFields({ children }: { children: ReactNode }) {
-	return <div className="workspace-settings-fields">{children}</div>;
+	return <div className="settings-fields">{children}</div>;
 }
 
 export function WorkspaceSettingsField({
@@ -92,7 +85,7 @@ export function WorkspaceSettingsField({
 	children: ReactNode;
 }) {
 	return (
-		<div className="workspace-settings-field" data-size={size}>
+		<div className="settings-field" data-size={size}>
 			{controlId ? (
 				<label htmlFor={controlId}>{label}</label>
 			) : (

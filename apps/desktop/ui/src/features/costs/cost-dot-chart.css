@@ -7,24 +7,24 @@
 	margin-left: auto;
 	padding: 2px;
 	border-radius: 9px;
-	background: var(--cost-soft);
+	background: var(--wash);
 }
 .cost-chart-kind > button {
 	padding: 3px 10px;
 	white-space: nowrap;
 	border-radius: 7px;
-	color: var(--cost-muted);
+	color: var(--ink-3);
 	font-size: 0.8125rem;
 	transition:
 		background-color 120ms ease,
 		color 120ms ease;
 }
 .cost-chart-kind > button:hover {
-	color: var(--cost-foreground);
+	color: var(--ink);
 }
 .cost-chart-kind > button[aria-pressed="true"] {
-	color: var(--cost-foreground);
-	background: var(--cost-hover);
+	color: var(--ink);
+	background: var(--hover);
 }
 
 .cost-chart-canvas[data-kind="dots"] > :not(.cost-dot-chart) {
@@ -60,7 +60,7 @@
 	font-size: 0.6875rem;
 	line-height: 12px;
 	font-weight: 500;
-	color: var(--cost-muted);
+	color: var(--ink-3);
 	white-space: nowrap;
 	font-variant-numeric: tabular-nums;
 }
@@ -69,7 +69,7 @@
 	left: var(--axis-at);
 }
 .cost-dot-axis > div[data-selected] {
-	color: var(--cost-foreground);
+	color: var(--ink);
 }
 .cost-dot-axis > div {
 	transition: filter 120ms ease-out;
@@ -175,16 +175,16 @@
 	transform: scale(1.12);
 }
 .cost-dot[data-outside] {
-	--dot-fill: color-mix(in oklab, var(--cost-muted) 60%, transparent);
+	--dot-fill: color-mix(in oklab, var(--ink-3) 60%, transparent);
 }
 .cost-dot[data-outside]::before {
 	mask-image: var(--pebble-dotted, none);
 }
 .cost-dot[data-empty] {
-	--dot-fill: var(--cost-soft);
+	--dot-fill: var(--wash);
 }
 .cost-dot[data-muted] {
-	--dot-fill: var(--cost-soft);
+	--dot-fill: var(--wash);
 }
 .cost-dot-mark {
 	position: absolute;
@@ -199,13 +199,13 @@
 }
 .cost-dot-label {
 	font-size: 0.6875rem;
-	color: var(--cost-muted);
+	color: var(--ink-3);
 	white-space: nowrap;
 }
 .cost-dot-halo {
 	position: absolute;
 	pointer-events: none;
-	background: color-mix(in oklab, var(--cost-foreground) 12%, transparent);
+	background: color-mix(in oklab, var(--ink) 12%, transparent);
 	mask:
 		linear-gradient(#000 0 0),
 		var(--pebble-fill) var(--halo-pad) var(--halo-pad) / var(--halo-size)
@@ -224,8 +224,7 @@ button.cost-dot-grid {
 	cursor: default;
 }
 button.cost-dot-grid:focus-visible {
-	outline: 2px solid
-		color-mix(in oklab, var(--cost-foreground) 40%, transparent);
+	outline: 2px solid color-mix(in oklab, var(--ink) 40%, transparent);
 	outline-offset: 2px;
 	border-radius: 6px;
 }
@@ -235,7 +234,7 @@ button.cost-dot-grid {
 .cost-dot-crosshair {
 	transition: opacity 180ms ease-out;
 	--cross-gap: 3px;
-	--cross-line: color-mix(in oklab, var(--cost-foreground) 22%, transparent);
+	--cross-line: color-mix(in oklab, var(--ink) 22%, transparent);
 	position: absolute;
 	inset: 0;
 	pointer-events: none;
@@ -253,10 +252,10 @@ button.cost-dot-grid {
 	top: calc(var(--cross-y) - var(--cross-gap));
 	width: calc(var(--cross-size) + 2 * var(--cross-gap));
 	height: calc(var(--cross-size) + 2 * var(--cross-gap));
-	color: var(--cost-foreground);
+	color: var(--ink);
 }
 .cost-dot-crosshair[data-tone="hover"] > [data-part="ring"] {
-	color: color-mix(in oklab, var(--cost-foreground) 55%, transparent);
+	color: color-mix(in oklab, var(--ink) 55%, transparent);
 }
 .cost-dot-crosshair > [data-part="ring"] > svg {
 	display: block;

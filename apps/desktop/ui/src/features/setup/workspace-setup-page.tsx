@@ -20,7 +20,7 @@ export function WorkspaceSetupPage({
 }) {
 	useCollapseSidebarBelow(SIDEBAR_COLLAPSE_BELOW_PX);
 	return (
-		<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-[var(--dashboard-01-content-background,#fcfcfc)] text-(--dashboardy-heading) [--reader-page:var(--dashboard-01-content-background,#fcfcfc)]">
+		<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-inset text-ink [--reader-page:var(--canvas,#fcfcfc)]">
 			<WorkspaceSetupHeader name={name} onBackToList={onBackToList} />
 			<h1 className="sr-only">{name}</h1>
 			<div className="relative isolate min-h-0 min-w-0 flex-1 overflow-hidden [--dashboard-01-content-background:var(--dashboard-01-stage-background)] [--stage-top:--spacing(2)]">
@@ -49,13 +49,13 @@ function WorkspaceSetupHeader({
 	return createPortal(
 		<nav
 			aria-label={`${shellRoute.title} breadcrumb`}
-			className="flex min-w-0 flex-1 items-center gap-1.5 text-base font-medium tracking-tight"
+			className="flex min-w-0 flex-1 items-center gap-s text-body-xxl font-medium"
 		>
 			<button
 				type="button"
 				onClick={onBackToList}
 				data-fluid-menu-root=""
-				className="flex shrink-0 items-center gap-2 text-muted-foreground transition-colors hover:text-foreground"
+				className="flex shrink-0 items-center gap-m text-ink-3 transition-colors hover:text-ink"
 			>
 				<ShellNavIcon
 					icon={shellRoute.icon}
@@ -67,11 +67,11 @@ function WorkspaceSetupHeader({
 			</button>
 			<IconChevronRight
 				aria-hidden="true"
-				className="size-4 shrink-0 text-muted-foreground/50"
+				className="size-4 shrink-0 text-ink-3/50"
 				stroke={1.5}
 			/>
-			<span aria-current="page" className="flex min-w-0 items-center gap-1.5">
-				<SkillMark skill={name} className="size-4.5 text-[10px]" />
+			<span aria-current="page" className="flex min-w-0 items-center gap-s">
+				<SkillMark skill={name} className="size-4.5 text-body-xs" />
 				<span className="truncate">{name}</span>
 			</span>
 		</nav>,

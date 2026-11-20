@@ -2,7 +2,7 @@ import {
 	type DashboardMetric,
 	GITHUB_INACTIVE_FILTER_TOOLTIP,
 } from "@rudel/api-routes";
-import { IconAlertTriangle, IconRefresh, IconX } from "@tabler/icons-react";
+import { IconAlertTriangle, IconX } from "@tabler/icons-react";
 import {
 	type CSSProperties,
 	type ReactNode,
@@ -15,10 +15,10 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { IntroReveal } from "@/app/ui/bones";
+import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
-import { Button } from "@/components/dashboard/button";
 import { EmptyState } from "@/components/dashboard/page-parts";
-import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
+import { RetryButton } from "@/components/retry-button";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { useShellHeaderPortal } from "@/features/shell/shell-header-portal";
 import { useOptionalOrganization } from "@/features/workspace/organization/useOrganization";
@@ -234,36 +234,36 @@ export function CostDashboardView({
 							}}
 						>
 							<TooltipTrigger
-								asChild
 								id={`cost-filter-${dimension}-${encodeURIComponent(id)}`}
 								onFocus={() => {
 									if (inactive) setFocusedFilter(`${dimension}:${id}`);
 								}}
 								onBlur={() => setFocusedFilter(null)}
-							>
-								<button
-									type="button"
-									key={`${dimension}:${id}`}
-									className="cost-filter-chip"
-									data-inactive={inactive}
-									aria-describedby={
-										inactive
-											? `cost-filter-description-${dimension}-${encodeURIComponent(id)}`
-											: undefined
-									}
-									onClick={() => toggle(dimension, id)}
-									title={`${COST_LABELS[dimension]}: ${costLabel(dimension, label) || "Unattributed"}`}
-									aria-label={`Remove ${dimension === "members" ? "member" : dimension === "models" ? "model" : COST_LABELS[dimension].toLowerCase()} filter ${costLabel(dimension, label)}${inactive ? ` (not applied to ${METRIC_LABELS[metric]})` : ""}`}
-								>
-									<span className="cost-filter-dimension">
-										{COST_LABELS[dimension]}
-									</span>
-									<span className="truncate">
-										{costLabel(dimension, label) || "Unattributed"}
-									</span>
-									<IconX size={12} className="shrink-0" />
-								</button>
-							</TooltipTrigger>
+								render={
+									<button
+										type="button"
+										key={`${dimension}:${id}`}
+										className="filter-chip"
+										data-inactive={inactive}
+										aria-describedby={
+											inactive
+												? `cost-filter-description-${dimension}-${encodeURIComponent(id)}`
+												: undefined
+										}
+										onClick={() => toggle(dimension, id)}
+										title={`${COST_LABELS[dimension]}: ${costLabel(dimension, label) || "Unattributed"}`}
+										aria-label={`Remove ${dimension === "members" ? "member" : dimension === "models" ? "model" : COST_LABELS[dimension].toLowerCase()} filter ${costLabel(dimension, label)}${inactive ? ` (not applied to ${METRIC_LABELS[metric]})` : ""}`}
+									>
+										<span className="filter-chip-dimension">
+											{COST_LABELS[dimension]}
+										</span>
+										<span className="truncate">
+											{costLabel(dimension, label) || "Unattributed"}
+										</span>
+										<IconX size={12} className="shrink-0" />
+									</button>
+								}
+							/>
 							{inactive ? (
 								<TooltipContent
 									role="tooltip"
@@ -336,16 +336,12 @@ export function CostDashboardView({
 									title="The dashboard couldn’t load"
 									description={dashboardErrorText(query.error)}
 								>
-									<Button
-										variant="outline"
-										className="mx-auto mt-2"
-										onClick={() => {
+									<RetryButton
+										onRetry={() => {
 											void query.refetch();
 										}}
-									>
-										<IconRefresh />
-										Try again
-									</Button>
+										className="mx-auto mt-m"
+									/>
 								</EmptyState>
 							</div>
 						) : (

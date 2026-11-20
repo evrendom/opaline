@@ -173,9 +173,9 @@ export function SessionThreadOverviewStripView({
 	return (
 		<section
 			aria-label="Session activity map (input context)"
-			className="@container h-[4.07rem] shrink-0 border-b border-(--session-overview-border) bg-(--session-overview-chart-surface) [--session-overview-chart-surface:#fcfcfc] dark:[--session-overview-chart-surface:var(--session-overview-surface)]"
+			className="@container h-[4.07rem] shrink-0 border-b border-line-strong bg-canvas"
 		>
-			<div className="relative flex h-[4.07rem] min-w-0 flex-col overflow-visible bg-(--session-overview-chart-surface)">
+			<div className="relative flex h-[4.07rem] min-w-0 flex-col overflow-visible bg-canvas">
 				{zoomSelectionIsDraft ? null : (
 					<SessionThreadOverviewHoverCard
 						chart={chart}
@@ -218,7 +218,7 @@ export function SessionThreadOverviewStripView({
 							{resolvedConfig.showCrosshair && readout ? (
 								<path
 									d={`M ${getChartX(readout.xRatio, resolvedConfig)} 2 V ${resolvedConfig.eventY + 5}`}
-									className="stroke-[color-mix(in_srgb,var(--session-overview-text)_28%,transparent)]"
+									className="stroke-[color-mix(in_srgb,var(--ink)_28%,transparent)]"
 									vectorEffect="non-scaling-stroke"
 								/>
 							) : null}

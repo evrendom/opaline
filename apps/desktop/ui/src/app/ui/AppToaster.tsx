@@ -25,9 +25,9 @@ export function AppToaster(props: ToasterProps) {
 			}}
 			style={
 				{
-					"--normal-bg": "var(--popover)",
-					"--normal-text": "var(--popover-foreground)",
-					"--normal-border": "var(--border)",
+					"--normal-bg": "var(--surface)",
+					"--normal-text": "var(--ink)",
+					"--normal-border": "var(--line-strong)",
 					"--border-radius": "var(--radius)",
 				} as CSSProperties
 			}

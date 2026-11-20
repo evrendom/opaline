@@ -42,7 +42,7 @@ function quotes(signals: readonly Signal[]): string {
 }
 
 const PILL =
-	"inline-flex h-5 items-center gap-1 rounded-3xl px-2 font-medium [&>svg]:size-3";
+	"inline-flex h-5 items-center gap-xs corner-xl px-m font-medium [&>svg]:size-3";
 
 /** Facts separated by dots. */
 function FactLine({
@@ -56,7 +56,7 @@ function FactLine({
 	return (
 		<div
 			className={cn(
-				"flex flex-wrap items-center gap-2 text-xs text-muted-foreground",
+				"flex flex-wrap items-center gap-m text-body-m text-ink-3",
 				className,
 			)}
 		>
@@ -100,9 +100,7 @@ function PromptTokens({
 				.join("\n")}
 		>
 			~{formatCompactNumber(estimate.tokens)} tokens
-			{share ? (
-				<span className="text-muted-foreground/70"> · {share}</span>
-			) : null}
+			{share ? <span className="text-ink-3/70"> · {share}</span> : null}
 		</span>
 	);
 }
@@ -129,9 +127,9 @@ export function MemberFactLine({
 	);
 	return (
 		// Lined up with the message text beside the avatar.
-		<FactLine className="pl-9">
+		<FactLine className="pl-[calc(var(--space-xxl)*1.5)]">
 			{[
-				<span key="who" className="font-medium text-foreground">
+				<span key="who" className="font-medium text-ink">
 					{userLabel}
 				</span>,
 				<span key="when" className="tabular-nums">
@@ -145,12 +143,12 @@ export function MemberFactLine({
 					/>
 				) : null,
 				turn.slashCommands.length > 0 ? (
-					<span key="commands" className="font-mono">
+					<span key="commands" className="font-data">
 						{turn.slashCommands.join(" ")}
 					</span>
 				) : null,
 				negative.length > 0 || frustrated || positive.length > 0 ? (
-					<span key="signals" className="flex items-center gap-1.5">
+					<span key="signals" className="flex items-center gap-s">
 						{negative.length > 0 || frustrated ? (
 							<span
 								title={
@@ -158,10 +156,7 @@ export function MemberFactLine({
 										? quotes(negative)
 										: "Tracked as frustrated: the run before it is flagged"
 								}
-								className={cn(
-									PILL,
-									"bg-rose-500/10 text-rose-600 dark:text-rose-400",
-								)}
+								className={cn(PILL, "bg-error/10 text-error dark:text-error")}
 							>
 								<IconMoodSad aria-hidden="true" />
 								Frustration
@@ -172,7 +167,7 @@ export function MemberFactLine({
 								title={quotes(positive)}
 								className={cn(
 									PILL,
-									"bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+									"bg-success/10 text-success dark:text-success",
 								)}
 							>
 								<IconMoodSmile aria-hidden="true" />
@@ -184,17 +179,14 @@ export function MemberFactLine({
 				questions && questions.length > 0 ? (
 					<span
 						key="questions"
-						className="flex flex-wrap items-center gap-1.5"
+						className="flex flex-wrap items-center gap-s"
 						data-run-question-tags
 					>
 						{questions.map((question) => (
 							<span
 								key={question.id}
 								title={runQuestionTagTitle(question)}
-								className={cn(
-									PILL,
-									"bg-amber-500/10 text-amber-700 dark:text-amber-400",
-								)}
+								className={cn(PILL, "bg-warning/10 text-warning")}
 							>
 								<IconMessageQuestion aria-hidden="true" />
 								{runQuestionTagLabel(question)}

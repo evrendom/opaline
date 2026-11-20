@@ -24,13 +24,13 @@ export function SessionPlanUsage({
 	if (points === undefined && !limited) return null;
 	return (
 		<span
-			className="ml-1 inline-flex items-center gap-0.5 tabular-nums"
+			className="ml-xs inline-flex items-center gap-xxs tabular-nums"
 			data-session-overview-metric-value="plan-usage"
 			data-limited={limited || undefined}
 		>
 			<IconBattery2
 				aria-hidden="true"
-				className={cn("size-3.5", limited && "text-[oklch(0.64_0.21_27)]")}
+				className={cn("size-3.5", limited && "text-error")}
 			/>
 			{points === undefined ? null : <span>{formatPlanShare(points)}</span>}
 			<span className="sr-only">

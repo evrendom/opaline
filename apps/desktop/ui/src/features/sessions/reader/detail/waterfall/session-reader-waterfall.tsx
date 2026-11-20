@@ -223,7 +223,7 @@ export function SessionReaderWaterfallView({
 						data-frozen-row={frozen ? "" : undefined}
 						className={cn(
 							frozen &&
-								"sticky bg-(--dashboard-01-content-background,var(--background))",
+								"sticky bg-(--dashboard-01-content-background,var(--canvas))",
 						)}
 						style={
 							frozen
@@ -298,7 +298,7 @@ export function SessionReaderWaterfallView({
 				<span
 					ref={cursorLabelRef}
 					style={{ display: "none" }}
-					className="pointer-events-none absolute top-0 z-10 rounded-sm border bg-background px-1.5 py-0.5 text-[10px] whitespace-nowrap text-muted-foreground tabular-nums shadow-sm"
+					className="pointer-events-none absolute top-0 z-10 rounded-sm border bg-canvas px-1.5 py-0.5 text-[10px] whitespace-nowrap text-ink-3 tabular-nums shadow-sm"
 				/>
 			</div>
 			<div />
@@ -315,7 +315,7 @@ export function SessionReaderWaterfallView({
 								<div
 									ref={progress.headerRef}
 									data-frozen-header=""
-									className="sticky top-[var(--frozen-offset,calc(var(--reader-top,1rem)-1rem))] z-30 -mt-4 flex flex-col gap-1.5 bg-(--dashboard-01-content-background,var(--background)) pt-4"
+									className="sticky top-[var(--frozen-offset,calc(var(--reader-top,1rem)-1rem))] z-30 -mt-4 flex flex-col gap-1.5 bg-(--dashboard-01-content-background,var(--canvas)) pt-4"
 								>
 									{header}
 									{rootRow}
@@ -344,7 +344,7 @@ export function SessionReaderWaterfallView({
 										<div
 											ref={cursorRef}
 											style={{ display: "none" }}
-											className="absolute inset-y-0 w-px bg-foreground/25"
+											className="absolute inset-y-0 w-px bg-ink/25"
 										/>
 									</div>
 
@@ -363,14 +363,14 @@ export function SessionReaderWaterfallView({
 													key={fraction}
 													className="absolute inset-y-0 w-px"
 													style={{
-														borderLeft: "1px dashed var(--border)",
+														borderLeft: "1px dashed var(--line-strong)",
 														left: `${fraction * 100}%`,
 														opacity: 0.5,
 													}}
 												/>
 											))}
 											{bare ? (
-												<div className="absolute inset-x-0 top-0 flex justify-between px-1 text-[9px] leading-3 text-muted-foreground/70 tabular-nums">
+												<div className="absolute inset-x-0 top-0 flex justify-between px-1 text-[9px] leading-3 text-ink-3/70 tabular-nums">
 													<span>0s</span>
 													<span>{formatWholeDuration(total)}</span>
 												</div>

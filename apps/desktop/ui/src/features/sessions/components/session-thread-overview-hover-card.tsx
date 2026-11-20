@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/app/ui/button";
+import { TouchTarget } from "@/app/ui/touch-target";
 import {
 	getSessionOverviewCallActivityCounts,
 	hasSessionOverviewActivity,
@@ -28,7 +29,7 @@ import {
 import type { SessionOverviewZoomWindow } from "./session-thread-overview-zoom";
 
 const SESSION_OVERVIEW_HOVER_CARD_SURFACE_CLASSES =
-	"absolute top-0 z-50 w-80 max-w-[calc(100%-1.5rem)] rounded-md bg-(--session-overview-surface) font-sans text-xs text-(--session-overview-text) shadow-md ring-1 ring-black/10 dark:ring-white/10";
+	"absolute top-0 z-50 w-80 max-w-[calc(100%-1.5rem)] corner-s bg-canvas font-body text-body-m text-ink shadow-md ring-1 ring-black/10 dark:ring-white/10";
 
 interface SessionContextUtilizationRingStyle extends CSSProperties {
 	"--session-context-ring-color-dark": string;
@@ -103,7 +104,7 @@ function SessionContextUtilizationRing({
 				viewBox="0 0 16 16"
 			>
 				<circle
-					className="stroke-(--session-overview-border)"
+					className="stroke-line-strong"
 					cx="8"
 					cy="8"
 					r="6.25"
@@ -183,7 +184,7 @@ function SessionOverviewActivityTag({
 }) {
 	return (
 		<div
-			className="flex h-4 shrink-0 items-center gap-0.5 rounded-(--activity-tag-radius) bg-[color-mix(in_srgb,var(--session-overview-text)_6%,transparent)] pr-1 pl-0.5 [--activity-tag-inset:--spacing(0.5)] [--activity-tag-radius:var(--radius-lg)]"
+			className="flex h-4 shrink-0 items-center gap-xxs rounded-(--activity-tag-radius) bg-[color-mix(in_srgb,var(--ink)_6%,transparent)] pr-xs pl-xxs [--activity-tag-inset:--spacing(0.5)] [--activity-tag-radius:var(--radius-lg)]"
 			data-session-overview-activity-tag={kind}
 			title={title}
 		>
@@ -314,7 +315,7 @@ function SessionOverviewEventCounts({
 						`${definition.count.toLocaleString()} ${definition.accessibleLabel}`,
 				)
 				.join(", ")}
-			className={`flex min-w-0 items-center gap-1 overflow-hidden ${layout === "full-row" ? "w-full justify-start" : ""}`}
+			className={`flex min-w-0 items-center gap-xs overflow-hidden ${layout === "full-row" ? "w-full justify-start" : ""}`}
 			role="img"
 		>
 			{visibleDefinitions.map((definition) => (
@@ -365,7 +366,7 @@ function SessionZoomSelectionCard({
 		<div
 			id={readoutId}
 			aria-label="Zoom selected time frame"
-			className={`${SESSION_OVERVIEW_HOVER_CARD_SURFACE_CLASSES} pointer-events-auto grid h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-2.5 py-1.5 ${placement === "right" ? "translate-x-3" : "-translate-x-3"}`}
+			className={`${SESSION_OVERVIEW_HOVER_CARD_SURFACE_CLASSES} pointer-events-auto grid h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-m px-l py-s ${placement === "right" ? "translate-x-3" : "-translate-x-3"}`}
 			data-session-overview-hover-card
 			data-session-overview-hover-card-mode="zoom"
 			data-session-overview-hover-card-placement={placement}
@@ -379,13 +380,13 @@ function SessionZoomSelectionCard({
 							? formatRange(startTimestamp, endTimestamp)
 							: "Selected time frame"}
 					</span>
-					<span className="text-(--session-overview-subtle)">
+					<span className="text-ink-3">
 						{" · "}
 						{formatCount(summary.turnCount, "turn")} ·{" "}
 						{formatCount(summary.callCount, "call")}
 					</span>
 				</p>
-				<div className="flex min-w-0 items-center gap-1.5 text-(--session-overview-subtle) tabular-nums">
+				<div className="flex min-w-0 items-center gap-s text-ink-3 tabular-nums">
 					{metricParts.length > 0 ? (
 						<p className="min-w-0 truncate">{metricParts.join(" · ")}</p>
 					) : null}
@@ -403,10 +404,7 @@ function SessionZoomSelectionCard({
 				size="xs"
 				type="button"
 			>
-				<span
-					aria-hidden="true"
-					className="pointer-fine:hidden absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2"
-				/>
+				<TouchTarget />
 				Zoom In
 			</Button>
 		</div>
@@ -497,22 +495,22 @@ export function SessionThreadOverviewHoverCard({
 			data-session-overview-hover-card-placement={placement}
 			style={getCardStyle(readout.xRatio, config)}
 		>
-			<div className="flex h-full min-w-0 flex-col justify-center gap-1 px-2.5 py-1.5">
-				<div className="flex min-w-0 items-center justify-between gap-2 tabular-nums">
-					<p className="min-w-0 truncate font-medium text-(--session-overview-text)">
+			<div className="flex h-full min-w-0 flex-col justify-center gap-xs px-l py-s">
+				<div className="flex min-w-0 items-center justify-between gap-m tabular-nums">
+					<p className="min-w-0 truncate font-medium text-ink">
 						{timestamp === undefined
 							? "Time unavailable"
 							: formatTimelineMomentWithSeconds(timestamp)}
 					</p>
 					{hit ? (
-						<div className="flex shrink-0 items-center gap-1">
+						<div className="flex shrink-0 items-center gap-xs">
 							<p
-								className="text-(--session-overview-subtle)"
+								className="text-ink-3"
 								data-session-overview-input-tokens
 								title="Input tokens"
 							>
 								IN-TOK{" "}
-								<span className="font-medium text-(--session-overview-text)">
+								<span className="font-medium text-ink">
 									{formatCompactNumber(hit.call.inputTotal)}
 									{inputDelta === undefined
 										? ""
@@ -534,7 +532,7 @@ export function SessionThreadOverviewHoverCard({
 						/>
 					</div>
 				) : (
-					<p className="text-(--session-overview-muted)">
+					<p className="text-ink-3">
 						{hit
 							? "No recorded actions for this call."
 							: "No model call or recorded action at this point."}

@@ -103,7 +103,7 @@ export function TraceTextCollapsedPreview({
 			className={
 				trailingContent
 					? "inline"
-					: "grid min-w-0 max-w-[65ch] grid-cols-1 gap-0.5"
+					: "grid min-w-0 max-w-[65ch] grid-cols-1 gap-xxs"
 			}
 			data-trace-text-preview
 		>
@@ -122,26 +122,20 @@ export function TraceTextCollapsedPreview({
 				<span
 					className={
 						trailingContent
-							? "inline space-x-1"
-							: "flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5"
+							? "inline space-x-xs"
+							: "flex min-w-0 flex-wrap items-center gap-x-xs gap-y-xxs"
 					}
 					data-trace-text-preview-tail
 				>
 					{preview.trailingSignals.length === 0 ? (
-						<span
-							aria-hidden="true"
-							className="text-(--session-overview-subtle)"
-						>
+						<span aria-hidden="true" className="text-ink-3">
 							[…]
 						</span>
 					) : (
 						preview.trailingSignals.map((signal) => (
 							<span className="contents" key={signal.key}>
 								{signal.gapBefore ? (
-									<span
-										aria-hidden="true"
-										className="text-(--session-overview-subtle)"
-									>
+									<span aria-hidden="true" className="text-ink-3">
 										[…]
 									</span>
 								) : null}

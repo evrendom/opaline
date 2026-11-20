@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
 import { Reveal } from "@/app/ui/bones";
-import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
+import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
 import {
 	ClaudeModelIcon,
 	CodexModelIcon,
@@ -165,7 +165,7 @@ function UsageBreakdown({
 										maximum={maximum}
 										color={
 											row.muted
-												? "var(--cost-muted)"
+												? "var(--ink-3)"
 												: (SERIES_COLORS[index % (SERIES_COLORS.length - 1)] ??
 													SERIES_COLORS[0])
 										}

@@ -14,6 +14,7 @@ import { MemoryRouter } from "react-router-dom";
 import { AppRouter } from "@/app/AppRouter";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
 import { ThemeProvider } from "@/app/providers/ThemeProvider";
+import { Button } from "@/app/ui/button";
 import { DateRangeProvider } from "@/features/analytics/date-range/DateRangeProvider";
 import { planUsageQueryKey } from "@/features/costs/plan-usage/use-plan-usage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
@@ -179,12 +180,12 @@ export function DemoRoot({
 			{active && connection === "error" ? (
 				<div
 					role="alert"
-					className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-popover p-4 text-popover-foreground shadow-lg dark:shadow-(--custom-shadow)"
+					className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 corner-m bg-surface p-xl text-ink shadow-lg dark:shadow-(--shadow-card)"
 				>
 					The demo data could not load.{" "}
-					<button type="button" onClick={() => void connect()}>
+					<Button variant="link" size="inline" onClick={() => void connect()}>
 						Try again
-					</button>
+					</Button>
 				</div>
 			) : null}
 		</DemoRuntimeContext.Provider>

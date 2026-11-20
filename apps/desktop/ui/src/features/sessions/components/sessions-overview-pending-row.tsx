@@ -99,20 +99,20 @@ export function SessionsOverviewPendingRow({
 					<span
 						className={cn(
 							SESSION_OVERVIEW_METADATA_CLASS_NAME,
-							"inline-flex items-center gap-1",
+							"inline-flex items-center gap-xs",
 						)}
 					>
 						{placeholderOnly ? null : "$"}
 						<span
 							className={cn(
-								"inline-block h-1.5 rounded-sm bg-black/8 dark:bg-white/10",
+								"inline-block h-1.5 corner-xs bg-hover-strong dark:bg-hover-strong",
 								index % 2 === 0 ? "w-4" : "w-5",
 							)}
 						/>
 					</span>
 				</div>
 				<div
-					className={cn(cellClassName, "gap-2 px-2")}
+					className={cn(cellClassName, "gap-m px-m")}
 					data-session-overview-column="model"
 				>
 					<SessionModelMark
@@ -128,26 +128,26 @@ export function SessionsOverviewPendingRow({
 						userLabel=""
 					/>
 					<div
-						className="flex min-w-0 items-center gap-1.5"
+						className="flex min-w-0 items-center gap-s"
 						data-session-overview-model-repository
 					>
 						{sourceLabel ? (
 							<p
-								className="min-w-0 max-w-28 shrink-0 truncate text-base/5 font-[450] tracking-normal text-(--session-overview-text) sm:text-[0.8125rem]/5"
+								className="min-w-0 max-w-28 shrink-0 truncate text-base/5 font-medium tracking-m text-ink sm:text-[0.8125rem]/5"
 								data-session-overview-model-label
 							>
 								{sourceLabel}
 							</p>
 						) : (
-							<span className="inline-block h-2 w-16 shrink-0 rounded-sm bg-black/8 dark:bg-white/10" />
+							<span className="inline-block h-2 w-16 shrink-0 corner-xs bg-hover-strong dark:bg-hover-strong" />
 						)}
 						<p
-							className="min-w-0 truncate text-left font-sans text-xs/4 font-normal tracking-normal text-[#0000009b] dark:text-[#ffffffaf]"
+							className="min-w-0 truncate text-left font-body text-xs/4 font-regular tracking-m text-ink-3"
 							data-session-overview-repository-label
 						>
 							{repositoryName}
 						</p>
-						<span className="inline-block h-1.5 w-12 shrink-0 rounded-sm bg-black/5 dark:bg-white/8" />
+						<span className="inline-block h-1.5 w-12 shrink-0 corner-xs bg-wash dark:bg-hover-strong" />
 					</div>
 					<SessionOverviewSubagentCountTag
 						session={{
@@ -176,12 +176,12 @@ export function SessionsOverviewPendingRow({
 							title="Error count will appear after upload"
 						>
 							<IconAlertCircle aria-hidden="true" className="size-3 shrink-0" />
-							<span className="inline-block h-1.5 w-2 rounded-sm bg-current/20" />
+							<span className="inline-block h-1.5 w-2 corner-xs bg-current/20" />
 						</span>
 					)}
 				</div>
 				<div className={cellClassName} data-session-overview-column="skills">
-					<div className="flex min-w-0 max-w-full items-center gap-1">
+					<div className="flex min-w-0 max-w-full items-center gap-xs">
 						{skills.map((skill) => (
 							<ConversationTraceTag
 								key={skill.id}
@@ -192,7 +192,7 @@ export function SessionsOverviewPendingRow({
 							>
 								<span
 									className={cn(
-										"my-1.5 inline-block h-1.5 max-w-full rounded-sm bg-black/8 dark:bg-white/10",
+										"my-s inline-block h-1.5 max-w-full corner-xs bg-hover-strong dark:bg-hover-strong",
 										skill.width,
 									)}
 								/>
@@ -201,11 +201,11 @@ export function SessionsOverviewPendingRow({
 					</div>
 				</div>
 				<div
-					className={cn(cellClassName, "justify-end gap-2")}
+					className={cn(cellClassName, "justify-end gap-m")}
 					data-session-overview-column="user"
 				>
 					<div
-						className="flex min-w-0 max-w-full items-center gap-1 overflow-hidden"
+						className="flex min-w-0 max-w-full items-center gap-xs overflow-hidden"
 						data-language-signal-speaker="member"
 					>
 						{positiveCount > 0 && (
@@ -227,15 +227,22 @@ export function SessionsOverviewPendingRow({
 							/>
 						)}
 					</div>
-					<span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-black/4 text-black/40 dark:bg-white/8 dark:text-white/40">
+					<span
+						className={cn(
+							"flex size-5 shrink-0 items-center justify-center",
+							"corner-full",
+							"bg-wash text-ink-disabled",
+							"dark:bg-hover-strong dark:text-ink-disabled",
+						)}
+					>
 						<IconUser className="size-3.5" />
 					</span>
 				</div>
 				<div
-					className={cn(cellClassName, "justify-end px-2")}
+					className={cn(cellClassName, "justify-end px-m")}
 					data-session-overview-column="time"
 				>
-					<span className="inline-block h-1.5 w-6 rounded-sm bg-black/8 dark:bg-white/10" />
+					<span className="inline-block h-1.5 w-6 corner-xs bg-hover-strong dark:bg-hover-strong" />
 				</div>
 			</div>
 		</li>
@@ -244,6 +251,6 @@ export function SessionsOverviewPendingRow({
 
 function PendingSignalText() {
 	return (
-		<span className="my-1 inline-block h-1.5 w-9 rounded-sm bg-current/20" />
+		<span className="my-xs inline-block h-1.5 w-9 corner-xs bg-current/20" />
 	);
 }

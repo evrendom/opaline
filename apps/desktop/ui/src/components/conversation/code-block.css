@@ -2,12 +2,7 @@
 .trace-code-block,
 .trace-inline-code {
 	--trace-code-surface: #fff;
-	--trace-code-sticky-surface: var(--session-overview-surface, #fff);
-	--trace-code-border: #0000000f;
-	--trace-code-outline: #0000000f;
-	--trace-code-primary: #000000df;
-	--trace-code-secondary: #0000009b;
-	--trace-code-tertiary: #00000072;
+	--trace-code-sticky-surface: var(--canvas, #fff);
 	--trace-code-comment: #00000072;
 	--trace-code-line-number: #0004;
 	--trace-code-keyword: #e93d82;
@@ -30,9 +25,9 @@
  * passes behind its owning sticky trace node. The root must not clip because
  * the top dressing paints just outside its box. */
 .trace-code-block [data-trace-code-block-header] {
-	border-top: 0.5px solid var(--trace-code-outline);
-	border-right: 0.5px solid var(--trace-code-outline);
-	border-left: 0.5px solid var(--trace-code-outline);
+	border-top: var(--border-s) solid var(--line);
+	border-right: var(--border-s) solid var(--line);
+	border-left: var(--border-s) solid var(--line);
 	/* Card tint layered over the opaque pane surface: composites exactly like
 	 * the card resting on the pane, but stays opaque while code slides behind
 	 * the filename row (the dark-mode card surface alone is translucent). */
@@ -58,10 +53,11 @@
 }
 
 .trace-code-block [data-trace-code-block-content] {
-	border-right: 0.5px solid var(--trace-code-outline);
-	border-bottom: 0.5px solid var(--trace-code-outline);
-	border-left: 0.5px solid var(--trace-code-outline);
-	border-radius: 0 0 8px 8px;
+	border-right: var(--border-s) solid var(--line);
+	border-bottom: var(--border-s) solid var(--line);
+	border-left: var(--border-s) solid var(--line);
+	border-radius: var(--radius-zero) var(--radius-zero) var(--radius-s)
+		var(--radius-s);
 	/* Cap the card so its end is always discoverable on screen; longer files
 	 * scroll through the card instead of stretching the page. The focus-gated
 	 * scroll container is this content box, never the card root. */
@@ -80,13 +76,14 @@
 }
 
 .trace-inline-code {
-	font-family: "Geist Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
-	font-size: 12px;
-	line-height: 16px;
-	color: var(--trace-code-primary);
+	font-family: var(--font-data);
+	font-size: var(--size-m);
+	letter-spacing: var(--letter-spacing-m);
+	line-height: var(--line-m);
+	color: var(--ink);
 	box-shadow:
 		inset 0 0 0 0.5px transparent,
-		0 0 0 0.5px var(--trace-code-outline),
+		0 0 0 0.5px var(--line),
 		0 1px 1px -1px #0000001a,
 		0 1px 2px 0 #0000000d;
 }
@@ -100,12 +97,7 @@
 .dark .trace-code-block,
 .dark .trace-inline-code {
 	--trace-code-surface: #ffffff09;
-	--trace-code-sticky-surface: var(--session-overview-surface, #191a1c);
-	--trace-code-border: #ffffff3b;
-	--trace-code-outline: #ffffff12;
-	--trace-code-primary: #ffffffed;
-	--trace-code-secondary: #ffffffaf;
-	--trace-code-tertiary: #ffffff64;
+	--trace-code-sticky-surface: var(--canvas, #191a1c);
 	--trace-code-comment: #ffffff64;
 	--trace-code-line-number: #fff5;
 	--trace-code-function: #e796f3;
@@ -121,7 +113,7 @@
 
 .dark .trace-inline-code {
 	box-shadow:
-		inset 0 0 0 0.5px var(--trace-code-outline),
+		inset 0 0 0 0.5px var(--line),
 		0 0 0 0.5px transparent;
 }
 
@@ -129,11 +121,6 @@
 	.trace-code-block,
 	.trace-inline-code {
 		--trace-code-surface: color(display-p3 1 1 1);
-		--trace-code-border: color(display-p3 0 0 0 / 0.063);
-		--trace-code-outline: color(display-p3 0 0 0 / 0.063);
-		--trace-code-primary: color(display-p3 0 0 0 / 0.875);
-		--trace-code-secondary: color(display-p3 0 0 0 / 0.608);
-		--trace-code-tertiary: color(display-p3 0 0 0 / 0.447);
 		--trace-code-comment: color(display-p3 0 0 0 / 0.447);
 		--trace-code-line-number: color(display-p3 0 0 0 / 0.267);
 		--trace-code-keyword: color(display-p3 0.843 0.298 0.507);
@@ -150,11 +137,6 @@
 	.dark .trace-code-block,
 	.dark .trace-inline-code {
 		--trace-code-surface: color(display-p3 1 1 1 / 0.034);
-		--trace-code-border: color(display-p3 1 1 1 / 0.231);
-		--trace-code-outline: color(display-p3 1 1 1 / 0.071);
-		--trace-code-primary: color(display-p3 1 1 1 / 0.929);
-		--trace-code-secondary: color(display-p3 1 1 1 / 0.685);
-		--trace-code-tertiary: color(display-p3 1 1 1 / 0.391);
 		--trace-code-comment: color(display-p3 1 1 1 / 0.391);
 		--trace-code-line-number: color(display-p3 1 1 1 / 0.332);
 		--trace-code-function: color(display-p3 0.86 0.602 0.933);
@@ -189,15 +171,15 @@
  * Anything peeking in NONE of these colors escapes every known layer.
  * ===================================================================== */
 [data-debug-sticky-colors] .trace-code-block {
-	background-color: rgba(255, 140, 0, 0.65) !important;
-	outline: 2px solid rgb(255, 100, 0) !important;
+	background-color: var(--warning-translucent) !important;
+	outline: var(--border-l) solid var(--warning) !important;
 	outline-offset: -2px;
 }
 
 [data-debug-sticky-colors] .trace-code-block [data-trace-code-block-header] {
-	background: rgba(255, 0, 0, 0.9) !important;
+	background: var(--error-translucent) !important;
 	box-shadow: 0 -2px 0 2px rgba(0, 200, 255, 0.9) !important;
-	outline: 1px solid rgb(130, 0, 0) !important;
+	outline: var(--border-m) solid var(--error) !important;
 	outline-offset: -1px;
 }
 
@@ -205,52 +187,56 @@
 	.trace-code-block
 	[data-trace-code-block-header]::after {
 	content: "DBG3";
-	margin-left: 8px;
-	padding: 2px 4px;
-	border-radius: 3px;
-	background: #000;
-	color: #fff;
-	font: 700 10px / 1 sans-serif;
+	margin-left: var(--space-m);
+	padding: var(--space-xxs) var(--space-xs);
+	border-radius: var(--radius-xs);
+	background: var(--ink);
+	color: var(--ink-inverse);
+	font-family: var(--font-sans);
+	font-size: var(--size-xs);
+	letter-spacing: var(--letter-spacing-xs);
+	font-weight: var(--weight-body-heavy);
+	line-height: 1;
 }
 
 [data-debug-sticky-colors]
 	.trace-code-block
 	[data-trace-code-block-header]::before {
-	background: rgba(255, 0, 255, 0.9) !important;
+	background: var(--color-2-translucent) !important;
 }
 
 [data-debug-sticky-colors] .trace-code-block [data-trace-code-block-content] {
-	background-color: rgba(255, 230, 0, 0.5) !important;
+	background-color: var(--warning-translucent) !important;
 }
 
 [data-debug-sticky-colors] .trace-code-block pre {
-	background: rgba(150, 0, 255, 0.18) !important;
+	background: var(--color-1-translucent) !important;
 }
 
 [data-debug-sticky-colors] [data-trace-tree-sticky-surface] {
-	background-color: rgba(0, 200, 80, 0.9) !important;
-	outline: 1px dashed rgb(0, 100, 0) !important;
+	background-color: var(--success-translucent) !important;
+	outline: var(--border-m) dashed var(--success) !important;
 	outline-offset: -1px;
 }
 
 [data-debug-sticky-colors]
 	[data-trace-tree-row-owner]:not([data-trace-tree-sticky-surface]) {
-	background-color: rgba(0, 220, 220, 0.45) !important;
+	background-color: var(--success-translucent) !important;
 }
 
 [data-debug-sticky-colors] [data-trace-tree-row-body] {
-	background-color: rgba(0, 80, 255, 0.12) !important;
+	background-color: var(--color-3-translucent) !important;
 }
 
 [data-debug-sticky-colors] [data-trace-tree-expanded-rails] {
-	background-color: rgba(160, 90, 30, 0.35) !important;
+	background-color: var(--error-translucent) !important;
 }
 
 [data-debug-sticky-colors] [data-trace-tool-details],
 [data-debug-sticky-colors] [data-trace-shell-command-details] {
-	background-color: rgba(255, 105, 180, 0.25) !important;
+	background-color: var(--color-5-translucent) !important;
 }
 
 [data-debug-sticky-colors] .sticky.top-0 {
-	background: rgba(0, 90, 40, 0.9) !important;
+	background: var(--success-translucent) !important;
 }

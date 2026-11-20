@@ -49,15 +49,15 @@ import {
 	YAxis,
 } from "recharts";
 import { introRequested } from "@/app/first-open";
+import { ChartLoadingWave } from "@/app/ui/chart-loading-wave";
 import { FlowFigure, FlowNumber } from "@/app/ui/flow-number";
+import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
 import { Skeleton } from "@/app/ui/skeleton";
 import {
 	Tooltip as InfoTooltip,
 	TooltipContent,
 	TooltipTrigger,
 } from "@/app/ui/tooltip";
-import { ChartLoadingWave } from "@/components/ui/chart-loading-wave";
-import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { useOptionalDateRange } from "@/features/analytics/date-range/DateRangeProvider";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { DemoTrendPreview } from "@/features/demo/demo-trend-preview";
@@ -945,7 +945,7 @@ export function CostChart({
 					style={usage?.selected ? { display: "none" } : undefined}
 				>
 					<div className="cost-chart-key" data-fluid-menu-root="">
-						<FluidMenuHover items=".cost-text-button" />
+						<FluidMenuHover items=".text-button" />
 						<div className="cost-chart-key-copy">
 							<h2 className="cost-chart-title">
 								{ciChart ? "PRs & CI" : metricLabel} over time
@@ -1116,7 +1116,7 @@ export function CostChart({
 								<output className="cost-chart-coverage">
 									<button
 										type="button"
-										className="cost-text-button cost-coverage-refresh"
+										className="text-button cost-coverage-refresh"
 										onClick={onRefresh}
 										disabled={refreshing}
 									>
@@ -1128,7 +1128,7 @@ export function CostChart({
 									<span>{unavailableLabel}</span>
 									<button
 										type="button"
-										className="cost-text-button cost-coverage-refresh"
+										className="text-button cost-coverage-refresh"
 										onClick={onRefresh}
 										disabled={refreshing}
 									>
@@ -1145,7 +1145,7 @@ export function CostChart({
 										Split by
 										<button
 											type="button"
-											className="cost-filter-chip"
+											className="filter-chip"
 											onClick={onResetSplit}
 											title={`Split by ${COST_LABELS[splitBy]}`}
 											aria-label={`Stop splitting by ${COST_LABELS[splitBy].toLowerCase()}`}
@@ -1294,7 +1294,7 @@ export function CostChart({
 											<CartesianGrid
 												yAxisId="count"
 												vertical={false}
-												stroke="var(--cost-border)"
+												stroke="var(--line)"
 												strokeDasharray="3 4"
 											/>
 										)}
@@ -1348,7 +1348,7 @@ export function CostChart({
 											tick={
 												heartbeat
 													? false
-													: { fill: "var(--cost-muted)", fontSize: 11 }
+													: { fill: "var(--ink-3)", fontSize: 11 }
 											}
 										/>
 										{metric === "agentRuns" || metric === "ciRuns" ? (
@@ -1367,7 +1367,7 @@ export function CostChart({
 												width={68}
 												tick={
 													phase === "idle" && durationStats?.sampleCount
-														? { fill: "var(--cost-muted)", fontSize: 11 }
+														? { fill: "var(--ink-3)", fontSize: 11 }
 														: false
 												}
 											/>
@@ -1391,7 +1391,7 @@ export function CostChart({
 												width={56}
 												tick={
 													phase === "idle"
-														? { fill: "var(--cost-muted)", fontSize: 11 }
+														? { fill: "var(--ink-3)", fontSize: 11 }
 														: false
 												}
 											/>
@@ -1404,7 +1404,7 @@ export function CostChart({
 											// Appear in place rather than slide in from the last spot.
 											isAnimationActive={false}
 											cursor={{
-												stroke: "var(--cost-muted)",
+												stroke: "var(--ink-3)",
 												strokeDasharray: "3 4",
 											}}
 											content={({ active, payload, label }) => {
@@ -1493,7 +1493,7 @@ export function CostChart({
 													}
 													activeDot={{
 														r: 4,
-														stroke: "var(--cost-surface)",
+														stroke: "var(--canvas)",
 														strokeWidth: 2,
 													}}
 													isAnimationActive={false}
@@ -1509,16 +1509,16 @@ export function CostChart({
 													dataKey="medianSeconds"
 													name="Median duration"
 													type="linear"
-													stroke="var(--cost-foreground)"
+													stroke="var(--ink)"
 													strokeWidth={2}
 													dot={{
 														r: 2,
 														strokeWidth: 0,
-														fill: "var(--cost-foreground)",
+														fill: "var(--ink)",
 													}}
 													activeDot={{
 														r: 4,
-														stroke: "var(--cost-surface)",
+														stroke: "var(--canvas)",
 														strokeWidth: 2,
 													}}
 													connectNulls={false}
@@ -1540,7 +1540,7 @@ export function CostChart({
 													}}
 													activeDot={{
 														r: 4,
-														stroke: "var(--cost-surface)",
+														stroke: "var(--canvas)",
 														strokeWidth: 2,
 													}}
 													connectNulls={false}
@@ -1564,7 +1564,7 @@ export function CostChart({
 												}}
 												activeDot={{
 													r: 4,
-													stroke: "var(--cost-surface)",
+													stroke: "var(--canvas)",
 													strokeWidth: 2,
 												}}
 												connectNulls={false}
@@ -1636,7 +1636,7 @@ export function GitHubHistoryNotes({
 			{history.ciUnavailablePullRequests > 0 ||
 			(metric === "ciRuns" && history.ciFrom && startDate < history.ciFrom) ? (
 				<InfoTooltip>
-					<TooltipTrigger className="cost-text-button">
+					<TooltipTrigger className="text-button">
 						CI history{" "}
 						{history.ciFrom
 							? `from ${historyDate(history.ciFrom)}`

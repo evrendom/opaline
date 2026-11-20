@@ -33,7 +33,7 @@ export function ProductLoadingIndicator() {
 export function ProductLoadingScreen({ children }: { children?: ReactNode }) {
 	useRootMark("data-app-shell");
 	return (
-		<div className="product-app-shell dashboard-01-preview flex h-dvh overflow-hidden overscroll-none text-foreground">
+		<div className="product-app-shell dashboard-01-preview flex h-dvh overflow-hidden overscroll-none text-ink">
 			<div
 				className="dashboard-01-chrome-frame relative flex h-full min-h-0 w-full overflow-clip overscroll-none"
 				style={shellChromeStyle}
@@ -54,7 +54,7 @@ export function ProductLoadingScreen({ children }: { children?: ReactNode }) {
 				>
 					<SidebarInset
 						className={cn(
-							"dashboard-01-window min-h-0 overflow-hidden overscroll-none bg-[var(--dashboard-01-content-background)]",
+							"dashboard-01-window min-h-0 overflow-hidden overscroll-none bg-[var(--canvas)]",
 							shellWindowRadiusClassName,
 						)}
 					>

@@ -18,18 +18,18 @@ const MODEL_BACKGROUND_CLASS_NAME =
 const MODEL_ICON_SHELL_CLASS_NAME =
 	"session-turn-table-model-icon-shell relative flex size-5 shrink-0 drop-shadow-[0_0_0.75px_rgb(0_0_0_/_14%)]";
 const MODEL_ICON_CLASS_NAME =
-	"session-turn-table-model-icon size-5 rounded-none border-0 bg-white shadow-none dark:bg-[color-mix(in_oklab,#fff_14%,var(--background))] [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]";
+	"session-turn-table-model-icon size-5 corner-zero edge-none bg-canvas shadow-none dark:bg-[color-mix(in_oklab,#fff_14%,var(--canvas))] [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]";
 
 export function SessionModelLoadingMark() {
 	return (
 		<span
 			aria-hidden="true"
-			className={cn(MODEL_MARK_CLASS_NAME, "text-[#111] dark:text-white")}
+			className={cn(MODEL_MARK_CLASS_NAME, "text-ink dark:text-ink")}
 		>
 			<span
 				className={cn(
 					MODEL_BACKGROUND_CLASS_NAME,
-					"bg-black/4 dark:bg-white/8",
+					"bg-wash dark:bg-hover-strong",
 				)}
 			>
 				<SessionModelProgressRing progress="loading" />
@@ -93,7 +93,7 @@ export function SessionModelMark({
 	const avatar = (
 		<Avatar
 			aria-label={userTitle}
-			className="absolute -right-0.5 -bottom-0.5 size-3.5 cursor-help bg-(--session-overview-surface) ring-1 ring-(--session-overview-surface) after:border-black/5 dark:after:border-white/10"
+			className="absolute -right-0.5 -bottom-0.5 size-3.5 cursor-help bg-canvas ring-1 ring-canvas after:border-line dark:after:border-line"
 			role="img"
 		>
 			{avatarUrl ? (
@@ -101,7 +101,7 @@ export function SessionModelMark({
 					<img
 						alt=""
 						data-slot="avatar-image"
-						className="aspect-square size-full rounded-full object-cover"
+						className="aspect-square size-full corner-full object-cover"
 						src={avatarUrl}
 					/>
 				) : (
@@ -109,10 +109,10 @@ export function SessionModelMark({
 				)
 			) : null}
 			{!(demo && avatarUrl) ? (
-				<AvatarFallback className="bg-(--session-overview-surface)">
+				<AvatarFallback className="bg-canvas">
 					<IconUser
 						aria-hidden="true"
-						className="size-2.5 shrink-0 text-(--session-overview-muted)"
+						className="size-2.5 shrink-0 text-ink-3"
 					/>
 				</AvatarFallback>
 			) : null}
@@ -124,18 +124,18 @@ export function SessionModelMark({
 			skullet-block=""
 			className={cn(
 				MODEL_MARK_CLASS_NAME,
-				"rounded-full",
-				tone.icon === "claude" && "text-[#b96949]",
-				tone.icon === "codex" && "text-[#111] dark:text-white",
-				tone.icon === null && "text-(--session-overview-muted)",
+				"corner-full",
+				tone.icon === "claude" && "text-warning",
+				tone.icon === "codex" && "text-ink dark:text-ink",
+				tone.icon === null && "text-ink-3",
 			)}
 		>
 			<span
 				{...iconAccessibility}
 				className={cn(
 					MODEL_BACKGROUND_CLASS_NAME,
-					tone.icon === "claude" && "bg-[#cc7d5e]/10",
-					tone.icon !== "claude" && "bg-black/4 dark:bg-white/8",
+					tone.icon === "claude" && "bg-warning/10",
+					tone.icon !== "claude" && "bg-wash dark:bg-hover-strong",
 					progress && tone.identityIconClassName,
 				)}
 				data-session-model-background

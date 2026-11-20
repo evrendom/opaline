@@ -1,11 +1,6 @@
 import type { ReactNode } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/app/ui/card";
 import { FlowNumber } from "@/app/ui/flow-number";
-import {
-	Card,
-	CardContent,
-	CardHeader,
-	CardTitle,
-} from "@/components/dashboard/card";
 import { PLAIN_NUMBER } from "@/lib/figure";
 import { cn } from "@/lib/utils";
 
@@ -32,17 +27,17 @@ export function SummarySection({
 			size="sm"
 			className={cn("min-w-0 scroll-mt-4", className)}
 		>
-			<CardHeader className="flex flex-row items-baseline justify-between gap-4">
+			<CardHeader className="flex flex-row items-baseline justify-between gap-xl">
 				<CardTitle>{title}</CardTitle>
 				{aside ??
 					(count !== undefined ? (
-						<span className="text-sm text-muted-foreground tabular-nums">
+						<span className="text-body-xl text-ink-3 tabular-nums">
 							<FlowNumber value={count} format={PLAIN_NUMBER} />
 						</span>
 					) : null)}
 			</CardHeader>
 			<CardContent
-				className={cn("flex min-w-0 flex-col gap-2", fill && "min-h-0 flex-1")}
+				className={cn("flex min-w-0 flex-col gap-m", fill && "min-h-0 flex-1")}
 			>
 				{children}
 			</CardContent>

@@ -151,7 +151,7 @@ export function AccountSettingsSection() {
 	return (
 		<SettingsPageReveal routeId="account" loading={data.state.isPending}>
 			{() => (
-				<div className="workspace-settings-page">
+				<div className="settings-page">
 					<ProfileOverviewCard
 						name={data.user.name}
 						email={data.user.email}

@@ -23,7 +23,7 @@ export function ThemeSwitcher() {
 	const pillId = useId();
 
 	return (
-		<fieldset className="inline-flex items-center rounded-full">
+		<fieldset className="inline-flex items-center corner-full">
 			<legend className="sr-only">Theme</legend>
 			{THEME_OPTIONS.map(({ value, label, icon: Icon }) => {
 				const active = theme === value;
@@ -36,17 +36,18 @@ export function ThemeSwitcher() {
 						title={label}
 						onClick={() => setTheme(value)}
 						className={cn(
-							"relative flex size-7 items-center justify-center rounded-full outline-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--dashboard-01-metric-button-focus-ring)]",
-							active
-								? "text-foreground"
-								: "text-muted-foreground/60 hover:text-foreground",
+							"relative flex size-7 items-center justify-center",
+							"corner-full",
+							"outline-none transition-colors",
+							"focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--dashboard-01-metric-button-focus-ring)]",
+							active ? "text-ink" : "text-ink-3/60 hover:text-ink",
 						)}
 					>
 						{active ? (
 							<motion.span
 								layoutId={pillId}
 								transition={MORPH}
-								className="absolute inset-0 rounded-full bg-input/50 shadow-(--custom-shadow)"
+								className="absolute inset-0 corner-full bg-line-strong/50 shadow-(--shadow-card)"
 							/>
 						) : null}
 						<Icon aria-hidden="true" className="relative z-10 size-3.5" />

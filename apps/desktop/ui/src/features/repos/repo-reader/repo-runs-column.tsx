@@ -96,10 +96,10 @@ export function usePickedRun() {
 }
 
 export const RAIL_SHELF =
-	"-mr-5 flex min-h-0 shrink-0 flex-col gap-1 rounded-lg bg-muted/60 pr-5 shadow-[inset_0_0_0_0.5px_rgb(0_0_0/0.06)] corner-squircle squircle:rounded-3xl dark:bg-muted/15 dark:shadow-[inset_0_0_0_0.5px_rgb(255_255_255/0.06)]";
+	"-mr-xxl flex min-h-0 shrink-0 flex-col gap-xs corner-m bg-field/60 pr-xxl shadow-[inset_0_0_0_0.5px_rgb(0_0_0/0.06)] corner-squircle squircle:corner-xl dark:bg-field/15 dark:shadow-[inset_0_0_0_0.5px_rgb(255_255_255/0.06)]";
 
 export const PICKED_ROW =
-	"bg-card shadow-[0_0_0_0.5px_rgb(0_0_0/0.08),0_1px_2px_-0.5px_rgb(0_0_0/0.1),0_2px_6px_-2px_rgb(0_0_0/0.12)] dark:bg-muted-foreground/10 dark:shadow-(--custom-shadow)";
+	"bg-card shadow-[0_0_0_0.5px_rgb(0_0_0/0.08),0_1px_2px_-0.5px_rgb(0_0_0/0.1),0_2px_6px_-2px_rgb(0_0_0/0.12)] dark:bg-ink-3/10 dark:shadow-(--shadow-card)";
 
 const COLUMN = cn(RAIL_SHELF, "w-[120px]");
 
@@ -107,7 +107,7 @@ function ShelfOutline() {
 	return (
 		<span
 			aria-hidden="true"
-			className="pointer-events-none absolute inset-y-4 right-0 left-4 rounded-xl border border-r-0 border-dashed corner-squircle squircle:rounded-4xl dark:border-border/50"
+			className="pointer-events-none absolute inset-y-4 right-0 left-4 corner-l edge-m edge-r-none border-dashed corner-squircle squircle:rounded-4xl dark:border-line/50"
 		/>
 	);
 }
@@ -298,9 +298,9 @@ function RunsList({
 	useRailFilter(filter);
 	return (
 		<section aria-label={label} className={cn(COLUMN, className)}>
-			<ScrollColumn className="px-1.5 pt-2 pb-4">
+			<ScrollColumn className="px-s pt-m pb-xl">
 				{!query.isPending && query.isError ? (
-					<p className="px-2 py-2 text-xs text-muted-foreground">
+					<p className="px-m py-m text-body-m text-ink-3">
 						Runs could not be read.
 					</p>
 				) : query.isPending || (runs && runs.length > 0) ? (
@@ -313,7 +313,7 @@ function RunsList({
 						{() =>
 							runs ? (
 								<FluidList>
-									<ul ref={listRef} className="flex flex-col gap-0.5">
+									<ul ref={listRef} className="flex flex-col gap-xxs">
 										{runs.map((run, index) => (
 											<li
 												key={runKeyOf(run)}
@@ -337,7 +337,7 @@ function RunsList({
 						}
 					</Reveal>
 				) : (
-					<p className="px-2 py-2 text-xs text-muted-foreground">{empty}</p>
+					<p className="px-m py-m text-body-m text-ink-3">{empty}</p>
 				)}
 			</ScrollColumn>
 		</section>
@@ -366,7 +366,11 @@ function RunRow({
 			onFocus={item.onFocus}
 			ref={item.ref}
 			className={cn(
-				"relative flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-xs font-medium tabular-nums outline-none transition-colors corner-squircle squircle:rounded-xl focus-visible:ring-2 focus-visible:ring-ring/50",
+				"relative flex w-full items-center gap-s",
+				"corner-s px-m py-s corner-squircle",
+				"text-left text-body-m font-medium tabular-nums",
+				"outline-none transition-colors",
+				"squircle:corner-l focus-visible:ring-2 focus-visible:ring-focus/50",
 				isPicked ? PICKED_ROW : undefined,
 			)}
 		>
@@ -450,12 +454,12 @@ const SKELETON_RUNS = Array.from({ length: 24 }, (_, index) => ({
 
 function RunsSample() {
 	return (
-		<ul className="flex flex-col gap-0.5">
+		<ul className="flex flex-col gap-xxs">
 			{SKELETON_RUNS.map((row) => (
-				<li key={row.id} className="flex h-7 items-center gap-1.5 px-2">
-					<Bone className="h-3 w-11 rounded-sm" />
+				<li key={row.id} className="flex h-7 items-center gap-s px-m">
+					<Bone className="h-3 w-11 corner-xs" />
 					{row.subagent ? (
-						<Bone className="size-4 shrink-0 rounded-full" />
+						<Bone className="size-4 shrink-0 corner-full" />
 					) : null}
 				</li>
 			))}

@@ -1,4 +1,5 @@
 import { IconChevronDown, IconChevronUp } from "@tabler/icons-react";
+import { TouchTarget } from "@/app/ui/touch-target";
 import { cn } from "@/lib/utils";
 import type {
 	SessionTurnTableSortKey,
@@ -29,15 +30,18 @@ export function SessionTurnTableSortableHeader({
 				isActive && sort.direction === "asc" ? "descending" : "ascending"
 			}`}
 			className={cn(
-				"relative flex h-full w-full min-w-0 items-center gap-1 text-left text-xs font-medium whitespace-nowrap text-(--session-overview-subtle) outline-none focus-visible:z-10",
-				columnIndex === 0 ? "pr-1.5 pl-3" : "px-1.5",
+				"relative flex h-full w-full min-w-0 items-center gap-xs",
+				"text-left text-body-m font-medium whitespace-nowrap",
+				"text-ink-3 outline-none",
+				"focus-visible:z-10",
+				columnIndex === 0 ? "pr-s pl-l" : "px-s",
 				className,
 			)}
 			onClick={() => onSort(sortKey)}
 		>
 			<span className="flex min-w-0 items-center">
 				<span
-					className="flex max-w-full min-w-0 items-center gap-1"
+					className="flex max-w-full min-w-0 items-center gap-xs"
 					data-sort-label-row
 				>
 					<span className="min-w-0 truncate">{label}</span>
@@ -53,10 +57,7 @@ export function SessionTurnTableSortableHeader({
 					) : null}
 				</span>
 			</span>
-			<span
-				aria-hidden="true"
-				className="pointer-fine:hidden absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2"
-			/>
+			<TouchTarget />
 		</button>
 	);
 }

@@ -7,17 +7,16 @@ import {
 import { useTheme } from "@/app/providers/ThemeProvider";
 
 const CODE_BLOCK_STYLE: CSSProperties = {
-	background: "var(--skill-document-code-background)",
-	border: "0.5px solid var(--skill-document-code-border)",
-	borderRadius: "8px",
+	background: "var(--inset)",
+	border: "var(--border-s) solid var(--line)",
+	borderRadius: "var(--radius-s)",
 	boxShadow: "inset 0 0 0 1px var(--skill-document-code-highlight)",
-	fontFamily:
-		'"SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
+	fontFamily: "var(--font-data)",
 	fontSize: "inherit",
 	lineHeight: "inherit",
-	margin: "12px 0 14px",
+	margin: "var(--space-l) var(--space-zero) var(--space-xl)",
 	overflow: "auto",
-	padding: "14px 16px",
+	padding: "var(--space-xl) var(--space-xl)",
 	tabSize: 2,
 };
 

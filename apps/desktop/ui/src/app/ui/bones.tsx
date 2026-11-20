@@ -20,7 +20,7 @@ import "./bones.css";
 import { cancelSkulletAnimations } from "./skullet-animations";
 
 const THEME = {
-	light: { base: "var(--bone)", highlight: "var(--bone-shine)" },
+	light: { base: "var(--hover-strong)", highlight: "var(--bone-shine)" },
 	animation: "shimmer" as const,
 	radius: "0.25rem",
 };

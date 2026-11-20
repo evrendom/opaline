@@ -20,7 +20,7 @@ import { toolSearchPayloads } from "./session-reader-tool-search";
 
 function MarkdownBody({ text }: { text: string }) {
 	return (
-		<div className="text-[13px] leading-relaxed">
+		<div className="text-body-l">
 			<MessageContent content={text} />
 		</div>
 	);

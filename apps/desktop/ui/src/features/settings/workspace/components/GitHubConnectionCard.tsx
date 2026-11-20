@@ -10,6 +10,7 @@ import {
 	DialogTitle,
 } from "@/app/ui/dialog";
 import { Skeleton } from "@/app/ui/skeleton";
+import { RetryButton } from "@/components/retry-button";
 import {
 	WorkspaceSettingsGroup,
 	WorkspaceSettingsRow,
@@ -183,11 +184,7 @@ function ConnectionControl({
 }) {
 	if (isPending) return <Skeleton className="h-8 w-full" />;
 	if (isError) {
-		return (
-			<Button type="button" variant="outline" size="sm" onClick={onRetry}>
-				Try again
-			</Button>
-		);
+		return <RetryButton onRetry={onRetry} />;
 	}
 	if (!status?.configured) {
 		return <span className="github-connection-state">Unavailable</span>;

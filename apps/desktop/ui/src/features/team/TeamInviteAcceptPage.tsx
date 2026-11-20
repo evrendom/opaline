@@ -98,15 +98,13 @@ function TeamInviteStateScreen(props: { body: string; title?: string }) {
 	const { body, title = "Joining workspace" } = props;
 
 	return (
-		<section className="flex min-h-svh items-center justify-center bg-background px-4 py-6 sm:px-6 lg:px-8">
-			<div className="mx-auto w-full max-w-xl space-y-3 text-center">
-				<p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+		<section className="flex min-h-svh items-center justify-center bg-canvas px-xl py-xxl sm:px-xxl lg:px-[calc(var(--space-xxl)*4/3)]">
+			<div className="mx-auto w-full max-w-xl space-y-l text-center">
+				<p className="text-body-m font-heavy uppercase tracking-[0.24em] text-ink-3">
 					Opaline team
 				</p>
-				<h1 className="text-3xl font-semibold text-foreground">{title}</h1>
-				<p className="text-sm leading-6 text-muted-foreground sm:text-[0.9375rem]">
-					{body}
-				</p>
+				<h1 className="text-display-s font-heavy text-ink">{title}</h1>
+				<p className="text-body-xl text-ink-3 sm:text-body-xl">{body}</p>
 			</div>
 		</section>
 	);

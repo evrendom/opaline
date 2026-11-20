@@ -111,7 +111,10 @@ export function CopyButton({
 			data-copied={copied ? "true" : undefined}
 			onClick={() => void copy()}
 			className={cn(
-				"copy-button inline-flex shrink-0 items-center justify-center rounded p-1 text-muted-foreground/60 transition-colors hover:text-foreground",
+				"copy-button inline-flex shrink-0 items-center justify-center",
+				"corner-xs p-xs",
+				"text-ink-3/60 transition-colors",
+				"hover:text-ink",
 				className,
 			)}
 		>

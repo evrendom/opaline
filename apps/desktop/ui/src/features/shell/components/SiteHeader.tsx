@@ -2,10 +2,10 @@ import { IconChevronRight } from "@tabler/icons-react";
 import { type ReactNode, useSyncExternalStore } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { appRoutes, getSessionDetailId, isNewSessionPath } from "@/app/routes";
+import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
 import { Separator } from "@/app/ui/separator";
 import { SidebarTrigger } from "@/app/ui/sidebar";
 import { Skeleton } from "@/app/ui/skeleton";
-import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
 import { sessionPaneMotionStyle } from "@/features/sessions/components/session-pane-motion";
@@ -35,7 +35,7 @@ function SiteHeaderLeadingControls({
 		<>
 			{showSidebarTrigger ? (
 				<>
-					<SidebarTrigger className="size-7 rounded-md text-[color:var(--dashboard-01-rail-icon)] hover:bg-[color:var(--dashboard-01-rail-hover)] hover:text-[color:var(--dashboard-01-rail-icon-active)] md:hidden" />
+					<SidebarTrigger className="size-7 corner-s text-ink-3 hover:bg-hover hover:text-ink md:hidden" />
 					<Separator
 						orientation="vertical"
 						className="data-vertical:h-4 data-vertical:self-auto md:hidden"
@@ -43,7 +43,7 @@ function SiteHeaderLeadingControls({
 				</>
 			) : null}
 			{import.meta.env.MODE !== "plugin" && showWorkspaceMenu ? (
-				<div className="flex shrink-0 items-center gap-1">
+				<div className="flex shrink-0 items-center gap-xs">
 					<WorkspaceMenuButton variant="header" />
 					<Separator
 						orientation="vertical"
@@ -87,7 +87,7 @@ export function SiteHeader({
 	const modelChip = sessionModel ? (
 		<ModelChip model={sessionModel} />
 	) : modelPending ? (
-		<Skeleton className="size-4.5 shrink-0 rounded-full" />
+		<Skeleton className="size-4.5 shrink-0 corner-full" />
 	) : null;
 	const params = new URLSearchParams(location.search);
 	const readingSubagent = params.has(AGENT_PARAM);
@@ -107,10 +107,10 @@ export function SiteHeader({
 		<DashboardHeader
 			className={
 				isNewSession
-					? "p-0"
+					? "p-zero"
 					: // Page header: no rule underneath, the section chip
 						// beside a larger title, aligned with the page's 32px gutter.
-						"h-14 gap-2 border-b-0 pt-2 pr-8 pl-8"
+						"h-14 gap-m edge-b-none pt-m pr-[calc(var(--space-xxl)*4/3)] pl-[calc(var(--space-xxl)*4/3)]"
 			}
 		>
 			{sessionDetailId !== null ? (
@@ -121,13 +121,17 @@ export function SiteHeader({
 					/>
 					{/* Detail breadcrumb: the section links back to the list,
 					    the session id is the page title. */}
-					<h1 className="flex min-w-0 items-center gap-1.5 text-base font-medium tracking-tight">
+					<h1 className="flex min-w-0 items-center gap-s text-body-xxl font-medium">
 						{/* Back link only lifts its text on hover. Its own fluid
 						    root keeps it out of the header's sliding hover fill. */}
 						<Link
 							to={getShellRoutePath(appRoutes.session())}
 							data-fluid-menu-root=""
-							className="group/back flex shrink-0 items-center gap-2 text-muted-foreground transition-colors hover:text-foreground"
+							className={cn(
+								"group/back flex shrink-0 items-center gap-m",
+								"text-ink-3 transition-colors",
+								"hover:text-ink",
+							)}
 						>
 							<span className="flex opacity-60 grayscale transition group-hover/back:opacity-100 group-hover/back:grayscale-0">
 								<ShellNavIcon
@@ -141,7 +145,7 @@ export function SiteHeader({
 						</Link>
 						<IconChevronRight
 							aria-hidden="true"
-							className="size-4 shrink-0 text-muted-foreground/50"
+							className="size-4 shrink-0 text-ink-3/50"
 							stroke={1.5}
 						/>
 						{modelChip ? (
@@ -155,23 +159,13 @@ export function SiteHeader({
 							</span>
 						) : null}
 						{sessionModel ? (
-							<span
-								className={cn(
-									"shrink-0",
-									sessionMuted && "text-muted-foreground",
-								)}
-							>
+							<span className={cn("shrink-0", sessionMuted && "text-ink-3")}>
 								{formatModelDisplayLabel(sessionModel)}
 							</span>
 						) : modelPending ? (
-							<Skeleton className="h-3.5 w-16 shrink-0 rounded-[4px] corner-squircle squircle:rounded-[8px]" />
+							<Skeleton className="h-3.5 w-16 shrink-0 corner-xs corner-squircle squircle:corner-s" />
 						) : null}
-						<span
-							className={cn(
-								"shrink-0",
-								sessionMuted && "text-muted-foreground",
-							)}
-						>
+						<span className={cn("shrink-0", sessionMuted && "text-ink-3")}>
 							Session
 						</span>
 						{readingSubagent ? (
@@ -179,17 +173,14 @@ export function SiteHeader({
 								to={mainThreadPath}
 								data-fluid-menu-root=""
 								title={sessionDetailId}
-								className="truncate text-muted-foreground transition-colors hover:text-foreground"
+								className="truncate text-ink-3 transition-colors hover:text-ink"
 							>
 								{shortSessionId}
 							</Link>
 						) : (
 							<span
 								title={sessionDetailId}
-								className={cn(
-									"truncate",
-									sessionMuted && "text-muted-foreground",
-								)}
+								className={cn("truncate", sessionMuted && "text-ink-3")}
 							>
 								{shortSessionId}
 							</span>
@@ -206,18 +197,23 @@ export function SiteHeader({
 					<div
 						data-slot="session-list-header-pane"
 						data-fluid-menu-root=""
-						className="hidden min-w-0 items-center gap-2 bg-[#fcfcfc] pr-2 pl-4.5 lg:flex lg:w-[var(--session-list-pane-width,29.8125rem)] lg:flex-none"
+						className={cn(
+							"hidden min-w-0 items-center gap-m",
+							"pr-m pl-xl",
+							"bg-inset",
+							"lg:flex lg:w-[var(--session-list-pane-width,29.8125rem)] lg:flex-none",
+						)}
 					>
 						<FluidMenuHover items='button, a[href], [role="button"]' />
 						{showSidebarTrigger ? (
-							<SidebarTrigger className="size-7 shrink-0 rounded-md text-[#5b5c5e] hover:bg-[#ececed] hover:text-[#1b1b1b]" />
+							<SidebarTrigger className="size-7 shrink-0 corner-s text-ink-2 hover:bg-[#ececed] hover:text-[#1b1b1b]" />
 						) : (
 							<SiteHeaderLeadingControls
 								showSidebarTrigger={showSidebarTrigger}
 								showWorkspaceMenu={showWorkspaceMenu}
 							/>
 						)}
-						<h1 className="truncate text-[0.8125rem]/5 font-medium tracking-normal text-balance text-[#1b1b1b]">
+						<h1 className="truncate text-[0.8125rem]/5 font-medium tracking-m text-balance text-ink">
 							Sessions
 						</h1>
 						<div
@@ -229,10 +225,15 @@ export function SiteHeader({
 						data-slot="session-detail-header-pane"
 						data-fluid-menu-root=""
 						style={sessionPaneMotionStyle}
-						className="relative z-10 flex min-w-0 flex-1 items-center gap-2 border-l border-black/6 bg-[var(--dashboard-01-content-background)] px-2 dark:border-white/8"
+						className={cn(
+							"relative z-10 flex min-w-0 flex-1 items-center gap-m",
+							"edge-l-m px-m",
+							"border-line bg-[var(--canvas)]",
+							"dark:border-line",
+						)}
 					>
 						<FluidMenuHover items='button, a[href], [role="button"]' />
-						<div className="flex shrink-0 items-center gap-2 lg:hidden">
+						<div className="flex shrink-0 items-center gap-m lg:hidden">
 							<SiteHeaderLeadingControls
 								showSidebarTrigger={showSidebarTrigger}
 								showWorkspaceMenu={showWorkspaceMenu}
@@ -251,7 +252,7 @@ export function SiteHeader({
 						showWorkspaceMenu={showWorkspaceMenu}
 					/>
 					{!isCollectionDetail ? (
-						<h1 className="flex min-w-0 items-center gap-2 text-base font-medium tracking-tight">
+						<h1 className="flex min-w-0 items-center gap-m text-body-xxl font-medium">
 							<ShellNavIcon
 								icon={currentShellRoute.icon}
 								activeIcon={currentShellRoute.activeIcon}

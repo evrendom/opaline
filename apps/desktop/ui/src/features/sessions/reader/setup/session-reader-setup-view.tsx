@@ -138,8 +138,8 @@ export function SessionReaderSetupView({
 		: undefined;
 	return (
 		<SessionSubagents onOpen={openSubagent} subagents={subagents}>
-			<div className="h-full overflow-hidden px-8 pt-2 pb-2">
-				<div className="flex h-full min-h-0 gap-6">
+			<div className="h-full overflow-hidden px-[calc(var(--space-xxl)*4/3)] pt-m pb-m">
+				<div className="flex h-full min-h-0 gap-xxl">
 					<div
 						className={cn(
 							"flex min-h-0 w-(--reader-rail) shrink-0 flex-col",
@@ -173,7 +173,7 @@ export function SessionReaderSetupView({
 							label="Reading the setup this session received"
 							loading={!setup}
 							sample={
-								<div className="flex h-full min-h-0 gap-6">
+								<div className="flex h-full min-h-0 gap-xxl">
 									<SetupColumnsSample agent={agent} model={model} run={run} />
 								</div>
 							}
@@ -182,7 +182,7 @@ export function SessionReaderSetupView({
 							{() =>
 								setup ? (
 									<ReaderSubagentsContext.Provider value={subagentsContext}>
-										<div className="flex h-full min-h-0 gap-6">
+										<div className="flex h-full min-h-0 gap-xxl">
 											<SetupPicked
 												key={`${run ?? ""}:${agent ?? ""}`}
 												agent={agent}
@@ -319,7 +319,7 @@ function SetupPicked({
 							<SetupCard file={shown} versions={versions} />
 						</div>
 						{detailStep && pickedTurn && runUses.waterfall ? (
-							<div className="flex min-h-0 flex-1 flex-col border-t border-border/50">
+							<div className="flex min-h-0 flex-1 flex-col edge-t-m border-line/50">
 								<SessionReaderStepDetail
 									bare
 									fields={false}

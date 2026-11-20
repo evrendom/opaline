@@ -9,7 +9,7 @@ export function AppLoadingScreen({
 		<div
 			aria-busy="true"
 			aria-live="polite"
-			className="dashboard-01-theme flex min-h-svh items-center justify-center bg-(--dashboard-01-content-background) text-foreground"
+			className="dashboard-01-theme flex min-h-svh items-center justify-center bg-canvas text-ink"
 		>
 			<span
 				aria-hidden="true"

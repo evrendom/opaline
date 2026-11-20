@@ -1,5 +1,3 @@
-"use client";
-
 import { Checkbox as CheckboxPrimitive } from "@base-ui/react/checkbox";
 import { IconCheck } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
@@ -9,16 +7,27 @@ function Checkbox({ className, ...props }: CheckboxPrimitive.Root.Props) {
 		<CheckboxPrimitive.Root
 			data-slot="checkbox"
 			className={cn(
-				"peer relative flex size-4 shrink-0 items-center justify-center rounded-[5px] border border-transparent bg-input/90 transition-shadow outline-none group-has-disabled/field:opacity-50 after:absolute after:-inset-x-3 after:-inset-y-2 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 aria-invalid:aria-checked:border-primary dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 data-checked:border-primary data-checked:bg-primary data-checked:text-primary-foreground dark:data-checked:bg-primary",
+				"peer relative flex size-4 shrink-0 items-center justify-center",
+				"corner-xs edge-m",
+				"border-line-strong shadow-xs transition-[shadow,opacity] outline-none",
+				"hover:opacity-80",
+				"group-has-disabled/field:opacity-50",
+				"after:absolute after:-inset-x-3 after:-inset-y-2",
+				"focus-visible:border-focus focus-visible:ring-[1.5px] focus-visible:ring-focus/50",
+				"disabled:cursor-not-allowed disabled:opacity-50",
+				"aria-invalid:border-error aria-invalid:ring-[1.5px] aria-invalid:ring-error/20 aria-invalid:aria-checked:border-primary",
+				"dark:bg-line-strong/30 dark:aria-invalid:border-error/50 dark:aria-invalid:ring-error/40",
+				"data-checked:border-primary data-checked:bg-primary data-checked:text-primary-fg",
+				"dark:data-checked:bg-primary",
 				className,
 			)}
 			{...props}
 		>
 			<CheckboxPrimitive.Indicator
 				data-slot="checkbox-indicator"
-				className="grid place-content-center text-current transition-none [&>svg]:size-3.5"
+				className="grid place-content-center text-current transition-none [&>svg]:size-2.5"
 			>
-				<IconCheck />
+				<IconCheck className="stroke-[3.5]" />
 			</CheckboxPrimitive.Indicator>
 		</CheckboxPrimitive.Root>
 	);

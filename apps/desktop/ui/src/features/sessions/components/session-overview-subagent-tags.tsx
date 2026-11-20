@@ -22,7 +22,7 @@ type SessionSubagentData = Pick<
 
 const SUBAGENT_TAG_CLASS_NAME = cn(
 	SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME,
-	"shrink-0 whitespace-nowrap bg-black/5 text-[#5f5e5b] dark:bg-white/8 dark:text-white/65",
+	"shrink-0 whitespace-nowrap bg-wash text-ink-2 dark:bg-hover-strong dark:text-ink-3",
 );
 
 const SUBAGENT_ROW_TITLES: Record<
@@ -64,7 +64,7 @@ export function SessionOverviewSubagentCountTag({
 			className={cn(
 				SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME,
 				SESSION_OVERVIEW_ICON_TAG_CLASS_NAME,
-				"shrink-0 bg-[#fce7f3] text-[#be185d] dark:bg-[#4a1d36] dark:text-[#f472b6]",
+				"shrink-0 bg-color-5-translucent text-error dark:bg-color-5-transparent dark:text-color-5",
 			)}
 			data-session-overview-subagent-count={count}
 			title={`${count} ${count === 1 ? "subagent" : "subagents"}`}

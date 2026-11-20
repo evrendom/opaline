@@ -16,20 +16,19 @@ import { isTraceTextCollapsible } from "./conversation-trace-text-disclosure";
 // connector elbows and depth-derived sticky slots both assume this height,
 // so shorter rows would leave see-through gaps between stacked sticky levels.
 export const traceRowClassName =
-	"flex min-h-10 w-full min-w-0 items-center gap-2 px-3 py-2 text-left text-[0.8125rem]";
+	"flex min-h-10 w-full min-w-0 items-center gap-m px-l py-m text-left text-body-l";
 
-const compactTraceRowClassName = "min-h-8 py-1";
+const compactTraceRowClassName = "min-h-8 py-xs";
 
 export const traceInteractiveRowClassName = "focus-visible:outline-none";
 
-const timestampClassName =
-	"shrink-0 tabular-nums text-[0.75rem] text-[color:var(--dashboardy-muted)]";
+const timestampClassName = "shrink-0 tabular-nums text-body-m text-ink-3";
 
 // Keep the expanded content below the sticky row's masking boundary. The 4px
 // top inset preserves the header-to-body gap and leaves rounded code
 // cards fully visible instead of tucking their top edge beneath the row.
-const expandedBodyClassName = "pt-1 pr-3 pb-2.5 pl-3";
-const proseBodyClassName = "px-3 py-1";
+const expandedBodyClassName = "pt-xs pr-l pb-l pl-l";
+const proseBodyClassName = "px-l py-xs";
 
 export type TraceFocusRequest = { anchorId: string; requestId: number };
 
@@ -144,7 +143,7 @@ export function TraceTextDisclosureIcon({ expanded }: { expanded: boolean }) {
 		<svg
 			aria-hidden="true"
 			className={cn(
-				"pointer-events-none -ml-0.5 size-4 shrink-0 transition-transform duration-150 will-change-transform",
+				"pointer-events-none -ml-xxs size-4 shrink-0 transition-transform duration-150 will-change-transform",
 				expanded && "rotate-90",
 			)}
 			data-trace-content-disclosure-icon
@@ -154,7 +153,7 @@ export function TraceTextDisclosureIcon({ expanded }: { expanded: boolean }) {
 			role="img"
 			style={{
 				color:
-					"oklch(from var(--constellation-tree-secondary, color(display-p3 0 0 0 / 60.8%)) calc(l + 0.16) c h)",
+					"oklch(from var(--ink-3, color(display-p3 0 0 0 / 60.8%)) calc(l + 0.16) c h)",
 			}}
 			viewBox="0 0 16 16"
 			width="16"
@@ -349,14 +348,14 @@ export function ExpandableTraceRow({
 						aria-label={disclosureLabel}
 						aria-expanded={expanded}
 						aria-controls={panelId}
-						className="group flex min-w-0 flex-1 items-center gap-0 text-left outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[color:var(--dashboard-01-metric-button-focus-ring)]"
+						className="group flex min-w-0 flex-1 items-center gap-zero text-left outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[color:var(--dashboard-01-metric-button-focus-ring)]"
 					>
 						{disclosureLabel ? null : label}
 						{children}
 						<TraceTextDisclosureIcon expanded={expanded} />
 					</button>
 				) : (
-					<div className="flex min-w-0 flex-1 items-center gap-2">
+					<div className="flex min-w-0 flex-1 items-center gap-m">
 						{label}
 						{children}
 					</div>

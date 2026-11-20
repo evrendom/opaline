@@ -1,5 +1,5 @@
 import { type ReactNode, useRef } from "react";
-import { FluidHoverHighlight } from "@/components/ui/fluid-hover-highlight";
+import { FluidHoverHighlight } from "@/app/ui/fluid-hover-highlight";
 import {
 	type UseFluidHoverReturn,
 	useFluidHover,
@@ -52,10 +52,7 @@ export function SessionsOverviewFluidList({
 		>
 			<FluidHoverHighlight
 				hover={hover}
-				className={cn(
-					"z-0 rounded-none bg-(--session-overview-hover)",
-					highlightClassName,
-				)}
+				className={cn("z-0 corner-zero bg-hover", highlightClassName)}
 			/>
 			<ul
 				aria-label="Recent sessions"

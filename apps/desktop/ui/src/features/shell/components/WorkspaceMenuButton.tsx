@@ -14,6 +14,7 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/app/ui/dropdown-menu";
+import { TouchTarget } from "@/app/ui/touch-target";
 import {
 	getUtilityRailItemClassName,
 	getUtilityRailLabelClassName,
@@ -58,10 +59,10 @@ export function WorkspaceMenuButton({
 						data-sidebar-workspace-row
 						className={cn(
 							isHeaderVariant
-								? "relative flex size-7 shrink-0 items-center justify-center rounded-md text-[#292A2F] outline-none hover:bg-black/4 active:scale-95 dark:text-white/90 dark:hover:bg-white/6"
+								? "relative flex size-7 shrink-0 items-center justify-center corner-s text-ink outline-none hover:bg-black/4 active:scale-95 dark:text-ink dark:hover:bg-white/6"
 								: getUtilityRailItemClassName(),
 							isBottomRailVariant &&
-								"!size-9 !w-9 self-auto overflow-visible rounded-lg",
+								"!size-9 !w-9 self-auto overflow-visible corner-m",
 							!isHeaderVariant &&
 								!isBottomRailVariant &&
 								"hover:!bg-transparent active:!bg-transparent",
@@ -72,10 +73,7 @@ export function WorkspaceMenuButton({
 				{isHeaderVariant ? (
 					<>
 						<OpalineMark className="size-4" />
-						<span
-							className="pointer-events-none absolute top-1/2 left-1/2 size-12 -translate-1/2 pointer-fine:hidden"
-							aria-hidden="true"
-						/>
+						<TouchTarget className="pointer-events-none size-12" />
 					</>
 				) : (
 					<>
@@ -83,7 +81,13 @@ export function WorkspaceMenuButton({
 							data-sidebar-workspace-icon-lane
 							className="flex h-[var(--sidebar-icon-lane-size)] w-[var(--sidebar-icon-lane-size)] shrink-0 items-center justify-center"
 						>
-							<div className="relative flex h-[var(--sidebar-avatar-size)] min-h-[var(--sidebar-avatar-size)] w-[var(--sidebar-avatar-size)] min-w-[var(--sidebar-avatar-size)] shrink-0 items-center justify-center text-[#292A2F] dark:text-white/90">
+							<div
+								className={cn(
+									"relative flex h-[var(--sidebar-avatar-size)] min-h-[var(--sidebar-avatar-size)] w-[var(--sidebar-avatar-size)] min-w-[var(--sidebar-avatar-size)] shrink-0 items-center justify-center",
+									"text-ink",
+									"dark:text-ink",
+								)}
+							>
 								<OpalineMark />
 							</div>
 						</div>
@@ -94,12 +98,7 @@ export function WorkspaceMenuButton({
 						>
 							{workspaceName}
 						</span>
-						{isBottomRailVariant ? (
-							<span
-								className="absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden"
-								aria-hidden="true"
-							/>
-						) : null}
+						{isBottomRailVariant ? <TouchTarget /> : null}
 					</>
 				)}
 			</DropdownMenuTrigger>

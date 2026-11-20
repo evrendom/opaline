@@ -2,7 +2,7 @@ import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 
 const buttonClassName =
-	"flex size-7 items-center justify-center rounded-md text-[color:var(--dashboard-01-rail-icon)] transition-colors hover:bg-[color:var(--dashboard-01-rail-hover)] hover:text-[color:var(--dashboard-01-rail-icon-active)]";
+	"flex size-7 items-center justify-center corner-s text-ink-3 transition-colors hover:bg-hover hover:text-ink";
 
 export function DesktopWindowBar() {
 	const navigate = useNavigate();

@@ -1,6 +1,7 @@
 import type { GitHubRepositoryConnectionStatus } from "@rudel/api-routes";
-import { IconFolder, IconSearch } from "@tabler/icons-react";
+import { IconFolder } from "@tabler/icons-react";
 import { useState } from "react";
+import { RepositorySearchField } from "@/features/settings/components/repository-search-field";
 import "@/features/settings/sessions/sessions-settings.css";
 import { FlowNumber } from "@/app/ui/flow-number";
 import { PLAIN_NUMBER } from "@/lib/figure";
@@ -58,18 +59,13 @@ export function GitHubRepositoryList({
 						)}
 					</p>
 				</div>
-				<div className="sessions-settings-card settings-section-surface">
-					<label className="sessions-settings-search">
-						<IconSearch size={16} aria-hidden="true" />
-						<input
-							type="search"
-							name="github-repository-search"
-							aria-label="Find a repository"
-							placeholder="Find a repository…"
-							value={search}
-							onChange={(event) => setSearch(event.target.value)}
-						/>
-					</label>
+				<div className="sessions-settings-card surface-card">
+					<RepositorySearchField
+						className="mb-m"
+						name="github-repository-search"
+						value={search}
+						onChange={setSearch}
+					/>
 					<div className="sessions-settings-table-wrap">
 						<table className="sessions-settings-table">
 							<thead>

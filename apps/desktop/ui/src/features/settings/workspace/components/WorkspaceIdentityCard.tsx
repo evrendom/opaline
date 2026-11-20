@@ -156,8 +156,8 @@ export function WorkspaceIdentityCard({
 				/>
 			</WorkspaceSettingsRow>
 			<WorkspaceSettingsRow label="Workspace URL" controlId="workspace-slug">
-				<div className="workspace-settings-url-control">
-					<div className="workspace-settings-url-field">
+				<div className="settings-url-control">
+					<div className="settings-url-field">
 						<span aria-hidden="true">{workspaceUrlPrefix(selfHost)}</span>
 						<Input
 							id="workspace-slug"
@@ -201,22 +201,19 @@ export function WorkspaceIdentityCard({
 						/>
 					</div>
 					{isEditingName ? (
-						<output
-							id="workspace-slug-status"
-							className="workspace-settings-status"
-						>
+						<output id="workspace-slug-status" className="settings-status">
 							{slugAvailability.message}
 						</output>
 					) : null}
 				</div>
 			</WorkspaceSettingsRow>
 			{isEditingName ? (
-				<div className="workspace-settings-actions">
+				<div className="settings-actions">
 					{renameError ? (
 						<p
 							id="workspace-name-error"
 							role="alert"
-							className="workspace-settings-error"
+							className="settings-error"
 						>
 							{renameError}
 						</p>

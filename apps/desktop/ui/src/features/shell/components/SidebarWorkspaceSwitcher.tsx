@@ -66,12 +66,12 @@ function WorkspaceMark({ logo }: { logo: string | null | undefined }) {
 			<Avatar
 				skullet-own=""
 				data-workspace-mark=""
-				className="size-5 rounded-none after:hidden [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]"
+				className="size-5 corner-zero after:hidden [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]"
 			>
 				{logo ? (
-					<AvatarImage src={logo} alt="" className="rounded-none" />
+					<AvatarImage src={logo} alt="" className="corner-zero" />
 				) : null}
-				<AvatarFallback className="rounded-none">
+				<AvatarFallback className="corner-zero">
 					<IconBuilding className="size-3!" />
 				</AvatarFallback>
 			</Avatar>
@@ -96,7 +96,7 @@ export function SidebarWorkspaceSwitcher() {
 						render={
 							<SidebarMenuButton
 								data-sidebar-interactive=""
-								className="pr-2 pl-1.75 [&_svg]:size-3.5"
+								className="pr-m pl-m [&_svg]:size-3.5"
 							/>
 						}
 					>

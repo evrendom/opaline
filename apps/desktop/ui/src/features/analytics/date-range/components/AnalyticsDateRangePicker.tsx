@@ -11,8 +11,8 @@ import { type ReactNode, useMemo, useRef, useState } from "react";
 import type { ChevronProps, DateRange } from "react-day-picker";
 import { Button } from "@/app/ui/button";
 import { Calendar } from "@/app/ui/calendar";
+import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
 import { Popover, PopoverTrigger } from "@/app/ui/popover";
-import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
 import { SessionMenuPopoverContent } from "@/features/sessions/components/session-menu-popover-content";
 import "./analytics-date-range-picker.css";
@@ -59,7 +59,7 @@ function LinearCalendarChevron({
 			aria-hidden="true"
 			size={size}
 			stroke={1.75}
-			className={cn("session-menu-icon size-4", className)}
+			className={cn("menu-icon size-4", className)}
 		/>
 	);
 }
@@ -198,10 +198,11 @@ export function AnalyticsDateRangePicker({
 		>
 			<PopoverTrigger
 				render={
-					<button
+					<Button
 						type="button"
-						data-variant="secondary"
-						className={cn("toolbar-button", triggerClassName)}
+						variant="toolbar"
+						data-active
+						className={triggerClassName}
 					/>
 				}
 			>
@@ -222,10 +223,7 @@ export function AnalyticsDateRangePicker({
 				sideOffset={6}
 				data-slot="popover-content"
 				aria-label="Date range"
-				className={cn(
-					"session-menu-surface session-date-picker",
-					contentClassName,
-				)}
+				className={cn("menu-surface session-date-picker", contentClassName)}
 			>
 				<form
 					className="flex min-h-0 flex-col overflow-hidden"
@@ -241,7 +239,7 @@ export function AnalyticsDateRangePicker({
 					>
 						<div
 							data-fluid-menu-root=""
-							className="session-menu-list session-date-picker-presets"
+							className="menu-list session-date-picker-presets"
 						>
 							<FluidMenuHover />
 							{presets.map((preset) => {
@@ -252,7 +250,7 @@ export function AnalyticsDateRangePicker({
 										key={preset.id}
 										type="button"
 										aria-pressed={isActive}
-										className="session-menu-row"
+										className="menu-row"
 										onClick={() => applyPreset(preset)}
 									>
 										<span className="truncate">{preset.label}</span>

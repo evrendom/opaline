@@ -93,7 +93,7 @@ export function SessionLink({
 			to={href(session.session_id)}
 			title={session.session_id}
 			className={cn(
-				"min-w-0 truncate text-foreground/90 underline-offset-2 hover:text-foreground hover:underline",
+				"min-w-0 truncate text-ink/90 underline-offset-2 hover:text-ink hover:underline",
 				className,
 			)}
 		>
@@ -107,7 +107,13 @@ export function SkillLink({ name }: { name: string }) {
 	return (
 		<Link
 			to={href(name)}
-			className="inline-flex h-6 max-w-full items-center truncate rounded-full bg-background px-2.5 text-[11px] text-foreground/90 shadow-(--custom-outline-shadow) hover:text-foreground dark:bg-card"
+			className={cn(
+				"inline-flex h-6 max-w-full items-center",
+				"corner-full px-l",
+				"truncate text-body-s",
+				"bg-canvas text-ink/90 shadow-(--shadow-control)",
+				"hover:text-ink dark:bg-card",
+			)}
 		>
 			{name}
 		</Link>
@@ -132,18 +138,15 @@ export function PullLink({
 			rel="noreferrer"
 			title={pull.pull.title ?? undefined}
 			className={cn(
-				"inline-flex min-w-0 items-center gap-1.5 text-foreground/90 hover:text-foreground",
+				"inline-flex min-w-0 items-center gap-s text-ink/90 hover:text-ink",
 				className,
 			)}
 		>
 			<Glyph
 				aria-hidden="true"
-				className={cn(
-					"size-3.5 shrink-0",
-					look.className || "text-muted-foreground",
-				)}
+				className={cn("size-3.5 shrink-0", look.className || "text-ink-3")}
 			/>
-			<span className="shrink-0 text-muted-foreground tabular-nums">
+			<span className="shrink-0 text-ink-3 tabular-nums">
 				#{pull.pull.number}
 			</span>
 			{title ? (
@@ -163,20 +166,20 @@ export function PushStrip({
 	pull: RepoPull;
 }) {
 	if (pull.rounds.length === 0)
-		return <span className="text-[11px] text-muted-foreground">no CI</span>;
+		return <span className="text-body-s text-ink-3">no CI</span>;
 	return (
 		<span
-			className={cn("inline-flex items-center gap-0.5", className)}
+			className={cn("inline-flex items-center gap-xxs", className)}
 			title={`${pull.rounds.length} pushes`}
 		>
 			{pull.rounds.slice(0, 14).map((round) => (
 				<span
 					key={round.sha}
-					className={cn("size-2 rounded-[2px]", OUTCOME_TONE[round.outcome])}
+					className={cn("size-2 corner-xs", OUTCOME_TONE[round.outcome])}
 				/>
 			))}
 			{pull.rounds.length > 14 ? (
-				<span className="pl-0.5 text-[10px] text-muted-foreground">
+				<span className="pl-xxs text-body-xs text-ink-3">
 					+{pull.rounds.length - 14}
 				</span>
 			) : null}
@@ -190,7 +193,7 @@ const CHIP_TONE = {
 	emerald: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300",
 	sky: "bg-sky-500/12 text-sky-700 dark:text-sky-300",
 	violet: "bg-violet-500/12 text-violet-700 dark:text-violet-300",
-	muted: "bg-muted text-muted-foreground",
+	muted: "bg-field text-ink-3",
 } as const;
 
 export type ChipTone = keyof typeof CHIP_TONE;
@@ -208,7 +211,9 @@ export function Chip({
 		<span
 			title={title}
 			className={cn(
-				"inline-flex h-5 shrink-0 items-center gap-1 rounded-full px-2 text-[11px] font-medium whitespace-nowrap tabular-nums",
+				"inline-flex h-5 shrink-0 items-center gap-xs",
+				"corner-full px-m",
+				"text-body-s font-medium whitespace-nowrap tabular-nums",
 				CHIP_TONE[tone],
 			)}
 		>
@@ -227,7 +232,7 @@ export function StruggleChips({
 	frustration: number;
 }) {
 	return (
-		<span className="inline-flex flex-wrap gap-1">
+		<span className="inline-flex flex-wrap gap-xs">
 			{frustration > 0 ? (
 				<Chip tone="rose" title="Member swore at the agent">
 					{frustration} frustrated
@@ -252,7 +257,7 @@ export function Bars({
 	highlight,
 	labels,
 	onPick,
-	tone = "bg-foreground/70",
+	tone = "bg-ink/70",
 	values,
 }: {
 	className?: string;
@@ -264,7 +269,7 @@ export function Bars({
 }) {
 	const max = Math.max(...values, 0);
 	return (
-		<div className={cn("flex h-16 items-end gap-[3px]", className)}>
+		<div className={cn("flex h-16 items-end gap-xs", className)}>
 			{values
 				.map((value, slot) => ({
 					value,
@@ -278,14 +283,14 @@ export function Bars({
 						title={labels?.[index]}
 						onClick={onPick ? () => onPick(index) : undefined}
 						className={cn(
-							"min-w-0 flex-1 rounded-[2px] transition-opacity",
+							"min-w-0 flex-1 corner-xs transition-opacity",
 							onPick ? "hover:opacity-100" : "cursor-default",
 							highlight === undefined ||
 								highlight === null ||
 								highlight === index
 								? "opacity-100"
 								: "opacity-35",
-							value > 0 ? tone : "bg-muted",
+							value > 0 ? tone : "bg-field",
 						)}
 						style={{
 							height: `${max > 0 && value > 0 ? Math.max(6, (value / max) * 100) : 4}%`,
@@ -305,12 +310,17 @@ export function Avatar({ userId }: { userId: string }) {
 			src={src}
 			alt={name}
 			title={name}
-			className="size-5 shrink-0 rounded-full object-cover"
+			className="size-5 shrink-0 corner-full object-cover"
 		/>
 	) : (
 		<span
 			title={name}
-			className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground uppercase"
+			className={cn(
+				"flex size-5 shrink-0 items-center justify-center",
+				"corner-full",
+				"text-body-xs font-medium uppercase",
+				"bg-field text-ink-3",
+			)}
 		>
 			{name.slice(0, 1)}
 		</span>
@@ -319,12 +329,12 @@ export function Avatar({ userId }: { userId: string }) {
 
 export function Loading({ what }: { what: string }) {
 	return (
-		<div className="flex flex-col gap-3 pt-2">
-			<p className="text-xs text-muted-foreground">Reading {what}…</p>
+		<div className="flex flex-col gap-l pt-m">
+			<p className="text-body-m text-ink-3">Reading {what}…</p>
 			{[72, 56, 64].map((width) => (
 				<div
 					key={width}
-					className="h-4 animate-pulse rounded-md bg-muted"
+					className="h-4 animate-pulse corner-s bg-field"
 					style={{ width: `${width}%` }}
 				/>
 			))}

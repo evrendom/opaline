@@ -4,6 +4,7 @@ import { IntroReveal } from "@/app/ui/bones";
 
 import { Link } from "react-router-dom";
 import { routePreloadHandlers } from "@/app/route-loaders";
+import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
 import {
 	Sidebar,
 	SidebarContent,
@@ -15,7 +16,6 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from "@/app/ui/sidebar";
-import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { useLocalDesktopApp } from "@/features/desktop/local-app";
 import { DesktopWindowBar } from "@/features/shell/components/desktop-window-bar";
 import { SidebarInstallCommand } from "@/features/shell/components/SidebarInstallCommand";
@@ -95,7 +95,10 @@ function SidebarNavTile({
 				data-active={active || undefined}
 				title={route.navLabel}
 				className={cn(
-					"flex h-10 w-full items-center justify-center rounded-[12px] corner-squircle squircle:rounded-[18px] border border-(--opal-ring) bg-(--opal-fill) outline-none transition-[background-color,border-color] duration-150 focus-visible:ring-2 focus-visible:ring-ring/50",
+					"flex h-10 w-full items-center justify-center",
+					"corner-l corner-squircle edge-m",
+					"border-(--opal-ring) bg-(--opal-fill) outline-none transition-[background-color,border-color] duration-150",
+					"squircle:corner-xl focus-visible:ring-2 focus-visible:ring-focus/50",
 					active && route.tone ? route.tone.chip : restingChipClassName,
 					!active &&
 						"hover:[--opal-fill:color-mix(in_oklab,var(--dashboard-01-rail-active)_55%,white)] dark:[--opal-fill:rgb(255_255_255/0.03)] dark:[--opal-ring:rgb(255_255_255/0.05)] dark:hover:[--opal-fill:rgb(255_255_255/0.06)]",
@@ -123,10 +126,7 @@ export function AppSidebar() {
 		<Sidebar variant="inset" collapsible="offcanvas">
 			{/* One highlight glides between rows on hover (Opaline's fluid
 			    hover), tinted like a row hover. */}
-			<div
-				data-fluid-menu-root=""
-				className="flex min-h-0 flex-1 flex-col [--session-overview-hover:color-mix(in_oklab,var(--sidebar-accent)_70%,transparent)]"
-			>
+			<div data-fluid-menu-root="" className="flex min-h-0 flex-1 flex-col">
 				<FluidMenuHover items="[data-sidebar-interactive]" bridgeGap={12} />
 				{/* The plugin's host already titles it "Opaline". */}
 				{import.meta.env.MODE === "plugin" ? null : (
@@ -142,7 +142,7 @@ export function AppSidebar() {
 					<SidebarGroup>
 						<SidebarGroupContent>
 							<nav aria-label="Primary">
-								<ul className="grid grid-cols-4 gap-1.5 px-1 pt-0.5">
+								<ul className="grid grid-cols-4 gap-s px-xs pt-xxs">
 									{visibleRoutes.map((route) => (
 										<SidebarNavTile
 											key={route.id}

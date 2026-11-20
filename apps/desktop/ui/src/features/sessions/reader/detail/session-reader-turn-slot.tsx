@@ -38,7 +38,7 @@ export function ReaderTurnSlot({
 				startMs: turn.startedAt ? Date.parse(turn.startedAt) : undefined,
 				turnId: turn.turnId,
 			})}
-			className={`-mx-6 -mb-(--reader-inset) scroll-mt-(--reader-top) px-6 pb-(--reader-inset) [contain-intrinsic-block-size:auto_var(--turn-estimate)] [content-visibility:auto] ${TURN_SLOT_LAYOUT_CLASS}`}
+			className={`-mx-xxl -mb-(--reader-inset) scroll-mt-(--reader-top) px-xxl pb-(--reader-inset) [contain-intrinsic-block-size:auto_var(--turn-estimate)] [content-visibility:auto] ${TURN_SLOT_LAYOUT_CLASS}`}
 			style={
 				{
 					"--turn-estimate": `${keptHeight ?? estimateTurnPx(turn)}px`,
@@ -73,12 +73,12 @@ export function TurnsPending({
 	return (
 		<div {...TURNS_PENDING_MARK} style={{ minHeight }}>
 			{failed ? (
-				<p className="text-xs text-muted-foreground tabular-nums">
+				<p className="text-body-m text-ink-3 tabular-nums">
 					Turns {from}–{to} could not be loaded.{" "}
 					<button
 						type="button"
 						onClick={onRetry}
-						className="underline underline-offset-2 hover:text-foreground"
+						className="underline underline-offset-2 hover:text-ink"
 					>
 						Retry
 					</button>

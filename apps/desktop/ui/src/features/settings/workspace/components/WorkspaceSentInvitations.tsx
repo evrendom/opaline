@@ -54,7 +54,7 @@ export function WorkspaceSentInvitations({
 	}
 
 	return (
-		<div className="workspace-settings-subsection">
+		<div className="settings-subsection">
 			<h3>Invitations sent</h3>
 			<WorkspaceOutgoingInvitationsTable
 				invitations={invitations}

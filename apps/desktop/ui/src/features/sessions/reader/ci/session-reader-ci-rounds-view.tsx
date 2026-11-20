@@ -32,23 +32,23 @@ const OUTCOME = {
 		label: "Cancelled",
 	},
 	failed: {
-		className: "text-rose-500",
+		className: "text-error",
 		icon: IconCircleX,
 		label: "Failed",
 	},
 	other: { className: "", icon: IconCircleDashed, label: "Ended" },
 	passed: {
-		className: "text-emerald-500",
+		className: "text-success",
 		icon: IconCircleCheck,
 		label: "Passed",
 	},
 	flaky: {
-		className: "text-amber-500",
+		className: "text-warning",
 		icon: IconRepeat,
 		label: "Flaky",
 	},
 	running: {
-		className: "text-amber-500",
+		className: "text-warning",
 		icon: IconCircleDashed,
 		label: "Running",
 	},
@@ -60,12 +60,12 @@ const OUTCOME = {
 const duration = (ms: number) => formatReaderDuration(ms / 1000);
 
 const DOT: Record<CiRoundOutcome, string> = {
-	cancelled: "border border-muted-foreground/50",
-	failed: "bg-rose-500",
-	other: "bg-muted-foreground/40",
-	passed: "bg-emerald-500",
-	flaky: "bg-amber-500",
-	running: "animate-pulse bg-amber-400",
+	cancelled: "edge-m border-ink-3/50",
+	failed: "bg-error",
+	other: "bg-ink-3/40",
+	passed: "bg-success",
+	flaky: "bg-warning",
+	running: "animate-pulse bg-warning-translucent",
 };
 
 export const isRoundPicked = (round: CiRound, pickedRun: string | null) =>
@@ -99,7 +99,7 @@ export function CiRoundMarks({
 			aria-label={`CI on ${rounds.length} ${rounds.length === 1 ? "push" : "pushes"}`}
 			className={cn(
 				"flex shrink-0 items-center",
-				compact ? "gap-0.5" : "gap-[3px]",
+				compact ? "gap-xxs" : "gap-xs",
 			)}
 		>
 			{shown.map((round, index) => (
@@ -107,7 +107,7 @@ export function CiRoundMarks({
 					key={round.sha}
 					title={roundWords(round, index)}
 					className={cn(
-						"rounded-full",
+						"corner-full",
 						compact ? "size-1" : "size-1.5",
 						DOT[round.outcome],
 					)}
@@ -116,8 +116,8 @@ export function CiRoundMarks({
 			{rest > 0 ? (
 				<span
 					className={cn(
-						"text-muted-foreground tabular-nums",
-						compact ? "text-[9px] leading-none" : "text-[10px]",
+						"text-ink-3 tabular-nums",
+						compact ? "text-body-xs leading-none" : "text-body-xs",
 					)}
 				>
 					+{rest}
@@ -137,7 +137,7 @@ export function CiRoundDots({
 	rounds: readonly CiRound[];
 }) {
 	return (
-		<span className="flex flex-wrap items-center gap-1">
+		<span className="flex flex-wrap items-center gap-xs">
 			{rounds.map((round, index) => {
 				const picked = isRoundPicked(round, pickedRun);
 				return (
@@ -148,14 +148,18 @@ export function CiRoundDots({
 						aria-label={roundWords(round, index)}
 						title={roundWords(round, index)}
 						onClick={() => onPick(round.run.ciRunId)}
-						className="group/dot pointer-events-auto flex size-4 items-center justify-center rounded-full outline-none"
+						className={cn(
+							"group/dot flex size-4 items-center justify-center",
+							"corner-full",
+							"pointer-events-auto outline-none",
+						)}
 					>
 						<span
 							className={cn(
-								"size-2 rounded-full transition-transform group-hover/dot:scale-125",
+								"size-2 corner-full transition-transform group-hover/dot:scale-125",
 								DOT[round.outcome],
 								picked &&
-									"scale-125 ring-2 ring-foreground/70 ring-offset-1 ring-offset-background",
+									"scale-125 ring-2 ring-ink/70 ring-offset-1 ring-offset-canvas",
 							)}
 						/>
 					</button>
@@ -178,9 +182,9 @@ export function CiPushDetail({
 }) {
 	const look = OUTCOME[round.outcome];
 	return (
-		<section className="flex flex-col gap-2 rounded-lg bg-muted/40 py-3">
-			<div className="flex min-w-0 flex-col gap-1 px-3">
-				<div className="flex min-w-0 items-center gap-2 text-sm">
+		<section className="flex flex-col gap-m corner-m bg-field/40 py-l">
+			<div className="flex min-w-0 flex-col gap-xs px-l">
+				<div className="flex min-w-0 items-center gap-m text-body-xl">
 					<Glyph icon={look.icon} className={cn("size-4", look.className)} />
 					<span className="font-medium">
 						Push <FlowNumber value={index + 1} format={PLAIN_NUMBER} /> of{" "}
@@ -190,8 +194,8 @@ export function CiPushDetail({
 						className={cn(
 							"min-w-0 truncate",
 							round.outcome === "failed"
-								? "text-rose-600 dark:text-rose-400"
-								: "text-muted-foreground",
+								? "text-error dark:text-error"
+								: "text-ink-3",
 						)}
 					>
 						{look.label}
@@ -206,7 +210,7 @@ export function CiPushDetail({
 						/>
 					) : null}
 				</div>
-				<p className="text-xs text-muted-foreground tabular-nums">
+				<p className="text-body-m text-ink-3 tabular-nums">
 					{[
 						`${round.run.headBranch} @${round.sha.slice(0, 7)}`,
 						`pushed ${formatWhen(round.at)}`,
@@ -219,7 +223,7 @@ export function CiPushDetail({
 						.join(" · ")}
 				</p>
 			</div>
-			<ul className="flex flex-col px-3">
+			<ul className="flex flex-col px-l">
 				{round.runs.map((run) => (
 					<PushRun key={run.ciRunId} run={run} />
 				))}
@@ -236,18 +240,18 @@ function PushRun({ run }: { run: SummaryCiRun }) {
 	const took = runDurationMs(run);
 	const github = ciRunUrl(run);
 	return (
-		<li className="flex min-h-7 min-w-0 items-center gap-2 text-xs">
+		<li className="flex min-h-7 min-w-0 items-center gap-m text-body-m">
 			<Glyph icon={look.icon} className={cn("size-3.5", look.className)} />
 			<span className="shrink-0 font-medium">
 				{run.workflowName}
 				{run.attempt > 1 ? (
-					<span className="font-normal text-muted-foreground">
+					<span className="font-regular text-ink-3">
 						{" "}
 						· attempt {run.attempt}
 					</span>
 				) : null}
 			</span>
-			<span className="flex min-w-0 flex-1 items-center gap-1.5 truncate">
+			<span className="flex min-w-0 flex-1 items-center gap-s truncate">
 				{failed.length > 0 ? (
 					failed.map((job) => {
 						const log = ciJobUrl(run, job);
@@ -258,21 +262,21 @@ function PushRun({ run }: { run: SummaryCiRun }) {
 								target="_blank"
 								rel="noreferrer"
 								title={`Open ${job.name}'s log on GitHub`}
-								className="truncate text-rose-600 underline-offset-2 hover:underline dark:text-rose-400"
+								className="truncate text-error underline-offset-2 hover:underline dark:text-error"
 							>
 								{job.name}
 							</a>
 						) : (
 							<span
 								key={job.jobId}
-								className="truncate text-rose-600 dark:text-rose-400"
+								className="truncate text-error dark:text-error"
 							>
 								{job.name}
 							</span>
 						);
 					})
 				) : (
-					<span className="text-muted-foreground">
+					<span className="text-ink-3">
 						{run.conclusion
 							? (CI_STATUS[run.conclusion] ?? run.conclusion)
 							: "Running"}
@@ -280,7 +284,7 @@ function PushRun({ run }: { run: SummaryCiRun }) {
 				)}
 			</span>
 			{took !== null ? (
-				<span className="shrink-0 text-muted-foreground tabular-nums">
+				<span className="shrink-0 text-ink-3 tabular-nums">
 					{duration(took)}
 				</span>
 			) : null}
@@ -292,9 +296,9 @@ function PushRun({ run }: { run: SummaryCiRun }) {
 }
 
 const END_DOT = {
-	closed: "bg-rose-500",
-	merged: "bg-violet-500",
-	open: "border border-muted-foreground/50",
+	closed: "bg-error",
+	merged: "bg-color-2",
+	open: "edge-m border-ink-3/50",
 };
 
 function LineNode({
@@ -309,13 +313,13 @@ function LineNode({
 	cross?: boolean;
 }) {
 	return (
-		<span className="relative flex justify-center pt-[3px]">
+		<span className="relative flex justify-center pt-xs">
 			{above ? (
-				<span className="absolute -top-1.5 h-[7px] w-px bg-border" />
+				<span className="absolute -top-1.5 h-[7px] w-px bg-line" />
 			) : null}
 			<span
 				className={cn(
-					"flex size-3 items-center justify-center rounded-full text-muted-foreground",
+					"flex size-3 items-center justify-center corner-full text-ink-3",
 					className,
 				)}
 			>
@@ -324,7 +328,7 @@ function LineNode({
 				) : null}
 			</span>
 			{below ? (
-				<span className="absolute top-[17px] -bottom-1.5 w-px bg-border" />
+				<span className="absolute top-[17px] -bottom-1.5 w-px bg-line" />
 			) : null}
 		</span>
 	);
@@ -345,8 +349,8 @@ export function CiRounds({
 	const longest = Math.max(1, ...rounds.map((round) => round.ciMs ?? 0));
 	const ending = pullEndWords(rounds, pull);
 	return (
-		<section className="flex flex-col gap-1">
-			<h3 className="px-3 text-xs font-medium text-foreground/80">Pushes</h3>
+		<section className="flex flex-col gap-xs">
+			<h3 className="px-l text-body-m font-medium text-ink/80">Pushes</h3>
 			<ol className="flex flex-col">
 				{rounds.map((round, index) => {
 					const picked = isRoundPicked(round, pickedRun);
@@ -362,8 +366,11 @@ export function CiRounds({
 								title={roundWords(round, index)}
 								onClick={() => onPickRun(round.run.ciRunId)}
 								className={cn(
-									"grid w-full grid-cols-[16px_minmax(0,1fr)] gap-x-2.5 rounded-lg px-3 py-1.5 text-left transition-colors",
-									picked ? "bg-muted ring-1 ring-border" : "hover:bg-muted/40",
+									"grid w-full grid-cols-[16px_minmax(0,1fr)] gap-x-l",
+									"corner-m px-l py-s",
+									"text-left",
+									"transition-colors",
+									picked ? "bg-field ring-1 ring-line" : "hover:bg-hover/40",
 								)}
 							>
 								<LineNode
@@ -372,12 +379,12 @@ export function CiRounds({
 									className={DOT[round.outcome]}
 									cross={round.outcome === "cancelled"}
 								/>
-								<span className="flex min-w-0 flex-col gap-1">
-									<span className="flex min-w-0 items-baseline gap-2 text-xs">
+								<span className="flex min-w-0 flex-col gap-xs">
+									<span className="flex min-w-0 items-baseline gap-m text-body-m">
 										<span className="shrink-0 font-medium">
 											Push {index + 1}
 										</span>
-										<span className="shrink-0 font-mono text-[11px] text-muted-foreground">
+										<span className="shrink-0 font-data text-body-s text-ink-3">
 											{round.sha.slice(0, 7)}
 										</span>
 										{failed ? (
@@ -385,40 +392,40 @@ export function CiRounds({
 												className={cn(
 													"min-w-0 truncate",
 													round.outcome === "failed"
-														? "text-rose-600 dark:text-rose-400"
-														: "text-amber-600 dark:text-amber-400",
+														? "text-error dark:text-error"
+														: "text-warning dark:text-warning",
 												)}
 											>
 												{pushOutcomeWords(round)}
 											</span>
 										) : null}
-										<span className="ml-auto shrink-0 text-[11px] whitespace-nowrap text-muted-foreground tabular-nums">
+										<span className="ml-auto shrink-0 text-body-s whitespace-nowrap text-ink-3 tabular-nums">
 											{formatWhen(round.at)}
 										</span>
 									</span>
-									<span className="flex items-center gap-2">
+									<span className="flex items-center gap-m">
 										<span className="h-1.5 min-w-0 flex-1">
 											{round.ciMs !== null ? (
 												<span
-													className="block h-full min-w-[2px] rounded-full bg-muted-foreground/35"
+													className="block h-full min-w-[2px] corner-full bg-ink-3/35"
 													style={{
 														width: `${(round.ciMs / longest) * 100}%`,
 													}}
 												/>
 											) : null}
 										</span>
-										<span className="w-14 shrink-0 text-right text-[11px] text-muted-foreground tabular-nums">
+										<span className="w-14 shrink-0 text-right text-body-s text-ink-3 tabular-nums">
 											{round.ciMs !== null ? duration(round.ciMs) : "—"}
 										</span>
 									</span>
 								</span>
 							</button>
 							{round.untilNextMs !== null ? (
-								<span className="grid grid-cols-[16px_minmax(0,1fr)] gap-x-2.5 px-3">
+								<span className="grid grid-cols-[16px_minmax(0,1fr)] gap-x-l px-l">
 									<span className="flex justify-center">
-										<span className="w-px bg-border" />
+										<span className="w-px bg-line" />
 									</span>
-									<span className="py-0.5 text-[11px] text-muted-foreground tabular-nums">
+									<span className="py-xxs text-body-s text-ink-3 tabular-nums">
 										{duration(round.untilNextMs)} until the next push
 									</span>
 								</span>
@@ -427,7 +434,7 @@ export function CiRounds({
 					);
 				})}
 				{ending && pull ? (
-					<li className="grid grid-cols-[16px_minmax(0,1fr)] gap-x-2.5 px-3 py-1.5 text-xs text-muted-foreground">
+					<li className="grid grid-cols-[16px_minmax(0,1fr)] gap-x-l px-l py-s text-body-m text-ink-3">
 						<LineNode
 							above
 							below={false}

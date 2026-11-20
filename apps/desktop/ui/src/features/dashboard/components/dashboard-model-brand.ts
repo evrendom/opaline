@@ -121,8 +121,7 @@ export function getModelBadgeTone(model: string): ModelBadgeTone {
 	}
 
 	return {
-		chipClassName:
-			"border-[color:var(--dashboardy-chip-border)] bg-[color:var(--dashboardy-chip-surface)] text-[color:var(--dashboardy-chip-foreground)]",
+		chipClassName: "border-accent-tint bg-accent-tint text-accent",
 		icon: null,
 		identityIconClassName: "",
 	};
@@ -136,7 +135,7 @@ export function getModelBrandChip(
 		return { glyphClassName: "text-[#D97757]", tint: "#D97757" };
 	}
 	if (icon === "codex") {
-		return { glyphClassName: "text-foreground", tint: "#10A37F" };
+		return { glyphClassName: "text-ink", tint: "#10A37F" };
 	}
 	return null;
 }

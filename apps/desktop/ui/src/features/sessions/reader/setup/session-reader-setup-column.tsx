@@ -70,7 +70,7 @@ export function SetupColumn({
 	return (
 		<div
 			className={cn(
-				"-mb-2 flex min-h-0 min-w-(--reader-setup-column) flex-1 flex-col gap-1.5 pt-(--panes-top)",
+				"-mb-m flex min-h-0 min-w-(--reader-setup-column) flex-1 flex-col gap-s pt-(--panes-top)",
 			)}
 		>
 			<PickStrip
@@ -96,13 +96,13 @@ export function SetupColumn({
 					/>
 				) : null}
 			</PickStrip>
-			<div ref={column.ref} className="-mx-1 flex min-h-0 flex-1 flex-col">
-				<ScrollColumn className="px-1 pb-8">
+			<div ref={column.ref} className="-mx-xs flex min-h-0 flex-1 flex-col">
+				<ScrollColumn className="px-xs pb-[calc(var(--space-xxl)*4/3)]">
 					{calls ? timeline : null}
 					{calls ? null : uses ? (
-						<FluidList className="flex flex-col gap-0.5">
+						<FluidList className="flex flex-col gap-xxs">
 							{uses.status === "failed" ? (
-								<p className="py-1 pl-2 text-[11px] text-muted-foreground">
+								<p className="py-xs pl-m text-body-s text-ink-3">
 									This run could not be read.
 								</p>
 							) : uses.status !== "loading" && uses.uses.length === 0 ? (
@@ -110,7 +110,7 @@ export function SetupColumn({
 									icon={IconPlug}
 									title="No skills or MCP"
 									description="This run used no skill or MCP server."
-									className="mt-1 p-6 py-8"
+									className="mt-xs p-xxl py-[calc(var(--space-xxl)*4/3)]"
 								/>
 							) : (
 								<Reveal
@@ -120,7 +120,7 @@ export function SetupColumn({
 									sampleId="reader-setup-uses"
 								>
 									{() => (
-										<div className="flex flex-col gap-0.5">
+										<div className="flex flex-col gap-xxs">
 											{useGroups.map((group) => (
 												<SetupUseGroup
 													key={group.file.setupFile}
@@ -138,13 +138,13 @@ export function SetupColumn({
 					) : null}
 					<FluidList
 						className={cn(
-							"flex flex-col gap-0.5",
-							uses && "mt-3 border-t border-border/50 pt-2",
+							"flex flex-col gap-xxs",
+							uses && "mt-l edge-t-m border-line/50 pt-m",
 							calls && "hidden",
 						)}
 					>
 						{files.length === 0 && !uses ? (
-							<p className="py-1 pl-2 text-[11px] text-muted-foreground">
+							<p className="py-xs pl-m text-body-s text-ink-3">
 								No setup received in this run.
 							</p>
 						) : null}
@@ -159,7 +159,7 @@ export function SetupColumn({
 						))}
 					</FluidList>
 					{receivedBy ? (
-						<div className="mt-3 border-t border-border/50 pt-1">
+						<div className="mt-l edge-t-m border-line/50 pt-xs">
 							{receivedBy}
 						</div>
 					) : null}
@@ -193,9 +193,7 @@ function groupUses(uses: readonly SetupUse[]): UseGroup[] {
 }
 
 const countOf = (uses: number) => (
-	<span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
-		{uses}×
-	</span>
+	<span className="shrink-0 text-body-s text-ink-3 tabular-nums">{uses}×</span>
 );
 
 const SAMPLE_SERVER: SessionSetupFile = {
@@ -251,7 +249,7 @@ const SAMPLE_USE_GROUPS = groupUses([
 
 function UsesSample() {
 	return (
-		<div className="flex flex-col gap-0.5">
+		<div className="flex flex-col gap-xxs">
 			{SAMPLE_USE_GROUPS.map((group) => (
 				<SetupUseGroup
 					key={group.file.setupFile}
@@ -278,21 +276,21 @@ function SetupUseGroup({
 }) {
 	const total = group.tools.reduce((sum, tool) => sum + tool.uses.length, 0);
 	return (
-		<div className="flex flex-col gap-0.5 pb-1.5">
-			<div className="flex items-center gap-2.5 px-2.5 py-1.5">
+		<div className="flex flex-col gap-xxs pb-s">
+			<div className="flex items-center gap-l px-l py-s">
 				<span className="flex shrink-0">
 					<SetupMark file={group.file} />
 				</span>
-				<span className="min-w-0 flex-1 truncate text-xs font-medium">
+				<span className="min-w-0 flex-1 truncate text-body-m font-medium">
 					{setupName(group.file)}
 				</span>
 				{countOf(total)}
 			</div>
 			{group.tools.map(({ tool, uses }) => (
-				<div key={tool ?? ""} className="flex flex-col gap-0.5">
+				<div key={tool ?? ""} className="flex flex-col gap-xxs">
 					{tool ? (
-						<div className="flex items-center gap-2 py-1 pr-2.5 pl-9">
-							<span className="min-w-0 flex-1 truncate text-xs text-foreground/90">
+						<div className="flex items-center gap-m py-xs pr-l pl-[calc(var(--space-xxl)*1.5)]">
+							<span className="min-w-0 flex-1 truncate text-body-m text-ink/90">
 								{tool}
 							</span>
 							{countOf(uses.length)}
@@ -373,23 +371,27 @@ function SetupUseRow({
 			onClick={onPick}
 			onFocus={item.onFocus}
 			className={cn(
-				"relative flex w-full items-center gap-2.5 rounded-md py-1 pr-2.5 text-left outline-none transition-colors corner-squircle squircle:rounded-xl",
+				"relative flex w-full items-center gap-l",
+				"corner-s py-xs pr-l corner-squircle",
+				"text-left",
+				"outline-none transition-colors",
+				"squircle:corner-l",
 				indent,
-				isPicked && "bg-muted",
+				isPicked && "bg-field",
 			)}
 		>
 			<span
 				className={cn(
-					"shrink-0 text-[11px] tabular-nums",
-					isPicked ? "text-foreground" : "text-muted-foreground",
+					"shrink-0 text-body-s tabular-nums",
+					isPicked ? "text-ink" : "text-ink-3",
 				)}
 			>
 				{formatPaddedTimeOfDay(step.startMs)}
 			</span>
 			<span
 				className={cn(
-					"min-w-0 flex-1 truncate text-xs",
-					isPicked ? "text-foreground" : "text-foreground/70",
+					"min-w-0 flex-1 truncate text-body-m",
+					isPicked ? "text-ink" : "text-ink/70",
 				)}
 			>
 				{about}
@@ -412,9 +414,9 @@ export function SetupMark({ file }: { file: SessionSetupFile }) {
 		return (
 			<span
 				skullet-block=""
-				className="inline-flex shrink-0 rounded-sm corner-squircle squircle:rounded-lg"
+				className="inline-flex shrink-0 corner-xs corner-squircle squircle:corner-m"
 			>
-				<Icon aria-hidden="true" className="size-4 text-muted-foreground/60" />
+				<Icon aria-hidden="true" className="size-4 text-ink-3/60" />
 			</span>
 		);
 	}
@@ -446,24 +448,28 @@ function SetupFileRow({
 			onClick={() => onPick(file.setupFile)}
 			onFocus={item.onFocus}
 			className={cn(
-				"relative flex w-full items-start gap-2.5 rounded-md px-2.5 py-1.5 text-left outline-none transition-colors corner-squircle squircle:rounded-xl",
-				isPicked && "bg-muted",
+				"relative flex w-full items-start gap-l",
+				"corner-s px-l py-s corner-squircle",
+				"text-left",
+				"outline-none transition-colors",
+				"squircle:corner-l",
+				isPicked && "bg-field",
 			)}
 		>
-			<span className="mt-px flex shrink-0">
+			<span className="mt-xxs flex shrink-0">
 				<SetupMark file={file} />
 			</span>
-			<span className="flex min-w-0 flex-1 flex-col gap-0.5">
+			<span className="flex min-w-0 flex-1 flex-col gap-xxs">
 				<span
 					title={file.setupFile}
 					className={cn(
-						"truncate text-xs",
-						isPicked ? "text-foreground" : "text-foreground/90",
+						"truncate text-body-m",
+						isPicked ? "text-ink" : "text-ink/90",
 					)}
 				>
 					{setupName(file)}
 				</span>
-				<span className="truncate text-[11px] text-muted-foreground tabular-nums">
+				<span className="truncate text-body-s text-ink-3 tabular-nums">
 					{setupOwner(file)}
 					{file.versions > 1 ? ` · ${file.versions} versions` : ""}
 				</span>

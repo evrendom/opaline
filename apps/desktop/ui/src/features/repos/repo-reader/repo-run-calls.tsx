@@ -281,7 +281,15 @@ function SplitPanes({ bottom, top }: { bottom: ReactNode; top: ReactNode }) {
 					event.preventDefault();
 				}}
 				data-resizing={dragging || undefined}
-				className="relative z-10 h-px shrink-0 cursor-row-resize touch-none select-none border-0 bg-border/60 outline-none transition-colors before:absolute before:inset-x-0 before:top-1/2 before:h-3 before:-translate-y-1/2 hover:bg-ring/60 focus-visible:bg-ring data-[resizing=true]:bg-ring"
+				className={cn(
+					"relative z-10 h-px shrink-0",
+					"edge-none",
+					"cursor-row-resize touch-none select-none bg-line/60 outline-none transition-colors",
+					"before:absolute before:inset-x-0 before:top-1/2 before:h-3 before:-translate-y-1/2",
+					"hover:bg-focus/60",
+					"focus-visible:bg-focus",
+					"data-[resizing=true]:bg-focus",
+				)}
 			/>
 			<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
 				{bottom}
@@ -342,9 +350,9 @@ function CallCard({
 		sessionParams,
 	);
 	return (
-		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 pt-4 pr-4 pl-5">
-			<div className="flex min-h-7 shrink-0 flex-wrap items-center gap-x-3 gap-y-1">
-				<div className="flex min-w-0 flex-1 items-center gap-1.5">
+		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-s pt-xl pr-xl pl-xxl">
+			<div className="flex min-h-7 shrink-0 flex-wrap items-center gap-x-l gap-y-xs">
+				<div className="flex min-w-0 flex-1 items-center gap-s">
 					<Crumb onClear={onClear}>
 						Run {run.turnId ? shortRunId(run.turnId) : run.turn}
 					</Crumb>
@@ -357,7 +365,13 @@ function CallCard({
 				</div>
 				<Link
 					to={openRun}
-					className="inline-flex h-6 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+					className={cn(
+						"inline-flex h-6 items-center gap-xs",
+						"corner-s px-m",
+						"text-body-m font-medium",
+						"text-ink-3 transition-colors",
+						"hover:text-ink",
+					)}
 				>
 					Open in session
 					<IconArrowUpRight aria-hidden="true" className="size-3.5" />
@@ -365,7 +379,12 @@ function CallCard({
 			</div>
 			{call?.path && !file ? (
 				<span
-					className="-mt-1 truncate pr-2 pl-2 text-left text-xs text-muted-foreground/70 [direction:rtl]"
+					className={cn(
+						"[direction:rtl]",
+						"-mt-xs pr-m pl-m",
+						"truncate text-left text-body-m",
+						"text-ink-3/70",
+					)}
 					title={call.path}
 				>
 					{`‎${call.path}‎`}
@@ -376,15 +395,15 @@ function CallCard({
 					icon={IconArrowUpRight}
 					title="No call to show"
 					description="This run touched it only indirectly. Open it in its session to see the whole run."
-					className="mt-3"
+					className="mt-l"
 				/>
 			) : (
-				<ScrollColumn className="-mr-4 -ml-1.5 pr-4 pl-1.5">
+				<ScrollColumn className="-mr-xl -ml-s pr-xl pl-s">
 					<Reveal
 						label="Loading the call"
 						loading={query.isPending}
 						sample={
-							<div className="flex flex-col gap-2 pt-2 pb-4">
+							<div className="flex flex-col gap-m pt-m pb-xl">
 								<CodeSample />
 							</div>
 						}
@@ -421,7 +440,7 @@ export function CallBody({
 	if (file && changes.length === 0) return <FileCall call={call} file={file} />;
 	if (changes.length > 0)
 		return (
-			<ol className="flex flex-col divide-y divide-border/40 pb-4">
+			<ol className="flex flex-col divide-y divide-line/40 pb-xl">
 				{changes.map((change, index) => (
 					<ChangeBlock
 						// biome-ignore lint/suspicious/noArrayIndexKey: one call's edits, in order
@@ -437,7 +456,7 @@ export function CallBody({
 			</ol>
 		);
 	return (
-		<div className="flex flex-col gap-4 pt-2 pb-4">
+		<div className="flex flex-col gap-xl pt-m pb-xl">
 			{read ? (
 				<CallSection title="Read" cut={call.output?.cut}>
 					<DiffView hunks={read} language={language} />
@@ -481,7 +500,7 @@ function CallPayloads({ call }: { call: RepositoryRunCall }) {
 		const output = call.output?.text ?? null;
 		const cut = Boolean(call.input?.cut || call.output?.cut);
 		return (
-			<div className="flex flex-col gap-1.5">
+			<div className="flex flex-col gap-s">
 				<ToolCard
 					call={
 						shell ? (
@@ -503,7 +522,7 @@ function CallPayloads({ call }: { call: RepositoryRunCall }) {
 					wrapLines={!shell}
 				/>
 				{cut ? (
-					<p className="text-xs text-muted-foreground/70">
+					<p className="text-body-m text-ink-3/70">
 						Cut short here; the rest is in the session's transcript.
 					</p>
 				) : null}
@@ -547,7 +566,7 @@ function CallPayloads({ call }: { call: RepositoryRunCall }) {
 		);
 	}
 	return payloads.map((payload) => (
-		<PayloadSection key={payload.label} className="px-0" {...payload} />
+		<PayloadSection key={payload.label} className="px-zero" {...payload} />
 	));
 }
 
@@ -561,11 +580,11 @@ function CallSection({
 	title: string;
 }) {
 	return (
-		<section className="flex flex-col gap-1.5">
-			<h3 className="text-xs font-medium text-muted-foreground">{title}</h3>
+		<section className="flex flex-col gap-s">
+			<h3 className="text-body-m font-medium text-ink-3">{title}</h3>
 			{children}
 			{cut ? (
-				<p className="text-xs text-muted-foreground/70">
+				<p className="text-body-m text-ink-3/70">
 					Cut short here; the rest is in the session's transcript.
 				</p>
 			) : null}
@@ -672,7 +691,7 @@ function FileCall({
 	);
 	if (!isRead)
 		return (
-			<p className="pt-3 text-[13px] text-muted-foreground">
+			<p className="pt-l text-body-l text-ink-3">
 				{call.tool === "Bash" || call.op.startsWith("inferred_")
 					? "Changed by a shell command, so the exact edit wasn't recorded. Open the run in its session to see what it ran."
 					: "This call's change wasn't recorded."}
@@ -680,7 +699,7 @@ function FileCall({
 		);
 	if (text !== undefined && (!hunks || !lit))
 		return (
-			<p className="pt-3 text-[13px] text-muted-foreground">
+			<p className="pt-l text-body-l text-ink-3">
 				The file's text isn't available to show what was read.
 			</p>
 		);
@@ -689,7 +708,7 @@ function FileCall({
 			label="Loading the file"
 			loading={text === undefined}
 			sample={
-				<div className="flex flex-col gap-2 pt-2 pb-4">
+				<div className="flex flex-col gap-m pt-m pb-xl">
 					<CodeSample />
 				</div>
 			}
@@ -697,7 +716,7 @@ function FileCall({
 		>
 			{() =>
 				hunks && lit ? (
-					<div className="flex flex-col gap-2 pt-2 pb-4">
+					<div className="flex flex-col gap-m pt-m pb-xl">
 						{call.input ? (
 							<ReadCommand
 								key={call.callId}
@@ -706,7 +725,7 @@ function FileCall({
 							/>
 						) : null}
 						{lit.size === 0 ? (
-							<p className="text-xs text-muted-foreground">
+							<p className="text-body-m text-ink-3">
 								What it read couldn't be matched to today's file.
 							</p>
 						) : null}
@@ -726,18 +745,18 @@ function ReadCommand({ bash, text }: { bash: boolean; text: string }) {
 	const [open, setOpen] = useState(false);
 	const hunks = useMemo(() => wholeText(text), [text]);
 	return (
-		<div className="flex flex-col gap-1 rounded-md bg-muted/50">
+		<div className="flex flex-col gap-xs corner-s bg-field/50">
 			<button
 				type="button"
 				aria-expanded={open}
 				onClick={() => setOpen(!open)}
-				className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+				className="flex w-full items-center gap-s corner-s px-m py-s text-left text-body-m text-ink-3 outline-none transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-focus/50"
 			>
 				<SelectorMark open={open} />
 				View command
 			</button>
 			{open ? (
-				<div className="px-2 pb-2">
+				<div className="px-m pb-m">
 					<DiffView hunks={hunks} language={bash ? "bash" : null} wrap />
 				</div>
 			) : null}

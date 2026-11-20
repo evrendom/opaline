@@ -135,7 +135,7 @@ describe("ConversationTraceEventRow shell calls", () => {
 		expect(markup).toContain(
 			'class="whitespace-pre-wrap break-words [overflow-wrap:anywhere]" data-trace-text-preview-leading',
 		);
-		expect(markup).not.toContain("flex-1 truncate font-sans");
+		expect(markup).not.toContain("flex-1 truncate font-body");
 		expect(markup).toContain("data-trace-content-disclosure");
 		expect(markup).not.toContain("data-trace-expanded-content");
 	});
@@ -189,14 +189,14 @@ describe("ConversationTraceEventRow shell calls", () => {
 		expect(markup).not.toContain("data-trace-expanded-content");
 		expect(markup).toContain("h-5");
 		expect(markup).toContain("items-center");
-		expect(markup).toContain("inline-flex h-5 items-center gap-1");
-		expect(markup).toContain("rounded-[5px]");
-		expect(markup).toContain("pl-1.5");
-		expect(markup).not.toContain("pl-0.5");
-		expect(markup).toContain("pr-1.5");
+		expect(markup).toContain("inline-flex h-5 items-center gap-xs");
+		expect(markup).toContain("corner-xs");
+		expect(markup).toContain("pl-s");
+		expect(markup).not.toContain("pl-xxs");
+		expect(markup).toContain("pr-s");
 		expect(markup).toContain("dashboardy-mono");
 		expect(markup).toContain(
-			'<code class="min-w-0 truncate whitespace-pre font-mono font-normal tracking-normal [font-variant-ligatures:none]"',
+			'<code class="min-w-0 truncate whitespace-pre font-data font-regular tracking-m [font-variant-ligatures:none]"',
 		);
 		expect(markup).toContain("data-trace-shell-command-preview");
 		expect(
@@ -433,13 +433,13 @@ describe("ConversationTraceEventRow shell calls", () => {
 		expect(markup).toContain("data-trace-content-disclosure");
 		expect(markup).toContain("data-trace-content-disclosure-icon");
 		expect(markup).toContain('data-trace-tool-label-group="true"');
-		expect(markup).toContain("items-center gap-1");
-		expect(markup).toContain("items-center gap-0 text-left");
-		expect(markup).toContain("pointer-events-none -ml-0.5 size-4");
+		expect(markup).toContain("items-center gap-xs");
+		expect(markup).toContain("items-center gap-zero text-left");
+		expect(markup).toContain("pointer-events-none -ml-xxs size-4");
 		expect(markup).toContain("transition-transform duration-150");
 		expect(markup).toContain('aria-hidden="true"');
 		expect(markup).toContain(
-			"oklch(from var(--constellation-tree-secondary, color(display-p3 0 0 0 / 60.8%)) calc(l + 0.16) c h)",
+			"oklch(from var(--ink-3, color(display-p3 0 0 0 / 60.8%)) calc(l + 0.16) c h)",
 		);
 		expect(markup).toContain('fill="currentColor"');
 		expect(markup).toContain("M7 10.62");

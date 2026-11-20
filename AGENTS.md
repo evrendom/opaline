@@ -23,7 +23,9 @@ This file is the instructions for every coding agent: Codex reads `AGENTS.md`, a
 
 ## Web UI
 
-- Menus, selects and popover lists get the fluid hover by building them from the components that carry it: `apps/desktop/ui/src/app/ui` (dropdown-menu, select, popover), `components/dashboard/select`, and `SessionMenuPopup` for the session-style menus. Do not hand-roll a Base UI popup.
+- The Mac app's UI is built on the Opaline design system: read `apps/desktop/ui/FRONTEND.md` and use the `opaline-design` skill before building UI. `apps/desktop/ui/src/app/ui` is its only primitive library; composites go in `src/components`.
+- The Opaline design system runs on Graphical (`apps/desktop/ui/graphical/`). For UI work, follow `apps/desktop/ui/GUI.md` and its theme reference `apps/desktop/ui/gui/themes.md`, and use the current theme with the `graphical-ui` skill, even when a request doesn't name Graphical. Use `graphical-adopt` for the editor's Copy for agent batches, theme changes and package updates, and `graphical-import` only for the initial conversion. The editor mounts in development only (`graphical/editor-root.tsx`).
+- Menus, selects and popover lists get the fluid hover by building them from the components that carry it: `apps/desktop/ui/src/app/ui` (dropdown-menu, select, popover) and `SessionMenuPopup` for the session-style menus. Do not hand-roll a Base UI popup.
 
 ## Tests
 

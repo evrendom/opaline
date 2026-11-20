@@ -101,7 +101,7 @@ export function getSessionOverviewEventDotColorClassName(
 		kind === "file-edit" && "bg-amber-600 dark:bg-amber-400",
 		kind === "file-read" && "bg-sky-600 dark:bg-sky-400",
 		kind === "file-write" && "bg-emerald-600 dark:bg-emerald-400",
-		kind === "skill" && "bg-(--session-overview-accent)",
+		kind === "skill" && "bg-accent",
 		kind === "subagent" && "bg-fuchsia-600 dark:bg-fuchsia-400",
 	);
 }
@@ -110,7 +110,7 @@ export function getSessionOverviewEventDotClassName(
 	kind: SessionThreadOverviewTimelineEventKind,
 ) {
 	return cn(
-		"size-1.5 shrink-0 rounded-full ring-1 ring-(--session-overview-chart-surface)",
+		"size-1.5 shrink-0 corner-full ring-1 ring-canvas",
 		getSessionOverviewEventDotColorClassName(kind),
 	);
 }
@@ -184,7 +184,7 @@ export const SessionThreadOverviewEventDots = memo(
 				{clusters.map(([clusterKey, cluster]) => (
 					<span
 						key={clusterKey}
-						className="absolute left-(--session-event-x) top-(--session-event-y) flex -translate-1/2 items-center gap-0.5"
+						className="absolute left-(--session-event-x) top-(--session-event-y) flex -translate-1/2 items-center gap-xxs"
 						data-session-overview-event-cluster
 						style={getEventPosition(cluster.xRatio, config, series)}
 					>

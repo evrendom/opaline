@@ -66,8 +66,8 @@ export function SessionOverviewRangeFilterPanel({
 		<div
 			className={
 				variant === "linear"
-					? "min-h-0 flex-1 px-2 pt-2.5 pb-2 [--slider-range-card-inset:0.5rem] [--slider-range-card-radius:var(--radius-xl)] [--session-range-slider-background:#fcfcfc] dark:[--session-range-slider-background:rgba(255,255,255,0.06)]"
-					: "px-2 pt-3 pb-2 [--slider-range-card-inset:0.5rem] [--slider-range-card-radius:var(--radius-xl)] [--session-range-slider-background:color-mix(in_srgb,var(--session-overview-text)_4%,var(--session-overview-surface))] dark:[--session-range-slider-background:rgba(255,255,255,0.06)]"
+					? "min-h-0 flex-1 px-m pt-l pb-m [--slider-range-card-inset:0.5rem] [--slider-range-card-radius:var(--radius-xl)] [--session-range-slider-background:#fcfcfc] dark:[--session-range-slider-background:rgba(255,255,255,0.06)]"
+					: "px-m pt-l pb-m [--slider-range-card-inset:0.5rem] [--slider-range-card-radius:var(--radius-xl)] [--session-range-slider-background:color-mix(in_srgb,var(--ink)_4%,var(--canvas))] dark:[--session-range-slider-background:rgba(255,255,255,0.06)]"
 			}
 		>
 			<SliderRangeInput
@@ -81,7 +81,7 @@ export function SessionOverviewRangeFilterPanel({
 				onCommit={setRange}
 				onInteractionEnd={onInteractionEnd}
 				onInteractionStart={onInteractionStart}
-				progressOverlay="color-mix(in srgb, var(--session-menu-accent, var(--session-overview-accent, #000)) 18%, transparent)"
+				progressOverlay="color-mix(in srgb, var(--ink, var(--accent, #000)) 18%, transparent)"
 				step={bounds.step}
 				trackBackground="var(--session-range-slider-background)"
 				value={[effectiveMinimum, effectiveMaximum]}
@@ -109,7 +109,7 @@ export function SessionOverviewTokenRangeFilterPanel({
 	variant?: "default" | "linear";
 }) {
 	return (
-		<div className="flex min-h-0 flex-1 flex-col py-1.5">
+		<div className="flex min-h-0 flex-1 flex-col py-s">
 			{(["input", "output"] as const).map((filterKey) => {
 				const label = filterKey === "input" ? "Input tokens" : "Output tokens";
 
@@ -119,7 +119,7 @@ export function SessionOverviewTokenRangeFilterPanel({
 						aria-label={label}
 						className="min-h-0 flex-1"
 					>
-						<div className="px-2.5 pt-1.5 text-[0.6875rem]/4 font-[500] tracking-[0.01em] text-(--session-overview-muted)">
+						<div className="px-l pt-s text-[0.6875rem]/4 font-medium tracking-l text-ink-3">
 							{label}
 						</div>
 						<SessionOverviewRangeFilterPanel

@@ -103,16 +103,18 @@ export function DashboardModelIdentity({
 
 	return (
 		<Tooltip>
-			<TooltipTrigger asChild>
-				<div className={cn("cursor-help", className)}>
-					{getModelBadgeTone(model).icon ? (
-						<ModelChip model={model} tip={false} />
-					) : null}
-					<div className="shrink-0 font-mono text-base font-semibold tracking-normal text-[color:var(--dashboardy-heading)] tabular-nums sm:text-[0.8125rem]">
-						{safeMessageCount}
+			<TooltipTrigger
+				render={
+					<div className={cn("cursor-help", className)}>
+						{getModelBadgeTone(model).icon ? (
+							<ModelChip model={model} tip={false} />
+						) : null}
+						<div className="shrink-0 font-data text-body-xxl font-heavy text-ink tabular-nums sm:text-body-l">
+							{safeMessageCount}
+						</div>
 					</div>
-				</div>
-			</TooltipTrigger>
+				}
+			/>
 			<TooltipContent>
 				{modelLabel}: {safeMessageCount} messages
 			</TooltipContent>
@@ -134,10 +136,10 @@ export function DashboardModelBadges({
 		return (
 			<span
 				className={cn(
-					"text-[color:var(--dashboardy-muted)]",
+					"text-ink-3",
 					size === "table"
-						? "text-base font-medium tracking-[-0.01em] sm:text-sm"
-						: "text-[12px]",
+						? "text-body-xxl font-medium sm:text-body-xl"
+						: "text-body-m",
 				)}
 			>
 				—
@@ -154,7 +156,7 @@ export function DashboardModelBadges({
 				return (
 					<span
 						key={model}
-						className={`inline-flex max-w-full items-center justify-center rounded-full border leading-none tabular-nums ${sizeClasses.badgeClassName} ${sizeClasses.paddingClassName} ${badgeTone.chipClassName}`}
+						className={`inline-flex max-w-full items-center justify-center corner-full edge-m leading-none tabular-nums ${sizeClasses.badgeClassName} ${sizeClasses.paddingClassName} ${badgeTone.chipClassName}`}
 					>
 						{badgeTone.icon ? (
 							<ModelChip

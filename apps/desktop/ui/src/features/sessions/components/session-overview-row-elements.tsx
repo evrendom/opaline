@@ -7,21 +7,21 @@ import {
 } from "./newsesh-session-language-signal";
 
 export const SESSION_OVERVIEW_ROW_CLASS_NAME =
-	"group/session grid h-12 w-full text-left outline-none focus-visible:z-20 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--session-overview-accent)";
+	"group/session grid h-12 w-full text-left outline-none focus-visible:z-20 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent";
 
 export const SESSION_OVERVIEW_MODEL_LABEL_CLASS_NAME =
-	"text-base/5 font-[450] tracking-normal text-(--session-overview-text) sm:text-[0.8125rem]/5";
+	"text-base/5 font-medium tracking-m text-ink sm:text-[0.8125rem]/5";
 
 export const SESSION_OVERVIEW_CELL_CLASS_NAME =
-	"flex min-w-0 items-center px-3";
+	"flex min-w-0 items-center px-l";
 
 export const SESSION_OVERVIEW_METADATA_CLASS_NAME =
-	"whitespace-nowrap text-left text-xs font-normal tracking-normal text-[#787774] tabular-nums [font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe_UI_Variable_Display','Segoe_UI',Helvetica,Arial,sans-serif] dark:text-white/65";
+	"whitespace-nowrap text-left text-body-m font-regular text-ink-3 tabular-nums [font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe_UI_Variable_Display','Segoe_UI',Helvetica,Arial,sans-serif] dark:text-ink-3";
 
 export const SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME =
-	"flex min-w-0 shrink items-center gap-0.75 rounded-sm px-1.5 py-0.5 text-[0.625rem] font-normal tabular-nums";
+	"flex min-w-0 shrink items-center gap-xs corner-xs px-s py-xxs text-body-xs font-regular tabular-nums";
 
-export const SESSION_OVERVIEW_ICON_TAG_CLASS_NAME = "h-[1.1875rem] pl-1";
+export const SESSION_OVERVIEW_ICON_TAG_CLASS_NAME = "h-[1.1875rem] pl-xs";
 
 export const SESSION_OVERVIEW_TAG_ICON_CLASS_NAME =
 	"size-3 shrink-0 [@media(min-resolution:2dppx)]:translate-y-[0.25px]";
@@ -29,8 +29,7 @@ export const SESSION_OVERVIEW_TAG_ICON_CLASS_NAME =
 export const SESSION_OVERVIEW_TAG_NUMBER_CLASS_NAME =
 	"[text-box:trim-both_cap_alphabetic]";
 
-export const SESSION_OVERVIEW_SWEAR_TAG_CLASS_NAME =
-	"bg-[#ffe4e6] text-[#be123c] dark:bg-[#4c1d25] dark:text-[#fb7185]";
+export const SESSION_OVERVIEW_SWEAR_TAG_CLASS_NAME = "bg-error-tint text-error";
 
 export function SessionLanguageSignalTag({
 	category,
@@ -52,10 +51,8 @@ export function SessionLanguageSignalTag({
 			data-signal-category={category}
 			className={cn(
 				SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME,
-				category === "positive" &&
-					"bg-[#dcfce7] text-[#15803d] dark:bg-[#173d2a] dark:text-[#4ade80]",
-				category === "apology" &&
-					"bg-[#fef3c7] text-[#b45309] dark:bg-[#493719] dark:text-[#fbbf24]",
+				category === "positive" && "bg-success-tint text-success",
+				category === "apology" && "bg-warning-tint text-warning",
 				category === "swear" && SESSION_OVERVIEW_SWEAR_TAG_CLASS_NAME,
 			)}
 		>
@@ -64,7 +61,7 @@ export function SessionLanguageSignalTag({
 			</span>
 			{remainingCount > 0 ? (
 				<span
-					className="shrink-0 text-[0.5rem]"
+					className="shrink-0 text-body-xxs"
 					data-session-overview-language-signal-overflow
 					title={remainingTitle}
 				>
@@ -91,7 +88,7 @@ export function SessionOverviewLanguageSignals({
 
 	return (
 		<div
-			className="flex min-w-0 max-w-full items-center gap-1 overflow-hidden"
+			className="flex min-w-0 max-w-full items-center gap-xs overflow-hidden"
 			data-language-signal-speaker={speaker}
 			title={`${speaker === "member" ? "Member" : "Model"} language signals: ${signalSummary}`}
 		>

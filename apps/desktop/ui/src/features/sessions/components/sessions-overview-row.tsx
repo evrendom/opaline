@@ -114,7 +114,7 @@ type SessionsOverviewRowProps = {
 
 const MAX_SESSION_OVERVIEW_SKILL_TAGS = 7;
 const SESSION_OVERVIEW_TOOLTIP_CLASS_NAME =
-	"whitespace-nowrap rounded-md border border-black/10 bg-white px-2.5 py-1.5 text-xs/4 font-medium text-[#202124] shadow-[0_8px_20px_-10px_rgba(0,0,0,0.4),0_2px_6px_rgba(0,0,0,0.1)] tabular-nums dark:border-white/10 dark:bg-[#202124] dark:text-[#f3f4f6]";
+	"whitespace-nowrap corner-s edge-m border-line bg-canvas px-l py-s text-xs/4 font-medium text-ink shadow-[0_8px_20px_-10px_rgba(0,0,0,0.4),0_2px_6px_rgba(0,0,0,0.1)] tabular-nums dark:border-line dark:bg-field dark:text-ink";
 // CSS selects both tags and the matching count, including before demo hydration.
 // Column widths grow continuously; only the number of skill tags changes in tiers.
 const SESSION_OVERVIEW_SKILL_OVERFLOW_TIERS = [
@@ -225,6 +225,9 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 		? `${clock.date}, ${clockTimeLabel}`
 		: clockTimeLabel;
 	const durationLabel = formatRoundedDuration(session.duration_min);
+	const sessionDateTime =
+		liveRow?.live.lastActivityAt ??
+		(failure ? (failure.sessionDate ?? undefined) : session.session_date);
 	const dateTooltipLabel = liveRow
 		? describeLiveSessionRowDate(liveRow.live, clockDateTimeLabel, liveNowMs)
 		: failure
@@ -251,11 +254,11 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 		// An open row shares the tint of the panel folded out beneath it, and
 		// rounds its top as the block's top edge.
 		expanded &&
-			"rounded-t-lg bg-neutral-100 corner-squircle squircle:rounded-t-2xl dark:bg-card",
+			"corner-t-m bg-field corner-squircle squircle:corner-t-xl dark:bg-card",
 	);
 	const cellClassName = cn(
 		SESSION_OVERVIEW_CELL_CLASS_NAME,
-		isActive && "bg-(--session-overview-hover)",
+		isActive && "bg-hover",
 	);
 	const getSkillHref = (name: string) => {
 		const path = appRoutes.skillDetail(name, session.session_id);
@@ -268,7 +271,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 		<div
 			className={cn(
 				cellClassName,
-				"col-start-3 row-start-1 justify-start gap-1",
+				"col-start-3 row-start-1 justify-start gap-xs",
 			)}
 			data-session-overview-column="skills"
 		>
@@ -277,7 +280,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 			) : null}
 			{renderedSkills.length === 0 ? null : (
 				<div
-					className="flex min-w-0 max-w-full items-center gap-1"
+					className="flex min-w-0 max-w-full items-center gap-xs"
 					title={skillsTitle}
 				>
 					{renderedSkills.map((skill, skillIndex) => (
@@ -303,7 +306,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 								value={skill}
 							>
 								<span
-									className="truncate font-sans"
+									className="truncate font-body"
 									data-session-overview-skill-name
 								>
 									{skill}
@@ -316,7 +319,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 							<span
 								key={limit}
 								className={cn(
-									"shrink-0 whitespace-nowrap text-[0.625rem] font-normal text-(--session-overview-subtle)",
+									"shrink-0 whitespace-nowrap text-body-xs font-regular text-ink-3",
 									className,
 								)}
 								data-session-overview-skill-overflow-tag
@@ -358,7 +361,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 				<span
 					className={cn(
 						SESSION_OVERVIEW_METADATA_CLASS_NAME,
-						"inline-flex shrink-0 items-center gap-1",
+						"inline-flex shrink-0 items-center gap-xs",
 					)}
 					data-session-overview-metric-value="cost"
 					data-session-overview-token-tooltip-label={tokenTooltipLabel}
@@ -378,13 +381,13 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 				</span>
 			</div>
 			<div
-				className={cn(cellClassName, "gap-2 px-2")}
+				className={cn(cellClassName, "gap-m px-m")}
 				data-session-overview-column="model"
 			>
 				{session.subagent_of ? (
 					<span className="flex shrink-0 items-center">
 						{modelMark}
-						<span className="relative -ml-3.75" title="Subagent">
+						<span className="relative -ml-xl" title="Subagent">
 							<SubagentPebble tint={subagentTint} />
 						</span>
 					</span>
@@ -392,7 +395,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 					modelMark
 				)}
 				<div
-					className="flex min-w-0 items-center gap-1.5"
+					className="flex min-w-0 items-center gap-s"
 					data-session-overview-model-repository
 				>
 					{liveRow ? <SessionOverviewLiveLabel state={liveRow.state} /> : null}
@@ -410,7 +413,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 						data-session-overview-model-label
 					>
 						{session.subagent_of ? (
-							<span className="text-(--session-overview-muted)">Subagent </span>
+							<span className="text-ink-3">Subagent </span>
 						) : null}
 						{formatModelDisplayLabel(displayModel)}
 						{failure ? (
@@ -423,7 +426,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 					<SessionPlaceLabel session={session} showPlace={showPlace} />
 					{branchLabel ? (
 						<p
-							className="min-w-0 truncate text-left font-sans text-xs/4 font-normal tracking-normal text-[#00000044] tabular-nums dark:text-[#ffffff55]"
+							className="min-w-0 truncate text-left font-body text-xs/4 font-regular tracking-m text-ink-3 tabular-nums"
 							data-session-overview-branch-label
 							dir="rtl"
 							title={branchLabel}
@@ -474,7 +477,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 				)
 			) : null}
 			<div
-				className={cn(cellClassName, "justify-end gap-2")}
+				className={cn(cellClassName, "justify-end gap-m")}
 				data-session-overview-column="user"
 			>
 				<SessionOverviewLanguageSignals session={session} speaker="member" />
@@ -492,25 +495,21 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 				)}
 			</div>
 			<div
-				className={cn(cellClassName, "justify-end px-2")}
+				className={cn(cellClassName, "justify-end px-m")}
 				data-session-overview-column="time"
 			>
 				<Tooltip>
-					<TooltipTrigger asChild>
-						<time
-							dateTime={
-								liveRow
-									? liveRow.live.lastActivityAt
-									: failure
-										? (failure.sessionDate ?? undefined)
-										: session.session_date
-							}
-							className={SESSION_OVERVIEW_METADATA_CLASS_NAME}
-							data-session-overview-date-tooltip-label={dateTooltipLabel}
-						>
-							{liveRow ? liveRow.age : clock.date || "—"}
-						</time>
-					</TooltipTrigger>
+					<TooltipTrigger
+						render={
+							<time
+								dateTime={sessionDateTime}
+								className={SESSION_OVERVIEW_METADATA_CLASS_NAME}
+								data-session-overview-date-tooltip-label={dateTooltipLabel}
+							>
+								{liveRow ? liveRow.age : clock.date || "—"}
+							</time>
+						}
+					/>
 					<TooltipContent
 						align="center"
 						className={SESSION_OVERVIEW_TOOLTIP_CLASS_NAME}

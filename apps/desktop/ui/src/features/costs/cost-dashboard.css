@@ -2,15 +2,6 @@
    share its tokens. */
 .cost-page,
 .cost-range-controls {
-	--cost-surface: var(--dashboard-01-content-background, #fcfcfc);
-	--cost-foreground: #292a2f;
-	--cost-muted: #828387;
-	--cost-border: rgb(0 0 0 / 7%);
-	--cost-soft: rgb(0 0 0 / 3%);
-	--cost-hover: rgb(0 0 0 / 5%);
-	--cost-divider: rgb(0 0 0 / 4%);
-	--cost-row-hover: rgb(0 0 0 / 1.5%);
-	--cost-blue: oklch(0.623 0.188 259.815);
 	--cost-duration-p95: oklch(0.606 0.219 292.717);
 	--cost-chart-fill-opacity: 0.08;
 }
@@ -21,9 +12,11 @@
 	min-width: 0;
 	min-height: 0;
 	overflow: hidden;
-	color: var(--cost-foreground);
-	background: var(--cost-surface);
-	font-size: 0.875rem;
+	color: var(--ink);
+	background: var(--canvas);
+	font-size: var(--size-xl);
+	line-height: var(--line-xl);
+	letter-spacing: var(--letter-spacing-xl);
 }
 
 .cost-page-scroll {
@@ -40,24 +33,24 @@
 	padding: 12px var(--cost-page-gutter, 32px) 24px;
 	display: flex;
 	flex-direction: column;
-	gap: 20px;
+	gap: var(--space-xxl);
 }
 .cost-page-toolbar {
 	display: flex;
 	align-items: flex-start;
 	flex-shrink: 0;
-	gap: 8px;
+	gap: var(--space-m);
 	min-height: 40px;
-	padding: 5px 32px;
-	background: var(--cost-surface);
+	padding: var(--space-s) calc(var(--space-xxl) * 4 / 3);
+	background: var(--canvas);
 }
 
 /* Page-header controls: the range picker. */
 .cost-range-controls {
 	display: flex;
 	align-items: center;
-	gap: 8px;
-	color: var(--cost-foreground);
+	gap: var(--space-m);
+	color: var(--ink);
 }
 .cost-range-controls[data-in-header] {
 	margin-left: auto;
@@ -67,9 +60,9 @@
 .cost-chart-card,
 .cost-breakdown,
 .cost-error {
-	border-radius: 10px;
+	border-radius: var(--radius-m);
 	background: var(--card);
-	box-shadow: var(--custom-shadow);
+	box-shadow: var(--shadow-card);
 }
 /* biome-ignore lint/correctness/noUnknownProperty: corner-shape is new (Chromium 139+); Biome does not know it yet. */
 @supports (corner-shape: squircle) {
@@ -77,7 +70,7 @@
 	.cost-chart-card,
 	.cost-breakdown,
 	.cost-error {
-		border-radius: 24px;
+		border-radius: var(--radius-xl);
 		/* biome-ignore lint/correctness/noUnknownProperty: see the @supports note above. */
 		corner-shape: squircle;
 	}
@@ -91,7 +84,7 @@
 .cost-chart-panel {
 	display: flex;
 	flex-direction: column;
-	gap: 16px;
+	gap: var(--space-xl);
 	container-type: inline-size;
 }
 .cost-chart-card {
@@ -104,8 +97,8 @@
 	   of room (six GitHub-enabled metrics, or the assistant panel open) the
 	   cards wrap instead of widening the page. */
 	grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-	gap: 16px;
-	padding: 0;
+	gap: var(--space-xl);
+	padding: var(--space-zero);
 	border: 0;
 }
 .cost-page:not([data-variant]) .cost-metrics[data-balanced] {
@@ -141,7 +134,7 @@
 	padding: 20px var(--metric-pad-x) 0;
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
+	gap: var(--space-m);
 	min-width: 0;
 	overflow: hidden;
 	text-align: left;
@@ -153,7 +146,7 @@
 	--metric-tint: var(--metric-color);
 }
 .cost-metric:hover {
-	box-shadow: var(--custom-shadow-secondary);
+	box-shadow: var(--shadow-raised);
 }
 .cost-metric[data-disabled]:not([data-primary="true"]) {
 	opacity: 0.5;
@@ -162,7 +155,7 @@
 	cursor: default;
 }
 .cost-metric:has(.cost-metric-select:focus-visible) {
-	outline: 2px solid var(--cost-blue);
+	outline: 2px solid var(--accent);
 	outline-offset: 2px;
 }
 /* The charted metric's card wears the sidebar nav chips' shadow in its own
@@ -172,7 +165,7 @@
    keeps its size. */
 .cost-metric[data-primary="true"] {
 	box-shadow:
-		var(--custom-shadow),
+		var(--shadow-card),
 		0 1.5px 2px color-mix(in oklch, var(--metric-color) 25%, transparent);
 }
 .cost-metric::after {
@@ -193,7 +186,7 @@
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 6px;
+	gap: var(--space-s);
 	min-width: 0;
 	height: 21px;
 	margin-bottom: auto;
@@ -201,11 +194,12 @@
 .cost-metric-label {
 	display: flex;
 	align-items: center;
-	gap: 7px;
+	gap: var(--space-m);
 	min-width: 0;
-	font-size: 0.875rem;
-	line-height: 1.25rem;
-	color: var(--cost-foreground);
+	font-size: var(--size-xl);
+	letter-spacing: var(--letter-spacing-xl);
+	line-height: var(--line-xl);
+	color: var(--ink);
 }
 .cost-metric-icon {
 	width: 14px;
@@ -232,29 +226,30 @@
 .cost-metric-value {
 	display: flex;
 	align-items: baseline;
-	gap: 6px;
+	gap: var(--space-s);
 	flex-shrink: 0;
-	font-size: 0.875rem;
-	line-height: 1.5;
-	font-weight: 500;
+	font-size: var(--size-xl);
+	line-height: var(--line-xl);
+	font-weight: var(--weight-body-medium);
 	font-variant-numeric: tabular-nums;
-	letter-spacing: -0.025em;
+	letter-spacing: var(--letter-spacing-xl);
 }
 .cost-metric-value:has(> .cost-metric-chip) {
-	gap: 4px;
+	gap: var(--space-xs);
 }
 .cost-metric-chip {
 	line-height: 1;
-	font-size: 0.75rem;
-	font-weight: 450;
-	letter-spacing: -0.01em;
-	color: var(--cost-muted);
+	font-size: var(--size-m);
+	font-weight: var(--weight-body-medium);
+	letter-spacing: var(--letter-spacing-m);
+	color: var(--ink-3);
 }
 .cost-metric-qualifier {
-	font-size: 0.75rem;
-	font-weight: 470;
-	letter-spacing: 0;
-	color: var(--cost-muted);
+	font-size: var(--size-m);
+	line-height: var(--line-m);
+	font-weight: var(--weight-body-medium);
+	letter-spacing: var(--letter-spacing-m);
+	color: var(--ink-3);
 }
 /* CardSparkline: the accent at half strength, its stroke at half again, over
    a fill fading from 40% to 10% (text-*-400/50 sparklines). */
@@ -314,7 +309,7 @@
 	stroke-opacity: 1;
 }
 .cost-metric-sparkline[data-placeholder] {
-	color: var(--cost-muted);
+	color: var(--ink-3);
 }
 .cost-metric-sparkline[data-placeholder] .cost-metric-trend-line {
 	stroke-opacity: 0.1;
@@ -324,17 +319,17 @@
    chart never jumps when a metric with notes (GitHub, indexing) is picked. */
 .cost-chart-key {
 	display: flex;
-	gap: 12px;
+	gap: var(--space-l);
 	justify-content: space-between;
 	align-items: flex-start;
-	padding: 18px 20px 0;
+	padding: var(--space-xl) var(--space-xxl) var(--space-zero);
 	min-height: 72px;
 }
 .cost-chart-key-copy {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: 8px 16px;
+	gap: var(--space-m) var(--space-xl);
 	min-width: 0;
 }
 .cost-chart-key-copy > output {
@@ -351,16 +346,20 @@
 	max-width: max-content;
 }
 .cost-chart-title {
-	font-size: 0.875rem;
-	font-weight: 500;
-	color: var(--cost-foreground);
+	font-size: var(--size-xl);
+	line-height: var(--line-xl);
+	letter-spacing: var(--letter-spacing-xl);
+	font-weight: var(--weight-body-medium);
+	color: var(--ink);
 }
 .cost-chart-coverage {
 	display: flex;
 	align-items: center;
-	gap: 8px;
-	color: var(--cost-muted);
-	font-size: 0.6875rem;
+	gap: var(--space-m);
+	color: var(--ink-3);
+	font-size: var(--size-s);
+	line-height: var(--line-s);
+	letter-spacing: var(--letter-spacing-s);
 	font-variant-numeric: tabular-nums;
 }
 .cost-coverage-refresh {
@@ -368,16 +367,18 @@
 }
 .cost-chart-legend {
 	display: flex;
-	gap: 8px 18px;
+	gap: var(--space-m) var(--space-xl);
 	flex-wrap: wrap;
 	min-width: 0;
 }
 .cost-legend-item {
 	display: flex;
 	align-items: center;
-	gap: 7px;
-	font-size: 0.75rem;
-	color: var(--cost-muted);
+	gap: var(--space-m);
+	font-size: var(--size-m);
+	line-height: var(--line-m);
+	letter-spacing: var(--letter-spacing-m);
+	color: var(--ink-3);
 }
 .cost-legend-item i,
 .cost-chart-tooltip i {
@@ -393,38 +394,37 @@
 	flex-wrap: wrap;
 	justify-content: flex-end;
 	align-items: center;
-	gap: 6px;
+	gap: var(--space-s);
 	min-width: 0;
 	max-width: 60%;
 	/* Centre the 28px chips on the title's line. */
-	margin-top: -4px;
+	margin-top: calc(var(--space-xs) * -1);
 }
 /* "Split by" reads as a label beside its tag, not inside it. */
 .cost-chart-split {
 	display: flex;
 	align-items: center;
-	gap: 6px;
-	font-size: 0.875rem;
-	color: var(--cost-muted);
+	gap: var(--space-s);
+	font-size: var(--size-xl);
+	line-height: var(--line-xl);
+	letter-spacing: var(--letter-spacing-xl);
+	color: var(--ink-3);
 	white-space: nowrap;
-}
-.cost-chart-split > .cost-filter-chip {
-	color: var(--cost-foreground);
 }
 .cost-chart-tags > .cost-active-filters {
 	flex: none;
 	justify-content: flex-end;
 }
 .cost-duration-legend {
-	padding: 5px 6px;
-	margin: -5px -6px;
-	border-radius: 4px;
+	padding: var(--space-s) var(--space-s);
+	margin: calc(var(--space-s) * -1) calc(var(--space-s) * -1);
+	border-radius: var(--radius-xs);
 }
 .cost-duration-legend:hover {
-	background: var(--cost-hover);
+	background: var(--hover);
 }
 .cost-duration-legend:focus-visible {
-	outline: 2px solid var(--cost-blue);
+	outline: 2px solid var(--accent);
 	outline-offset: 2px;
 }
 .cost-duration-legend[aria-pressed="false"] {
@@ -433,54 +433,56 @@
 .cost-duration-legend i {
 	width: 18px;
 	height: 0;
-	border-top: 2px solid var(--cost-foreground);
-	border-radius: 0;
+	border-top: var(--border-l) solid var(--ink);
+	border-radius: var(--radius-zero);
 }
 .cost-duration-legend[data-percentile="p95"] i {
-	border-top-color: var(--cost-duration-p95);
+	border-top-color: var(--color-3);
 	border-top-style: dashed;
 }
 .cost-duration-legend strong {
-	color: var(--cost-foreground);
-	font-weight: 500;
+	color: var(--ink);
+	font-weight: var(--weight-body-medium);
 	font-variant-numeric: tabular-nums;
 }
 .cost-chart-canvas {
 	position: relative;
 	/* The marketing demo sets --cost-viewport-height to the height it opens to. */
 	height: clamp(240px, calc(var(--cost-viewport-height, 100vh) * 0.31), 360px);
-	margin: 16px 18px 14px 8px;
+	margin: var(--space-xl) var(--space-xl) var(--space-xl) var(--space-m);
 	min-width: 0;
 }
 .cost-chart-tooltip {
 	min-width: 190px;
-	border-radius: 10px;
-	padding: 12px;
-	color: var(--cost-foreground);
-	background: var(--cost-surface);
+	border-radius: var(--radius-m);
+	padding: var(--space-l);
+	color: var(--ink);
+	background: var(--canvas);
 	box-shadow:
 		0 6px 20px rgb(0 0 0 / 8%),
-		0 0 0 1px var(--cost-border);
+		0 0 0 1px var(--line);
 	display: grid;
-	gap: 7px;
-	font-size: 0.75rem;
+	gap: var(--space-m);
+	font-size: var(--size-m);
+	line-height: var(--line-m);
+	letter-spacing: var(--letter-spacing-m);
 }
 .cost-chart-tooltip p {
-	color: var(--cost-muted);
-	padding-bottom: 3px;
+	color: var(--ink-3);
+	padding-bottom: var(--space-xs);
 }
 .cost-chart-tooltip > div,
 .cost-chart-tooltip span {
 	display: flex;
 	align-items: center;
-	gap: 8px;
+	gap: var(--space-m);
 }
 .cost-chart-tooltip > div {
 	justify-content: space-between;
-	gap: 24px;
+	gap: var(--space-xxl);
 }
 .cost-chart-tooltip strong {
-	font-weight: 500;
+	font-weight: var(--weight-body-medium);
 	font-variant-numeric: tabular-nums;
 }
 .cost-chart-empty {
@@ -491,14 +493,16 @@
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	gap: 10px;
-	padding: 0 16px;
+	gap: var(--space-l);
+	padding: var(--space-zero) var(--space-xl);
 	text-align: center;
 	pointer-events: none;
 }
 .cost-chart-empty p {
-	font-size: 0.875rem;
-	font-weight: 500;
+	font-size: var(--size-xl);
+	line-height: var(--line-xl);
+	letter-spacing: var(--letter-spacing-xl);
+	font-weight: var(--weight-body-medium);
 	text-wrap: balance;
 }
 .cost-chart-canvas[data-sample] > :not(.cost-chart-empty),
@@ -514,7 +518,7 @@
 .cost-breakdowns {
 	display: grid;
 	grid-template-columns: repeat(3, minmax(0, 1fr));
-	gap: 16px;
+	gap: var(--space-xl);
 }
 .cost-breakdowns[data-pull-requests="true"] {
 	grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -526,16 +530,15 @@
 	> .cost-breakdown[data-dimension="ciWorkflows"] {
 	grid-column: span 2;
 }
-.cost-filter-chip[data-inactive="true"] {
-	opacity: 0.6;
-}
 .cost-chart-coverage {
 	flex-wrap: wrap;
 }
 .cost-cycle-time {
 	display: block;
-	color: var(--cost-muted);
-	font-size: 10px;
+	color: var(--ink-3);
+	font-size: var(--size-xs);
+	line-height: var(--line-xs);
+	letter-spacing: var(--letter-spacing-xs);
 }
 .cost-breakdowns[data-signals="true"]
 	> .cost-breakdown[data-dimension="phrases"] {
@@ -558,28 +561,31 @@
    then hairline-divided rows that scroll inside the card to its bottom edge. */
 .cost-breakdown-heading {
 	display: flex;
-	gap: 12px;
+	gap: var(--space-l);
 	align-items: center;
 	justify-content: space-between;
-	padding: 20px 20px 4px;
+	padding: var(--space-xxl) var(--space-xxl) var(--space-xs);
 }
 .cost-breakdown-heading h2 {
-	font-size: 0.875rem;
-	line-height: 1.5;
-	font-weight: 500;
+	font-size: var(--size-xl);
+	letter-spacing: var(--letter-spacing-xl);
+	line-height: var(--line-xl);
+	font-weight: var(--weight-body-medium);
 	text-wrap: balance;
 }
 .cost-breakdown-heading > div {
-	color: var(--cost-muted);
-	font-size: 0.6875rem;
+	color: var(--ink-3);
+	font-size: var(--size-s);
+	line-height: var(--line-s);
+	letter-spacing: var(--letter-spacing-s);
 }
 .cost-breakdown-selected {
-	color: var(--cost-blue);
+	color: var(--accent);
 	font-weight: 500;
 }
 .cost-heading-currency {
 	opacity: 0.6;
-	padding-left: 3px;
+	padding-left: var(--space-xs);
 }
 .cost-scroll-fade {
 	position: relative;
@@ -617,12 +623,14 @@
 }
 .cost-breakdown-list .cost-breakdown-row {
 	justify-content: space-between;
-	gap: 24px;
+	gap: var(--space-xxl);
 	min-height: 0;
-	padding: 12px 20px;
-	font-size: 0.875rem;
-	border-radius: 0;
-	border-top: 1px solid var(--cost-divider);
+	padding: var(--space-l) var(--space-xxl);
+	font-size: var(--size-xl);
+	line-height: var(--line-xl);
+	letter-spacing: var(--letter-spacing-xl);
+	border-radius: var(--radius-zero);
+	border-top: var(--border-m) solid var(--line);
 	transition: background-color 150ms ease;
 }
 /* Of-type, not child: the fluid hover's layer sits among the rows. */
@@ -634,14 +642,14 @@
    block (Breakdown rows). The fluid hover paints it, gliding between rows;
    a row it doesn't track still fills itself. */
 .cost-breakdown-list .cost-breakdown-row:not([data-fluid-menu-item]):hover {
-	background: var(--cost-row-hover);
+	background: var(--hover);
 }
 /* Above the page's fill rule, in the row's own hover colour. */
 .cost-breakdown .cost-breakdown-list
 	[data-fluid-menu-root]:not(.cost-metrics)
 	> .fluid-menu-hover-layer
 	.fluid-menu-hover-fill {
-	background: var(--cost-row-hover);
+	background: var(--hover);
 }
 .cost-breakdown-list .cost-breakdown-row:hover,
 .cost-breakdown-list .cost-breakdown-row:hover + .cost-breakdown-row {
@@ -649,20 +657,22 @@
 }
 /* A list that scrolls leaves room for its last row to clear the fade. */
 .cost-breakdown-list[data-many] .cost-breakdown-row:last-of-type {
-	padding-bottom: 36px;
+	padding-bottom: calc(var(--space-xxl) * 1.5);
 }
 .cost-breakdown-row {
 	position: relative;
 	display: flex;
 	align-items: center;
-	gap: 12px;
+	gap: var(--space-l);
 	width: 100%;
 	min-width: 0;
 	min-height: 34px;
-	padding: 7px 9px;
-	font-size: 0.8125rem;
+	padding: var(--space-m) var(--space-m);
+	font-size: var(--size-l);
+	line-height: var(--line-l);
+	letter-spacing: var(--letter-spacing-l);
 	text-align: left;
-	border-radius: 5px;
+	border-radius: var(--radius-xs);
 	outline: none;
 	font-variant-numeric: tabular-nums;
 }
@@ -674,14 +684,14 @@
 	[data-fluid-menu-root]
 	> .fluid-menu-hover-layer
 	.fluid-menu-hover-fill {
-	background: var(--cost-hover);
+	background: var(--hover);
 }
 .cost-breakdown-row:focus-visible {
-	outline: 2px solid var(--cost-blue);
+	outline: 2px solid var(--accent);
 	outline-offset: -2px;
 }
 .cost-breakdown-row[aria-pressed="true"] {
-	color: var(--cost-blue);
+	color: var(--accent);
 }
 /* Share bar: 2px by 56px under the value, filled from the right in
    the row's series colour. */
@@ -690,10 +700,10 @@
 	justify-content: flex-end;
 	width: 56px;
 	height: 2px;
-	margin-top: 6px;
+	margin-top: var(--space-s);
 	margin-left: auto;
-	border-radius: 999px;
-	background: color-mix(in oklch, var(--cost-muted) 10%, transparent);
+	border-radius: var(--radius-full);
+	background: color-mix(in oklch, var(--ink-3) 10%, transparent);
 	overflow: hidden;
 }
 .cost-row-meter > span {
@@ -705,7 +715,7 @@
 	position: relative;
 	display: flex;
 	align-items: center;
-	gap: 6px;
+	gap: var(--space-s);
 	min-width: 0;
 	flex: 1;
 }
@@ -716,10 +726,12 @@
 	text-align: right;
 }
 .cost-member-initial {
-	font-size: 0.5625rem;
-	background: var(--cost-soft);
-	color: var(--cost-muted);
-	font-weight: 500;
+	font-size: var(--size-xs);
+	line-height: var(--line-xs);
+	letter-spacing: var(--letter-spacing-xs);
+	background: var(--wash);
+	color: var(--ink-3);
+	font-weight: var(--weight-body-medium);
 }
 .cost-unknown-model {
 	width: 16px;
@@ -736,14 +748,10 @@
 	grid-template-rows: 0.28fr;
 	min-width: 40px;
 	min-height: 10px;
-	border-radius: 999px;
+	border-radius: var(--radius-full);
 	overflow: hidden;
-	background: color-mix(
-		in srgb,
-		var(--cost-foreground) 14%,
-		var(--cost-surface)
-	);
-	box-shadow: 0 0 0 1px var(--cost-border);
+	background: color-mix(in srgb, var(--ink) 14%, var(--canvas));
+	box-shadow: 0 0 0 1px var(--line);
 	transition:
 		grid-template-columns 200ms ease,
 		grid-template-rows 200ms ease;
@@ -759,17 +767,17 @@
 	transition:
 		transform 200ms ease,
 		opacity 150ms ease;
-	padding: 3px;
+	padding: var(--space-xs);
 }
 .cost-breakdown:hover .cost-tools,
 .cost-tools:focus-within,
 .cost-tools[data-open="true"] {
 	grid-template-columns: 1fr;
 	grid-template-rows: 1fr;
-	background: var(--cost-surface);
+	background: var(--canvas);
 	box-shadow:
 		0 2px 7px rgb(0 0 0 / 8%),
-		0 0 0 1px var(--cost-border);
+		0 0 0 1px var(--line);
 }
 .cost-breakdown:hover .cost-tools-inner,
 .cost-tools:focus-within .cost-tools-inner,
@@ -782,7 +790,7 @@
 	position: relative;
 	height: 28px;
 	width: 34px;
-	border-radius: 999px;
+	border-radius: var(--radius-full);
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -791,17 +799,10 @@
 }
 .cost-tool-button[aria-pressed="true"],
 .cost-tool-button[data-popup-open] {
-	background: var(--cost-hover);
+	background: var(--hover);
 }
 .cost-tool-button[aria-pressed="true"] {
-	color: var(--cost-blue);
-}
-.cost-tool-button:focus-visible,
-.cost-secondary-button:focus-visible,
-.cost-text-button:focus-visible,
-.cost-filter-chip:focus-visible {
-	outline: 2px solid var(--cost-blue);
-	outline-offset: -1px;
+	color: var(--accent);
 }
 .cost-tool-button:disabled {
 	opacity: 0.4;
@@ -819,48 +820,6 @@
 .cost-active-filters > * {
 	flex-shrink: 0;
 }
-.cost-filter-chip {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	min-width: 0;
-	max-width: min(340px, 100%);
-	height: 28px;
-	padding: 4px 8px 4px 6px;
-	border: 0;
-	border-radius: 6px;
-	background: var(--cost-surface);
-	font-size: 0.875rem;
-	font-weight: 500;
-	letter-spacing: -0.01em;
-	box-shadow:
-		0 0 0 0.5px transparent inset,
-		0 0 0 0.5px #0000000f,
-		0 1px 1px -1px #0000001a,
-		0 1px 2px 0 #0000000d;
-}
-.dark .cost-filter-chip {
-	box-shadow: 0 0 0 0.5px #ffffff12 inset;
-}
-.cost-filter-dimension {
-	flex-shrink: 0;
-	white-space: nowrap;
-	color: var(--cost-muted);
-}
-.cost-text-button {
-	font-size: 0.75rem;
-	color: var(--cost-muted);
-	padding: 4px 6px;
-	border-radius: 5px;
-	white-space: nowrap;
-}
-.cost-text-button:hover {
-	color: var(--cost-foreground);
-}
-.cost-text-button:disabled {
-	opacity: 0.5;
-	cursor: default;
-}
 .cost-breakdown[data-empty] .cost-tools {
 	display: none;
 }
@@ -871,34 +830,29 @@
 	display: flex;
 	height: 100%;
 	min-height: 160px;
-	padding: 4px 12px 12px;
+	padding: var(--space-xs) var(--space-l) var(--space-l);
 }
 .cost-breakdown-empty {
-	padding: 35px 12px;
+	padding: calc(var(--space-xxl) * 1.5) var(--space-l);
 	text-align: center;
-	color: var(--cost-muted);
-	font-size: 0.8125rem;
-}
-.cost-breakdown-dialog {
-	--cost-foreground: #292a2f;
-	--cost-muted: #828387;
-	--cost-surface: #fff;
-	--cost-border: rgb(0 0 0 / 7%);
-	--cost-soft: rgb(0 0 0 / 3%);
-	--cost-hover: rgb(0 0 0 / 5%);
-	--cost-blue: oklch(0.623 0.188 259.815);
+	color: var(--ink-3);
+	font-size: var(--size-l);
+	line-height: var(--line-l);
+	letter-spacing: var(--letter-spacing-l);
 }
 .cost-search {
 	width: 100%;
 	min-width: 0;
-	padding: 8px 10px;
-	border: 1px solid var(--cost-border);
-	border-radius: 6px;
+	padding: var(--space-m) var(--space-l);
+	border: var(--border-m) solid var(--line);
+	border-radius: var(--radius-xs);
 	background: transparent;
-	font-size: 0.875rem;
+	font-size: var(--size-xl);
+	line-height: var(--line-xl);
+	letter-spacing: var(--letter-spacing-xl);
 }
 .cost-search:focus {
-	outline: 2px solid var(--cost-blue);
+	outline: 2px solid var(--accent);
 	outline-offset: -1px;
 }
 .cost-expanded-list {
@@ -907,30 +861,20 @@
 	overscroll-behavior: none;
 	display: flex;
 	flex-direction: column;
-	gap: 3px;
+	gap: var(--space-xs);
 }
 .cost-dialog-footer {
 	display: flex;
 	justify-content: space-between;
-	gap: 16px;
-}
-.cost-secondary-button {
-	font-size: 0.8125rem;
-	min-height: 32px;
-	padding: 5px 12px;
-	border: 1px solid var(--cost-border);
-	border-radius: 6px;
-}
-.cost-secondary-button:hover {
-	background: var(--cost-hover);
+	gap: var(--space-xl);
 }
 .cost-error {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 20px;
+	gap: var(--space-xxl);
 	min-height: 220px;
-	padding: 32px;
+	padding: calc(var(--space-xxl) * 4 / 3);
 }
 .cost-error-state {
 	display: flex;
@@ -942,11 +886,11 @@
 	min-width: 0;
 }
 .cost-error h2 {
-	font-weight: 500;
+	font-weight: var(--weight-body-medium);
 }
 .cost-error p {
-	color: var(--cost-muted);
-	padding-top: 6px;
+	color: var(--ink-3);
+	padding-top: var(--space-s);
 }
 /* Sized like the stat card value it stands in for, so the label keeps its
    room while the number loads. */
@@ -978,16 +922,16 @@
 	display: block;
 	height: 8px;
 	width: 28px;
-	border-radius: 2px;
+	border-radius: var(--radius-xs);
 }
 .cost-chart-loading-dates [skullet-bar] {
 	width: 48px;
 }
 .cost-metric[data-unavailable="true"] .cost-metric-value {
-	font-size: 0.875rem;
-	line-height: 2.0625rem;
-	letter-spacing: normal;
-	color: var(--cost-muted);
+	font-size: var(--size-xl);
+	line-height: var(--line-xl);
+	letter-spacing: var(--letter-spacing-xl);
+	color: var(--ink-3);
 }
 /* The chart loads as itself (chart-flow.ts): Recharts draws the heartbeat
    behind a window sweeping across it, the way ChartLoadingWave flows. The
@@ -1068,7 +1012,7 @@
 	height: 100%;
 }
 .cost-chart-loading-guides path {
-	stroke: color-mix(in srgb, var(--cost-foreground) 6%, transparent);
+	stroke: color-mix(in srgb, var(--ink) 6%, transparent);
 }
 .cost-chart-skeleton[data-leaving] {
 	pointer-events: none;
@@ -1079,7 +1023,7 @@
 	left: 0;
 	bottom: 0;
 	width: 100%;
-	margin: 0;
+	margin: var(--space-zero);
 }
 .cost-metric[data-revealing]
 	.cost-metric-wave
@@ -1149,26 +1093,32 @@
 		padding: 16px var(--metric-pad-x) 0;
 	}
 	.cost-metric-value {
-		font-size: 1.375rem;
+		font-size: var(--display-size-xxs);
+		line-height: var(--display-line-xxs);
+		letter-spacing: var(--display-letter-spacing-xxs);
 	}
 	.cost-metric-label {
-		font-size: 0.75rem;
+		font-size: var(--size-m);
+		line-height: var(--line-m);
+		letter-spacing: var(--letter-spacing-m);
 	}
 	.cost-chart-key {
-		padding-inline: 16px;
+		padding-inline: var(--space-xl);
 	}
 }
 @media (max-width: 640px) {
 	.cost-page-content {
-		padding: 20px 14px;
-		gap: 16px;
+		padding: var(--space-xxl) var(--space-xl);
+		gap: var(--space-xl);
 	}
 	.cost-breakdown-row,
 	.cost-chart-empty,
 	.cost-breakdown-empty,
 	.cost-search,
 	.cost-error {
-		font-size: 1rem;
+		font-size: var(--size-xxl);
+		line-height: var(--line-xxl);
+		letter-spacing: var(--letter-spacing-xxl);
 	}
 	.cost-chart-canvas {
 		height: 260px;
@@ -1178,12 +1128,12 @@
 	.cost-tools {
 		grid-template-columns: 1fr;
 		grid-template-rows: 1fr;
-		background: var(--cost-surface);
+		background: var(--canvas);
 	}
 	.cost-tools-inner {
 		opacity: 1;
 		transform: none;
-		gap: 12px;
+		gap: var(--space-l);
 	}
 	.cost-tool-button {
 		min-height: 38px;
@@ -1217,21 +1167,13 @@
 }
 .dark .cost-tools,
 .dark .cost-chart-tooltip {
-	box-shadow: 0 0 0 1px var(--cost-border);
+	box-shadow: 0 0 0 1px var(--line);
 }
 
 .dark .cost-page,
 .dark .cost-range-controls,
 .dark .cost-breakdown-dialog {
-	--cost-surface: var(--background);
 	--cost-chart-fill-opacity: 0.12;
-	--cost-foreground: #e6e6e9;
-	--cost-muted: #919299;
-	--cost-border: rgb(255 255 255 / 9%);
-	--cost-soft: rgb(255 255 255 / 4%);
-	--cost-hover: rgb(255 255 255 / 7%);
-	--cost-divider: rgb(255 255 255 / 4%);
-	--cost-row-hover: rgb(255 255 255 / 3%);
 }
 /* While newer numbers load, only the chart line dims, and only if the load
    outlasts a beat, so quick refreshes never flicker. Cards stay crisp. */
@@ -1250,13 +1192,13 @@
 	width: 100%;
 }
 
-.cost-chart-interval .session-menu-row:has(input:checked)::before {
-	background: var(--session-menu-highlight);
+.cost-chart-interval .menu-row:has(input:checked)::before {
+	background: var(--hover);
 }
-.cost-chart-interval .session-menu-icon {
+.cost-chart-interval .menu-icon {
 	visibility: hidden;
 }
-.cost-chart-interval input:checked + .session-menu-icon {
+.cost-chart-interval input:checked + .menu-icon {
 	visibility: visible;
 }
 @media (min-width: 900px) {
@@ -1275,18 +1217,18 @@
 	}
 	.session-date-picker:has(.cost-chart-interval) .session-date-picker-divider {
 		width: auto;
-		height: var(--session-menu-hairline);
+		height: var(--menu-hairline);
 	}
 }
 
 .cost-breakdown[data-dimension="durations"] .cost-breakdown-row:last-of-type {
-	border-top: 1px solid var(--cost-border);
-	margin-top: 0.5rem;
+	border-top: var(--border-m) solid var(--line);
+	margin-top: var(--space-m);
 }
 
 /* Plugin app: rows that name people load only when asked for. */
 .cost-breakdown-load {
-	color: var(--cost-blue);
+	color: var(--accent);
 	font: inherit;
 	text-decoration: underline;
 	text-underline-offset: 2px;
@@ -1336,7 +1278,7 @@
 .cost-metric-marker {
 	stroke: currentColor;
 	stroke-opacity: 0.4;
-	stroke-width: 1;
+	stroke-width: var(--border-m);
 	stroke-dasharray: 2 2;
 	stroke-linecap: round;
 }
@@ -1353,7 +1295,7 @@
 .cost-ci-chart {
 	position: absolute;
 	inset: 0;
-	--ci-run: color-mix(in oklab, var(--cost-foreground) 18%, transparent);
+	--ci-run: color-mix(in oklab, var(--ink) 18%, transparent);
 	--ci-failed: oklch(0.637 0.208 25.331);
 }
 .cost-ci-chart svg {
@@ -1361,22 +1303,24 @@
 	overflow: visible;
 }
 .cost-ci-grid {
-	stroke: var(--cost-border);
+	stroke: var(--line);
 	stroke-dasharray: 3 4;
 }
 .cost-ci-tick {
-	fill: var(--cost-muted);
-	font-size: 11px;
+	fill: var(--ink-3);
+	font-size: var(--size-s);
+	line-height: var(--line-s);
+	letter-spacing: var(--letter-spacing-s);
 }
 .cost-ci-tick[data-merged] {
-	fill: color-mix(in oklab, var(--ci-merged) 75%, var(--cost-muted));
+	fill: color-mix(in oklab, var(--ci-merged) 75%, var(--ink-3));
 }
 .cost-ci-day rect {
 	fill: var(--ci-run);
 	transition: opacity 150ms ease;
 }
 .cost-ci-day rect[data-failed] {
-	fill: var(--ci-failed);
+	fill: var(--error);
 }
 .cost-ci-day[data-dim] rect {
 	opacity: 0.35;
@@ -1384,30 +1328,30 @@
 .cost-ci-line {
 	fill: none;
 	stroke: var(--ci-merged);
-	stroke-width: 2;
+	stroke-width: var(--border-l);
 	stroke-linejoin: round;
 	stroke-linecap: round;
 	pointer-events: none;
 }
 .cost-ci-dot {
 	fill: var(--ci-merged);
-	stroke: var(--cost-surface);
-	stroke-width: 2;
+	stroke: var(--canvas);
+	stroke-width: var(--border-l);
 	pointer-events: none;
 }
 .cost-ci-hit {
 	fill: transparent;
 }
 .cost-ci-marker {
-	stroke: var(--cost-muted);
+	stroke: var(--ink-3);
 	stroke-dasharray: 3 3;
 	pointer-events: none;
 }
 .cost-legend-item i[data-ci="runs"] {
-	background: color-mix(in oklab, var(--cost-foreground) 35%, transparent);
+	background: color-mix(in oklab, var(--ink) 35%, transparent);
 }
 .cost-legend-item i[data-ci="failed"] {
-	background: oklch(0.637 0.208 25.331);
+	background: var(--error);
 }
 .cost-ci-ring {
 	width: 15px;
@@ -1417,10 +1361,10 @@
 }
 .cost-ci-ring path {
 	fill: none;
-	stroke: color-mix(in oklab, var(--cost-foreground) 18%, transparent);
-	stroke-width: 2.6;
+	stroke: color-mix(in oklab, var(--ink) 18%, transparent);
+	stroke-width: var(--border-l);
 	transition: stroke 200ms ease;
 }
 .cost-ci-ring path[data-failed] {
-	stroke: oklch(0.637 0.208 25.331);
+	stroke: var(--error);
 }

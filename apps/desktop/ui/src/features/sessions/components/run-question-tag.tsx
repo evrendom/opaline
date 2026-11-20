@@ -27,11 +27,11 @@ export function RunQuestionTag({
 		>
 			<IconMessageQuestion
 				aria-hidden="true"
-				className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400"
+				className="size-3.5 shrink-0 text-warning dark:text-warning"
 			/>
-			<span className="truncate font-sans">{runQuestionTagLabel(tag)}</span>
+			<span className="truncate font-body">{runQuestionTagLabel(tag)}</span>
 			{tag.runs > 1 ? (
-				<span className="shrink-0 font-normal text-[#8d8d8d] tabular-nums dark:text-[#8c8c8c]">
+				<span className="shrink-0 font-regular text-ink-3 tabular-nums dark:text-ink-3">
 					×{tag.runs}
 				</span>
 			) : null}
@@ -53,7 +53,7 @@ export function SessionOverviewQuestionTags({
 	const hidden = tags.slice(MAX_SESSION_OVERVIEW_QUESTION_TAGS);
 	return (
 		<div
-			className="flex min-w-0 max-w-full shrink-0 items-center gap-1"
+			className="flex min-w-0 max-w-full shrink-0 items-center gap-xs"
 			data-session-overview-question-tags
 		>
 			{rendered.map((tag) => (
@@ -65,7 +65,7 @@ export function SessionOverviewQuestionTags({
 			))}
 			{hidden.length > 0 ? (
 				<span
-					className="shrink-0 whitespace-nowrap text-[0.625rem] font-normal text-(--session-overview-subtle)"
+					className="shrink-0 whitespace-nowrap text-body-xs font-regular text-ink-3"
 					data-session-overview-question-overflow-tag
 					title={hidden.map((tag) => tag.label ?? tag.question).join(", ")}
 				>

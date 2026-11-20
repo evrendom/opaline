@@ -6,11 +6,11 @@ import {
 	IconSortDescending,
 } from "@tabler/icons-react";
 import { useRef } from "react";
+import { Button } from "@/app/ui/button";
+import { TouchTarget } from "@/app/ui/touch-target";
 import { SessionMenuPopup } from "./session-menu-popup";
-import "./session-menu.css";
 import {
 	getInitialSortDirection,
-	SESSION_OVERVIEW_MENU_TRIGGER_CLASS_NAME,
 	SESSION_OVERVIEW_SORT_OPTIONS,
 	type SessionOverviewSortKey,
 	type SessionSortState,
@@ -79,29 +79,26 @@ export function ToolbarSortMenu<K extends string>({
 			<Menu.Trigger
 				ref={triggerRef}
 				aria-label={`Sort ${noun}, ${activeSortLabel}, ${sort.direction === "asc" ? "ascending" : "descending"}`}
-				className={SESSION_OVERVIEW_MENU_TRIGGER_CLASS_NAME}
+				render={<Button variant="toolbar" />}
 			>
 				<IconSortDescending
 					aria-hidden="true"
-					className="size-4 h-lh shrink-0 text-[#5d5d5d] dark:text-[#acaeb2]"
+					className="size-4 h-lh shrink-0 text-ink-2 dark:text-ink-3"
 				/>
-				<span className="text-(--session-overview-muted)">Sorted by</span>
+				<span className="text-ink-3">Sorted by</span>
 				<span>{activeSortLabel}</span>
 				{sort.direction === "asc" ? (
 					<IconChevronUp
 						aria-hidden="true"
-						className="size-4 shrink-0 text-[#5d5d5d] dark:text-[#acaeb2]"
+						className="size-4 shrink-0 text-ink-2 dark:text-ink-3"
 					/>
 				) : (
 					<IconChevronDown
 						aria-hidden="true"
-						className="size-4 shrink-0 text-[#5d5d5d] dark:text-[#acaeb2]"
+						className="size-4 shrink-0 text-ink-2 dark:text-ink-3"
 					/>
 				)}
-				<span
-					aria-hidden="true"
-					className="pointer-fine:hidden absolute top-1/2 left-1/2 size-12 -translate-1/2"
-				/>
+				<TouchTarget className="size-12" />
 			</Menu.Trigger>
 			<SessionMenuPopup aria-label={`Sort ${noun}`}>
 				<Menu.RadioGroup
@@ -122,14 +119,14 @@ export function ToolbarSortMenu<K extends string>({
 							key={option.key}
 							value={option.key}
 							closeOnClick
-							className="session-menu-row"
+							className="menu-row"
 						>
 							<SortCheck />
 							{option.label}
 						</Menu.RadioItem>
 					))}
 				</Menu.RadioGroup>
-				<Menu.Separator className="session-menu-separator" />
+				<Menu.Separator className="menu-separator" />
 				<Menu.RadioGroup
 					aria-label="Sort direction"
 					value={sort.direction}
@@ -138,15 +135,11 @@ export function ToolbarSortMenu<K extends string>({
 							onSortChange({ ...sort, direction: value });
 					}}
 				>
-					<Menu.RadioItem value="asc" closeOnClick className="session-menu-row">
+					<Menu.RadioItem value="asc" closeOnClick className="menu-row">
 						<SortCheck />
 						Ascending
 					</Menu.RadioItem>
-					<Menu.RadioItem
-						value="desc"
-						closeOnClick
-						className="session-menu-row"
-					>
+					<Menu.RadioItem value="desc" closeOnClick className="menu-row">
 						<SortCheck />
 						Descending
 					</Menu.RadioItem>
@@ -158,7 +151,7 @@ export function ToolbarSortMenu<K extends string>({
 
 function SortCheck() {
 	return (
-		<Menu.RadioItemIndicator className="session-menu-sort-check">
+		<Menu.RadioItemIndicator className="menu-sort-check">
 			<IconCheck aria-hidden="true" className="size-3.5" />
 		</Menu.RadioItemIndicator>
 	);

@@ -96,21 +96,21 @@ export function Breakdown({
 	const total = parts.reduce((sum, part) => sum + part.value, 0);
 	const shown = parts.filter((part) => part.value > 0);
 	const heading = (
-		<span className="truncate text-xs/4 text-muted-foreground">
+		<span className="truncate text-xs/4 text-ink-3">
 			{title}
 			{toggle?.label ? (
-				<span className="text-muted-foreground/70"> · {toggle.label}</span>
+				<span className="text-ink-3/70"> · {toggle.label}</span>
 			) : null}
 		</span>
 	);
 	return (
-		<div className="flex min-w-0 flex-col gap-1">
+		<div className="flex min-w-0 flex-col gap-xs">
 			{toggle ? (
 				<Tip label={`Show ${toggle.next}`}>
 					<button
 						type="button"
 						onClick={toggle.onToggle}
-						className="flex w-fit max-w-full hover:[&>span]:text-foreground"
+						className="flex w-fit max-w-full hover:[&>span]:text-ink"
 					>
 						{heading}
 					</button>
@@ -118,10 +118,10 @@ export function Breakdown({
 			) : (
 				heading
 			)}
-			<span className="truncate text-[13px]/4 text-foreground tabular-nums">
+			<span className="truncate text-[13px]/4 text-ink tabular-nums">
 				{value}
 			</span>
-			<span className="flex h-1 gap-px overflow-hidden rounded-full bg-muted-foreground/10">
+			<span className="flex h-1 gap-xxs overflow-hidden corner-full bg-ink-3/10">
 				{shown.map((part) => (
 					<Tip
 						key={part.label}

@@ -5,8 +5,8 @@ import type {
 import { IconRoute } from "@tabler/icons-react";
 import { keepPreviousData, useQueries } from "@tanstack/react-query";
 import { type ReactNode, useMemo, useRef, useState } from "react";
+import { Skeleton } from "@/app/ui/skeleton";
 import { EmptyState } from "@/components/dashboard/page-parts";
-import { Skeleton } from "@/components/dashboard/skeleton";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { fetchSessionDetailOverview } from "@/features/sessions/components/session-detail-fast-query";
@@ -186,13 +186,13 @@ export function RepoSkillSessions({
 	return (
 		<div className="min-h-0 flex-1 overflow-y-auto overscroll-none">
 			{rows.length === 0 && searching ? (
-				<div className="flex flex-col gap-2 p-4">
+				<div className="flex flex-col gap-m p-xl">
 					{[0, 1, 2, 3].map((index) => (
-						<Skeleton key={index} className="h-8 w-full rounded-lg" />
+						<Skeleton key={index} className="h-8 w-full corner-m" />
 					))}
 				</div>
 			) : rows.length === 0 ? (
-				<div className="px-8 pt-6">
+				<div className="px-[calc(var(--space-xxl)*4/3)] pt-xxl">
 					<EmptyState
 						icon={IconRoute}
 						title={
@@ -206,7 +206,7 @@ export function RepoSkillSessions({
 			) : (
 				// Inset 16px on the left, as the skill file card is from this
 				// pane, so the rounded highlight and open block clear the edge.
-				<div className="pl-4">
+				<div className="pl-xl">
 					<SessionsOverviewFluidList
 						fillHeight={false}
 						highlightClassName="rounded-lg corner-squircle squircle:rounded-2xl"
@@ -243,14 +243,14 @@ export function RepoSkillSessions({
 											// one, though the pointer is on neither.
 											// biome-ignore lint/a11y/noStaticElementInteractions: only keeps the list's decorative hover out; the panel's own controls are buttons.
 											<div
-												className="rounded-b-lg bg-neutral-100 px-4 pb-4 corner-squircle squircle:rounded-b-2xl dark:bg-card"
+												className="corner-b-m bg-field px-xl pb-xl corner-squircle squircle:corner-b-xl dark:bg-card"
 												onMouseEnter={() => setActiveIndex(null)}
 												onMouseMove={(event) => event.stopPropagation()}
 											>
 												{/* The card's body, under the cap the row freezes with:
 												    its sides and bottom (the clip drops the shadow's top
 												    edge, where the cap meets it). */}
-												<div className="overflow-clip rounded-b-lg bg-(--dashboard-01-content-background,var(--background)) shadow-(--custom-outline-shadow) [clip-path:inset(0_-8px_-8px_-8px)] corner-squircle squircle:rounded-b-xl">
+												<div className="overflow-clip corner-b-m bg-(--dashboard-01-content-background,var(--canvas)) shadow-(--shadow-control) [clip-path:inset(0_-8px_-8px_-8px)] corner-squircle squircle:corner-b-l">
 													<SkillRunWaterfall
 														sessionId={trace.session.session_id}
 														revision={trace.revision}
@@ -271,9 +271,7 @@ export function RepoSkillSessions({
 				</div>
 			)}
 			{rows.length > 0 && searching ? (
-				<p className="px-6 py-3 text-xs text-(--session-overview-subtle)">
-					Finding more runs…
-				</p>
+				<p className="px-xxl py-l text-body-m text-ink-3">Finding more runs…</p>
 			) : null}
 		</div>
 	);
@@ -333,11 +331,7 @@ function AgentTraceRow({
 		>
 			{/* Frozen, it sits on the list's own ground, so the rows scrolling
 			    behind it don't show through its rounded top corners. */}
-			<div
-				className={cn(
-					open && "sticky top-0 z-40 bg-(--session-overview-surface)",
-				)}
-			>
+			<div className={cn(open && "sticky top-0 z-40 bg-canvas")}>
 				<button
 					ref={itemRef}
 					type="button"
@@ -351,18 +345,18 @@ function AgentTraceRow({
 						// An open row shares the tint of the panel folded out beneath it,
 						// rounding the top of the block the panel rounds at the bottom.
 						open &&
-							"rounded-t-lg bg-neutral-100 corner-squircle squircle:rounded-t-2xl dark:bg-card",
+							"corner-t-m bg-field corner-squircle squircle:corner-t-xl dark:bg-card",
 					)}
 				>
 					<div className={SESSION_OVERVIEW_CELL_CLASS_NAME}>
 						<span
-							className="truncate font-mono text-[11px] text-(--session-overview-subtle)"
+							className="truncate font-data text-body-s text-ink-3"
 							title={run.turnId}
 						>
 							{shortRunId(run.turnId)}
 						</span>
 					</div>
-					<div className={cn(SESSION_OVERVIEW_CELL_CLASS_NAME, "px-2")}>
+					<div className={cn(SESSION_OVERVIEW_CELL_CLASS_NAME, "px-m")}>
 						<time
 							dateTime={run.startedAt ?? undefined}
 							className={SESSION_OVERVIEW_METADATA_CLASS_NAME}
@@ -376,7 +370,7 @@ function AgentTraceRow({
 								: "—"}
 						</time>
 					</div>
-					<div className={cn(SESSION_OVERVIEW_CELL_CLASS_NAME, "gap-2 px-2")}>
+					<div className={cn(SESSION_OVERVIEW_CELL_CLASS_NAME, "gap-m px-m")}>
 						<ModelChip model={model} glyph="size-3" open={open} />
 						<p
 							className={cn(
@@ -403,7 +397,7 @@ function AgentTraceRow({
 					<div
 						className={cn(
 							SESSION_OVERVIEW_CELL_CLASS_NAME,
-							"justify-end gap-2",
+							"justify-end gap-m",
 						)}
 						title={
 							tokens === null
@@ -431,8 +425,8 @@ function AgentTraceRow({
 					// the row, so the card keeps its top while the rest of it scrolls
 					// under the frozen header; only its top and sides show, meeting
 					// the card's body (which shows the rest) seamlessly.
-					<div className="h-4 bg-neutral-100 px-4 pt-1 dark:bg-card">
-						<div className="h-5 rounded-t-lg bg-(--dashboard-01-content-background,var(--background)) shadow-(--custom-outline-shadow) [clip-path:inset(-8px_-8px_7px_-8px)] corner-squircle squircle:rounded-t-xl" />
+					<div className="h-4 bg-field px-xl pt-xs dark:bg-card">
+						<div className="h-5 corner-t-m bg-(--dashboard-01-content-background,var(--canvas)) shadow-(--shadow-control) [clip-path:inset(-8px_-8px_7px_-8px)] corner-squircle squircle:corner-t-l" />
 					</div>
 				) : null}
 			</div>

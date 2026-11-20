@@ -107,9 +107,9 @@ function ToolSearchLoaded({
 	tools: readonly string[];
 }) {
 	if (tools.length === 0)
-		return <p className="text-xs text-muted-foreground">Nothing matched.</p>;
+		return <p className="text-body-m text-ink-3">Nothing matched.</p>;
 	return (
-		<ul className="-mx-2 flex flex-col">
+		<ul className="-mx-m flex flex-col">
 			{tools.map((tool) => {
 				const Glyph =
 					CONVERSATION_TOOL_ICONS[getToolPresentation(tool).icon] ??
@@ -119,22 +119,22 @@ function ToolSearchLoaded({
 					<li
 						key={tool}
 						title={tool}
-						className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1"
+						className="flex min-w-0 items-center gap-m corner-s px-m py-xs"
 					>
 						<OpalChip tint={LANE_LOOK.tools.tint} className="size-4">
-							<Glyph aria-hidden="true" className="size-2.5 text-teal-500" />
+							<Glyph aria-hidden="true" className="size-2.5 text-success" />
 						</OpalChip>
 						<span
 							className={
 								count > 0
-									? "min-w-0 truncate text-xs"
-									: "min-w-0 truncate text-xs text-muted-foreground"
+									? "min-w-0 truncate text-body-m"
+									: "min-w-0 truncate text-body-m text-ink-3"
 							}
 						>
 							{toolLabel(tool)}
 						</span>
 						<span
-							className="ml-auto shrink-0 text-[11px] tabular-nums text-muted-foreground"
+							className="ml-auto shrink-0 text-body-s tabular-nums text-ink-3"
 							title={
 								count > 0
 									? `Called ${count} ${count === 1 ? "time" : "times"} after it loaded`

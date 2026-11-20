@@ -1,6 +1,6 @@
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import type { KeyboardEvent, RefObject } from "react";
-import { FluidHoverHighlight } from "@/components/ui/fluid-hover-highlight";
+import { FluidHoverHighlight } from "@/app/ui/fluid-hover-highlight";
 import { useFluidHover } from "@/hooks/use-fluid-hover";
 import type { SessionTurnEpisode } from "./session-turn-episodes";
 import type { SessionTurnTableRow } from "./session-turn-table";
@@ -89,11 +89,8 @@ export function SessionTurnTableBody({
 				inert
 				className="pointer-events-none absolute inset-0 z-0 block"
 			>
-				<td className="block size-full p-0">
-					<FluidHoverHighlight
-						hover={hover}
-						className="rounded-none bg-(--session-overview-hover)"
-					/>
+				<td className="block size-full p-zero">
+					<FluidHoverHighlight hover={hover} className="corner-zero bg-hover" />
 				</td>
 			</tr>
 			{/* Loaded pages intentionally stay in the DOM, even for ~2,000-row whale searches. */}
@@ -168,7 +165,7 @@ export function SessionTurnTableBody({
 						>
 							<td
 								aria-hidden="true"
-								className="block size-full rounded-full bg-[oklch(0.67_0.164_262.589)] shadow-[inset_0_0_1px_#00000012,inset_0_1px_1px_#00000012,inset_0_-1px_0_#ffffff0a] dark:shadow-none"
+								className="block size-full corner-full bg-color-1 shadow-[inset_0_0_1px_#00000012,inset_0_1px_1px_#00000012,inset_0_-1px_0_#ffffff0a] dark:shadow-none"
 							/>
 						</motion.tr>
 					))}

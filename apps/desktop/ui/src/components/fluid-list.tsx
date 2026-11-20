@@ -57,7 +57,7 @@ export function FluidList({
 			<FluidHoverHighlight
 				hover={hover}
 				className={cn(
-					"z-0 rounded-md bg-foreground/[0.05] corner-squircle squircle:rounded-xl dark:bg-muted/50",
+					"z-0 corner-s bg-ink/[0.05] corner-squircle squircle:corner-l dark:bg-field/50",
 					highlightClassName,
 				)}
 			/>

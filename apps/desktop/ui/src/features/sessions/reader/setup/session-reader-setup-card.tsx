@@ -68,19 +68,19 @@ export function SetupCard({
 	);
 	return (
 		<div className="flex min-h-0 min-w-0 flex-1 flex-col">
-			<header className="flex flex-col gap-2 border-b border-border/50 px-5 py-4">
-				<div className="flex min-w-0 items-center gap-2">
+			<header className="flex flex-col gap-m edge-b-m border-line/50 px-xxl py-xl">
+				<div className="flex min-w-0 items-center gap-m">
 					<span className="flex shrink-0">
 						<SetupMark file={file} />
 					</span>
 					<h2
 						title={file.setupFile}
-						className="min-w-0 truncate text-sm font-medium"
+						className="min-w-0 truncate text-body-xl font-medium"
 					>
 						{setupName(file)}
 					</h2>
 					{details ? (
-						<span className="shrink-0 text-xs text-muted-foreground">
+						<span className="shrink-0 text-body-m text-ink-3">
 							{setupOwner(file)} · {KIND_LABEL[file.kind] ?? file.kind}
 						</span>
 					) : null}
@@ -105,18 +105,18 @@ export function SetupCard({
 					) : null}
 				</div>
 				{details && versions.length > 0 && versions.length < file.versions ? (
-					<p className="text-xs text-muted-foreground tabular-nums">
+					<p className="text-body-m text-ink-3 tabular-nums">
 						The latest {versions.length} of its {file.versions} versions.
 					</p>
 				) : null}
 				{versionPicker && versions.length > 1 ? (
-					<div className="flex flex-wrap items-center gap-1">
+					<div className="flex flex-wrap items-center gap-xs">
 						{versions.map((version, index) => (
 							<Button
 								key={version.version}
 								size="xs"
 								variant="ghost"
-								className={cn("font-mono", TOGGLE)}
+								className={cn("font-data", TOGGLE)}
 								aria-pressed={version === shown}
 								title={`First received ${new Date(version.firstAt).toLocaleString()}, by ${version.runs} ${version.runs === 1 ? "run" : "runs"}`}
 								onClick={() => pick(version.version)}
@@ -130,7 +130,7 @@ export function SetupCard({
 			<div className="flex min-h-0 flex-1">
 				<div className="flex min-h-0 min-w-0 flex-1 flex-col">
 					{!query.isLoading && !shown ? (
-						<p className="px-5 py-4 text-[13px] text-muted-foreground">
+						<p className="px-xxl py-xl text-body-l text-ink-3">
 							{query.isError
 								? "Its text could not be read."
 								: "Its text was not kept for this session."}
@@ -142,11 +142,11 @@ export function SetupCard({
 							label="Reading its text"
 							loading={query.isLoading}
 							sample={
-								<div className="flex flex-col gap-2 px-5 py-4">
+								<div className="flex flex-col gap-m px-xxl py-xl">
 									{[88, 72, 80, 56, 64].map((width) => (
 										<Bone
 											key={width}
-											className="h-3.5 rounded-md"
+											className="h-3.5 corner-s"
 											style={{ width: `${width}%` }}
 										/>
 									))}
@@ -156,10 +156,10 @@ export function SetupCard({
 						>
 							{() =>
 								shown ? (
-									<ScrollColumn className="px-5 py-4">
+									<ScrollColumn className="px-xxl py-xl">
 										{hunks ? (
 											hunks.length === 0 ? (
-												<p className="text-[13px] text-muted-foreground">
+												<p className="text-body-l text-ink-3">
 													No line changed since the version before.
 												</p>
 											) : (
@@ -169,7 +169,7 @@ export function SetupCard({
 											<SetupProse text={shown.text} />
 										)}
 										{shown.textCut ? (
-											<p className="pt-3 text-xs text-muted-foreground tabular-nums">
+											<p className="pt-l text-body-m text-ink-3 tabular-nums">
 												Only its start was kept: the whole text is{" "}
 												{shown.chars.toLocaleString()} characters.
 											</p>

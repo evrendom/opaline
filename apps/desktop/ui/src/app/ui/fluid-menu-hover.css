@@ -1,0 +1,51 @@
+@layer components {
+	:where([data-fluid-menu-root]) {
+		position: relative;
+		isolation: isolate;
+	}
+}
+
+.fluid-menu-hover-layer {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	z-index: -1;
+}
+
+.fluid-menu-hover-fill {
+	border-radius: inherit;
+	background: var(--hover);
+}
+
+.fluid-menu-hover-layer[data-over] {
+	z-index: 30;
+}
+
+.fluid-menu-hover-layer[data-over] .fluid-menu-hover-fill {
+	background: color-mix(in oklab, var(--ink) 4%, transparent);
+}
+
+.fluid-menu-hover-layer[data-destructive] .fluid-menu-hover-fill {
+	background: color-mix(in srgb, var(--error) 15%, transparent);
+}
+
+/* Only replace transient fills. Current links, checks, ranges and presets persist. */
+[data-fluid-menu-item]:not(
+		:disabled,
+		[data-disabled],
+		[aria-disabled="true"],
+		[aria-pressed="true"],
+		[aria-current="page"],
+		[data-selected-single="true"],
+		[data-range-start="true"],
+		[data-range-end="true"],
+		[data-range-middle="true"]
+	):is(
+		:hover,
+		:focus,
+		:focus-within,
+		[data-highlighted],
+		[data-fluid-hover-active]
+	) {
+	background-color: transparent;
+}

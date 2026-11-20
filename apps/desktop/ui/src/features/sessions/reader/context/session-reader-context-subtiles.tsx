@@ -41,20 +41,22 @@ export function MarkLegend({
 	return (
 		<div
 			className={cn(
-				"inline-flex min-w-0 shrink-0 items-center gap-0.5 rounded-lg bg-black/[0.04] p-0.5 text-xs font-medium text-muted-foreground corner-squircle squircle:rounded-[14px] dark:bg-white/[0.06]",
+				"inline-flex min-w-0 shrink-0 items-center gap-xxs",
+				"corner-m p-xxs corner-squircle",
+				"text-body-m font-medium",
+				"bg-wash text-ink-3",
+				"squircle:corner-l dark:bg-wash",
 				className,
 			)}
 		>
-			<span className="flex h-6 items-center px-2 text-muted-foreground/60">
-				Errors
-			</span>
-			<ul aria-label="Errors" className="flex min-w-0 items-center gap-0.5">
+			<span className="flex h-6 items-center px-m text-ink-3/60">Errors</span>
+			<ul aria-label="Errors" className="flex min-w-0 items-center gap-xxs">
 				{shown.map((tone) => (
-					<li key={tone} className="flex h-6 items-center gap-1.5 px-2">
+					<li key={tone} className="flex h-6 items-center gap-s px-m">
 						<span
 							aria-hidden="true"
 							className={cn(
-								"size-2.5 shrink-0 rounded-[3px] border corner-squircle",
+								"size-2.5 shrink-0 corner-xs edge-m corner-squircle",
 								markGlow(tone),
 							)}
 						/>
@@ -82,9 +84,9 @@ export function markOf(
 }
 
 const TEXT: Record<Tone, string> = {
-	later: "text-opal-4",
-	minor: "text-opal-3",
-	never: "text-rose-500",
+	later: "text-color-4",
+	minor: "text-color-2",
+	never: "text-error",
 };
 
 const ICON_ROOM = 16;
@@ -173,7 +175,7 @@ export function ContextSubTiles({
 					>
 						<span
 							className={cn(
-								"absolute inset-0 rounded-[3px] border corner-squircle squircle:rounded-[6px]",
+								"absolute inset-0 corner-xs edge-m corner-squircle squircle:corner-xs",
 								mark ? markGlow(mark) : "border-current opacity-20",
 							)}
 						/>

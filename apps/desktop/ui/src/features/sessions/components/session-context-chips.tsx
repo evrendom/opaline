@@ -42,10 +42,10 @@ export function SessionContextChips({
 			label="Loading where this session ran"
 			loading={!viewModel}
 			sample={
-				<div className="flex shrink-0 flex-wrap items-center gap-2 bg-(--dashboard-01-content-background) px-6 pt-1 pb-3">
-					<Bone className="h-8 w-28 rounded-full" />
-					<Bone className="h-8 w-36 rounded-full" />
-					<Bone className="h-8 w-32 rounded-full" />
+				<div className="flex shrink-0 flex-wrap items-center gap-m bg-canvas px-xxl pt-xs pb-l">
+					<Bone className="h-8 w-28 corner-full" />
+					<Bone className="h-8 w-36 corner-full" />
+					<Bone className="h-8 w-32 corner-full" />
 				</div>
 			}
 			sampleId="session-chips"
@@ -76,12 +76,12 @@ function ContextChips({
 	} = viewModel;
 
 	return (
-		<div className="flex shrink-0 flex-wrap items-center gap-2 bg-(--dashboard-01-content-background) px-6 pt-1 pb-3">
+		<div className="flex shrink-0 flex-wrap items-center gap-m bg-canvas px-xxl pt-xs pb-l">
 			<ContextChip
 				icon={
 					<Avatar className="size-3.5 after:hidden">
 						{avatarUrl ? <AvatarImage src={avatarUrl} alt="" /> : null}
-						<AvatarFallback className="text-[0.5rem]">
+						<AvatarFallback className="text-body-xxs">
 							{safeUserDisplayName.charAt(0).toUpperCase()}
 						</AvatarFallback>
 					</Avatar>
@@ -151,7 +151,7 @@ export function SessionWhere({
 	if (safeGitSha)
 		parts.push([
 			"commit",
-			<span key="commit" className="font-mono" title={safeGitSha}>
+			<span key="commit" className="font-data" title={safeGitSha}>
 				{safeGitSha.slice(0, 8)}
 			</span>,
 		]);

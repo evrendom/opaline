@@ -24,7 +24,7 @@ describe("session constellation tree tokens", () => {
 		expect(css).toContain('[data-active-rail-position="middle"]');
 		expect(css).toContain("stroke-width: var(--active-turn-rail-width)");
 		expect(css).toContain("transform: scale(1.5)");
-		expect(css).toContain("color(display-p3 0 0 0 / 60.8%)");
+		expect(css).toContain("var(--ink-3)");
 		expect(css).toContain('font-family: "Inter Variable"');
 		expect(css).toContain(
 			"[data-trace-preview]:not([data-trace-shell-command-preview])",
@@ -90,7 +90,7 @@ describe("session constellation tree tokens", () => {
 
 		expect(css).toContain("[data-trace-request-metadata]");
 		expect(css).toContain("[data-trace-request-separator]");
-		expect(css).toContain("color: var(--constellation-tree-disabled)");
+		expect(css).toContain("color: var(--ink-3)");
 		expect(css).toContain("font-variant-numeric: tabular-nums");
 		expect(css).toContain("letter-spacing: normal");
 		expect(css).toContain("[data-trace-model-label]");

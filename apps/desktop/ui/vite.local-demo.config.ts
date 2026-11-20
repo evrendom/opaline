@@ -5,7 +5,8 @@
 //
 // product-demo mode holds auth requests until the marketing page's "Explore"
 // button activates the demo. There is no such button here, so activate it as
-// soon as the page loads.
+// soon as the page loads, on the demo's clock (Aug 31, 2026, its data's last
+// day) so the default date range holds its sessions.
 //
 // The demo workspace has no GitHub connection, so the server never offers the
 // GitHub outcome metrics there. To work on that gated UI locally, dashboard
@@ -27,7 +28,7 @@ const activateDemo: Plugin = {
 			tag: "script",
 			attrs: { type: "module" },
 			children:
-				'import { setDemoActive } from "/src/features/demo/demo-activation.ts"; setDemoActive(true);',
+				'import { installDemoClock } from "/src/features/demo/demo-clock.ts"; import { setDemoActive } from "/src/features/demo/demo-activation.ts"; installDemoClock(); setDemoActive(true);',
 			injectTo: "head",
 		},
 	],

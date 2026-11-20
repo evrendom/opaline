@@ -1,22 +1,13 @@
 /* Black pill in light, its mirror in dark: a light pill with dark text. The
    opal glow on hover is the same in both. */
-:root {
-	--website-primary-background: rgb(0 0 0 / 95%);
-	--website-primary-foreground: #fff;
-}
-
-.dark {
-	--website-primary-background: oklch(0.922 0 0);
-	--website-primary-foreground: oklch(0.205 0 0);
-}
 
 .opaline-website-primary-button {
 	position: relative;
 	isolation: isolate;
 	overflow: hidden;
 	border-color: transparent;
-	background: var(--website-primary-background);
-	color: var(--website-primary-foreground);
+	background: var(--primary);
+	color: var(--primary-fg);
 	box-shadow: none;
 }
 
@@ -27,7 +18,7 @@
 	left: 50%;
 	width: 68.5px;
 	height: 28.5px;
-	border-radius: 999px;
+	border-radius: var(--radius-full);
 	background-image: linear-gradient(
 		90deg,
 		oklch(0.59 0.223 262.833 / 44%) 20%,
@@ -48,7 +39,7 @@
 	z-index: 1;
 	inset: 0;
 	border-radius: inherit;
-	background: oklch(0.1 0 0 / 38%);
+	background: var(--neutral-9-translucent);
 	box-shadow:
 		inset 0 0 0 0.5px oklch(1 0 0 / 10%),
 		inset 0 1px 0 oklch(1 0 0 / 12%);
@@ -70,8 +61,8 @@
 
 .opaline-website-primary-button:hover:not(:disabled),
 .opaline-website-primary-button:focus-visible {
-	background: var(--website-primary-background);
-	color: var(--website-primary-foreground);
+	background: var(--primary);
+	color: var(--primary-fg);
 }
 
 .opaline-website-primary-button:hover:not(:disabled)::before,

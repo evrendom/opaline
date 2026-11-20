@@ -4,6 +4,7 @@ import {
 	DropdownMenuContent,
 	DropdownMenuTrigger,
 } from "@/app/ui/dropdown-menu";
+import { TouchTarget } from "@/app/ui/touch-target";
 import {
 	ModelTraceIcon,
 	UserTraceAvatar,
@@ -98,7 +99,7 @@ export function SessionTurnTableSpeakerVisibilityControls({
 	return (
 		<fieldset
 			className={cn(
-				"session-constellation-tree m-0 flex h-full w-full min-w-0 shrink-0 items-center border-0 p-0 pl-1",
+				"session-constellation-tree m-zero flex h-full w-full min-w-0 shrink-0 items-center edge-none p-zero pl-xs",
 				className,
 			)}
 		>
@@ -109,7 +110,12 @@ export function SessionTurnTableSpeakerVisibilityControls({
 						<button
 							type="button"
 							aria-label={`Choose visible rows: ${visibleSpeakerLabel}`}
-							className="relative flex h-8 w-9 shrink-0 items-center justify-start rounded-sm outline-none focus-visible:z-10"
+							className={cn(
+								"relative flex h-8 w-9 shrink-0 items-center justify-start",
+								"corner-xs",
+								"outline-none",
+								"focus-visible:z-10",
+							)}
 						/>
 					}
 				>
@@ -125,7 +131,7 @@ export function SessionTurnTableSpeakerVisibilityControls({
 									key={speaker}
 									className={cn(
 										"relative flex size-5 shrink-0 items-center justify-center",
-										optionIndex === 0 ? "z-0" : "z-10 -ml-3",
+										optionIndex === 0 ? "z-0" : "z-10 -ml-l",
 										!selected && "saturate-0 opacity-35",
 									)}
 									data-selected={selected}
@@ -141,14 +147,11 @@ export function SessionTurnTableSpeakerVisibilityControls({
 							);
 						})}
 					</span>
-					<span
-						aria-hidden="true"
-						className="pointer-fine:hidden pointer-events-none absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2"
-					/>
+					<TouchTarget className="pointer-events-none" />
 				</DropdownMenuTrigger>
 				<DropdownMenuContent
 					align="start"
-					className="w-auto min-w-40 rounded-lg bg-white p-1 text-black shadow-lg ring-1 ring-black/10 dark:bg-popover dark:text-popover-foreground dark:shadow-none dark:ring-white/10"
+					className="w-auto min-w-40 corner-m bg-canvas p-xs text-ink shadow-lg ring-1 ring-black/10 dark:bg-surface dark:text-ink dark:shadow-none dark:ring-white/10"
 					sideOffset={4}
 				>
 					{SESSION_TURN_TABLE_SPEAKERS.map((speaker) => {
@@ -159,7 +162,7 @@ export function SessionTurnTableSpeakerVisibilityControls({
 								key={speaker}
 								checked={selected}
 								className={cn(
-									"rounded-md py-1.5 pr-7 pl-2 text-xs font-medium",
+									"corner-s py-s pr-[calc(var(--space-xxl)*1.25)] pl-m text-body-m font-medium",
 									!selected && "opacity-40",
 								)}
 								closeOnClick={false}

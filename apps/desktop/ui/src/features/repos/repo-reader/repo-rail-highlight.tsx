@@ -125,13 +125,13 @@ export function RailHighlightProvider({
 	const lead = onClear ? (
 		<span
 			title={name}
-			className="group/tag inline-flex h-8 min-w-0 items-center gap-1 rounded-full bg-card pr-3 pl-1.5 text-xs font-medium text-foreground shadow-(--custom-outline-shadow)"
+			className="group/tag inline-flex h-8 min-w-0 items-center gap-xs corner-full bg-card pr-l pl-s text-body-m font-medium text-ink shadow-(--shadow-control)"
 		>
 			<button
 				type="button"
 				aria-label={`Stop filtering by ${name}`}
 				onClick={onClear}
-				className="grid size-5 shrink-0 place-items-center rounded-full outline-none"
+				className="grid size-5 shrink-0 place-items-center corner-full outline-none"
 			>
 				{TabIcon ? (
 					<TabIcon
@@ -141,7 +141,7 @@ export function RailHighlightProvider({
 				) : null}
 				<IconX
 					aria-hidden="true"
-					className={`${swap} scale-50 text-muted-foreground opacity-0 group-hover/tag:scale-100 group-hover/tag:opacity-100 group-has-focus-visible/tag:scale-100 group-has-focus-visible/tag:opacity-100 hover:text-foreground`}
+					className={`${swap} scale-50 text-ink-3 opacity-0 group-hover/tag:scale-100 group-hover/tag:opacity-100 group-has-focus-visible/tag:scale-100 group-has-focus-visible/tag:opacity-100 hover:text-ink`}
 				/>
 			</button>
 			<span className="min-w-0 truncate">{name}</span>

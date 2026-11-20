@@ -62,7 +62,7 @@ const FAINTEST_DOT = 0.14;
 const SEGMENT_GAP_PX = 3;
 const X_AXIS_HEIGHT = 40;
 const SEGMENT_RADIUS_PX = 2;
-const TICK_STYLE = { fill: "var(--cost-muted)", fontSize: 11 };
+const TICK_STYLE = { fill: "var(--ink-3)", fontSize: 11 };
 const DAY_MS = 86_400_000;
 
 const resetTickFormat = new Intl.DateTimeFormat("en-US", {
@@ -256,7 +256,7 @@ export function PlanUsageChart({
 				<PillTabs
 					className="h-8 shrink-0 bg-transparent"
 					label="Provider"
-					pillClassName="bg-card shadow-(--custom-shadow) dark:bg-muted-foreground/10"
+					pillClassName="bg-card shadow-(--shadow-card) dark:bg-ink-3/10"
 					onChange={onProviderChange}
 					tabs={PROVIDER_TABS}
 					value={provider}
@@ -437,7 +437,7 @@ function UsageLoadingCanvas({
 					>
 						<CartesianGrid
 							vertical={false}
-							stroke="var(--cost-border)"
+							stroke="var(--line)"
 							strokeDasharray="3 4"
 						/>
 						<XAxis
@@ -646,7 +646,7 @@ function UsageCanvas({
 					>
 						<CartesianGrid
 							vertical={false}
-							stroke="var(--cost-border)"
+							stroke="var(--line)"
 							strokeDasharray="3 4"
 						/>
 						<XAxis
@@ -685,7 +685,7 @@ function UsageCanvas({
 						/>
 						<Tooltip
 							isAnimationActive={false}
-							cursor={{ fill: "var(--cost-hover)", opacity: 0.5 }}
+							cursor={{ fill: "var(--hover)", opacity: 0.5 }}
 							content={() => null}
 						/>
 						<Bar
@@ -783,7 +783,7 @@ function solidColor(period: Period): string {
 }
 
 function usedColor(period: Period): string {
-	return `color-mix(in srgb, ${solidColor(period)} 38%, var(--cost-surface))`;
+	return `color-mix(in srgb, ${solidColor(period)} 38%, var(--canvas))`;
 }
 
 interface BarShapeProps {
@@ -860,7 +860,7 @@ function SplitBar({
 					y={snap(y) - RESET_ICON_PX - RESET_ICON_GAP_PX}
 					size={RESET_ICON_PX}
 					stroke={1.75}
-					color="var(--cost-muted)"
+					color="var(--ink-3)"
 					title={reset}
 					aria-label={reset}
 				/>

@@ -32,7 +32,7 @@ export type SubagentSummary =
 
 export function FactDot() {
 	return (
-		<span aria-hidden="true" className="text-muted-foreground/50">
+		<span aria-hidden="true" className="text-ink-3/50">
 			·
 		</span>
 	);
@@ -107,7 +107,7 @@ export function SubagentStrip({
 	if (summary)
 		facts.push([
 			"tokens",
-			<span key="tokens" className="inline-flex items-center gap-1.5">
+			<span key="tokens" className="inline-flex items-center gap-s">
 				<TokenCounts turn={summary} />
 			</span>,
 		]);
@@ -143,7 +143,7 @@ export function SubagentStrip({
 								: "Foreground"}
 						</span>
 						{launch.isError ? (
-							<span className="inline-flex items-center gap-0.5 text-rose-500">
+							<span className="inline-flex items-center gap-xxs text-error">
 								<IconAlertTriangle aria-hidden="true" className="size-3" />
 								Failed
 							</span>
@@ -206,33 +206,37 @@ export function ReaderStrip({
 	return (
 		<div
 			className={cn(
-				"flex flex-col gap-2 rounded-lg bg-card px-3 py-2.5 text-xs shadow-(--custom-shadow) corner-squircle squircle:rounded-3xl",
+				"flex flex-col gap-m",
+				"corner-m px-l py-l corner-squircle",
+				"text-body-m",
+				"bg-card shadow-(--shadow-card)",
+				"squircle:corner-xl",
 				className,
 			)}
 		>
-			<div className="flex min-w-0 items-center gap-2">
+			<div className="flex min-w-0 items-center gap-m">
 				{named ? (
 					<>
 						{lead}
-						<span className="flex min-w-0 flex-1 items-baseline gap-1 text-sm font-medium">
+						<span className="flex min-w-0 flex-1 items-baseline gap-xs text-body-xl font-medium">
 							{kind ? (
-								<span className="shrink-0 text-muted-foreground">{kind}</span>
+								<span className="shrink-0 text-ink-3">{kind}</span>
 							) : null}
 							<span className="truncate">{id}</span>
 						</span>
 					</>
 				) : (
-					<p className="min-w-0 flex-1 truncate text-sm">{title}</p>
+					<p className="min-w-0 flex-1 truncate text-body-xl">{title}</p>
 				)}
 				{aside ? (
-					<span className="flex shrink-0 items-center gap-1.5 text-muted-foreground">
+					<span className="flex shrink-0 items-center gap-s text-ink-3">
 						{aside}
 					</span>
 				) : null}
 			</div>
-			{named && title ? <p className="truncate text-sm">{title}</p> : null}
+			{named && title ? <p className="truncate text-body-xl">{title}</p> : null}
 			{facts.length > 0 || failed || lanes.length > 0 || files.length > 0 ? (
-				<div className="flex flex-wrap items-center gap-x-1.5 gap-y-1.5 text-muted-foreground tabular-nums">
+				<div className="flex flex-wrap items-center gap-x-s gap-y-s text-ink-3 tabular-nums">
 					{facts.map(([name, fact], index) => (
 						<Fragment key={name}>
 							{index > 0 ? <FactDot /> : null}
@@ -242,21 +246,21 @@ export function ReaderStrip({
 					{failed ? (
 						<>
 							<FactDot />
-							<span className="inline-flex items-center gap-0.5 text-rose-500">
+							<span className="inline-flex items-center gap-xxs text-error">
 								<IconAlertTriangle aria-hidden="true" className="size-3" />
 								{failed}
 							</span>
 						</>
 					) : null}
 					{lanes.length > 0 || files.length > 0 ? (
-						<span className="ml-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+						<span className="ml-l flex flex-wrap items-center gap-x-l gap-y-s">
 							{lanes.map((lane) => {
 								const Glyph = lane.glyph;
 								return (
 									<span
 										key={lane.key}
 										title={`${lane.label}: ${lane.count}`}
-										className="inline-flex items-center gap-1"
+										className="inline-flex items-center gap-xs"
 									>
 										<OpalChip
 											tint={lane.tint}

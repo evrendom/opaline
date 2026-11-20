@@ -1,5 +1,6 @@
 import { IconChevronDown, IconChevronUp } from "@tabler/icons-react";
 import type { ReactNode } from "react";
+import { TouchTarget } from "@/app/ui/touch-target";
 import {
 	SESSION_OVERVIEW_GRID_CLASS_NAME,
 	SESSION_OVERVIEW_GRID_WITHOUT_SKILLS_CLASS_NAME,
@@ -34,7 +35,7 @@ export function SessionsOverviewHeader({
 	return (
 		<div
 			className={cn(
-				"sticky top-0 left-0 z-30 grid h-12 min-w-0 shrink-0 overflow-hidden bg-(--session-overview-surface) in-data-rail-beside:h-15",
+				"sticky top-0 left-0 z-30 grid h-12 min-w-0 shrink-0 overflow-hidden bg-canvas in-data-rail-beside:h-15",
 				showSkillsColumn
 					? SESSION_OVERVIEW_GRID_CLASS_NAME
 					: SESSION_OVERVIEW_GRID_WITHOUT_SKILLS_CLASS_NAME,
@@ -46,7 +47,14 @@ export function SessionsOverviewHeader({
 			    8px of air around its buttons. Its 24px gutters put the first
 			    button's icon on the page title icon's centre line,
 			    rather than lining up the button's edge. */}
-			<div className="pointer-events-none absolute inset-y-0 left-0 z-10 flex w-[100cqw] items-center px-6 in-data-rail-beside:top-3">
+			<div
+				className={cn(
+					"absolute inset-y-0 left-0 z-10 flex w-[100cqw] items-center",
+					"px-xxl",
+					"pointer-events-none",
+					"in-data-rail-beside:top-3",
+				)}
+			>
 				{controls}
 			</div>
 			{SESSION_OVERVIEW_VISIBLE_COLUMNS.filter(
@@ -59,7 +67,7 @@ export function SessionsOverviewHeader({
 						key={column.key}
 						aria-hidden={isInert ? true : undefined}
 						className={cn(
-							"flex min-w-0 bg-(--session-overview-surface)",
+							"flex min-w-0 bg-canvas",
 							isInert && "pointer-events-none select-none",
 						)}
 						data-slot={
@@ -104,7 +112,14 @@ function SessionOverviewSortableHeader({
 				isActive && sort.direction === "asc" ? "descending" : "ascending"
 			}`}
 			className={cn(
-				"relative flex h-full min-w-0 flex-1 items-center gap-1 px-3 text-left text-base font-medium tracking-[-0.01em] whitespace-nowrap text-black outline-none hover:bg-(--session-overview-hover) focus-visible:z-10 focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-(--session-overview-accent) sm:text-sm dark:text-(--session-overview-text)",
+				"relative flex h-full min-w-0 flex-1 items-center gap-xs",
+				"px-l",
+				"text-left text-body-xxl font-medium whitespace-nowrap",
+				"text-ink outline-none",
+				"hover:bg-hover",
+				"focus-visible:z-10 focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent",
+				"sm:text-body-xl",
+				"dark:text-ink",
 				align === "right" ? "justify-end text-right" : "justify-start",
 			)}
 			onClick={() => onSort(sortKey)}
@@ -117,10 +132,7 @@ function SessionOverviewSortableHeader({
 					<IconChevronDown aria-hidden="true" className="size-3.5 shrink-0" />
 				)
 			) : null}
-			<span
-				aria-hidden="true"
-				className="pointer-fine:hidden absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2"
-			/>
+			<TouchTarget />
 		</button>
 	);
 }

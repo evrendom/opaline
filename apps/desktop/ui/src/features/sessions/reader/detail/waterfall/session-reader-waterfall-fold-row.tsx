@@ -59,7 +59,7 @@ export function FoldRow({
 			<OpalChip
 				open={expanded}
 				tint="var(--color-slate-500)"
-				className="text-muted-foreground"
+				className="text-ink-3"
 			>
 				<IconStack2 aria-hidden="true" className="size-3" />
 			</OpalChip>
@@ -68,9 +68,7 @@ export function FoldRow({
 		<span className="min-w-0 truncate">
 			{variant === "repeat" ? (
 				<>
-					<span className="text-muted-foreground tabular-nums">
-						×{steps.length}
-					</span>{" "}
+					<span className="text-ink-3 tabular-nums">×{steps.length}</span>{" "}
 					<span>{head.name}</span>
 				</>
 			) : (
@@ -78,18 +76,16 @@ export function FoldRow({
 					<span className="tabular-nums">
 						{steps.length} {variant === "filtered" ? "hidden" : "steps"}
 					</span>
-					<span className="ml-1.5 text-muted-foreground">
-						{summarizeSteps(steps)}
-					</span>
+					<span className="ml-1.5 text-ink-3">{summarizeSteps(steps)}</span>
 				</>
 			)}
 		</span>
 	);
 	const bar = (
 		<ProgressBar
-			baseClassName="bg-muted-foreground/25"
-			color="var(--muted-foreground)"
-			fillClassName="bg-muted-foreground/50"
+			baseClassName="bg-ink-3/25"
+			color="var(--ink-3)"
+			fillClassName="bg-ink-3/50"
 			left={offset}
 			width={width}
 		>

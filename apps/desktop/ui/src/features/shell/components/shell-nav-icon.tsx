@@ -54,7 +54,7 @@ export const restingChipClassName =
 // opaque, so the chip doesn't show through and strokes don't darken where
 // they overlap. Alpha blending is a mix in sRGB.
 export const restingGlyphClassName =
-	"text-[color:color-mix(in_srgb,var(--muted-foreground)_70%,var(--sidebar))]";
+	"text-[color:color-mix(in_srgb,var(--ink-3)_70%,var(--sidebar))]";
 
 // Adapted from the NavIcon: the outline glyph cross-fades
 // into its filled variant when the section is active, and the resting chip and

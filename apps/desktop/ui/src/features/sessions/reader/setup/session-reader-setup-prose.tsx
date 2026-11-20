@@ -104,14 +104,14 @@ function Inline({ text }: { text: string }) {
 				if (index % 2 === 0) return <Fragment key={key}>{part}</Fragment>;
 				if (part.startsWith("**"))
 					return (
-						<strong key={key} className="font-semibold">
+						<strong key={key} className="font-heavy">
 							{part.slice(2, -2)}
 						</strong>
 					);
 				return (
 					<code
 						key={key}
-						className="rounded bg-muted px-1 py-px font-mono text-[0.85em]"
+						className="corner-xs bg-field px-xs py-xxs font-data text-[0.85em]"
 					>
 						{part.slice(1, -1)}
 					</code>
@@ -136,7 +136,7 @@ export function SetupProse({
 		<div
 			data-selectable=""
 			className={cn(
-				"flex flex-col gap-2.5 text-[13px] leading-relaxed [overflow-wrap:anywhere]",
+				"flex flex-col gap-l text-body-l [overflow-wrap:anywhere]",
 				className,
 			)}
 		>
@@ -148,8 +148,8 @@ export function SetupProse({
 							<div
 								key={key}
 								className={cn(
-									"font-semibold text-balance",
-									block.level <= 2 ? "mt-1 text-sm" : "text-[13px]",
+									"font-heavy text-balance",
+									block.level <= 2 ? "mt-xs text-body-l" : "text-body-xl",
 								)}
 							>
 								<Inline text={block.text} />
@@ -173,13 +173,13 @@ export function SetupProse({
 							<List
 								key={key}
 								className={cn(
-									"space-y-0.5 pl-5 marker:text-muted-foreground/70",
+									"space-y-xxs pl-xxl marker:text-ink-3/70",
 									block.ordered ? "list-decimal" : "list-disc",
 								)}
 							>
 								{block.items.map((item, at) => (
 									// biome-ignore lint/suspicious/noArrayIndexKey: a list's items are fixed; the same item can repeat, so its place keys it
-									<li key={`${at}:${item}`} className="pl-0.5">
+									<li key={`${at}:${item}`} className="pl-xxs">
 										<Inline text={item} />
 									</li>
 								))}
@@ -190,22 +190,19 @@ export function SetupProse({
 						return (
 							<pre
 								key={key}
-								className="overflow-x-auto rounded-md bg-muted px-3 py-2 font-mono text-[11px] leading-5"
+								className="overflow-x-auto corner-s bg-field px-l py-m font-data text-body-s"
 							>
 								{block.lines.join("\n")}
 							</pre>
 						);
 					case "tag":
 						return (
-							<div
-								key={key}
-								className="font-mono text-[11px] text-muted-foreground"
-							>
+							<div key={key} className="font-data text-body-s text-ink-3">
 								{block.text}
 							</div>
 						);
 					case "rule":
-						return <hr key={key} className="border-border/60" />;
+						return <hr key={key} className="border-line/60" />;
 					default:
 						return null;
 				}

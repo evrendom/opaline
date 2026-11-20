@@ -12,7 +12,7 @@ export function AdminDashboardPage() {
 			<CostDashboardView
 				dashboard={dashboard}
 				toolbarStart={
-					<h1 className="flex h-7 shrink-0 items-center px-1.5 text-sm font-medium tracking-[-0.01em] text-(--cost-foreground)">
+					<h1 className="flex h-7 shrink-0 items-center px-s text-body-xl font-medium text-ink">
 						All users
 					</h1>
 				}

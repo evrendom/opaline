@@ -85,9 +85,9 @@ export function SeenFile({
 	const others = step.paths.length - 1;
 	const time = formatPaddedTimeOfDay(step.at);
 	return (
-		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 pt-4 pr-4 pl-5">
-			<div className="flex min-h-7 shrink-0 flex-wrap items-center gap-x-3 gap-y-1">
-				<div className="flex min-w-0 flex-1 items-center gap-1.5">
+		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-s pt-xl pr-xl pl-xxl">
+			<div className="flex min-h-7 shrink-0 flex-wrap items-center gap-x-l gap-y-xs">
+				<div className="flex min-w-0 flex-1 items-center gap-s">
 					{run ? (
 						<RunCrumbs
 							agent={agent}
@@ -97,16 +97,16 @@ export function SeenFile({
 						/>
 					) : null}
 					<Crumb onClear={onClearRead} title={path}>
-						<span className="inline-flex items-center gap-1">
+						<span className="inline-flex items-center gap-xs">
 							<IconEyeFilled
 								aria-hidden="true"
-								className="size-3.5 text-muted-foreground"
+								className="size-3.5 text-ink-3"
 							/>
 							{name}
 						</span>
 					</Crumb>
 				</div>
-				<span className="text-xs whitespace-nowrap text-muted-foreground tabular-nums">
+				<span className="text-body-m whitespace-nowrap text-ink-3 tabular-nums">
 					{said}
 					{others > 0
 						? ` · read with ${others} other ${others === 1 ? "file" : "files"}`
@@ -114,11 +114,11 @@ export function SeenFile({
 					{` · seen at ${time}`}
 				</span>
 			</div>
-			<ScrollColumn className="-mr-4 -ml-1.5 pr-4 pl-1.5">
-				<div className="flex flex-col gap-2 pt-2 pb-4">
+			<ScrollColumn className="-mr-xl -ml-s pr-xl pl-s">
+				<div className="flex flex-col gap-m pt-m pb-xl">
 					<DiffView hunks={hunks} language={languageForPath(path)} />
 					{seen.cut ? (
-						<p className="text-xs text-muted-foreground/70">
+						<p className="text-body-m text-ink-3/70">
 							Cut at {SESSION_RUN_SEEN_LIMIT.toLocaleString()} characters; the
 							rest is in the transcript.
 						</p>

@@ -28,7 +28,7 @@ export function McpSettingsPage() {
 
 export function McpSettingsView({ origin }: { origin: string }) {
 	return (
-		<div className="workspace-settings-page">
+		<div className="settings-page">
 			<WorkspaceSettingsGroup
 				title="Install with the Opaline CLI"
 				description="Registers this server's MCP in Claude Code, Codex and Cursor on the computer where you run it, with the API key the CLI saved when you signed in."

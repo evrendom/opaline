@@ -1,13 +1,9 @@
 import type { RepositorySettings } from "@rudel/api-routes";
-import {
-	IconCheck,
-	IconCopy,
-	IconFolder,
-	IconSearch,
-} from "@tabler/icons-react";
+import { IconCheck, IconCopy, IconFolder } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { Button } from "@/app/ui/button";
 import { Skeleton } from "@/app/ui/skeleton";
+import { RepositorySearchField } from "@/features/settings/components/repository-search-field";
 import "@/features/settings/components/settings-section.css";
 import "./sessions-settings.css";
 
@@ -57,18 +53,18 @@ export function SessionsSettingsView({
 					</p>
 				</div>
 				{localManager ? (
-					<div className="sessions-settings-card settings-section-surface">
+					<div className="sessions-settings-card surface-card">
 						{localManager}
 					</div>
 				) : (
-					<div className="sessions-settings-card sessions-settings-manage settings-section-surface">
+					<div className="sessions-settings-card sessions-settings-manage surface-card">
 						<div className="sessions-settings-command">
 							<code>{MANAGE_COMMAND}</code>
 							<Button
 								type="button"
 								variant="ghost"
 								size="sm"
-								className="rounded-md transition-none active:not-aria-[haspopup]:translate-y-0"
+								className="corner-s transition-none active:not-aria-[haspopup]:translate-y-0"
 								onClick={onCopy}
 								aria-label="Copy repository management command"
 							>
@@ -123,24 +119,19 @@ export function SessionsSettingsView({
 						computers.
 					</p>
 				</div>
-				<div className="sessions-settings-card settings-section-surface">
-					<label className="sessions-settings-search">
-						<IconSearch size={16} aria-hidden="true" />
-						<input
-							type="search"
-							name="repository-search"
-							aria-label="Find a repository"
-							placeholder="Find a repository…"
-							value={search}
-							onChange={(event) => onSearch(event.target.value)}
-						/>
-					</label>
+				<div className="sessions-settings-card surface-card">
+					<RepositorySearchField
+						className="mb-m"
+						name="repository-search"
+						value={search}
+						onChange={onSearch}
+					/>
 					{error ? (
 						<div className="sessions-settings-empty" role="alert">
 							Could not load repositories.{" "}
-							<button type="button" onClick={onRefresh}>
+							<Button variant="link" size="inline" onClick={onRefresh}>
 								Try again
-							</button>
+							</Button>
 						</div>
 					) : (
 						<div className="sessions-settings-table-wrap">
@@ -218,24 +209,24 @@ function SampleRows() {
 		<tr key={name}>
 			<td>
 				<div className="sessions-settings-repo">
-					<Skeleton className="size-4 shrink-0 rounded-sm" />
+					<Skeleton className="size-4 shrink-0 corner-xs" />
 					<Skeleton
-						className="h-3.5 rounded-sm"
+						className="h-3.5 corner-xs"
 						style={{ width: `${name.length * 0.5}rem` }}
 					/>
 				</div>
 			</td>
 			<td>
 				<Skeleton
-					className="ml-auto h-3.5 rounded-sm"
+					className="ml-auto h-3.5 corner-xs"
 					style={{ width: `${String(count).length * 0.45}rem` }}
 				/>
 			</td>
 			<td>
 				<span className="sessions-settings-status">
-					<Skeleton className="size-1.5 shrink-0 rounded-full" />
+					<Skeleton className="size-1.5 shrink-0 corner-full" />
 					<Skeleton
-						className="h-3.5 rounded-sm"
+						className="h-3.5 corner-xs"
 						style={{ width: `${status.length * 0.4}rem` }}
 					/>
 				</span>

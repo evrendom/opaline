@@ -70,8 +70,8 @@ function DeleteWorkspaceDialogBody({
 	return (
 		<DialogContent>
 			<DialogHeader>
-				<DialogTitle className="flex items-center gap-2">
-					<IconAlertTriangle className="text-destructive" />
+				<DialogTitle className="flex items-center gap-m">
+					<IconAlertTriangle className="text-error" />
 					Delete workspace
 				</DialogTitle>
 				<DialogDescription>
@@ -80,21 +80,21 @@ function DeleteWorkspaceDialogBody({
 				</DialogDescription>
 			</DialogHeader>
 
-			<div className="flex flex-col gap-4">
+			<div className="flex flex-col gap-xl">
 				{isLoading ? (
-					<div className="flex items-center gap-2 text-sm text-muted-foreground">
+					<div className="flex items-center gap-m text-body-xl text-ink-3">
 						<IconLoader2 className="animate-spin" />
 						Checking workspace data…
 					</div>
 				) : (
-					<p className="text-sm text-muted-foreground">
+					<p className="text-body-xl text-ink-3">
 						{sessionCount && sessionCount > 0
 							? `${sessionCount} sessions are attached to this workspace and will be removed.`
 							: "No session data is attached to this workspace."}
 					</p>
 				)}
 
-				<Field className="gap-2">
+				<Field className="gap-m">
 					<FieldLabel htmlFor="delete-workspace-confirm">
 						Type {organization.name} to confirm
 					</FieldLabel>
@@ -106,7 +106,7 @@ function DeleteWorkspaceDialogBody({
 					/>
 				</Field>
 
-				{error ? <p className="text-sm text-destructive">{error}</p> : null}
+				{error ? <p className="text-body-xl text-error">{error}</p> : null}
 			</div>
 
 			<DialogFooter>

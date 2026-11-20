@@ -50,7 +50,7 @@ const hasName = (path: string) =>
 	!/^(?:\.{1,2}|~)$/u.test(path.split("/").filter(Boolean).at(-1) ?? "");
 
 const WHOLE = "inline-block max-w-full indent-0 [overflow-wrap:anywhere]";
-const CHIP = cn(WHOLE, "rounded-sm bg-muted px-1 py-px text-foreground");
+const CHIP = cn(WHOLE, "corner-xs bg-field px-xs py-xxs text-ink");
 
 function SegmentView({ color, segment }: { color?: string; segment: Segment }) {
 	const style = color ? { color } : undefined;
@@ -58,7 +58,7 @@ function SegmentView({ color, segment }: { color?: string; segment: Segment }) {
 		return hasName(segment.file) ? (
 			<FileTag className="align-middle" path={segment.file} />
 		) : (
-			<code style={style} className={cn(CHIP, "font-mono text-[12px]")}>
+			<code style={style} className={cn(CHIP, "font-data text-body-m")}>
 				{segment.file}
 			</code>
 		);
@@ -68,7 +68,7 @@ function SegmentView({ color, segment }: { color?: string; segment: Segment }) {
 				style={style}
 				className={cn(
 					WHOLE,
-					"font-medium text-foreground [font-variant-ligatures:none] [font-feature-settings:'calt'_0]",
+					"font-medium text-ink [font-variant-ligatures:none] [font-feature-settings:'calt'_0]",
 				)}
 			>
 				“<Indented text={segment.term} />”
@@ -76,7 +76,7 @@ function SegmentView({ color, segment }: { color?: string; segment: Segment }) {
 		);
 	if ("code" in segment)
 		return (
-			<code style={style} className={cn(CHIP, "font-mono text-[12px]")}>
+			<code style={style} className={cn(CHIP, "font-data text-body-m")}>
 				{segment.code}
 			</code>
 		);
@@ -198,7 +198,7 @@ function Letters({ pieces }: { pieces: Piece[] }) {
 function QuoteMark({ piece }: { piece: Piece }) {
 	const double = piece.text === '"';
 	return (
-		<span className="text-muted-foreground/70">
+		<span className="text-ink-3/70">
 			{piece.mark === "open" ? (double ? "“" : "‘") : double ? "”" : "’"}
 		</span>
 	);
@@ -208,7 +208,12 @@ function Sign({ title, word }: { title: string; word: string }) {
 	return (
 		<span
 			title={title}
-			className="mx-0.5 inline-block rounded-sm bg-muted px-1 align-[1px] font-sans text-[10px] leading-4 font-medium text-muted-foreground"
+			className={cn(
+				"inline-block",
+				"mx-xxs corner-xs px-xs",
+				"align-[1px] font-body text-body-xs font-medium",
+				"bg-field text-ink-3",
+			)}
 		>
 			{word}
 		</span>
@@ -253,7 +258,7 @@ function StageText({
 	span: Span;
 }) {
 	return open ? (
-		<span className="text-[13px] leading-5 text-foreground/80">
+		<span className="text-body-l text-ink/80">
 			{keyed(gluePunctuation(capitalized(sentence)), (part) =>
 				segmentText(part.segment),
 			).map(({ item, key }) => (
@@ -295,7 +300,7 @@ function CommandText({
 		);
 		const close = words({ end: quoted.end, start: quoted.end - 1 }, NO_FILES);
 		return (
-			<code className="font-mono text-[12px] leading-5">
+			<code className="font-data text-body-m">
 				{words({ end: quoted.start, start: span.start })}{" "}
 				<span className={WHOLE}>
 					{open}
@@ -318,9 +323,7 @@ function CommandText({
 	}
 	const [pattern] = alternativesIn(raw, span, orSyntax(raw, span));
 	if (!pattern)
-		return (
-			<code className="font-mono text-[12px] leading-5">{words(span)}</code>
-		);
+		return <code className="font-data text-body-m">{words(span)}</code>;
 	const { alternatives, quoted } = pattern;
 	const openQuote = words(
 		{ end: quoted.start + 1, start: quoted.start },
@@ -331,7 +334,7 @@ function CommandText({
 		NO_FILES,
 	);
 	return (
-		<code className="font-mono text-[12px] leading-5">
+		<code className="font-data text-body-m">
 			{words({ end: quoted.start, start: span.start })}
 			<span className="block pl-[2ch]">
 				{keyed(alternatives, (part) => raw.slice(part.start, part.end)).map(
@@ -376,7 +379,7 @@ function Spaces({ count }: { count: number }) {
 	return (
 		<span
 			title={`${count} space${count === 1 ? "" : "s"}`}
-			className="text-muted-foreground/50 select-none"
+			className="text-ink-3/50 select-none"
 		>
 			{"·".repeat(count)}
 		</span>
@@ -400,8 +403,11 @@ function WordsButton({
 			title={label}
 			onClick={onToggle}
 			className={cn(
-				"ml-auto inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground",
-				open && "bg-muted text-foreground",
+				"inline-flex size-5 shrink-0 items-center justify-center",
+				"ml-auto corner-xs",
+				"text-ink-3/60 transition-colors",
+				"hover:bg-hover hover:text-ink",
+				open && "bg-field text-ink",
 			)}
 		>
 			<Icon aria-hidden="true" className="size-3.5" />
@@ -436,14 +442,14 @@ function StepRows({
 		: [{ sentence: step.sentence, span: { end: step.raw.length, start: 0 } }];
 	const operator = first || !step.connector ? null : OPERATOR[step.connector];
 	return (
-		<li className="flex flex-col gap-1 py-1.5">
+		<li className="flex flex-col gap-xs py-s">
 			{keyed(rows, (row) => step.raw.slice(row.span.start, row.span.end)).map(
 				({ item, key }, index) => {
 					const mark = index === 0 ? operator : "|";
 					return (
-						<div key={key} className="flex min-w-0 items-baseline gap-1.5">
+						<div key={key} className="flex min-w-0 items-baseline gap-s">
 							{mark && OPERATOR_SIGN[mark] ? (
-								<span className="shrink-0 leading-5">
+								<span className="shrink-0">
 									<Sign {...OPERATOR_SIGN[mark]} />
 								</span>
 							) : null}
@@ -494,8 +500,15 @@ export function CommandLines({
 			return next;
 		});
 	return (
-		<div className="flex flex-col gap-2">
-			<ul className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-background px-2 py-0.5 dark:bg-black/25">
+		<div className="flex flex-col gap-m">
+			<ul
+				className={cn(
+					"flex flex-col",
+					"divide-y corner-m edge-m px-m py-xxs",
+					"divide-line/40 border-line/60 bg-canvas",
+					"dark:bg-canvas/25",
+				)}
+			>
 				{keyed(steps, (step) => step.raw).map(({ item, key }, index) => (
 					<StepRows
 						key={key}

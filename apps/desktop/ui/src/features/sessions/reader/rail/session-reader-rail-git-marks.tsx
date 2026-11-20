@@ -45,7 +45,7 @@ export function RailGitMarks({
 	});
 	if (shown.length === 0) return null;
 	return (
-		<span className="flex shrink-0 items-center -space-x-1">
+		<span className="flex shrink-0 items-center -space-x-xs">
 			{shown.map(({ count, tag }) => (
 				<TagChip
 					key={tag.key}

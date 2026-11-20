@@ -1,5 +1,5 @@
 import { IconChartArea } from "@tabler/icons-react";
-import { EmptyMedia } from "@/components/dashboard/empty";
+import { EmptyMedia } from "@/app/ui/empty";
 import {
 	OpalineShape,
 	restingChipClassName,

@@ -1,48 +1,5 @@
 /* Onboarding colours. Light keeps the original values; dark maps them onto
    the app's neutral dark tokens. */
-:root {
-	--welcome-text: #171717;
-	--welcome-muted: #737373;
-	--welcome-hover: #f5f5f5;
-	--welcome-track: #e5e5e5;
-	--welcome-primary: #0d0d0d;
-	--welcome-primary-hover: #262626;
-	--welcome-primary-foreground: #fff;
-	--welcome-control: #fff;
-	--welcome-control-hover: #f9f9f9;
-	--welcome-control-shadow:
-		inset 0 0 0 0.5px rgb(0 0 0 / 0%), 0 0 0 0.5px rgb(0 0 0 / 6%),
-		0 1px 1px -1px rgb(0 0 0 / 10%), 0 1px 2px rgb(0 0 0 / 5%);
-	--welcome-divider: #17171720;
-	--welcome-border: #17171725;
-	--welcome-border-soft: #17171715;
-	--welcome-field: #ffffffa3;
-	--welcome-addon: #ededf0;
-	--welcome-error: #a33b30;
-	--welcome-success: #008a00;
-	--welcome-placeholder: #a3a3a3;
-}
-
-.dark {
-	--welcome-text: oklch(0.985 0 0);
-	--welcome-muted: oklch(0.708 0 0);
-	--welcome-hover: oklch(0.269 0 0);
-	--welcome-track: oklch(0.269 0 0);
-	--welcome-primary: oklch(0.922 0 0);
-	--welcome-primary-hover: oklch(0.85 0 0);
-	--welcome-primary-foreground: oklch(0.205 0 0);
-	--welcome-control: var(--card);
-	--welcome-control-hover: oklch(0.235 0 0);
-	--welcome-control-shadow: var(--custom-outline-shadow);
-	--welcome-divider: rgb(255 255 255 / 12%);
-	--welcome-border: rgb(255 255 255 / 15%);
-	--welcome-border-soft: rgb(255 255 255 / 9%);
-	--welcome-field: rgb(255 255 255 / 4%);
-	--welcome-addon: oklch(0.235 0 0);
-	--welcome-error: oklch(0.704 0.191 22.216);
-	--welcome-success: oklch(0.792 0.209 151.711);
-	--welcome-placeholder: oklch(0.556 0 0);
-}
 
 .cli-welcome-field textarea {
 	overscroll-behavior: none;
@@ -50,36 +7,39 @@
 .cli-welcome-panel-content {
 	display: flex;
 	flex-direction: column;
-	gap: 48px;
+	gap: calc(var(--space-xxl) * 2);
 	min-height: 100%;
 }
 .cli-welcome-brand-row {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 16px;
+	gap: var(--space-xl);
 }
 .cli-welcome-form .cli-welcome-back {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	gap: 6px;
+	gap: var(--space-s);
 	min-height: 44px;
-	margin: 0 0 20px -8px;
-	padding: 0 8px;
+	margin: var(--space-zero) var(--space-zero) var(--space-xxl)
+		calc(var(--space-m) * -1);
+	padding: var(--space-zero) var(--space-m);
 	border: 0;
-	border-radius: 8px;
+	border-radius: var(--radius-s);
 	background: transparent;
-	color: var(--welcome-muted);
+	color: var(--ink-3);
 	font: inherit;
-	font-size: 13px;
+	font-size: var(--size-l);
+	line-height: var(--line-l);
+	letter-spacing: var(--letter-spacing-l);
 }
 .cli-welcome-form .cli-welcome-back:hover:not(:disabled) {
-	background: var(--welcome-hover);
-	color: var(--welcome-text);
+	background: var(--hover);
+	color: var(--ink);
 }
 .cli-welcome-back:focus-visible {
-	outline: 2px solid var(--welcome-text);
+	outline: 2px solid var(--ink);
 	outline-offset: 3px;
 }
 .cli-welcome-back:disabled {
@@ -89,13 +49,13 @@
 .cli-welcome-brand {
 	display: inline-flex;
 	align-items: center;
-	gap: 6px;
+	gap: var(--space-s);
 	min-height: 32px;
 	text-decoration: none;
 }
 .cli-welcome-brand:focus-visible,
 .cli-welcome-footer a:focus-visible {
-	outline: 2px solid var(--welcome-text);
+	outline: 2px solid var(--ink);
 	outline-offset: 3px;
 	border-radius: 4px;
 }
@@ -110,84 +70,88 @@
 	flex-wrap: wrap;
 	align-items: center;
 	justify-content: space-between;
-	gap: 12px 24px;
-	color: var(--welcome-muted);
-	font-size: 12px;
-	line-height: 1.5;
+	gap: var(--space-l) var(--space-xxl);
+	color: var(--ink-3);
+	font-size: var(--size-m);
+	letter-spacing: var(--letter-spacing-m);
+	line-height: var(--line-m);
 }
 .cli-welcome-footer p {
 	white-space: nowrap;
-	margin: 0;
+	margin: var(--space-zero);
 }
 .cli-welcome-footer nav {
 	display: flex;
-	gap: 16px;
+	gap: var(--space-xl);
 }
 .cli-welcome-footer a {
 	color: inherit;
 	text-decoration: none;
 }
 .cli-welcome-footer a:hover {
-	color: var(--welcome-text);
+	color: var(--ink);
 	text-decoration: underline;
 }
 .cli-welcome-progress {
 	display: flex;
 	flex-direction: column;
 	align-items: flex-end;
-	gap: 6px;
-	color: var(--welcome-muted);
-	font-size: 13px;
+	gap: var(--space-s);
+	color: var(--ink-3);
+	font-size: var(--size-l);
+	line-height: var(--line-l);
+	letter-spacing: var(--letter-spacing-l);
 	font-variant-numeric: tabular-nums;
 }
 .cli-welcome-progress ol {
 	display: flex;
-	gap: 6px;
+	gap: var(--space-s);
 	list-style: none;
-	padding: 0;
-	margin: 0;
+	padding: var(--space-zero);
+	margin: var(--space-zero);
 }
 .cli-welcome-progress li {
 	width: 18px;
 	height: 2px;
-	border-radius: 2px;
-	background: var(--welcome-track);
+	border-radius: var(--radius-xs);
+	background: var(--line-strong);
 }
 .cli-welcome-progress li[data-complete="true"] {
-	background: var(--welcome-text);
+	background: var(--ink);
 }
 .cli-onboarding-surface.cli-welcome-form {
 	flex: 0 0 auto;
 	width: 100%;
 	max-width: 400px;
 	margin: auto;
-	padding: 0;
-	border-radius: 0;
+	padding: var(--space-zero);
+	border-radius: var(--radius-zero);
 	overflow: visible;
 	background: transparent;
-	font-family: "Inter Variable", Inter, system-ui, sans-serif;
+	font-family: var(--font-body);
 }
 .cli-welcome-form h1,
 .cli-welcome-form h2 {
-	font-size: 20px;
-	font-weight: 600;
-	line-height: 1.35;
-	letter-spacing: -0.025em;
-	margin: 0 0 12px;
+	font-size: var(--display-size-xxs);
+	font-weight: var(--weight-body-heavy);
+	line-height: var(--display-line-xxs);
+	letter-spacing: var(--display-letter-spacing-xxs);
+	margin: var(--space-zero) var(--space-zero) var(--space-l);
 	text-wrap: balance;
 	outline: none;
 }
 .cli-welcome-form p {
-	color: var(--welcome-muted);
-	font-size: 14px;
-	line-height: 1.6;
+	color: var(--ink-3);
+	font-size: var(--size-xl);
+	letter-spacing: var(--letter-spacing-xl);
+	line-height: var(--line-xl);
 	text-wrap: pretty;
-	margin: 0 0 32px;
+	margin: var(--space-zero) var(--space-zero) calc(var(--space-xxl) * 4 / 3);
 }
 .cli-welcome-form button {
 	min-height: 42px;
 	font: inherit;
-	border-radius: 8px;
+	border-radius: var(--radius-s);
 }
 .cli-welcome-form button:disabled {
 	opacity: 0.55;
@@ -195,16 +159,16 @@
 }
 .cli-welcome-form button:focus-visible,
 .cli-welcome-avatar:focus-within {
-	outline: 2px solid var(--welcome-text);
+	outline: 2px solid var(--ink);
 	outline-offset: 3px;
 }
 .cli-welcome-form .cli-onboarding-primary {
-	background: var(--welcome-primary);
-	border-color: var(--welcome-primary);
-	color: var(--welcome-primary-foreground);
+	background: var(--primary);
+	border-color: var(--primary);
+	color: var(--primary-fg);
 }
 .cli-welcome-form .cli-onboarding-primary:hover:not(:disabled) {
-	background: var(--welcome-primary-hover);
+	background: var(--primary-hover);
 }
 .cli-welcome-form .cli-welcome-command {
 	width: 100%;
@@ -212,9 +176,11 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	gap: 8px;
-	font-size: 13px;
-	font-weight: 500;
+	gap: var(--space-m);
+	font-size: var(--size-l);
+	line-height: var(--line-l);
+	letter-spacing: var(--letter-spacing-l);
+	font-weight: var(--weight-body-medium);
 	font-feature-settings: "ss03";
 	min-height: 44px;
 }
@@ -226,7 +192,7 @@
 	color: oklch(0.205 0 0);
 }
 .dark .cli-welcome-command .instant-v2-button-glass {
-	background: oklch(0.97 0 0 / 0.35);
+	background: var(--neutral-8-translucent);
 	box-shadow:
 		inset 0 0 0 0.5px oklch(0 0 0 / 0.1),
 		inset 0 1px 0 oklch(1 0 0 / 0.6);
@@ -238,18 +204,18 @@
 	overflow-wrap: anywhere;
 }
 .cli-welcome-command + .cli-onboarding-error {
-	margin-top: 12px;
+	margin-top: var(--space-l);
 }
 .cli-welcome-form .cli-onboarding-auth-options {
-	gap: 12px;
+	gap: var(--space-l);
 }
 .cli-welcome-form .cli-onboarding-auth-options button {
 	border-color: transparent;
-	background: var(--welcome-control);
-	box-shadow: var(--welcome-control-shadow);
+	background: var(--surface);
+	box-shadow: var(--shadow-control);
 }
 .cli-welcome-form .cli-onboarding-auth-options button:hover:not(:disabled) {
-	background: var(--welcome-control-hover);
+	background: var(--hover);
 }
 .cli-welcome-form
 	.cli-onboarding-auth-options
@@ -258,42 +224,45 @@
 	.cli-onboarding-auth-options
 	button.opaline-website-primary-button:hover:not(:disabled) {
 	border-color: transparent;
-	background: var(--website-primary-background);
-	color: var(--website-primary-foreground);
+	background: var(--primary);
+	color: var(--primary-fg);
 	box-shadow: none;
 }
 .cli-welcome-form .cli-onboarding-divider {
 	display: flex;
-	gap: 12px;
+	gap: var(--space-l);
 	align-items: center;
-	padding: 4px 0;
+	padding: var(--space-xs) var(--space-zero);
 }
 .cli-welcome-form .cli-onboarding-divider::before,
 .cli-welcome-form .cli-onboarding-divider::after {
 	content: "";
 	height: 1px;
 	flex: 1;
-	background: var(--welcome-divider);
+	background: var(--line);
 }
 .cli-welcome-form .cli-onboarding-terms {
-	margin-top: 28px;
-	font-size: 11px;
-	line-height: 1.6;
+	margin-top: calc(var(--space-xxl) * 1.25);
+	font-size: var(--size-s);
+	letter-spacing: var(--letter-spacing-s);
+	line-height: var(--line-s);
 }
 .cli-welcome-form .cli-onboarding-text-button {
 	background: none;
 	border: none;
-	color: var(--welcome-muted);
-	padding: 8px 0;
-	font-size: 13px;
+	color: var(--ink-3);
+	padding: var(--space-m) var(--space-zero);
+	font-size: var(--size-l);
+	line-height: var(--line-l);
+	letter-spacing: var(--letter-spacing-l);
 	text-decoration: none;
 }
 .cli-welcome-form .cli-onboarding-text-button:hover:not(:disabled) {
-	color: var(--welcome-text);
+	color: var(--ink);
 	text-decoration: underline;
 }
 .cli-welcome-form .cli-onboarding-error {
-	color: var(--welcome-error);
+	color: var(--error);
 }
 .cli-device-code {
 	width: 100%;
@@ -312,13 +281,14 @@
 	height: 56px;
 	flex: 1 1 0;
 	place-items: center;
-	border: 1px solid var(--welcome-border);
-	border-radius: 8px;
-	background: var(--welcome-field);
-	color: var(--welcome-text);
+	border: var(--border-m) solid var(--line);
+	border-radius: var(--radius-s);
+	background: var(--surface);
+	color: var(--ink);
 	font-family: inherit;
-	font-size: 16px;
-	font-weight: 600;
+	font-size: var(--size-xxl);
+	letter-spacing: var(--letter-spacing-xxl);
+	font-weight: var(--weight-body-heavy);
 	font-variant-numeric: tabular-nums;
 	line-height: 1;
 }
@@ -327,24 +297,28 @@
 	width: 10px;
 	flex: 0 0 10px;
 	place-items: center;
-	color: var(--welcome-muted);
-	font-size: 16px;
+	color: var(--ink-3);
+	font-size: var(--size-xxl);
+	line-height: var(--line-xxl);
+	letter-spacing: var(--letter-spacing-xxl);
 }
 .cli-device-code + .cli-onboarding-error {
-	margin: 12px 0 0;
+	margin: var(--space-l) var(--space-zero) var(--space-zero);
 }
 .cli-welcome-fields {
 	display: grid;
-	gap: 24px;
+	gap: var(--space-xxl);
 }
 .cli-welcome-field {
 	display: grid;
-	gap: 10px;
+	gap: var(--space-l);
 	min-width: 0;
 }
 .cli-welcome-field label {
-	color: var(--welcome-muted);
-	font-size: 13px;
+	color: var(--ink-3);
+	font-size: var(--size-l);
+	line-height: var(--line-l);
+	letter-spacing: var(--letter-spacing-l);
 }
 .cli-welcome-field input:not([type="file"]),
 .cli-welcome-field textarea,
@@ -353,11 +327,11 @@
 	width: 100%;
 	min-width: 0;
 	min-height: 44px;
-	border: 1px solid var(--welcome-border);
-	border-radius: 8px;
-	padding: 11px 13px;
-	background: var(--welcome-field);
-	color: var(--welcome-text);
+	border: var(--border-m) solid var(--line);
+	border-radius: var(--radius-s);
+	padding: var(--space-l) var(--space-l);
+	background: var(--surface);
+	color: var(--ink);
 	font: inherit;
 }
 .cli-welcome-field textarea {
@@ -370,54 +344,55 @@
 	display: flex;
 	min-width: 0;
 	overflow: hidden;
-	border: 1px solid var(--welcome-border);
-	border-radius: 12px;
-	background: var(--welcome-field);
+	border: var(--border-m) solid var(--line);
+	border-radius: var(--radius-l);
+	background: var(--surface);
 }
 .cli-welcome-url-input > span {
 	display: flex;
 	align-items: center;
 	flex: 0 0 auto;
-	padding: 0 13px;
-	border-right: 1px solid var(--welcome-border-soft);
-	background: var(--welcome-addon);
-	color: var(--welcome-muted);
+	padding: var(--space-zero) var(--space-l);
+	border-right: var(--border-m) solid var(--line);
+	background: var(--field);
+	color: var(--ink-3);
 }
 .cli-welcome-field .cli-welcome-url-input input {
 	border: 0;
-	border-radius: 0;
+	border-radius: var(--radius-zero);
 	background: transparent;
 	outline: none;
 }
 .cli-welcome-url-input:focus-within {
-	outline: 1px solid var(--welcome-text);
+	outline: 1px solid var(--ink);
 	outline-offset: -1px;
 }
 .cli-welcome-form .cli-welcome-slug-status {
-	margin: 0;
-	font-size: 12px;
-	line-height: 1.6;
-	color: var(--welcome-muted);
+	margin: var(--space-zero);
+	font-size: var(--size-m);
+	letter-spacing: var(--letter-spacing-m);
+	line-height: var(--line-m);
+	color: var(--ink-3);
 }
 .cli-welcome-form .cli-welcome-slug-status[data-status="available"] {
-	color: var(--welcome-success);
+	color: var(--success);
 }
 .cli-welcome-form .cli-welcome-slug-status[data-status="invalid"],
 .cli-welcome-form .cli-welcome-slug-status[data-status="taken"] {
-	color: var(--welcome-error);
+	color: var(--error);
 }
 .cli-welcome-field #welcome-workspace-name {
-	border-radius: 12px;
+	border-radius: var(--radius-l);
 }
 .cli-welcome-field input::placeholder,
 .cli-welcome-field textarea::placeholder {
-	color: var(--welcome-placeholder);
+	color: var(--ink-3);
 }
 .cli-welcome-field input:focus-visible,
 .cli-welcome-field textarea:focus-visible,
 .cli-welcome-field select:focus-visible,
 .cli-welcome-form .cli-onboarding-email input:focus-visible {
-	outline: 2px solid var(--welcome-text);
+	outline: 2px solid var(--ink);
 	outline-offset: -1px;
 }
 .cli-welcome-field .cli-welcome-url-input input:focus-visible {
@@ -425,23 +400,25 @@
 	box-shadow: none;
 }
 .cli-welcome-form .cli-welcome-upload-note {
-	font-size: 12px;
-	margin: 0;
+	font-size: var(--size-m);
+	line-height: var(--line-m);
+	letter-spacing: var(--letter-spacing-m);
+	margin: var(--space-zero);
 }
 .cli-welcome-actions {
 	display: flex;
 	flex-direction: column-reverse;
 	align-items: center;
 	justify-content: flex-end;
-	gap: 12px;
-	padding-top: 24px;
+	gap: var(--space-l);
+	padding-top: var(--space-xxl);
 }
 .cli-welcome-actions .cli-onboarding-primary {
 	width: 100%;
 }
 .cli-welcome-profile-row {
 	display: flex;
-	gap: 12px;
+	gap: var(--space-l);
 	align-items: center;
 }
 .cli-welcome-avatar {
@@ -453,7 +430,7 @@
 	place-items: center;
 	position: relative;
 	overflow: hidden;
-	border: 1px solid var(--welcome-border);
+	border: var(--border-m) solid var(--line);
 }
 .cli-welcome-avatar img {
 	width: 100%;
@@ -470,22 +447,24 @@
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 12px;
+	gap: var(--space-l);
 }
 .cli-welcome-form .cli-welcome-copy-link {
 	display: flex;
-	gap: 6px;
+	gap: var(--space-s);
 	align-items: center;
 	background: transparent;
-	border: 1px solid var(--welcome-border);
-	color: var(--welcome-text);
-	font-size: 12px;
-	font-weight: 500;
+	border: var(--border-m) solid var(--line);
+	color: var(--ink);
+	font-size: var(--size-m);
+	line-height: var(--line-m);
+	letter-spacing: var(--letter-spacing-m);
+	font-weight: var(--weight-body-medium);
 	min-height: 32px;
-	padding: 6px 10px;
+	padding: var(--space-s) var(--space-l);
 }
 .cli-welcome-form .cli-welcome-copy-link:hover:not(:disabled) {
-	background: var(--welcome-hover);
+	background: var(--hover);
 }
 .cli-welcome-step-content {
 	animation: welcome-form-enter 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -507,17 +486,21 @@
 @media (max-width: 899px) {
 	.cli-welcome-panel-content {
 		min-height: auto;
-		gap: 40px;
+		gap: calc(var(--space-xxl) * 5 / 3);
 	}
 	.cli-welcome-form p,
 	.cli-welcome-form button,
 	.cli-welcome-field input:not([type="file"]),
 	.cli-welcome-field textarea {
-		font-size: 16px;
+		font-size: var(--size-xxl);
+		line-height: var(--line-xxl);
+		letter-spacing: var(--letter-spacing-xxl);
 	}
 	.cli-welcome-form h1,
 	.cli-welcome-form h2 {
-		font-size: 20px;
+		font-size: var(--display-size-xxs);
+		line-height: var(--display-line-xxs);
+		letter-spacing: var(--display-letter-spacing-xxs);
 	}
 }
 @media (prefers-reduced-motion: reduce) {

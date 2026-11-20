@@ -311,7 +311,14 @@ export function SessionsOverviewTable({
 			}
 		>
 			{sessionDetailDisabledNote ? (
-				<p className="border-t border-(--session-overview-border) px-3 py-2 text-base font-medium text-(--session-overview-muted) sm:text-sm">
+				<p
+					className={cn(
+						"edge-t-m px-l py-m",
+						"text-body-xxl font-medium",
+						"border-line-strong text-ink-3",
+						"sm:text-body-xl",
+					)}
+				>
 					{sessionDetailDisabledNote}
 				</p>
 			) : null}
@@ -374,7 +381,7 @@ export function SessionsOverviewTable({
 					/>
 					<div
 						className={cn(
-							"@container/sessions-overview flex min-h-[calc(100%-var(--scroll-fade-top-offset,3rem))] flex-col in-data-rail-beside:pr-1.5",
+							"@container/sessions-overview flex min-h-[calc(100%-var(--scroll-fade-top-offset,3rem))] flex-col in-data-rail-beside:pr-s",
 							showSkillsColumn && SESSION_OVERVIEW_MIN_WIDTH_CLASS_NAME,
 						)}
 						data-slot="sessions-overview-canvas"
@@ -486,7 +493,7 @@ export function SessionsOverviewTable({
 							/>
 						) : null}
 						{!pagination && tableState.unloadedSessionCount > 0 ? (
-							<p className="px-3 py-2 text-right text-sm text-(--session-overview-muted)">
+							<p className="px-l py-m text-right text-body-xl text-ink-3">
 								{formatNumber(tableState.unloadedSessionCount)} more not shown
 								{tableState.hasActiveFilters
 									? "; filters apply to loaded sessions"

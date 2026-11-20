@@ -184,15 +184,15 @@ export function SelfHostedAuthForm({
 	)
 		return (
 			<div
-				className="flex w-full max-w-sm flex-col gap-4"
+				className="flex w-full max-w-sm flex-col gap-xl"
 				data-self-hosted-auth="invite-only"
 			>
-				<div className="rounded-3xl bg-muted/35 px-3 py-2 text-sm leading-5 text-muted-foreground ring-1 ring-border/60">
+				<div className="corner-xl bg-field/35 px-l py-m text-body-xl text-ink-3 ring-1 ring-line/60">
 					{signUp === "needs-setup"
 						? "No account exists yet. The owner account comes from the server's setup, not from this page."
 						: "Ask a workspace owner or admin for an invite link (Settings, Members, Invite link) and open it here to create your account."}
 				</div>
-				<p className="text-center text-sm text-muted-foreground">
+				<p className="text-center text-body-xl text-ink-3">
 					Already have an account?{" "}
 					<button
 						type="button"
@@ -207,12 +207,12 @@ export function SelfHostedAuthForm({
 
 	return (
 		<div
-			className="flex w-full max-w-sm flex-col gap-4"
+			className="flex w-full max-w-sm flex-col gap-xl"
 			data-self-hosted-auth={mode}
 		>
 			{providers.length > 0 ? (
 				<>
-					<div className="flex flex-col gap-2">
+					<div className="flex flex-col gap-m">
 						{providers.map((provider, index) => (
 							<Button
 								key={provider}
@@ -231,9 +231,9 @@ export function SelfHostedAuthForm({
 							</Button>
 						))}
 					</div>
-					<div className="flex items-center gap-2">
+					<div className="flex items-center gap-m">
 						<Separator className="flex-1" />
-						<span className="text-xs text-muted-foreground">OR</span>
+						<span className="text-body-m text-ink-3">OR</span>
 						<Separator className="flex-1" />
 					</div>
 				</>
@@ -244,10 +244,10 @@ export function SelfHostedAuthForm({
 					role={feedback.kind === "error" ? "alert" : "status"}
 					aria-live="polite"
 					className={cn(
-						"rounded-3xl px-3 py-2 text-sm leading-5 ring-1",
+						"corner-xl px-l py-m text-body-xl ring-1",
 						feedback.kind === "error"
-							? "bg-destructive/5 text-destructive ring-destructive/15"
-							: "bg-muted/35 text-muted-foreground ring-border/60",
+							? "bg-error/5 text-error ring-error/15"
+							: "bg-field/35 text-ink-3 ring-line/60",
 					)}
 				>
 					{feedback.message}
@@ -255,7 +255,7 @@ export function SelfHostedAuthForm({
 			) : null}
 
 			{codeSentTo ? (
-				<form onSubmit={submitCode} className="flex flex-col gap-4">
+				<form onSubmit={submitCode} className="flex flex-col gap-xl">
 					<Label className="sr-only" htmlFor="self-hosted-code">
 						Email code
 					</Label>
@@ -282,7 +282,7 @@ export function SelfHostedAuthForm({
 						type="button"
 						variant="ghost"
 						size="sm"
-						className="text-muted-foreground"
+						className="text-ink-3"
 						disabled={loading}
 						onClick={() => {
 							setCodeSentTo(null);
@@ -295,11 +295,11 @@ export function SelfHostedAuthForm({
 			) : (
 				<form
 					onSubmit={submitPassword}
-					className="flex flex-col gap-4"
+					className="flex flex-col gap-xl"
 					noValidate
 				>
 					{mode === "sign-up" ? (
-						<div className="flex flex-col gap-2">
+						<div className="flex flex-col gap-m">
 							<Label className="sr-only" htmlFor="self-hosted-name">
 								Name
 							</Label>
@@ -315,7 +315,7 @@ export function SelfHostedAuthForm({
 							/>
 						</div>
 					) : null}
-					<div className="flex flex-col gap-2">
+					<div className="flex flex-col gap-m">
 						<Label className="sr-only" htmlFor="self-hosted-email">
 							Email
 						</Label>
@@ -334,7 +334,7 @@ export function SelfHostedAuthForm({
 							required
 						/>
 					</div>
-					<div className="flex flex-col gap-2">
+					<div className="flex flex-col gap-m">
 						<Label className="sr-only" htmlFor="self-hosted-password">
 							Password
 						</Label>
@@ -374,7 +374,7 @@ export function SelfHostedAuthForm({
 							type="button"
 							variant="ghost"
 							size="sm"
-							className="text-muted-foreground"
+							className="text-ink-3"
 							disabled={loading}
 							onClick={() => void sendCode()}
 						>
@@ -390,13 +390,13 @@ export function SelfHostedAuthForm({
 				navigator.userAgent,
 				window.location.hostname,
 			) ? (
-				<p className="text-center text-xs text-muted-foreground">
+				<p className="text-center text-body-m text-ink-3">
 					Running this server? <code>opaline server open</code> signs you in
 					from its terminal.
 				</p>
 			) : null}
 
-			<p className="text-center text-sm text-muted-foreground">
+			<p className="text-center text-body-xl text-ink-3">
 				{mode === "sign-in"
 					? "Don't have an account? "
 					: "Already have an account? "}

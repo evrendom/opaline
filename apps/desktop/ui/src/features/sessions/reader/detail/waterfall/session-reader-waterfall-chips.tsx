@@ -58,9 +58,9 @@ function ciTone(ci: SessionReaderStep["ci"]): {
 				: ci.run.conclusion;
 	if (conclusion === undefined)
 		return {
-			bar: "bg-muted-foreground/40",
-			text: "text-muted-foreground",
-			tint: "var(--muted-foreground)",
+			bar: "bg-ink-3/40",
+			text: "text-ink-3",
+			tint: "var(--ink-3)",
 		};
 	if (conclusion === "success" || conclusion === null) return CI_STANDARD;
 	if (
@@ -92,7 +92,7 @@ function ciJobGlyph(ci: Extract<SessionReaderStep["ci"], { kind: "job" }>) {
 function modelAccent(model: string | null): string | null {
 	const icon = model ? getModelBadgeTone(model).icon : null;
 	if (icon === "claude") return "#CC7D5E";
-	if (icon === "codex") return "var(--foreground)";
+	if (icon === "codex") return "var(--ink)";
 	return null;
 }
 
@@ -160,7 +160,7 @@ export function OpalChip({
 						)
 					: "relative grid size-4.5 shrink-0 place-items-center [--opal-fill:color-mix(in_oklab,var(--opal-tint)_15%,transparent)] [--opal-ring:color-mix(in_oklab,var(--opal-tint)_14%,transparent)] drop-shadow-[0_2px_3px_color-mix(in_oklab,var(--opal-tint)_25%,transparent)] dark:[--opal-ring:rgb(255_255_255/0.08)] dark:drop-shadow-[0_1px_2px_rgb(0_0_0/0.24)]",
 				solid &&
-					"[--opal-fill:color-mix(in_oklab,var(--opal-tint)_15%,var(--dashboard-01-content-background,var(--background)))]",
+					"[--opal-fill:color-mix(in_oklab,var(--opal-tint)_15%,var(--canvas,var(--canvas)))]",
 				className,
 			)}
 			style={{ "--opal-tint": tint } as CSSProperties}

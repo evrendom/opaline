@@ -23,7 +23,7 @@ export function TwoLines({
 	);
 	const folded = !expanded && overflows;
 	return (
-		<div className="flex min-w-0 flex-col items-start gap-1.5">
+		<div className="flex min-w-0 flex-col items-start gap-s">
 			<div
 				ref={measure}
 				className={cn(
@@ -40,7 +40,7 @@ export function TwoLines({
 				<button
 					type="button"
 					onClick={() => setExpanded((value) => !value)}
-					className="text-xs text-muted-foreground hover:text-foreground"
+					className="text-body-m text-ink-3 hover:text-ink"
 				>
 					{expanded ? "Show less" : "Show more"}
 				</button>

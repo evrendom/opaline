@@ -74,12 +74,12 @@ export function ResetPasswordForm({
 	return (
 		<Card className="w-full max-w-sm">
 			<CardHeader>
-				<CardTitle className="text-2xl">Reset password</CardTitle>
+				<CardTitle className="text-display-xs">Reset password</CardTitle>
 				<CardDescription>Enter your new password</CardDescription>
 			</CardHeader>
-			<CardContent className="flex flex-col gap-4">
-				<form onSubmit={handleSubmit} className="flex flex-col gap-4">
-					<div className="flex flex-col gap-2">
+			<CardContent className="flex flex-col gap-xl">
+				<form onSubmit={handleSubmit} className="flex flex-col gap-xl">
+					<div className="flex flex-col gap-m">
 						<Label htmlFor="new-password">New password</Label>
 						<Input
 							id="new-password"
@@ -103,10 +103,10 @@ export function ResetPasswordForm({
 							role={feedback.kind === "error" ? "alert" : "status"}
 							aria-live="polite"
 							className={cn(
-								"rounded-3xl px-3 py-2 text-sm leading-5 ring-1",
+								"corner-xl px-l py-m text-body-xl ring-1",
 								feedback.kind === "error"
-									? "bg-destructive/5 text-destructive ring-destructive/15"
-									: "bg-muted/35 text-muted-foreground ring-border/60",
+									? "bg-error/5 text-error ring-error/15"
+									: "bg-field/35 text-ink-3 ring-line/60",
 							)}
 						>
 							{feedback.message}
@@ -122,7 +122,7 @@ export function ResetPasswordForm({
 					variant="ghost"
 					size="sm"
 					onClick={onBackToLogin}
-					className="self-start text-muted-foreground"
+					className="self-start text-ink-3"
 				>
 					Back to sign in
 				</Button>

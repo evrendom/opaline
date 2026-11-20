@@ -113,9 +113,9 @@ describe("session turn table pane", () => {
 		expect(markup).toContain("Fable 5");
 		expect(markup).not.toContain(">claude-fable-5<");
 		expect(markup).toContain("data-trace-tree-row-content");
-		expect(markup).toContain("-ml-3");
+		expect(markup).toContain("-ml-l");
 		expect(markup).toContain("size-5");
-		expect(markup).not.toContain("hover:bg-(--session-overview-hover)");
+		expect(markup).not.toContain("hover:bg-hover");
 		expect(markup).not.toContain("<div");
 	});
 

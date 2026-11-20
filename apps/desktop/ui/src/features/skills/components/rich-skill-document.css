@@ -1,41 +1,32 @@
 .rich-skill-document {
-	--skill-document-code-background: #f6f8fa;
-	--skill-document-code-border: rgba(31, 35, 40, 0.08);
 	--skill-document-code-highlight: rgba(255, 255, 255, 0.7);
-	--skill-document-inline-code-background: rgba(135, 131, 120, 0.15);
-	--skill-document-border: rgba(15, 23, 42, 0.12);
-	--skill-document-table-background: rgba(242, 241, 238, 0.62);
 	min-width: 0;
-	color: var(--dashboardy-heading);
+	color: var(--ink);
 	font-family: var(--font-sans);
-	font-size: 15px;
-	font-weight: 400;
-	line-height: 24px;
+	font-size: var(--size-xl);
+	letter-spacing: var(--letter-spacing-xl);
+	font-weight: var(--weight-body-regular);
+	line-height: var(--line-xl);
 	overflow-wrap: anywhere;
 }
 
 .dark .rich-skill-document {
-	--skill-document-code-background: oklch(0.205 0 0);
 	/* Hairlines: a 7% edge and a barely-there inner highlight. */
-	--skill-document-code-border: rgba(255, 255, 255, 0.07);
 	--skill-document-code-highlight: rgba(255, 255, 255, 0.03);
-	--skill-document-inline-code-background: rgba(255, 255, 255, 0.09);
-	--skill-document-border: rgba(255, 255, 255, 0.16);
-	--skill-document-table-background: rgba(255, 255, 255, 0.055);
 }
 
 .rich-skill-document > :first-child {
-	margin-top: 0;
+	margin-top: var(--space-zero);
 }
 
 .rich-skill-document > :last-child {
-	margin-bottom: 0;
+	margin-bottom: var(--space-zero);
 }
 
 .rich-skill-document p {
 	min-height: 24px;
-	margin: 0 0 8px;
-	color: var(--dashboardy-heading);
+	margin: var(--space-zero) var(--space-zero) var(--space-m);
+	color: var(--ink);
 	font: inherit;
 }
 
@@ -44,50 +35,53 @@
 .rich-skill-document h3,
 .rich-skill-document h4 {
 	position: relative;
-	color: var(--dashboardy-heading);
+	color: var(--ink);
 	font-family: var(--font-sans);
-	letter-spacing: 0;
+	letter-spacing: var(--tracking-m);
 }
 
 .rich-skill-document h1,
 .rich-skill-document h2 {
-	margin: 32px 0 0;
-	font-size: 19px;
-	font-weight: 700;
-	line-height: 28px;
+	margin: calc(var(--space-xxl) * 4 / 3) var(--space-zero) var(--space-zero);
+	font-size: var(--display-size-xxs);
+	letter-spacing: var(--display-letter-spacing-xxs);
+	font-weight: var(--weight-body-heavy);
+	line-height: var(--display-line-xxs);
 }
 
 .rich-skill-document h3 {
-	margin: 24px 0 6px;
-	font-size: 17px;
-	font-weight: 600;
-	line-height: 24px;
+	margin: var(--space-xxl) var(--space-zero) var(--space-s);
+	font-size: var(--size-xxl);
+	letter-spacing: var(--letter-spacing-xxl);
+	font-weight: var(--weight-body-heavy);
+	line-height: var(--line-xxl);
 }
 
 .rich-skill-document h4 {
-	margin: 18px 0 0;
-	font-size: 15px;
-	font-weight: 600;
-	line-height: 24px;
+	margin: var(--space-xl) var(--space-zero) var(--space-zero);
+	font-size: var(--size-xl);
+	letter-spacing: var(--letter-spacing-xl);
+	font-weight: var(--weight-body-heavy);
+	line-height: var(--line-xl);
 }
 
 .rich-skill-document blockquote {
-	margin: 10px 0 8px;
-	padding: 4px 14px;
-	border-left: 3px solid var(--skill-document-border);
-	color: var(--dashboardy-muted);
+	margin: var(--space-l) var(--space-zero) var(--space-m);
+	padding: var(--space-xs) var(--space-xl);
+	border-left: var(--border-l) solid var(--line);
+	color: var(--ink-3);
 }
 
 .rich-skill-document blockquote p {
-	padding-block: 2px;
+	padding-block: var(--space-xxs);
 	color: inherit;
 }
 
 .rich-skill-document ul,
 .rich-skill-document ol {
-	margin: 5px 0;
-	padding-left: 28px;
-	color: var(--dashboardy-heading);
+	margin: var(--space-s) var(--space-zero);
+	padding-left: calc(var(--space-xxl) * 1.25);
+	color: var(--ink);
 	font: inherit;
 }
 
@@ -100,20 +94,20 @@
 }
 
 .rich-skill-document li {
-	padding-left: 2px;
+	padding-left: var(--space-xxs);
 }
 
 .rich-skill-document li > p {
 	min-height: 0;
-	margin: 0;
+	margin: var(--space-zero);
 }
 
 .rich-skill-document code:not(.rich-skill-document__code) {
-	padding: 2px 4px;
-	border-radius: 4px;
-	background: var(--skill-document-inline-code-background);
-	color: #c43c4b;
-	font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+	padding: var(--space-xxs) var(--space-xs);
+	border-radius: var(--radius-xs);
+	background: var(--hover-strong);
+	color: var(--error);
+	font-family: var(--font-data);
 	font-size: 0.85em;
 }
 
@@ -124,16 +118,15 @@
 }
 
 .rich-skill-document__plain-code-block {
-	margin: 12px 0 14px;
-	padding: 14px 16px;
+	margin: var(--space-l) var(--space-zero) var(--space-xl);
+	padding: var(--space-xl) var(--space-xl);
 	overflow: auto;
-	border: 0.5px solid var(--skill-document-code-border);
-	border-radius: 8px;
-	background: var(--skill-document-code-background);
+	border: var(--border-s) solid var(--line);
+	border-radius: var(--radius-s);
+	background: var(--inset);
 	box-shadow: inset 0 0 0 1px var(--skill-document-code-highlight);
-	color: #1f2328;
-	font-family:
-		"SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+	color: var(--ink);
+	font-family: var(--font-data);
 	font-size: inherit;
 	line-height: inherit;
 	tab-size: 2;
@@ -141,9 +134,9 @@
 
 .rich-skill-document[data-variant="preview"]
 	.rich-skill-document__plain-code-block {
-	margin: 8px 0 10px;
-	padding: 9px 10px;
-	border-radius: 6px;
+	margin: var(--space-m) var(--space-zero) var(--space-l);
+	padding: var(--space-m) var(--space-l);
+	border-radius: var(--radius-xs);
 }
 
 .rich-skill-document__code {
@@ -153,14 +146,14 @@
 
 .rich-skill-document hr {
 	height: 1px;
-	margin: 20px 2px;
+	margin: var(--space-xxl) var(--space-xxs);
 	border: 0;
-	background: var(--skill-document-border);
+	background: var(--line);
 }
 
 .rich-skill-document__table-scroll {
 	width: 100%;
-	margin: 12px 0;
+	margin: var(--space-l) var(--space-zero);
 	overflow-x: auto;
 }
 
@@ -168,115 +161,108 @@
 	width: 100%;
 	border-collapse: collapse;
 	table-layout: fixed;
-	color: var(--dashboardy-heading);
-	font-family: var(
-		--font-sans,
-		Inter,
-		-apple-system,
-		BlinkMacSystemFont,
-		"Segoe UI",
-		sans-serif
-	);
-	font-size: 14px;
-	line-height: 21px;
+	color: var(--ink);
+	font-family: var(--font-sans);
+	font-size: var(--size-xl);
+	letter-spacing: var(--letter-spacing-xl);
+	line-height: var(--line-xl);
 }
 
 .rich-skill-document th,
 .rich-skill-document td {
 	min-width: 92px;
-	padding: 7px 9px;
-	border: 1px solid var(--skill-document-border);
+	padding: var(--space-m) var(--space-m);
+	border: var(--border-m) solid var(--line);
 	vertical-align: top;
 }
 
 .rich-skill-document th {
-	background: var(--skill-document-table-background);
-	font-weight: 650;
+	background: var(--wash);
+	font-weight: var(--weight-body-heavy);
 	text-align: left;
 }
 
 .rich-skill-document th p,
 .rich-skill-document td p {
 	min-height: 21px;
-	margin: 0;
+	margin: var(--space-zero);
 	font-family: inherit;
 	font-size: inherit;
 	line-height: inherit;
 }
 
 .rich-skill-document a {
-	color: var(--dashboardy-accent);
+	color: var(--accent);
 	text-decoration: underline;
 	text-decoration-color: color-mix(in srgb, currentcolor 34%, transparent);
 	text-underline-offset: 3px;
 }
 
 .rich-skill-document strong {
-	font-weight: 650;
+	font-weight: var(--weight-body-heavy);
 }
 
 .rich-skill-document[data-variant="preview"] {
-	--skill-document-code-background: var(--session-overview-hover);
-	--skill-document-inline-code-background: var(--session-overview-hover);
-	font-size: 1rem;
-	line-height: 1.5rem;
-	color: var(--session-overview-muted);
+	font-size: var(--size-xxl);
+	letter-spacing: var(--letter-spacing-xxl);
+	line-height: var(--line-xxl);
+	color: var(--ink-3);
 }
 
 .rich-skill-document[data-variant="preview"] p {
 	min-height: 0;
-	margin-bottom: 0.5rem;
+	margin-bottom: var(--space-m);
 	color: inherit;
 }
 
 .rich-skill-document[data-variant="preview"] h1,
 .rich-skill-document[data-variant="preview"] h2 {
-	margin-top: 1rem;
+	margin-top: var(--space-xl);
 	font-size: inherit;
-	font-weight: 500;
+	font-weight: var(--weight-body-medium);
 	line-height: inherit;
-	color: var(--session-overview-text);
+	color: var(--ink);
 }
 
 .rich-skill-document[data-variant="preview"] h3 {
-	margin: 0.75rem 0 0.25rem;
+	margin: var(--space-l) var(--space-zero) var(--space-xs);
 	font-size: inherit;
-	font-weight: 500;
+	font-weight: var(--weight-body-medium);
 	line-height: inherit;
 }
 
 .rich-skill-document[data-variant="preview"] h4 {
-	margin-top: 0.75rem;
+	margin-top: var(--space-l);
 	font-size: inherit;
-	font-weight: 500;
+	font-weight: var(--weight-body-medium);
 	line-height: inherit;
 }
 
 .rich-skill-document[data-variant="preview"] blockquote {
-	margin: 6px 0;
-	padding: 2px 8px;
-	border-left-width: 2px;
+	margin: var(--space-s) var(--space-zero);
+	padding: var(--space-xxs) var(--space-m);
+	border-left-width: var(--border-l);
 }
 
 .rich-skill-document[data-variant="preview"] ul,
 .rich-skill-document[data-variant="preview"] ol {
-	margin: 3px 0;
-	padding-left: 17px;
+	margin: var(--space-xs) var(--space-zero);
+	padding-left: var(--space-xl);
 }
 
 .rich-skill-document[data-variant="preview"]
 	code:not(.rich-skill-document__code) {
-	padding: 1px 3px;
-	border-radius: 3px;
+	padding: var(--space-xxs) var(--space-xs);
+	border-radius: var(--radius-xs);
 }
 
 .rich-skill-document[data-variant="preview"] hr {
-	margin: 10px 1px;
+	margin: var(--space-l) var(--space-xxs);
 }
 
 .rich-skill-document[data-variant="preview"]
 	.rich-skill-document__table-scroll {
-	margin: 7px 0;
+	margin: var(--space-m) var(--space-zero);
 }
 
 .rich-skill-document[data-variant="preview"] table {
@@ -287,11 +273,11 @@
 .rich-skill-document[data-variant="preview"] th,
 .rich-skill-document[data-variant="preview"] td {
 	min-width: 58px;
-	padding: 4px 5px;
+	padding: var(--space-xs) var(--space-s);
 }
 
 .rich-skill-document[data-variant="preview"] > :first-child {
-	margin-top: 0;
+	margin-top: var(--space-zero);
 }
 
 .rich-skill-document[data-variant="preview"] :is(ul, ol) {
@@ -300,8 +286,9 @@
 
 @media (min-width: 40rem) {
 	.rich-skill-document[data-variant="preview"] {
-		font-size: 0.875rem;
-		line-height: 1.375rem;
+		font-size: var(--size-xl);
+		letter-spacing: var(--letter-spacing-xl);
+		line-height: var(--line-xl);
 	}
 }
 

@@ -264,8 +264,8 @@ describe("ConversationTrace sticky surfaces", () => {
 		expect(
 			container.querySelectorAll("[data-trace-collapsed-flow-cluster]"),
 		).toHaveLength(4);
-		expect(steps[1]?.className).not.toContain("-ml-2");
-		expect(steps[2]?.className).toContain("-ml-2");
+		expect(steps[1]?.className).not.toContain("-ml-m");
+		expect(steps[2]?.className).toContain("-ml-m");
 		expect(steps.filter((step) => step.title === "Ran")).toHaveLength(1);
 		expect(
 			container.querySelector("[data-trace-collapsed-flow-count]"),
@@ -293,20 +293,20 @@ describe("ConversationTrace sticky surfaces", () => {
 		expect(remainingCount).toHaveTextContent("+3");
 		expect(remainingCount).toHaveAttribute("data-trace-icon");
 		expect(remainingCount).toHaveClass(
-			"text-[8px]",
+			"text-body-xxs",
 			"tracking-[-0.08em]",
 			"[text-indent:-1.5px]",
 		);
 		expect(remainingCount?.style.width).toBe("16px");
 		expect(remainingCount?.style.height).toBe("16px");
 		expect(remainingCount?.style.color).toBe(
-			"var(--constellation-tree-tertiary, var(--session-overview-subtle, var(--session-overview-muted)))",
+			"var(--ink-3, var(--ink-3, var(--ink-3)))",
 		);
 		expect(remainingCount?.style.background).toBe(
-			"color-mix(in srgb, var(--conversation-trace-connector-color, var(--session-overview-border)) 75%, transparent)",
+			"color-mix(in srgb, var(--conversation-trace-connector-color, var(--line-strong)) 75%, transparent)",
 		);
 		expect(remainingCount?.style.getPropertyValue("--trace-icon-bg")).toBe(
-			"color-mix(in srgb, var(--conversation-trace-connector-color, var(--session-overview-border)) 75%, transparent)",
+			"color-mix(in srgb, var(--conversation-trace-connector-color, var(--line-strong)) 75%, transparent)",
 		);
 		expect(remainingCount?.style.mask).toContain("opaline-trace-fill.svg");
 	});
@@ -375,7 +375,7 @@ describe("ConversationTrace sticky surfaces", () => {
 		expect(stickyRows).toContain(userRow);
 		for (const row of stickyRows) {
 			expect(row).toHaveAttribute("data-trace-tree-sticky-surface", "true");
-			expect(row.className).toContain("bg-(--session-overview-surface)");
+			expect(row.className).toContain("bg-canvas");
 			expect(row.className).not.toContain("transform:translateY");
 			expect(
 				row.style.getPropertyValue("--conversation-trace-stack-offset"),
@@ -441,7 +441,7 @@ describe("ConversationTrace sticky surfaces", () => {
 		expect(treeItem?.querySelector("[data-trace-expanded-content]")).toBeNull();
 		expect(treeRow).not.toHaveAttribute("data-trace-tree-sticky-surface");
 		expect(treeRow).not.toHaveAttribute("data-trace-tree-sticky-top");
-		expect(collapsedPreview).toHaveClass("px-3", "py-1");
+		expect(collapsedPreview).toHaveClass("px-l", "py-xs");
 		expect(collapsedPreview).not.toHaveClass("min-h-10");
 		fireEvent.click(trigger);
 
@@ -453,7 +453,7 @@ describe("ConversationTrace sticky surfaces", () => {
 		);
 		const subtree = treeItem?.querySelector<HTMLOListElement>(":scope > ol");
 		expect(trigger).toHaveAttribute("aria-expanded", "true");
-		expect(expandedContent).toHaveClass("px-3", "py-1");
+		expect(expandedContent).toHaveClass("px-l", "py-xs");
 		expect(treeRow).not.toHaveAttribute("data-trace-tree-sticky-surface");
 		expect(treeRow).not.toHaveAttribute("data-trace-tree-sticky-top");
 		expect(treeRow?.className).not.toContain("sticky");

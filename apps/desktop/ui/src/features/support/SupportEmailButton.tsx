@@ -1,5 +1,6 @@
 import { useLayoutEffect, useSyncExternalStore } from "react";
 import { useLocation } from "react-router-dom";
+import { TouchTarget } from "@/app/ui/touch-target";
 import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import { showsSupportEmail } from "@/features/self-hosted/surfaces";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
@@ -66,16 +67,16 @@ function SupportEmailLink({ className }: { className: string }) {
 		<a
 			aria-label="Email Opaline support"
 			className={cn(
-				"flex items-center justify-center rounded-full text-muted-foreground outline-none hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+				"flex items-center justify-center",
+				"corner-full",
+				"text-ink-3 outline-none",
+				"hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
 				className,
 			)}
 			href={href}
 			title="Email support"
 		>
-			<span
-				aria-hidden="true"
-				className="absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden"
-			/>
+			<TouchTarget />
 			<span aria-hidden="true" className="font-medium">
 				?
 			</span>
@@ -89,7 +90,7 @@ export function SupportEmailButton() {
 	const docked = useSupportDocked();
 	if (docked || !showsSupportEmail(selfHost)) return null;
 	return (
-		<SupportEmailLink className="fixed right-[max(1rem,env(safe-area-inset-right))] bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 size-9 bg-popover shadow-lg ring-1 ring-foreground/10 hover:bg-accent dark:shadow-none" />
+		<SupportEmailLink className="fixed right-[max(1rem,env(safe-area-inset-right))] bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 size-9 bg-surface shadow-lg ring-1 ring-ink/10 hover:bg-hover dark:shadow-none" />
 	);
 }
 
@@ -107,7 +108,7 @@ export function DockedSupportEmailButton({
 	return (
 		<SupportEmailLink
 			className={cn(
-				"relative size-5 text-[0.6875rem] ring-1 ring-foreground/10 transition-colors hover:bg-accent",
+				"relative size-5 text-body-s ring-1 ring-ink/10 transition-colors hover:bg-hover",
 				className,
 			)}
 		/>

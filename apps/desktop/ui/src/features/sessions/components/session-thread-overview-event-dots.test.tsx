@@ -103,7 +103,7 @@ describe("SessionThreadOverviewEventDots", () => {
 		expect(markup).toContain('data-session-overview-event="file-edit"');
 		expect(markup).toContain('data-session-overview-event="subagent"');
 		expect(markup).toContain('data-count="2"');
-		expect(markup).toContain("rounded-full");
+		expect(markup).toContain("corner-full");
 		expect(markup).toContain("--session-event-x:25.5%");
 		expect(markup).toContain("--session-event-y:36.184");
 		expect(markup).toContain(

@@ -185,7 +185,7 @@ export const ReaderMap = memo(function ReaderMap({
 	tags?: readonly string[];
 }) {
 	return (
-		<div className="-mx-6 -mt-2 -mb-4 [overflow-anchor:none]">
+		<div className="-mx-xxl -mt-m -mb-xl [overflow-anchor:none]">
 			<div
 				className={cn(
 					"sticky top-0 z-40 flex h-[100cqh] flex-col",

@@ -26,8 +26,8 @@ export function BillingManagementCard({
 	if (summary.isError) {
 		return (
 			<WorkspaceSettingsGroup title="Billing">
-				<div className="workspace-settings-actions">
-					<p className="workspace-settings-error" role="alert">
+				<div className="settings-actions">
+					<p className="settings-error" role="alert">
 						Billing information could not be loaded right now.
 					</p>
 				</div>
@@ -54,7 +54,7 @@ export function BillingManagementCard({
 		<WorkspaceSettingsGroup title="Billing">
 			<WorkspaceSettingsRow label={planLabel} description={planDescription}>
 				{/* Plan badge. */}
-				<span className="inline-flex h-5 items-center rounded-full bg-emerald-500/10 px-2 text-xs font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+				<span className="inline-flex h-5 items-center corner-full bg-success/10 px-m text-body-m font-medium text-success dark:bg-emerald-500/15 dark:text-success">
 					{currentPlan}
 				</span>
 			</WorkspaceSettingsRow>
@@ -88,8 +88,8 @@ export function BillingManagementCard({
 				</a>
 			</WorkspaceSettingsRow>
 			{error ? (
-				<div className="workspace-settings-actions">
-					<p className="workspace-settings-error" role="alert">
+				<div className="settings-actions">
+					<p className="settings-error" role="alert">
 						{error}
 					</p>
 				</div>

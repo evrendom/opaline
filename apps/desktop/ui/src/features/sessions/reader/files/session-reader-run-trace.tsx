@@ -118,7 +118,7 @@ export function RunTrace({
 	});
 	if (rows.length === 0)
 		return (
-			<p className="py-1 pl-2 text-[11px] text-muted-foreground">
+			<p className="py-xs pl-m text-body-s text-ink-3">
 				No files read or edited.
 			</p>
 		);
@@ -178,7 +178,7 @@ export function RunTrace({
 			/>,
 		);
 	}
-	return <ol className="flex flex-col pt-1 pb-2">{items}</ol>;
+	return <ol className="flex flex-col pt-xs pb-m">{items}</ol>;
 }
 
 type Place = { folder: string; root: string | null; shown: string };
@@ -285,20 +285,20 @@ function ReadRuler({
 			role="img"
 			aria-label={title}
 			title={title}
-			className="flex w-10 shrink-0 flex-col items-end gap-0.5"
+			className="flex w-10 shrink-0 flex-col items-end gap-xxs"
 		>
-			<span className="text-[9px] leading-none text-muted-foreground/70 tabular-nums">
+			<span className="text-body-xs leading-none text-ink-3/70 tabular-nums">
 				{count === null
 					? "all lines"
 					: `${count.toLocaleString()} ${count === 1 ? "line" : "lines"}`}
 			</span>
-			<span className="relative h-1 w-full overflow-hidden rounded-full bg-muted-foreground/15">
+			<span className="relative h-1 w-full overflow-hidden corner-full bg-ink-3/15">
 				{ranges.map((range) => {
 					const to = range.to ?? total;
 					return (
 						<span
 							key={`${range.from}-${range.to}`}
-							className="absolute inset-y-0 min-w-0.5 rounded-full bg-muted-foreground/55"
+							className="absolute inset-y-0 min-w-0.5 corner-full bg-ink-3/55"
 							style={{
 								left: share(range.from - 1),
 								width: share(to - range.from + 1),
@@ -313,10 +313,17 @@ function ReadRuler({
 
 function RepoRow({ root }: { root: string }) {
 	return (
-		<li className="flex h-6 items-center gap-1.5 px-2 pt-1 text-[11px] font-medium text-muted-foreground/70">
+		<li
+			className={cn(
+				"flex h-6 items-center gap-s",
+				"px-m pt-xs",
+				"text-body-s font-medium",
+				"text-ink-3/70",
+			)}
+		>
 			<IconFolderOpenFilled
 				aria-hidden="true"
-				className="size-3 shrink-0 text-muted-foreground/40"
+				className="size-3 shrink-0 text-ink-3/40"
 			/>
 			<span className="min-w-0 truncate">{root.split("/").at(-1)}</span>
 		</li>
@@ -349,18 +356,19 @@ function FolderRow({
 	return (
 		<li
 			className={cn(
-				"flex min-h-6 items-start gap-1.5 pt-1.5 pr-2 pb-0.5 text-[11px] leading-4 text-muted-foreground/70",
-				inRepo ? "pl-5" : "pl-2",
+				"flex min-h-6 items-start gap-s",
+				"pt-s pr-m pb-xxs",
+				"text-body-s",
+				"text-ink-3/70",
+				inRepo ? "pl-xxl" : "pl-m",
 			)}
 		>
 			<IconFolderOpenFilled
 				aria-hidden="true"
-				className="mt-0.5 size-3 shrink-0 text-muted-foreground/40"
+				className="mt-xxs size-3 shrink-0 text-ink-3/40"
 			/>
 			<span className="min-w-0 [overflow-wrap:anywhere]">
-				{same ? (
-					<span className="text-muted-foreground/40">{`${same} / `}</span>
-				) : null}
+				{same ? <span className="text-ink-3/40">{`${same} / `}</span> : null}
 				{fresh}
 			</span>
 		</li>
@@ -407,16 +415,18 @@ function StepRow({
 				onClick={onPick}
 				aria-current={selected || undefined}
 				className={cn(
-					"relative isolate flex h-6 w-full items-center gap-1.5 px-2 text-left text-xs",
-					"before:absolute before:inset-x-0 before:inset-y-px before:-z-10 before:rounded-md before:transition-colors",
-					depth === 1 && "pl-5",
-					depth === 2 && "pl-8",
-					selected ? "before:bg-muted" : "hover:before:bg-muted/50",
+					"relative isolate flex h-6 w-full items-center gap-s",
+					"px-m",
+					"text-left text-body-m",
+					"before:absolute before:inset-x-0 before:inset-y-px before:-z-10 before:corner-s before:transition-colors",
+					depth === 1 && "pl-xxl",
+					depth === 2 && "pl-[calc(var(--space-xxl)*4/3)]",
+					selected ? "before:bg-field" : "hover:before:bg-hover/50",
 					step.failed
-						? "text-destructive"
+						? "text-error"
 						: selected
-							? "font-medium text-foreground"
-							: "text-muted-foreground",
+							? "font-medium text-ink"
+							: "text-ink-3",
 				)}
 			>
 				<Glyph
@@ -425,8 +435,8 @@ function StepRow({
 						"size-3 shrink-0",
 						step.kind === "check" &&
 							!step.failed &&
-							"text-green-600 dark:text-green-400",
-						step.kind === "edit" && "text-opal-2",
+							"text-success dark:text-green-400",
+						step.kind === "edit" && "text-color-3",
 						!failedCheck &&
 							step.kind !== "check" &&
 							step.kind !== "edit" &&
@@ -438,7 +448,7 @@ function StepRow({
 						aria-hidden="true"
 						className={cn(
 							"size-3.5 shrink-0 transition-colors",
-							selected ? "text-foreground" : "text-muted-foreground/50",
+							selected ? "text-ink" : "text-ink-3/50",
 						)}
 					/>
 				) : null}
@@ -446,12 +456,12 @@ function StepRow({
 					className={cn(
 						"min-w-0 flex-1 truncate",
 						step.kind === "edit" || step.kind === "check"
-							? "text-foreground"
+							? "text-ink"
 							: undefined,
 						(step.kind === "search" ||
 							step.kind === "shell" ||
 							step.kind === "git") &&
-							"font-mono text-[11px]",
+							"font-data text-body-s",
 					)}
 				>
 					{step.kind === "check" && step.check ? `${step.check} · ` : ""}
@@ -464,11 +474,11 @@ function StepRow({
 					/>
 				) : null}
 				{edit ? (
-					<span className="shrink-0 text-[11px] tabular-nums">
-						<span className="text-green-600 dark:text-green-400">
+					<span className="shrink-0 text-body-s tabular-nums">
+						<span className="text-success dark:text-green-400">
 							+{edit.added}
 						</span>{" "}
-						<span className="text-red-600 dark:text-red-400">
+						<span className="text-error dark:text-red-400">
 							−{edit.removed}
 						</span>
 					</span>

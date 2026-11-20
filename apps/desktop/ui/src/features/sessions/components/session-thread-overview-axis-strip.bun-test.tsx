@@ -153,8 +153,7 @@ describe("SessionOverviewTimelineFooter", () => {
 		expect(markup).toContain("data-session-overview-viewport-pane");
 		expect(markup).toContain("--session-overview-viewport-left:25%");
 		expect(markup).toContain("--session-overview-viewport-width:50%");
-		expect(markup).toContain("bg-orange-500/10");
-		expect(markup).toContain("dark:bg-orange-400/10");
+		expect(markup).toContain("bg-warning/10");
 		expect(markup).not.toContain("ring-orange");
 		expect(markup).not.toContain("rounded-");
 		expect(markup).not.toContain("data-session-overview-selection-marker");

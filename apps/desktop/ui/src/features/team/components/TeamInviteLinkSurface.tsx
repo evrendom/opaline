@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/app/ui/button";
 import { Input } from "@/app/ui/input";
+import { TouchTarget } from "@/app/ui/touch-target";
 import { copyTextToClipboardWithResult } from "@/lib/clipboard";
 import { client } from "@/lib/orpc";
 
@@ -83,9 +84,9 @@ export function TeamInviteLinkSurface({
 
 	if (layout === "settings") {
 		return (
-			<div className="workspace-settings-link-surface">
+			<div className="settings-link-surface">
 				{teamInviteLink ? (
-					<div className="workspace-settings-link-value">
+					<div className="settings-link-value">
 						<Input
 							aria-label="Team invite link"
 							value={teamInviteLink}
@@ -103,7 +104,7 @@ export function TeamInviteLinkSurface({
 						</Button>
 					</div>
 				) : null}
-				<div className="workspace-settings-link-actions">
+				<div className="settings-link-actions">
 					<Button
 						disabled={isInviteLinkPending}
 						onClick={() => void handleCreateTeamInviteLink()}
@@ -133,58 +134,55 @@ export function TeamInviteLinkSurface({
 
 	if (layout === "toolbar") {
 		return (
-			<div className="flex min-w-0 items-center gap-2">
+			<div className="flex min-w-0 items-center gap-m">
 				{teamInviteLink ? (
 					// The link in a pill like the toolbar's search, copied from inside.
-					<div className="flex h-8 min-w-0 items-center gap-1.5 rounded-full bg-card pr-1 pl-3 shadow-(--custom-outline-shadow)">
+					<div className="flex h-8 min-w-0 items-center gap-s corner-full bg-card pr-xs pl-l shadow-(--shadow-control)">
 						<IconLink
 							aria-hidden="true"
-							className="size-3.5 shrink-0 stroke-muted-foreground"
+							className="size-3.5 shrink-0 stroke-ink-3"
 						/>
 						<p
-							className="max-w-72 min-w-0 truncate font-mono text-xs text-foreground"
+							className="max-w-72 min-w-0 truncate font-data text-body-m text-ink"
 							title={teamInviteLink}
 						>
 							{teamInviteLink}
 						</p>
-						<button
+						<Button
 							type="button"
-							skullet-block=""
+							size="xs"
 							aria-label={copied ? "Copied team link" : "Copy team link"}
-							className="h-6 shrink-0 rounded-full bg-foreground px-2.5 text-xs font-medium text-background disabled:opacity-50"
 							disabled={isInviteLinkPending}
 							onClick={() => void handleCopyTeamLink()}
 						>
 							{copied ? "Copied" : "Copy"}
-						</button>
+						</Button>
 					</div>
 				) : null}
-				<button
+				<Button
 					type="button"
-					skullet-block=""
-					className="toolbar-button"
+					variant="toolbar"
 					disabled={isInviteLinkPending}
 					onClick={() => void handleCreateTeamInviteLink()}
 				>
 					{teamInviteLink ? null : <IconLink aria-hidden="true" />}
 					{teamInviteLink ? "Replace" : "Create invite link"}
-				</button>
-				<button
+				</Button>
+				<Button
 					type="button"
-					skullet-block=""
-					className="toolbar-button"
+					variant="toolbar"
 					disabled={isInviteLinkPending}
 					onClick={() => void handleRevokeTeamInviteLink()}
 				>
 					{teamInviteLink ? "Revoke" : "Revoke existing links"}
-				</button>
+				</Button>
 			</div>
 		);
 	}
 
 	if (!teamInviteLink) {
 		return (
-			<div className="flex w-full flex-wrap gap-2">
+			<div className="flex w-full flex-wrap gap-m">
 				<Button
 					className="relative"
 					disabled={isInviteLinkPending}
@@ -193,10 +191,7 @@ export function TeamInviteLinkSurface({
 					type="button"
 					variant="outline"
 				>
-					<span
-						aria-hidden="true"
-						className="pointer-fine:hidden absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2"
-					/>
+					<TouchTarget />
 					Create invite link
 				</Button>
 				<Button
@@ -207,10 +202,7 @@ export function TeamInviteLinkSurface({
 					type="button"
 					variant="ghost"
 				>
-					<span
-						aria-hidden="true"
-						className="pointer-fine:hidden absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2"
-					/>
+					<TouchTarget />
 					Revoke existing links
 				</Button>
 			</div>
@@ -219,30 +211,27 @@ export function TeamInviteLinkSurface({
 
 	if (layout === "row") {
 		return (
-			<div className="flex w-full min-w-0 items-center gap-2">
-				<div className="grid h-10 min-w-0 flex-1 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-1 rounded-full border border-black/10 bg-background p-1 dark:border-white/10">
+			<div className="flex w-full min-w-0 items-center gap-m">
+				<div className="grid h-10 min-w-0 flex-1 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-xs corner-full edge-m border-line bg-canvas p-xs dark:border-line">
 					<IconLink
 						aria-hidden="true"
-						className="size-4 h-lh shrink-0 justify-self-center stroke-muted-foreground"
+						className="size-4 h-lh shrink-0 justify-self-center stroke-ink-3"
 					/>
 					<p
-						className="min-w-0 truncate font-mono text-base font-medium text-foreground sm:text-sm"
+						className="min-w-0 truncate font-data text-body-xxl font-medium text-ink sm:text-body-xl"
 						title={teamInviteLink}
 					>
 						{teamInviteLink}
 					</p>
 					<Button
 						aria-label={copied ? "Copied team link" : "Copy team link"}
-						className="relative rounded-full"
+						className="relative corner-full"
 						disabled={isInviteLinkPending}
 						onClick={() => void handleCopyTeamLink()}
 						size="sm"
 						type="button"
 					>
-						<span
-							aria-hidden="true"
-							className="pointer-fine:hidden absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2"
-						/>
+						<TouchTarget />
 						{copied ? "Copied" : "Copy"}
 					</Button>
 				</div>
@@ -254,10 +243,7 @@ export function TeamInviteLinkSurface({
 					type="button"
 					variant="ghost"
 				>
-					<span
-						aria-hidden="true"
-						className="pointer-fine:hidden absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2"
-					/>
+					<TouchTarget />
 					Replace
 				</Button>
 				<Button
@@ -268,10 +254,7 @@ export function TeamInviteLinkSurface({
 					type="button"
 					variant="ghost"
 				>
-					<span
-						aria-hidden="true"
-						className="pointer-fine:hidden absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2"
-					/>
+					<TouchTarget />
 					Revoke
 				</Button>
 			</div>
@@ -279,34 +262,31 @@ export function TeamInviteLinkSurface({
 	}
 
 	return (
-		<div className="flex w-full min-w-0 flex-col gap-2">
-			<div className="grid h-11 w-full min-w-0 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-1 rounded-full border border-black/10 bg-background p-1 dark:border-white/10">
+		<div className="flex w-full min-w-0 flex-col gap-m">
+			<div className="grid h-11 w-full min-w-0 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-xs corner-full edge-m border-line bg-canvas p-xs dark:border-line">
 				<IconLink
 					aria-hidden="true"
-					className="size-4 h-lh shrink-0 justify-self-center stroke-muted-foreground"
+					className="size-4 h-lh shrink-0 justify-self-center stroke-ink-3"
 				/>
 				<p
-					className="min-w-0 truncate font-mono text-base font-medium text-foreground sm:text-sm"
+					className="min-w-0 truncate font-data text-body-xxl font-medium text-ink sm:text-body-xl"
 					title={teamInviteLink}
 				>
 					{teamInviteLink}
 				</p>
 				<Button
 					aria-label={copied ? "Copied team link" : "Copy team link"}
-					className="relative rounded-full"
+					className="relative corner-full"
 					disabled={isInviteLinkPending}
 					onClick={() => void handleCopyTeamLink()}
 					size="sm"
 					type="button"
 				>
-					<span
-						aria-hidden="true"
-						className="pointer-fine:hidden absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2"
-					/>
+					<TouchTarget />
 					{copied ? "Copied" : "Copy"}
 				</Button>
 			</div>
-			<div className="flex justify-end gap-1">
+			<div className="flex justify-end gap-xs">
 				<Button
 					className="relative"
 					disabled={isInviteLinkPending}
@@ -315,10 +295,7 @@ export function TeamInviteLinkSurface({
 					type="button"
 					variant="ghost"
 				>
-					<span
-						aria-hidden="true"
-						className="pointer-fine:hidden absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2"
-					/>
+					<TouchTarget />
 					Replace
 				</Button>
 				<Button
@@ -329,10 +306,7 @@ export function TeamInviteLinkSurface({
 					type="button"
 					variant="ghost"
 				>
-					<span
-						aria-hidden="true"
-						className="pointer-fine:hidden absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2"
-					/>
+					<TouchTarget />
 					Revoke
 				</Button>
 			</div>
@@ -347,8 +321,8 @@ export function TeamInviteLinkActionsSample({
 }) {
 	if (layout === "settings")
 		return (
-			<div className="workspace-settings-link-surface">
-				<div className="workspace-settings-link-actions">
+			<div className="settings-link-surface">
+				<div className="settings-link-actions">
 					<Button size="sm" type="button" variant="outline">
 						Create invite link
 					</Button>
@@ -359,14 +333,14 @@ export function TeamInviteLinkActionsSample({
 			</div>
 		);
 	return (
-		<div className="flex min-w-0 items-center gap-2">
-			<button type="button" skullet-block="" className="toolbar-button">
+		<div className="flex min-w-0 items-center gap-m">
+			<Button type="button" variant="toolbar">
 				<IconLink aria-hidden="true" />
 				Create invite link
-			</button>
-			<button type="button" skullet-block="" className="toolbar-button">
+			</Button>
+			<Button type="button" variant="toolbar">
 				Revoke existing links
-			</button>
+			</Button>
 		</div>
 	);
 }

@@ -96,19 +96,22 @@ export const RailRow = memo(function RailRow({
 			aria-label={`Turn ${number}`}
 			onClick={(event) => onPick(turn, event.clientY)}
 			className={cn(
-				"group/row relative grid auto-rows-[minmax(var(--rail-line-height),auto)] grid-cols-[minmax(0,1fr)_auto] items-center gap-x-1.5 gap-y-(--rail-line-gap) rounded-md px-1.5 text-left text-xs corner-squircle squircle:rounded-xl",
+				"group/row relative grid auto-rows-[minmax(var(--rail-line-height),auto)] grid-cols-[minmax(0,1fr)_auto] items-center gap-x-s gap-y-(--rail-line-gap)",
+				"corner-s px-s corner-squircle",
+				"text-left text-body-m",
+				"squircle:corner-l",
 				shown.length > 0 && "pb-(--rail-line-gap)",
 			)}
 		>
 			{shown.length > 0 ? (
 				<span
 					aria-hidden="true"
-					className="pointer-events-none absolute inset-0 -z-[5] rounded-md ring-1 ring-border/60 ring-inset corner-squircle squircle:rounded-xl"
+					className="pointer-events-none absolute inset-0 -z-[5] corner-s ring-1 ring-line/60 ring-inset corner-squircle squircle:corner-l"
 				/>
 			) : null}
 			<span
 				className={cn(
-					"group/line flex min-w-0 flex-wrap items-center gap-1.5 tabular-nums",
+					"group/line flex min-w-0 flex-wrap items-center gap-s tabular-nums",
 					isIdle(null) && IDLE,
 				)}
 			>
@@ -118,7 +121,7 @@ export const RailRow = memo(function RailRow({
 					</span>
 					<RowCopy label="Copy turn ID" value={turn.turnId} />
 				</span>
-				<span className="flex shrink-0 items-center -space-x-1 empty:hidden">
+				<span className="flex shrink-0 items-center -space-x-xs empty:hidden">
 					{marks?.get(railLineKey(turn.turnId, null))}
 					<RailGitMarks counts={turn.stepKinds} />
 				</span>
@@ -168,7 +171,7 @@ function RailLines({ count }: { count: number }) {
 			data-rail-line=""
 			style={{ gridRow: `${line + 1} / ${line + 2}` }}
 			className={cn(
-				"pointer-events-none absolute inset-y-0 col-span-full rounded-md corner-squircle squircle:rounded-xl",
+				"pointer-events-none absolute inset-y-0 col-span-full corner-s corner-squircle squircle:corner-l",
 				line === 0 ? "-inset-x-1.5" : "-right-(--rail-line-gap) left-2.5",
 			)}
 		/>
@@ -222,7 +225,12 @@ function GroupToggle({
 			onKeyDown={(event) => {
 				if (event.key === "Enter" || event.key === " ") run(event);
 			}}
-			className="-ml-1 inline-flex shrink-0 items-center rounded px-0.5 text-muted-foreground transition-colors hover:text-foreground"
+			className={cn(
+				"inline-flex shrink-0 items-center",
+				"-ml-xs corner-xs px-xxs",
+				"text-ink-3 transition-colors",
+				"hover:text-ink",
+			)}
 		>
 			<IconChevronDown
 				aria-hidden="true"
@@ -255,7 +263,10 @@ function RowCopy({ label, value }: { label: string; value: string }) {
 				if (event.key === "Enter" || event.key === " ") run(event);
 			}}
 			className={cn(
-				"copy-button absolute top-1/2 right-0 inline-flex -translate-y-1/2 items-center justify-center rounded p-0.5 text-muted-foreground opacity-0 transition-opacity group-hover/line:opacity-100 hover:text-foreground",
+				"copy-button absolute top-1/2 right-0 inline-flex items-center justify-center",
+				"corner-xs p-xxs",
+				"-translate-y-1/2 text-ink-3 opacity-0 transition-opacity",
+				"group-hover/line:opacity-100 hover:text-ink",
 				COPY_REVEAL,
 			)}
 		>
@@ -284,8 +295,10 @@ function SubagentName({
 			ref={lineRef}
 			data-rail-subagent=""
 			className={cn(
-				"group/line flex min-w-0 flex-wrap items-center gap-1.5 pl-4 tabular-nums",
-				selected ? "text-foreground" : "text-muted-foreground",
+				"group/line flex min-w-0 flex-wrap items-center gap-s",
+				"pl-xl",
+				"tabular-nums",
+				selected ? "text-ink" : "text-ink-3",
 				idle && IDLE,
 			)}
 		>
@@ -299,7 +312,7 @@ function SubagentName({
 				</span>
 				<RowCopy label="Copy subagent ID" value={subagentId} />
 			</span>
-			<span className="flex shrink-0 items-center -space-x-1 empty:hidden">
+			<span className="flex shrink-0 items-center -space-x-xs empty:hidden">
 				{mark}
 				<RailGitMarks counts={gitActions} />
 			</span>
@@ -343,21 +356,21 @@ function TurnFigures({
 			)}
 			style={{ gridRow: `span ${ids.length + 1}` }}
 		>
-			<span className="relative flex flex-col items-end gap-0.5">
+			<span className="relative flex flex-col items-end gap-xxs">
 				<OverFigure mark={markOf?.(null)} />
 				{figure === "context" ? (
-					<span className="flex w-16 items-center justify-end text-muted-foreground">
+					<span className="flex w-16 items-center justify-end text-ink-3">
 						<ContextFill compact tip={false} turn={turn} />
 					</span>
 				) : figure === "time" ? (
-					<span className="w-14 text-right whitespace-nowrap text-muted-foreground">
+					<span className="w-14 text-right whitespace-nowrap text-ink-3">
 						{formatReaderDuration(turn.durationSeconds)}
 					</span>
 				) : (
 					<span
 						className={cn(
 							"w-11 text-right",
-							getCostShade(cost, costThresholds) ?? "text-muted-foreground",
+							getCostShade(cost, costThresholds) ?? "text-ink-3",
 						)}
 					>
 						{formatReaderCost(cost)}
@@ -371,7 +384,7 @@ function TurnFigures({
 					<span
 						key={id}
 						className={cn(
-							"flex w-16 flex-col items-end justify-center gap-0.5 text-muted-foreground",
+							"flex w-16 flex-col items-end justify-center gap-xxs text-ink-3",
 							SUBAGENT_FIGURE,
 						)}
 					>
@@ -382,7 +395,7 @@ function TurnFigures({
 					<span
 						key={id}
 						className={cn(
-							"flex w-14 flex-col items-end gap-0.5 whitespace-nowrap text-muted-foreground",
+							"flex w-14 flex-col items-end gap-xxs whitespace-nowrap text-ink-3",
 							SUBAGENT_FIGURE,
 						)}
 					>
@@ -393,7 +406,7 @@ function TurnFigures({
 					<span
 						key={id}
 						className={cn(
-							"flex w-11 flex-col items-end gap-0.5 text-muted-foreground",
+							"flex w-11 flex-col items-end gap-xxs text-ink-3",
 							SUBAGENT_FIGURE,
 						)}
 					>

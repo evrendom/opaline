@@ -23,8 +23,9 @@ import {
 	DialogTitle,
 } from "@/app/ui/dialog";
 import { FlowNumber } from "@/app/ui/flow-number";
+import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
-import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
+import { TouchTarget } from "@/app/ui/touch-target";
 import {
 	ClaudeModelIcon,
 	CodexModelIcon,
@@ -232,7 +233,7 @@ export function CostBreakdown({
 				</div>
 			</section>
 			<Dialog open={expanded} onOpenChange={setExpanded}>
-				<DialogContent className="cost-breakdown-dialog gap-4 sm:max-w-xl">
+				<DialogContent className="cost-breakdown-dialog gap-xl sm:max-w-xl">
 					<DialogTitle>{label}</DialogTitle>
 					<DialogDescription>
 						Select {label.toLowerCase()} to filter{" "}
@@ -283,7 +284,7 @@ export function CostBreakdown({
 						<FluidMenuHover items="button" />
 						<button
 							type="button"
-							className="cost-text-button"
+							className="text-button"
 							onClick={onClear}
 							disabled={selected.length === 0}
 						>
@@ -291,7 +292,7 @@ export function CostBreakdown({
 						</button>
 						<button
 							type="button"
-							className="cost-secondary-button"
+							className="secondary-button"
 							onClick={() => setExpanded(false)}
 						>
 							Done
@@ -424,12 +425,12 @@ function EntryIcon({
 				alt=""
 				width={16}
 				height={16}
-				className="size-4 shrink-0 rounded-full object-cover ring-1 ring-black/5 dark:ring-white/10"
+				className="size-4 shrink-0 corner-full object-cover ring-1 ring-black/5 dark:ring-white/10"
 			/>
 		);
 	if (dimension === "members")
 		return (
-			<Avatar className="size-4 shrink-0 rounded-full ring-1 ring-black/5 dark:ring-white/10">
+			<Avatar className="size-4 shrink-0 corner-full ring-1 ring-black/5 dark:ring-white/10">
 				<AvatarImage src={image ?? undefined} alt="" />
 				<AvatarFallback className="cost-member-initial">
 					{entry.label
@@ -472,22 +473,21 @@ function ToolButton({
 }) {
 	return (
 		<Tooltip>
-			<TooltipTrigger asChild>
-				<button
-					type="button"
-					className="cost-tool-button"
-					aria-label={label}
-					aria-pressed={pressed}
-					onClick={onClick}
-					disabled={disabled}
-				>
-					<Glyph size={16} />
-					<span
-						className="absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden"
-						aria-hidden="true"
-					/>
-				</button>
-			</TooltipTrigger>
+			<TooltipTrigger
+				render={
+					<button
+						type="button"
+						className="cost-tool-button"
+						aria-label={label}
+						aria-pressed={pressed}
+						onClick={onClick}
+						disabled={disabled}
+					>
+						<Glyph size={16} />
+						<TouchTarget />
+					</button>
+				}
+			/>
 			<TooltipContent>{label}</TooltipContent>
 		</Tooltip>
 	);

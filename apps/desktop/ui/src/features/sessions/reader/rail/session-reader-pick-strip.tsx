@@ -22,8 +22,11 @@ export function PickStrip({
 	return (
 		<div
 			className={cn(
-				"flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-muted/50 pr-1 text-xs",
-				untitled && !run && !agent ? "w-max min-w-full pl-1" : "pl-2",
+				"flex h-8 shrink-0 items-center gap-s",
+				"corner-s pr-xs",
+				"text-body-m",
+				"bg-field/50",
+				untitled && !run && !agent ? "w-max min-w-full pl-xs" : "pl-m",
 			)}
 		>
 			{agent ? (
@@ -37,14 +40,14 @@ export function PickStrip({
 				<span className="shrink-0 font-medium">Entire session</span>
 			)}
 			{summary ? (
-				<span className="min-w-0 truncate text-[11px] text-muted-foreground">
+				<span className="min-w-0 truncate text-body-s text-ink-3">
 					{summary}
 				</span>
 			) : null}
 			{children ? (
 				<span
 					className={cn(
-						"flex items-center gap-0.5",
+						"flex items-center gap-xxs",
 						untitled && !run && !agent
 							? "min-w-0 flex-1 justify-between"
 							: "ml-auto shrink-0",

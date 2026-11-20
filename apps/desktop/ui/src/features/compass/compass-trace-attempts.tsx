@@ -191,7 +191,7 @@ export const TraceAttempts = memo(function TraceAttempts({
 	return (
 		<SubagentTints ids={subagentIds}>
 			<TipLayer>
-				<div data-trace="" className="relative flex flex-col gap-5">
+				<div data-trace="" className="relative flex flex-col gap-xxl">
 					{lanesSlot
 						? createPortal(
 								<RunLanes
@@ -207,7 +207,7 @@ export const TraceAttempts = memo(function TraceAttempts({
 								lanesSlot,
 							)
 						: null}
-					<ol ref={watchList} className="flex flex-col gap-2">
+					<ol ref={watchList} className="flex flex-col gap-m">
 						{interleave(
 							attempts.filter((attempt) => !attempt.answer),
 							exchanges?.list ?? [],
@@ -275,7 +275,7 @@ const AttemptWaterfall = memo(function AttemptWaterfall({
 		];
 	}, [attempt]);
 	return (
-		<li data-attempt={attempt.id} className="flex flex-col gap-3">
+		<li data-attempt={attempt.id} className="flex flex-col gap-l">
 			<AttemptSteps
 				endMs={saidMs}
 				model={model}
@@ -286,8 +286,8 @@ const AttemptWaterfall = memo(function AttemptWaterfall({
 				startMs={startMs}
 				steps={before}
 			/>
-			<div className="flex gap-3" style={{ marginLeft: `-${AVATAR_COLUMN}` }}>
-				<span className="mt-1.5 h-fit shrink-0">
+			<div className="flex gap-l" style={{ marginLeft: `-${AVATAR_COLUMN}` }}>
+				<span className="mt-s h-fit shrink-0">
 					{agent ? (
 						<SubagentAvatar subagentId={agent} />
 					) : (
@@ -298,7 +298,7 @@ const AttemptWaterfall = memo(function AttemptWaterfall({
 					{attempt.said ? (
 						<AssistantResponse text={attempt.said} />
 					) : (
-						<p className="px-1 text-sm text-muted-foreground italic">
+						<p className="px-xs text-body-xl text-ink-3 italic">
 							{attempt.intent ?? "Worked without saying what for."}
 						</p>
 					)}
@@ -384,8 +384,8 @@ function Bubble({
 	return (
 		<div
 			className={cn(
-				"min-w-0 flex-1 rounded-lg px-3 py-2.5 corner-squircle squircle:rounded-2xl",
-				!tint && "bg-black/[0.025] dark:bg-white/[0.04]",
+				"min-w-0 flex-1 corner-m px-l py-l corner-squircle squircle:corner-xl",
+				!tint && "bg-wash dark:bg-wash",
 			)}
 			style={tint ? tintedGround(tint) : undefined}
 		>

@@ -21,7 +21,7 @@ export function SessionsOverviewControls({
 		<div
 			inert={inert}
 			data-slot="sessions-overview-controls"
-			className="pointer-events-none flex min-w-0 flex-1 items-center gap-2 *:pointer-events-auto"
+			className="pointer-events-none flex min-w-0 flex-1 items-center gap-m *:pointer-events-auto"
 		>
 			{toolbarStart}
 			<SessionsOverviewSortMenu
@@ -34,7 +34,7 @@ export function SessionsOverviewControls({
 				<button
 					type="button"
 					onClick={tableState.onRetryFilterCatalog}
-					className="rounded-md px-2 py-1 text-sm hover:bg-(--session-overview-hover)"
+					className="corner-s px-m py-xs text-body-xl hover:bg-hover"
 				>
 					Retry filters
 				</button>

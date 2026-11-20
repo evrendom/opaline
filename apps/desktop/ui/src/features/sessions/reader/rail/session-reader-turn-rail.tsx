@@ -17,8 +17,8 @@ import {
 	useSyncExternalStore,
 } from "react";
 import { useLatestValueRef } from "@/app/hooks/useLatestValueRef";
+import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
 import { FluidHoverHighlight } from "@/components/fluid-hover-highlight";
-import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { shortRunId } from "@/features/sessions/run-id";
 import type { ItemRect } from "@/hooks/use-fluid-hover";
 import { useScrollFade } from "@/hooks/use-scroll-fade";
@@ -283,9 +283,15 @@ export const TurnRailList = memo(function TurnRailList({
 
 	return (
 		<div className={cn("relative isolate flex min-h-0 flex-1 flex-col", CARD)}>
-			<div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/60 py-2 pr-2 pl-4">
-				<h2 className="truncate text-sm font-medium">Agent runs</h2>
-				<div className="flex shrink-0 items-center gap-1.5">
+			<div
+				className={cn(
+					"flex shrink-0 items-center justify-between gap-m",
+					"edge-b-m py-m pr-m pl-xl",
+					"border-line/60",
+				)}
+			>
+				<h2 className="truncate text-body-xl font-medium">Agent runs</h2>
+				<div className="flex shrink-0 items-center gap-s">
 					{lead}
 					<RailTagsPicker
 						figure={{
@@ -299,7 +305,7 @@ export const TurnRailList = memo(function TurnRailList({
 					/>
 				</div>
 			</div>
-			<div className="relative flex min-h-0 flex-1 flex-col px-1.5">
+			<div className="relative flex min-h-0 flex-1 flex-col px-s">
 				<div
 					ref={setList}
 					{...fade}
@@ -307,14 +313,19 @@ export const TurnRailList = memo(function TurnRailList({
 					onScroll={(event) =>
 						railScrolls.set(scrollKey, event.currentTarget.scrollTop)
 					}
-					className="scroll-fade relative -mx-1.5 flex min-h-0 flex-col gap-(--rail-line-gap) overflow-y-auto overscroll-contain px-1.5 pt-2 pb-2 [scrollbar-width:none] [--scroll-fade-top-depth:16px] [&::-webkit-scrollbar]:hidden [&_.fluid-menu-hover-fill]:corner-squircle"
+					className={cn(
+						"relative flex min-h-0 flex-col gap-(--rail-line-gap) overflow-y-auto overscroll-contain [scrollbar-width:none] [--scroll-fade-top-depth:16px]",
+						"-mx-s px-s pt-m pb-m",
+						"scroll-fade",
+						"[&::-webkit-scrollbar]:hidden [&_.fluid-menu-hover-fill]:corner-squircle",
+					)}
 				>
 					<FluidMenuHover bridgeGap={2} items="[data-rail-line]" />
 					<FluidHoverHighlight
 						rect={active.rect}
 						session={0}
 						transition={false}
-						className="z-0 rounded-md bg-card shadow-[0_0_0_0.5px_rgb(0_0_0/0.08),0_1px_2px_-0.5px_rgb(0_0_0/0.1),0_2px_6px_-2px_rgb(0_0_0/0.12)] corner-squircle squircle:rounded-xl dark:bg-muted-foreground/10 dark:shadow-(--custom-shadow)"
+						className="z-0 corner-s bg-card shadow-[0_0_0_0.5px_rgb(0_0_0/0.08),0_1px_2px_-0.5px_rgb(0_0_0/0.1),0_2px_6px_-2px_rgb(0_0_0/0.12)] corner-squircle squircle:corner-l dark:bg-ink-3/10 dark:shadow-(--shadow-card)"
 					/>
 					{whole ? (
 						<button
@@ -324,7 +335,11 @@ export const TurnRailList = memo(function TurnRailList({
 							disabled={whole.disabled}
 							onClick={whole.onPick}
 							className={cn(
-								"relative flex h-(--rail-line-height) shrink-0 items-center justify-between gap-1.5 rounded-md px-1.5 text-left text-xs tabular-nums transition-opacity duration-300 ease-out corner-squircle squircle:rounded-xl",
+								"relative flex h-(--rail-line-height) shrink-0 items-center justify-between gap-s",
+								"corner-s px-s corner-squircle",
+								"text-left text-body-m tabular-nums",
+								"transition-opacity duration-300 ease-out",
+								"squircle:corner-l",
 								whole.disabled &&
 									"cursor-default opacity-40 starting:opacity-100",
 							)}
@@ -332,17 +347,17 @@ export const TurnRailList = memo(function TurnRailList({
 							<span
 								className={cn(
 									"font-medium",
-									whole.picked ? "text-foreground" : "text-muted-foreground",
+									whole.picked ? "text-ink" : "text-ink-3",
 								)}
 							>
 								Entire session
 							</span>
-							<span className="text-muted-foreground">
+							<span className="text-ink-3">
 								{whole.total} {whole.total === 1 ? "turn" : "turns"}
 							</span>
 							<span
 								data-rail-line={whole.disabled ? undefined : ""}
-								className="pointer-events-none absolute inset-0 rounded-md corner-squircle squircle:rounded-xl"
+								className="pointer-events-none absolute inset-0 corner-s corner-squircle squircle:corner-l"
 							/>
 						</button>
 					) : null}
@@ -379,7 +394,7 @@ export const TurnRailList = memo(function TurnRailList({
 				>
 					<JumpPill
 						icon={
-							<span className="flex items-center gap-1.5 text-xs font-medium tabular-nums">
+							<span className="flex items-center gap-s text-body-m font-medium tabular-nums">
 								<ModelChip glyph="size-3" model={model} />
 								{activeTurnId === WHOLE_SESSION
 									? "Entire session"

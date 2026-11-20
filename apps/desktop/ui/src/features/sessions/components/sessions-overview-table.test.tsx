@@ -273,7 +273,7 @@ describe("SessionsOverviewTable", () => {
 		const memberCell = modelCell.nextElementSibling?.nextElementSibling;
 		assert(memberCell);
 		expect(memberCell).toHaveAttribute("data-session-overview-column", "user");
-		expect(memberCell).toHaveClass("justify-end", "gap-2");
+		expect(memberCell).toHaveClass("justify-end", "gap-m");
 		expect(memberCell.firstElementChild).toHaveAttribute(
 			"data-language-signal-speaker",
 			"member",
@@ -320,7 +320,7 @@ describe("SessionsOverviewTable", () => {
 		);
 		expect(chart.querySelector("path")).toHaveAttribute("stroke-width", "3");
 		expect(chart.querySelector("path")).not.toHaveAttribute("stroke-dasharray");
-		expect(cost).toHaveClass("text-xs", "font-normal", "text-[#787774]");
+		expect(cost).toHaveClass("text-body-m", "font-regular", "text-ink-3");
 		expect(cost).not.toHaveAttribute("data-slot");
 		expect(cost).toHaveAttribute(
 			"data-session-overview-token-tooltip-label",
@@ -342,9 +342,9 @@ describe("SessionsOverviewTable", () => {
 			"[data-session-overview-repository-label]",
 		);
 		expect(repositoryLabel).toHaveClass(
-			"text-[#0000009b]",
+			"text-ink-3",
 			"text-xs/4",
-			"font-normal",
+			"font-regular",
 			"truncate",
 			"text-left",
 		);
@@ -352,7 +352,7 @@ describe("SessionsOverviewTable", () => {
 		expect(repositoryLabel).toHaveAttribute("title", "rudel");
 		expect(repositoryLabel).not.toHaveClass("max-w-28");
 		assert(repositoryLabel);
-		expect(repositoryLabel.parentElement).toHaveClass("gap-1.5");
+		expect(repositoryLabel.parentElement).toHaveClass("gap-s");
 		expect(repositoryLabel.previousElementSibling).toHaveAttribute(
 			"data-session-overview-model-label",
 		);
@@ -365,9 +365,9 @@ describe("SessionsOverviewTable", () => {
 			"[data-session-overview-branch-label]",
 		);
 		expect(branchLabel).toHaveClass(
-			"text-[#00000044]",
+			"text-ink-3",
 			"text-xs/4",
-			"font-normal",
+			"font-regular",
 			"tabular-nums",
 			"truncate",
 			"text-left",
@@ -449,7 +449,7 @@ describe("SessionsOverviewTable", () => {
 			expect(skillTag).toHaveAttribute("data-trace-tag-context", "sparkle");
 			expect(
 				skillTag.querySelector("[data-session-overview-skill-name]"),
-			).toHaveClass("font-sans");
+			).toHaveClass("font-body");
 		}
 	});
 

@@ -3,8 +3,8 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 const KIND_COLOR = {
-	number: "text-[oklch(0.56_0.16_55)] dark:text-[oklch(0.8_0.14_55)]",
-	literal: "text-[oklch(0.5_0.2_292.717)] dark:text-[oklch(0.74_0.16_292.717)]",
+	number: "text-warning dark:text-warning",
+	literal: "text-color-3 dark:text-color-2",
 } as const;
 
 const OPEN_LEVELS = 2;
@@ -27,9 +27,9 @@ function summary(value: object): string {
 function Primitive({ value }: { value: unknown }) {
 	if (typeof value === "string")
 		return value === "" ? (
-			<span className="text-muted-foreground/50">""</span>
+			<span className="text-ink-3/50">""</span>
 		) : (
-			<span className="whitespace-pre-wrap text-foreground [overflow-wrap:anywhere]">
+			<span className="whitespace-pre-wrap text-ink [overflow-wrap:anywhere]">
 				{value}
 			</span>
 		);
@@ -52,21 +52,14 @@ function Entry({
 	const nested = isNested(value) && entriesOf(value).length > 0;
 	const [open, setOpen] = useState(depth < OPEN_LEVELS);
 	const key = (
-		<span
-			className={cn(
-				"text-muted-foreground",
-				index && "text-muted-foreground/60",
-			)}
-		>
-			{name}
-		</span>
+		<span className={cn("text-ink-3", index && "text-ink-3/60")}>{name}</span>
 	);
 	if (!nested)
 		return (
 			<>
 				{key}
 				{isNested(value) ? (
-					<span className="text-muted-foreground/50">
+					<span className="text-ink-3/50">
 						{Array.isArray(value) ? "[]" : "{}"}
 					</span>
 				) : (
@@ -80,22 +73,20 @@ function Entry({
 				type="button"
 				aria-expanded={open}
 				onClick={() => setOpen((current) => !current)}
-				className="flex items-center gap-0.5 text-left hover:text-foreground"
+				className="flex items-center gap-xxs text-left hover:text-ink"
 			>
 				<IconChevronRight
 					aria-hidden="true"
 					className={cn(
-						"size-3.5 shrink-0 text-muted-foreground/60 transition-transform",
+						"size-3.5 shrink-0 text-ink-3/60 transition-transform",
 						open && "rotate-90",
 					)}
 				/>
 				{key}
 			</button>
-			<span className="text-muted-foreground/50">
-				{open ? null : summary(value)}
-			</span>
+			<span className="text-ink-3/50">{open ? null : summary(value)}</span>
 			{open ? (
-				<div className="col-span-2 pl-4">
+				<div className="col-span-2 pl-xl">
 					<Entries depth={depth + 1} value={value} />
 				</div>
 			) : null}
@@ -105,7 +96,7 @@ function Entry({
 
 function Entries({ depth, value }: { depth: number; value: object }) {
 	return (
-		<div className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3">
+		<div className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-l">
 			{entriesOf(value).map(([name, item]) => (
 				<Entry
 					key={name}
@@ -121,7 +112,7 @@ function Entries({ depth, value }: { depth: number; value: object }) {
 
 export function JsonTree({ value }: { value: object }) {
 	return (
-		<div className="font-mono text-[12px] leading-5">
+		<div className="font-data text-body-m">
 			<Entries depth={0} value={value} />
 		</div>
 	);

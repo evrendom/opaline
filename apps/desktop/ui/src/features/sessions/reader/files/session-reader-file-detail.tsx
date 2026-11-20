@@ -37,7 +37,7 @@ export function RunCrumbs({
 				<>
 					<Crumb onClear={onClearAgent}>
 						<SubagentTag
-							className="inline-flex shrink gap-1"
+							className="inline-flex shrink gap-xs"
 							subagentId={agent}
 						/>
 					</Crumb>
@@ -79,13 +79,13 @@ export function LineCounts({
 	return (
 		<>
 			<FlowNumber
-				className="text-green-600 dark:text-green-400"
+				className="text-success dark:text-green-400"
 				value={added}
 				format={PLAIN_NUMBER}
 				prefix="+"
 			/>{" "}
 			<FlowNumber
-				className="text-red-600 dark:text-red-400"
+				className="text-error dark:text-red-400"
 				value={removed}
 				format={PLAIN_NUMBER}
 				prefix="−"
@@ -122,9 +122,9 @@ export function FileDetail({
 	const language = languageForPath(file.path);
 	const { directory, name } = splitPath(file.path);
 	return (
-		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 pt-4 pr-4 pl-5">
-			<div className="flex min-h-7 shrink-0 flex-wrap items-center gap-x-3 gap-y-1">
-				<div className="flex min-w-0 flex-1 items-center gap-1.5">
+		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-s pt-xl pr-xl pl-xxl">
+			<div className="flex min-h-7 shrink-0 flex-wrap items-center gap-x-l gap-y-xs">
+				<div className="flex min-w-0 flex-1 items-center gap-s">
 					{run ? (
 						<RunCrumbs
 							agent={agent}
@@ -136,14 +136,14 @@ export function FileDetail({
 					<Crumb onClear={run ? onClearFile : undefined} title={file.path}>
 						{name}
 						{file.movedTo ? (
-							<span className="font-normal text-muted-foreground">
+							<span className="font-regular text-ink-3">
 								{" "}
 								→ {file.movedTo.split("/").at(-1)}
 							</span>
 						) : null}
 					</Crumb>
 				</div>
-				<span className="text-xs whitespace-nowrap text-muted-foreground tabular-nums">
+				<span className="text-body-m whitespace-nowrap text-ink-3 tabular-nums">
 					<LineCounts {...totals} />
 					{" · "}
 					{run
@@ -167,7 +167,7 @@ export function FileDetail({
 				/>
 			</div>
 			<span
-				className="-mt-1 truncate pl-2 text-left text-xs text-muted-foreground/70 [direction:rtl]"
+				className="-mt-xs truncate pl-m text-left text-body-m text-ink-3/70 [direction:rtl]"
 				title={directory}
 			>
 				{`‎${directory}‎`}
@@ -177,17 +177,17 @@ export function FileDetail({
 					icon={IconFileCode}
 					title="Never seen whole"
 					description="The session never read or wrote this file in full, or made an edit it couldn't place, so its text isn't known."
-					className="mt-3 mb-4"
+					className="mt-l mb-xl"
 				/>
 			) : (
-				<ScrollColumn className="-mr-4 -ml-1.5 pr-4 pl-1.5">
+				<ScrollColumn className="-mr-xl -ml-s pr-xl pl-s">
 					{view === "file" && file.content !== null ? (
-						<div className="flex flex-col gap-2 pt-2 pb-4">
+						<div className="flex flex-col gap-m pt-m pb-xl">
 							<DiffView hunks={wholeText(file.content)} language={language} />
 							{file.contentCut ? <Cut /> : null}
 						</div>
 					) : (
-						<ol className="flex flex-col divide-y divide-border/40 pb-4">
+						<ol className="flex flex-col divide-y divide-line/40 pb-xl">
 							{changes.map((change, index) => (
 								<ChangeBlock
 									// biome-ignore lint/suspicious/noArrayIndexKey: their place tells them apart

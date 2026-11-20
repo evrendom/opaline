@@ -6,7 +6,7 @@ import { formatNumber, formatShortCount } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export const TOGGLE =
-	"text-muted-foreground active:not-aria-[haspopup]:translate-y-0 aria-pressed:bg-card aria-pressed:text-foreground aria-pressed:shadow-(--custom-shadow) dark:aria-pressed:bg-muted-foreground/10";
+	"text-ink-3 active:not-aria-[haspopup]:translate-y-0 aria-pressed:bg-card aria-pressed:text-ink aria-pressed:shadow-(--shadow-card) dark:aria-pressed:bg-ink-3/10";
 
 export function ViewToggle<View extends string>({
 	iconsOnly = false,
@@ -32,14 +32,14 @@ export function ViewToggle<View extends string>({
 		<fieldset
 			ref={row}
 			aria-label={label}
-			className="relative inline-flex shrink-0 items-center gap-0.5"
+			className="relative inline-flex shrink-0 items-center gap-xxs"
 		>
 			{pill ? (
 				<span
 					ref={pillRef}
 					aria-hidden="true"
 					skullet-ignore=""
-					className="pointer-events-none absolute top-1/2 left-0 h-6 origin-left rounded-md bg-card shadow-(--custom-shadow) corner-squircle will-change-transform squircle:rounded-xl dark:bg-muted-foreground/10"
+					className="pointer-events-none absolute top-1/2 left-0 h-6 origin-left corner-s bg-card shadow-(--shadow-card) corner-squircle will-change-transform squircle:corner-l dark:bg-ink-3/10"
 					style={{
 						transform: `translate(${pill.left}px, -50%)`,
 						width: pill.width,
@@ -58,17 +58,19 @@ export function ViewToggle<View extends string>({
 					disabled={off}
 					onClick={() => onPick(id)}
 					className={cn(
-						"relative flex h-6 items-center gap-1 rounded-md text-xs font-medium transition-colors outline-none corner-squircle focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-default disabled:opacity-45 squircle:rounded-xl",
-						iconsOnly ? "px-1.5" : "px-2",
-						id === value
-							? "text-foreground"
-							: "text-muted-foreground enabled:hover:text-foreground",
+						"relative flex h-6 items-center gap-xs",
+						"corner-s corner-squircle",
+						"text-body-m font-medium",
+						"transition-colors outline-none",
+						"focus-visible:ring-2 focus-visible:ring-focus/50 disabled:cursor-default disabled:opacity-45 squircle:corner-l",
+						iconsOnly ? "px-s" : "px-m",
+						id === value ? "text-ink" : "text-ink-3 enabled:hover:text-ink",
 					)}
 				>
 					{Glyph ? <Glyph aria-hidden="true" className="size-3.5" /> : null}
 					{iconsOnly ? null : word}
 					{count === undefined ? null : (
-						<span className="font-normal text-muted-foreground tabular-nums">
+						<span className="font-regular text-ink-3 tabular-nums">
 							<span aria-hidden="true">{formatShortCount(count)}</span>
 							<span className="sr-only">{formatNumber(count)}</span>
 						</span>
@@ -80,7 +82,7 @@ export function ViewToggle<View extends string>({
 }
 
 export const CARD =
-	"rounded-lg bg-card shadow-(--custom-shadow) corner-squircle squircle:rounded-3xl";
+	"corner-m bg-card shadow-(--shadow-card) corner-squircle squircle:corner-xl";
 
 export function ScrollColumn({
 	children,
@@ -113,7 +115,12 @@ export function Crumb({
 }) {
 	return (
 		<span
-			className="inline-flex min-w-0 items-center gap-1 rounded-md bg-muted/70 py-0.5 pr-0.5 pl-2 text-sm font-medium"
+			className={cn(
+				"inline-flex min-w-0 items-center gap-xs",
+				"corner-s py-xxs pr-xxs pl-m",
+				"text-body-xl font-medium",
+				"bg-field/70",
+			)}
 			title={title}
 		>
 			<span className="min-w-0 truncate">{children}</span>
@@ -122,7 +129,7 @@ export function Crumb({
 					type="button"
 					aria-label="Let go"
 					onClick={onClear}
-					className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+					className="shrink-0 corner-xs p-xxs text-ink-3 hover:bg-hover hover:text-ink"
 				>
 					<IconX className="size-3" />
 				</button>
@@ -134,5 +141,5 @@ export function Crumb({
 }
 
 export function CrumbSeparator() {
-	return <span className="shrink-0 text-muted-foreground/50">›</span>;
+	return <span className="shrink-0 text-ink-3/50">›</span>;
 }

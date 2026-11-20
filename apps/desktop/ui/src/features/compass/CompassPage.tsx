@@ -13,8 +13,8 @@ import {
 import { type KeyboardEvent, type ReactNode, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Reveal } from "@/app/ui/bones";
-import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
-import { UsageStateMessage } from "@/components/usage-collection-view";
+import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
+import { PageEmptyState } from "@/components/dashboard/page-parts";
 import { useDateRange } from "@/features/analytics/date-range/useDateRange";
 import { DashboardDateControls } from "@/features/dashboard/components/DashboardDateControls";
 import { useShellHeaderPortal } from "@/features/shell/shell-header-portal";
@@ -50,8 +50,8 @@ export function CompassPage() {
 	if (!access.pending && !access.enabled)
 		return (
 			<div className="cost-page isolate antialiased">
-				<UsageStateMessage
-					icon={<IconCompass aria-hidden="true" />}
+				<PageEmptyState
+					icon={IconCompass}
 					title="Compass isn’t enabled for this workspace"
 					description="Compass is in early access for a few workspaces."
 				/>
@@ -180,7 +180,7 @@ function CompassView({ observable }: { observable: boolean }) {
 								type="button"
 								role="tab"
 								aria-selected={view === "runs"}
-								className="cost-text-button"
+								className="text-button"
 								onClick={() => setView("runs")}
 							>
 								Runs
@@ -194,7 +194,7 @@ function CompassView({ observable }: { observable: boolean }) {
 								type="button"
 								role="tab"
 								aria-selected={view === "patterns"}
-								className="cost-text-button"
+								className="text-button"
 								onClick={() => setView("patterns")}
 							>
 								Patterns
@@ -210,7 +210,7 @@ function CompassView({ observable }: { observable: boolean }) {
 								<>
 									<button
 										type="button"
-										className="cost-text-button"
+										className="text-button"
 										aria-pressed={mine}
 										onClick={() => setMine((value) => !value)}
 										title={
@@ -283,7 +283,7 @@ function CompassView({ observable }: { observable: boolean }) {
 												<div className="compass-more">
 													<button
 														type="button"
-														className="cost-text-button"
+														className="text-button"
 														disabled={list.isFetchingNextPage}
 														onClick={() => {
 															void list.fetchNextPage();
@@ -332,7 +332,7 @@ function CompassView({ observable }: { observable: boolean }) {
 				<section className="compass-detail-pane" aria-label="Detail">
 					<button
 						type="button"
-						className="cost-text-button compass-back"
+						className="text-button compass-back"
 						onClick={() => setReading(false)}
 					>
 						<IconArrowLeft aria-hidden="true" className="size-3.5" />

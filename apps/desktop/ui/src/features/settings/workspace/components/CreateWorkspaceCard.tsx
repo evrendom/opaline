@@ -100,13 +100,9 @@ export function CreateWorkspaceCard({
 						readOnly
 					/>
 				</WorkspaceSettingsRow>
-				<div className="workspace-settings-actions">
+				<div className="settings-actions">
 					{error ? (
-						<p
-							id={`${nameId}-error`}
-							role="alert"
-							className="workspace-settings-error"
-						>
+						<p id={`${nameId}-error`} role="alert" className="settings-error">
 							{error}
 						</p>
 					) : null}
@@ -121,7 +117,7 @@ export function CreateWorkspaceCard({
 
 export function CreateWorkspacePage() {
 	return (
-		<div className="workspace-settings-page">
+		<div className="settings-page">
 			<CreateWorkspaceCard />
 		</div>
 	);

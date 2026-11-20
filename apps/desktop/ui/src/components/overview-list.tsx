@@ -1,10 +1,11 @@
-import { IconAdjustmentsHorizontal, IconUser } from "@tabler/icons-react";
+import { IconUser } from "@tabler/icons-react";
 import { type ReactNode, useRef, useState } from "react";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
-import { FlowNumber } from "@/app/ui/flow-number";
+import { Button } from "@/app/ui/button";
+import { FluidHoverHighlight } from "@/app/ui/fluid-hover-highlight";
 import { Popover, PopoverTitle, PopoverTrigger } from "@/app/ui/popover";
-import { FluidHoverHighlight } from "@/components/ui/fluid-hover-highlight";
+import { FilterTriggerLabel } from "@/components/filter-trigger-label";
 import { SessionMenuPopoverContent } from "@/features/sessions/components/session-menu-popover-content";
 import { SessionMenuFlyoutSurface } from "@/features/sessions/components/sessions-overview-linear-filter-flyout";
 import { LinearFilterList } from "@/features/sessions/components/sessions-overview-linear-filter-menu";
@@ -15,20 +16,18 @@ import {
 	type UseFluidHoverReturn,
 	useFluidHover,
 } from "@/hooks/use-fluid-hover";
-import { PLAIN_NUMBER } from "@/lib/figure";
 import { cn } from "@/lib/utils";
 
 // The two-line overview rows shared by Repos and Skills: a name over who uses
 // it, with the metrics trailing in fixed tracks so they line up without
 // column headers.
 export const OVERVIEW_ROW_LEAD_CELL_CLASS_NAME =
-	"flex min-w-0 items-center gap-3 pr-3 pl-5";
+	"flex min-w-0 items-center gap-l pr-l pl-xxl";
 export const OVERVIEW_METRIC_CELL_CLASS_NAME =
-	"flex min-w-0 items-center justify-end px-3 text-right text-xs whitespace-nowrap tabular-nums text-(--session-overview-muted)";
-export const OVERVIEW_METRIC_UNIT_CLASS_NAME =
-	"text-(--session-overview-subtle)";
+	"flex min-w-0 items-center justify-end px-l text-right text-body-m whitespace-nowrap tabular-nums text-ink-3";
+export const OVERVIEW_METRIC_UNIT_CLASS_NAME = "text-ink-3";
 export const OVERVIEW_ROW_CLASS_NAME =
-	"grid h-16 w-full text-left outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--session-overview-accent)";
+	"grid h-16 w-full text-left outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent";
 
 export const compactNumber = new Intl.NumberFormat("en-US", {
 	notation: "compact",
@@ -74,7 +73,7 @@ export function OverviewList({
 			>
 				<FluidHoverHighlight
 					hover={hover}
-					className="z-0 rounded-none bg-(--session-overview-hover)"
+					className="z-0 corner-zero bg-hover"
 				/>
 				{/* biome-ignore lint/a11y/useSemanticElements: An explicit role preserves this list in Safari with list-style none. */}
 				<ul
@@ -109,7 +108,7 @@ export function OverviewMembers({
 	const hiddenCount = Math.max(0, userCount - names.length);
 	return (
 		<>
-			<span className="flex shrink-0 -space-x-1">
+			<span className="flex shrink-0 -space-x-xs">
 				{(topUserIds.length > 0 ? topUserIds : [""]).map((userId) => (
 					<MemberAvatar key={userId} avatarUrl={avatarMap[userId]} />
 				))}
@@ -125,15 +124,12 @@ export function OverviewMembers({
 
 function MemberAvatar({ avatarUrl }: { avatarUrl: string | undefined }) {
 	return (
-		<Avatar className="size-4 bg-(--session-overview-surface) ring-1 ring-(--session-overview-surface) after:border-black/5 dark:after:border-white/10">
+		<Avatar className="size-4 bg-canvas ring-1 ring-canvas after:border-line dark:after:border-line">
 			{avatarUrl ? (
 				<AvatarImage alt="" src={avatarUrl} decoding="async" loading="lazy" />
 			) : null}
-			<AvatarFallback className="bg-(--session-overview-hover)">
-				<IconUser
-					aria-hidden="true"
-					className="size-2.5 shrink-0 text-(--session-overview-muted)"
-				/>
+			<AvatarFallback className="bg-hover">
+				<IconUser aria-hidden="true" className="size-2.5 shrink-0 text-ink-3" />
 			</AvatarFallback>
 		</Avatar>
 	);
@@ -213,24 +209,10 @@ export function OverviewRangeFiltersMenu<TKey extends string>({
 				disabled={disabled}
 				aria-label={triggerLabel}
 				title={triggerLabel}
-				className="toolbar-button"
 				data-active={activeFilterCount > 0 || undefined}
+				render={<Button variant="toolbar" />}
 			>
-				<IconAdjustmentsHorizontal
-					aria-hidden="true"
-					className={cn(
-						"size-4 h-lh shrink-0",
-						activeFilterCount > 0
-							? "text-(--session-overview-accent)"
-							: "text-[#5d5d5d] dark:text-[#acaeb2]",
-					)}
-				/>
-				<span>Filter</span>
-				{activeFilterCount > 0 ? (
-					<span className="min-w-4 rounded-full bg-(--session-overview-accent) px-1 text-center text-[10px] leading-4 font-semibold tabular-nums text-white">
-						<FlowNumber value={activeFilterCount} format={PLAIN_NUMBER} />
-					</span>
-				) : null}
+				<FilterTriggerLabel activeCount={activeFilterCount} />
 			</PopoverTrigger>
 			<SessionMenuPopoverContent
 				align="start"
@@ -241,13 +223,10 @@ export function OverviewRangeFiltersMenu<TKey extends string>({
 					if (event.buttons === 0 && !rangeInteractionRef.current)
 						scheduleClose();
 				}}
-				className="session-menu-popover gap-0"
+				className="menu-popover gap-zero"
 			>
 				<PopoverTitle className="sr-only">{`Filter ${noun}`}</PopoverTitle>
-				<div
-					ref={setMenuElement}
-					className="session-menu-surface session-menu-parent"
-				>
+				<div ref={setMenuElement} className="menu-surface menu-parent">
 					<LinearFilterList
 						activeFilterKey={selectedKey}
 						filters={filters}
@@ -264,12 +243,12 @@ export function OverviewRangeFiltersMenu<TKey extends string>({
 						}}
 					/>
 					{activeFilterCount > 0 ? (
-						<div className="session-menu-footer">
-							<div aria-hidden="true" className="session-menu-separator" />
+						<div className="menu-footer">
+							<div aria-hidden="true" className="menu-separator" />
 							<button
 								type="button"
 								aria-label="Clear all filters"
-								className="session-menu-row"
+								className="menu-row"
 								onClick={onClearAll}
 							>
 								Clear all

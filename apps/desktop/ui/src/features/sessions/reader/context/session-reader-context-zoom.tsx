@@ -12,9 +12,9 @@ const GAP = 4;
 const MIN_CELL = 40;
 
 const TEXT: Record<Tone, string> = {
-	later: "text-opal-4",
+	later: "text-color-4",
 	minor: "",
-	never: "text-rose-600",
+	never: "text-error",
 };
 
 const nameOf = (label: string, files: boolean) =>
@@ -166,7 +166,9 @@ export function ContextZoom({
 			<div
 				ref={measure}
 				className={cn(
-					"relative min-h-0 flex-1 rounded-md border p-0 corner-squircle squircle:rounded-xl",
+					"relative min-h-0 flex-1",
+					"corner-s edge-m p-zero corner-squircle",
+					"squircle:corner-l",
 					boxLook.className,
 				)}
 				style={boxLook.style}
@@ -196,7 +198,11 @@ export function ContextZoom({
 							key={cell.part.label}
 							title={item.label}
 							className={cn(
-								"group/thing absolute flex flex-col items-start gap-0.5 overflow-hidden rounded-md border bg-card p-1.5 text-[12px] leading-4 transition-opacity corner-squircle squircle:rounded-xl",
+								"group/thing absolute flex flex-col items-start gap-xxs overflow-hidden",
+								"corner-s edge-m p-s corner-squircle",
+								"text-body-m",
+								"bg-card transition-opacity",
+								"squircle:corner-l",
 								"border-current/20",
 								mark && !picked.has(item.label) && markGlow(mark),
 								picked.size > 0 && !picked.has(item.label) && "opacity-40",
@@ -226,12 +232,12 @@ export function ContextZoom({
 							/>
 							<span
 								className={cn(
-									"pointer-events-none relative flex min-w-0 max-w-full items-center gap-1.5",
+									"pointer-events-none relative flex min-w-0 max-w-full items-center gap-s",
 									!showName && "m-auto",
 								)}
 							>
 								{item.more ? (
-									<span className="font-medium text-muted-foreground tabular-nums">
+									<span className="font-medium text-ink-3 tabular-nums">
 										+{item.more}
 									</span>
 								) : w >= 16 && h >= 16 ? (
@@ -254,7 +260,13 @@ export function ContextZoom({
 									data-context-pick=""
 									onClick={open.go}
 									aria-label={`Open ${nameOf(item.label, files)} in ${open.words}`}
-									className="absolute right-1.5 bottom-1.5 inline-flex h-6 items-center gap-0.5 rounded-md bg-muted/70 pr-1 pl-2 text-[12px] font-medium text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground"
+									className={cn(
+										"absolute right-1.5 bottom-1.5 inline-flex h-6 items-center gap-xxs",
+										"corner-s pr-xs pl-m",
+										"text-body-m font-medium",
+										"bg-field/70 text-ink-3 transition-colors outline-none",
+										"hover:bg-hover hover:text-ink",
+									)}
 								>
 									{open.words}
 									<IconArrowUpRight aria-hidden="true" className="size-3" />

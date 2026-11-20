@@ -2,9 +2,9 @@
 	position: relative;
 	height: 52px;
 	min-width: 0;
-	margin: 0;
+	margin: var(--space-zero);
 	overflow: visible;
-	padding: 0;
+	padding: var(--space-zero);
 	border: 0;
 	touch-action: none;
 }
@@ -22,12 +22,9 @@
 .slider-range-input-strip {
 	--slider-range-minimum: 0%;
 	--slider-range-maximum: 100%;
-	--slider-range-track-background: var(--session-overview-surface, #fff);
+	--slider-range-track-background: var(--canvas);
 	--slider-range-progress-overlay: rgb(25 23 21 / 10%);
-	--slider-range-handle: var(
-		--session-overview-text,
-		var(--foreground, #191715)
-	);
+	--slider-range-handle: var(--ink);
 	position: absolute;
 	inset: auto 0 0;
 	height: 28px;
@@ -68,7 +65,7 @@
 	position: absolute;
 	inset: 0 auto 0 var(--slider-range-minimum);
 	width: calc(var(--slider-range-maximum) - var(--slider-range-minimum));
-	background: var(--slider-range-progress-overlay);
+	background: var(--neutral-6-transparent);
 	border-radius: inherit;
 	pointer-events: none;
 	transition: background 150ms ease;
@@ -96,7 +93,7 @@
 	width: 1px;
 	height: 6px;
 	background: transparent;
-	border-radius: 999px;
+	border-radius: var(--radius-full);
 	transform: translate(-50%, -50%);
 	transition: background 200ms ease;
 }
@@ -112,7 +109,7 @@
 	width: 3px;
 	height: 18px;
 	background: var(--slider-range-handle);
-	border-radius: 999px;
+	border-radius: var(--radius-full);
 	pointer-events: none;
 	transition:
 		opacity 150ms ease,
@@ -136,7 +133,7 @@
 	width: 100%;
 	align-items: center;
 	justify-content: space-between;
-	gap: 8px;
+	gap: var(--space-m);
 	pointer-events: none;
 }
 
@@ -144,10 +141,11 @@
 	display: inline-flex;
 	min-width: 0;
 	align-items: center;
-	gap: 5px;
-	color: var(--session-overview-muted, #625a54);
-	font-weight: 500;
-	font-size: 13px;
+	gap: var(--space-s);
+	color: var(--ink-2);
+	font-weight: var(--weight-body-medium);
+	font-size: var(--size-l);
+	letter-spacing: var(--letter-spacing-l);
 	line-height: 1;
 	transition: color 150ms ease;
 }
@@ -161,9 +159,9 @@
 
 .slider-range-input-label strong {
 	flex: none;
-	color: var(--session-overview-text, var(--foreground, #3e3934));
-	font-weight: 500;
-	font-family: "Geist Mono", monospace;
+	color: var(--ink);
+	font-weight: var(--weight-data-medium);
+	font-family: var(--font-data);
 	white-space: nowrap;
 }
 
@@ -178,7 +176,7 @@
 }
 
 .slider-range-input-wrapper[data-active="true"] .slider-range-input-label {
-	color: var(--session-overview-text, var(--foreground, #191715));
+	color: var(--ink, var(--foreground, #191715));
 }
 
 .dark .slider-range-input-strip {

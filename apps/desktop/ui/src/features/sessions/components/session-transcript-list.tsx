@@ -1287,7 +1287,7 @@ function TranscriptRowContent({
 			return (
 				<button
 					type="button"
-					className="min-h-11 w-full border-y border-(--session-overview-border) px-3 text-left text-xs text-(--session-overview-muted)"
+					className="min-h-11 w-full edge-y-m border-line-strong px-l text-left text-body-m text-ink-3"
 				>
 					Show {row.hidden.events.toLocaleString()} more {row.hidden.kindLabel}
 				</button>
@@ -1344,7 +1344,7 @@ function TranscriptRowContent({
 			);
 		case "turn-error":
 			return (
-				<div className="flex min-h-48 flex-col items-center justify-center gap-3 p-6 text-sm text-(--session-overview-muted)">
+				<div className="flex min-h-48 flex-col items-center justify-center gap-l p-xxl text-body-xl text-ink-3">
 					<p>This turn could not be loaded.</p>
 					<Button
 						onClick={() => onRetryTurn?.(row.turnId)}
@@ -1358,13 +1358,13 @@ function TranscriptRowContent({
 			);
 		case "no-response":
 			return (
-				<p className="py-10 text-center text-sm text-(--session-overview-muted)">
+				<p className="py-[calc(var(--space-xxl)*5/3)] text-center text-body-xl text-ink-3">
 					No response recorded
 				</p>
 			);
 		case "window-edge":
 			return (
-				<div className="flex min-h-12 items-center justify-center border-y border-(--session-overview-border) p-2">
+				<div className="flex min-h-12 items-center justify-center edge-y-m border-line-strong p-m">
 					<Button
 						disabled={row.state === "loading"}
 						onClick={() =>
@@ -1419,7 +1419,7 @@ function TranscriptRowDebugBadge({
 	return (
 		<output
 			ref={outputRef}
-			className="pointer-events-none absolute top-1 right-2 z-50 rounded-md border border-(--session-overview-border) bg-(--session-overview-surface) px-2 py-1 text-[0.6875rem] text-(--session-overview-muted) shadow-sm"
+			className="pointer-events-none absolute top-1 right-2 z-50 corner-s edge-m border-line-strong bg-canvas px-m py-xs text-body-s text-ink-3 shadow-sm"
 		/>
 	);
 }

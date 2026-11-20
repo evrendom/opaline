@@ -99,7 +99,7 @@ export function WorkspaceInviteMemberForm({
 	return (
 		<form onSubmit={inviteMember}>
 			{!canManage ? (
-				<p className="workspace-settings-empty">
+				<p className="settings-empty">
 					Only admins and owners can invite new members.
 				</p>
 			) : null}
@@ -154,13 +154,13 @@ export function WorkspaceInviteMemberForm({
 				</Button>
 			</WorkspaceSettingsFields>
 			{inviteLink ? (
-				<div className="workspace-settings-link-surface">
-					<p className="workspace-settings-status">
+				<div className="settings-link-surface">
+					<p className="settings-status">
 						{invitedEmail
 							? `Share this link with ${invitedEmail}.`
 							: "Share this link with the invited member."}
 					</p>
-					<div className="workspace-settings-link-value">
+					<div className="settings-link-value">
 						<Input
 							aria-label="Email invitation link"
 							value={inviteLink}
@@ -175,7 +175,7 @@ export function WorkspaceInviteMemberForm({
 							{copiedInviteLink ? "Copied" : "Copy link"}
 						</Button>
 					</div>
-					<div className="workspace-settings-link-actions">
+					<div className="settings-link-actions">
 						<Button
 							type="button"
 							variant="ghost"

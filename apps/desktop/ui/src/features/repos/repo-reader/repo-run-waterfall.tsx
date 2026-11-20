@@ -104,17 +104,17 @@ function RunSteps({
 	const onPr = all.filter((call) => tiedToCi(stepOf(call), run)).length;
 	return (
 		<section className="flex items-baseline gap-2 px-3">
-			<h3 className="text-xs font-medium text-foreground/80">
+			<h3 className="text-xs font-medium text-ink/80">
 				Run {run.turnId ? shortRunId(run.turnId) : run.turn}
 			</h3>
 			{query.data ? (
-				<span className="text-[11px] text-muted-foreground tabular-nums">
+				<span className="text-[11px] text-ink-3 tabular-nums">
 					{onPr} of {all.length} calls on this PR
 				</span>
 			) : null}
 			<Link
 				to={runHref(getShellRoutePath, repoKey, run, "ci")}
-				className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+				className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-ink-3 transition-colors hover:text-ink"
 			>
 				Open session
 				<IconArrowUpRight aria-hidden="true" className="size-3.5" />

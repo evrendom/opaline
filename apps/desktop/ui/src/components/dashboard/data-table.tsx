@@ -11,21 +11,21 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
+import { Button } from "@/app/ui/button";
 import { FlowNumber } from "@/app/ui/flow-number";
-import { Button } from "@/components/dashboard/button";
 import {
 	InputGroup,
 	InputGroupAddon,
 	InputGroupButton,
 	InputGroupInput,
-} from "@/components/dashboard/input-group";
+} from "@/app/ui/input-group";
 import {
 	Select,
 	SelectContent,
 	SelectItem,
 	SelectTrigger,
-} from "@/components/dashboard/select";
-import { TableHead } from "@/components/dashboard/table";
+} from "@/app/ui/select";
+import { TableHead } from "@/app/ui/table";
 import { PLAIN_NUMBER } from "@/lib/figure";
 import { cn } from "@/lib/utils";
 
@@ -196,16 +196,16 @@ export function SortableHead<K extends string>({
 			    or when the column is actively sorted. */}
 			<span
 				className={cn(
-					"inline-flex flex-row-reverse items-center gap-1.5 text-foreground",
-					align === "right" && "-mr-5",
+					"inline-flex flex-row-reverse items-center gap-s text-ink",
+					align === "right" && "-mr-xxl",
 				)}
 			>
 				<Arrow
 					className={cn(
 						"size-3.5 shrink-0 transition-[color,opacity]",
 						active
-							? "text-foreground"
-							: "text-muted-foreground opacity-0 group-hover:opacity-100",
+							? "text-ink"
+							: "text-ink-3 opacity-0 group-hover:opacity-100",
 						"group-hover:text-primary",
 					)}
 					stroke={active ? 2 : 1.5}
@@ -231,7 +231,10 @@ export function Toolbar({
 }) {
 	return (
 		<div
-			className={cn("flex flex-wrap items-center gap-2 pl-6 pr-6", className)}
+			className={cn(
+				"flex flex-wrap items-center gap-m pl-xxl pr-xxl",
+				className,
+			)}
 		>
 			{children}
 		</div>
@@ -260,15 +263,18 @@ export function SearchInput({
 		// it matches the sibling chips (which render that variant).
 		<InputGroup
 			className={cn(
-				// dark:bg-card explicitly: InputGroup's base sets dark:bg-input/30 (a
+				// dark:bg-card explicitly: InputGroup's base sets dark:bg-line-strong/30 (a
 				// translucent wash that lands a shade lighter than card), which would
 				// otherwise win over the plain bg-card and mismatch the chips.
-				"h-8 w-56 rounded-full squircle:rounded-full corner-round! shadow-(--custom-outline-shadow) dark:shadow-(--custom-outline-shadow) dark:border-0 bg-card dark:bg-card hover:bg-muted/50 dark:hover:bg-muted",
+				"h-8 w-56",
+				"corner-full corner-round!",
+				"shadow-(--shadow-control) bg-card",
+				"squircle:corner-full dark:shadow-(--shadow-control) dark:edge-none dark:bg-card hover:bg-hover/50 dark:hover:bg-hover",
 				className,
 			)}
 		>
 			<InputGroupAddon>
-				<IconSearch className="size-3.5 dark:text-[#5B5B5B] text-[#B8B8B8]" />
+				<IconSearch className="size-3.5 dark:text-ink-disabled text-ink-3" />
 			</InputGroupAddon>
 			<InputGroupInput
 				value={value}
@@ -283,7 +289,7 @@ export function SearchInput({
 						size="icon-xs"
 						aria-label="Clear search"
 						onClick={() => onChange("")}
-						className="rounded-full text-muted-foreground/60 hover:text-foreground"
+						className="corner-full text-ink-3/60 hover:text-ink"
 					>
 						<IconX className="size-3.5" />
 					</InputGroupButton>
@@ -314,9 +320,9 @@ export function ToggleChip({
 				// the SearchInput surface: background hover flips instantly,
 				// text/shadow still ease. The inactive label/icon dims to muted
 				// (outline would pin the icon to neutral, hence the svg override).
-				"font-normal transition-[color,box-shadow] active:scale-100",
+				"font-regular transition-[color,box-shadow] active:scale-100",
 				!active &&
-					"text-muted-foreground/50 hover:text-muted-foreground/50 bg-card hover:bg-muted/50 aria-expanded:bg-muted/50 dark:hover:bg-muted dark:aria-expanded:bg-muted [&_svg:not([class*='text-'])]:text-muted-foreground/50 dark:[&_svg:not([class*='text-'])]:text-muted-foreground/50",
+					"text-ink-3/50 hover:text-ink-3/50 bg-card hover:bg-hover/50 aria-expanded:bg-hover/50 dark:hover:bg-hover dark:aria-expanded:bg-hover [&_svg:not([class*='text-'])]:text-ink-3/50 dark:[&_svg:not([class*='text-'])]:text-ink-3/50",
 			)}
 		>
 			{children}
@@ -346,7 +352,7 @@ export function ClearFiltersButton({
 					<Button
 						variant="outline"
 						onClick={onClick}
-						className="text-muted-foreground gap-1 bg-card hover:bg-muted/50 aria-expanded:bg-muted/50 dark:hover:bg-muted dark:aria-expanded:bg-muted"
+						className="text-ink-3 gap-xs bg-card hover:bg-hover/50 aria-expanded:bg-hover/50 dark:hover:bg-hover dark:aria-expanded:bg-hover"
 					>
 						<IconX />
 						Clear
@@ -401,15 +407,22 @@ export function PaginationFooter({
 		);
 	const count = Math.round(total);
 	return (
-		<div className="flex items-center justify-end gap-1 border-t border-border/50 px-6 pt-4 dark:border-border/40">
-			<span className="text-xs text-muted-foreground/50 tabular-nums">
+		<div
+			className={cn(
+				"flex items-center justify-end gap-xs",
+				"edge-t-m px-xxl pt-xl",
+				"border-line/50",
+				"dark:border-line/40",
+			)}
+		>
+			<span className="text-body-m text-ink-3/50 tabular-nums">
 				<FlowNumber
 					value={count}
 					format={count >= 1000 ? COMPACT_COUNT : undefined}
 				/>{" "}
 				{total === 1 ? noun[0] : noun[1]}
 			</span>
-			<span className="text-xs text-muted-foreground/20 mx-3">/</span>
+			<span className="text-body-m text-ink-3/20 mx-l">/</span>
 			{onPageSizeChange ? (
 				<Select<string, false>
 					value={String(pageSize)}
@@ -419,11 +432,25 @@ export function PaginationFooter({
 						title="Rows per page"
 						// Strip the trigger surface down to bare text so it reads as part
 						// of the count line, only revealing itself as a control on hover.
-						className="h-auto data-[size=default]:h-auto gap-1.5 rounded-md squircle:rounded-md border-0 bg-transparent p-0 text-xs text-muted-foreground/50 tabular-nums shadow-none transition-[color,box-shadow] hover:text-foreground dark:border-0 dark:bg-transparent dark:shadow-none dark:hover:bg-transparent"
+						className={cn(
+							"h-auto gap-s",
+							"corner-s edge-none p-zero",
+							"text-body-m tabular-nums",
+							"bg-transparent text-ink-3/50 shadow-none transition-[color,box-shadow]",
+							"data-[size=default]:h-auto",
+							"squircle:corner-s",
+							"hover:text-ink",
+							"dark:edge-none dark:bg-transparent dark:shadow-none dark:hover:bg-transparent",
+						)}
 					>
 						{range}
 					</SelectTrigger>
-					<SelectContent className="w-auto min-w-28" align="end" sideOffset={6}>
+					<SelectContent
+						className="w-auto min-w-28"
+						align="end"
+						alignItemWithTrigger={false}
+						sideOffset={6}
+					>
 						{pageSizes.map((s) => (
 							<SelectItem key={s} value={String(s)}>
 								{s} per page
@@ -432,11 +459,9 @@ export function PaginationFooter({
 					</SelectContent>
 				</Select>
 			) : (
-				<span className="text-xs text-muted-foreground/50 tabular-nums">
-					{range}
-				</span>
+				<span className="text-body-m text-ink-3/50 tabular-nums">{range}</span>
 			)}
-			<div className="ml-1.5 flex items-center gap-1">
+			<div className="ml-s flex items-center gap-xs">
 				<Button
 					variant={page === 0 || isFetching ? "ghost" : "outline"}
 					size="icon-sm"

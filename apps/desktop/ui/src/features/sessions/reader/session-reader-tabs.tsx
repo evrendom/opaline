@@ -260,7 +260,7 @@ export function SessionReaderTabs({
 		<PillTabs
 			className="h-8 bg-transparent"
 			label="Session view"
-			pillClassName="bg-card shadow-(--custom-shadow) dark:bg-muted-foreground/10"
+			pillClassName="bg-card shadow-(--shadow-card) dark:bg-ink-3/10"
 			onChange={onChange}
 			tabs={tabs}
 			value={value}
@@ -276,7 +276,10 @@ export function TabsBandFade({ className }: { className?: string }) {
 		<div
 			aria-hidden="true"
 			className={cn(
-				"pointer-events-none sticky z-40 -mb-4 h-4 bg-linear-to-b from-[var(--dashboard-01-content-background,#fcfcfc)] to-transparent opacity-0 transition-opacity duration-200 in-data-fade-top:opacity-100",
+				"sticky z-40 h-4",
+				"-mb-xl",
+				"pointer-events-none bg-linear-to-b from-[var(--canvas,#fcfcfc)] to-transparent opacity-0 transition-opacity duration-200",
+				"in-data-fade-top:opacity-100",
 				className,
 			)}
 		/>
@@ -288,7 +291,10 @@ export function ViewBottomFade({ className }: { className?: string }) {
 		<div
 			aria-hidden="true"
 			className={cn(
-				"pointer-events-none sticky bottom-0 z-30 -mt-8 h-8 bg-linear-to-t from-[var(--dashboard-01-content-background,#fcfcfc)] to-transparent opacity-0 transition-opacity duration-200 in-data-fade-bottom:opacity-100",
+				"sticky bottom-0 z-30 h-8",
+				"-mt-[calc(var(--space-xxl)*4/3)]",
+				"pointer-events-none bg-linear-to-t from-[var(--canvas,#fcfcfc)] to-transparent opacity-0 transition-opacity duration-200",
+				"in-data-fade-bottom:opacity-100",
 				className,
 			)}
 		/>

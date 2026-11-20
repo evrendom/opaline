@@ -11,10 +11,9 @@ import { getModelIconComponent } from "./conversation-trace-model-icon";
 import { CONVERSATION_TOOL_ICONS } from "./conversation-trace-tool-icons";
 
 export const CONVERSATION_TRACE_TAG_CLASS_NAME =
-	"inline-flex h-5 items-center gap-1 truncate rounded-[5px] bg-white pr-1.5 pl-0.5 dashboardy-mono text-[0.75rem]/4 font-medium text-[#000000df] shadow-[0_0_0_0.5px_transparent_inset,0_0_0_0.5px_#0000000f,0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d] select-none dark:bg-[#ffffff12] dark:text-[#ffffffed] dark:shadow-[0_0_0_0.5px_#ffffff12_inset,0_0_0_0.5px_transparent,0_1px_1px_-1px_transparent,0_1px_2px_0_transparent]";
+	"inline-flex h-5 items-center gap-xs truncate corner-xs bg-canvas pr-s pl-xxs dashboardy-mono text-[0.75rem]/4 font-medium text-ink shadow-[0_0_0_0.5px_transparent_inset,0_0_0_0.5px_#0000000f,0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d] select-none dark:bg-[#ffffff12] dark:text-[#ffffffed] dark:shadow-[0_0_0_0.5px_#ffffff12_inset,0_0_0_0.5px_transparent,0_1px_1px_-1px_transparent,0_1px_2px_0_transparent]";
 
-const defaultIconClassName =
-	"size-3.5 shrink-0 text-[#8d8d8d] dark:text-[#8c8c8c]";
+const defaultIconClassName = "size-3.5 shrink-0 text-ink-3 dark:text-ink-3";
 const typeScriptIconClassName = "size-3.5 shrink-0 text-[#3178c6]";
 
 function isTypeScriptFile(value: string) {

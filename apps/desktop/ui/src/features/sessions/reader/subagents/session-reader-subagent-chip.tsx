@@ -32,9 +32,9 @@ export function SubagentChip({
 					: "text-[color-mix(in_oklab,var(--opal-tint)_80%,black)] drop-shadow-none group-data-[progress=running]/ring:text-(--opal-tint) dark:text-[color-mix(in_oklch,var(--opal-tint)_55%,transparent)] dark:drop-shadow-none dark:group-data-[progress=running]/ring:text-(--opal-tint)",
 				solid &&
 					!selected &&
-					"dark:text-[color-mix(in_oklch,var(--opal-tint)_55%,var(--dashboard-01-content-background,var(--background)))] [--opal-ring:color-mix(in_oklab,var(--opal-tint)_14%,var(--dashboard-01-content-background,var(--background)))] dark:[--opal-ring:color-mix(in_oklab,#fff_8%,var(--dashboard-01-content-background,var(--background)))]",
+					"dark:text-[color-mix(in_oklch,var(--opal-tint)_55%,var(--canvas,var(--canvas)))] [--opal-ring:color-mix(in_oklab,var(--opal-tint)_14%,var(--canvas,var(--canvas)))] dark:[--opal-ring:color-mix(in_oklab,#fff_8%,var(--canvas,var(--canvas)))]",
 				ringed &&
-					"drop-shadow-none [--opal-ring:color-mix(in_oklab,var(--opal-tint)_20%,var(--dashboard-01-content-background,var(--background)))] dark:drop-shadow-none dark:[--opal-ring:color-mix(in_oklab,var(--opal-tint)_30%,var(--dashboard-01-content-background,var(--background)))]",
+					"drop-shadow-none [--opal-ring:color-mix(in_oklab,var(--opal-tint)_20%,var(--canvas,var(--canvas)))] dark:drop-shadow-none dark:[--opal-ring:color-mix(in_oklab,var(--opal-tint)_30%,var(--canvas,var(--canvas)))]",
 			)}
 		>
 			{selected ? (
@@ -54,7 +54,7 @@ export function SubagentChip({
 		<span
 			data-subagent-chip={subagentId}
 			data-progress="waiting"
-			className="group/ring relative -m-0.5 grid size-5 shrink-0 place-items-center"
+			className="group/ring relative -m-xxs grid size-5 shrink-0 place-items-center"
 			style={{ color: tint ?? LANE_LOOK.agent.tint }}
 		>
 			<svg
@@ -135,11 +135,11 @@ export function SubagentTag({
 	const tint = useSubagentTintById()(subagentId);
 	return (
 		<span
-			className={cn("flex shrink-0 items-center gap-1.5", className)}
+			className={cn("flex shrink-0 items-center gap-s", className)}
 			title={title}
 		>
 			<SubagentChip selected={selected} subagentId={subagentId} />
-			<span className="font-mono" style={tint ? { color: tint } : undefined}>
+			<span className="font-data" style={tint ? { color: tint } : undefined}>
 				{shortSubagentId(subagentId)}
 			</span>
 		</span>

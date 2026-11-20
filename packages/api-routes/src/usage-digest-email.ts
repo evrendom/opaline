@@ -859,7 +859,7 @@ function teamBlock(assets: Assets, team: DigestTeamSection): string {
 
 /**
  * The team section for a member alone in the workspace, as the app's empty
- * states look (components/dashboard/empty.tsx): a dashed outline, the icon on
+ * states look (apps/desktop/ui/src/app/ui/empty.tsx): a dashed outline, the icon on
  * a small muted tile, a title, a line under it and an outline button.
  */
 function inviteBlock(assets: Assets, inviteUrl: string): string {

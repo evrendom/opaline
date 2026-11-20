@@ -297,13 +297,13 @@ export function SignupForm(props: SignupFormProps) {
 						<div
 							role="alert"
 							aria-live="polite"
-							className="rounded-lg bg-destructive/5 px-3 py-2 text-destructive ring-1 ring-destructive/15"
+							className="corner-m bg-error/5 px-l py-m text-error ring-1 ring-error/15"
 						>
 							{feedback.message}
 						</div>
 					) : null}
 
-					<form onSubmit={handleSubmit} className="flex flex-col gap-4">
+					<form onSubmit={handleSubmit} className="flex flex-col gap-xl">
 						<Label className="sr-only" htmlFor={SIGNUP_CODE_INPUT_ID}>
 							Email code
 						</Label>
@@ -331,9 +331,9 @@ export function SignupForm(props: SignupFormProps) {
 			) : (
 				<div
 					key="signup-options"
-					className="opaline-auth-stage flex flex-col gap-4"
+					className="opaline-auth-stage flex flex-col gap-xl"
 				>
-					<div className="flex flex-col gap-2">
+					<div className="flex flex-col gap-m">
 						<Button
 							type="button"
 							className="opaline-website-primary-button"
@@ -350,9 +350,9 @@ export function SignupForm(props: SignupFormProps) {
 						</Button>
 					</div>
 
-					<div className="flex items-center gap-2">
+					<div className="flex items-center gap-m">
 						<Separator className="flex-1" />
-						<span className="text-xs text-muted-foreground">OR</span>
+						<span className="text-body-m text-ink-3">OR</span>
 						<Separator className="flex-1" />
 					</div>
 
@@ -361,10 +361,10 @@ export function SignupForm(props: SignupFormProps) {
 							role={feedback.kind === "error" ? "alert" : "status"}
 							aria-live="polite"
 							className={cn(
-								"rounded-3xl px-3 py-2 text-sm leading-5 ring-1",
+								"corner-xl px-l py-m text-body-xl ring-1",
 								feedback.kind === "error"
-									? "bg-destructive/5 text-destructive ring-destructive/15"
-									: "bg-muted/35 text-muted-foreground ring-border/60",
+									? "bg-error/5 text-error ring-error/15"
+									: "bg-field/35 text-ink-3 ring-line/60",
 							)}
 						>
 							{feedback.message}
@@ -372,8 +372,8 @@ export function SignupForm(props: SignupFormProps) {
 					) : null}
 
 					{showEmailForm ? (
-						<form onSubmit={handleSubmit} className="flex flex-col gap-4">
-							<div className="flex flex-col gap-2">
+						<form onSubmit={handleSubmit} className="flex flex-col gap-xl">
+							<div className="flex flex-col gap-m">
 								<Label className="sr-only" htmlFor="email">
 									Email
 								</Label>
@@ -410,7 +410,7 @@ export function SignupForm(props: SignupFormProps) {
 						</Button>
 					)}
 
-					<p className="text-center text-xs text-muted-foreground">
+					<p className="text-center text-body-m text-ink-3">
 						By signing up, you agree to our{" "}
 						<a
 							href="https://opaline.so/terms"
@@ -432,7 +432,7 @@ export function SignupForm(props: SignupFormProps) {
 					</p>
 
 					{hideSwitchPrompt ? null : (
-						<p className="text-center text-sm text-muted-foreground">
+						<p className="text-center text-body-xl text-ink-3">
 							Already have an account?{" "}
 							<button
 								type="button"

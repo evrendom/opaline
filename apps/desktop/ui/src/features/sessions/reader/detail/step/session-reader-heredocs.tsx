@@ -70,10 +70,10 @@ export function HeredocBodies({ command }: { command: string }) {
 	}));
 	if (heredocs.length === 0) return null;
 	return (
-		<div className="flex flex-col gap-2">
+		<div className="flex flex-col gap-m">
 			{heredocs.map((heredoc) => (
-				<div key={heredoc.key} className="flex flex-col gap-1">
-					<span className="truncate px-1 font-mono text-[11px] text-muted-foreground">
+				<div key={heredoc.key} className="flex flex-col gap-xs">
+					<span className="truncate px-xs font-data text-body-s text-ink-3">
 						{heredoc.lead || "heredoc"}
 					</span>
 					<HighlightedCode

@@ -24,7 +24,7 @@ export function CompactionToggle({
 	value: boolean;
 }) {
 	return (
-		<span className="inline-flex shrink-0 self-start rounded-lg bg-black/[0.04] p-0.5 corner-squircle squircle:rounded-[14px] dark:bg-white/[0.06]">
+		<span className="inline-flex shrink-0 self-start corner-m bg-wash p-xxs corner-squircle squircle:corner-l dark:bg-wash">
 			<ViewToggle
 				label="Context"
 				onPick={(view) => onChange(view === "with")}

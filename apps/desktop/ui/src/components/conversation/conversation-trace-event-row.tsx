@@ -75,7 +75,7 @@ export function ConversationTraceInteractionEpisodeRow({
 			fullPreviewText={undefined}
 			label={
 				<span
-					className="flex min-w-0 items-center gap-1"
+					className="flex min-w-0 items-center gap-xs"
 					data-trace-interaction-episode
 					data-trace-interaction-episode-size={episode.events.length}
 				>
@@ -91,11 +91,7 @@ export function ConversationTraceInteractionEpisodeRow({
 			}
 			leading={
 				<TraceIcon
-					className={
-						episode.isError
-							? "border-[color:var(--dashboardy-danger-foreground)] text-[color:var(--dashboardy-danger-foreground)]"
-							: undefined
-					}
+					className={episode.isError ? "border-error text-error" : undefined}
 					icon={CONVERSATION_TOOL_ICONS.computer}
 					toolIcon={episode.isError ? undefined : "computer"}
 					tone={episode.isError ? "tomato" : "amber"}
@@ -127,7 +123,7 @@ function ConversationTraceInteractionEpisodeEvents({
 	const remaining = events.length - visibleEvents.length;
 	return (
 		<div
-			className="grid divide-y divide-[color:var(--dashboardy-divider)]"
+			className="grid divide-y divide-line"
 			data-trace-interaction-episode-window={visibleEvents.length}
 		>
 			{visibleEvents.map((event) => (
@@ -146,7 +142,7 @@ function ConversationTraceInteractionEpisodeEvents({
 							),
 						)
 					}
-					className="min-h-11 px-3 text-left text-xs font-medium text-[color:var(--dashboardy-muted)]"
+					className="min-h-11 px-l text-left text-body-m font-medium text-ink-3"
 					data-trace-interaction-episode-more
 				>
 					{`Show ${Math.min(
@@ -264,7 +260,7 @@ export function ShellToolCallBody({
 	const output = formatShellOutput(rawOutputText);
 
 	return (
-		<div className="grid gap-3" data-trace-shell-command-details>
+		<div className="grid gap-l" data-trace-shell-command-details>
 			<CodeBlock code={command} filename="Input" language="bash" />
 			<CodeBlock
 				code={output.text}
@@ -374,7 +370,7 @@ export function ToolCallBody({
 	const output = formatShellOutput(rawOutputText);
 
 	return (
-		<div className="grid gap-3" data-trace-tool-details>
+		<div className="grid gap-l" data-trace-tool-details>
 			{inputText ? (
 				<CodeBlock code={inputText} filename="Input" language="json" />
 			) : null}
@@ -399,11 +395,11 @@ function MessagePreviewText({ text }: { text: string }) {
 			{part.type === "text" ? (
 				<SignalText text={part.content} />
 			) : part.type === "strong" ? (
-				<strong className="font-semibold">
+				<strong className="font-heavy">
 					<SignalText text={part.content} />
 				</strong>
 			) : (
-				<span className="font-mono">{part.content}</span>
+				<span className="font-data">{part.content}</span>
 			)}
 		</span>
 	));
@@ -442,7 +438,7 @@ export function ConversationTraceEventRow({
 				treeBodyClassName="-ml-3"
 				textDisclosure
 				body={
-					<p className="whitespace-pre-wrap font-sans text-[0.8125rem] leading-5 font-normal tracking-normal text-[color:var(--dashboardy-heading)] text-pretty">
+					<p className="whitespace-pre-wrap font-body text-body-l font-regular text-ink text-pretty">
 						<SignalText text={event.text} />
 					</p>
 				}
@@ -557,7 +553,7 @@ export function ConversationTraceEventRow({
 				fullPreviewText={undefined}
 				label={
 					<ConversationTraceTag
-						className="min-w-0 max-w-[36rem] shrink pl-1.5"
+						className="min-w-0 max-w-[36rem] shrink pl-s"
 						data-trace-shell-command-tag
 						hideIcon
 						title={shellCommand}
@@ -565,7 +561,7 @@ export function ConversationTraceEventRow({
 						value={shellCommand}
 					>
 						<code
-							className="min-w-0 truncate whitespace-pre font-mono font-normal tracking-normal [font-variant-ligatures:none]"
+							className="min-w-0 truncate whitespace-pre font-data font-regular tracking-m [font-variant-ligatures:none]"
 							data-trace-preview
 							data-trace-shell-command-preview
 						>
@@ -575,11 +571,7 @@ export function ConversationTraceEventRow({
 				}
 				leading={
 					<TraceIcon
-						className={
-							isError
-								? "border-[color:var(--dashboardy-danger-foreground)] text-[color:var(--dashboardy-danger-foreground)]"
-								: undefined
-						}
+						className={isError ? "border-error text-error" : undefined}
 						icon={CONVERSATION_TOOL_ICONS.terminal}
 						toolIcon="terminal"
 						tone={isError ? "tomato" : "amber"}
@@ -617,11 +609,7 @@ export function ConversationTraceEventRow({
 				}
 				leading={
 					<TraceIcon
-						className={
-							isError
-								? "border-[color:var(--dashboardy-danger-foreground)] text-[color:var(--dashboardy-danger-foreground)]"
-								: undefined
-						}
+						className={isError ? "border-error text-error" : undefined}
 						icon={CONVERSATION_TOOL_ICONS[icon]}
 						toolIcon={icon}
 						tone={isError ? "tomato" : "amber"}
@@ -659,7 +647,7 @@ export function ConversationTraceEventRow({
 			fullPreviewText={undefined}
 			label={
 				<span
-					className="flex min-w-0 items-center gap-1"
+					className="flex min-w-0 items-center gap-xs"
 					data-trace-tool-label-group
 				>
 					<p className={conversationTraceLabelClassName}>{verb}</p>
@@ -693,11 +681,7 @@ export function ConversationTraceEventRow({
 					/>
 				) : (
 					<TraceIcon
-						className={
-							isError
-								? "border-[color:var(--dashboardy-danger-foreground)] text-[color:var(--dashboardy-danger-foreground)]"
-								: undefined
-						}
+						className={isError ? "border-error text-error" : undefined}
 						icon={CONVERSATION_TOOL_ICONS[icon]}
 						toolIcon={isError || hasNeutralReadIcon ? undefined : icon}
 						tone={isError ? "tomato" : hasNeutralReadIcon ? "neutral" : "amber"}
@@ -728,7 +712,7 @@ export function ConversationTraceEventRow({
 				<p
 					className={cn(
 						conversationTracePreviewClassName,
-						"font-mono text-[0.75rem]",
+						"font-data text-body-m",
 					)}
 					data-trace-preview
 				>

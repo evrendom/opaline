@@ -17,23 +17,13 @@ import {
 	AvatarImage,
 } from "@/app/ui/avatar";
 import { Button } from "@/app/ui/button";
+import { FluidHoverHighlight } from "@/app/ui/fluid-hover-highlight";
 import { Skeleton } from "@/app/ui/skeleton";
 import { CONVERSATION_TRACE_TAG_CLASS_NAME } from "@/components/conversation/conversation-trace-tag";
-import {
-	Empty,
-	EmptyContent,
-	EmptyDescription,
-	EmptyHeader,
-	EmptyMedia,
-	EmptyTitle,
-} from "@/components/dashboard/empty";
+import { PageEmptyState } from "@/components/dashboard/page-parts";
+import { RetryButton } from "@/components/retry-button";
 import { SkillMark } from "@/components/skill-mark";
-import { FluidHoverHighlight } from "@/components/ui/fluid-hover-highlight";
 import { SESSION_OVERVIEW_SURFACE_CLASS_NAME } from "@/features/sessions/components/sessions-overview-table-utils";
-import {
-	OpalineShape,
-	restingChipClassName,
-} from "@/features/shell/components/shell-nav-icon";
 import { useShellHeaderPortal } from "@/features/shell/shell-header-portal";
 import { useUserMap } from "@/features/workspace/hooks/useUserMap";
 import {
@@ -64,12 +54,12 @@ interface UsageCollectionViewProps {
 
 // Card grid: 16px gaps, its edges on the page title's 32px gutter.
 const USAGE_GRID_CLASS_NAME =
-	"grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,13.5rem),1fr))] gap-4 px-4 pt-1 pb-6 sm:px-8";
+	"grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,13.5rem),1fr))] gap-xl px-xl pt-xs pb-xxl sm:px-[calc(var(--space-xxl)*4/3)]";
 // Card: a squircle on its soft hairline shadow, no border.
 const USAGE_CARD_CLASS_NAME =
-	"relative flex h-full w-full min-w-0 flex-col overflow-hidden rounded-lg bg-card text-left text-(--session-overview-text) shadow-(--custom-shadow) squircle:rounded-3xl corner-squircle";
+	"relative flex h-full w-full min-w-0 flex-col overflow-hidden corner-m bg-card text-left text-ink shadow-(--shadow-card) squircle:corner-xl corner-squircle";
 const USAGE_METADATA_ICON_CLASS_NAME =
-	"size-3.5 shrink-0 text-[#8d8d8d] dark:text-[#8c8c8c]";
+	"size-3.5 shrink-0 text-ink-3 dark:text-ink-3";
 
 type SkillAttribution = NonNullable<HistoricalSkillSummary["attribution"]>;
 
@@ -152,21 +142,27 @@ export function UsageCollectionHeader({
 	const content = (
 		<div
 			className={cn(
-				"ml-auto flex min-w-0 flex-1 items-center justify-end gap-2",
+				"ml-auto flex min-w-0 flex-1 items-center justify-end gap-m",
 				inline &&
 					// The detail page's side pane: a 48px strip on 24px gutters, level
 					// with the sessions toolbar beside it.
-					"h-12 w-full flex-none border-b border-(--session-overview-border) px-6",
+					"h-12 w-full flex-none edge-b-m border-line-strong px-xxl",
 			)}
 		>
-			{inline ? <h2 className="mr-auto text-sm font-medium">Skills</h2> : null}
+			{inline ? (
+				<h2 className="mr-auto text-body-xl font-medium">Skills</h2>
+			) : null}
 			<div className="relative min-w-0 max-w-56 flex-1 sm:flex-none">
 				<label className="sr-only" htmlFor={`${kind}-search`}>
 					Search {kind}
 				</label>
 				<IconSearch
 					aria-hidden="true"
-					className="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-[#b8b8b8] dark:text-[#5b5b5b]"
+					className={cn(
+						"absolute top-1/2 left-2.5 z-10 size-3.5",
+						"pointer-events-none -translate-y-1/2 text-ink-3",
+						"dark:text-ink-disabled",
+					)}
 				/>
 				<input
 					id={`${kind}-search`}
@@ -218,23 +214,19 @@ function UsageCollectionState({
 
 	if (isError) {
 		return (
-			<UsageStateMessage
-				icon={<IconBook aria-hidden="true" />}
+			<PageEmptyState
+				icon={IconBook}
 				title={`${kind === "skills" ? "Skills" : "Repos"} couldn’t be loaded`}
 				description="Your historical sessions are still available. Try loading this view again."
-				action={
-					<Button type="button" size="sm" variant="outline" onClick={onRetry}>
-						Try again
-					</Button>
-				}
+				action={<RetryButton onRetry={onRetry} />}
 			/>
 		);
 	}
 
 	if (itemCount === 0) {
 		return (
-			<UsageStateMessage
-				icon={<IconBook aria-hidden="true" />}
+			<PageEmptyState
+				icon={IconBook}
 				title={`No ${kind} yet`}
 				description={
 					kind === "skills"
@@ -247,8 +239,8 @@ function UsageCollectionState({
 
 	if (filteredItems.length === 0 && hasSearch) {
 		return (
-			<UsageStateMessage
-				icon={<IconZoomCancel aria-hidden="true" />}
+			<PageEmptyState
+				icon={IconZoomCancel}
 				title={`No matching ${kind}`}
 				description="Try a different exact name or clear the search."
 				action={
@@ -309,7 +301,7 @@ function UsageCardGrid({
 			>
 				<FluidHoverHighlight
 					hover={hover}
-					className="z-10 rounded-lg bg-black/2 dark:bg-white/3"
+					className="z-10 corner-m bg-wash dark:bg-wash"
 				/>
 				{/* biome-ignore lint/a11y/useSemanticElements: An explicit role preserves this list in Safari with list-style none. */}
 				<ul
@@ -368,19 +360,23 @@ const UsageCard = memo(function UsageCard({
 				aria-label={`Open ${skill.name}`}
 				onClick={() => onSelectItem(skill.id)}
 				onFocus={() => setActiveIndex(index)}
-				className="absolute inset-0 z-20 rounded-[inherit] outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--session-overview-accent)"
+				className="absolute inset-0 z-20 rounded-[inherit] outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
 			/>
 			<div className="pointer-events-none flex min-h-0 flex-1 flex-col">
-				<header className="flex min-h-16 flex-1 items-center gap-2.5 px-5 py-4">
+				<header className="flex min-h-16 flex-1 items-center gap-l px-xxl py-xl">
 					<SkillMark skill={skill.name} emoji={skill.emoji} />
 					<h2
-						className="line-clamp-2 min-w-0 flex-1 font-sans text-base font-medium text-balance wrap-anywhere sm:text-sm"
+						className={cn(
+							"line-clamp-2 min-w-0 flex-1 wrap-anywhere",
+							"font-body text-body-xxl font-medium text-balance",
+							"sm:text-body-xl",
+						)}
 						title={skill.name}
 					>
 						{skill.name}
 					</h2>
 				</header>
-				<footer className="shrink-0 border-t border-black/[0.04] px-5 py-4 dark:border-white/6">
+				<footer className="shrink-0 edge-t-m border-line px-xxl py-xl dark:border-line">
 					<UsageSummary
 						avatarMap={avatarMap}
 						attribution={skill.attribution}
@@ -417,10 +413,10 @@ function UsageSummary({
 	);
 
 	return (
-		<dl className="grid min-w-0 gap-1.5 text-xs text-(--session-overview-muted)">
+		<dl className="grid min-w-0 gap-s text-body-m text-ink-3">
 			<div className="flex min-w-0 items-center">
 				<dt className="sr-only">Sessions</dt>
-				<dd className="flex min-w-0 items-center gap-2">
+				<dd className="flex min-w-0 items-center gap-m">
 					<AvatarGroup
 						role="group"
 						aria-label={
@@ -428,7 +424,7 @@ function UsageSummary({
 								? formatUserCount(attribution.userCount)
 								: "Skill users"
 						}
-						className="shrink-0 *:data-[slot=avatar]:ring-white dark:*:data-[slot=avatar]:ring-(--dashboardy-surface-opaque)"
+						className="shrink-0 *:data-[slot=avatar]:ring-white dark:*:data-[slot=avatar]:ring-canvas"
 					>
 						{visibleUsers.length > 0 ? (
 							visibleUsers.map((user) => (
@@ -446,14 +442,14 @@ function UsageSummary({
 							<UsageUserAvatar avatarUrl={undefined} title={undefined} />
 						)}
 						{hiddenUserCount > 0 ? (
-							<AvatarGroupCount className="bg-(--session-overview-hover) font-sans text-xs text-(--session-overview-muted) ring-white tabular-nums dark:ring-(--dashboardy-surface-opaque)">
+							<AvatarGroupCount className="bg-hover font-body text-body-m text-ink-3 ring-white tabular-nums dark:ring-canvas">
 								+{hiddenUserCount.toLocaleString()}
 								<span className="sr-only"> more users</span>
 							</AvatarGroupCount>
 						) : null}
 					</AvatarGroup>
 					<span
-						className="font-sans font-normal text-(--session-overview-text) tabular-nums"
+						className="font-body font-regular text-ink tabular-nums"
 						title={formatCompactSessionCount(sessionCount)}
 					>
 						{sessionCount.toLocaleString()}
@@ -467,7 +463,7 @@ function UsageSummary({
 			{visibleRepos.length > 0 ? (
 				<div className="flex min-w-0 items-center">
 					<dt className="sr-only">Repositories</dt>
-					<dd className="flex min-w-0 items-center gap-1.5">
+					<dd className="flex min-w-0 items-center gap-s">
 						{visibleRepos.map((repo) => (
 							<RepositoryChip
 								key={repo.repoKey}
@@ -479,10 +475,10 @@ function UsageSummary({
 							<span
 								className={cn(
 									CONVERSATION_TRACE_TAG_CLASS_NAME,
-									"shrink-0 px-1.5",
+									"shrink-0 px-s",
 								)}
 							>
-								<span className="font-sans font-normal text-(--session-overview-muted) tabular-nums">
+								<span className="font-body font-regular text-ink-3 tabular-nums">
 									+{hiddenRepoCount.toLocaleString()}
 									<span className="sr-only"> more repositories</span>
 								</span>
@@ -506,12 +502,12 @@ function UsageUserAvatar({
 		<Avatar
 			title={title}
 			size="sm"
-			className="bg-white after:border-black/5 dark:bg-(--dashboardy-surface-opaque) dark:after:border-white/10"
+			className="bg-canvas after:border-line dark:bg-canvas dark:after:border-line"
 		>
 			{avatarUrl ? (
 				<AvatarImage alt="" src={avatarUrl} decoding="async" loading="lazy" />
 			) : null}
-			<AvatarFallback className="bg-(--session-overview-hover)">
+			<AvatarFallback className="bg-hover">
 				<IconUser
 					aria-hidden="true"
 					className={USAGE_METADATA_ICON_CLASS_NAME}
@@ -532,7 +528,7 @@ function RepositoryChip({
 		<span
 			className={cn(
 				CONVERSATION_TRACE_TAG_CLASS_NAME,
-				"min-w-0 gap-1.5 overflow-visible font-normal",
+				"min-w-0 gap-s overflow-visible font-regular",
 			)}
 			title={`Repository ${label}, ${formatCompactSessionCount(sessionCount)}`}
 		>
@@ -540,8 +536,16 @@ function RepositoryChip({
 				aria-hidden="true"
 				className={USAGE_METADATA_ICON_CLASS_NAME}
 			/>
-			<span className="min-w-0 truncate font-sans">{label}</span>
-			<span className="shrink-0 border-l border-black/6 pl-1.5 font-sans text-(--session-overview-subtle) tabular-nums dark:border-white/10">
+			<span className="min-w-0 truncate font-body">{label}</span>
+			<span
+				className={cn(
+					"shrink-0",
+					"edge-l-m pl-s",
+					"font-body tabular-nums",
+					"border-line text-ink-3",
+					"dark:border-line",
+				)}
+			>
 				{sessionCount.toLocaleString()}
 			</span>
 		</span>
@@ -555,13 +559,13 @@ function UsageCollectionSkeleton({ kind }: { kind: "skills" | "repos" }) {
 			<div className={USAGE_GRID_CLASS_NAME}>
 				{["first", "second", "third", "fourth", "fifth", "sixth"].map((key) => (
 					<div key={key} className={USAGE_CARD_CLASS_NAME}>
-						<div className="flex min-h-16 flex-1 items-center gap-2.5 px-5 py-4">
+						<div className="flex min-h-16 flex-1 items-center gap-l px-xxl py-xl">
 							<Skeleton className="size-9 shrink-0 [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]" />
 							<Skeleton className="h-5 min-w-0 flex-1" />
 						</div>
-						<div className="grid gap-1.5 border-t border-black/5 px-4 py-3 dark:border-white/6">
-							<div className="flex items-center gap-2">
-								<Skeleton className="size-6 rounded-full" />
+						<div className="grid gap-s edge-t-m border-line px-xl py-l dark:border-line">
+							<div className="flex items-center gap-m">
+								<Skeleton className="size-6 corner-full" />
 								<Skeleton className="h-4 w-8" />
 							</div>
 							<Skeleton className="h-5 w-1/2" />
@@ -569,42 +573,6 @@ function UsageCollectionSkeleton({ kind }: { kind: "skills" | "repos" }) {
 					</div>
 				))}
 			</div>
-		</div>
-	);
-}
-
-export function UsageStateMessage({
-	action,
-	description,
-	icon,
-	title,
-}: {
-	action?: ReactNode;
-	description: string;
-	icon: ReactNode;
-	title: string;
-}) {
-	return (
-		<div className="flex min-h-64 flex-1 flex-col p-6">
-			<Empty className="border border-dashed">
-				<EmptyHeader>
-					<EmptyMedia variant="icon">
-						<OpalineShape
-							className={cn(
-								"absolute inset-0",
-								restingChipClassName,
-								"[--opal-ring:rgb(17_24_39/0.08)]",
-							)}
-						/>
-						<span className="relative grid place-items-center">{icon}</span>
-					</EmptyMedia>
-					<EmptyContent>
-						<EmptyTitle>{title}</EmptyTitle>
-						<EmptyDescription>{description}</EmptyDescription>
-						{action}
-					</EmptyContent>
-				</EmptyHeader>
-			</Empty>
 		</div>
 	);
 }

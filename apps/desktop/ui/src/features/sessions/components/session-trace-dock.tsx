@@ -1,6 +1,7 @@
 import { IconArrowDown, IconArrowLeft, IconArrowUp } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
+import { TouchTarget } from "@/app/ui/touch-target";
 import type { SessionNavigation } from "@/features/sessions/session-navigation";
 import { cn } from "@/lib/utils";
 
@@ -8,12 +9,9 @@ const sessionTraceDockPressClassName =
 	"scale-100 transition-transform duration-150 ease-out active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100";
 
 const sessionTraceDockButtonClassName = cn(
-	"group relative flex size-9 shrink-0 items-center justify-center rounded-[calc(var(--dock-radius)-var(--dock-padding))] text-[color:var(--dashboard-01-rail-icon-active)] outline-none hover:bg-neutral-950/4 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:active:scale-100 dark:hover:bg-white/6",
+	"group relative flex size-9 shrink-0 items-center justify-center rounded-[calc(var(--dock-radius)-var(--dock-padding))] text-ink outline-none hover:bg-neutral-950/4 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:active:scale-100 dark:hover:bg-white/6",
 	sessionTraceDockPressClassName,
 );
-
-const sessionTraceDockTouchTargetClassName =
-	"absolute top-1/2 left-1/2 size-12 -translate-1/2 pointer-fine:hidden";
 
 function SessionTraceNavigationButton({
 	disabled,
@@ -28,21 +26,20 @@ function SessionTraceNavigationButton({
 }) {
 	return (
 		<Tooltip>
-			<TooltipTrigger asChild>
-				<button
-					type="button"
-					aria-label={label}
-					className={sessionTraceDockButtonClassName}
-					disabled={disabled}
-					onClick={onClick}
-				>
-					{icon}
-					<span
-						aria-hidden="true"
-						className={sessionTraceDockTouchTargetClassName}
-					/>
-				</button>
-			</TooltipTrigger>
+			<TooltipTrigger
+				render={
+					<button
+						type="button"
+						aria-label={label}
+						className={sessionTraceDockButtonClassName}
+						disabled={disabled}
+						onClick={onClick}
+					>
+						{icon}
+						<TouchTarget className="size-12" />
+					</button>
+				}
+			/>
 			<TooltipContent side="top" sideOffset={10}>
 				{label}
 			</TooltipContent>
@@ -69,13 +66,17 @@ export function SessionTraceDock({
 	return (
 		<nav
 			aria-label="Session controls"
-			className="shell-dock-content flex min-w-0 items-center gap-1"
+			className="shell-dock-content flex min-w-0 items-center gap-xs"
 		>
 			<button
 				type="button"
 				aria-label="Back to sessions"
 				className={cn(
-					"group relative flex h-9 shrink-0 items-center gap-1.5 rounded-[calc(var(--dock-radius)-var(--dock-padding))] pl-2 pr-2.5 text-base font-medium text-[color:var(--dashboard-01-rail-icon-active)] outline-none hover:bg-neutral-950/4 dark:hover:bg-white/6 sm:text-sm",
+					"group relative flex h-9 shrink-0 items-center gap-s",
+					"rounded-[calc(var(--dock-radius)-var(--dock-padding))] pl-m pr-l",
+					"text-body-xxl font-medium",
+					"text-ink outline-none",
+					"hover:bg-neutral-950/4 dark:hover:bg-white/6 sm:text-body-xl",
 					sessionTraceDockPressClassName,
 				)}
 				onClick={onReturn}
@@ -85,14 +86,11 @@ export function SessionTraceDock({
 					className="size-4 shrink-0 transition-transform duration-200 ease-out group-hover:-translate-x-px group-active:translate-x-0 motion-reduce:transition-none"
 				/>
 				<span>Back</span>
-				<span
-					aria-hidden="true"
-					className={sessionTraceDockTouchTargetClassName}
-				/>
+				<TouchTarget className="size-12" />
 			</button>
 			<div
 				aria-hidden="true"
-				className="h-5 w-px shrink-0 bg-neutral-950/8 dark:bg-white/10"
+				className="h-5 w-px shrink-0 bg-hover-strong dark:bg-hover-strong"
 			/>
 			<SessionTraceNavigationButton
 				disabled={!navigation.hasPreviousSession}
@@ -107,7 +105,13 @@ export function SessionTraceDock({
 			/>
 			<p
 				aria-live="polite"
-				className="min-w-16 shrink-0 px-1 text-center font-mono text-base font-medium whitespace-nowrap text-[color:var(--dashboard-01-rail-icon)] tabular-nums sm:min-w-20 sm:text-sm"
+				className={cn(
+					"min-w-16 shrink-0",
+					"px-xs",
+					"text-center font-data text-body-xxl font-medium whitespace-nowrap tabular-nums",
+					"text-ink-3",
+					"sm:min-w-20 sm:text-body-xl",
+				)}
 			>
 				<span className="sr-only">Session </span>
 				{positionLabel}

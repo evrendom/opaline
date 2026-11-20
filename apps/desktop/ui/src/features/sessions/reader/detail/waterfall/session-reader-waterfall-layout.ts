@@ -23,8 +23,8 @@ export const ROW =
 
 export function rowState(selected: boolean): string {
 	return selected
-		? "bg-accent dark:bg-accent/70"
-		: "hover:bg-accent/80 dark:hover:bg-accent/50";
+		? "bg-hover dark:bg-hover/70"
+		: "hover:bg-hover/80 dark:hover:bg-hover/50";
 }
 
 export function barGeometry(

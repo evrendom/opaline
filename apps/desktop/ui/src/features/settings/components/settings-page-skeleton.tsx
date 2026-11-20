@@ -16,7 +16,7 @@ import {
 function SettingsPageSample({ routeId }: { routeId: PrimarySettingsRouteId }) {
 	if (routeId === "sessions") return <SessionsSettingsSample />;
 	return (
-		<div className="workspace-settings-page">
+		<div className="settings-page">
 			{routeId === "workspace" ? (
 				<WorkspaceSettingsSample />
 			) : routeId === "members" ? (
@@ -32,7 +32,7 @@ function SettingsPageSample({ routeId }: { routeId: PrimarySettingsRouteId }) {
 							label="A saved analysis of the team's sessions"
 							description="Saved last week"
 						>
-							<span className="workspace-settings-badge">Shared</span>
+							<span className="settings-badge">Shared</span>
 						</WorkspaceSettingsRow>
 					))}
 				</WorkspaceSettingsGroup>

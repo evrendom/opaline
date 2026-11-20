@@ -7,7 +7,7 @@ export function ResetPasswordApp() {
 		resolvedTheme === "dark" ? "/favicon-dark.svg" : "/favicon-light.svg";
 
 	return (
-		<div className="flex min-h-screen flex-col items-center justify-center gap-6">
+		<div className="flex min-h-screen flex-col items-center justify-center gap-xxl">
 			<img src={logoSrc} alt="Opaline" className="h-10 w-10" />
 			<ResetPasswordForm onBackToLogin={() => (window.location.href = "/")} />
 		</div>

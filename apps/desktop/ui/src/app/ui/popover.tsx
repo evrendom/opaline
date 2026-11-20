@@ -1,6 +1,5 @@
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
-import type * as React from "react";
-import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
+import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
 
 import { cn } from "@/lib/utils";
 
@@ -38,7 +37,19 @@ function PopoverContent({
 					data-fluid-menu-root=""
 					data-slot="popover-content"
 					className={cn(
-						"z-50 flex w-72 origin-(--transform-origin) flex-col gap-4 rounded-lg squircle:rounded-3xl corner-squircle bg-popover p-3 text-sm text-popover-foreground shadow-(--custom-shadow) outline-hidden duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+						"z-50 flex w-72 flex-col gap-xl",
+						"corner-m corner-squircle p-l",
+						"text-body-xl",
+						"origin-(--transform-origin) bg-surface text-ink shadow-(--shadow-card) outline-hidden duration-100",
+						"squircle:corner-xl",
+						"data-[side=bottom]:slide-in-from-top-2",
+						"data-[side=inline-end]:slide-in-from-left-2",
+						"data-[side=inline-start]:slide-in-from-right-2",
+						"data-[side=left]:slide-in-from-right-2",
+						"data-[side=right]:slide-in-from-left-2",
+						"data-[side=top]:slide-in-from-bottom-2",
+						"data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95",
+						"data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
 						className,
 					)}
 					{...props}
@@ -48,16 +59,6 @@ function PopoverContent({
 				</PopoverPrimitive.Popup>
 			</PopoverPrimitive.Positioner>
 		</PopoverPrimitive.Portal>
-	);
-}
-
-function PopoverHeader({ className, ...props }: React.ComponentProps<"div">) {
-	return (
-		<div
-			data-slot="popover-header"
-			className={cn("flex flex-col gap-1 text-sm", className)}
-			{...props}
-		/>
 	);
 }
 
@@ -71,24 +72,4 @@ function PopoverTitle({ className, ...props }: PopoverPrimitive.Title.Props) {
 	);
 }
 
-function PopoverDescription({
-	className,
-	...props
-}: PopoverPrimitive.Description.Props) {
-	return (
-		<PopoverPrimitive.Description
-			data-slot="popover-description"
-			className={cn("text-muted-foreground", className)}
-			{...props}
-		/>
-	);
-}
-
-export {
-	Popover,
-	PopoverContent,
-	PopoverDescription,
-	PopoverHeader,
-	PopoverTitle,
-	PopoverTrigger,
-};
+export { Popover, PopoverContent, PopoverTitle, PopoverTrigger };

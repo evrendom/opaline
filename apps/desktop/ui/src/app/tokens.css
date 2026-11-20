@@ -1,0 +1,184 @@
+/* ============================================================
+   Opaline · tokens.css
+   Layer 1 is the primitive set Graphical's theme defines
+   (graphical/themes/opaline.json → graphical/generated/theme.css): the
+   neutral ramp, the opal palette, success / warning / error, type, space,
+   corners, strokes, elevation and motion. Edit it through the Graphical
+   editor or graphical-adopt, never by hand.
+   Layer 2, below, is the set of roles Opaline's screens are written against.
+   Components and patterns read Layer 2 only. `.dark` swaps Layer 1 and the
+   few roles that change character.
+   ============================================================ */
+
+:root {
+	/* -- Ground */
+	--canvas: var(--neutral-1); /* the window's content */
+	--surface: var(--neutral-1); /* cards, panels, popovers, menus, controls */
+	--card: var(--surface);
+	--inset: var(
+		--neutral-2
+	); /* a recessed area on the canvas: wells, code, rails */
+	--field: var(--neutral-3); /* inputs, chips, segmented tracks */
+	--hover: var(
+		--neutral-10-transparent
+	); /* a row or control under the pointer */
+	--hover-strong: var(--neutral-10-translucent); /* pressed, open, selected */
+	--wash: var(
+		--neutral-10-transparent
+	); /* a soft tint on any ground: metric cards, stripes */
+
+	/* -- Ink: three greys, no fourth */
+	--ink: var(--neutral-10); /* titles, body, values */
+	--ink-2: var(--neutral-8); /* secondary copy */
+	--ink-3: var(--neutral-7); /* meta, labels, icons, placeholders */
+	--ink-disabled: var(--neutral-6);
+	--ink-inverse: var(--neutral-1);
+
+	/* -- Lines: white space first, a line next, a card last */
+	--line: var(--neutral-10-translucent); /* hairlines, dividers, rails */
+	--line-strong: var(--neutral-4); /* opaque edges: inputs, tracks, menus */
+	--line-soft: var(--neutral-10-transparent); /* chart grids, quiet dividers */
+
+	/* -- Action: neutral is the primary action; colour means state */
+	--primary: var(--neutral-9);
+	--primary-hover: color-mix(in oklch, var(--primary) 85%, var(--canvas));
+	--primary-fg: var(--neutral-1);
+	--focus: var(--neutral-6);
+	--accent: var(--color-1); /* Opaline blue: links, selection, info */
+	--accent-tint: var(--color-1-transparent);
+	--accent-line: var(--color-1-translucent);
+	--success-tint: var(--success-transparent);
+	--success-line: var(--success-translucent);
+	--warning-tint: var(--warning-transparent);
+	--warning-line: var(--warning-translucent);
+	--error-tint: var(--error-transparent);
+	--error-line: var(--error-translucent);
+
+	/* -- Elevation by role. A hairline plus a soft drop stands in for a border;
+	   dark trades the drop for an inset highlight edge. */
+	--shadow-card:
+		0 0 0 0.5px rgb(0 0 0 / 0.06), 0 0.5px 2px -0.5px rgb(0 0 0 / 0.06),
+		0 1px 4px 0 rgb(0 0 0 / 0.04);
+	--shadow-control:
+		0 0 0 0.5px rgb(0 0 0 / 0.06), 0 0.5px 2px -0.5px rgb(0 0 0 / 0.06),
+		0 2px 4px 0 rgb(0 0 0 / 0.04);
+	--shadow-raised:
+		0 0 0 0.5px rgb(0 0 0 / 0.08), 0 0.5px 2px -0.5px rgb(0 0 0 / 0.08),
+		0 2px 4px 0 rgb(0 0 0 / 0.05);
+	--shadow-overlay:
+		0 0 0 0.5px rgb(0 0 0 / 0.08), 0 1px 2px -0.5px rgb(0 0 0 / 0.06),
+		0 6px 12px -4px rgb(0 0 0 / 0.1), 0 16px 32px -8px rgb(0 0 0 / 0.16);
+	--shadow-primary:
+		0 0 0 0.5px rgb(0 0 0 / 0.6), 0 0.5px 2px -0.5px rgb(0 0 0 / 0.4),
+		0 2px 4px 0 rgb(0 0 0 / 0.18);
+	--shadow-destructive:
+		0 0 0 0.5px rgb(244 63 94 / 0.25), 0 0.5px 2px -0.5px rgb(244 63 94 / 0.18),
+		0 2px 4px 0 rgb(244 63 94 / 0.12);
+
+	/* -- Third-party names (shadcn registry code, the sidebar primitive).
+	   Our code reads the roles above; these exist for code we don't own. */
+	--background: var(--canvas);
+	--foreground: var(--ink);
+	--card-foreground: var(--ink);
+	--popover: var(--surface);
+	--popover-foreground: var(--ink);
+	--primary-foreground: var(--primary-fg);
+	--secondary: var(--field);
+	--secondary-foreground: var(--ink);
+	--muted: var(--field);
+	--muted-foreground: var(--ink-3);
+	--accent-foreground: var(--ink);
+	--destructive: var(--error);
+	--border: var(--line-strong);
+	--input: var(--line-strong);
+	--ring: var(--focus);
+	--radius: var(
+		--radius-m
+	); /* shadcn's base radius; its sm…4xl multiples scale from it */
+	--scrollbar-thumb: var(--line);
+}
+
+.dark {
+	--surface: var(--neutral-2);
+	--line-strong: var(--line);
+	--primary: var(--neutral-10);
+	--shadow-card:
+		inset 0 0.75px 0 0 rgb(255 255 255 / 0.03),
+		inset 0 0 0 0.75px rgb(255 255 255 / 0.03), 0 0 0 0.75px rgb(0 0 0 / 0.1),
+		0 2px 2px 0 rgb(0 0 0 / 0.1), 0 4px 4px 0 rgb(0 0 0 / 0.1),
+		0 8px 8px 0 rgb(0 0 0 / 0.1);
+	--shadow-control:
+		inset 0 0.5px 0 0 rgb(255 255 255 / 0.05),
+		inset 0 0 0 0.5px rgb(255 255 255 / 0.045), 0 0 0 0.5px rgb(0 0 0 / 0.14),
+		0 0.5px 2px -0.5px rgb(0 0 0 / 0.14), 0 2px 4px 0 rgb(0 0 0 / 0.08);
+	--shadow-raised:
+		inset 0 0.5px 0 0 rgb(255 255 255 / 0.04),
+		0 0 0 0.5px rgb(255 255 255 / 0.08), 0 0.5px 2px 0 rgb(0 0 0 / 0.25);
+	--shadow-overlay:
+		inset 0 0.75px 0 0 rgb(255 255 255 / 0.06),
+		inset 0 0 0 0.75px rgb(255 255 255 / 0.05), 0 0 0 0.75px rgb(0 0 0 / 0.3),
+		0 4px 8px 0 rgb(0 0 0 / 0.25), 0 12px 24px 0 rgb(0 0 0 / 0.35),
+		0 24px 48px -8px rgb(0 0 0 / 0.4);
+	--shadow-primary:
+		inset 0 0.5px 0 0 rgb(255 255 255 / 0.45),
+		0 0 0 0.5px rgb(255 255 255 / 0.55), 0 0.5px 2px 0 rgb(0 0 0 / 0.5);
+	--shadow-destructive:
+		inset 0 0.5px 0 0 rgb(244 63 94 / 0.03), 0 0 0 0.5px rgb(244 63 94 / 0.18),
+		0 0.5px 2px 0 rgb(244 63 94 / 0.1);
+}
+
+/* Layer 2 as Tailwind colours: `bg-surface`, `text-ink-3`, `border-line`. */
+@theme inline {
+	--color-canvas: var(--canvas);
+	--color-surface: var(--surface);
+	--color-card: var(--card);
+	--color-inset: var(--inset);
+	--color-field: var(--field);
+	--color-hover: var(--hover);
+	--color-hover-strong: var(--hover-strong);
+	--color-wash: var(--wash);
+	--color-ink: var(--ink);
+	--color-ink-2: var(--ink-2);
+	--color-ink-3: var(--ink-3);
+	--color-ink-disabled: var(--ink-disabled);
+	--color-ink-inverse: var(--ink-inverse);
+	--color-line: var(--line);
+	--color-line-strong: var(--line-strong);
+	--color-line-soft: var(--line-soft);
+	--color-primary: var(--primary);
+	--color-primary-hover: var(--primary-hover);
+	--color-primary-fg: var(--primary-fg);
+	--color-focus: var(--focus);
+	--color-accent: var(--accent);
+	--color-accent-tint: var(--accent-tint);
+	--color-accent-line: var(--accent-line);
+	--color-success-tint: var(--success-tint);
+	--color-success-line: var(--success-line);
+	--color-warning-tint: var(--warning-tint);
+	--color-warning-line: var(--warning-line);
+	--color-error-tint: var(--error-tint);
+	--color-error-line: var(--error-line);
+}
+
+/* -- Kept as authored: chart series (data paint) and the sidebar primitive's
+   tokens (the window chrome, translucent for macOS vibrancy in app-surface.css). */
+:root {
+	--chart-1: oklch(0.87 0 0);
+	--chart-2: oklch(0.556 0 0);
+	--chart-3: oklch(0.439 0 0);
+	--chart-4: oklch(0.371 0 0);
+	--chart-5: oklch(0.269 0 0);
+	--sidebar: oklch(0.985 0 0);
+	--sidebar-foreground: var(--ink);
+	--sidebar-primary: var(--ink);
+	--sidebar-primary-foreground: var(--neutral-2);
+	--sidebar-accent: var(--field);
+	--sidebar-accent-foreground: var(--ink);
+	--sidebar-border: var(--line-strong);
+	--sidebar-ring: var(--ink-3);
+}
+
+.dark {
+	--sidebar: oklch(0.145 0 0);
+	--sidebar-primary-foreground: var(--ink);
+}

@@ -214,7 +214,7 @@ export function SessionReaderSummary({
 			? {
 					...figure,
 					badge: (
-						<span className="flex items-center gap-1">
+						<span className="flex items-center gap-xs">
 							{badged.map((kind) => (
 								<FlagChip key={kind} kind={kind} />
 							))}
@@ -233,8 +233,8 @@ export function SessionReaderSummary({
 	);
 	return (
 		<SessionSubagents onOpen={openSubagent} subagents={sessionSubagents}>
-			<div className="h-full overflow-hidden px-8 pt-2 pb-2">
-				<div className="flex h-full min-h-0 gap-6">
+			<div className="h-full overflow-hidden px-[calc(var(--space-xxl)*4/3)] pt-m pb-m">
+				<div className="flex h-full min-h-0 gap-xxl">
 					<div
 						className={cn(
 							"flex min-h-0 w-(--reader-rail) shrink-0 flex-col",
@@ -255,9 +255,14 @@ export function SessionReaderSummary({
 					<div
 						ref={scroll.ref}
 						{...scroll.fade}
-						className="scroll-fade -mx-2 -mb-2 flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-2 pt-(--summary-top) pb-8 [--scroll-fade-top-depth:0px] [--summary-top:var(--panes-top)] [container-type:size] *:shrink-0"
+						className={cn(
+							"flex min-h-0 min-w-0 flex-1 flex-col gap-xl overflow-y-auto [--scroll-fade-top-depth:0px] [--summary-top:var(--panes-top)] [container-type:size]",
+							"-mx-m -mb-m px-m pt-(--summary-top) pb-[calc(var(--space-xxl)*4/3)]",
+							"scroll-fade",
+							"*:shrink-0",
+						)}
 					>
-						<TabsBandFade className="-mx-2 -mt-1.5 -mb-4 h-1.5 top-[calc(var(--stage-top)-0.5rem-var(--summary-top))] shrink-0" />
+						<TabsBandFade className="-mx-m -mt-s -mb-xl h-1.5 top-[calc(var(--stage-top)-0.5rem-var(--summary-top))] shrink-0" />
 						<SummaryStrip
 							agent={pickedSubagent ? (agent ?? undefined) : undefined}
 							overview={overview}
@@ -286,7 +291,7 @@ export function SessionReaderSummary({
 							/>
 						)}
 
-						<div className="grid gap-4 lg:grid-cols-2">
+						<div className="grid gap-xl lg:grid-cols-2">
 							<SummarySection
 								anchor="skills"
 								title="Skills & Context files"
@@ -317,7 +322,7 @@ export function SessionReaderSummary({
 							</SummarySection>
 						</div>
 
-						<div className="grid gap-4 lg:grid-cols-2">
+						<div className="grid gap-xl lg:grid-cols-2">
 							<SummarySection
 								anchor="files"
 								className={ciShown ? undefined : "lg:col-span-2"}
@@ -334,7 +339,7 @@ export function SessionReaderSummary({
 								<SummaryFiles files={files} onOpenFiles={onOpenFiles} />
 							</SummarySection>
 							{ciShown ? (
-								<div className="grid min-w-0 grid-rows-2 gap-4">
+								<div className="grid min-w-0 grid-rows-2 gap-xl">
 									<SummarySection
 										anchor="pull-requests"
 										fill

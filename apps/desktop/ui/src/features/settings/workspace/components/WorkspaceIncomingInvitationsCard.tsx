@@ -37,22 +37,18 @@ export function WorkspaceIncomingInvitationsCard({
 	return (
 		<WorkspaceSettingsGroup title={title} description={description}>
 			{!isPending && invitations.length === 0 ? (
-				<p className="workspace-settings-empty">
-					No pending invitations right now.
-				</p>
+				<p className="settings-empty">No pending invitations right now.</p>
 			) : (
 				<Reveal
 					label="Loading invitations"
 					loading={isPending}
 					sample={
-						<p className="workspace-settings-empty">
-							No pending invitations right now.
-						</p>
+						<p className="settings-empty">No pending invitations right now.</p>
 					}
 					sampleId="incoming-invitations"
 				>
 					{() => (
-						<ul className="workspace-settings-list" aria-label={title}>
+						<ul className="settings-list" aria-label={title}>
 							{invitations.map((invitation) => (
 								<li key={invitation.id}>
 									<WorkspaceSettingsRow

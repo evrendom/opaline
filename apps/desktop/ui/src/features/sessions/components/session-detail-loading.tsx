@@ -1,11 +1,11 @@
 import { type CSSProperties, useRef } from "react";
-import { Skeleton } from "@/app/ui/skeleton";
-import { ChartLoadingWave } from "@/components/ui/chart-loading-wave";
+import { ChartLoadingWave } from "@/app/ui/chart-loading-wave";
 import {
 	useElementWidth,
 	useStoredPaneSize,
-} from "@/components/ui/horizontal-resize-handle";
-import { clampPaneSize } from "@/components/ui/horizontal-resize-utils";
+} from "@/app/ui/horizontal-resize-handle";
+import { clampPaneSize } from "@/app/ui/horizontal-resize-utils";
+import { Skeleton } from "@/app/ui/skeleton";
 import { cn } from "@/lib/utils";
 import {
 	DEFAULT_SESSION_TRANSCRIPT_PANE_WIDTH_PX,
@@ -23,7 +23,7 @@ function Placeholder({ className }: { className?: string }) {
 	return (
 		<Skeleton
 			className={cn(
-				"h-3 animate-none rounded-sm bg-[color-mix(in_srgb,var(--session-overview-text)_6%,transparent)] dark:bg-white/10",
+				"h-3 animate-none corner-xs bg-[color-mix(in_srgb,var(--ink)_6%,transparent)] dark:bg-hover-strong",
 				className,
 			)}
 		/>
@@ -34,7 +34,7 @@ export function SessionChartLoading() {
 	return (
 		<div
 			aria-hidden="true"
-			className="h-[4.07rem] shrink-0 overflow-hidden border-b border-(--session-overview-border) bg-[#fcfcfc] dark:bg-(--session-overview-surface)"
+			className="h-[4.07rem] shrink-0 overflow-hidden edge-b-m border-line-strong bg-inset dark:bg-canvas"
 			data-session-chart-loading
 		>
 			{/* The wave draws its baseline at 50 and its guides a quarter, half
@@ -45,7 +45,7 @@ export function SessionChartLoading() {
 				className="h-[2.57rem] w-full"
 				viewBoxHeight={(50 * 80) / 74}
 			/>
-			<div className="flex h-6 items-center justify-between border-t-[0.5px] border-(--session-overview-border) px-3">
+			<div className="flex h-6 items-center justify-between edge-t-s border-line-strong px-l">
 				<Placeholder className="h-2 w-16" />
 				<Placeholder className="h-2 w-16" />
 			</div>
@@ -60,10 +60,17 @@ function TurnTableLoading() {
 			className="min-h-0 min-w-0 overflow-hidden"
 			data-session-detail-loading-table
 		>
-			<div className="grid h-11 min-w-[366px] grid-cols-[46px_repeat(4,64px)_minmax(64px,1fr)] items-center border-b-[0.5px] border-(--session-overview-border) text-[0.75rem] font-medium text-(--session-overview-subtle)">
-				<Placeholder className="size-5 justify-self-center rounded-full" />
+			<div
+				className={cn(
+					"grid h-11 min-w-[366px] grid-cols-[46px_repeat(4,64px)_minmax(64px,1fr)] items-center",
+					"edge-b-s",
+					"text-body-m font-medium",
+					"border-line-strong text-ink-3",
+				)}
+			>
+				<Placeholder className="size-5 justify-self-center corner-full" />
 				{TABLE_COLUMNS.map((label) => (
-					<div key={label} className="truncate px-1.5 first:pl-0">
+					<div key={label} className="truncate px-s first:pl-zero">
 						{label}
 					</div>
 				))}
@@ -73,19 +80,16 @@ function TurnTableLoading() {
 					key={index}
 					className="grid h-9 min-w-[366px] grid-cols-[46px_repeat(4,64px)_minmax(64px,1fr)] items-center"
 				>
-					<Placeholder className="size-5 justify-self-center rounded-full" />
+					<Placeholder className="size-5 justify-self-center corner-full" />
 					<Placeholder className="h-2.5 w-12" />
 					{index % 2 === 0 ? (
-						<div className="col-span-4 px-1.5">
+						<div className="col-span-4 px-s">
 							<Placeholder className={index % 4 === 0 ? "w-4/5" : "w-3/5"} />
 						</div>
 					) : (
 						TABLE_COLUMNS.slice(1).map((label) => (
-							<div
-								key={label}
-								className="flex min-w-0 items-center gap-1.5 px-1.5"
-							>
-								<div className="size-3.5 shrink-0 rounded-full border-2 border-[color-mix(in_srgb,var(--session-overview-text)_8%,transparent)]" />
+							<div key={label} className="flex min-w-0 items-center gap-s px-s">
+								<div className="size-3.5 shrink-0 corner-full edge-l border-[color-mix(in_srgb,var(--ink)_8%,transparent)]" />
 								<Placeholder className="h-2.5 w-6" />
 							</div>
 						))
@@ -100,30 +104,33 @@ export function SessionTranscriptLoading() {
 	return (
 		<div
 			aria-busy="true"
-			className="min-w-0 overflow-hidden px-4 py-3"
+			className="min-w-0 overflow-hidden px-xl py-l"
 			data-session-transcript-loading
 		>
 			<output className="sr-only">Loading conversation</output>
-			<div aria-hidden="true" className="flex flex-col gap-8">
+			<div
+				aria-hidden="true"
+				className="flex flex-col gap-[calc(var(--space-xxl)*4/3)]"
+			>
 				{[0, 1, 2].map((turn) => (
 					<div
 						key={turn}
-						className="flex flex-col gap-6 border-l border-(--session-overview-border) pl-3"
+						className="flex flex-col gap-xxl edge-l-m border-line-strong pl-l"
 					>
-						<div className="flex flex-col gap-3">
-							<div className="flex items-center gap-2">
-								<Placeholder className="size-5 shrink-0 rounded-full" />
+						<div className="flex flex-col gap-l">
+							<div className="flex items-center gap-m">
+								<Placeholder className="size-5 shrink-0 corner-full" />
 								<Placeholder className="w-16" />
 							</div>
 							<Placeholder className="w-11/12" />
 							<Placeholder className="w-3/5" />
 						</div>
-						<div className="flex flex-col gap-3">
-							<div className="flex items-center gap-2">
-								<Placeholder className="size-4 shrink-0 rounded-full" />
+						<div className="flex flex-col gap-l">
+							<div className="flex items-center gap-m">
+								<Placeholder className="size-4 shrink-0 corner-full" />
 								<Placeholder className="w-28" />
 							</div>
-							<div className="flex items-center gap-2">
+							<div className="flex items-center gap-m">
 								<Placeholder className="h-4 w-20" />
 								<Placeholder className="h-4 w-9" />
 							</div>
@@ -178,17 +185,18 @@ export function SessionDetailContentLoadingView({
 				style={style}
 			>
 				<TurnTableLoading />
-				<div
-					aria-hidden="true"
-					className="border-l border-(--session-overview-border)"
-				/>
+				<div aria-hidden="true" className="edge-l-m border-line-strong" />
 				<div className="flex min-h-0 min-w-0 flex-col overflow-hidden">
 					<div
 						aria-hidden="true"
-						className="flex h-11 shrink-0 items-center gap-2 overflow-hidden border-y-[0.5px] border-(--session-overview-border) p-2"
+						className={cn(
+							"flex h-11 shrink-0 items-center gap-m overflow-hidden",
+							"edge-y-s p-m",
+							"border-line-strong",
+						)}
 					>
 						{[0, 1, 2, 3, 4].map((key) => (
-							<Placeholder key={key} className="h-7 w-16 shrink-0 rounded-md" />
+							<Placeholder key={key} className="h-7 w-16 shrink-0 corner-s" />
 						))}
 					</div>
 					<SessionTranscriptLoading />

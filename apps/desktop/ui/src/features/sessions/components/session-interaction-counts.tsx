@@ -3,7 +3,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import { DashboardModelIdentity } from "@/features/dashboard/components/DashboardModelBadges";
 import { cn } from "@/lib/utils";
 
-const sessionIdentityCounterClassName = "flex shrink-0 items-start gap-2";
+const sessionIdentityCounterClassName = "flex shrink-0 items-start gap-m";
 
 function SessionUserIdentity({
 	displayName,
@@ -18,26 +18,28 @@ function SessionUserIdentity({
 
 	return (
 		<Tooltip>
-			<TooltipTrigger asChild>
-				<div className={cn(sessionIdentityCounterClassName, "cursor-help")}>
-					{imageUrl ? (
-						<img
-							src={imageUrl}
-							alt=""
-							width={16}
-							height={16}
-							className="size-4 shrink-0 rounded-full object-cover outline-1 -outline-offset-1 outline-black/5 dark:outline-white/10"
-						/>
-					) : (
-						<span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-[color:var(--dashboardy-subsurface-strong)] outline-1 -outline-offset-1 outline-black/5 dark:outline-white/10">
-							<IconUser className="size-3 shrink-0" />
-						</span>
-					)}
-					<div className="shrink-0 font-mono text-base font-semibold tracking-normal text-[color:var(--dashboardy-heading)] tabular-nums sm:text-[0.8125rem]">
-						{safeMessageCount}
+			<TooltipTrigger
+				render={
+					<div className={cn(sessionIdentityCounterClassName, "cursor-help")}>
+						{imageUrl ? (
+							<img
+								src={imageUrl}
+								alt=""
+								width={16}
+								height={16}
+								className="size-4 shrink-0 corner-full object-cover outline-(length:--border-m) -outline-offset-1 outline-line dark:outline-line"
+							/>
+						) : (
+							<span className="flex size-4 shrink-0 items-center justify-center corner-full bg-field outline-(length:--border-m) -outline-offset-1 outline-line dark:outline-line">
+								<IconUser className="size-3 shrink-0" />
+							</span>
+						)}
+						<div className="shrink-0 font-data text-body-xxl font-heavy text-ink tabular-nums sm:text-body-l">
+							{safeMessageCount}
+						</div>
 					</div>
-				</div>
-			</TooltipTrigger>
+				}
+			/>
 			<TooltipContent>
 				{displayName}: {safeMessageCount} messages
 			</TooltipContent>

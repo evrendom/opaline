@@ -2,6 +2,7 @@
 
 import type { VirtualItem } from "@tanstack/react-virtual";
 import { memo, useCallback, useRef, useState } from "react";
+import { TouchTarget } from "@/app/ui/touch-target";
 import { ConversationTraceTreeItem } from "@/components/conversation/ConversationTrace";
 import type { TraceEvent } from "@/components/conversation/conversation-trace";
 import {
@@ -142,31 +143,32 @@ export function TranscriptFoldSummaryControl({
 		.map(({ count, label }) => `${count.toLocaleString()} ${label}`)
 		.join(", ");
 	return (
-		<div className="min-w-0 pr-3">
+		<div className="min-w-0 pr-l">
 			<button
 				aria-expanded={expanded}
 				aria-label={`${action} ${label}${metricLabel ? `: ${metricLabel}` : ""}`}
-				className="group group/fold pointer-events-auto relative flex h-8 max-w-full min-w-0 select-none items-center gap-2 rounded-md pr-1.5 pl-3 text-left text-[0.6875rem]/[1.0625rem] text-(--session-overview-muted) outline-none hover:text-(--session-overview-text)"
+				className="group group/fold pointer-events-auto relative flex h-8 max-w-full min-w-0 select-none items-center gap-m corner-s pr-s pl-l text-left text-[0.6875rem]/[1.0625rem] text-ink-3 outline-none hover:text-ink"
 				data-transcript-fold-turn-id={turnId}
 				data-trace-hover-row
 				onClick={onToggle}
 				title={`${action} ${label}`}
 				type="button"
 			>
-				<span
-					aria-hidden="true"
-					className="pointer-events-none absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden"
-				/>
+				<TouchTarget className="pointer-events-none" />
 				<span className="shrink-0 font-medium">{label}</span>
 				<span
 					aria-hidden="true"
-					className="flex min-w-0 items-center gap-2 overflow-x-auto tabular-nums [scrollbar-width:none]"
+					className="flex min-w-0 items-center gap-m overflow-x-auto tabular-nums [scrollbar-width:none]"
 					data-transcript-fold-summary-metrics
 				>
 					{metrics.map(({ count, Icon, kind, label, tone, toolIcon }) => (
 						<span
 							key={kind}
-							className="flex h-5 min-w-5 shrink-0 items-center gap-0.5 py-0 pr-1.5 pl-0.75 font-medium"
+							className={cn(
+								"flex h-5 min-w-5 shrink-0 items-center gap-xxs",
+								"py-zero pr-s pl-xs",
+								"font-medium",
+							)}
 							data-transcript-fold-summary-metric={kind}
 							data-trace-icon-tone={tone}
 							data-trace-tool-icon={toolIcon}
@@ -517,7 +519,7 @@ function TranscriptStickyHeaderVisual({
 			rowHeight={group.header.renderHeight}
 		>
 			<div
-				className="@container/model-header flex min-h-10 min-w-0 items-center gap-2 pr-3"
+				className="@container/model-header flex min-h-10 min-w-0 items-center gap-m pr-l"
 				style={
 					group.header.renderHeight
 						? { minHeight: group.header.renderHeight }
@@ -531,9 +533,9 @@ function TranscriptStickyHeaderVisual({
 							expandable={false}
 							imageUrl={group.header.userImageUrl}
 						/>
-						<div className="group flex min-w-0 items-center gap-0 text-left">
+						<div className="group flex min-w-0 items-center gap-zero text-left">
 							<h3
-								className="min-w-0 shrink-0 truncate text-xs font-medium text-(--session-overview-text)"
+								className="min-w-0 shrink-0 truncate text-body-m font-medium text-ink"
 								data-trace-user-label
 							>
 								{group.header.userLabel}
@@ -541,7 +543,7 @@ function TranscriptStickyHeaderVisual({
 						</div>
 					</>
 				) : (
-					<div className="flex min-h-10 min-w-0 flex-1 items-center gap-2 text-left">
+					<div className="flex min-h-10 min-w-0 flex-1 items-center gap-m text-left">
 						<ModelSectionHeader
 							data={group.header}
 							expanded
@@ -572,7 +574,7 @@ export const TranscriptStickyHeaderWrappers = memo(
 			>
 				<div
 					aria-hidden="true"
-					className="pointer-events-none sticky top-0 w-full min-w-0 bg-(--session-overview-surface)"
+					className="pointer-events-none sticky top-0 w-full min-w-0 bg-canvas"
 					data-transcript-sticky-header
 					data-transcript-sticky-header-kind={placement.group.header.kind}
 					data-transcript-sticky-header-owner={placement.group.turnId}

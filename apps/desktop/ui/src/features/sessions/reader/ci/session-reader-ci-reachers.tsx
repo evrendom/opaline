@@ -13,11 +13,9 @@ import {
 
 function TurnTag({ index, turnId }: { index: number; turnId: string }) {
 	return (
-		<span className="flex shrink-0 items-baseline gap-1.5 tabular-nums">
-			<span className="w-5 text-muted-foreground/70">{index + 1}</span>
-			<span className="font-mono text-muted-foreground">
-				{shortRunId(turnId)}
-			</span>
+		<span className="flex shrink-0 items-baseline gap-s tabular-nums">
+			<span className="w-5 text-ink-3/70">{index + 1}</span>
+			<span className="font-data text-ink-3">{shortRunId(turnId)}</span>
 		</span>
 	);
 }
@@ -29,8 +27,8 @@ function HowWords({ link }: { link: CiReachLink }) {
 		<span
 			title={words.full}
 			className={cn(
-				"shrink-0 text-[11px] whitespace-nowrap",
-				exact ? "text-foreground/70" : "text-muted-foreground italic",
+				"shrink-0 text-body-s whitespace-nowrap",
+				exact ? "text-ink/70" : "text-ink-3 italic",
 			)}
 		>
 			<span className={cn(exact && "font-medium")}>
@@ -42,7 +40,7 @@ function HowWords({ link }: { link: CiReachLink }) {
 }
 
 const ROW =
-	"flex min-h-6 w-full min-w-0 items-center gap-2 rounded-md px-1.5 text-left text-xs transition-colors hover:bg-muted/60";
+	"flex min-h-6 w-full min-w-0 items-center gap-m corner-s px-s text-left text-body-m transition-colors hover:bg-hover/60";
 
 export function ReachedBy({
 	lit = null,
@@ -61,8 +59,8 @@ export function ReachedBy({
 		else turns.push({ reach: [each], turnId: each.reacher.turnId });
 	}
 	return (
-		<div className="flex min-w-0 flex-col pl-6">
-			<span className="text-[11px] text-muted-foreground">
+		<div className="flex min-w-0 flex-col pl-xxl">
+			<span className="text-body-s text-ink-3">
 				Reached by {reach.length} {reach.length === 1 ? "run" : "runs"}
 			</span>
 			<ul className="flex min-w-0 flex-col">
@@ -78,14 +76,14 @@ export function ReachedBy({
 								onClick={() => onOpenTurn(turn.turnId)}
 								className={cn(
 									ROW,
-									main && lit === main.reacher.key && "bg-muted",
+									main && lit === main.reacher.key && "bg-field",
 								)}
 							>
 								<TurnTag index={first.index} turnId={turn.turnId} />
 								<span
 									className={cn(
 										"min-w-0 flex-1 truncate",
-										main ? "text-foreground/85" : "text-muted-foreground",
+										main ? "text-ink/85" : "text-ink-3",
 									)}
 								>
 									{first.prompt ?? "No prompt"}
@@ -93,7 +91,7 @@ export function ReachedBy({
 								{main ? (
 									<HowWords link={main.link} />
 								) : (
-									<span className="shrink-0 text-[11px] text-muted-foreground">
+									<span className="shrink-0 text-body-s text-ink-3">
 										through its{" "}
 										{subagents.length === 1 ? "subagent" : "subagents"}
 									</span>
@@ -107,13 +105,17 @@ export function ReachedBy({
 									onClick={() =>
 										onOpenTurn(reacher.turnId, reacher.agent ?? undefined)
 									}
-									className={cn(ROW, "pl-8", lit === reacher.key && "bg-muted")}
+									className={cn(
+										ROW,
+										"pl-[calc(var(--space-xxl)*4/3)]",
+										lit === reacher.key && "bg-field",
+									)}
 								>
 									<SubagentTag
 										subagentId={reacher.agent ?? ""}
 										selected={lit === reacher.key}
 									/>
-									<span className="min-w-0 flex-1 truncate text-foreground/80">
+									<span className="min-w-0 flex-1 truncate text-ink/80">
 										{reacher.task ?? "Subagent"}
 									</span>
 									<HowWords link={link} />
@@ -141,9 +143,9 @@ export function PullTouchers({
 	const shown = open ? touchers : touchers.slice(0, TOUCHERS_SHOWN);
 	const rest = touchers.length - shown.length;
 	return (
-		<div className="flex min-w-0 flex-col gap-0.5 pt-1">
+		<div className="flex min-w-0 flex-col gap-xxs pt-xs">
 			<span
-				className="text-[11px] text-muted-foreground"
+				className="text-body-s text-ink-3"
 				title="Only runs that reached its CI: Opaline ties a pull request to a run through the CI it ran."
 			>
 				{touchers.length} {touchers.length === 1 ? "run" : "runs"} reached its
@@ -157,18 +159,18 @@ export function PullTouchers({
 							onClick={() =>
 								onOpenTurn(reacher.turnId, reacher.agent ?? undefined)
 							}
-							className={cn(ROW, "-mx-1.5 w-[calc(100%+0.75rem)]")}
+							className={cn(ROW, "-mx-s w-[calc(100%+0.75rem)]")}
 						>
 							<TurnTag index={reacher.index} turnId={reacher.turnId} />
 							{reacher.agent ? (
 								<SubagentTag subagentId={reacher.agent} />
 							) : null}
-							<span className="min-w-0 flex-1 truncate text-foreground/80">
+							<span className="min-w-0 flex-1 truncate text-ink/80">
 								{reacher.agent
 									? (reacher.task ?? "Subagent")
 									: (reacher.prompt ?? "No prompt")}
 							</span>
-							<span className="shrink-0 text-[11px] text-muted-foreground">
+							<span className="shrink-0 text-body-s text-ink-3">
 								{ways.join(", ") || "ran while its CI did"}
 							</span>
 						</button>
@@ -179,7 +181,7 @@ export function PullTouchers({
 				<button
 					type="button"
 					onClick={() => setOpen(!open)}
-					className="w-fit text-[11px] text-muted-foreground tabular-nums hover:text-foreground"
+					className="w-fit text-body-s text-ink-3 tabular-nums hover:text-ink"
 				>
 					{open ? "Fewer" : `${rest} more`}
 				</button>

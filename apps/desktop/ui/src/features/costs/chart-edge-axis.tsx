@@ -63,7 +63,7 @@ export function EdgeTick({
 			y={y}
 			dy="0.71em"
 			textAnchor={anchor}
-			fill={hovered ? "var(--cost-foreground)" : "var(--cost-muted)"}
+			fill={hovered ? "var(--ink)" : "var(--ink-3)"}
 			fontSize={11}
 		>
 			{text}

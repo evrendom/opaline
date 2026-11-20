@@ -4,7 +4,7 @@ import { EmptyState } from "@/components/dashboard/page-parts";
 export function BreakdownEmpty({ title }: { title: string }) {
 	return (
 		<div className="cost-breakdown-empty-state">
-			<EmptyState icon={IconList} title={title} className="gap-3 p-4 py-6" />
+			<EmptyState icon={IconList} title={title} className="gap-l p-xl py-xxl" />
 		</div>
 	);
 }

@@ -142,7 +142,7 @@ function GroupGap() {
 const AgentGlyph = LANE_LOOK.agent.glyph;
 
 const TRACE_WINDOW =
-	"pointer-events-none absolute -top-1.5 -bottom-0.5 -z-5 hidden rounded-[6px] bg-white corner-squircle squircle:rounded-xl shadow-[0_1px_2px_rgb(0_0_0/0.06),0_2px_8px_-2px_rgb(0_0_0/0.08)] ring-1 ring-zinc-950/10 will-change-transform dark:bg-white/[0.07] dark:shadow-none dark:ring-white/15";
+	"pointer-events-none absolute -top-1.5 -bottom-0.5 -z-5 hidden corner-xs bg-canvas corner-squircle squircle:corner-l shadow-[0_1px_2px_rgb(0_0_0/0.06),0_2px_8px_-2px_rgb(0_0_0/0.08)] ring-1 ring-zinc-950/10 will-change-transform dark:bg-hover-strong dark:shadow-none dark:ring-white/15";
 
 export function RunLanes({
 	onlyPickedLane = false,
@@ -384,13 +384,13 @@ export function RunLanes({
 			/>
 		);
 		return (
-			<div key={lane.id} className="flex h-4 items-center gap-1">
+			<div key={lane.id} className="flex h-4 items-center gap-xs">
 				{onOpen ? (
 					<button
 						type="button"
 						aria-label={`Open ${lane.label}'s thread`}
 						onClick={onOpen}
-						className="group/open flex rounded-full"
+						className="group/open flex corner-full"
 					>
 						{mark}
 					</button>
@@ -398,7 +398,7 @@ export function RunLanes({
 					mark
 				)}
 				{lane.bars.length > 0 && lane.counts !== "none" ? (
-					<span className="text-xs text-muted-foreground tabular-nums">
+					<span className="text-body-m text-ink-3 tabular-nums">
 						{lane.counts === "bars"
 							? new Set(lane.bars.map((bar) => bar.stepId)).size
 							: lane.counts}
@@ -410,7 +410,9 @@ export function RunLanes({
 							role="img"
 							aria-label={`${failedIn(lane)} failed`}
 							className={cn(
-								"inline-flex shrink-0 items-center gap-0.5 text-xs text-rose-500 tabular-nums transition-[opacity,filter] duration-200",
+								"inline-flex shrink-0 items-center gap-xxs",
+								"text-body-m tabular-nums",
+								"text-error transition-[opacity,filter] duration-200",
 								anyPicked &&
 									!pickedLanes.has(lane.id) &&
 									"opacity-35 saturate-[0.15]",
@@ -446,7 +448,11 @@ export function RunLanes({
 		return (
 			<div
 				key={lane.id}
-				className="relative h-4 overflow-hidden rounded-[4px] before:absolute before:inset-0 before:-z-10 before:bg-muted/60"
+				className={cn(
+					"relative h-4 overflow-hidden",
+					"corner-xs",
+					"before:absolute before:inset-0 before:-z-10 before:bg-field/60",
+				)}
 			>
 				{lane.bars.map((bar) => {
 					if (base === undefined && (bar.to < on.from || bar.from > on.to))
@@ -470,7 +476,9 @@ export function RunLanes({
 							key={`${bar.stepId}:${bar.from}`}
 							data-step={bar.stepId}
 							className={cn(
-								"absolute inset-y-[2px] flex min-w-[2px] items-center overflow-hidden rounded-[3px] hover:brightness-110",
+								"absolute inset-y-[2px] flex min-w-[2px] items-center overflow-hidden",
+								"corner-xs",
+								"hover:brightness-110",
 								own ? null : bar.className,
 								"transition-[opacity,filter] duration-200",
 								bar.stepId === selected &&
@@ -502,7 +510,7 @@ export function RunLanes({
 							}}
 						>
 							{bar.name && !bar.open && at.width > 18 ? (
-								<span className="pointer-events-none truncate pl-1 font-mono text-[8px] leading-none text-white">
+								<span className="pointer-events-none truncate pl-xs font-data text-body-xxs leading-none text-white">
 									{bar.name}
 								</span>
 							) : null}
@@ -512,7 +520,14 @@ export function RunLanes({
 				{base === undefined &&
 				on.to >= ends.to &&
 				ranOnPast(lane.bars, ends.to) >= 1_000 ? (
-					<span className="pointer-events-none absolute top-1/2 right-0.5 -translate-y-1/2 rounded-[3px] bg-background/90 px-0.5 text-[8px] leading-3 text-muted-foreground tabular-nums">
+					<span
+						className={cn(
+							"absolute top-1/2 right-0.5",
+							"corner-xs px-xxs",
+							"text-body-xxs tabular-nums",
+							"pointer-events-none -translate-y-1/2 bg-canvas/90 text-ink-3",
+						)}
+					>
 						+{formatRanOn(ranOnPast(lane.bars, ends.to))}
 					</span>
 				) : null}
@@ -536,7 +551,7 @@ export function RunLanes({
 			data-clock-from={view.from}
 			data-clock-to={view.to}
 			className={cn(
-				"rounded-lg bg-card px-2 py-2 shadow-(--custom-shadow) corner-squircle squircle:rounded-3xl",
+				"corner-m bg-card px-m py-m shadow-(--shadow-card) corner-squircle squircle:corner-xl",
 				!launched &&
 					"pointer-events-auto sticky top-(--reader-pane-top,var(--reader-top,1rem))",
 			)}
@@ -547,11 +562,11 @@ export function RunLanes({
 				} as CSSProperties
 			}
 		>
-			<div className="flex gap-1.5 select-none">
-				<div ref={marksColumn} className="flex shrink-0 flex-col gap-0.5">
+			<div className="flex gap-s select-none">
+				<div ref={marksColumn} className="flex shrink-0 flex-col gap-xxs">
 					{renderHead(group)}
 				</div>
-				<div className="relative isolate flex min-w-0 flex-1 flex-col gap-0.5">
+				<div className="relative isolate flex min-w-0 flex-1 flex-col gap-xxs">
 					<LaterTalks
 						after={Math.max(
 							waterfall.endMs,
@@ -596,9 +611,9 @@ export function RunLanes({
 			<div
 				data-run-from={view.from}
 				data-run-to={view.to}
-				className="flex gap-1.5 select-none"
+				className="flex gap-s select-none"
 			>
-				<div ref={marksColumn} className="flex shrink-0 flex-col gap-0.5">
+				<div ref={marksColumn} className="flex shrink-0 flex-col gap-xxs">
 					{shownLanes.map((lane) => renderMark(lane))}
 					{usage && usage.length > 0 && !narrowed ? (
 						<div className="flex h-8 items-center">
@@ -606,7 +621,7 @@ export function RunLanes({
 						</div>
 					) : null}
 					{unused > 0 && !narrowed ? (
-						<div className="flex h-2 items-center justify-center pt-0.5">
+						<div className="flex h-2 items-center justify-center pt-xxs">
 							<button
 								type="button"
 								aria-pressed={allLanes}
@@ -621,7 +636,7 @@ export function RunLanes({
 										: `Show all lanes, ${unused} this run didn't use`
 								}
 								onClick={() => setAllLanes((shown) => !shown)}
-								className="inline-flex items-center rounded px-0.5 text-muted-foreground/70 hover:bg-muted hover:text-foreground"
+								className="inline-flex items-center corner-xs px-xxs text-ink-3/70 hover:bg-hover hover:text-ink"
 							>
 								{allLanes ? (
 									<IconChevronUp aria-hidden="true" className="size-2.5" />
@@ -632,10 +647,10 @@ export function RunLanes({
 						</div>
 					) : null}
 				</div>
-				<div className="flex min-w-0 flex-1 flex-col gap-1">
+				<div className="flex min-w-0 flex-1 flex-col gap-xs">
 					<div
 						ref={trackRef}
-						className="relative isolate flex cursor-crosshair touch-none flex-col gap-0.5"
+						className="relative isolate flex cursor-crosshair touch-none flex-col gap-xxs"
 						{...trackEvents(trackRef)}
 					>
 						{shownLanes.map((lane) => renderLane(lane))}
@@ -649,7 +664,7 @@ export function RunLanes({
 						<span ref={windowRef} className={TRACE_WINDOW} />
 						{brush ? (
 							<span
-								className="pointer-events-none absolute -inset-y-0.5 rounded-sm border border-foreground/30 bg-foreground/5"
+								className="pointer-events-none absolute -inset-y-0.5 corner-xs edge-m border-ink/30 bg-ink/5"
 								style={{
 									left: `${pct(brush.from)}%`,
 									width: `${pct(brush.to) - pct(brush.from)}%`,
@@ -657,7 +672,7 @@ export function RunLanes({
 							/>
 						) : null}
 					</div>
-					<div className="relative flex justify-between gap-2 px-0.5 text-[8px] leading-none text-muted-foreground/70 tabular-nums">
+					<div className="relative flex justify-between gap-m px-xxs text-body-xxs leading-none text-ink-3/70 tabular-nums">
 						<span className={cn(brush && "invisible")}>
 							{offset(view.from)}
 						</span>
@@ -694,7 +709,10 @@ export function RunLanes({
 			</div>
 			{withSubagents && launched.length > 0 && runningSlot
 				? createPortal(
-						<div ref={runningRef} className="flex flex-wrap items-center gap-1">
+						<div
+							ref={runningRef}
+							className="flex flex-wrap items-center gap-xs"
+						>
 							{launched.map((step) => (
 								<span
 									key={step.id}
@@ -712,7 +730,7 @@ export function RunLanes({
 							))}
 							<span
 								data-running-count=""
-								className="ml-1 text-[11px] text-muted-foreground tabular-nums"
+								className="ml-xs text-body-s text-ink-3 tabular-nums"
 							/>
 						</div>,
 						runningSlot,
@@ -721,10 +739,10 @@ export function RunLanes({
 			{cardGroups.length > 0 && subagentSlot
 				? createPortal(
 						<TipLayer delay={150}>
-							<div className="flex gap-1.5 select-none">
+							<div className="flex gap-s select-none">
 								<div
 									ref={marksColumn}
-									className="flex shrink-0 flex-col gap-0.5"
+									className="flex shrink-0 flex-col gap-xxs"
 								>
 									{cardGroups.map((group, index) => (
 										<Fragment key={group.id}>
@@ -735,7 +753,7 @@ export function RunLanes({
 								</div>
 								<div
 									ref={agentTrackRef}
-									className="relative isolate flex min-w-0 flex-1 cursor-crosshair touch-none flex-col gap-0.5"
+									className="relative isolate flex min-w-0 flex-1 cursor-crosshair touch-none flex-col gap-xxs"
 									{...trackEvents(agentTrackRef)}
 								>
 									{cardGroups.map((group, index) => (
@@ -747,7 +765,7 @@ export function RunLanes({
 									<span ref={agentWindowRef} className={TRACE_WINDOW} />
 									{brush ? (
 										<span
-											className="pointer-events-none absolute -inset-y-0.5 rounded-sm border border-foreground/30 bg-foreground/5"
+											className="pointer-events-none absolute -inset-y-0.5 corner-xs edge-m border-ink/30 bg-ink/5"
 											style={{
 												left: `${pct(brush.from)}%`,
 												width: `${pct(brush.to) - pct(brush.from)}%`,

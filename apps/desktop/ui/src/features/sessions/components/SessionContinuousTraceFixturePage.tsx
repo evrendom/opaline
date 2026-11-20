@@ -575,7 +575,7 @@ export function SessionContinuousTraceFixturePage() {
 			data-trace-fixture-scroller
 			data-trace-fixture-total-turns={fixtureOptions.length}
 			data-session-constellation-version="v2"
-			className="session-constellation-tree session-constellation-tree-v2 session-transcript-mask isolate h-dvh min-w-0 overflow-y-auto overscroll-contain bg-(--session-overview-surface) antialiased [--session-overview-accent:#266df0] [--session-overview-border:#eeeff1] [--session-overview-hover:#f6f7f7] [--session-overview-muted:rgba(0,0,0,0.63)] [--session-overview-subtle:rgba(0,0,0,0.5)] [--session-overview-surface:#fff] [--session-overview-text:#101112] [font-family:Inter,sans-serif] [overflow-anchor:none] [scrollbar-gutter:stable]"
+			className="session-constellation-tree session-constellation-tree-v2 session-transcript-mask isolate h-dvh min-w-0 overflow-y-auto overscroll-contain bg-canvas antialiased [font-family:Inter,sans-serif] [overflow-anchor:none] [scrollbar-gutter:stable]"
 		>
 			{mountsThread ? (
 				<SessionTranscriptList

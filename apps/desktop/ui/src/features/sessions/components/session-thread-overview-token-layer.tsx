@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { ContextUtilizationGradients } from "@/components/ui/context-utilization-gradients";
+import { ContextUtilizationGradients } from "@/app/ui/context-utilization-gradients";
 import type { SessionThreadOverviewStripConfig } from "./session-thread-overview-config";
 import type { SessionOverviewCallSeries } from "./session-thread-overview-model";
 import {
@@ -34,11 +34,11 @@ function PulseGradient({ gradientId, signal, tone }: PulseSeriesLayer) {
 	return (
 		<linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
 			<stop
-				className="[stop-color:var(--session-overview-accent)] [stop-opacity:0.08] dark:[stop-opacity:0.12]"
+				className="[stop-color:var(--accent)] [stop-opacity:0.08] dark:[stop-opacity:0.12]"
 				offset="0%"
 			/>
 			<stop
-				className="[stop-color:var(--session-overview-accent)]"
+				className="[stop-color:var(--accent)]"
 				offset="100%"
 				stopOpacity="0"
 			/>
@@ -54,9 +54,7 @@ function PulseCurve({ gradientId, signal, tone }: PulseSeriesLayer) {
 			) : null}
 			{signal.linePath ? (
 				<path
-					className={
-						tone === "accent" ? "stroke-(--session-overview-accent)" : undefined
-					}
+					className={tone === "accent" ? "stroke-accent" : undefined}
 					d={signal.linePath}
 					fill="none"
 					stroke={tone === "context" ? `url(#${gradientId}-stroke)` : undefined}
@@ -105,17 +103,13 @@ function PulseBreakBridges({
 			<g key={`${layer.gradientId}-${gap.key}`} data-pulse-break-bridge>
 				<path
 					d={path}
-					stroke="var(--session-overview-chart-surface)"
+					stroke="var(--canvas)"
 					strokeLinecap="round"
 					strokeWidth="5"
 					vectorEffect="non-scaling-stroke"
 				/>
 				<path
-					className={
-						layer.tone === "accent"
-							? "stroke-(--session-overview-accent)"
-							: undefined
-					}
+					className={layer.tone === "accent" ? "stroke-accent" : undefined}
 					d={path}
 					fill="none"
 					stroke={
@@ -172,7 +166,7 @@ export function SessionThreadOverviewTokenLayer({
 			{gridYs.map((y) => (
 				<path
 					key={y}
-					className="stroke-[color-mix(in_srgb,var(--session-overview-text)_6%,transparent)]"
+					className="stroke-[color-mix(in_srgb,var(--ink)_6%,transparent)]"
 					d={`M ${plotLeft} ${y} H ${plotRight}`}
 					strokeWidth="1"
 					vectorEffect="non-scaling-stroke"
