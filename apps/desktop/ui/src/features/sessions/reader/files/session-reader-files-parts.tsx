@@ -39,7 +39,7 @@ export function ViewToggle<View extends string>({
 					ref={pillRef}
 					aria-hidden="true"
 					skullet-ignore=""
-					className="pointer-events-none absolute top-1/2 left-0 h-6 origin-left corner-s bg-picked shadow-card corner-squircle will-change-transform squircle:corner-l"
+					className="pointer-events-none absolute top-1/2 left-0 h-6 origin-left corner-s bg-card-soft shadow-card corner-squircle will-change-transform squircle:corner-l"
 					style={{
 						transform: `translate(${pill.left}px, -50%)`,
 						width: pill.width,

@@ -42,21 +42,9 @@ export type Escape = {
 
 /**
  * Where an escape fails the check, as path prefixes relative to apps/desktop/ui.
- * Everything else is reported but passes. After the reader and product areas
- * are cleaned, this becomes `["src/"]`.
+ * Everything else is reported but passes.
  */
-export const ENFORCED: string[] = [
-	"src/app/",
-	"src/widget/",
-	"src/index.css",
-	"src/features/settings/",
-	"src/features/auth/",
-	"src/features/cli-onboarding/",
-	"src/features/invitations/",
-	"src/features/shell/",
-	"src/features/support/",
-	"src/features/demo/",
-];
+export const ENFORCED: string[] = ["src/"];
 
 const ALL: Rule[] = ["type", "space", "radius", "colour", "shadow"];
 
