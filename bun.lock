@@ -15,7 +15,7 @@
     },
     "apps/cli": {
       "name": "@opalinehq/cli",
-      "version": "0.17.1",
+      "version": "0.18.0",
       "bin": {
         "opaline": "dist/cli.js",
       },
@@ -235,12 +235,12 @@
     },
     "packages/opaline": {
       "name": "opaline",
-      "version": "0.17.1",
+      "version": "0.18.0",
       "bin": {
         "opaline": "./bin/opaline.js",
       },
       "dependencies": {
-        "@opalinehq/cli": "0.17.1",
+        "@opalinehq/cli": "0.18.0",
       },
     },
     "packages/repo-intelligence-source-github": {
@@ -257,12 +257,12 @@
     },
     "packages/rudel-alias": {
       "name": "rudel",
-      "version": "0.17.1",
+      "version": "0.18.0",
       "bin": {
         "rudel": "./bin/rudel.js",
       },
       "dependencies": {
-        "@opalinehq/cli": "0.17.1",
+        "@opalinehq/cli": "0.18.0",
       },
     },
     "packages/secret-filter": {

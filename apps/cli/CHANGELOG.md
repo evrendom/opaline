@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.18.0](https://github.com/evrendom/opaline/compare/opaline-cli@0.17.1...opaline-cli@0.18.0) (2026-11-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* **cli:** Opaline's cloud service is retired, and this is the CLI's final release. Every command, including the hooks earlier versions installed, now only removes what those versions set up: their Claude Code and Codex upload hooks, the Codex notify wrapper, MCP entries pointing at opaline.so or rudel.ai, the saved sign-in and the cloud state. It makes no network calls. Opaline is now a free Mac app: https://opaline.evren.so
+
+### Features
+
+* **cli:** retire the CLI; every command only removes what earlier versions installed ([#573](https://github.com/evrendom/opaline/pull/573)) ([de81cf8](https://github.com/evrendom/opaline/commit/de81cf82716eb71784c5c0dc62a9a06354227d65))
+
 ## [0.17.1](https://github.com/opalinehq/cli/compare/opaline-cli@0.17.0...opaline-cli@0.17.1) (2026-11-09)
 
 
