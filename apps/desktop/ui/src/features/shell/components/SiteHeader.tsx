@@ -121,7 +121,8 @@ export function SiteHeader({
 					/>
 					{/* Detail breadcrumb: the section links back to the list,
 					    the session id is the page title. */}
-					<h1 className="flex min-w-0 items-center gap-s text-body-xxl font-medium">
+					{/* design-escape-ok(type): shipped value; -0.025em title tracking */}
+					<h1 className="flex min-w-0 items-center gap-s text-body-xxl font-medium tracking-[-0.025em]">
 						{/* Back link only lifts its text on hover. Its own fluid
 						    root keeps it out of the header's sliding hover fill. */}
 						<Link
@@ -253,7 +254,10 @@ export function SiteHeader({
 						showWorkspaceMenu={showWorkspaceMenu}
 					/>
 					{!isCollectionDetail ? (
-						<h1 className="flex min-w-0 items-center gap-m text-body-xxl font-medium">
+						<h1
+							// design-escape-ok(type): shipped value; -0.025em title tracking
+							className="flex min-w-0 items-center gap-m text-body-xxl font-medium tracking-[-0.025em]"
+						>
 							<ShellNavIcon
 								icon={currentShellRoute.icon}
 								activeIcon={currentShellRoute.activeIcon}

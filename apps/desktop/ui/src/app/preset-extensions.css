@@ -38,11 +38,31 @@
 
 :root {
 	--app-font-heading: var(--font-display);
-	--opal-1-tint: var(--color-1-transparent);
-	--opal-2-tint: var(--color-3-transparent);
-	--opal-3-tint: var(--color-2-transparent);
-	--opal-4-tint: var(--color-4-transparent);
-	--opal-5-tint: var(--color-5-transparent);
+	/* The sheen's tints are opaque, pale in light and deep in dark, so a tile
+	   reads the same over the translucent sidebar as over a card. */
+	/* design-escape-ok(colour): shipped value; oklch(0.95 0.035 262.833) */
+	--opal-1-tint: oklch(0.95 0.035 262.833);
+	/* design-escape-ok(colour): shipped value; oklch(0.95 0.035 281.458) */
+	--opal-2-tint: oklch(0.95 0.035 281.458);
+	/* design-escape-ok(colour): shipped value; oklch(0.95 0.035 302.391) */
+	--opal-3-tint: oklch(0.95 0.035 302.391);
+	/* design-escape-ok(colour): shipped value; oklch(0.95 0.035 323.991) */
+	--opal-4-tint: oklch(0.95 0.035 323.991);
+	/* design-escape-ok(colour): shipped value; oklch(0.95 0.035 344.619) */
+	--opal-5-tint: oklch(0.95 0.035 344.619);
+}
+
+.dark {
+	/* design-escape-ok(colour): shipped value; oklch(0.28 0.08 262.833) */
+	--opal-1-tint: oklch(0.28 0.08 262.833);
+	/* design-escape-ok(colour): shipped value; oklch(0.28 0.08 281.458) */
+	--opal-2-tint: oklch(0.28 0.08 281.458);
+	/* design-escape-ok(colour): shipped value; oklch(0.28 0.08 302.391) */
+	--opal-3-tint: oklch(0.28 0.08 302.391);
+	/* design-escape-ok(colour): shipped value; oklch(0.28 0.08 323.991) */
+	--opal-4-tint: oklch(0.28 0.08 323.991);
+	/* design-escape-ok(colour): shipped value; oklch(0.28 0.08 344.619) */
+	--opal-5-tint: oklch(0.28 0.08 344.619);
 }
 
 @layer base {

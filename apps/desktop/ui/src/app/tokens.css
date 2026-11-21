@@ -285,7 +285,8 @@
 	--sidebar-primary: var(--ink);
 	--sidebar-primary-foreground: var(--neutral-2);
 	--sidebar-accent: var(--field);
-	--sidebar-accent-foreground: var(--ink);
+	/* design-escape-ok(colour): shipped value; oklch(0.205 0 0), the picked sidebar row's text */
+	--sidebar-accent-foreground: oklch(0.205 0 0);
 	--sidebar-border: var(--line-strong);
 	--sidebar-ring: var(--ink-3);
 }
@@ -293,4 +294,5 @@
 .dark {
 	--sidebar: oklch(0.145 0 0);
 	--sidebar-primary-foreground: var(--ink);
+	--sidebar-accent-foreground: var(--ink);
 }

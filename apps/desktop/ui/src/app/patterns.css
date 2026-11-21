@@ -684,8 +684,8 @@
 	flex-direction: column;
 	gap: var(--space-l);
 	font-size: var(--size-xl);
-	letter-spacing: var(--letter-spacing-xl);
-	line-height: var(--line-xl);
+	/* design-escape-ok(type): shipped value; 1.5 line, inherited by every row */
+	line-height: 1.5;
 }
 
 .settings-group-heading {
@@ -693,7 +693,7 @@
 	align-items: center;
 	justify-content: space-between;
 	gap: var(--space-xl);
-	padding-inline: var(--space-xxl);
+	padding-inline: calc(var(--space-xs) * 5);
 }
 
 .settings-group-title {
@@ -711,9 +711,8 @@
 }
 
 .settings-group-heading h2 {
-	font-size: var(--size-xl);
-	line-height: var(--line-xl);
-	letter-spacing: var(--letter-spacing-xl);
+	/* design-escape-ok(type): shipped value; 15px heading on the group's 1.5 line */
+	font-size: 0.9375rem;
 	font-weight: var(--weight-body-medium);
 }
 
@@ -728,16 +727,17 @@
 
 .settings-group-rows {
 	min-width: 0;
-	padding: var(--space-zero) var(--space-xxl);
+	padding: var(--space-zero) calc(var(--space-xs) * 5);
 }
 
 .settings-group-rows > * + * {
-	border-top: var(--border-m) solid var(--line);
+	/* design-escape-ok(colour): shipped value; #0000000f, #ffffff14 in dark */
+	border-top: var(--border-m) solid var(--settings-row-line, #0000000f);
 }
 
 .settings-row,
 .settings-actions {
-	padding: var(--space-xl) var(--space-zero);
+	padding: calc(var(--space-xxs) * 7) var(--space-zero);
 }
 
 .settings-row-copy > :first-child {
@@ -746,8 +746,6 @@
 
 .settings-row-description {
 	font-size: var(--size-l);
-	line-height: var(--line-l);
-	letter-spacing: var(--letter-spacing-l);
 }
 
 .settings-row {
@@ -760,7 +758,15 @@
 }
 
 .settings-list > * + * {
-	border-top: var(--border-m) solid var(--line);
+	/* design-escape-ok(colour): shipped value; #0000000d, #ffffff12 in dark */
+	border-top: var(--border-m) solid var(--settings-list-line, #0000000d);
+}
+
+.dark .settings-group {
+	/* design-escape-ok(colour): shipped value; #ffffff14 */
+	--settings-row-line: #ffffff14;
+	/* design-escape-ok(colour): shipped value; #ffffff12 */
+	--settings-list-line: #ffffff12;
 }
 
 .settings-subsection {
@@ -803,11 +809,18 @@
 	background: transparent;
 	box-shadow: var(--shadow-card);
 	font-size: inherit;
-	padding-inline: var(--space-l);
+	padding-inline: calc(var(--space-xxs) * 5);
 }
 
 .settings-row-control > [data-slot="select-trigger"] {
 	width: 100%;
+}
+
+/* The shipped settings select: a 16px chevron in the meta ink. */
+.settings-group [data-slot="select-trigger"] > svg:last-child {
+	width: var(--space-xl);
+	height: var(--space-xl);
+	color: var(--ink-3);
 }
 
 .settings-member-identity {
@@ -831,8 +844,6 @@
 	column-gap: var(--space-l);
 	color: var(--ink-3);
 	font-size: var(--size-l);
-	line-height: var(--line-l);
-	letter-spacing: var(--letter-spacing-l);
 	font-weight: var(--weight-body-regular);
 	font-variant-numeric: tabular-nums;
 }
@@ -841,7 +852,7 @@
 	display: flex;
 	min-width: 0;
 	align-items: baseline;
-	gap: var(--space-l);
+	gap: calc(var(--space-xxs) * 5);
 }
 
 .settings-member-copy > :first-child {
@@ -850,8 +861,6 @@
 
 .settings-member-copy > :last-child {
 	font-size: var(--size-m);
-	line-height: var(--line-m);
-	letter-spacing: var(--letter-spacing-m);
 	font-weight: var(--weight-body-regular);
 }
 
@@ -882,8 +891,6 @@
 	box-shadow: var(--shadow-raised);
 	color: var(--ink);
 	font-size: var(--size-m);
-	line-height: var(--line-m);
-	letter-spacing: var(--letter-spacing-m);
 	font-weight: var(--weight-body-medium);
 }
 
@@ -977,6 +984,17 @@
 	font-weight: var(--weight-body-medium);
 }
 
+/* The shipped small button here: a 4px gap, 12px sides and 16px icons. */
+.settings-group [data-slot="button"][data-size="sm"] {
+	gap: var(--space-xs);
+	padding-inline: var(--space-l);
+}
+
+.settings-group [data-slot="button"] > svg:not([class*="size-"]) {
+	width: var(--space-xl);
+	height: var(--space-xl);
+}
+
 .settings-group [data-slot="button"][data-variant="outline"] {
 	border: 0;
 	background: var(--canvas);
@@ -1024,8 +1042,6 @@
 @container settings (min-width: 480px) {
 	.settings-group {
 		font-size: var(--size-xl);
-		line-height: var(--line-xl);
-		letter-spacing: var(--letter-spacing-xl);
 	}
 
 	.settings-row {
@@ -1065,8 +1081,6 @@
 @media (max-width: 639px), (pointer: coarse) {
 	.settings-group {
 		font-size: var(--size-xxl);
-		line-height: var(--line-xxl);
-		letter-spacing: var(--letter-spacing-xxl);
 	}
 
 	.settings-group [data-slot="button"],

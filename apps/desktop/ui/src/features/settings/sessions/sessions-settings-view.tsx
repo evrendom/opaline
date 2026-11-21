@@ -130,7 +130,12 @@ export function SessionsSettingsView({
 					{error ? (
 						<div className="sessions-settings-empty" role="alert">
 							Could not load repositories.{" "}
-							<Button variant="link" size="inline" onClick={onRefresh}>
+							<Button
+								variant="link"
+								size="inline"
+								className="font-regular text-inherit decoration-current underline-offset-[3px]"
+								onClick={onRefresh}
+							>
 								Try again
 							</Button>
 						</div>

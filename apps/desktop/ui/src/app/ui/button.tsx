@@ -13,20 +13,23 @@ const buttonVariants = cva(
 	{
 		variants: {
 			variant: {
-				// The fill lightens on hover by mode (80% light, 90% dark); no
-				// role holds a per-mode opacity, so the step stays a dark: pair.
+				// The shipped filled button: a flat near-black (near-white in dark)
+				// fill inside a 1px clear edge, no shadow, lightening to 80% on hover.
+				// No role holds these greys (primary is a step lighter), so they stay
+				// as shipped.
 				default:
-					// design-escape-ok(opacity): no role renders this; primary/80 and /90 hover
-					"bg-primary shadow-control text-primary-fg hover:bg-primary/80 dark:hover:bg-primary/90 [&_svg:not([class*='text-'])]:text-ink-disabled",
+					// design-escape-ok(colour,opacity): shipped value; oklch(0.205 0 0) fill on oklch(0.985 0 0) text, oklch(0.922 0 0) on oklch(0.205 0 0) in dark, /80 hover
+					"border border-transparent bg-[oklch(0.205_0_0)] text-[oklch(0.985_0_0)] hover:bg-[oklch(0.205_0_0)]/80 dark:bg-[oklch(0.922_0_0)] dark:text-[oklch(0.205_0_0)] dark:hover:bg-[oklch(0.922_0_0)]/80",
 				outline:
 					"shadow-control bg-card hover:bg-hover hover:text-ink aria-expanded:bg-hover aria-expanded:text-ink [&_svg:not([class*='text-'])]:text-ink-3",
 				ghost:
 					"hover:bg-hover hover:text-ink aria-expanded:bg-hover aria-expanded:text-ink [&_svg:not([class*='text-'])]:text-ink-3",
 				// The error fill is stronger in dark (10/20% light, 20/30% dark);
-				// error-tint is 11/17%, so the fill keeps its own dark: steps.
+				// error-tint is 11/17%, so the fill keeps its own dark: steps. Like the
+				// filled button it sits flat inside a 1px clear edge, with no shadow.
 				destructive:
 					// design-escape-ok(opacity): no role renders this; error/10–/30 fills
-					"bg-error/10 shadow-control text-error hover:bg-error/20 dark:bg-error/20 dark:hover:bg-error/30",
+					"border border-transparent bg-error/10 text-error hover:bg-error/20 dark:bg-error/20 dark:hover:bg-error/30",
 				// Underline stays rendered but transparent at rest, fading its opacity
 				// in on hover — the base `transition-all` animates the decoration color.
 				// design-escape-ok(opacity): no role renders this; ink/20 underline at rest
@@ -39,8 +42,9 @@ const buttonVariants = cva(
 					"bg-card font-regular text-ink-3 shadow-control hover:bg-hover aria-expanded:bg-hover data-popup-open:bg-hover aria-pressed:text-ink aria-pressed:shadow-raised data-active:text-ink data-active:shadow-raised [&>svg]:size-3.5",
 			},
 			size: {
-				xs: "h-6 gap-xs corner-full px-l text-body-m in-data-[slot=button-group]:corner-full has-[>svg:first-child]:pl-m has-[>svg:last-child]:pr-m [&_svg:not([class*='size-'])]:size-[11px]",
-				sm: "h-7 gap-s corner-full px-l in-data-[slot=button-group]:corner-full has-[>svg:first-child]:pl-m has-[>svg:last-child]:pr-m",
+				xs: "h-6 gap-xs corner-full px-[calc(var(--space-xxs)*5)] text-body-m in-data-[slot=button-group]:corner-full has-[>svg:first-child]:pl-m has-[>svg:last-child]:pr-m [&_svg:not([class*='size-'])]:size-[11px]",
+				// The shipped small button is 32px with a 4px gap.
+				sm: "h-8 gap-xs corner-full px-l in-data-[slot=button-group]:corner-full has-[>svg:first-child]:pl-m has-[>svg:last-child]:pr-m",
 				default:
 					"h-8 gap-s px-l in-data-[slot=button-group]:corner-full has-[>svg:first-child]:pl-l has-[>svg:last-child]:pr-l",
 				icon: "size-8",
@@ -52,6 +56,19 @@ const buttonVariants = cva(
 				inline: "h-auto gap-xs p-zero align-baseline text-[length:inherit]",
 			},
 		},
+		compoundVariants: [
+			// The toolbar pill's shipped spacing: a 5.5px gap, and 10px on an
+			// icon's side. A lone icon before a plain label shipped with 10px on
+			// both sides (the label was a text node, so the icon was also the
+			// last element).
+			{
+				variant: "toolbar",
+				size: "default",
+				className:
+					// design-escape-ok(space): shipped value; 5.5px gap
+					"gap-[5.5px] has-[>svg:first-child]:pl-[calc(var(--space-xxs)*5)] has-[>svg:last-child]:pr-[calc(var(--space-xxs)*5)] has-[>svg+[data-button-text]:last-child]:pr-[calc(var(--space-xxs)*5)]",
+			},
+		],
 		defaultVariants: {
 			variant: "default",
 			size: "default",
@@ -82,7 +99,7 @@ function Button({
 		>
 			{React.Children.map(children, (child) =>
 				typeof child === "string" || typeof child === "number" ? (
-					<span>{child}</span>
+					<span data-button-text="">{child}</span>
 				) : (
 					child
 				),

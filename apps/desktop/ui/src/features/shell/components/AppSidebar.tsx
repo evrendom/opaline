@@ -96,9 +96,10 @@ export function SidebarNavTile({
 				title={route.navLabel}
 				className={cn(
 					"flex h-10 w-full items-center justify-center",
-					"corner-l corner-squircle edge-m",
+					// design-escape-ok(radius): shipped value; 12px tile corner without squircle support
+					"rounded-[12px] corner-squircle edge-m",
 					"border-(--opal-ring) bg-(--opal-fill) focus-outline transition-[background-color,border-color] duration-(--motion-duration)",
-					"squircle:corner-xl",
+					"squircle:corner-xl-inner",
 					active && route.tone ? route.tone.chip : restingChipClassName,
 					!active &&
 						"hover:[--opal-fill:color-mix(in_oklab,var(--dashboard-01-rail-active)_55%,white)] dark:[--opal-fill:rgb(255_255_255/0.03)] dark:[--opal-ring:rgb(255_255_255/0.05)] dark:hover:[--opal-fill:rgb(255_255_255/0.06)]",

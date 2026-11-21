@@ -4,8 +4,8 @@
 	gap: calc(var(--space-xxl) * 5 / 3);
 	padding-bottom: calc(var(--space-xxl) * 4 / 3);
 	font-size: var(--size-xl);
-	letter-spacing: var(--letter-spacing-xl);
-	line-height: var(--line-xl);
+	/* design-escape-ok(type): shipped value; 1.5 line */
+	line-height: 1.5;
 }
 .sessions-settings-section {
 	display: flex;
@@ -16,15 +16,15 @@
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-xs);
-	padding-inline: var(--space-xxl);
+	padding-inline: calc(var(--space-xs) * 5);
 }
 .sessions-settings-card {
-	padding: var(--space-xl) var(--space-xxl);
+	padding: var(--space-xl) calc(var(--space-xs) * 5);
 }
 .sessions-settings h2 {
 	margin: var(--space-zero);
-	font-size: var(--size-xl);
-	letter-spacing: var(--letter-spacing-xl);
+	/* design-escape-ok(type): shipped value; 15px heading */
+	font-size: 0.9375rem;
 	line-height: var(--line-xl);
 	font-weight: var(--weight-body-medium);
 	color: var(--ink);
@@ -37,29 +37,28 @@
 .sessions-settings-manage {
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-l);
+	gap: calc(var(--space-xxs) * 5);
 }
 .sessions-settings-command {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: var(--space-l);
-	padding: var(--space-m) var(--space-l) var(--space-m) var(--space-xl);
+	padding: var(--space-m) calc(var(--space-xxs) * 5) var(--space-m)
+		calc(var(--space-xxs) * 7);
 	border: var(--border-m) solid var(--line-strong);
 	border-radius: var(--radius-s);
-	background: var(--settings-section-fill);
+	background: var(--card);
 }
 .sessions-settings-command code {
 	min-width: 0;
 	overflow-wrap: anywhere;
 	font-size: var(--size-l);
-	line-height: var(--line-l);
-	letter-spacing: var(--letter-spacing-l);
 }
 .sessions-settings .sessions-settings-note {
 	font-size: var(--size-m);
-	letter-spacing: var(--letter-spacing-m);
-	line-height: var(--line-m);
+	/* design-escape-ok(type): shipped value; 18px line */
+	line-height: 18px;
 }
 .sessions-settings-list-heading {
 	display: flex;
@@ -82,7 +81,7 @@
 	display: flex;
 	align-items: center;
 	gap: var(--space-m);
-	padding: var(--space-m) var(--space-l);
+	padding: calc(var(--space-xxs) * 3.5) calc(var(--space-xxs) * 5);
 	border: var(--border-m) solid var(--line-strong);
 	border-radius: var(--radius-xs);
 	color: var(--ink-3);
@@ -100,8 +99,6 @@
 	background: transparent;
 	font: inherit;
 	font-size: var(--size-l);
-	line-height: var(--line-l);
-	letter-spacing: var(--letter-spacing-l);
 	color: var(--ink);
 	border: 0;
 	outline: 0;
@@ -119,13 +116,11 @@
 	border-collapse: collapse;
 	text-align: left;
 	font-size: var(--size-l);
-	line-height: var(--line-l);
-	letter-spacing: var(--letter-spacing-l);
 }
 .sessions-settings-table th {
 	height: 36px;
 	color: var(--ink-3);
-	font-weight: var(--weight-body-medium);
+	font-weight: 450;
 	white-space: nowrap;
 }
 .sessions-settings-table th,
@@ -149,7 +144,7 @@
 .sessions-settings-repo {
 	display: flex;
 	align-items: center;
-	gap: var(--space-m);
+	gap: 9px;
 	min-width: 140px;
 }
 .sessions-settings-repo svg {
@@ -167,7 +162,7 @@
 .sessions-settings-status {
 	display: inline-flex;
 	align-items: center;
-	gap: var(--space-m);
+	gap: 7px;
 	color: var(--ink-3);
 }
 .sessions-settings-status-dot {
@@ -179,7 +174,8 @@
 	opacity: 0.5;
 }
 .sessions-settings-status[data-state="enabled"] .sessions-settings-status-dot {
-	background: var(--success);
+	/* design-escape-ok(colour): shipped value; #36966c */
+	background: #36966c;
 	opacity: 1;
 }
 .sessions-settings-status:is(
@@ -187,7 +183,8 @@
 		[data-state="mixed"]
 	)
 	> span {
-	background: var(--warning);
+	/* design-escape-ok(colour): shipped value; #b48a39 */
+	background: #b48a39;
 	opacity: 1;
 }
 .sessions-settings-status[data-state="unknown"] .sessions-settings-status-dot {
@@ -195,11 +192,11 @@
 	border: var(--border-m) solid var(--ink-3);
 }
 .sessions-settings-empty {
-	padding: calc(var(--space-xxl) * 1.25) var(--space-zero);
+	padding: calc(var(--space-xxs) * 14) var(--space-zero);
 	color: var(--ink-3);
 }
 .sessions-settings-status-note {
-	padding-top: var(--space-xl);
+	padding-top: calc(var(--space-xxs) * 7);
 }
 @media (max-width: 640px) {
 	.sessions-settings,
@@ -209,8 +206,6 @@
 	.sessions-settings-search input,
 	.sessions-settings-table {
 		font-size: var(--size-xxl);
-		line-height: var(--line-xxl);
-		letter-spacing: var(--letter-spacing-xxl);
 	}
 
 	.sessions-settings-repo-name {

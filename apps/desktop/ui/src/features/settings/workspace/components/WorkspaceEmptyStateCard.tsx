@@ -12,14 +12,16 @@ import { SettingsSectionCard } from "@/features/settings/components/settings-sec
 export function WorkspaceEmptyStateCard() {
 	return (
 		<SettingsSectionCard>
-			<CardHeader>
-				<CardTitle>No workspace selected</CardTitle>
+			<CardHeader className="gap-s group-data-[size=sm]/card:px-xl">
+				<CardTitle className="group-data-[size=sm]/card:text-body-xxl">
+					No workspace selected
+				</CardTitle>
 				<CardDescription>
 					You can create a workspace here or accept an invitation to join one
 					that already exists.
 				</CardDescription>
 			</CardHeader>
-			<CardContent>
+			<CardContent className="group-data-[size=sm]/card:px-xl">
 				<Link to="#new-workspace" className={buttonVariants({ size: "sm" })}>
 					<IconPlus data-icon="inline-start" />
 					Create workspace

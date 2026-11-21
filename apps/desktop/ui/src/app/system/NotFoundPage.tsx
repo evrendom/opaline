@@ -13,8 +13,12 @@ export function NotFoundPage() {
 				<div className="text-body-xl font-medium uppercase tracking-[0.18em] text-ink-3">
 					404
 				</div>
-				<h1 className="text-display-s font-heavy text-ink">Page not found</h1>
-				<p className="text-body-xl text-ink-3">
+				{/* design-escape-ok(type): shipped value; -0.025em tracking */}
+				<h1 className="text-display-s font-heavy tracking-[-0.025em] text-ink">
+					Page not found
+				</h1>
+				{/* design-escape-ok(type): shipped value; 14/24 */}
+				<p className="text-body-xl leading-6 text-ink-3">
 					The page you’re looking for does not exist or is no longer available.
 				</p>
 				<Link
@@ -23,7 +27,7 @@ export function NotFoundPage() {
 							? getWorkspaceAppPath(workspace.slug, appRoutes.dashboard())
 							: appRoutes.dashboard()
 					}
-					className={buttonVariants()}
+					className={buttonVariants({ className: "h-9" })}
 				>
 					Go to dashboard
 				</Link>

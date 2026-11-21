@@ -11,7 +11,10 @@ export function SettingsSectionCard({
 	return (
 		<Card
 			size={size}
-			className={cn("surface-card py-xl ring-0", className)}
+			className={cn(
+				"surface-card ring-0 data-[size=sm]:gap-xl data-[size=sm]:py-xl",
+				className,
+			)}
 			{...props}
 		/>
 	);
