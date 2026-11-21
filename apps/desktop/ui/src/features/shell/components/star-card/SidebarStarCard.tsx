@@ -5,7 +5,7 @@ import { useStarPrompt } from "./star-prompt";
 import "./sidebar-star-card.css";
 
 const TITLE = "Enjoying Opaline?";
-const BODY_OFF = "Drag to star us on GitHub :)";
+const BODY_OFF = "Drag to star us on GitHub.";
 const BODY_ON = "Thank you for starring!";
 const HINT = "Drag the star all the way across.";
 
