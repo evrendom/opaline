@@ -20,6 +20,7 @@
         "opaline": "dist/cli.js",
       },
       "devDependencies": {
+        "@rudel/cli-retire": "workspace:*",
         "@types/node": "^22",
         "bun-types": "latest",
         "smol-toml": "^1.6.0",
@@ -42,6 +43,7 @@
         "@rudel/agent-adapters": "workspace:*",
         "@rudel/api-routes": "workspace:*",
         "@rudel/ch-schema": "workspace:*",
+        "@rudel/cli-retire": "workspace:*",
         "@rudel/language-signals": "workspace:*",
         "@rudel/repo-intelligence-source-github": "workspace:*",
         "@rudel/secret-filter": "workspace:*",
@@ -196,6 +198,18 @@
         "@rudel/secret-filter": "workspace:*",
         "@rudel/typescript-config": "workspace:*",
         "@types/node": "^22",
+        "bun-types": "latest",
+        "typescript": "5.9.2",
+      },
+    },
+    "packages/cli-retire": {
+      "name": "@rudel/cli-retire",
+      "version": "0.0.0",
+      "dependencies": {
+        "smol-toml": "^1.6.0",
+      },
+      "devDependencies": {
+        "@rudel/typescript-config": "workspace:*",
         "bun-types": "latest",
         "typescript": "5.9.2",
       },
@@ -891,6 +905,8 @@
     "@rudel/ch-schema": ["@rudel/ch-schema@workspace:packages/ch-schema"],
 
     "@rudel/cli-harness": ["@rudel/cli-harness@workspace:packages/cli-harness"],
+
+    "@rudel/cli-retire": ["@rudel/cli-retire@workspace:packages/cli-retire"],
 
     "@rudel/desktop": ["@rudel/desktop@workspace:apps/desktop/shell"],
 

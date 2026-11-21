@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { CREDENTIALS_FILE } from "../retire/state.js";
+import { CREDENTIALS_FILE } from "@rudel/cli-retire";
 import {
 	makeHome,
 	persistentClaudeHook,

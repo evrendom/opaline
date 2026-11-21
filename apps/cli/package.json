@@ -44,6 +44,7 @@
 		"test:packed-smoke": "bun test ./src/__tests__/packed-cli.integration.ts"
 	},
 	"devDependencies": {
+		"@rudel/cli-retire": "workspace:*",
 		"@types/node": "^22",
 		"bun-types": "latest",
 		"smol-toml": "^1.6.0",

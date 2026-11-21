@@ -1,0 +1,21 @@
+{
+	"name": "@rudel/cli-retire",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"check-types": "tsc --noEmit",
+		"test": "bun test"
+	},
+	"dependencies": {
+		"smol-toml": "^1.6.0"
+	},
+	"devDependencies": {
+		"@rudel/typescript-config": "workspace:*",
+		"bun-types": "latest",
+		"typescript": "5.9.2"
+	}
+}
