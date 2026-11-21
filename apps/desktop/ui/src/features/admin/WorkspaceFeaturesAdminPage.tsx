@@ -225,7 +225,7 @@ function FeatureSwitch({
 							setBusy(false);
 						}}
 						className={cn(
-							"h-8 px-l text-body-m whitespace-nowrap focus-visible:outline-2 focus-visible:-outline-offset-2 disabled:cursor-wait",
+							"h-8 px-[calc(var(--space-m)+var(--space-xxs))] text-body-m whitespace-nowrap focus-visible:outline-2 focus-visible:-outline-offset-2 disabled:cursor-wait",
 							current === option.value
 								? "bg-ink text-canvas"
 								: "bg-canvas text-ink-3 hover:text-ink",

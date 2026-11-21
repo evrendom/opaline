@@ -216,7 +216,7 @@ export function StatCard({
 				<div className="flex min-w-0 items-center justify-between gap-m">
 					<div
 						className={cn(
-							"flex items-center gap-m",
+							"flex items-center gap-[calc(var(--space-s)+var(--space-xxs)/2)]",
 							note ? "shrink-0" : "min-w-0",
 						)}
 					>

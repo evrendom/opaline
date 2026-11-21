@@ -57,7 +57,8 @@ export function ContextPartTiles({
 						key={part.key}
 						className={cn(
 							"absolute flex items-center justify-center overflow-hidden",
-							"corner-xs edge-m corner-squircle",
+							// design-escape-ok(radius): shipped value; 3px corner
+							"rounded-[3px] edge-m corner-squircle",
 							"squircle:corner-xs",
 							look.className,
 						)}

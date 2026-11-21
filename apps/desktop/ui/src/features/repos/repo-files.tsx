@@ -199,7 +199,7 @@ export function RepoFiles({ repoKey }: { repoKey: string }) {
 										repository={tree.data.repository}
 									/>
 								) : (
-									<p className="px-xxl py-xl text-body-l text-ink-3">
+									<p className="px-[calc(var(--space-xl)+var(--space-xs))] py-xl text-body-l text-ink-3">
 										<span className="font-data">{picked}</span> isn't among the
 										files this repo's sessions changed or read.
 									</p>
@@ -451,10 +451,13 @@ function TreeSkeleton() {
 				<div
 					// biome-ignore lint/suspicious/noArrayIndexKey: a fixed placeholder list
 					key={index}
-					className="flex h-7 shrink-0 items-center gap-m pr-l"
+					className="flex h-7 shrink-0 items-center gap-m pr-[calc(var(--space-m)+var(--space-xxs))]"
 					style={{ paddingLeft: 8 + depth * 12 }}
 				>
-					<Skeleton className="size-3.5 shrink-0 corner-xs" />
+					<Skeleton
+						// design-escape-ok(radius): shipped value; 4px corner
+						className="size-3.5 shrink-0 rounded-[4px]"
+					/>
 					<Skeleton
 						className="h-2.5 corner-full"
 						style={{ width: `${width}%` }}
@@ -468,7 +471,7 @@ function TreeSkeleton() {
 function FileDetailSkeleton() {
 	return (
 		<div
-			className="flex min-h-0 min-w-0 flex-1 flex-col gap-s pt-xl pr-xl pl-xxl"
+			className="flex min-h-0 min-w-0 flex-1 flex-col gap-s pt-xl pr-xl pl-[calc(var(--space-xl)+var(--space-xs))]"
 			aria-hidden="true"
 		>
 			<div className="flex min-h-7 items-center gap-l">

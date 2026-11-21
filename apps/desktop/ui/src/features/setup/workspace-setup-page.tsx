@@ -20,7 +20,7 @@ export function WorkspaceSetupPage({
 }) {
 	useCollapseSidebarBelow(SIDEBAR_COLLAPSE_BELOW_PX);
 	return (
-		<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-inset text-ink [--reader-page:var(--canvas)]">
+		<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-inset dark:bg-canvas text-dashboardy-heading [--reader-page:var(--canvas)]">
 			<WorkspaceSetupHeader name={name} onBackToList={onBackToList} />
 			<h1 className="sr-only">{name}</h1>
 			<div className="relative isolate min-h-0 min-w-0 flex-1 overflow-hidden [--dashboard-01-content-background:var(--dashboard-01-stage-background)] [--stage-top:--spacing(2)]">

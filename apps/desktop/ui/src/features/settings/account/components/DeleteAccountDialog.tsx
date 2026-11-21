@@ -81,6 +81,7 @@ export function DeleteAccountDialog({
 							Type {user.email} to confirm
 						</FieldLabel>
 						<Input
+							variant="plain"
 							id="delete-account-confirm"
 							value={confirmEmail}
 							onChange={(event) => setConfirmEmail(event.target.value)}
@@ -95,7 +96,8 @@ export function DeleteAccountDialog({
 				<DialogFooter>
 					<Button
 						type="button"
-						variant="outline"
+						variant="bordered"
+						size="md"
 						onClick={() => onOpenChange(false)}
 						disabled={isDeleting}
 					>
@@ -104,6 +106,7 @@ export function DeleteAccountDialog({
 					<Button
 						type="button"
 						variant="destructive"
+						size="md"
 						onClick={() => void handleDelete()}
 						disabled={!canDelete}
 					>

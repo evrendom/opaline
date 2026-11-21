@@ -112,7 +112,7 @@ function FooterLabel({
 			animate="shown"
 			exit="leave"
 			transition={reduceMotion ? { duration: 0 } : HANDOVER}
-			className="flex items-center gap-s whitespace-nowrap [grid-area:1/1]"
+			className="flex items-center gap-[calc(var(--space-xs)+var(--space-xxs)/2)] whitespace-nowrap [grid-area:1/1]"
 		>
 			{children}
 			<IconArrowUpRight
@@ -149,7 +149,7 @@ export function LastSessionUploadBar() {
 	return (
 		<div className="flex h-8 shrink-0 items-center gap-xl px-xs text-body-m text-ink-3 tabular-nums">
 			{initialImport ? (
-				<output className="flex items-center gap-s">
+				<output className="flex items-center gap-[calc(var(--space-xs)+var(--space-xxs)/2)]">
 					<IconLoader2
 						aria-hidden="true"
 						className="size-3.25 animate-spin opacity-80"
@@ -168,7 +168,7 @@ export function LastSessionUploadBar() {
 							? "Open your sessions"
 							: `Open the session ${localApp ? "that ended" : "uploaded"} ${fixedFormat ? formatUtcTime(shownAt) : shownAt.toLocaleString()}`
 					}
-					className="group/last-upload flex items-center gap-s corner-xs outline-none transition-colors hover:text-ink"
+					className="group/last-upload flex items-center gap-[calc(var(--space-xs)+var(--space-xxs)/2)] corner-xs outline-none transition-colors hover:text-ink"
 				>
 					{localApp ? (
 						<IconRobot aria-hidden="true" className="size-3.25 opacity-80" />

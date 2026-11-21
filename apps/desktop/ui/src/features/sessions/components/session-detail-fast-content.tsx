@@ -254,7 +254,7 @@ export function SessionDetailFastContent({
 	}
 
 	return (
-		<div className="grid h-full min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] overflow-hidden bg-canvas [font-family:Inter,sans-serif]">
+		<div className="grid h-full min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] overflow-hidden bg-canvas [--fluid-fill:var(--hover)] [font-family:Inter,sans-serif]">
 			<div className="flex min-h-0 flex-col">
 				<SessionDetailLayout
 					showOverviewStrip={showOverviewStrip}

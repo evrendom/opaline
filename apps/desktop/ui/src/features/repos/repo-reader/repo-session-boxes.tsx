@@ -338,7 +338,7 @@ export function RepoSessionBoxes({ fill = false }: { fill?: boolean }) {
 					<div
 						data-session-pick=""
 						className={cn(
-							"relative mt-s flex flex-col",
+							"relative mt-[calc(var(--space-xs)+var(--space-xxs)/2)] flex flex-col",
 							fill ? "min-h-0 flex-1" : "h-[420px]",
 						)}
 						style={{ "--tint": look.color } as CSSProperties}
@@ -528,7 +528,9 @@ function SessionTile({
 				aria-hidden="true"
 				className={cn(
 					"pointer-events-none relative flex min-w-0 flex-col text-body-l",
-					showName ? "px-l py-xs" : "h-full items-center justify-center",
+					showName
+						? "px-[calc(var(--space-m)+var(--space-xxs))] py-xs"
+						: "h-full items-center justify-center",
 				)}
 			>
 				<span className="flex min-w-0 items-center gap-s">

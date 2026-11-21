@@ -166,7 +166,10 @@ export function SiteHeader({
 								{formatModelDisplayLabel(sessionModel)}
 							</span>
 						) : modelPending ? (
-							<Skeleton className="h-3.5 w-16 shrink-0 corner-xs corner-squircle squircle:corner-s" />
+							<Skeleton
+								// design-escape-ok(radius): shipped value; 4px corner
+								className="h-3.5 w-16 shrink-0 rounded-[4px] corner-squircle squircle:corner-s"
+							/>
 						) : null}
 						<span className={cn("shrink-0", sessionMuted && "text-ink-3")}>
 							Session
@@ -202,7 +205,7 @@ export function SiteHeader({
 						data-fluid-menu-root=""
 						className={cn(
 							"hidden min-w-0 items-center gap-m",
-							"pr-m pl-xl",
+							"pr-m pl-[calc(var(--space-xl)+var(--space-xxs))]",
 							"bg-inset",
 							"lg:flex lg:w-[var(--session-list-pane-width,29.8125rem)] lg:flex-none",
 						)}

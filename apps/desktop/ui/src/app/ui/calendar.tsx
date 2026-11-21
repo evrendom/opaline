@@ -19,7 +19,7 @@ function Calendar({
 	classNames,
 	showOutsideDays = true,
 	captionLayout = "label",
-	buttonVariant = "ghost",
+	buttonVariant = "quiet",
 	locale,
 	formatters,
 	components,

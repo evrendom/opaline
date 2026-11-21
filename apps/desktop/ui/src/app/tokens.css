@@ -153,6 +153,8 @@
 	--cost-foreground: #292a2f;
 	--cost-muted: #828387;
 	--cost-border: rgb(0 0 0 / 0.07);
+	--cost-hover: rgb(0 0 0 / 0.05);
+	--cost-row-hover: rgb(0 0 0 / 0.015);
 	--session-overview-muted: rgb(0 0 0 / 0.63);
 	--session-overview-subtle: rgb(0 0 0 / 0.5);
 	--cost-blue: oklch(0.623 0.188 259.815); /* both modes */
@@ -193,6 +195,8 @@
 	--cost-foreground: #e6e6e9;
 	--cost-muted: #919299;
 	--cost-border: rgb(255 255 255 / 0.09);
+	--cost-hover: rgb(255 255 255 / 0.07);
+	--cost-row-hover: rgb(255 255 255 / 0.03);
 	--session-overview-muted: rgb(255 255 255 / 0.65);
 	--session-overview-subtle: rgb(255 255 255 / 0.5);
 }

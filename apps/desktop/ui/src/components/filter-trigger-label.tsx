@@ -18,7 +18,10 @@ export function FilterTriggerLabel({
 				aria-hidden="true"
 				className={cn(
 					"size-4 h-lh shrink-0",
-					activeCount > 0 ? "text-accent" : "text-ink-2 dark:text-ink-3",
+					activeCount > 0
+						? "text-accent"
+						: // design-escape-ok(colour): shipped value; #5d5d5d, #acaeb2 in dark
+							"text-[#5d5d5d] dark:text-[#acaeb2]",
 				)}
 			/>
 			{iconOnly ? null : <span>Filter</span>}

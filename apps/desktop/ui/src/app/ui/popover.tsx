@@ -39,7 +39,8 @@ function PopoverContent({
 					className={cn(
 						"z-50 flex w-72 flex-col gap-xl",
 						"corner-m corner-squircle p-l",
-						"text-body-xl",
+						// design-escape-ok(type): shipped value; the 20/14 line as a ratio, so smaller text inside keeps it
+						"text-body-xl leading-[calc(20/14)]",
 						"origin-(--transform-origin) bg-surface text-ink shadow-card outline-hidden duration-(--motion-quick-duration)",
 						"squircle:corner-xl",
 						"data-[side=bottom]:slide-in-from-top-2",

@@ -176,7 +176,7 @@ export function KindsMenu({
 
 const FLAG_TONE: ShellNavTone = {
 	// design-escape-ok(shadow): the flag chip's fill, ring and glow are tinted from its flag colour (artwork)
-	chip: "[--opal-fill:color-mix(in_oklch,var(--flag-tint)_14%,var(--surface))] [--opal-ring:color-mix(in_oklch,var(--flag-tint)_20%,transparent)] drop-shadow-[0_1.5px_2px_color-mix(in_oklch,var(--flag-tint)_25%,transparent)]",
+	chip: "[--opal-fill:color-mix(in_oklch,var(--flag-tint)_14%,var(--menu-background))] [--opal-ring:color-mix(in_oklch,var(--flag-tint)_20%,transparent)] drop-shadow-[0_1.5px_2px_color-mix(in_oklch,var(--flag-tint)_25%,transparent)]",
 	glyph: "text-(--flag-tint)",
 };
 
@@ -215,7 +215,7 @@ function FlagKindRow({
 				tone={FLAG_TONE}
 			/>
 			<span className="flex-1">{children}</span>
-			<span className="tabular-nums text-ink-3">{count}</span>
+			<span className="tabular-nums text-(--menu-icon)">{count}</span>
 		</Menu.CheckboxItem>
 	);
 }

@@ -22,13 +22,13 @@
 	min-width: 0;
 	align-items: baseline;
 	gap: var(--space-m);
-	color: var(--ink);
-	font-weight: var(--weight-body-medium);
+	color: var(--menu-focused-label);
+	font-weight: 450;
 	white-space: nowrap;
 }
 
 .cli-update-notice-versions {
-	color: var(--ink-3);
+	color: var(--menu-icon);
 	font-variant-numeric: tabular-nums;
 }
 
@@ -42,7 +42,7 @@
 	border: 0;
 	border-radius: var(--cli-update-notice-inner-radius);
 	background: transparent;
-	color: var(--ink-3);
+	color: var(--menu-icon);
 	outline: none;
 	transition:
 		background-color var(--motion-quick-duration) var(--motion-wave-easing),
@@ -50,8 +50,8 @@
 }
 
 .cli-update-notice-dismiss:is(:hover, :focus-visible) {
-	background: var(--hover);
-	color: var(--ink);
+	background: var(--menu-highlight);
+	color: var(--menu-focused-label);
 }
 
 .cli-update-notice .menu-list {

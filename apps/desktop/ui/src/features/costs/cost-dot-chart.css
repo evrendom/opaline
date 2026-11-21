@@ -226,7 +226,8 @@ button.cost-dot-grid {
 	cursor: default;
 }
 button.cost-dot-grid:focus-visible {
-	outline: 2px solid color-mix(in oklab, var(--ink) 40%, transparent);
+	outline: 2px solid
+		color-mix(in oklab, var(--cost-foreground) 40%, transparent);
 	outline-offset: 2px;
 	border-radius: var(--radius-xs);
 }

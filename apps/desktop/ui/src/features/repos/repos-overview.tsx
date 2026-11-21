@@ -486,13 +486,16 @@ function RepoLastActive({ lastActiveAt }: { lastActiveAt: string }) {
 		>
 			<span aria-hidden="true" className="relative flex size-1.5 shrink-0">
 				{recency === "now" ? (
-					<span className="absolute inset-0 animate-ping corner-full bg-success opacity-60 motion-reduce:animate-none" />
+					<span
+						// design-escape-ok(colour): shipped value; #22c55e
+						className="absolute inset-0 animate-ping corner-full bg-[#22c55e] opacity-60 motion-reduce:animate-none"
+					/>
 				) : null}
 				<span
 					className={cn(
 						"relative size-1.5 corner-full",
-						// design-escape-ok(opacity): no role renders this; ink/20, dark ink/25
-						recency === "older" ? "bg-ink/20 dark:bg-ink/25" : "bg-success",
+						// design-escape-ok(colour,opacity): shipped value; #22c55e, ink/20, dark ink/25
+						recency === "older" ? "bg-ink/20 dark:bg-ink/25" : "bg-[#22c55e]",
 					)}
 				/>
 			</span>

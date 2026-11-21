@@ -21,6 +21,9 @@
 /* The text-button pattern as the cost and compass pages shipped it: the
    page's muted ink, its line height, a 5px corner. */
 .cost-page .text-button {
+	/* The shipped cost button left display and gap to the call site's utilities. */
+	display: revert-layer;
+	gap: revert-layer;
 	color: var(--cost-muted);
 	line-height: inherit;
 	letter-spacing: inherit;
@@ -34,6 +37,14 @@
 		[data-popup-open]
 	) {
 	color: var(--cost-foreground);
+}
+.cost-page
+	.text-button:is(
+		[aria-pressed="true"],
+		[aria-selected="true"],
+		[data-popup-open]
+	) {
+	background: var(--cost-hover);
 }
 
 .cost-page-scroll {
@@ -432,7 +443,7 @@
 	border-radius: 4px;
 }
 .cost-duration-legend:hover {
-	background: var(--hover);
+	background: var(--cost-hover);
 }
 .cost-duration-legend:focus-visible {
 	outline: 2px solid var(--accent);
@@ -473,7 +484,7 @@
 	--cost-tooltip-drop: 0 6px 20px rgb(0 0 0 / 8%);
 	box-shadow:
 		var(--cost-tooltip-drop),
-		0 0 0 1px var(--line);
+		0 0 0 1px var(--cost-border);
 	display: grid;
 	gap: 7px;
 	font-size: var(--size-m);
@@ -645,14 +656,14 @@
    block (Breakdown rows). The fluid hover paints it, gliding between rows;
    a row it doesn't track still fills itself. */
 .cost-breakdown-list .cost-breakdown-row:not([data-fluid-menu-item]):hover {
-	background: var(--hover);
+	background: var(--cost-row-hover);
 }
 /* Above the page's fill rule, in the row's own hover colour. */
 .cost-breakdown .cost-breakdown-list
 	[data-fluid-menu-root]:not(.cost-metrics)
 	> .fluid-menu-hover-layer
 	.fluid-menu-hover-fill {
-	background: var(--hover);
+	background: var(--cost-row-hover);
 }
 .cost-breakdown-list .cost-breakdown-row:hover,
 .cost-breakdown-list .cost-breakdown-row:hover + .cost-breakdown-row {
@@ -685,7 +696,7 @@
 	[data-fluid-menu-root]
 	> .fluid-menu-hover-layer
 	.fluid-menu-hover-fill {
-	background: var(--hover);
+	background: var(--cost-hover);
 }
 .cost-breakdown-row:focus-visible {
 	outline: 2px solid var(--accent);
@@ -753,7 +764,7 @@
 	border-radius: 999px;
 	overflow: hidden;
 	background: color-mix(in srgb, var(--cost-foreground) 14%, var(--canvas));
-	box-shadow: 0 0 0 1px var(--line);
+	box-shadow: 0 0 0 1px var(--cost-border);
 	transition:
 		grid-template-columns var(--motion-medium-duration) var(--motion-easing),
 		grid-template-rows var(--motion-medium-duration) var(--motion-easing);
@@ -781,7 +792,7 @@
 	--cost-tools-drop: 0 2px 7px rgb(0 0 0 / 8%);
 	box-shadow:
 		var(--cost-tools-drop),
-		0 0 0 1px var(--line);
+		0 0 0 1px var(--cost-border);
 }
 .cost-breakdown:hover .cost-tools-inner,
 .cost-tools:focus-within .cost-tools-inner,
@@ -803,7 +814,7 @@
 }
 .cost-tool-button[aria-pressed="true"],
 .cost-tool-button[data-popup-open] {
-	background: var(--hover);
+	background: var(--cost-hover);
 }
 .cost-tool-button[aria-pressed="true"] {
 	color: var(--cost-blue);
@@ -846,7 +857,7 @@
 	width: 100%;
 	min-width: 0;
 	padding: 8px 10px;
-	border: 1px solid var(--line);
+	border: 1px solid var(--cost-border);
 	border-radius: var(--radius-xs);
 	background: transparent;
 	font-size: var(--size-xl);
@@ -1165,7 +1176,7 @@
 }
 .dark .cost-tools,
 .dark .cost-chart-tooltip {
-	box-shadow: 0 0 0 1px var(--line);
+	box-shadow: 0 0 0 1px var(--cost-border);
 }
 
 .dark .cost-page,
@@ -1192,7 +1203,7 @@
 }
 
 .cost-chart-interval .menu-row:has(input:checked)::before {
-	background: var(--hover);
+	background: var(--menu-highlight);
 }
 .cost-chart-interval .menu-icon {
 	visibility: hidden;
@@ -1221,7 +1232,7 @@
 }
 
 .cost-breakdown[data-dimension="durations"] .cost-breakdown-row:last-of-type {
-	border-top: 1px solid var(--line);
+	border-top: 1px solid var(--cost-border);
 	margin-top: var(--space-m);
 }
 
@@ -1303,7 +1314,7 @@
 	overflow: visible;
 }
 .cost-ci-grid {
-	stroke: var(--line);
+	stroke: var(--cost-border);
 	stroke-dasharray: 3 4;
 }
 .cost-ci-tick {
@@ -1311,7 +1322,7 @@
 	font-size: var(--size-s);
 }
 .cost-ci-tick[data-merged] {
-	fill: color-mix(in oklab, var(--ci-merged) 75%, var(--ink-3));
+	fill: color-mix(in oklab, var(--ci-merged) 75%, var(--cost-muted));
 }
 .cost-ci-day rect {
 	fill: var(--ci-run);

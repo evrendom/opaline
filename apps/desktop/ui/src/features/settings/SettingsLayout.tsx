@@ -86,7 +86,7 @@ export function SettingsSectionTab({
 				aria-current={active ? "page" : undefined}
 				className={cn(
 					"relative flex h-8 items-center",
-					"corner-s px-l corner-squircle",
+					"corner-s px-[calc(var(--space-m)+var(--space-xxs))] corner-squircle",
 					"text-body-xl font-medium",
 					"focus-outline",
 					"squircle:corner-l pointer-coarse:h-12",

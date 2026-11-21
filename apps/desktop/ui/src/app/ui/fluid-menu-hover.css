@@ -12,9 +12,11 @@
 	z-index: -1;
 }
 
+/* The shipped fill is the opaque field grey; a surface can tint it through
+   --fluid-fill (the sidebar takes its accent at 70%). */
 .fluid-menu-hover-fill {
 	border-radius: inherit;
-	background: var(--hover);
+	background: var(--fluid-fill, var(--field));
 }
 
 .fluid-menu-hover-layer[data-over] {

@@ -110,7 +110,7 @@ export function SkillLink({ name }: { name: string }) {
 			to={href(name)}
 			className={cn(
 				"inline-flex h-6 max-w-full items-center",
-				"corner-full px-l",
+				"corner-full px-[calc(var(--space-m)+var(--space-xxs))]",
 				"truncate text-body-s",
 				// design-escape-ok(opacity): no role renders this; ink/90
 				"bg-card text-ink/90 shadow-control",
@@ -178,7 +178,8 @@ export function PushStrip({
 			{pull.rounds.slice(0, 14).map((round) => (
 				<span
 					key={round.sha}
-					className={cn("size-2 corner-xs", OUTCOME_TONE[round.outcome])}
+					// design-escape-ok(radius): shipped value; 2px corner
+					className={cn("size-2 rounded-[2px]", OUTCOME_TONE[round.outcome])}
 				/>
 			))}
 			{pull.rounds.length > 14 ? (
@@ -270,7 +271,12 @@ export function Bars({
 }) {
 	const max = Math.max(...values, 0);
 	return (
-		<div className={cn("flex h-16 items-end gap-xs", className)}>
+		<div
+			className={cn(
+				"flex h-16 items-end gap-[calc(var(--space-xxs)*3/2)]",
+				className,
+			)}
+		>
 			{values
 				.map((value, slot) => ({
 					value,
@@ -284,7 +290,8 @@ export function Bars({
 						title={labels?.[index]}
 						onClick={onPick ? () => onPick(index) : undefined}
 						className={cn(
-							"min-w-0 flex-1 corner-xs transition-opacity",
+							// design-escape-ok(radius): shipped value; 2px corner
+							"min-w-0 flex-1 rounded-[2px] transition-opacity",
 							onPick ? "hover:opacity-100" : "cursor-default",
 							highlight === undefined ||
 								highlight === null ||

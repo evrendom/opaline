@@ -450,7 +450,8 @@ export function RunLanes({
 				key={lane.id}
 				className={cn(
 					"relative h-4 overflow-hidden",
-					"corner-xs",
+					// design-escape-ok(radius): shipped value; 4px corner
+					"rounded-[4px]",
 					// design-escape-ok(opacity): no role renders this; field/60
 					"before:absolute before:inset-0 before:-z-10 before:bg-field/60",
 				)}
@@ -478,7 +479,8 @@ export function RunLanes({
 							data-step={bar.stepId}
 							className={cn(
 								"absolute inset-y-[2px] flex min-w-[2px] items-center overflow-hidden",
-								"corner-xs",
+								// design-escape-ok(radius): shipped value; 3px corner
+								"rounded-[3px]",
 								"hover:brightness-110",
 								own ? null : bar.className,
 								"transition-[opacity,filter] duration-(--motion-medium-duration)",
@@ -528,7 +530,8 @@ export function RunLanes({
 					<span
 						className={cn(
 							"absolute top-1/2 right-0.5",
-							"corner-xs px-xxs",
+							// design-escape-ok(radius): shipped value; 3px corner
+							"rounded-[3px] px-xxs",
 							"text-body-xxs tabular-nums",
 							// design-escape-ok(opacity): no role renders this; canvas/90
 							"pointer-events-none -translate-y-1/2 bg-canvas/90 text-ink-3",
@@ -642,7 +645,8 @@ export function RunLanes({
 										: `Show all lanes, ${unused} this run didn't use`
 								}
 								onClick={() => setAllLanes((shown) => !shown)}
-								className="inline-flex items-center corner-xs px-xxs text-ink-disabled hover:bg-hover hover:text-ink"
+								// design-escape-ok(radius): shipped value; 4px corner
+								className="inline-flex items-center rounded-[4px] px-xxs text-ink-disabled hover:bg-hover hover:text-ink"
 							>
 								{allLanes ? (
 									<IconChevronUp aria-hidden="true" className="size-2.5" />

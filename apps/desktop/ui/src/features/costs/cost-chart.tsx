@@ -1295,7 +1295,7 @@ export function CostChart({
 											<CartesianGrid
 												yAxisId="count"
 												vertical={false}
-												stroke="var(--line)"
+												stroke="var(--cost-border)"
 												strokeDasharray="3 4"
 											/>
 										)}
@@ -1349,7 +1349,7 @@ export function CostChart({
 											tick={
 												heartbeat
 													? false
-													: { fill: "var(--ink-3)", fontSize: 11 }
+													: { fill: "var(--cost-muted)", fontSize: 11 }
 											}
 										/>
 										{metric === "agentRuns" || metric === "ciRuns" ? (
@@ -1368,7 +1368,7 @@ export function CostChart({
 												width={68}
 												tick={
 													phase === "idle" && durationStats?.sampleCount
-														? { fill: "var(--ink-3)", fontSize: 11 }
+														? { fill: "var(--cost-muted)", fontSize: 11 }
 														: false
 												}
 											/>
@@ -1392,7 +1392,7 @@ export function CostChart({
 												width={56}
 												tick={
 													phase === "idle"
-														? { fill: "var(--ink-3)", fontSize: 11 }
+														? { fill: "var(--cost-muted)", fontSize: 11 }
 														: false
 												}
 											/>
@@ -1405,7 +1405,7 @@ export function CostChart({
 											// Appear in place rather than slide in from the last spot.
 											isAnimationActive={false}
 											cursor={{
-												stroke: "var(--ink-3)",
+												stroke: "var(--cost-muted)",
 												strokeDasharray: "3 4",
 											}}
 											content={({ active, payload, label }) => {
@@ -1510,12 +1510,12 @@ export function CostChart({
 													dataKey="medianSeconds"
 													name="Median duration"
 													type="linear"
-													stroke="var(--ink)"
+													stroke="var(--cost-foreground)"
 													strokeWidth={2}
 													dot={{
 														r: 2,
 														strokeWidth: 0,
-														fill: "var(--ink)",
+														fill: "var(--cost-foreground)",
 													}}
 													activeDot={{
 														r: 4,

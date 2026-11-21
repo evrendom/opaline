@@ -19,7 +19,7 @@ export const SESSION_OVERVIEW_ROW_HEIGHT = 48;
 export const SESSION_OVERVIEW_HEADER_HEIGHT = 48;
 
 export const SESSION_OVERVIEW_SURFACE_CLASS_NAME =
-	"flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-canvas font-body";
+	"flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-canvas font-body [--fluid-fill:var(--hover)]";
 
 // Reuse the former branch track's minimum width for the inline model/repo/branch.
 // Give the inline names 55% of spare width (up to 960px); Skills gets the rest.

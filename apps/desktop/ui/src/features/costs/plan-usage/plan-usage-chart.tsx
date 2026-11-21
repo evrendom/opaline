@@ -1066,7 +1066,7 @@ function SplitBar({
 					y={snap(y) - RESET_ICON_PX - RESET_ICON_GAP_PX}
 					size={RESET_ICON_PX}
 					stroke={1.75}
-					color="var(--ink-3)"
+					color="var(--cost-muted)"
 					title={reset}
 					aria-label={reset}
 				/>

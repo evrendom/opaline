@@ -85,7 +85,7 @@ export function PillTabs<T extends string>({
 						}}
 						className={cn(
 							"relative flex h-8 items-center",
-							"corner-s px-l corner-squircle",
+							"corner-s px-[calc(var(--space-m)+var(--space-xxs))] corner-squircle",
 							"text-body-xl font-medium",
 							"transition-colors outline-none",
 							"squircle:corner-l",

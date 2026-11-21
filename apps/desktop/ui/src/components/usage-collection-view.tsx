@@ -58,7 +58,9 @@ const USAGE_GRID_CLASS_NAME =
 // Card: a squircle on its soft hairline shadow, no border.
 const USAGE_CARD_CLASS_NAME =
 	"relative flex h-full w-full min-w-0 flex-col overflow-hidden corner-m bg-card text-left text-session-overview-text shadow-card squircle:corner-xl corner-squircle";
-const USAGE_METADATA_ICON_CLASS_NAME = "size-3.5 shrink-0 text-ink-3";
+const USAGE_METADATA_ICON_CLASS_NAME =
+	// design-escape-ok(colour): shipped value; #8d8d8d, #8c8c8c in dark
+	"size-3.5 shrink-0 text-[#8d8d8d] dark:text-[#8c8c8c]";
 
 type SkillAttribution = NonNullable<HistoricalSkillSummary["attribution"]>;
 
@@ -159,8 +161,8 @@ export function UsageCollectionHeader({
 					aria-hidden="true"
 					className={cn(
 						"absolute top-1/2 left-2.5 z-10 size-3.5",
-						"pointer-events-none -translate-y-1/2 text-ink-3",
-						"dark:text-ink-disabled",
+						// design-escape-ok(colour): shipped value; #b8b8b8, #5b5b5b in dark
+						"pointer-events-none -translate-y-1/2 text-[#b8b8b8] dark:text-[#5b5b5b]",
 					)}
 				/>
 				<input
@@ -360,7 +362,7 @@ const UsageCard = memo(function UsageCard({
 				className="absolute inset-0 z-20 corner-m corner-squircle squircle:corner-xl focus-outline focus-visible:-outline-offset-2"
 			/>
 			<div className="pointer-events-none flex min-h-0 flex-1 flex-col">
-				<header className="flex min-h-16 flex-1 items-center gap-l px-xxl py-xl">
+				<header className="flex min-h-16 flex-1 items-center gap-[calc(var(--space-m)+var(--space-xxs))] px-[calc(var(--space-xl)+var(--space-xs))] py-xl">
 					<SkillMark skill={skill.name} emoji={skill.emoji} />
 					<h2
 						className={cn(
@@ -373,7 +375,7 @@ const UsageCard = memo(function UsageCard({
 						{skill.name}
 					</h2>
 				</header>
-				<footer className="shrink-0 edge-t-m border-line px-xxl py-xl">
+				<footer className="shrink-0 edge-t-m border-line px-[calc(var(--space-xl)+var(--space-xs))] py-xl">
 					<UsageSummary
 						avatarMap={avatarMap}
 						attribution={skill.attribution}
@@ -551,7 +553,7 @@ function UsageCollectionSkeleton({ kind }: { kind: "skills" | "repos" }) {
 			<div className={USAGE_GRID_CLASS_NAME}>
 				{["first", "second", "third", "fourth", "fifth", "sixth"].map((key) => (
 					<div key={key} className={USAGE_CARD_CLASS_NAME}>
-						<div className="flex min-h-16 flex-1 items-center gap-l px-xxl py-xl">
+						<div className="flex min-h-16 flex-1 items-center gap-[calc(var(--space-m)+var(--space-xxs))] px-[calc(var(--space-xl)+var(--space-xs))] py-xl">
 							<Skeleton className="size-9 shrink-0 [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]" />
 							<Skeleton className="h-5 min-w-0 flex-1" />
 						</div>

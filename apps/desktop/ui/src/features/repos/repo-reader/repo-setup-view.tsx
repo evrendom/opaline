@@ -162,7 +162,8 @@ function CalledServerCard({
 function ListedSkillCard({ skill }: { skill: RepositoryListedSkill }) {
 	return (
 		<div className="flex min-h-0 min-w-0 flex-1 flex-col">
-			<header className="flex flex-col gap-m edge-b-m border-line-soft px-xxl py-xl">
+			{/* design-escape-ok(opacity): shipped value; border/50 as line-strong at 50% */}
+			<header className="flex flex-col gap-m edge-b-m border-line-strong/50 px-[calc(var(--space-xl)+var(--space-xs))] py-xl">
 				<div className="flex min-w-0 items-center gap-m">
 					<span className="flex shrink-0 opacity-60 grayscale">
 						<SkillMarkGlyph />
@@ -175,7 +176,7 @@ function ListedSkillCard({ skill }: { skill: RepositoryListedSkill }) {
 					</span>
 				</div>
 			</header>
-			<div className="flex flex-col gap-l px-xxl py-xl text-body-l">
+			<div className="flex flex-col gap-l px-[calc(var(--space-xl)+var(--space-xs))] py-xl text-body-l">
 				{skill.description ? <p>{skill.description}</p> : null}
 				<p className="text-body-m text-ink-3">
 					Offered in {skill.sessions}{" "}
@@ -351,7 +352,7 @@ export function RepoSetupView({
 							{groups.map((group, groupIndex) => (
 								<section key={group.label} className="flex flex-col gap-xxs">
 									{groups.length > 1 ? (
-										<h3 className="px-l pt-l pb-xs text-body-s font-medium text-ink-3">
+										<h3 className="px-[calc(var(--space-m)+var(--space-xxs))] pt-l pb-xs text-body-s font-medium text-ink-3">
 											{group.label}
 										</h3>
 									) : null}
@@ -566,7 +567,7 @@ function ToolRows({
 									onFocus={item.onFocus}
 									className={cn(
 										"relative flex w-full items-baseline gap-s",
-										"corner-s py-xs pr-l pl-l corner-squircle",
+										"corner-s py-xs pr-[calc(var(--space-m)+var(--space-xxs))] pl-l corner-squircle",
 										"text-left text-body-s tabular-nums",
 										"outline-none transition-colors",
 										"squircle:corner-l",
@@ -654,7 +655,7 @@ function VersionRows({
 									onFocus={item.onFocus}
 									className={cn(
 										"relative flex w-full items-baseline gap-s",
-										"corner-s py-xs pr-l pl-l corner-squircle",
+										"corner-s py-xs pr-[calc(var(--space-m)+var(--space-xxs))] pl-l corner-squircle",
 										"text-left text-body-s tabular-nums",
 										"outline-none transition-colors",
 										"squircle:corner-l",
@@ -756,8 +757,8 @@ function RepoSetupRow({
 			onClick={() => onPick(file.setupFile)}
 			onFocus={item.onFocus}
 			className={cn(
-				"relative flex w-full items-center gap-l",
-				"corner-s px-l py-s corner-squircle",
+				"relative flex w-full items-center gap-[calc(var(--space-m)+var(--space-xxs))]",
+				"corner-s px-[calc(var(--space-m)+var(--space-xxs))] py-s corner-squircle",
 				"text-left",
 				"outline-none transition-colors",
 				"squircle:corner-l",
@@ -838,7 +839,7 @@ function SetupSkeleton() {
 							<div
 								// biome-ignore lint/suspicious/noArrayIndexKey: a fixed placeholder list
 								key={index}
-								className="flex h-7 items-center gap-l px-l"
+								className="flex h-7 items-center gap-[calc(var(--space-m)+var(--space-xxs))] px-[calc(var(--space-m)+var(--space-xxs))]"
 							>
 								<Bar className="size-4 shrink-0 corner-full" />
 								<Bar
@@ -850,7 +851,12 @@ function SetupSkeleton() {
 					</div>
 				</div>
 				<div className={RUNS_SHELF}>
-					<div className={cn(RAIL_SHELF, "w-[120px] px-xl pt-l")}>
+					<div
+						className={cn(
+							RAIL_SHELF,
+							"w-[120px] px-[calc(var(--space-l)+var(--space-xxs))] pt-l",
+						)}
+					>
 						{RAIL_SKELETON.map((width, index) => (
 							<Bar
 								// biome-ignore lint/suspicious/noArrayIndexKey: a fixed placeholder list
@@ -862,7 +868,7 @@ function SetupSkeleton() {
 					</div>
 					<div
 						className={cn(
-							"relative z-10 flex min-h-0 min-w-0 flex-1 flex-col gap-l overflow-hidden px-xxl py-xl",
+							"relative z-10 flex min-h-0 min-w-0 flex-1 flex-col gap-l overflow-hidden px-[calc(var(--space-xl)+var(--space-xs))] py-xl",
 							CARD,
 						)}
 					>

@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 // it, with the metrics trailing in fixed tracks so they line up without
 // column headers.
 export const OVERVIEW_ROW_LEAD_CELL_CLASS_NAME =
-	"flex min-w-0 items-center gap-l pr-l pl-xxl";
+	"flex min-w-0 items-center gap-l pr-l pl-[calc(var(--space-xl)+var(--space-xs))]";
 export const OVERVIEW_METRIC_CELL_CLASS_NAME =
 	"flex min-w-0 items-center justify-end px-l text-right text-body-m whitespace-nowrap tabular-nums text-session-overview-muted";
 export const OVERVIEW_METRIC_UNIT_CLASS_NAME = "text-session-overview-subtle";

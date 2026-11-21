@@ -4,7 +4,7 @@
    column, its Cancel/Apply footer, its fluid hover and its pebble-shaped
    selected days. */
 .session-date-picker {
-	--ring: var(--focus);
+	--ring: var(--menu-accent);
 	width: fit-content;
 	max-width: calc(100vw - 32px);
 	max-height: min(var(--available-height, 100svh), calc(100svh - 32px));
@@ -26,12 +26,12 @@
 .session-date-picker-divider {
 	flex: none;
 	height: var(--menu-hairline);
-	background: var(--line-strong);
+	background: var(--menu-border);
 }
 
 .session-date-picker-calendar-panel {
 	min-width: 0;
-	padding: var(--space-xl);
+	padding: calc(var(--space-l) + var(--space-xxs));
 }
 
 .session-date-picker-calendar {
@@ -40,10 +40,9 @@
 	width: 100%;
 	padding: var(--space-m) var(--space-zero) var(--space-zero);
 	font-size: var(--size-xl);
-	line-height: var(--line-xl);
 	letter-spacing: var(--letter-spacing-xl);
 	font-weight: var(--weight-body-regular);
-	color: var(--ink);
+	color: var(--menu-label);
 }
 
 .session-date-picker-month-label {
@@ -51,7 +50,7 @@
 	letter-spacing: var(--letter-spacing-xl);
 	font-weight: var(--weight-body-medium);
 	line-height: var(--line-xl);
-	color: var(--ink);
+	color: var(--menu-label);
 }
 
 .session-date-picker-weekday {
@@ -59,12 +58,12 @@
 	font-size: var(--size-l);
 	letter-spacing: var(--letter-spacing-l);
 	font-weight: var(--weight-body-regular);
-	line-height: var(--line-l);
-	color: color-mix(in oklch, var(--ink-3) 60%, transparent);
+	line-height: var(--line-m);
+	color: color-mix(in oklch, var(--menu-icon) 60%, transparent);
 }
 
 .session-date-picker-calendar .rdp-day_weekends {
-	color: var(--ink-3);
+	color: var(--menu-icon);
 }
 
 .session-date-picker-nav-button {
@@ -77,14 +76,13 @@
 	border: 0;
 	border-radius: var(--radius-s);
 	background: transparent;
-	color: var(--ink-3);
+	color: var(--menu-icon);
 	outline: none;
 }
 
 .session-date-picker-calendar button[data-day] {
 	border-radius: var(--radius-full);
 	font-size: var(--size-xl);
-	line-height: var(--line-xl);
 	letter-spacing: var(--letter-spacing-xl);
 	font-weight: var(--weight-body-regular);
 	box-shadow: none;
@@ -95,8 +93,8 @@
 .session-date-picker-calendar :is(.rdp-range_start, .rdp-range_end)::after,
 .session-date-picker-calendar button[data-range-middle="true"],
 .session-date-picker-calendar td[data-today="true"] {
-	background: var(--hover);
-	color: var(--ink);
+	background: var(--menu-highlight);
+	color: var(--menu-label);
 }
 
 .session-date-picker-calendar button[data-range-middle="true"] {
@@ -141,7 +139,7 @@
 		[data-selected-single="true"]
 	) {
 	background: transparent;
-	color: var(--surface);
+	color: var(--menu-check);
 }
 
 .session-date-picker-calendar
@@ -157,7 +155,7 @@
 	position: absolute;
 	inset: 0;
 	z-index: -1;
-	background: var(--ink);
+	background: var(--menu-accent);
 	-webkit-mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
 	mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
 }
@@ -165,7 +163,7 @@
 .session-date-picker-calendar
 	td[data-today="true"]:not([data-selected="true"])
 	button::before {
-	background: var(--hover);
+	background: var(--menu-highlight);
 }
 
 .session-date-picker-actions .fluid-menu-hover-fill::before {
@@ -190,7 +188,7 @@
 	display: flex;
 	flex: none;
 	justify-content: flex-end;
-	border-top: var(--menu-hairline) solid var(--line-strong);
+	border-top: var(--menu-hairline) solid var(--menu-border);
 	padding: var(--space-s);
 }
 
@@ -204,20 +202,19 @@
 	padding: var(--space-zero) var(--space-l);
 	border-radius: var(--radius-s);
 	font-size: var(--size-xl);
-	line-height: var(--line-xl);
 	letter-spacing: var(--letter-spacing-xl);
 	font-weight: var(--weight-body-regular);
 	box-shadow: none;
 }
 
 .session-date-picker-cancel {
-	color: var(--ink-3);
+	color: var(--menu-icon);
 }
 
 .session-date-picker-apply,
 .session-date-picker-apply:hover {
-	background: var(--ink);
-	color: var(--surface);
+	background: var(--menu-accent);
+	color: var(--menu-check);
 }
 
 @media (min-width: 768px) {
@@ -248,7 +245,7 @@
 }
 .session-date-picker .menu-list .menu-row[aria-pressed="true"]::before,
 .session-date-picker .menu-list .menu-row:has(:checked)::before {
-	background: var(--hover-strong);
+	background: var(--menu-selected);
 	box-shadow: var(--shadow-raised);
 }
 
@@ -256,7 +253,7 @@
 @supports (corner-shape: squircle) {
 	/* A popover's 24px squircle; its rows and buttons sit concentric at 12px. */
 	.menu-surface.session-date-picker {
-		border-radius: var(--radius-xl);
+		border-radius: 24px;
 	}
 	.session-date-picker .menu-list .menu-row::before,
 	.menu-surface.session-date-picker .menu-list .fluid-menu-hover-fill::before,

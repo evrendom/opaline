@@ -61,7 +61,8 @@ export function DetailIdentityBreadcrumb({
 							{!current ? (
 								<IconChevronRight
 									aria-hidden="true"
-									className="size-4 shrink-0 text-ink-disabled"
+									// design-escape-ok(colour): shipped value; #ededed, #373737 in dark
+									className="size-4 shrink-0 text-[#ededed] dark:text-[#373737]"
 								/>
 							) : null}
 						</li>

@@ -57,7 +57,7 @@ export function RunQuestionsAdminPage() {
 					probability of yes. A new wording is a new question; earlier answers
 					keep their wording. Test a question on 20 runs before turning it on.
 				</p>
-				<ul className="list-disc pl-xxl text-ink-3">
+				<ul className="list-disc pl-[calc(var(--space-xl)+var(--space-xs))] text-ink-3">
 					<li>Ask one yes/no question; split a compound condition in two.</li>
 					<li>
 						Phrase it so a high value means yes (not "Was the run free of
