@@ -248,7 +248,10 @@ test("finds hooks installed under another configuration directory than this run'
 test("a hook pointing at a folder without an Opaline runtime removes the hook and deletes nothing there", () => {
 	const unrelated = join(home, "not-opaline");
 	seedState(unrelated);
-	write(join(unrelated, "runtime", "cli.js"), "#!/usr/bin/env node\n// someone else's tool\n");
+	write(
+		join(unrelated, "runtime", "cli.js"),
+		"#!/usr/bin/env node\n// someone else's tool\n",
+	);
 	write(join(home, ".claude", "settings.json"), {
 		hooks: {
 			SessionEnd: [
