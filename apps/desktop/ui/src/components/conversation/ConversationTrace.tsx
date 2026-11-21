@@ -101,7 +101,7 @@ export {
 } from "./expandable-trace-row";
 
 const speakerLabelClassName =
-	// design-escape-ok: deliberate exception, 13/18 heading; no step
+	// design-escape-ok(type): no role renders this; 13/18
 	"shrink-0 [font-family:var(--app-font-heading)] text-[0.8125rem]/[1.125rem] font-heavy text-ink";
 
 function AgentSection({

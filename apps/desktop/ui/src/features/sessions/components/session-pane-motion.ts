@@ -17,5 +17,6 @@ export const sessionPaneMotionStyle: SessionPaneMotionStyle = {
 			bounce: spring.slow.bounce,
 		}),
 	),
+	// design-escape-ok(motion): no role renders this; ease-out
 	"--session-pane-fade-enter": `${spring.slow.duration}s ease-out`,
 };

@@ -44,7 +44,7 @@ export function ChangeBlock({
 				className={cn(
 					"flex min-h-6 flex-wrap items-center gap-x-s gap-y-xs",
 					"text-body-m tabular-nums",
-					"text-ink-3/70",
+					"text-ink-disabled",
 				)}
 			>
 				<span className="font-medium text-ink">
@@ -66,6 +66,7 @@ export function ChangeBlock({
 						className={cn(
 							"inline-flex items-center gap-xs",
 							"corner-full px-s py-xxs",
+							// design-escape-ok(opacity): no role renders this; bg-error/10
 							"bg-error/10 text-error",
 						)}
 					>
@@ -111,7 +112,7 @@ export function ChangeBlock({
 
 export function Cut() {
 	return (
-		<p className="text-body-m text-ink-3/70">
+		<p className="text-body-m text-ink-disabled">
 			Cut at {SESSION_FILE_TEXT_LIMIT.toLocaleString()} characters; the rest is
 			in the transcript.
 		</p>

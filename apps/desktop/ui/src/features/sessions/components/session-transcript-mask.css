@@ -1,11 +1,7 @@
 .session-transcript-mask {
 	--transcript-mask-bar-height: 3px;
 	--transcript-mask-gap: 37px;
-	--transcript-mask-tone: color-mix(
-		in srgb,
-		var(--field, rgb(240 243 247 / 98%)) 32%,
-		transparent
-	);
+	--transcript-mask-tone: color-mix(in srgb, var(--field) 32%, transparent);
 
 	background-image: repeating-linear-gradient(
 		to bottom,
@@ -17,11 +13,7 @@
 }
 
 .dark .session-transcript-mask {
-	--transcript-mask-tone: color-mix(
-		in srgb,
-		var(--field, rgb(15 23 42 / 98%)) 42%,
-		transparent
-	);
+	--transcript-mask-tone: color-mix(in srgb, var(--field) 42%, transparent);
 }
 
 .session-transcript-row-surface {

@@ -38,7 +38,7 @@ export function SessionOverviewFilterOptionsPanel({
 	return (
 		<>
 			{canSearch ? (
-				<div className="relative edge-b-m border-line/60 p-m">
+				<div className="relative edge-b-m border-line-soft p-m">
 					<label className="sr-only" htmlFor={`${controlId}-search`}>
 						{`Search ${label.toLocaleLowerCase()}`}
 					</label>
@@ -50,6 +50,7 @@ export function SessionOverviewFilterOptionsPanel({
 						id={`${controlId}-search`}
 						type="text"
 						name={`${controlId}-search`}
+						// design-escape-ok(opacity): no role renders this; bg-field/60
 						className="h-8 corner-m bg-field/60 pr-m pl-[calc(var(--space-xxl)*1.5)] text-body-xl"
 						placeholder={`Search ${label.toLocaleLowerCase()}`}
 						value={searchQuery}
@@ -110,7 +111,7 @@ export function SessionOverviewFilterOptionsPanel({
 							<label
 								key={option.value}
 								htmlFor={optionId}
-								className="flex min-h-9 items-center gap-l corner-m px-l py-s text-body-xl font-medium outline-none hover:bg-hover hover:text-ink"
+								className="flex min-h-9 items-center gap-l corner-m px-l py-s text-body-xl font-medium focus-outline hover:bg-hover hover:text-ink"
 								title={option.value}
 							>
 								<Checkbox
@@ -131,7 +132,7 @@ export function SessionOverviewFilterOptionsPanel({
 				)}
 			</div>
 			{variant === "default" ? (
-				<div className="edge-t-m border-line/60 px-l py-m text-body-m tabular-nums text-ink-3">
+				<div className="edge-t-m border-line-soft px-l py-m text-body-m tabular-nums text-ink-3">
 					{selectedOptionCount.toLocaleString()} of{" "}
 					{options.length.toLocaleString()} selected
 				</div>

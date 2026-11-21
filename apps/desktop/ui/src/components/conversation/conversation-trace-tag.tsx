@@ -11,10 +11,11 @@ import { getModelIconComponent } from "./conversation-trace-model-icon";
 import { CONVERSATION_TOOL_ICONS } from "./conversation-trace-tool-icons";
 
 export const CONVERSATION_TRACE_TAG_CLASS_NAME =
+	// design-escape-ok(opacity): no role renders this; dark:bg-ink/7, dark:text-ink/93
 	"inline-flex h-5 items-center gap-xs truncate corner-xs bg-canvas pr-s pl-xxs dashboardy-mono text-body-m font-medium text-ink shadow-chip select-none dark:bg-ink/7 dark:text-ink/93 dark:shadow-inset";
 
 const defaultIconClassName = "size-3.5 shrink-0 text-ink-3";
-// design-escape-ok: TypeScript's brand colour
+// design-escape-ok(colour): TypeScript's brand colour
 const typeScriptIconClassName = "size-3.5 shrink-0 text-[#3178c6]";
 
 function isTypeScriptFile(value: string) {

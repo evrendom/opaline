@@ -48,6 +48,7 @@ export function PayloadSection({
 						className={cn("size-3 transition-transform", open && "rotate-90")}
 					/>
 					{label}
+					{/* design-escape-ok(opacity): no role renders this; text-ink-3/60 */}
 					<span className="text-ink-3/60 tabular-nums">
 						{hint ?? sizeHint(value)}
 					</span>

@@ -111,7 +111,7 @@ function Inline({ text }: { text: string }) {
 				return (
 					<code
 						key={key}
-						// design-escape-ok: inline code scales with its prose
+						// design-escape-ok(type): inline code scales with its prose
 						className="corner-xs bg-field px-xs py-xxs font-data text-[0.85em]"
 					>
 						{part.slice(1, -1)}
@@ -174,7 +174,7 @@ export function SetupProse({
 							<List
 								key={key}
 								className={cn(
-									"space-y-xxs pl-xxl marker:text-ink-3/70",
+									"space-y-xxs pl-xxl marker:text-ink-disabled",
 									block.ordered ? "list-decimal" : "list-disc",
 								)}
 							>
@@ -203,7 +203,7 @@ export function SetupProse({
 							</div>
 						);
 					case "rule":
-						return <hr key={key} className="border-line/60" />;
+						return <hr key={key} className="border-line-soft" />;
 					default:
 						return null;
 				}

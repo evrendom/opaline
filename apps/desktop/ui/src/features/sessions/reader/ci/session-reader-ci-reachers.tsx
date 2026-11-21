@@ -14,7 +14,7 @@ import {
 function TurnTag({ index, turnId }: { index: number; turnId: string }) {
 	return (
 		<span className="flex shrink-0 items-baseline gap-s tabular-nums">
-			<span className="w-5 text-ink-3/70">{index + 1}</span>
+			<span className="w-5 text-ink-disabled">{index + 1}</span>
 			<span className="font-data text-ink-3">{shortRunId(turnId)}</span>
 		</span>
 	);
@@ -28,6 +28,7 @@ function HowWords({ link }: { link: CiReachLink }) {
 			title={words.full}
 			className={cn(
 				"shrink-0 text-body-s whitespace-nowrap",
+				// design-escape-ok(opacity): no role renders this; text-ink/70
 				exact ? "text-ink/70" : "text-ink-3 italic",
 			)}
 		>
@@ -40,7 +41,7 @@ function HowWords({ link }: { link: CiReachLink }) {
 }
 
 const ROW =
-	"flex min-h-6 w-full min-w-0 items-center gap-m corner-s px-s text-left text-body-m transition-colors hover:bg-hover/60";
+	"flex min-h-6 w-full min-w-0 items-center gap-m corner-s px-s text-left text-body-m transition-colors hover:bg-hover";
 
 export function ReachedBy({
 	lit = null,
@@ -83,6 +84,7 @@ export function ReachedBy({
 								<span
 									className={cn(
 										"min-w-0 flex-1 truncate",
+										// design-escape-ok(opacity): no role renders this; text-ink/85
 										main ? "text-ink/85" : "text-ink-3",
 									)}
 								>
@@ -115,6 +117,7 @@ export function ReachedBy({
 										subagentId={reacher.agent ?? ""}
 										selected={lit === reacher.key}
 									/>
+									{/* design-escape-ok(opacity): no role renders this; text-ink/80 */}
 									<span className="min-w-0 flex-1 truncate text-ink/80">
 										{reacher.task ?? "Subagent"}
 									</span>
@@ -165,6 +168,7 @@ export function PullTouchers({
 							{reacher.agent ? (
 								<SubagentTag subagentId={reacher.agent} />
 							) : null}
+							{/* design-escape-ok(opacity): no role renders this; text-ink/80 */}
 							<span className="min-w-0 flex-1 truncate text-ink/80">
 								{reacher.agent
 									? (reacher.task ?? "Subagent")

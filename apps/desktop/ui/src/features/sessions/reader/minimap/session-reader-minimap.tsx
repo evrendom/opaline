@@ -296,6 +296,7 @@ export function ReaderMinimap({
 					/>
 				))}
 				<path
+					// design-escape-ok(base): a category colour from the opal sheen (data paint)
 					className="fill-none stroke-color-2/30"
 					d={`${line.rail} ${line.branches}`}
 					strokeLinecap="round"
@@ -319,6 +320,7 @@ export function ReaderMinimap({
 						clipPath={`url(#${litId})`}
 					>
 						<path
+							// design-escape-ok(base): a category colour from the opal sheen (data paint)
 							className="fill-none stroke-color-2"
 							d={`${line.rail} ${line.branches}`}
 							strokeLinecap="round"
@@ -398,7 +400,8 @@ export function ReaderMinimap({
 								? "fill-canvas"
 								: node.alert
 									? "fill-error stroke-error"
-									: "fill-canvas stroke-color-2/60"
+									: // design-escape-ok(base): a category colour from the opal sheen (data paint)
+										"fill-canvas stroke-color-2/60"
 						}
 						style={
 							node.kind === "subagent"
@@ -479,6 +482,7 @@ export function ReaderMinimap({
 			</svg>
 			<div
 				ref={viewRef}
+				// design-escape-ok(opacity): no role renders this; ring-ink/8 hover:ring-ink/15 dark:ring-ink/12 dark:hover:bg-ink/8
 				className="absolute inset-x-0 top-0 corner-s bg-canvas corner-squircle squircle:corner-l ring-1 ring-ink/8 hover:ring-ink/15 dark:bg-wash dark:ring-ink/12 dark:hover:bg-ink/8"
 			/>
 			<MinimapHeads

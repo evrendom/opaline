@@ -58,6 +58,7 @@ function ciTone(ci: SessionReaderStep["ci"]): {
 				: ci.run.conclusion;
 	if (conclusion === undefined)
 		return {
+			// design-escape-ok(opacity): no role renders this; bg-ink-3/40
 			bar: "bg-ink-3/40",
 			text: "text-ink-3",
 			tint: "var(--ink-3)",
@@ -155,7 +156,7 @@ export function OpalChip({
 				"corner-full",
 				sidebar
 					? cn(
-							"relative grid size-4.5 shrink-0 place-items-center transition-colors duration-(--motion-quick-duration) ease-in-out",
+							"relative grid size-4.5 shrink-0 place-items-center transition-colors duration-(--motion-quick-duration) ease-wave",
 							sidebar === "active" ? tone.glyph : restingGlyphClassName,
 						)
 					: "relative grid size-4.5 shrink-0 place-items-center [--opal-fill:color-mix(in_oklab,var(--opal-tint)_15%,transparent)] [--opal-ring:color-mix(in_oklab,var(--opal-tint)_14%,transparent)] drop-shadow-[0_2px_3px_color-mix(in_oklab,var(--opal-tint)_25%,transparent)] dark:[--opal-ring:rgb(255_255_255/0.08)] dark:drop-shadow-[0_1px_2px_rgb(0_0_0/0.24)]",
@@ -172,7 +173,7 @@ export function OpalChip({
 					/>
 					<OpalineShape
 						className={cn(
-							"absolute inset-0 transition-opacity duration-(--motion-quick-duration) ease-in-out",
+							"absolute inset-0 transition-opacity duration-(--motion-quick-duration) ease-wave",
 							tone.chip,
 							sidebar === "active" ? "opacity-100" : "opacity-0",
 						)}

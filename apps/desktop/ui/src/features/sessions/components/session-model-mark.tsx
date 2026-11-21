@@ -16,7 +16,7 @@ const MODEL_MARK_CLASS_NAME =
 const MODEL_BACKGROUND_CLASS_NAME =
 	"absolute inset-0 [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]";
 const MODEL_ICON_SHELL_CLASS_NAME =
-	// design-escape-ok: the model icon's hairline edge is artwork
+	// design-escape-ok(shadow): the model icon's hairline edge is artwork
 	"session-turn-table-model-icon-shell relative flex size-5 shrink-0 drop-shadow-[0_0_0.75px_rgb(0_0_0_/_14%)]";
 const MODEL_ICON_CLASS_NAME =
 	"session-turn-table-model-icon size-5 corner-zero edge-none bg-canvas shadow-none dark:bg-[color-mix(in_oklab,#fff_14%,var(--canvas))] [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]";
@@ -127,6 +127,7 @@ export function SessionModelMark({
 				{...iconAccessibility}
 				className={cn(
 					MODEL_BACKGROUND_CLASS_NAME,
+					// design-escape-ok(opacity): no role renders this; bg-warning/10
 					tone.icon === "claude" && "bg-warning/10",
 					tone.icon !== "claude" && "bg-mark-fill",
 					progress && tone.identityIconClassName,

@@ -3,6 +3,7 @@ import {
 	IconChevronRight,
 	IconFilterEdit,
 } from "@tabler/icons-react";
+import { Button } from "@/app/ui/button";
 import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
 
 type LinearFilterItem = {
@@ -22,19 +23,21 @@ export function LinearActiveFiltersButton({
 	const label = `Review ${count.toLocaleString()} active session ${count === 1 ? "filter" : "filters"}`;
 
 	return (
-		<button
+		<Button
 			type="button"
+			variant="ghost"
+			size="icon-sm"
 			aria-label={label}
-			className="relative flex size-7 shrink-0 items-center justify-center corner-s text-ink outline-none hover:bg-hover-strong focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-ink"
+			className="relative size-7 corner-s text-ink hover:bg-hover-strong"
 			onClick={onClick}
 			title={label}
 		>
-			<IconFilterEdit aria-hidden="true" className="size-4" />
+			<IconFilterEdit aria-hidden="true" className="size-4 text-current" />
 			<span
 				aria-hidden="true"
 				className="absolute top-1 right-1 size-1.5 corner-full bg-ink ring-1 ring-canvas"
 			/>
-		</button>
+		</Button>
 	);
 }
 

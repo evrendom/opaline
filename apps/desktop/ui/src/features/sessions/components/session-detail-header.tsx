@@ -43,7 +43,7 @@ type SessionDetailHeaderProps = {
 // Record pill: round segments that tint on hover inside an
 // outlined pill.
 const sessionHeaderNavigationButtonClassName =
-	"relative flex h-full items-center corner-full p-m text-ink-3 outline-none transition-colors hover:bg-hover hover:text-ink disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-ink-3";
+	"relative flex h-full items-center corner-full p-m text-ink-3 focus-outline transition-colors hover:bg-hover hover:text-ink disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-ink-3";
 
 const sessionMetricsGroupClassName =
 	"flex w-fit min-w-0 max-w-full items-center divide-x divide-line overflow-x-auto";
@@ -99,6 +99,7 @@ function SessionIdentityBreadcrumb({
 							{index < 3 ? (
 								<IconChevronRight
 									aria-hidden="true"
+									// design-escape-ok(opacity): no role renders this; text-ink/6, dark:text-ink/8
 									className="size-4 shrink-0 text-ink/6 dark:text-ink/8"
 								/>
 							) : null}

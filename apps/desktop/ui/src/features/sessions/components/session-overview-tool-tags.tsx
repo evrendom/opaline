@@ -63,7 +63,7 @@ function ToolTag({
 				"h-[1.1875rem] max-w-44 gap-xs [corner-shape:superellipse(1.25)]",
 				"corner-m py-xxs pr-s pl-xxs",
 				"text-ink bg-card shadow-card",
-				"dark:bg-ink-3/10",
+				"dark:bg-wash",
 				onOpen && "cursor-pointer hover:bg-hover",
 			)}
 			data-session-overview-tool-tag={kind}

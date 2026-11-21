@@ -141,6 +141,7 @@ function BreakdownStrip({
 							style={{ backgroundColor: part.color }}
 						/>
 						{part.label} {format(part.value)}
+						{/* design-escape-ok(opacity): no role renders this; text-ink-3/60 */}
 						<span className="text-ink-3/60">{share(part.value)}</span>
 					</span>
 				))}
@@ -244,19 +245,19 @@ function TimeDistribution({
 			format={formatDuration}
 			total={totalMs}
 			parts={[
-				// design-escape-ok: legend swatches repeat the activity lanes' colours
+				// design-escape-ok(colour): legend swatches repeat the activity lanes' colours
 				{ label: "Thinking", swatch: "bg-violet-500", value: thinking },
-				// design-escape-ok: legend swatches repeat the activity lanes' colours
+				// design-escape-ok(colour): legend swatches repeat the activity lanes' colours
 				{ label: "Writing", swatch: "bg-violet-300", value: writing },
-				// design-escape-ok: legend swatches repeat the activity lanes' colours
+				// design-escape-ok(colour): legend swatches repeat the activity lanes' colours
 				{ label: "Tools", swatch: "bg-blue-500", value: tools },
-				// design-escape-ok: legend swatches repeat the activity lanes' colours
+				// design-escape-ok(colour): legend swatches repeat the activity lanes' colours
 				{ label: "Waiting on you", swatch: "bg-amber-400", value: you },
-				// design-escape-ok: legend swatches repeat the activity lanes' colours
+				// design-escape-ok(colour): legend swatches repeat the activity lanes' colours
 				{ label: "Compacting", swatch: "bg-green-500", value: compacting },
 				{
 					label: "Waiting",
-					swatch: "bg-ink-3/15",
+					swatch: "bg-hover-strong",
 					value: Math.max(0, totalMs - covered),
 				},
 			]
@@ -286,6 +287,7 @@ function Touched({ marks }: { marks: readonly SessionReaderTurnMark[] }) {
 						<span className="flex items-center gap-s text-body-m text-ink-3">
 							<Icon aria-hidden="true" className={cn("size-3.5", className)} />
 							{label}
+							{/* design-escape-ok(opacity): no role renders this; text-ink-3/60 */}
 							<span className="text-ink-3/60 tabular-nums">
 								{mark.items.length}
 							</span>
@@ -387,8 +389,9 @@ function StepKinds({
 									"flex w-full items-center gap-m",
 									"corner-s px-m py-xs",
 									"text-left",
-									"hover:bg-hover/80 dark:hover:bg-hover/50",
-									on && "bg-hover dark:bg-hover/70",
+									// design-escape-ok(opacity): no role renders this; dark:hover:bg-hover/50
+									"hover:bg-hover dark:hover:bg-hover/50",
+									on && "bg-hover dark:bg-hover",
 								)}
 							>
 								<StepIconChip step={option.sample} />
@@ -452,12 +455,12 @@ export function RunOverview({
 	return (
 		<>
 			{touched.length > 0 ? (
-				<div className="edge-b-m border-line/40 px-xxl pb-xxl">
+				<div className="edge-b-m border-line-soft px-xxl pb-xxl">
 					<Touched marks={touched} />
 				</div>
 			) : null}
 
-			<div className="edge-b-m border-line/40 px-xxl pb-xxl">
+			<div className="edge-b-m border-line-soft px-xxl pb-xxl">
 				<StepKinds
 					filter={filter}
 					onToggle={onToggleFilter}
@@ -471,7 +474,7 @@ export function RunOverview({
 				<div
 					className={cn(
 						"grid grid-cols-2 gap-xl px-xxl",
-						totalMs > 0 && "edge-b-m border-line/40 pb-xxl",
+						totalMs > 0 && "edge-b-m border-line-soft pb-xxl",
 					)}
 				>
 					<Field label="Started" value={formatDateTime(turn.startedAt)} />
@@ -495,7 +498,7 @@ export function RunOverview({
 					/>
 					<Field
 						label="Tokens"
-						className="col-span-2 edge-t-m border-line/40 pt-xl"
+						className="col-span-2 edge-t-m border-line-soft pt-xl"
 						value={
 							<span className="flex flex-col gap-m">
 								{formatCompactNumber(tokens)}

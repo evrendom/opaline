@@ -87,12 +87,14 @@ function SessionDetailActivityMenuItem({
 				aria-expanded={flyoutsEnabled ? isOpen : undefined}
 				aria-haspopup={flyoutsEnabled ? "menu" : undefined}
 				className={cn(
-					// design-escape-ok: deliberate exception, 10px trigger padding sits between steps; a step shifts the strip
-					"session-detail-opaline-trigger relative inline-flex shrink-0 items-center justify-center gap-s corner-s border-[0.5px] border-ink/20 bg-canvas px-2.5 py-xs text-body-l font-medium text-ink/60 disabled:pointer-events-none dark:border-ink/25 dark:text-ink/70",
+					// design-escape-ok(opacity): no role renders this; border-ink/20, text-ink/60, dark:border-ink/25, dark:text-ink/70
+					"session-detail-opaline-trigger relative inline-flex shrink-0 items-center justify-center gap-s corner-s border-[0.5px] border-ink/20 bg-canvas px-[calc(var(--space-m)+var(--space-xxs))] py-xs text-body-l font-medium text-ink/60 disabled:pointer-events-none dark:border-ink/25 dark:text-ink/70",
 					flyoutsEnabled &&
+						// design-escape-ok(opacity): no role renders this; hover:bg-ink/[0.063], hover:text-ink/90, dark:hover:bg-ink/[0.071], dark:hover:text-ink/95
 						"hover:bg-ink/[0.063] hover:text-ink/90 dark:hover:bg-ink/[0.071] dark:hover:text-ink/95",
 					flyoutsEnabled &&
 						isOpen &&
+						// design-escape-ok(opacity): no role renders this; bg-ink/[0.063], text-ink/90, dark:bg-ink/[0.071], dark:text-ink/95
 						"bg-ink/[0.063] text-ink/90 dark:bg-ink/[0.071] dark:text-ink/95",
 				)}
 				data-state={isOpen ? "open" : "closed"}
@@ -107,6 +109,7 @@ function SessionDetailActivityMenuItem({
 			>
 				<TouchTarget className="pointer-events-none" />
 				<span>{group.label}</span>
+				{/* design-escape-ok(opacity): no role renders this; text-ink/60, dark:text-ink/70 */}
 				<span className="text-ink/60 tabular-nums dark:text-ink/70">
 					{group.totalCount.toLocaleString()}
 				</span>
@@ -532,6 +535,7 @@ export function SessionDetailActivityStrip({
 				</ul>
 				{flyoutsEnabled && panelFrames.length > 0 ? (
 					<div
+						// design-escape-ok(opacity): a translucent flyout over backdrop blur; no translucent ground role (also text-ink/90, ring-ink/8)
 						className="session-detail-opaline-menu absolute top-[calc(100%+1px)] right-0 left-0 overflow-hidden corner-l bg-canvas/90 text-ink/90 shadow-flyout ring-1 ring-ink/8 backdrop-blur-2xl outline-none dark:text-ink"
 						data-state={popupState}
 						onPointerEnter={() => clearTimer(closeTimerRef.current)}

@@ -100,7 +100,7 @@ export function SessionMemberRow({
 					"group inline-flex items-center gap-xxs",
 					"corner-xs",
 					"align-baseline text-body-m font-medium",
-					"text-ink-3 outline-none",
+					"text-ink-3 focus-outline",
 					"hover:text-ink",
 				)}
 				data-trace-content-disclosure

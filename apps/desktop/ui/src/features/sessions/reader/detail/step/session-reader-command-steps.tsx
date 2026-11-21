@@ -198,7 +198,7 @@ function Letters({ pieces }: { pieces: Piece[] }) {
 function QuoteMark({ piece }: { piece: Piece }) {
 	const double = piece.text === '"';
 	return (
-		<span className="text-ink-3/70">
+		<span className="text-ink-disabled">
 			{piece.mark === "open" ? (double ? "“" : "‘") : double ? "”" : "’"}
 		</span>
 	);
@@ -258,6 +258,7 @@ function StageText({
 	span: Span;
 }) {
 	return open ? (
+		// design-escape-ok(opacity): no role renders this; text-ink/80">
 		<span className="text-body-l text-ink/80">
 			{keyed(gluePunctuation(capitalized(sentence)), (part) =>
 				segmentText(part.segment),
@@ -505,7 +506,7 @@ export function CommandLines({
 				className={cn(
 					"flex flex-col",
 					"divide-y corner-m edge-m px-m py-xxs",
-					"divide-line/40 border-line/60 bg-canvas",
+					"divide-line-soft border-line-soft bg-canvas",
 					"dark:bg-canvas/25",
 				)}
 			>

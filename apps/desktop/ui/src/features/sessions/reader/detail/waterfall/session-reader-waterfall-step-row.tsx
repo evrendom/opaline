@@ -47,7 +47,7 @@ const DASHED =
 function SubagentRoleMark({ role }: { role: SubagentRole }) {
 	const { Icon, className, label } = {
 		finish: {
-			// design-escape-ok: deliberate exception, emerald-500 in both modes; success is green-600 in light, visibly darker (dark's success is this emerald)
+			// design-escape-ok(colour): deliberate exception, emerald-500 in both modes; success is green-600 in light, visibly darker (dark's success is this emerald)
 			className: "text-emerald-500",
 			Icon: IconCircleCheckFilled,
 			label: "Finished",
@@ -115,7 +115,7 @@ export const StepRowView = memo(function StepRowView({
 	const subagentTint = useSubagentTint(step);
 	const subagentRole = useSubagentRole(step);
 	const bar = step.isError
-		? // design-escape-ok: an error step's bar beside the lane-tinted bars
+		? // design-escape-ok(colour): an error step's bar beside the lane-tinted bars
 			{ className: "bg-rose-500" }
 		: { style: { backgroundColor: subagentTint ?? stepTint(step) } };
 	const timed = isToolStep(step) || step.kind === "ci" || durationMs > 0;
@@ -220,7 +220,7 @@ export const StepRowView = memo(function StepRowView({
 							<span
 								role="img"
 								aria-label="Error"
-								// design-escape-ok: deliberate exception, rose to match the waterfall's rose-500 error bar (data paint); the error role is a visibly different red
+								// design-escape-ok(colour): deliberate exception, rose to match the waterfall's rose-500 error bar (data paint); the error role is a visibly different red
 								className="inline-flex size-5 shrink-0 items-center justify-center corner-full bg-rose-500/10 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400"
 							>
 								<IconAlertTriangle aria-hidden="true" className="size-3" />

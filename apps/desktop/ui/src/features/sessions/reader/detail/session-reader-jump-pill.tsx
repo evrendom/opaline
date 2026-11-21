@@ -99,7 +99,7 @@ export function JumpPill({
 			className={cn(
 				"flex h-8 items-center gap-s",
 				"corner-full pr-l pl-s",
-				"bg-canvas text-ink-3 shadow-card transition-[opacity,translate,color] duration-(--motion-medium-duration) ease-out",
+				"bg-canvas text-ink-3 shadow-card transition-[opacity,translate,color] duration-(--motion-medium-duration) ease-base",
 				"hover:text-ink dark:bg-card",
 				where
 					? "pointer-events-auto translate-y-0 opacity-100"

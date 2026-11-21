@@ -5,6 +5,7 @@ import {
 } from "@tabler/icons-react";
 
 const TOGGLE =
+	// design-escape-ok(opacity): no role renders this; text-ink-3/60
 	"inline-flex shrink-0 items-center justify-center corner-xs p-xs text-ink-3/60 transition-colors outline-none hover:text-ink aria-pressed:text-ink";
 
 export function StepHeadToggles({

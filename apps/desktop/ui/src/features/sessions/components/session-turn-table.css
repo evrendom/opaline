@@ -72,7 +72,7 @@
 	background: var(--line);
 	opacity: 0;
 	pointer-events: none;
-	transition: opacity var(--motion-medium-duration) ease;
+	transition: opacity var(--motion-medium-duration) var(--motion-easing);
 }
 
 .session-turn-table-scrollbar[data-overflow="true"][data-visible="true"]

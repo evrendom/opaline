@@ -139,7 +139,7 @@ export function SetupColumn({
 					<FluidList
 						className={cn(
 							"flex flex-col gap-xxs",
-							uses && "mt-l edge-t-m border-line/50 pt-m",
+							uses && "mt-l edge-t-m border-line-soft pt-m",
 							calls && "hidden",
 						)}
 					>
@@ -159,7 +159,7 @@ export function SetupColumn({
 						))}
 					</FluidList>
 					{receivedBy ? (
-						<div className="mt-l edge-t-m border-line/50 pt-xs">
+						<div className="mt-l edge-t-m border-line-soft pt-xs">
 							{receivedBy}
 						</div>
 					) : null}
@@ -290,6 +290,7 @@ function SetupUseGroup({
 				<div key={tool ?? ""} className="flex flex-col gap-xxs">
 					{tool ? (
 						<div className="flex items-center gap-m py-xs pr-l pl-[calc(var(--space-xxl)*1.5)]">
+							{/* design-escape-ok(opacity): no role renders this; text-ink/90 */}
 							<span className="min-w-0 flex-1 truncate text-body-m text-ink/90">
 								{tool}
 							</span>
@@ -299,8 +300,11 @@ function SetupUseGroup({
 					{uses.map((use) => (
 						<SetupUseRow
 							key={use.step.id}
-							// design-escape-ok: indents align under the tool icon column
-							indent={tool ? "pl-13" : "pl-9"}
+							indent={
+								tool
+									? "pl-[calc(var(--space-xxl)*2+var(--space-xs))]"
+									: "pl-[calc(var(--space-xxl)+var(--space-l))]"
+							}
 							index={indexOf(use)}
 							isPicked={use.step.id === pickedUse}
 							onPick={() => onPickUse(use)}
@@ -392,6 +396,7 @@ function SetupUseRow({
 			<span
 				className={cn(
 					"min-w-0 flex-1 truncate text-body-m",
+					// design-escape-ok(opacity): no role renders this; text-ink/70
 					isPicked ? "text-ink" : "text-ink/70",
 				)}
 			>
@@ -417,6 +422,7 @@ export function SetupMark({ file }: { file: SessionSetupFile }) {
 				skullet-block=""
 				className="inline-flex shrink-0 corner-xs corner-squircle squircle:corner-m"
 			>
+				{/* design-escape-ok(opacity): no role renders this; text-ink-3/60 */}
 				<Icon aria-hidden="true" className="size-4 text-ink-3/60" />
 			</span>
 		);
@@ -465,6 +471,7 @@ function SetupFileRow({
 					title={file.setupFile}
 					className={cn(
 						"truncate text-body-m",
+						// design-escape-ok(opacity): no role renders this; text-ink/90
 						isPicked ? "text-ink" : "text-ink/90",
 					)}
 				>

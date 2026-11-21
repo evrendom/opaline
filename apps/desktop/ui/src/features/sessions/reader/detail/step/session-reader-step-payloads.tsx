@@ -96,13 +96,16 @@ export function HighlightedCode({
 						key={`${id}#${repeat}`}
 						className={cn(
 							"flex px-l",
+							// design-escape-ok(opacity): no role renders this; bg-success/10
 							kind === "addition" && "bg-success/10",
+							// design-escape-ok(opacity): no role renders this; bg-error/10
 							kind === "deletion" && "bg-error/10",
 						)}
 					>
 						{startLine !== undefined || lineNumbers ? (
 							<span
 								aria-hidden="true"
+								// design-escape-ok(opacity): no role renders this; text-ink-3/50
 								className="mr-l shrink-0 text-right text-ink-3/50 tabular-nums select-none"
 								style={{ width: `${gutter}ch` }}
 							>

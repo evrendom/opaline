@@ -133,7 +133,7 @@ export function SessionsOverviewPendingRow({
 					>
 						{sourceLabel ? (
 							<p
-								// design-escape-ok: 16/20 applies below sm only
+								// design-escape-ok(type): no role renders this; 16/20 below sm
 								className="min-w-0 max-w-28 shrink-0 truncate text-base/5 font-medium tracking-m text-ink sm:text-body-l"
 								data-session-overview-model-label
 							>

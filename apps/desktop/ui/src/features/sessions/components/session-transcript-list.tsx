@@ -1149,8 +1149,7 @@ const TranscriptVirtualRow = memo(function TranscriptVirtualRow({
 					{...elementTimingAttributes}
 					key={contentVersion}
 					aria-hidden
-					// design-escape-ok: an invisible 1px measuring node
-					className="pointer-events-none absolute top-0 left-0 size-px overflow-hidden text-[1px] leading-none opacity-[0.01]"
+					className="pointer-events-none absolute top-0 left-0 size-px overflow-hidden text-body-xxs line-solid opacity-[0.01]"
 				>
 					{contentVersion}
 				</span>

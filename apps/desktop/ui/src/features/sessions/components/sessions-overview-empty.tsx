@@ -4,7 +4,7 @@ import { useDotPick } from "@/features/costs/cost-hover-date";
 import { dayLabel } from "./sessions-focused-day-tag";
 
 const LINK_BUTTON_CLASS_NAME =
-	"mx-auto corner-s px-m py-xs text-body-xl font-medium text-accent outline-none hover:bg-hover focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-accent";
+	"mx-auto corner-s px-m py-xs text-body-xl font-medium text-accent focus-outline hover:bg-hover";
 
 export function SessionsOverviewEmpty({
 	noneInRange,

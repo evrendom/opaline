@@ -32,7 +32,7 @@ export const TURN_MARKS: Record<
 		tint: "var(--color-emerald-500)",
 	},
 	"file-edited": {
-		className: "text-color-1",
+		className: "text-accent",
 		Icon: IconPencil,
 		label: "Edited",
 		tint: "var(--color-blue-500)",
@@ -171,6 +171,7 @@ export function RunTouchTags({
 					"inline-flex h-5 items-center gap-xs",
 					"corner-full pr-m pl-xxs",
 					"tabular-nums",
+					// design-escape-ok(opacity): no role renders this; text-ink/80
 					"bg-canvas text-ink/80 shadow-control",
 					"dark:bg-card",
 				)}

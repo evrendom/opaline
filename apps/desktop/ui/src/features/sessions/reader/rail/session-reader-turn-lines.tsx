@@ -100,7 +100,7 @@ function PromptTokens({
 				.join("\n")}
 		>
 			~{formatCompactNumber(estimate.tokens)} tokens
-			{share ? <span className="text-ink-3/70"> · {share}</span> : null}
+			{share ? <span className="text-ink-disabled"> · {share}</span> : null}
 		</span>
 	);
 }
@@ -156,6 +156,7 @@ export function MemberFactLine({
 										? quotes(negative)
 										: "Tracked as frustrated: the run before it is flagged"
 								}
+								// design-escape-ok(opacity): no role renders this; bg-error/10
 								className={cn(PILL, "bg-error/10 text-error")}
 							>
 								<IconMoodSad aria-hidden="true" />
@@ -165,6 +166,7 @@ export function MemberFactLine({
 						{positive.length > 0 ? (
 							<span
 								title={quotes(positive)}
+								// design-escape-ok(opacity): no role renders this; bg-success/10
 								className={cn(PILL, "bg-success/10 text-success")}
 							>
 								<IconMoodSmile aria-hidden="true" />
@@ -183,6 +185,7 @@ export function MemberFactLine({
 							<span
 								key={question.id}
 								title={runQuestionTagTitle(question)}
+								// design-escape-ok(opacity): no role renders this; bg-warning/10
 								className={cn(PILL, "bg-warning/10 text-warning")}
 							>
 								<IconMessageQuestion aria-hidden="true" />
