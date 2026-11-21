@@ -271,7 +271,9 @@ export function RepoSkillSessions({
 				</div>
 			)}
 			{rows.length > 0 && searching ? (
-				<p className="px-xxl py-l text-body-m text-ink-3">Finding more runs…</p>
+				<p className="px-xxl py-l text-body-m text-session-overview-subtle">
+					Finding more runs…
+				</p>
 			) : null}
 		</div>
 	);
@@ -349,7 +351,7 @@ function AgentTraceRow({
 				>
 					<div className={SESSION_OVERVIEW_CELL_CLASS_NAME}>
 						<span
-							className="truncate font-data text-body-s text-ink-3"
+							className="truncate font-data text-body-s text-session-overview-subtle"
 							title={run.turnId}
 						>
 							{shortRunId(run.turnId)}

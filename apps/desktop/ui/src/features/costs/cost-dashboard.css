@@ -13,11 +13,27 @@
 	min-width: 0;
 	min-height: 0;
 	overflow: hidden;
-	color: var(--ink);
+	color: var(--cost-foreground);
 	background: var(--canvas);
 	font-size: var(--size-xl);
-	line-height: var(--line-xl);
-	letter-spacing: var(--letter-spacing-xl);
+}
+
+/* The text-button pattern as the cost and compass pages shipped it: the
+   page's muted ink, its line height, a 5px corner. */
+.cost-page .text-button {
+	color: var(--cost-muted);
+	line-height: inherit;
+	letter-spacing: inherit;
+	border-radius: 5px;
+}
+.cost-page .text-button:hover,
+.cost-page
+	.text-button:is(
+		[aria-pressed="true"],
+		[aria-selected="true"],
+		[data-popup-open]
+	) {
+	color: var(--cost-foreground);
 }
 
 .cost-page-scroll {
@@ -34,7 +50,7 @@
 	padding: var(--space-l) var(--cost-page-gutter, 32px) var(--space-xxl);
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-xxl);
+	gap: 20px;
 }
 .cost-page-toolbar {
 	display: flex;
@@ -42,7 +58,7 @@
 	flex-shrink: 0;
 	gap: var(--space-m);
 	min-height: 40px;
-	padding: var(--space-s) calc(var(--space-xxl) * 4 / 3);
+	padding: 5px 32px;
 	background: var(--canvas);
 }
 
@@ -51,7 +67,7 @@
 	display: flex;
 	align-items: center;
 	gap: var(--space-m);
-	color: var(--ink);
+	color: var(--cost-foreground);
 }
 .cost-range-controls[data-in-header] {
 	margin-left: auto;
@@ -71,7 +87,7 @@
 	.cost-chart-card,
 	.cost-breakdown,
 	.cost-error {
-		border-radius: var(--radius-xl);
+		border-radius: 24px;
 		/* biome-ignore lint/correctness/noUnknownProperty: see the @supports note above. */
 		corner-shape: squircle;
 	}
@@ -196,12 +212,11 @@
 .cost-metric-label {
 	display: flex;
 	align-items: center;
-	gap: var(--space-m);
+	gap: 7px;
 	min-width: 0;
 	font-size: var(--size-xl);
-	letter-spacing: var(--letter-spacing-xl);
 	line-height: var(--line-xl);
-	color: var(--ink);
+	color: var(--cost-foreground);
 }
 .cost-metric-icon {
 	width: 14px;
@@ -231,10 +246,12 @@
 	gap: var(--space-s);
 	flex-shrink: 0;
 	font-size: var(--size-xl);
-	line-height: var(--line-xl);
+	/* design-escape-ok(type): shipped value; 1.5 */
+	line-height: 1.5;
 	font-weight: var(--weight-body-medium);
 	font-variant-numeric: tabular-nums;
-	letter-spacing: var(--letter-spacing-xl);
+	/* design-escape-ok(type): shipped value; -0.025em */
+	letter-spacing: -0.025em;
 }
 .cost-metric-value:has(> .cost-metric-chip) {
 	gap: var(--space-xs);
@@ -242,16 +259,16 @@
 .cost-metric-chip {
 	line-height: 1;
 	font-size: var(--size-m);
-	font-weight: var(--weight-body-medium);
-	letter-spacing: var(--letter-spacing-m);
-	color: var(--ink-3);
+	font-weight: 450;
+	/* design-escape-ok(type): shipped value; -0.01em */
+	letter-spacing: -0.01em;
+	color: var(--cost-muted);
 }
 .cost-metric-qualifier {
 	font-size: var(--size-m);
-	line-height: var(--line-m);
-	font-weight: var(--weight-body-medium);
+	font-weight: 470;
 	letter-spacing: var(--letter-spacing-m);
-	color: var(--ink-3);
+	color: var(--cost-muted);
 }
 /* CardSparkline: the accent at half strength, its stroke at half again, over
    a fill fading from 40% to 10% (text-*-400/50 sparklines). */
@@ -311,7 +328,7 @@
 	stroke-opacity: 1;
 }
 .cost-metric-sparkline[data-placeholder] {
-	color: var(--ink-3);
+	color: var(--cost-muted);
 }
 .cost-metric-sparkline[data-placeholder] .cost-metric-trend-line {
 	stroke-opacity: 0.1;
@@ -324,7 +341,7 @@
 	gap: var(--space-l);
 	justify-content: space-between;
 	align-items: flex-start;
-	padding: var(--space-xl) var(--space-xxl) var(--space-zero);
+	padding: 18px 20px 0;
 	min-height: 72px;
 }
 .cost-chart-key-copy {
@@ -349,19 +366,15 @@
 }
 .cost-chart-title {
 	font-size: var(--size-xl);
-	line-height: var(--line-xl);
-	letter-spacing: var(--letter-spacing-xl);
 	font-weight: var(--weight-body-medium);
-	color: var(--ink);
+	color: var(--cost-foreground);
 }
 .cost-chart-coverage {
 	display: flex;
 	align-items: center;
 	gap: var(--space-m);
-	color: var(--ink-3);
+	color: var(--cost-muted);
 	font-size: var(--size-s);
-	line-height: var(--line-s);
-	letter-spacing: var(--letter-spacing-s);
 	font-variant-numeric: tabular-nums;
 }
 .cost-coverage-refresh {
@@ -369,18 +382,16 @@
 }
 .cost-chart-legend {
 	display: flex;
-	gap: var(--space-m) var(--space-xl);
+	gap: 8px 18px;
 	flex-wrap: wrap;
 	min-width: 0;
 }
 .cost-legend-item {
 	display: flex;
 	align-items: center;
-	gap: var(--space-m);
+	gap: 7px;
 	font-size: var(--size-m);
-	line-height: var(--line-m);
-	letter-spacing: var(--letter-spacing-m);
-	color: var(--ink-3);
+	color: var(--cost-muted);
 }
 .cost-legend-item i,
 .cost-chart-tooltip i {
@@ -408,9 +419,7 @@
 	align-items: center;
 	gap: var(--space-s);
 	font-size: var(--size-xl);
-	line-height: var(--line-xl);
-	letter-spacing: var(--letter-spacing-xl);
-	color: var(--ink-3);
+	color: var(--cost-muted);
 	white-space: nowrap;
 }
 .cost-chart-tags > .cost-active-filters {
@@ -418,9 +427,9 @@
 	justify-content: flex-end;
 }
 .cost-duration-legend {
-	padding: var(--space-s) var(--space-s);
-	margin: calc(var(--space-s) * -1) calc(var(--space-s) * -1);
-	border-radius: var(--radius-xs);
+	padding: 5px 6px;
+	margin: -5px -6px;
+	border-radius: 4px;
 }
 .cost-duration-legend:hover {
 	background: var(--hover);
@@ -435,16 +444,15 @@
 .cost-duration-legend i {
 	width: 18px;
 	height: 0;
-	border-top: var(--border-l) solid var(--ink);
+	border-top: 2px solid var(--cost-foreground);
 	border-radius: var(--radius-zero);
 }
 .cost-duration-legend[data-percentile="p95"] i {
-	/* design-escape-ok(base): the p95 legend swatch, data paint */
-	border-top-color: var(--color-3);
+	border-top-color: var(--cost-duration-p95);
 	border-top-style: dashed;
 }
 .cost-duration-legend strong {
-	color: var(--ink);
+	color: var(--cost-foreground);
 	font-weight: var(--weight-body-medium);
 	font-variant-numeric: tabular-nums;
 }
@@ -452,14 +460,14 @@
 	position: relative;
 	/* The marketing demo sets --cost-viewport-height to the height it opens to. */
 	height: clamp(240px, calc(var(--cost-viewport-height, 100vh) * 0.31), 360px);
-	margin: var(--space-xl) var(--space-xl) var(--space-xl) var(--space-m);
+	margin: 16px 18px 14px 8px;
 	min-width: 0;
 }
 .cost-chart-tooltip {
 	min-width: 190px;
 	border-radius: var(--radius-m);
 	padding: var(--space-l);
-	color: var(--ink);
+	color: var(--cost-foreground);
 	background: var(--canvas);
 	/* design-escape-ok(colour): no role renders this; the tooltip's 6px 20px 8% drop */
 	--cost-tooltip-drop: 0 6px 20px rgb(0 0 0 / 8%);
@@ -467,14 +475,12 @@
 		var(--cost-tooltip-drop),
 		0 0 0 1px var(--line);
 	display: grid;
-	gap: var(--space-m);
+	gap: 7px;
 	font-size: var(--size-m);
-	line-height: var(--line-m);
-	letter-spacing: var(--letter-spacing-m);
 }
 .cost-chart-tooltip p {
-	color: var(--ink-3);
-	padding-bottom: var(--space-xs);
+	color: var(--cost-muted);
+	padding-bottom: 3px;
 }
 .cost-chart-tooltip > div,
 .cost-chart-tooltip span {
@@ -498,15 +504,13 @@
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	gap: var(--space-l);
+	gap: 10px;
 	padding: var(--space-zero) var(--space-xl);
 	text-align: center;
 	pointer-events: none;
 }
 .cost-chart-empty p {
 	font-size: var(--size-xl);
-	line-height: var(--line-xl);
-	letter-spacing: var(--letter-spacing-xl);
 	font-weight: var(--weight-body-medium);
 	text-wrap: balance;
 }
@@ -540,10 +544,8 @@
 }
 .cost-cycle-time {
 	display: block;
-	color: var(--ink-3);
+	color: var(--cost-muted);
 	font-size: var(--size-xs);
-	line-height: var(--line-xs);
-	letter-spacing: var(--letter-spacing-xs);
 }
 .cost-breakdowns[data-signals="true"]
 	> .cost-breakdown[data-dimension="phrases"] {
@@ -569,28 +571,26 @@
 	gap: var(--space-l);
 	align-items: center;
 	justify-content: space-between;
-	padding: var(--space-xxl) var(--space-xxl) var(--space-xs);
+	padding: 20px 20px 4px;
 }
 .cost-breakdown-heading h2 {
 	font-size: var(--size-xl);
-	letter-spacing: var(--letter-spacing-xl);
-	line-height: var(--line-xl);
+	/* design-escape-ok(type): shipped value; 1.5 */
+	line-height: 1.5;
 	font-weight: var(--weight-body-medium);
 	text-wrap: balance;
 }
 .cost-breakdown-heading > div {
-	color: var(--ink-3);
+	color: var(--cost-muted);
 	font-size: var(--size-s);
-	line-height: var(--line-s);
-	letter-spacing: var(--letter-spacing-s);
 }
 .cost-breakdown-selected {
-	color: var(--accent);
+	color: var(--cost-blue);
 	font-weight: 500;
 }
 .cost-heading-currency {
 	opacity: 0.6;
-	padding-left: var(--space-xs);
+	padding-left: 3px;
 }
 .cost-scroll-fade {
 	position: relative;
@@ -630,12 +630,10 @@
 	justify-content: space-between;
 	gap: var(--space-xxl);
 	min-height: 0;
-	padding: var(--space-l) var(--space-xxl);
+	padding: 12px 20px;
 	font-size: var(--size-xl);
-	line-height: var(--line-xl);
-	letter-spacing: var(--letter-spacing-xl);
 	border-radius: var(--radius-zero);
-	border-top: var(--border-m) solid var(--line);
+	border-top: 1px solid var(--line-soft);
 	transition: background-color var(--motion-duration) var(--motion-easing);
 }
 /* Of-type, not child: the fluid hover's layer sits among the rows. */
@@ -672,12 +670,10 @@
 	width: 100%;
 	min-width: 0;
 	min-height: 34px;
-	padding: var(--space-m) var(--space-m);
+	padding: 7px 9px;
 	font-size: var(--size-l);
-	line-height: var(--line-l);
-	letter-spacing: var(--letter-spacing-l);
 	text-align: left;
-	border-radius: var(--radius-xs);
+	border-radius: 5px;
 	outline: none;
 	font-variant-numeric: tabular-nums;
 }
@@ -696,7 +692,7 @@
 	outline-offset: -2px;
 }
 .cost-breakdown-row[aria-pressed="true"] {
-	color: var(--accent);
+	color: var(--cost-blue);
 }
 /* Share bar: 2px by 56px under the value, filled from the right in
    the row's series colour. */
@@ -707,8 +703,8 @@
 	height: 2px;
 	margin-top: var(--space-s);
 	margin-left: auto;
-	border-radius: var(--radius-full);
-	background: color-mix(in oklch, var(--ink-3) 10%, transparent);
+	border-radius: 999px;
+	background: color-mix(in oklch, var(--cost-muted) 10%, transparent);
 	overflow: hidden;
 }
 .cost-row-meter > span {
@@ -731,11 +727,12 @@
 	text-align: right;
 }
 .cost-member-initial {
-	font-size: var(--size-xs);
-	line-height: var(--line-xs);
-	letter-spacing: var(--letter-spacing-xs);
+	/* design-escape-ok(type): shipped value; 0.5625rem */
+	font-size: 0.5625rem;
+	/* the avatar fallback's text-sm ratio, as shipped */
+	line-height: calc(1.25 / 0.875);
 	background: var(--wash);
-	color: var(--ink-3);
+	color: var(--cost-muted);
 	font-weight: var(--weight-body-medium);
 }
 .cost-unknown-model {
@@ -753,9 +750,9 @@
 	grid-template-rows: 0.28fr;
 	min-width: 40px;
 	min-height: 10px;
-	border-radius: var(--radius-full);
+	border-radius: 999px;
 	overflow: hidden;
-	background: color-mix(in srgb, var(--ink) 14%, var(--canvas));
+	background: color-mix(in srgb, var(--cost-foreground) 14%, var(--canvas));
 	box-shadow: 0 0 0 1px var(--line);
 	transition:
 		grid-template-columns var(--motion-medium-duration) var(--motion-easing),
@@ -772,7 +769,7 @@
 	transition:
 		transform var(--motion-medium-duration) var(--motion-easing),
 		opacity var(--motion-duration) var(--motion-easing);
-	padding: var(--space-xs);
+	padding: 3px;
 }
 .cost-breakdown:hover .cost-tools,
 .cost-tools:focus-within,
@@ -797,7 +794,7 @@
 	position: relative;
 	height: 28px;
 	width: 34px;
-	border-radius: var(--radius-full);
+	border-radius: 999px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -809,7 +806,7 @@
 	background: var(--hover);
 }
 .cost-tool-button[aria-pressed="true"] {
-	color: var(--accent);
+	color: var(--cost-blue);
 }
 .cost-tool-button:disabled {
 	opacity: 0.4;
@@ -840,23 +837,19 @@
 	padding: var(--space-xs) var(--space-l) var(--space-l);
 }
 .cost-breakdown-empty {
-	padding: calc(var(--space-xxl) * 1.5) var(--space-l);
+	padding: 35px 12px;
 	text-align: center;
-	color: var(--ink-3);
+	color: var(--cost-muted);
 	font-size: var(--size-l);
-	line-height: var(--line-l);
-	letter-spacing: var(--letter-spacing-l);
 }
 .cost-search {
 	width: 100%;
 	min-width: 0;
-	padding: var(--space-m) var(--space-l);
-	border: var(--border-m) solid var(--line);
+	padding: 8px 10px;
+	border: 1px solid var(--line);
 	border-radius: var(--radius-xs);
 	background: transparent;
 	font-size: var(--size-xl);
-	line-height: var(--line-xl);
-	letter-spacing: var(--letter-spacing-xl);
 }
 .cost-search:focus {
 	outline: 2px solid var(--accent);
@@ -868,7 +861,7 @@
 	overscroll-behavior: none;
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-xs);
+	gap: 3px;
 }
 .cost-dialog-footer {
 	display: flex;
@@ -879,7 +872,7 @@
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: var(--space-xxl);
+	gap: 20px;
 	min-height: 220px;
 	padding: calc(var(--space-xxl) * 4 / 3);
 }
@@ -896,7 +889,7 @@
 	font-weight: var(--weight-body-medium);
 }
 .cost-error p {
-	color: var(--ink-3);
+	color: var(--cost-muted);
 	padding-top: var(--space-s);
 }
 /* Sized like the stat card value it stands in for, so the label keeps its
@@ -929,16 +922,17 @@
 	display: block;
 	height: 8px;
 	width: 28px;
-	border-radius: var(--radius-xs);
+	border-radius: 2px;
 }
 .cost-chart-loading-dates [skullet-bar] {
 	width: 48px;
 }
 .cost-metric[data-unavailable="true"] .cost-metric-value {
 	font-size: var(--size-xl);
-	line-height: var(--line-xl);
+	/* design-escape-ok(type): shipped value; 2.0625rem */
+	line-height: 2.0625rem;
 	letter-spacing: var(--letter-spacing-xl);
-	color: var(--ink-3);
+	color: var(--cost-muted);
 }
 /* The chart loads as itself (chart-flow.ts): Recharts draws the heartbeat
    behind a window sweeping across it, the way ChartLoadingWave flows. The
@@ -1020,7 +1014,7 @@
 	height: 100%;
 }
 .cost-chart-loading-guides path {
-	stroke: color-mix(in srgb, var(--ink) 6%, transparent);
+	stroke: color-mix(in srgb, var(--cost-foreground) 6%, transparent);
 }
 .cost-chart-skeleton[data-leaving] {
 	pointer-events: none;
@@ -1102,14 +1096,11 @@
 		padding: var(--space-xl) var(--metric-pad-x) 0;
 	}
 	.cost-metric-value {
-		font-size: var(--display-size-xxs);
-		line-height: var(--display-line-xxs);
-		letter-spacing: var(--display-letter-spacing-xxs);
+		/* design-escape-ok(type): shipped value; 1.375rem */
+		font-size: 1.375rem;
 	}
 	.cost-metric-label {
 		font-size: var(--size-m);
-		line-height: var(--line-m);
-		letter-spacing: var(--letter-spacing-m);
 	}
 	.cost-chart-key {
 		padding-inline: var(--space-xl);
@@ -1117,7 +1108,7 @@
 }
 @media (max-width: 640px) {
 	.cost-page-content {
-		padding: var(--space-xxl) var(--space-xl);
+		padding: 20px 14px;
 		gap: var(--space-xl);
 	}
 	.cost-breakdown-row,
@@ -1126,8 +1117,6 @@
 	.cost-search,
 	.cost-error {
 		font-size: var(--size-xxl);
-		line-height: var(--line-xxl);
-		letter-spacing: var(--letter-spacing-xxl);
 	}
 	.cost-chart-canvas {
 		height: 260px;
@@ -1232,13 +1221,13 @@
 }
 
 .cost-breakdown[data-dimension="durations"] .cost-breakdown-row:last-of-type {
-	border-top: var(--border-m) solid var(--line);
+	border-top: 1px solid var(--line);
 	margin-top: var(--space-m);
 }
 
 /* Plugin app: rows that name people load only when asked for. */
 .cost-breakdown-load {
-	color: var(--accent);
+	color: var(--cost-blue);
 	font: inherit;
 	text-decoration: underline;
 	text-underline-offset: 2px;
@@ -1305,7 +1294,7 @@
 .cost-ci-chart {
 	position: absolute;
 	inset: 0;
-	--ci-run: color-mix(in oklab, var(--ink) 18%, transparent);
+	--ci-run: color-mix(in oklab, var(--cost-foreground) 18%, transparent);
 	/* design-escape-ok(colour): no role renders this; red-500, the error role is a different red */
 	--ci-failed: oklch(0.637 0.208 25.331);
 }
@@ -1318,10 +1307,8 @@
 	stroke-dasharray: 3 4;
 }
 .cost-ci-tick {
-	fill: var(--ink-3);
+	fill: var(--cost-muted);
 	font-size: var(--size-s);
-	line-height: var(--line-s);
-	letter-spacing: var(--letter-spacing-s);
 }
 .cost-ci-tick[data-merged] {
 	fill: color-mix(in oklab, var(--ci-merged) 75%, var(--ink-3));
@@ -1331,7 +1318,7 @@
 	transition: opacity var(--motion-duration) var(--motion-easing);
 }
 .cost-ci-day rect[data-failed] {
-	fill: var(--error);
+	fill: var(--ci-failed);
 }
 .cost-ci-day[data-dim] rect {
 	opacity: 0.35;
@@ -1354,15 +1341,16 @@
 	fill: transparent;
 }
 .cost-ci-marker {
-	stroke: var(--ink-3);
+	stroke: var(--cost-muted);
 	stroke-dasharray: 3 3;
 	pointer-events: none;
 }
 .cost-legend-item i[data-ci="runs"] {
-	background: color-mix(in oklab, var(--ink) 35%, transparent);
+	background: color-mix(in oklab, var(--cost-foreground) 35%, transparent);
 }
 .cost-legend-item i[data-ci="failed"] {
-	background: var(--error);
+	/* design-escape-ok(colour): shipped value; oklch(0.637 0.208 25.331) */
+	background: oklch(0.637 0.208 25.331);
 }
 .cost-ci-ring {
 	width: 15px;
@@ -1372,10 +1360,11 @@
 }
 .cost-ci-ring path {
 	fill: none;
-	stroke: color-mix(in oklab, var(--ink) 18%, transparent);
-	stroke-width: var(--border-l);
+	stroke: color-mix(in oklab, var(--cost-foreground) 18%, transparent);
+	stroke-width: 2.6;
 	transition: stroke var(--motion-medium-duration) var(--motion-easing);
 }
 .cost-ci-ring path[data-failed] {
-	stroke: var(--error);
+	/* design-escape-ok(colour): shipped value; oklch(0.637 0.208 25.331) */
+	stroke: oklch(0.637 0.208 25.331);
 }

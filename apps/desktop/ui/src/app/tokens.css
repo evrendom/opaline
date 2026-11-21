@@ -140,6 +140,16 @@
 	--shelf: var(--field);
 	/* a faint edge ringing a small avatar or logo on any ground */
 	--line-faint: color-mix(in oklab, var(--ink) 5%, transparent);
+	/* round 4 · product */
+	/* main's cost-page, dashboard and session-overview inks, kept as shipped */
+	--cost-foreground: #292a2f;
+	--cost-muted: #828387;
+	--dashboardy-heading: #111827;
+	--session-overview-muted: rgb(0 0 0 / 0.63);
+	--session-overview-subtle: rgb(0 0 0 / 0.5);
+	--session-overview-text: #101112;
+	--cost-blue: oklch(0.623 0.188 259.815); /* both modes */
+	/* end round 4 · product */
 }
 
 .dark {
@@ -169,6 +179,14 @@
 	--track: color-mix(in oklab, var(--field) 50%, transparent);
 	--shelf: var(--card);
 	--line-faint: color-mix(in oklab, var(--ink) 10%, transparent);
+	/* round 4 · product */
+	--cost-foreground: #e6e6e9;
+	--cost-muted: #919299;
+	--dashboardy-heading: #e6e6e9;
+	--session-overview-muted: rgb(255 255 255 / 0.65);
+	--session-overview-subtle: rgb(255 255 255 / 0.5);
+	--session-overview-text: #e6e6e9;
+	/* end round 4 · product */
 }
 
 /* Layer 2 as Tailwind colours: `bg-surface`, `text-ink-3`, `border-line`. */
@@ -210,6 +228,16 @@
 	--color-track: var(--track);
 	--color-shelf: var(--shelf);
 	--color-line-faint: var(--line-faint);
+
+	/* round 4 · product */
+	--color-cost-foreground: var(--cost-foreground);
+	--color-cost-muted: var(--cost-muted);
+	--color-dashboardy-heading: var(--dashboardy-heading);
+	--color-session-overview-muted: var(--session-overview-muted);
+	--color-session-overview-subtle: var(--session-overview-subtle);
+	--color-session-overview-text: var(--session-overview-text);
+	--color-cost-blue: var(--cost-blue);
+	/* end round 4 · product */
 }
 
 /* Layer 2 elevation as Tailwind shadows: `shadow-card`, `shadow-control`,

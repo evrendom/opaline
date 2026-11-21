@@ -41,14 +41,14 @@ describe("SignalText", () => {
 		expect(markup).toContain("text-body-l");
 		expect(markup).toContain('data-signal="negative"');
 		expect(markup).toContain('data-signal="swear"');
-		expect(markup).toContain("bg-error-tint");
-		expect(markup).toContain("text-error");
+		expect(markup).toContain("bg-[#ffe4e6]");
+		expect(markup).toContain("text-[#be123c]");
 		expect(markup).toContain('data-signal="apology"');
-		expect(markup).toContain("bg-warning-tint");
-		expect(markup).toContain("text-warning");
+		expect(markup).toContain("bg-[#fef3c7]");
+		expect(markup).toContain("text-[#b45309]");
 		expect(markup).toContain('data-signal="positive"');
-		expect(markup).toContain("bg-success-tint");
-		expect(markup).toContain("text-success");
+		expect(markup).toContain("bg-[#dcfce7]");
+		expect(markup).toContain("text-[#15803d]");
 		expect(markup).toContain("select-none");
 	});
 

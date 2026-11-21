@@ -216,8 +216,8 @@ function ModelComposition({
 // metrics in fixed tracks with their units inline, so they line up without
 // column headers (kept for screen readers).
 const METRIC_CELL_CLASS_NAME =
-	"h-16 px-l py-zero text-right align-middle text-body-m tabular-nums whitespace-nowrap text-ink-3";
-const METRIC_UNIT_CLASS_NAME = "text-ink-3";
+	"h-16 px-l py-zero text-right align-middle text-body-m tabular-nums whitespace-nowrap text-session-overview-muted";
+const METRIC_UNIT_CLASS_NAME = "text-session-overview-subtle";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** When a teammate was last active, by day (the roster keeps dates, not
@@ -263,8 +263,8 @@ export function LastActive({
 				aria-hidden="true"
 				className={cn(
 					"size-1.5 shrink-0 corner-full",
-					// design-escape-ok(opacity): no role renders this; ink/20, dark ink/25
-					days < 7 ? "bg-success" : "bg-ink/20 dark:bg-ink/25",
+					// design-escape-ok(colour,opacity): shipped value; #22c55e, ink/20, dark ink/25
+					days < 7 ? "bg-[#22c55e]" : "bg-ink/20 dark:bg-ink/25",
 				)}
 			/>
 			<time dateTime={lastActiveDate ?? undefined}>{label}</time>
@@ -294,10 +294,12 @@ function TeamMemberRow({
 						</AvatarFallback>
 					</Avatar>
 					<div className="min-w-0">
-						<p className="truncate text-body-xl font-medium text-ink">
+						<p className="truncate text-body-xl font-medium text-session-overview-text">
 							{row.displayName}
 						</p>
-						<p className="truncate text-body-m text-ink-3">{row.role}</p>
+						<p className="truncate text-body-m text-session-overview-muted">
+							{row.role}
+						</p>
 					</div>
 				</div>
 			</td>
@@ -320,7 +322,12 @@ function TeamMemberRow({
 				<span>{formatCompactWholeNumber(row.totalTokens)}</span>
 				<span className={METRIC_UNIT_CLASS_NAME}> tok</span>
 			</td>
-			<td className={cn(METRIC_CELL_CLASS_NAME, "font-medium text-ink")}>
+			<td
+				className={cn(
+					METRIC_CELL_CLASS_NAME,
+					"font-medium text-session-overview-text",
+				)}
+			>
 				{formatCompactWholeCurrency(row.cost)}
 			</td>
 			<td className={cn(METRIC_CELL_CLASS_NAME, "pr-zero pl-l")}>
