@@ -2,7 +2,7 @@ const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { app, autoUpdater, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, screen, shell } = require("electron");
+const { app, autoUpdater, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, net, Notification, powerMonitor, screen, shell } = require("electron");
 
 const explicitUrl = process.env.OPALINE_URL;
 const isDev = Boolean(explicitUrl);
@@ -37,6 +37,7 @@ const { askForSessionFolders } = require("./folder-access");
 const { createAgents } = require("./agents");
 const { createDockUsage } = require("./dock-usage");
 const { createLocalStack, introUrl } = require("./stack/local-stack");
+const { createStarPrompt } = require("./star-prompt");
 const { createEnvironmentMenu } = require("./environments");
 const { keepClaudeTranscripts } = require("./stack/transcripts");
 const { createUpdateDialogs, createUpdateNotifier, createUpdater } = require("./updates");
@@ -509,6 +510,26 @@ ipcMain.handle("onboarding:expand", (event) => {
 
 ipcMain.on("onboarding:pass-through", (event, through) => {
 	if (fromOnboarding(event)) onboardingWindow?.setIgnoreMouseEvents(Boolean(through), { forward: true });
+});
+
+// "Star Opaline" card in the rail: asks once, after an hour of active use.
+// OPALINE_STAR_PROMPT=now (development builds only) asks straight away.
+const starPrompt = createStarPrompt({
+	file: path.join(app.getPath("userData"), "star-prompt.json"),
+	idleSeconds: () => powerMonitor.getSystemIdleTime(),
+	fetchJson: (url) => net.fetch(url, { headers: { Accept: "application/vnd.github+json" } }).then((response) => (response.ok ? response.json() : null)),
+	openInBackground: (url) => shell.openExternal(url, { activate: false }),
+	...(isDev && process.env.OPALINE_STAR_PROMPT === "now" ? { askAfterMs: 0 } : {}),
+});
+const STAR_TICK_MS = 30_000;
+setInterval(() => {
+	const focused = BrowserWindow.getFocusedWindow();
+	starPrompt.tick(Boolean(focused && appWindows.has(focused)));
+}, STAR_TICK_MS).unref?.();
+ipcMain.handle("star:status", (event) => (fromApp(event) ? starPrompt.status() : { show: false, count: null }));
+ipcMain.handle("star:star", (event) => (fromApp(event) ? starPrompt.star() : null));
+ipcMain.on("star:dismiss", (event) => {
+	if (fromApp(event)) starPrompt.dismiss();
 });
 
 ipcMain.on("app:replay-open", (event) => {

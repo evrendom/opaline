@@ -1,0 +1,448 @@
+@property --star-card-beam-angle {
+	syntax: "<angle>";
+	inherits: false;
+	initial-value: 0deg;
+}
+
+.star-card-dock {
+	padding: 0 8px 8px;
+}
+
+.star-card {
+	/* Graphite split-flap: top half lit from above, bottom a touch darker. */
+	--flap-top-hi: #34363b;
+	--flap-top-lo: #2a2c30;
+	--flap-bot-hi: #26282c;
+	--flap-bot-lo: #202226;
+	--flap-ink: #f2eee6;
+	--flap-gold: var(--color-amber-300);
+	--flap-housing: #121315;
+	--flap-seam: rgb(0 0 0 / 55%);
+	--flap-shade: rgb(0 0 0 / 85%);
+	--flap-w: 22px;
+	--flap-h: 34px;
+	--knob-bg: #fff;
+	--knob-shadow: 0 1px 3px rgb(0 0 0 / 20%);
+	--shimmer-hi: oklch(0.2 0 0);
+	position: relative;
+	padding: 14px;
+	text-align: center;
+	background: var(--popover);
+	color: var(--foreground);
+	box-shadow: var(--custom-shadow-lifted);
+}
+.dark .star-card {
+	--knob-bg: oklch(0.34 0 0);
+	--knob-shadow:
+		0 1px 3px rgb(0 0 0 / 55%), inset 0 0.5px 0 rgb(255 255 255 / 14%),
+		inset 0 0 0 0.5px rgb(255 255 255 / 6%);
+	--shimmer-hi: oklch(0.99 0 0);
+}
+
+.star-card-close {
+	position: absolute;
+	z-index: 6;
+	top: 8px;
+	right: 8px;
+	display: grid;
+	place-items: center;
+	width: 24px;
+	height: 24px;
+	border: 0;
+	border-radius: 999px;
+	background: transparent;
+	color: color-mix(in oklch, var(--muted-foreground) 70%, transparent);
+	cursor: pointer;
+}
+.star-card-close:hover {
+	background: var(--accent);
+	color: var(--foreground);
+}
+.star-card-title {
+	margin: 8px 20px 0;
+	font-size: 13px;
+	line-height: 20px;
+	font-weight: 500;
+}
+.star-card-body {
+	min-height: 16px;
+	margin: 2px 0 0;
+	font-size: 12px;
+	line-height: 16px;
+	color: var(--muted-foreground);
+}
+
+/* ---------- split-flap count ---------- */
+.star-card-flaps {
+	display: inline-flex;
+	gap: 2px;
+	margin-top: 6px;
+	padding: 3px;
+	border-radius: 7px;
+	background: var(--flap-housing);
+	box-shadow:
+		inset 0 1px 2px rgb(0 0 0 / 35%),
+		inset 0 0 0 0.5px rgb(0 0 0 / 30%),
+		0 0.5px 0 rgb(255 255 255 / 8%);
+}
+.star-card-flap {
+	--t: 0;
+	--seam: 1px;
+	position: relative;
+	width: var(--flap-w);
+	height: var(--flap-h);
+	perspective: 140px;
+	border-radius: 4px;
+	font-size: 21px;
+	font-weight: 700;
+	line-height: var(--flap-h);
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -0.02em;
+	color: var(--flap-ink);
+	box-shadow:
+		0 1px 1.5px rgb(0 0 0 / 35%),
+		0 0 0 0.5px rgb(0 0 0 / 25%);
+}
+.star-card-half,
+.star-card-leaf > span {
+	position: absolute;
+	left: 0;
+	right: 0;
+	height: calc(var(--flap-h) / 2 - var(--seam) / 2);
+	overflow: hidden;
+}
+.star-card-half.is-top,
+.star-card-leaf .is-front {
+	top: 0;
+	border-radius: 4px 4px 1px 1px;
+	background: linear-gradient(
+		to bottom,
+		var(--flap-top-hi),
+		var(--flap-top-lo)
+	);
+	box-shadow: inset 0 0.5px 0 rgb(255 255 255 / 9%);
+}
+.star-card-half.is-bot,
+.star-card-leaf .is-back {
+	border-radius: 1px 1px 4px 4px;
+	background: linear-gradient(
+		to bottom,
+		var(--flap-bot-hi),
+		var(--flap-bot-lo)
+	);
+}
+.star-card-half.is-bot {
+	bottom: 0;
+}
+.star-card-half > span,
+.star-card-leaf > span > span {
+	display: block;
+	height: var(--flap-h);
+}
+.star-card-half.is-bot > span,
+.star-card-leaf .is-back > span {
+	position: relative;
+	top: calc(var(--flap-h) / -2 - var(--seam) / 2);
+}
+.star-card-leaf {
+	position: absolute;
+	z-index: 2;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: calc(var(--flap-h) / 2 - var(--seam) / 2);
+	transform-origin: 50% calc(100% + var(--seam) / 2);
+	transform-style: preserve-3d;
+}
+.star-card-leaf .is-front,
+.star-card-leaf .is-back {
+	backface-visibility: hidden;
+}
+.star-card-leaf .is-back {
+	top: 0;
+	transform: rotateX(180deg);
+}
+/* Shading follows the fold: the leaf darkens edge-on, the revealed top starts
+   in its shadow, and the bottom darkens under the leaf about to cover it. */
+.star-card-leaf .is-front::after,
+.star-card-leaf .is-back::after,
+.star-card-half::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	background: var(--flap-shade);
+}
+.star-card-leaf .is-front::after {
+	opacity: calc(min(1, var(--t) * 2) * 0.6);
+}
+.star-card-leaf .is-back::after {
+	opacity: calc(max(0, 1 - var(--t)) * 0.66);
+	background: linear-gradient(to bottom, var(--flap-shade), transparent);
+}
+.star-card-half.is-top::after {
+	opacity: calc(max(0, 0.6 - var(--t)) * 0.7);
+}
+.star-card-half.is-bot::after {
+	opacity: calc(sin(var(--t) * 3.14159rad) * 0.5);
+	background: linear-gradient(to bottom, var(--flap-shade), transparent 85%);
+}
+.star-card-flap::before {
+	content: "";
+	position: absolute;
+	z-index: 3;
+	top: 50%;
+	left: 0;
+	right: 0;
+	height: var(--seam);
+	margin-top: calc(var(--seam) / -2);
+	background: var(--flap-seam);
+}
+.star-card-flap.is-ones {
+	color: color-mix(
+		in oklab,
+		var(--flap-gold) calc(var(--flap-frac, 0) * 100%),
+		var(--flap-ink)
+	);
+	text-shadow: 0 0 calc(var(--flap-frac, 0) * 8px)
+		color-mix(
+			in oklab,
+			var(--flap-gold) calc(var(--flap-frac, 0) * 45%),
+			transparent
+		);
+}
+
+/* ---------- the switch ---------- */
+.star-card-track-wrap {
+	position: relative;
+	height: 36px;
+	margin-top: 14px;
+}
+.star-card-track {
+	position: absolute;
+	top: 0;
+	left: 0;
+	display: block;
+	width: 100%;
+	height: 36px;
+	padding: 0;
+	border: 0;
+	border-radius: 18px;
+	background: color-mix(
+		in oklab,
+		var(--color-amber-500) calc(var(--frac, 0) * 25%),
+		var(--accent)
+	);
+	box-shadow: inset 0 0 0 1px transparent;
+	color: inherit;
+	font: inherit;
+	cursor: grab;
+	touch-action: none;
+	user-select: none;
+	transition: box-shadow 150ms ease;
+}
+.star-card-track[data-active="true"] {
+	box-shadow:
+		inset 0 0 0 1px color-mix(in oklch, var(--foreground) 10%, transparent),
+		0 1px 3px rgb(0 0 0 / 6%);
+}
+.star-card-track[data-dragging="true"] {
+	cursor: grabbing;
+	box-shadow:
+		inset 0 0 0 1px color-mix(in oklch, var(--foreground) 14%, transparent),
+		0 1px 2px rgb(0 0 0 / 8%);
+}
+.star-card-track:focus {
+	outline: none;
+}
+.star-card-track:focus-visible {
+	outline: 2px solid
+		color-mix(in oklch, var(--color-amber-500) 60%, transparent);
+	outline-offset: 2px;
+}
+.star-card-label {
+	position: absolute;
+	inset: 0;
+	display: grid;
+	place-items: center;
+	font-size: 12px;
+	font-weight: 500;
+	white-space: nowrap;
+	pointer-events: none;
+}
+.star-card-label > span {
+	background-image: linear-gradient(
+		100deg,
+		var(--muted-foreground) 0%,
+		var(--muted-foreground) 38%,
+		var(--shimmer-hi) 50%,
+		var(--muted-foreground) 62%,
+		var(--muted-foreground) 100%
+	);
+	background-size: 260% 100%;
+	background-position: 100% 0;
+	-webkit-background-clip: text;
+	background-clip: text;
+	color: transparent;
+}
+.star-card-track[data-active="true"]:not([data-dragging="true"])
+	.star-card-label
+	> span {
+	animation: star-card-shimmer 1800ms linear infinite;
+}
+@keyframes star-card-shimmer {
+	from {
+		background-position: 100% 0;
+	}
+	to {
+		background-position: 0% 0;
+	}
+}
+.star-card-knob {
+	position: absolute;
+	z-index: 1;
+	top: 4px;
+	left: 4px;
+	display: grid;
+	place-items: center;
+	width: 28px;
+	height: 28px;
+	border-radius: 999px;
+	background: var(--knob-bg);
+	box-shadow: var(--knob-shadow);
+	pointer-events: none;
+	transition: transform 250ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.star-card-track[data-pressed="true"] .star-card-knob {
+	transform: scale(0.94);
+}
+.star-card-knob svg {
+	width: 16px;
+	height: 16px;
+}
+.star-card-star-off {
+	color: var(--muted-foreground);
+}
+.star-card-star-on {
+	color: var(--color-amber-500);
+}
+.star-card-pop {
+	animation: star-card-pop 420ms cubic-bezier(0.2, 0.9, 0.25, 1.4);
+}
+@keyframes star-card-pop {
+	0% {
+		transform: scale(0.2) rotate(-40deg);
+		opacity: 0;
+	}
+	60% {
+		transform: scale(1.25) rotate(8deg);
+		opacity: 1;
+	}
+	100% {
+		transform: none;
+	}
+}
+
+/* ---------- celebration ---------- */
+.star-card-beam {
+	position: absolute;
+	z-index: 4;
+	inset: 0;
+	padding: 1.5px;
+	border-radius: inherit;
+	/* biome-ignore lint/correctness/noUnknownProperty: corner-shape (Chromium) keeps the beam on the card's squircle edge. */
+	corner-shape: inherit;
+	opacity: 0;
+	pointer-events: none;
+	background: conic-gradient(
+		from var(--star-card-beam-angle),
+		transparent 0deg 230deg,
+		var(--color-amber-400) 315deg,
+		#fff 338deg,
+		var(--color-amber-300) 350deg,
+		transparent 360deg
+	);
+	-webkit-mask:
+		linear-gradient(#000 0 0) content-box,
+		linear-gradient(#000 0 0);
+	-webkit-mask-composite: xor;
+	mask:
+		linear-gradient(#000 0 0) content-box exclude,
+		linear-gradient(#000 0 0);
+}
+.star-card-beam.is-glow {
+	padding: 3px;
+	filter: blur(5px);
+}
+.star-card-beam.is-running {
+	animation:
+		star-card-beam-spin 1400ms cubic-bezier(0.45, 0.05, 0.35, 1) forwards,
+		star-card-beam-fade 1400ms ease forwards;
+}
+.star-card-beam.is-glow.is-running {
+	animation:
+		star-card-beam-spin 1400ms cubic-bezier(0.45, 0.05, 0.35, 1) forwards,
+		star-card-beam-fade-glow 1400ms ease forwards;
+}
+@keyframes star-card-beam-spin {
+	from {
+		--star-card-beam-angle: 0deg;
+	}
+	to {
+		--star-card-beam-angle: 360deg;
+	}
+}
+@keyframes star-card-beam-fade {
+	0% {
+		opacity: 0;
+	}
+	12%,
+	78% {
+		opacity: 1;
+	}
+	100% {
+		opacity: 0;
+	}
+}
+@keyframes star-card-beam-fade-glow {
+	0% {
+		opacity: 0;
+	}
+	12%,
+	78% {
+		opacity: 0.75;
+	}
+	100% {
+		opacity: 0;
+	}
+}
+.star-card-fx {
+	position: absolute;
+	z-index: 5;
+	inset: 0;
+	pointer-events: none;
+}
+.star-card-sparkle {
+	position: absolute;
+	top: 0;
+	left: 0;
+	pointer-events: none;
+}
+.star-card-sparkle svg {
+	display: block;
+	width: 100%;
+	height: 100%;
+	filter: drop-shadow(
+		0 0 3px color-mix(in oklab, var(--color-amber-400) 70%, transparent)
+	);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.star-card-track[data-active="true"]:not([data-dragging="true"])
+		.star-card-label
+		> span,
+	.star-card-beam.is-running,
+	.star-card-beam.is-glow.is-running {
+		animation: none;
+	}
+}
