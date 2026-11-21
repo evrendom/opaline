@@ -32,37 +32,3 @@
 	color: var(--ink-3);
 	margin: var(--space-zero) var(--space-zero) var(--space-xxl);
 }
-.cli-onboarding-auth-options {
-	display: grid;
-	gap: var(--space-l);
-}
-.cli-onboarding-divider {
-	text-align: center;
-	color: var(--ink-3);
-	font-size: var(--size-m);
-	line-height: var(--line-m);
-	letter-spacing: var(--letter-spacing-m);
-	padding: var(--space-xxs);
-}
-.cli-onboarding-surface .cli-onboarding-terms {
-	font-size: var(--size-s);
-	line-height: var(--line-s);
-	letter-spacing: var(--letter-spacing-s);
-	margin: var(--space-xxl) var(--space-zero) var(--space-zero);
-}
-.cli-onboarding-terms a {
-	color: inherit;
-	text-decoration: underline;
-}
-.cli-onboarding-surface .cli-onboarding-error {
-	color: var(--error);
-}
-.cli-onboarding-email {
-	display: grid;
-	gap: var(--space-l);
-}
-.cli-onboarding-email label {
-	font-size: var(--size-m);
-	line-height: var(--line-m);
-	letter-spacing: var(--letter-spacing-m);
-}

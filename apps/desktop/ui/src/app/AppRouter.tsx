@@ -12,7 +12,6 @@ import { routeLoaders } from "@/app/route-loaders";
 import { appRoutes } from "@/app/routes";
 import { NotFoundPage } from "@/app/system/NotFoundPage";
 import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
-import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import { SessionReaderFallback } from "@/features/sessions/reader/session-reader-light-samples";
 import { SettingsPageSkeleton } from "@/features/settings/components/settings-page-skeleton";
 import { settingsRouteMap } from "@/features/settings/config/settings-routes";
@@ -45,10 +44,7 @@ const WorkspaceFeaturesAdminPage = lazyNamed(
 	routeLoaders.adminFeatures,
 	"WorkspaceFeaturesAdminPage",
 );
-const CliOnboardingPage = lazyNamed(
-	routeLoaders.cliOnboarding,
-	"CliOnboardingPage",
-);
+const SelfHostedWelcome = lazyNamed(routeLoaders.welcome, "SelfHostedWelcome");
 
 const DashboardPage = lazyNamed(routeLoaders.dashboard, "DashboardPage");
 const SessionsPage = lazyNamed(routeLoaders.sessions, "SessionsPage");
@@ -80,10 +76,6 @@ const MembersSettingsPage = lazyNamed(
 const AccountSettingsPage = lazyNamed(
 	() => import("@/features/settings/account/AccountSettingsPage"),
 	"AccountSettingsPage",
-);
-const McpSettingsPage = lazyNamed(
-	() => import("@/features/self-hosted/McpSettingsPage"),
-	"McpSettingsPage",
 );
 const ReportPage = lazyNamed(routeLoaders.report, "ReportPage");
 const LEGACY_DASHBOARDY_PATH = "/dashboardy";
@@ -178,7 +170,6 @@ function getShellRouteElements(
 	routePaths: ShellRoutePaths,
 	SessionComponent: ComponentType = SessionsPage,
 	DashboardComponent: ComponentType = DashboardPage,
-	selfHosted = false,
 ) {
 	return (
 		<>
@@ -309,12 +300,6 @@ function getShellRouteElements(
 						/>
 					}
 				/>
-				{selfHosted ? (
-					<Route
-						path={settingsRouteMap.mcp.segment}
-						element={<LazyRoute Component={McpSettingsPage} />}
-					/>
-				) : null}
 				<Route
 					path={settingsRouteMap["create-workspace"].segment}
 					element={
@@ -336,15 +321,14 @@ type AppRouterProps = {
 };
 
 export function AppRouter(props: AppRouterProps) {
-	return <AppRouterRoutes {...props} selfHosted={useSelfHost() !== null} />;
+	return <AppRouterRoutes {...props} />;
 }
 
 export function AppRouterRoutes({
 	rootRedirectTarget,
 	sessionComponent,
 	dashboardComponent,
-	selfHosted,
-}: AppRouterProps & { selfHosted: boolean }) {
+}: AppRouterProps) {
 	const rootRedirect = rootRedirectTarget || shellRouteMap.dashboard.path;
 	return (
 		<Routes>
@@ -366,12 +350,11 @@ export function AppRouterRoutes({
 					canonicalShellRoutePaths,
 					sessionComponent,
 					dashboardComponent,
-					selfHosted,
 				)}
 
 				<Route
 					path={CLI_SETUP_PATH}
-					element={<LazyRoute Component={CliOnboardingPage} />}
+					element={<LazyRoute Component={SelfHostedWelcome} />}
 				/>
 				<Route
 					path={`${appRoutes.newSession()}/:sessionId?`}
@@ -414,7 +397,6 @@ export function AppRouterRoutes({
 						workspaceShellRoutePaths,
 						sessionComponent,
 						dashboardComponent,
-						selfHosted,
 					)}
 					<Route
 						path="/:workspaceSlug"

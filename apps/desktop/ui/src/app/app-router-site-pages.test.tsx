@@ -40,7 +40,6 @@ function expandParams(path: string): string[] {
 function appRouterPaths() {
 	const element = AppRouterRoutes({
 		rootRedirectTarget: null,
-		selfHosted: false,
 	}) as ReactElement<{
 		children: ReactNode;
 	}>;
