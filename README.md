@@ -1,88 +1,129 @@
 <div align="center">
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/opaline-dark.png" />
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/readme/opaline-light.png" />
+  <img src="docs/assets/readme/opaline-dark.png" alt="Opaline" width="72" height="72" />
+</picture>
+
 # Opaline
 
-**See where your Claude Code and Codex agents get stuck, what they cost, and what to fix in your setup.**
+**Pull back the curtain on your Claude Code and Codex sessions.**
 
-[![Download for macOS (Apple Silicon)](https://img.shields.io/badge/Download-macOS%20(Apple%20Silicon)-black?logo=apple)](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-macOS-arm64.dmg)
-[![Download for macOS (Intel)](https://img.shields.io/badge/Download-macOS%20(Intel)-black?logo=apple)](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-macOS-x64.dmg)
-[![Download for Linux](https://img.shields.io/badge/Download-Linux%20(x64)-black?logo=linux)](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-Linux-x86_64.AppImage)
-[![Latest Release](https://img.shields.io/github/v/release/evrendom/opaline?label=release)](https://github.com/evrendom/opaline/releases)
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+Local-first desktop app for macOS and Linux. See what filled your context window, where agents got stuck, what they cost, and let them retro their own setup.
 
-**Download Opaline for Mac:** [**Apple Silicon**](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-macOS-arm64.dmg) · [**Intel**](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-macOS-x64.dmg) · **Linux:** [**AppImage**](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-Linux-x86_64.AppImage) · [**.deb**](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-Linux-amd64.deb) · [opaline.so](https://opaline.so)
+<p align="center">
+  <a href="https://github.com/evrendom/opaline/releases"><img src="https://img.shields.io/github/v/release/evrendom/opaline?label=release" alt="Latest Release"></a>
+  <a href="https://www.producthunt.com/products/rudel/launches/claude-code-codex-usage-trading-cards-by-rudel" title="Product Hunt #5 with 172 upvotes (May 4, 2026)"><img src="https://img.shields.io/badge/Product%20Hunt-%235%20%C2%B7%20%E2%96%B2%20172-DA552F?logo=producthunt&amp;logoColor=white" alt="Product Hunt: #5 and 172 upvotes"></a>
+  <a href="https://news.ycombinator.com/item?id=47350416" title="Show HN: 144 points and 86 comments"><img src="https://img.shields.io/badge/Hacker%20News-144%20%C2%B7%2086-ff6600?logo=ycombinator&amp;logoColor=white" alt="Hacker News: 144 points and 86 comments"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache_2.0-64748b" alt="Apache 2.0 license"></a>
+</p>
+
+[Install](#install) · [Features](#features) · [Agent MCP](#let-your-agents-retro-themselves) · [Architecture](#how-its-built) · [Build from source](#build-from-source) · [opaline.evren.so](https://opaline.evren.so)
 
 </div>
 
 <p align="center">
-  <a href="docs/assets/readme/dashboard.mp4">
-    <img src="docs/assets/readme/dashboard.gif" alt="The Opaline dashboard: usage, cost, sessions, agent runs and frustrations over a month" width="100%" />
-  </a>
+  <img src="docs/assets/readme/dashboard.gif" alt="Opaline dashboard showing Claude and Codex usage, cost, sessions, and frustrations" width="100%" />
 </p>
 
-Opaline is a local-first Mac app for **Claude Code** and **Codex**. It reads the sessions your coding agents already leave on your Mac and shows what they cost, where they loop or fail, which mistakes keep coming back, and what to improve in your `CLAUDE.md`, `AGENTS.md`, skills, hooks, scripts, or CI.
+## Install
 
-Everything runs on your machine. Opaline brings its own local server, Postgres, and ClickHouse—nothing leaves your Mac.
+- **macOS:** [Apple Silicon (`.dmg`)](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-macOS-arm64.dmg) · [Intel (`.dmg`)](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-macOS-x64.dmg) (open and drag to Applications)
+- **Linux x64:** [AppImage](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-Linux-x86_64.AppImage) (`chmod +x` and run) · [`.deb`](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-Linux-amd64.deb) (`sudo apt install ./Opaline-Linux-amd64.deb`)
 
----
-
-## What you get
-
-- **Usage & cost breakdowns** — Track Claude Code and Codex spend and usage by day, repository, and model, including your plan usage.
-- **Readable session inspector** — Inspect every turn, tool call, touched file, context window, subagent, pull request, and CI run without digging through raw transcripts.
-- **Loop & failure flags** — Automatically surface runs that looped, failed, or needed correction so recurring setup problems stand out immediately.
-- **Built-in MCP for your agents** — Click **"Connect your agents"** to install the Opaline plugin in Claude Code and Codex so your agents can query past sessions directly through the local MCP server.
-- **Zero-config local stack** — Bundles its own server, Postgres, and ClickHouse, and keeps itself up to date from GitHub Releases.
-
-<table>
-  <tr>
-    <td width="50%"><img src="docs/assets/readme/cost.png" alt="Cost over time, by repository and model" /></td>
-    <td width="50%"><img src="docs/assets/readme/frustrations.png" alt="Frustrations over time, with signal types and the exact phrases" /></td>
-  </tr>
-  <tr>
-    <td align="center"><sub><b>Cost</b> by day, repository and model</sub></td>
-    <td align="center"><sub><b>Frustrations</b>: corrections and apologies, with the exact words</sub></td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="docs/assets/readme/sessions.png" alt="Session list with cost, skills, errors and feedback per session" /></td>
-    <td width="50%"><img src="docs/assets/readme/session-summary.png" alt="One session: context window, cost, duration, skills, tools and files" /></td>
-  </tr>
-  <tr>
-    <td align="center"><sub><b>Sessions</b> with cost, skills, errors and feedback</sub></td>
-    <td align="center"><sub><b>Session summary</b>: what filled the context window</sub></td>
-  </tr>
-</table>
+Launch Opaline and it starts its bundled local stack automatically, imports existing Claude Code and Codex sessions, and updates via GitHub Releases. No account, no Docker, and nothing leaves your machine. *(Downloads are ~310-530 MB because Electron, Postgres, and ClickHouse are bundled in.)*
 
 <p align="center">
-  <img src="docs/assets/readme/session-detail.png" alt="A session's turns and tool calls on a timeline" width="100%" />
-  <br />
-  <sub><b>Session detail</b>: every turn and tool call on one timeline</sub>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/dock-dark.png" />
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/readme/dock-light.png" />
+    <img src="docs/assets/readme/dock-dark.png" alt="Opaline in the macOS Dock, its icon showing 75 percent of the weekly Claude Code limit left" width="640" />
+  </picture>
 </p>
 
----
+On macOS, the Dock icon shows how much of your weekly Claude Code or Codex limit is left. Right-click it for each agent's number, its reset time, and which one the icon shows.
 
-## Quick Start
+## Features
 
-1. Download Opaline for Mac ([**Apple Silicon**](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-macOS-arm64.dmg) or [**Intel**](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-macOS-x64.dmg)) and move it to Applications.
-   On Linux, download the [**AppImage**](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-Linux-x86_64.AppImage) (`chmod +x` it and run it) or the [**.deb**](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-Linux-amd64.deb) (`sudo apt install ./Opaline-Linux-amd64.deb`).
-2. Launch Opaline—it automatically starts its bundled local stack and reads your existing Claude Code and Codex sessions.
-3. *(Optional)* Click **"Connect your agents"** inside the app to enable the local MCP plugin for Claude Code and Codex.
+See what actually consumed your context window (`Read files`, `rg`, skills, tool definitions, shell output) and which tool calls failed, recovered, or stayed unresolved:
 
----
+<img src="docs/assets/readme/session-summary.png" alt="Session summary treemap showing context window breakdown, cost, duration, skills, tools, and files" width="100%" />
 
-## Privacy
+| Surface | What it gives you |
+| :--- | :--- |
+| **Session timeline** | Every turn, thinking block, skill, file read, subagent, and step-by-step cost without reading raw JSONL. |
+| **Frustrations** | Verbatim user corrections and model apologies (`"Sorry"`, `"failed again"`) tracked over time. |
+| **Usage & cost** | Weekly Claude and Codex plan-limit burn, estimated API cost by repo and model, and live running agents. |
+| **Built-in MCP** | One-click plugin so your agents can query past runs and propose fixes to `CLAUDE.md`, `AGENTS.md`, skills, or CI. |
 
-Agent transcripts contain whatever your agents saw: source code, prompts, command output, file contents, URLs, and sometimes secrets. Opaline processes and stores everything locally on your Mac—no telemetry, no cloud sync, and no external database required.
+<details>
+<summary>More screenshots (timeline, frustrations, sessions, cost)</summary>
 
----
+<br />
 
-## Build from Source
+**Session timeline:** every turn and tool call in one view
+<img src="docs/assets/readme/session-detail.png" alt="Session detail timeline" width="100%" />
 
-**Requirements:** macOS and [Bun](https://bun.sh).
+**Frustrations:** corrections and apologies with exact verbatim phrases
+<img src="docs/assets/readme/frustrations.png" alt="Frustrations over time with signal types and verbatim phrases" width="100%" />
+
+**Sessions:** live agents, subagents, skills, errors, and cost per session
+<img src="docs/assets/readme/sessions.png" alt="Sessions list" width="100%" />
+
+**Cost:** spend over time by repository and model
+<img src="docs/assets/readme/cost.png" alt="Cost breakdown" width="100%" />
+
+</details>
+
+## Let your agents retro themselves
+
+Click **Connect your agents** inside Opaline to install the local skill and MCP server for Claude Code and Codex. Then ask them directly:
+
+```text
+"Run a retro on my last 30 days: where did my agents lose the most time, and what should I change in CLAUDE.md?"
+"Why did my last run in acme/loomrail cost $19 and loop on tests?"
+"Compare my Claude Code and Codex runs this month by cost and frustration rate."
+```
+
+The MCP server gives your agents read-only SQL, pattern digests, search, and saved checks so they can pinpoint recurring failures, edit your repo setup, and verify whether a fix held.
+
+## How it's built
+
+Everything runs inside one local bundle. There is no cloud service, no telemetry, and no external database.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/architecture-dark.svg" />
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/readme/architecture-light.svg" />
+    <img src="docs/assets/readme/architecture-dark.svg" alt="Opaline local architecture: local session JSONL, AGENTS.md, skills and hooks, git repositories, and GitHub token feed a bundled Bun server, ClickHouse, and Postgres, serving the Electron + React desktop UI and optional local MCP server." width="100%" />
+  </picture>
+</p>
+
+- **Code layout:** `apps/desktop/shell` (Electron + runtime manager), `apps/desktop/ui` (React + Vite), `apps/desktop/server` (Bun + oRPC + MCP), `packages/ch-schema` & `packages/sql-schema` (database schemas), `plugin/` (agent skill).
+- **Local data:** Stored under `~/Library/Application Support/Opaline/server` on macOS or `~/.config/Opaline/server` on Linux.
+- **Privacy:** Transcripts may include source code, prompts, command output, and secrets. Opaline never sends them off your machine.
+
+## Build from source
+
+Requires [Bun](https://bun.sh) (plus Docker for `dev:local`).
 
 ```bash
 git clone https://github.com/evrendom/opaline.git
 cd opaline
 bun install
-bash apps/desktop/shell/package.sh
+
+# Local development (starts Postgres + ClickHouse in Docker, then API + UI)
+bun run dev:local
+
+# Package the desktop app
+bash apps/desktop/shell/package.sh        # macOS (.app + .dmg)
+bash apps/desktop/shell/package-linux.sh  # Linux x64 (.AppImage + .deb)
+
+# Full check suite (disclosure, typecheck, lint, tests, build)
+bun run verify
 ```
+
+## License
+
+[Apache-2.0](LICENSE)

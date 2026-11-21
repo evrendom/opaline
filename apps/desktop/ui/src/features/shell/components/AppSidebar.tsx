@@ -27,6 +27,7 @@ import {
 	restingGlyphClassName,
 	ShellNavIcon,
 } from "@/features/shell/components/shell-nav-icon";
+import { SidebarStarCard } from "@/features/shell/components/star-card/SidebarStarCard";
 import {
 	type ShellRouteDefinition,
 	shellNavigationRoutes,
@@ -176,6 +177,9 @@ export function AppSidebar({
 						</IntroReveal>
 					)}
 				</SidebarContent>
+
+				{/* Only the Mac app asks; the hook shows nothing without its bridge. */}
+				<SidebarStarCard />
 
 				{localApp ? null : (
 					<SidebarFooter>

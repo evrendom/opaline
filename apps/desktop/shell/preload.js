@@ -3,6 +3,9 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("opalineDesktop", {
 	introReady: () => ipcRenderer.send("app:intro-ready"),
 	retryStart: () => ipcRenderer.send("app:retry-start"),
+	starStatus: () => ipcRenderer.invoke("star:status"),
+	star: () => ipcRenderer.invoke("star:star"),
+	dismissStar: () => ipcRenderer.send("star:dismiss"),
 	...(process.argv.includes("--opaline-debug") ? { replayOpen: () => ipcRenderer.send("app:replay-open") } : {}),
 });
 
