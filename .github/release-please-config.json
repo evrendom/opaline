@@ -13,6 +13,7 @@
 	"packages": {
 		"apps/cli": {
 			"release-type": "node",
+			"bump-minor-pre-major": true,
 			"component": "opaline-cli",
 			"changelog-path": "CHANGELOG.md",
 			"extra-files": [
