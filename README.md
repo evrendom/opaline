@@ -1,6 +1,10 @@
 <div align="center">
 
-<img src="docs/assets/readme/opaline-dark.png" alt="Opaline" width="72" height="72" />
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/opaline-dark.png" />
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/readme/opaline-light.png" />
+  <img src="docs/assets/readme/opaline-dark.png" alt="Opaline" width="72" height="72" />
+</picture>
 
 # Opaline
 
@@ -31,7 +35,11 @@ Local-first desktop app for macOS and Linux. See what filled your context window
 Launch Opaline and it starts its bundled local stack automatically, imports existing Claude Code and Codex sessions, and updates via GitHub Releases. No account, no Docker, and nothing leaves your machine. *(Downloads are ~310-530 MB because Electron, Postgres, and ClickHouse are bundled in.)*
 
 <p align="center">
-  <img src="docs/assets/readme/dock.png" alt="Opaline in the macOS Dock, its icon showing 75 percent of the weekly Claude Code limit left" width="640" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/dock-dark.png" />
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/readme/dock-light.png" />
+    <img src="docs/assets/readme/dock-dark.png" alt="Opaline in the macOS Dock, its icon showing 75 percent of the weekly Claude Code limit left" width="640" />
+  </picture>
 </p>
 
 On macOS, the Dock icon shows how much of your weekly Claude Code or Codex limit is left. Right-click it for each agent's number, its reset time, and which one the icon shows.
