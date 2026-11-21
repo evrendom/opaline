@@ -44,7 +44,6 @@ const ACTION = [
 // success-line is defined but no screen reads it.
 const STATE = [
 	"success",
-	"success-tint",
 	"warning",
 	"warning-tint",
 	"warning-line",

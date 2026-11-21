@@ -51,7 +51,6 @@
 	--accent-tint: var(--color-1-transparent);
 	--accent-line: var(--color-1-translucent);
 	--accent-fg: #ffffff; /* text and icons on an accent fill, white in both modes */
-	--success-tint: var(--success-transparent);
 	--warning-tint: var(--warning-transparent);
 	--warning-line: var(--warning-translucent);
 	--error-tint: var(--error-transparent);
@@ -221,7 +220,6 @@
 	--color-accent-tint: var(--accent-tint);
 	--color-accent-line: var(--accent-line);
 	--color-accent-fg: var(--accent-fg);
-	--color-success-tint: var(--success-tint);
 	--color-warning-tint: var(--warning-tint);
 	--color-warning-line: var(--warning-line);
 	--color-error-tint: var(--error-tint);
@@ -310,14 +308,9 @@
 	}
 }
 
-/* -- Kept as authored: chart series (data paint) and the sidebar primitive's
+/* -- Kept as authored: the sidebar primitive's
    tokens (the window chrome, translucent for macOS vibrancy in app-surface.css). */
 :root {
-	--chart-1: oklch(0.87 0 0);
-	--chart-2: oklch(0.556 0 0);
-	--chart-3: oklch(0.439 0 0);
-	--chart-4: oklch(0.371 0 0);
-	--chart-5: oklch(0.269 0 0);
 	--sidebar: oklch(0.985 0 0);
 	--sidebar-foreground: var(--ink);
 	--sidebar-primary: var(--ink);
