@@ -101,6 +101,7 @@ Everything runs inside one local bundle. There is no cloud service, no telemetry
 </p>
 
 - **Code layout:** `apps/desktop/shell` (Electron + runtime manager), `apps/desktop/ui` (React + Vite), `apps/desktop/server` (Bun + oRPC + MCP), `packages/ch-schema` & `packages/sql-schema` (database schemas), `plugin/` (agent skill).
+- **Plan usage:** Opaline asks your installed CLIs for your plan's rate limits: `claude -p` with a `get_usage` control request, and `codex app-server` with `account/rateLimits/read`. It samples every 5 minutes while agents are running and every 30 minutes when idle, and the Dock icon shows 100 minus the weekly percent used.
 - **Local data:** Stored under `~/Library/Application Support/Opaline/server` on macOS or `~/.config/Opaline/server` on Linux.
 - **Privacy:** Transcripts may include source code, prompts, command output, and secrets. Opaline never sends them off your machine.
 
