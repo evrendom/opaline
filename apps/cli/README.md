@@ -1,40 +1,39 @@
 # Opaline CLI
 
-**Your Claude Code and Codex sessions, in one place.**
+**Retired.** Opaline's cloud has shut down, and this CLI no longer uploads
+anything. Opaline is now a free Mac app that keeps your Claude Code and Codex
+sessions on your Mac: [opaline.evren.so](https://opaline.evren.so).
 
-This package, `@opalinehq/cli`, contains the shared CLI implementation. For new installations, use [`opaline`](https://www.npmjs.com/package/opaline), which runs the same implementation at the matching version.
+## Remove what earlier versions set up
 
-## Get started
-
-Requires Node.js 20 or newer. Run from any directory:
+If you ever ran the Opaline CLI on a computer, run this once there:
 
 ```bash
 npx opaline@latest
 ```
 
-Choose repositories with ↑↓ and Space. Press Enter to review, then Enter to confirm. Sign in through your browser when prompted. Existing sessions upload to Opaline, and future sessions sync automatically for enabled repositories.
+Use `@latest`: a plain `npx opaline` may reuse an older cached copy. The
+command makes no network requests, and it removes:
 
-After upload, new users finish setup in the browser; returning users open their workspace's Sessions page. If you start setup in your browser, use the command it supplies, including its `--code` value.
+- Opaline's automatic-upload hooks from `~/.claude/settings.json`, from the
+  project settings of the folders you set up, and from Codex's `notify`
+  setting in `~/.codex/config.toml` (a notify command Opaline wrapped is put
+  back);
+- MCP servers that point at Opaline's cloud (`opaline.so/api/mcp`) from Claude
+  Code and Codex;
+- the saved sign-in and the upload state in the CLI's folder (`~/.rudel`, or
+  `OPALINE_CONFIG_DIR`/`RUDEL_CONFIG_DIR` if you set one).
 
-Run the command again to change which repositories sync. Existing Rudel credentials and settings remain in `~/.rudel`.
+It leaves everything else alone: your own hooks, other MCP servers, the
+Opaline Mac app's plugin and its data in `~/.opaline/server`. Files it cannot
+parse are left untouched and named in its output. It keeps `~/.rudel/logs`,
+the list of folders you set up (`~/.rudel/auto-upload.json`) and
+`~/.rudel/runtime`, the copy that automatic uploads ran. That copy is now this
+retired version, so a hook it missed cleans up the next time it runs instead
+of uploading. Delete `~/.rudel` yourself once you no longer need any of it.
 
-## Updates
-
-Eligible interactive commands may offer one **Update / Skip** prompt with a link to the exact open-source release. Accepting updates a supported existing npm or pnpm global installation and the retained automatic-upload runtime; it does not add a global installation for npx-only users or change repository selections, login, or workspace settings.
-
-Run `npx opaline@latest update` to check explicitly. Ambiguous and Windows global installations stay unchanged; update failures report a manual command or corrective action when available. See [review and install updates](https://github.com/evrendom/opaline/blob/main/docs/usage.md#review-and-install-updates) for the complete behavior.
-
-## Data and privacy
-
-Opaline uploads full session transcripts, which can include prompts, responses, source code, tool output, and metadata. Known-secret filtering is best-effort and cannot guarantee every sensitive value is removed.
-
-Official releases also send limited usage analytics, including repository/session counts, linked to your account after sign-in. Those events exclude transcript content, repository names, and local paths. Set `DO_NOT_TRACK=1` or `POSTHOG_ENABLED=false` in the CLI's environment to opt out of usage analytics.
-
-## Learn more
-
-- [CLI guide](https://github.com/evrendom/opaline/blob/main/docs/usage.md) — commands, installation, configuration, troubleshooting, and migration from Rudel.
-- [Data handling](https://github.com/evrendom/opaline/blob/main/docs/data-handling.md) — full transcript and analytics disclosure, including persistent opt-out.
-- [Contributing](https://github.com/evrendom/opaline/blob/main/.github/CONTRIBUTING.md) — local development and the CLI playground.
+Every command (`upload`, `login`, `update`, the `hooks` handlers) now does
+only this cleanup. Hook handlers print nothing and always succeed.
 
 ## License
 

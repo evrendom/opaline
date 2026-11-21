@@ -41,8 +41,12 @@ See [npm's trusted publishing documentation](https://docs.npmjs.com/trusted-publ
    for registry availability, then publishes `opaline` and `rudel` with the
    same version and the `latest` tag.
 
-All three install names remain supported. Do not deprecate or unpublish the
-compatibility packages when maintaining or releasing the CLI.
+The CLI is retired: every release from 0.18.0 on only removes what earlier
+versions installed (see the [CLI guide](usage.md)). Keep all three packages
+published and never unpublish them: the names must stay ours, because hooks
+and scripts on users' computers still run `opaline`, `rudel` and
+`@opalinehq/cli`. Deprecate the packages only after the retiring release is
+published and verified.
 
 Release Please tracks changes under `apps/cli`. A launcher-only change should
 include an update to the CLI's installation documentation under `apps/cli`
@@ -58,15 +62,29 @@ failure. Do not change package contents and reuse an already published version.
 
 ## Verification after publishing
 
+Every command of a retired release cleans up the computer it runs on, so run
+the checks with a throwaway home directory:
+
 ```bash
 npm view opaline version dependencies
 npm view @opalinehq/cli version
 npm view rudel version dependencies
+export HOME="$(mktemp -d)"
 npx --yes opaline@latest --version
 npx --yes @opalinehq/cli@latest --version
 npx --yes rudel@latest --version
 ```
 
-The three commands should report the same CLI version. `rudel` also emits
-its existing rename notice to stderr. Migration instructions for existing
-global installations are in the [CLI guide](usage.md#optional-global-install).
+The three commands should report the same CLI version.
+
+## Deprecation
+
+Once the retiring release is verified, deprecate every version of all three
+packages so installs show the notice. Deprecated packages still install and
+run, so `npx opaline@latest` keeps working:
+
+```bash
+for package in opaline @opalinehq/cli rudel; do
+  npm deprecate "${package}@*" "Opaline's cloud has shut down. Run npx opaline@latest once to remove its upload hooks. The free Mac app: https://opaline.evren.so"
+done
+```

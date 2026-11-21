@@ -521,11 +521,6 @@ jobs:
         with:
           filter: "@opalinehq/cli"
 
-      - name: Verify settings recovery and hook migration
-        env:
-          POSTHOG_ENABLED: "false"
-        run: bun test apps/cli/src/__tests__/auto-upload-config.test.ts apps/cli/src/__tests__/upload-manager-migration.test.ts
-
       - name: Pack and install all three CLI packages
         shell: bash
         run: |
@@ -543,6 +538,8 @@ jobs:
             ".tmp/cli-smoke/package/${primary_tarball}" \
             ".tmp/cli-smoke/package/${rudel_tarball}"
 
+      # Every command of the retired CLI cleans up the computer it runs on, so
+      # each run gets a throwaway home directory.
       - name: Verify canonical and alias behavior
         shell: bash
         run: |
@@ -555,63 +552,48 @@ jobs:
             test "$(node -p "require('./${package_dir}/package.json').version")" = "${version}"
             test "$(node -p "require('./${package_dir}/package.json').dependencies['@opalinehq/cli']")" = "${version}"
           done
+          # The retired CLI is one self-contained bundle: installing it pulls in nothing.
+          test "$(node -p "Object.keys(require('./apps/cli/package.json').dependencies ?? {}).length")" = "0"
+
+          home_dir() {
+            rm -rf ".tmp/cli-smoke/$1" && mkdir -p ".tmp/cli-smoke/$1"
+            if command -v cygpath > /dev/null; then cygpath -w "$(pwd)/.tmp/cli-smoke/$1"; else echo "$(pwd)/.tmp/cli-smoke/$1"; fi
+          }
+          run() {
+            local name="$1" cli="$2" home
+            shift 2
+            home="$(home_dir "home-${name}")"
+            printf '%s' '{"session_id":"","transcript_path":"","cwd":""}' |
+              HOME="${home}" USERPROFILE="${home}" node "${cli}" "$@" \
+                > ".tmp/cli-smoke/${name}.stdout" 2> ".tmp/cli-smoke/${name}.stderr"
+          }
 
           for cli in "${opaline_cli}" "${primary_cli}" "${rudel_cli}"; do
-            test "$(node "${cli}" --version)" = "${version}"
+            home="$(home_dir home-version)"
+            test "$(HOME="${home}" USERPROFILE="${home}" node "${cli}" --version)" = "${version}"
           done
 
-          node "${opaline_cli}" --help > .tmp/cli-smoke/opaline-help.stdout 2> .tmp/cli-smoke/opaline-help.stderr
-          node "${primary_cli}" --help > .tmp/cli-smoke/primary-help.stdout 2> .tmp/cli-smoke/primary-help.stderr
-          node "${rudel_cli}" --help > .tmp/cli-smoke/rudel-help.stdout 2> .tmp/cli-smoke/rudel-help.stderr
-          cmp .tmp/cli-smoke/opaline-help.stdout .tmp/cli-smoke/primary-help.stdout
-          cmp .tmp/cli-smoke/opaline-help.stderr .tmp/cli-smoke/primary-help.stderr
-          cmp .tmp/cli-smoke/opaline-help.stdout .tmp/cli-smoke/rudel-help.stdout
-          test "$(head -n 1 .tmp/cli-smoke/rudel-help.stderr)" = "rudel is now opaline"
-          tail -n +2 .tmp/cli-smoke/rudel-help.stderr | cmp .tmp/cli-smoke/opaline-help.stderr -
-
-          set +e
-          node "${opaline_cli}" not-a-command > .tmp/cli-smoke/opaline-error.stdout 2> .tmp/cli-smoke/opaline-error.stderr
-          opaline_exit=$?
-          node "${primary_cli}" not-a-command > .tmp/cli-smoke/primary-error.stdout 2> .tmp/cli-smoke/primary-error.stderr
-          primary_exit=$?
-          node "${rudel_cli}" not-a-command > .tmp/cli-smoke/rudel-error.stdout 2> .tmp/cli-smoke/rudel-error.stderr
-          rudel_exit=$?
-          set -e
-
-          test "${opaline_exit}" -ne 0
-          test "${opaline_exit}" -eq "${rudel_exit}"
-          test "${opaline_exit}" -eq "${primary_exit}"
-          cmp .tmp/cli-smoke/opaline-error.stdout .tmp/cli-smoke/primary-error.stdout
-          cmp .tmp/cli-smoke/opaline-error.stderr .tmp/cli-smoke/primary-error.stderr
-          cmp .tmp/cli-smoke/opaline-error.stdout .tmp/cli-smoke/rudel-error.stdout
-          tail -n +2 .tmp/cli-smoke/rudel-error.stderr | cmp .tmp/cli-smoke/opaline-error.stderr -
-
-          mkdir -p .tmp/cli-smoke/opaline-config .tmp/cli-smoke/primary-config .tmp/cli-smoke/rudel-config
-          hook_input='{"session_id":"","transcript_path":"","cwd":""}'
-          printf '%s' "${hook_input}" | OPALINE_CONFIG_DIR=.tmp/cli-smoke/opaline-config node "${opaline_cli}" hooks claude session-end > .tmp/cli-smoke/opaline-stdin.stdout 2> .tmp/cli-smoke/opaline-stdin.stderr
-          opaline_stdin_exit=$?
-          printf '%s' "${hook_input}" | OPALINE_CONFIG_DIR=.tmp/cli-smoke/primary-config node "${primary_cli}" hooks claude session-end > .tmp/cli-smoke/primary-stdin.stdout 2> .tmp/cli-smoke/primary-stdin.stderr
-          primary_stdin_exit=$?
-          printf '%s' "${hook_input}" | OPALINE_CONFIG_DIR=.tmp/cli-smoke/rudel-config node "${rudel_cli}" hooks claude session-end > .tmp/cli-smoke/rudel-stdin.stdout 2> .tmp/cli-smoke/rudel-stdin.stderr
-          rudel_stdin_exit=$?
-
-          test "${opaline_stdin_exit}" -eq "${rudel_stdin_exit}"
-          test "${opaline_stdin_exit}" -eq "${primary_stdin_exit}"
-          cmp .tmp/cli-smoke/opaline-stdin.stdout .tmp/cli-smoke/primary-stdin.stdout
-          cmp .tmp/cli-smoke/opaline-stdin.stderr .tmp/cli-smoke/primary-stdin.stderr
-          cmp .tmp/cli-smoke/opaline-stdin.stdout .tmp/cli-smoke/rudel-stdin.stdout
-          tail -n +2 .tmp/cli-smoke/rudel-stdin.stderr | cmp .tmp/cli-smoke/opaline-stdin.stderr -
+          for command in "--help" "not-a-command" "hooks claude session-end"; do
+            # shellcheck disable=SC2086
+            run opaline "${opaline_cli}" ${command}
+            # shellcheck disable=SC2086
+            run primary "${primary_cli}" ${command}
+            # shellcheck disable=SC2086
+            run rudel "${rudel_cli}" ${command}
+            for name in primary rudel; do
+              cmp .tmp/cli-smoke/opaline.stdout ".tmp/cli-smoke/${name}.stdout"
+              cmp .tmp/cli-smoke/opaline.stderr ".tmp/cli-smoke/${name}.stderr"
+            done
+            test ! -s .tmp/cli-smoke/opaline.stderr
+          done
+          # A hook handler prints nothing: Claude Code adds hook output to the session.
+          test ! -s .tmp/cli-smoke/opaline.stdout
 
       - name: Run packed CLI smoke suite through opaline
         shell: bash
         run: bun run --cwd apps/cli test:packed-smoke
         env:
           OPALINE_PACKED_CLI: ${{ github.workspace }}/.tmp/cli-smoke/install/node_modules/opaline/bin/opaline.js
-
-      - name: Verify Windows browser opening
-        if: runner.os == 'Windows'
-        shell: bash
-        run: bun test ./apps/cli/src/__tests__/browser-opener.windows.integration.ts
 
   cli-smoke-required:
     if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)

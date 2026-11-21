@@ -1,184 +1,52 @@
 # CLI guide
 
-[← Back to the README](../README.md)
+The Opaline CLI (`opaline`, `@opalinehq/cli` and `rudel` on npm) is retired.
+Opaline's cloud has shut down, so there is nothing left to upload to. Opaline
+is now a free Mac app that keeps your Claude Code and Codex sessions on your
+Mac: [opaline.evren.so](https://opaline.evren.so). The app reads sessions from
+disk and does not need the CLI.
 
-## Run without installing
+## Remove the CLI from a computer
 
-Requires Node.js 20 or newer.
+On each computer where you ran the CLI, run once:
 
 ```bash
 npx opaline@latest
 ```
 
-Run from any directory, including your home folder. The CLI finds saved Claude Code and Codex sessions across repositories, lets you choose what to upload, and sets up automatic uploads for those selections. `pnpx opaline@latest` works too.
+`npx rudel@latest` does the same. Use `@latest`: a plain `npx opaline` may
+reuse an older cached copy. A global installation can then be removed with
+your package manager, for example `npm uninstall --global opaline`.
 
-Browser login opens after you review and confirm your selection, when authentication is needed. Choose a destination if you belong to multiple workspaces. Existing repository destinations are retained.
+The command makes no network requests. It:
 
-Automatic uploads retain the bundled CLI under `~/.rudel/runtime` and use your Node executable, so hooks keep working after the temporary runner cache is gone. You do not need a global install for automatic uploads.
+1. deletes the saved sign-in first, which stops every earlier version's hooks
+   from uploading;
+2. removes Opaline's automatic-upload hooks from `~/.claude/settings.json`
+   (and `$CLAUDE_CONFIG_DIR/settings.json`), from the project settings of the
+   current folder and of every folder listed in the CLI's `auto-upload.json`;
+3. removes Opaline from Codex's `notify` setting in `~/.codex/config.toml`
+   (and `$CODEX_HOME/config.toml`), putting back the notify command Opaline
+   wrapped, if any;
+4. removes MCP servers whose URL is Opaline's cloud (`opaline.so/api/mcp`,
+   `app.rudel.ai/api/mcp`) from Claude Code's `~/.claude.json` and from the
+   Codex config;
+5. deletes the CLI's upload state from its folder: `~/.rudel`, or
+   `OPALINE_CONFIG_DIR`/`RUDEL_CONFIG_DIR` if you set one, and any other
+   folder an installed hook pointed at.
 
-## Start from the browser
+Hooks are recognised by their command: `opaline hooks …`, `rudel hooks …`, or
+`'<node>' '<folder>/runtime/cli.js' hooks …`. Your own hooks, other MCP
+servers, plugins (including the Opaline Mac app's) and every other setting are
+left as they were. A file that cannot be parsed is left untouched and named in
+the command's output; remove Opaline's entries from it by hand.
 
-If you start setup in Opaline, copy and run the command supplied by that page:
+It keeps `logs/`, `auto-upload.json` and `runtime/` in the CLI's folder.
+`runtime/cli.js` is the copy automatic uploads ran, now replaced by this
+retired version: a hook the command could not reach cleans up when it next
+runs instead of uploading. Delete the folder yourself once you no longer need
+it.
 
-```bash
-npx opaline@latest --code <one-time-code>
-```
-
-The code pairs the terminal with your browser for live selection and upload status. It expires after ten minutes if unused. Approve login in the same browser where you copied the command; uploads go to the workspace approved there.
-
-After upload, new users continue setup at `/welcome`. Returning users open their destination workspace's Sessions page at `/{workspace}/sessions`, using its actual slug. A paired setup link keeps the connection so the browser can resume the flow.
-
-## Choose and manage repositories
-
-The picker fills during scanning, then shows local and already-uploaded session counts alongside ON/OFF toggles. Worktrees are grouped by repository.
-
-| Control | Action |
-| --- | --- |
-| ↑ / ↓ | Move through the list. |
-| Space | Toggle the selected repository. |
-| Type | Filter repositories by name. |
-| Ctrl+U | Clear the filter. |
-| Enter | Review your selection, then confirm it. |
-| Esc | Return from review, or leave the picker without saving. |
-
-The review groups repositories into newly added, already active, and deactivated. Upload progress stays in the same table. Sessions already uploaded to the destination are skipped.
-
-Run `npx opaline@latest` again to change your selections. Turning a repository OFF stops future automatic uploads and keeps sessions already in Opaline. Hooks already uploading may finish.
-
-### Agent hooks
-
-Opaline installs the required Claude Code and/or Codex hooks. Claude Code's hook is installed in your user settings, so setup does not depend on your current directory. Hooks run headlessly, check the repository allowlist, filter known secret patterns, and upload sessions. Existing unrelated hooks and settings are preserved.
-
-While a session runs, the same hooks also stream its new transcript lines, including sub-agent transcripts, so the session appears in Opaline within seconds. Claude Code sessions stream from their start. Interactive Codex sessions (the CLI and the desktop app) become visible when their first turn ends, then stream live. A `codex exec` or `codex exec resume` run is sent when its turn ends: the notification arrives at the end of the turn, and that Codex process has exited by then. Nothing new is installed: the hooks register the session with one small background process per machine that follows every running session, sends only complete new lines, and exits a minute after the last session ends. The uploads the hooks already make are unchanged, so a session still arrives if live updates are unavailable. Live updates run only when the server offers them; the server can pause them, and `OPALINE_LIVE_SESSIONS=0` turns them off on one machine.
-
-Codex notification tools can coexist with automatic uploads. Opaline retains the existing command and arguments, forwards the notification JSON, and uploads independently. Codex Computer Use stays at the front of its notification chain. Turning uploads OFF keeps notifications working.
-
-Custom scripts are preserved; Opaline does not rewrite scripts that invoke older Rudel installations themselves. Setup failures show the complete error and a retry/back action, including the settings file to fix when a Codex configuration is invalid.
-
-## Optional global install
-
-```bash
-npm install --global opaline
-opaline
-```
-
-After installation, you can replace `npx opaline@latest` with `opaline` in the examples below. To update a global installation, run the install command again or use the guided update flow below.
-
-If you already installed `@opalinehq/cli` globally, run `npm uninstall --global @opalinehq/cli` before installing `opaline`: both packages provide the same executable. Your existing credentials and settings are retained.
-
-## Review and install updates
-
-In an interactive terminal, bare `opaline`, `upload`, `login`, `whoami`, `enable`, and `disable` commands check for a newer release before continuing. When Opaline can safely update an existing installation, it shows one **Update / Skip** prompt with a link to that exact GitHub release so you can review its notes and source first. Update installs the reviewed version; it never falls back to an unreviewed `latest` version.
-
-An accepted update can refresh one identifiable npm or pnpm global installation and the retained automatic-upload runtime under `~/.rudel/runtime`. It does not enable repositories, install missing hooks, or change login or workspace settings. An npx-only user does not gain a global installation.
-
-Run the check directly with:
-
-```bash
-npx opaline@latest update
-```
-
-Update prompts do not appear for help or version output, CI, background hooks, file imports, or browser pairing. Skip affects only the current invocation. A pinned npx invocation has already selected the version running that command, so the update applies to supported persistent installations and future automatic uploads rather than replacing the current npx process.
-
-Opaline does not guess when more than one global installation is present. Windows global installations, package-manager policy or permission failures, and legacy hooks using a custom configuration directory receive manual instructions instead. Existing repository selections and credentials remain unchanged.
-
-## Command reference
-
-| Command | Description |
-| --- | --- |
-| `npx opaline@latest` | Open the repository picker. |
-| `npx opaline@latest upload` | Manage automatic uploads and upload selected repositories. |
-| `npx opaline@latest --code <code>` | Pair with the browser that supplied the command. |
-| `npx opaline@latest login` | Sign in through the browser. |
-| `npx opaline@latest logout` | Revoke the current credential and log out locally. |
-| `npx opaline@latest whoami` | Show the authenticated user and local upload failures. |
-| `npx opaline@latest doctor` | Run read-only authentication, API, configuration, version, and hook diagnostics. |
-| `npx opaline@latest update` | Review the latest release and update supported persistent installations. |
-| `npx opaline@latest sql "<SELECT ...>" --out rows.jsonl` | Export every row of one read-only query over the Opaline views. |
-| `npx opaline@latest pull --repo <repo> --from <day> --to <day>` | Copy a slice of sessions and their runs, calls, git, CI and setup rows to local files. |
-| `npx opaline@latest count --pattern <regex>` | Count matching calls, prompts or sessions in the latest pull, with a definition. |
-| `npx opaline@latest --help` | Show command help. |
-| `npx opaline@latest --version` | Print the CLI version. |
-
-### Historical imports and existing scripts
-
-```bash
-npx opaline@latest import ./path/to/session.jsonl
-npx opaline@latest upload --retry
-```
-
-Use `npx opaline@latest import --help` for historical import options. The legacy `upload <session>` form remains supported. File/retry flags require a session argument or `--retry`; normal repository selection uses the picker. Batch uploads and retries send smaller sessions first.
-
-Uploads that Opaline accepted but had not finished processing when the CLI stopped waiting are kept as pending, not failed. The next hook run and `upload --retry` check them with the server: finished jobs are cleared, failed jobs are reported with the server's error, and expired jobs are uploaded again.
-
-### Linking a chat to an Opaline analysis
-
-The Opaline skill runs this after it saves an analysis, from inside the chat:
-
-```bash
-opaline import "$CODEX_THREAD_ID" --analysis <analysis id>
-```
-
-Pass a Codex thread id, a Claude Code session id or a transcript path. The CLI uploads the chat into the analysis's workspace (no `--org`), with a Codex thread's parent chat and every subagent thread spawned in that chat (`--no-related` uploads only the given thread). It also records a marker for seven days, so the Codex turn-complete hook (or the Claude Code SessionEnd hook) uploads the chat again after the agent's answer and after follow-up turns, even where automatic uploads are off; subagents spawned in later turns are picked up then. Importing the same chat for another analysis links it to both, and each later upload carries each analysis id. These uploads never capture repository evidence. The command prints one line, or one JSON object with `--json`, and exits non-zero if the server does not support analysis uploads or refuses the analysis.
-
-### Data for agents: sql, pull and count
-
-The Opaline MCP answers questions with bounded results. When a result is too large to page through, it names the command that fetches all of it:
-
-```bash
-opaline sql "SELECT session_id, count() AS calls FROM calls GROUP BY session_id" --out rows.jsonl
-opaline pull --repo acme/widgets --from 2026-10-01 --to 2026-10-31
-opaline pull --pattern fc_1a2b3c4d5e --repo acme/widgets --from 2026-10-01 --to 2026-10-31
-opaline count --pattern "no matches found" --in output
-```
-
-`sql` streams the rows to `<file>.partial` and renames it when the query finished (`.jsonl` or `.csv`). `pull` writes `sessions/<session_id>.jsonl` (every stored record of each session) plus one `.jsonl` file per table and `MANIFEST.json` under `~/.cache/opaline/pulls/<workspace>/`, replaces that directory on every pull, and records it in `~/.cache/opaline/pulls/LAST`. `count` runs locally on the latest pull (or `--pull <dir>`). `sql` and `pull` take `--workspace <slug>` and need a server that supports data export (they say so otherwise). Pulled files hold full session content: treat the cache directory like the transcripts themselves.
-
-`enable` and `disable` are aliases for the repository picker. Open it and confirm your selections to change automatic uploads. `set-org` remains available to change the workspace associated with a project.
-
-## Configuration
-
-The production API defaults to `https://opaline.so`.
-
-| Variable | Purpose |
-| --- | --- |
-| `OPALINE_LOG_LEVEL=debug` | Print verbose, token-safe diagnostics to stderr. |
-| `OPALINE_API_BASE` | Override the API base; `RUDEL_API_BASE` is also accepted. |
-| `OPALINE_CONFIG_DIR` | Override local state; `RUDEL_CONFIG_DIR` is also accepted. |
-| `OPALINE_ALLOW_INSECURE_API_BASE=1` | Permit plaintext non-loopback login/authentication traffic. |
-| `OPALINE_ALLOW_INSECURE_ENDPOINT=1` | Permit plaintext non-loopback transcript uploads. |
-| `OPALINE_LIVE_SESSIONS=0` | Turn off live updates of running Claude Code and Codex sessions on this machine; regular uploads continue. |
-| `DO_NOT_TRACK=1` or `POSTHOG_ENABLED=false` | Disable CLI usage analytics. |
-
-The insecure overrides transmit credentials or transcripts without transport encryption. Use them only for a trusted self-hosted network. Login and transcript-upload overrides are separate.
-
-See [data handling](data-handling.md#usage-analytics) for analytics details, including how to keep the opt-out active for future commands and hooks.
-
-## Troubleshooting
-
-Start with:
-
-```bash
-OPALINE_LOG_LEVEL=debug npx opaline@latest doctor
-```
-
-| Problem | What to try |
-| --- | --- |
-| Not authenticated | Run `npx opaline@latest login`. Existing credentials should be found automatically under `~/.rudel/credentials.json`. |
-| API unreachable | Check that `https://opaline.so/health` is reachable and inspect any `OPALINE_API_BASE` or `RUDEL_API_BASE` override. |
-| Hooks disabled | Run `npx opaline@latest` and enable the repositories you want to sync. |
-| Queued upload failures | Run `npx opaline@latest upload --retry`. Permanent failures remain visible in `whoami`. |
-| Invalid Codex configuration | Follow the file path and error shown by the CLI, fix the setting, then retry. |
-| Rudel rename notice in a script | The alias keeps stdout unchanged and writes its notice only to stderr. |
-
-Still stuck? [Open an issue](https://github.com/evrendom/opaline/issues). Do not include credentials or private session contents.
-
-## Moving from Rudel
-
-Existing Rudel users do not need to log in again. Credentials, retry queues, logs, and project mappings remain in `~/.rudel` for compatibility. Set `OPALINE_CONFIG_DIR` to use another directory.
-
-Existing Rudel hooks are recognized as enabled. Saving repository selections migrates owned hooks to Opaline, removes duplicate local hooks, and preserves unrelated agent settings.
-
-`opaline` is the recommended package name. It runs the `@opalinehq/cli` implementation pinned to the matching release. Both `@opalinehq/cli` and the `rudel` compatibility package remain supported.
-
-The `rudel` executable delegates to the same implementation with unchanged arguments, stdin, stdout, and exit status. It adds one rename notice to stderr per invocation.
+Every command and every hook handler now runs only this cleanup. Hook
+handlers print nothing and exit successfully; in a terminal, the command lists
+what it removed.
