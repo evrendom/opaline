@@ -87,8 +87,8 @@ export function tileLook(
 	if (kind === "free")
 		return {
 			className:
-				// design-escape-ok(opacity): shipped value; ink/14 edge (ink/16 in dark), ink/45 label
-				"border-dashed border-ink/14 text-ink/45 bg-[repeating-linear-gradient(135deg,transparent_0_6px,color-mix(in_srgb,var(--ink)_3.5%,transparent)_6px_7px)] dark:border-ink/16 dark:bg-[repeating-linear-gradient(135deg,transparent_0_6px,color-mix(in_srgb,var(--ink)_5%,transparent)_6px_7px)]",
+				// design-escape-ok(opacity,colour): shipped value; ink/14 edge (ink/16 in dark), a black/45 label (white/45 in dark)
+				"border-dashed border-ink/14 text-[rgba(0,0,0,0.45)] dark:text-[rgba(255,255,255,0.45)] bg-[repeating-linear-gradient(135deg,transparent_0_6px,color-mix(in_srgb,var(--ink)_3.5%,transparent)_6px_7px)] dark:border-ink/16 dark:bg-[repeating-linear-gradient(135deg,transparent_0_6px,color-mix(in_srgb,var(--ink)_5%,transparent)_6px_7px)]",
 		};
 	if (strong)
 		return {

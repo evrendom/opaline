@@ -35,8 +35,8 @@ export function pullRequestLook(pull: SessionPullRequest): {
 } {
 	if (pull.mergedAt)
 		return {
-			// design-escape-ok(base): a category colour from the opal sheen (data paint)
-			className: "text-color-2",
+			// design-escape-ok(colour): shipped value; violet-500 data paint
+			className: "text-violet-500",
 			icon: IconGitMerge,
 			label: "Merged",
 		};

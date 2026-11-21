@@ -113,8 +113,8 @@ type SessionsOverviewRowProps = {
 
 const MAX_SESSION_OVERVIEW_SKILL_TAGS = 7;
 const SESSION_OVERVIEW_TOOLTIP_CLASS_NAME =
-	// design-escape-ok(shadow): no role renders this; the row tooltip's 40% drop
-	"whitespace-nowrap corner-s edge-m border-line bg-canvas px-l py-s text-body-m font-medium text-ink shadow-[0_8px_20px_-10px_rgba(0,0,0,0.4),0_2px_6px_rgba(0,0,0,0.1)] tabular-nums dark:bg-field";
+	// design-escape-ok(shadow,space,colour): shipped value; the row tooltip's 40% drop, 10px sides, #202124 ink (#f3f4f6 on #202124 in dark)
+	"whitespace-nowrap corner-s squircle:corner-xl-inner edge-m border-line-strong bg-canvas px-[10px] py-s text-body-m font-medium text-[#202124] shadow-[0_8px_20px_-10px_rgba(0,0,0,0.4),0_2px_6px_rgba(0,0,0,0.1)] tabular-nums dark:bg-[#202124] dark:text-[#f3f4f6]";
 // CSS selects both tags and the matching count, including before demo hydration.
 // Column widths grow continuously; only the number of skill tags changes in tiers.
 const SESSION_OVERVIEW_SKILL_OVERFLOW_TIERS = [
