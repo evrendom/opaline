@@ -97,16 +97,13 @@ describe("reach", () => {
 	});
 });
 
-test("the CLI's test script expands into its files plus the two scripts it chains", () => {
+test("the CLI's test script expands into its test files", () => {
 	const items = scriptItems(ROOT, "apps/cli", "test");
-	const runs = new Set(
-		items.map((i) => (i.kind === "file" ? i.run : i.command)),
-	);
-	expect(runs).toEqual(
-		new Set(["test#0", "test:r2-memory#0", "test:sidecar-faults#0"]),
-	);
+	expect(
+		new Set(items.map((i) => (i.kind === "file" ? i.run : i.command))),
+	).toEqual(new Set(["test#0"]));
 	expect(items.map(itemKey)).toContain(
-		"apps/cli/src/__tests__/r2-multipart-memory.integration.ts",
+		"apps/cli/src/__tests__/retire.test.ts",
 	);
 	expect(suiteItems("integration", ROOT).every((i) => i.kind === "file")).toBe(
 		true,
