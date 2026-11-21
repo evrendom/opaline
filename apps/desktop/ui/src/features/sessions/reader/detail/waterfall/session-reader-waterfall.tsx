@@ -271,10 +271,10 @@ export function SessionReaderWaterfallView({
 				<div key={String(open)} className="relative h-5">
 					<ProgressBar
 						ref={progress.barRef}
-						// design-escape-ok(opacity): no role renders this; bg-primary/50
-						baseClassName="bg-primary/50 opacity-35"
-						// design-escape-ok(opacity): no role renders this; bg-primary/50
-						fillClassName="bg-primary/50"
+						// design-escape-ok(colour): shipped value; main's primary at 50%, oklch(0.205) (oklch(0.922) in dark)
+						baseClassName="bg-[oklch(0.205_0_0/0.5)] opacity-35 dark:bg-[oklch(0.922_0_0/0.5)]"
+						// design-escape-ok(colour): shipped value; main's primary at 50%, oklch(0.205) (oklch(0.922) in dark)
+						fillClassName="bg-[oklch(0.205_0_0/0.5)] dark:bg-[oklch(0.922_0_0/0.5)]"
 						left={0}
 						width={(runMs / total) * 100}
 					/>
@@ -374,8 +374,8 @@ export function SessionReaderWaterfallView({
 												/>
 											))}
 											{bare ? (
-												// design-escape-ok(type): deliberate exception, 9/12 ruler ticks
-												<div className="absolute inset-x-0 top-0 flex justify-between px-xs text-[9px] leading-3 text-ink-disabled tabular-nums">
+												// design-escape-ok(type,opacity): deliberate exception, 9/12 ruler ticks; muted-foreground/70 as shipped
+												<div className="absolute inset-x-0 top-0 flex justify-between px-xs text-[9px] leading-3 text-ink-3/70 tabular-nums">
 													<span>0s</span>
 													<span>{formatWholeDuration(total)}</span>
 												</div>

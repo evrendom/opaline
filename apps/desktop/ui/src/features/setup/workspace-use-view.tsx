@@ -48,7 +48,6 @@ import { ToolCard } from "@/features/sessions/reader/detail/step/session-reader-
 import { ModelChip } from "@/features/sessions/reader/detail/waterfall/session-reader-waterfall-chips";
 import {
 	CARD,
-	ReaderPane,
 	ScrollColumn,
 } from "@/features/sessions/reader/files/session-reader-files-parts";
 import { mcpResult } from "@/features/sessions/reader/model/session-reader-mcp-tool";
@@ -395,7 +394,8 @@ function RunList({
 		<FluidList>
 			{days.map((day) => (
 				<section key={day.label} className="flex flex-col gap-xxs">
-					<h3 className="px-l pt-l pb-xs text-body-s font-medium text-ink-3 first:pt-xs">
+					{/* design-escape-ok(type): shipped value; the 11px label on a 1.5 line */}
+					<h3 className="px-[calc(var(--space-m)+var(--space-xxs))] pt-l pb-xs text-body-s leading-normal font-medium text-ink-3 first:pt-xs">
 						{day.label}
 					</h3>
 					{day.runs.map((run) => (
@@ -452,8 +452,8 @@ function RunRow({
 			onPointerEnter={() => onWarm(run)}
 			title={prompt || undefined}
 			className={cn(
-				"relative flex w-full items-center gap-l",
-				"corner-s px-l py-s corner-squircle",
+				"relative flex w-full items-center gap-[calc(var(--space-m)+var(--space-xxs))]",
+				"corner-s px-[calc(var(--space-m)+var(--space-xxs))] py-s corner-squircle",
 				"text-left",
 				"focus-outline transition-colors",
 				"squircle:corner-l",
@@ -492,7 +492,8 @@ function RunRow({
 					className={cn(
 						"shrink-0",
 						"corner-xs px-xs",
-						"text-body-xs font-medium tabular-nums",
+						// design-escape-ok(type): shipped value; 10px on a 16px line
+						"text-body-xs leading-4 font-medium tabular-nums",
 						"bg-field text-ink-3",
 					)}
 				>
@@ -531,7 +532,7 @@ function McpRunCalls({
 	const calls = query.data?.calls;
 	const tag = version ? ` · v${version}` : "";
 	return (
-		<ReaderPane>
+		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-s pt-xl pr-xl pl-[calc(var(--space-xl)+var(--space-xs))]">
 			<PickStrip
 				agent={run.agentId || null}
 				model={run.model ?? null}
@@ -582,7 +583,7 @@ function McpRunCalls({
 					)}
 				</Reveal>
 			)}
-		</ReaderPane>
+		</div>
 	);
 }
 
@@ -768,7 +769,7 @@ function RunTrace({
 				: `Loaded ${name}${tag}${steps.length > 1 ? `, ${steps.length} times` : ""}`
 			: undefined;
 	return (
-		<ReaderPane>
+		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-s pt-xl pr-xl pl-[calc(var(--space-xl)+var(--space-xs))]">
 			<PickStrip
 				agent={agent}
 				model={model}
@@ -785,7 +786,8 @@ function RunTrace({
 					className={cn(
 						"flex h-6 items-center gap-xs",
 						"corner-xs px-s",
-						"text-body-s",
+						// design-escape-ok(type): shipped value; 11px on main's inherited 4/3 line
+						"text-body-s leading-[calc(4/3)]",
 						"text-ink-3 transition-colors",
 						"hover:text-ink",
 					)}
@@ -803,7 +805,7 @@ function RunTrace({
 				userId={userId}
 				uses={uses}
 			/>
-		</ReaderPane>
+		</div>
 	);
 }
 
@@ -961,8 +963,10 @@ function OpenRunLink({
 			to={sessionPagePath(getShellRoutePath, undefined, run.sessionId, params)}
 			className={
 				compact
-					? "flex h-6 items-center gap-xs corner-xs px-s text-body-s text-ink-3 transition-colors hover:text-ink"
-					: "inline-flex h-8 items-center gap-xs corner-s edge-m border-line-soft px-l text-body-m font-medium transition-colors hover:bg-hover"
+					? // design-escape-ok(type): shipped value; 11px on main's inherited 4/3 line
+						"flex h-6 items-center gap-xs corner-xs px-s text-body-s leading-[calc(4/3)] text-ink-3 transition-colors hover:text-ink"
+					: // design-escape-ok(opacity): shipped value; border/60 as line-strong at 60%
+						"inline-flex h-8 items-center gap-xs corner-s edge-m border-line-strong/60 px-l text-body-m font-medium transition-colors hover:bg-field"
 			}
 		>
 			Open in session
@@ -978,7 +982,10 @@ function RunListSample() {
 	return (
 		<div className="flex flex-col gap-xxs pt-xs">
 			{[72, 56, 80, 64, 50, 76, 60, 68, 54, 74].map((width) => (
-				<div key={width} className="flex h-7 items-center gap-l px-l">
+				<div
+					key={width}
+					className="flex h-7 items-center gap-[calc(var(--space-m)+var(--space-xxs))] px-[calc(var(--space-m)+var(--space-xxs))]"
+				>
 					<Bone className="size-4 shrink-0 corner-full" />
 					<Bone className="h-2.5 corner-full" style={{ width: `${width}%` }} />
 				</div>
@@ -1037,7 +1044,7 @@ function MiddleSample({ section }: { section: UseSection }) {
 			label={section === "mcp" ? "Reading the calls" : "Reading this run"}
 			className="min-w-0 flex-1"
 		>
-			<div className="flex h-full min-h-0 min-w-0 flex-col gap-s pt-xl pr-xl pl-xxl">
+			<div className="flex h-full min-h-0 min-w-0 flex-col gap-s pt-xl pr-xl pl-[calc(var(--space-xl)+var(--space-xs))]">
 				<div
 					className={cn(
 						"flex h-8 shrink-0 items-center gap-s",
@@ -1071,14 +1078,14 @@ const TRACE_ROWS = [
 function SkillTraceBody() {
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
-			<div className="flex flex-col gap-m pt-l pb-xxl">
+			<div className="flex flex-col gap-m pt-l pb-[calc(var(--space-xl)+var(--space-xs))]">
 				<div className="flex items-center gap-m pl-[calc(var(--space-xxl)*1.5)]">
 					<Bone className="h-3 w-14 corner-xs" />
 					<Bone className="h-3 w-20 corner-xs" />
 				</div>
 				<div className="flex gap-l">
 					<Bone className="mt-s size-6 shrink-0 corner-full" />
-					<div className="flex min-w-0 flex-1 flex-col gap-m corner-m bg-card px-l py-l shadow-card corner-squircle squircle:corner-xl">
+					<div className="flex min-w-0 flex-1 flex-col gap-m corner-m bg-card px-l py-l shadow-card corner-squircle squircle:corner-xl-inner">
 						<Bone className="h-3 w-full corner-xs" />
 						<Bone className="h-3 w-10/12 corner-xs" />
 						<Bone className="h-3 w-1/2 corner-xs" />
@@ -1118,15 +1125,19 @@ function McpCallsSample() {
 				className={cn(
 					"flex flex-col",
 					"divide-y corner-m edge-m px-l",
-					"divide-line-soft border-line-soft bg-canvas",
+					// design-escape-ok(opacity): shipped value; border/40 and /60 as line-strong
+					"divide-line-strong/40 border-line-strong/60 bg-canvas",
 				)}
 			>
-				<div className="flex items-center gap-s py-l">
+				<div className="flex items-center gap-s py-[calc(var(--space-m)+var(--space-xxs))]">
 					<Bone className="h-4 w-14 corner-xs" />
 					<Bone className="h-3 w-24 corner-xs" />
 				</div>
 				{["command", "context"].map((key) => (
-					<div key={key} className="flex flex-col gap-s py-l">
+					<div
+						key={key}
+						className="flex flex-col gap-s py-[calc(var(--space-m)+var(--space-xxs))]"
+					>
 						<Bone className="h-2.5 w-16 corner-xs" />
 						<Bone className="h-3 w-3/4 corner-xs" />
 					</div>
@@ -1152,11 +1163,12 @@ const FILE_LINES = [94, 88, 96, 70, 0, 90, 84, 92, 60, 0, 86, 94, 78].map(
 function FileCardSample() {
 	return (
 		<div className="flex flex-col">
-			<div className="flex items-center gap-m edge-b-m border-line-soft px-xxl py-xl">
+			{/* design-escape-ok(opacity): shipped value; border/50 as line-strong at 50% */}
+			<div className="flex items-center gap-m edge-b-m border-line-strong/50 px-[calc(var(--space-xl)+var(--space-xs))] py-xl">
 				<Bone className="size-4 shrink-0 corner-full" />
 				<Bone className="h-3.5 w-28 corner-xs" />
 			</div>
-			<div className="flex flex-col gap-l px-xxl py-xxl">
+			<div className="flex flex-col gap-[calc(var(--space-m)+var(--space-xxs))] px-[calc(var(--space-xl)+var(--space-xs))] py-[calc(var(--space-xl)+var(--space-xs))]">
 				<Bone className="mb-xs h-4 w-1/3 corner-xs" />
 				{FILE_LINES.map(({ line, width }) =>
 					width ? (

@@ -183,7 +183,10 @@ function FlagTag({ kinds }: { kinds: readonly MomentKind[] }) {
 				title={labels.join(", ")}
 				className="size-4 drop-shadow-none dark:drop-shadow-none"
 			>
-				<IconAlertTriangle aria-hidden="true" className="size-2.5 text-error" />
+				<IconAlertTriangle
+					aria-hidden="true"
+					className="size-2.5 text-rose-mark"
+				/>
 			</OpalChip>
 			<span className="sr-only">Flagged: {labels.join(", ")}</span>
 		</span>

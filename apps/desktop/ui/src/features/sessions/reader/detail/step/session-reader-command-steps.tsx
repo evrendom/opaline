@@ -198,7 +198,7 @@ function Letters({ pieces }: { pieces: Piece[] }) {
 function QuoteMark({ piece }: { piece: Piece }) {
 	const double = piece.text === '"';
 	return (
-		<span className="text-ink-disabled">
+		<span className="text-ink-3/70">
 			{piece.mark === "open" ? (double ? "“" : "‘") : double ? "”" : "’"}
 		</span>
 	);
@@ -505,7 +505,8 @@ export function CommandLines({
 				className={cn(
 					"flex flex-col",
 					"divide-y corner-m edge-m px-m py-xxs",
-					"divide-line-soft border-line-soft bg-canvas",
+					// design-escape-ok(opacity): shipped value; border/60
+					"divide-line-soft border-line-strong/60 bg-canvas",
 					"dark:bg-canvas/25",
 				)}
 			>

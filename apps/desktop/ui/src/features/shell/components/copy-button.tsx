@@ -112,7 +112,8 @@ export function CopyButton({
 			onClick={() => void copy()}
 			className={cn(
 				"copy-button inline-flex shrink-0 items-center justify-center",
-				"corner-xs p-xs",
+				// design-escape-ok(radius): shipped value; 4px corner
+				"rounded-[4px] p-xs",
 				"text-ink-3-60 transition-colors focus-outline",
 				"hover:text-ink",
 				className,

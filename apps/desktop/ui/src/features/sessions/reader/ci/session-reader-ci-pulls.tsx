@@ -226,7 +226,8 @@ export function PullLine({
 					aria-hidden="true"
 					className={cn(
 						"mt-xxs size-4 shrink-0",
-						look.className || "text-ink-disabled",
+						// design-escape-ok(opacity): shipped value; muted-foreground/70
+						look.className || "text-ink-3/70",
 					)}
 				/>
 				<span
@@ -286,7 +287,8 @@ export function CiPullCard({
 	const push = row.rounds[pushIndex];
 	return (
 		<div className="flex min-h-0 min-w-0 flex-1 flex-col">
-			<header className="flex flex-col gap-s edge-b-m border-line-soft px-xxl py-xl">
+			{/* design-escape-ok(opacity): shipped value; border/50 */}
+			<header className="flex flex-col gap-s edge-b-m border-line-strong/50 px-xxl py-xl">
 				<div className="flex min-w-0 items-center gap-m">
 					<PullGlyph
 						aria-hidden="true"

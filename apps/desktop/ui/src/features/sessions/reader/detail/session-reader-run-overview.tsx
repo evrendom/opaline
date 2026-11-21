@@ -382,7 +382,8 @@ function StepKinds({
 									"flex w-full items-center gap-m",
 									"corner-s px-m py-xs",
 									"text-left focus-outline",
-									"hover:bg-hover dark:hover:bg-hover-50",
+									// design-escape-ok(opacity): shipped value; field/80 (field/50 in dark)
+									"hover:bg-field/80 dark:hover:bg-field/50",
 									on && "bg-hover dark:bg-hover",
 								)}
 							>

@@ -23,8 +23,8 @@ function DialogOverlay({
 			data-slot="dialog-overlay"
 			className={cn(
 				"fixed inset-0 isolate z-50",
-				// design-escape-ok(opacity): no role renders this; ink/20 backdrop
-				"bg-ink/20 duration-(--motion-quick-duration)",
+				// design-escape-ok(colour): shipped value; black/20 backdrop in both modes
+				"bg-[rgb(0_0_0/0.2)] duration-(--motion-quick-duration)",
 				"supports-backdrop-filter:backdrop-blur-[2px] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
 				className,
 			)}
@@ -48,10 +48,12 @@ function DialogContent({
 				data-slot="dialog-content"
 				className={cn(
 					"fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] gap-xxl",
-					"corner-xl corner-squircle p-xxl",
-					"text-body-xl",
+					"corner-xl-inner corner-squircle p-xxl",
+					// design-escape-ok(type): shipped value; the 20/14 line as a ratio, so smaller text inside keeps it
+					"text-body-xl leading-[calc(20/14)]",
 					"-translate-x-1/2 -translate-y-1/2 bg-surface text-ink shadow-card duration-(--motion-quick-duration) outline-none",
-					"squircle:corner-xl",
+					// design-escape-ok(radius): shipped value; 40px squircle
+					"squircle:rounded-[40px]",
 					"sm:max-w-md",
 					"data-open:animate-in data-open:fade-in-0 data-open:zoom-in-[96%]",
 					"data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-[99%]",
@@ -65,7 +67,7 @@ function DialogContent({
 						data-slot="dialog-close"
 						render={
 							<Button
-								variant="ghost"
+								variant="quiet"
 								className="absolute top-4 right-4"
 								size="icon-sm"
 							/>
@@ -123,7 +125,8 @@ function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
 			data-slot="dialog-title"
 			className={cn(
 				// set solid: the title's line box hugs its text
-				"font-body text-body-xxl line-solid font-medium",
+				// design-escape-ok(type): shipped value; normal tracking on the 16px title
+				"font-body text-body-xxl line-solid font-medium tracking-normal",
 				className,
 			)}
 			{...props}

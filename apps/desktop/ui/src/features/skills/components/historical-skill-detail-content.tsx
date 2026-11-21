@@ -59,7 +59,7 @@ export function HistoricalSkillDetailContent({
 				className={cn(
 					"flex shrink-0 items-center gap-l",
 					variant === "card"
-						? "px-xxl pt-xxl pb-xs"
+						? "px-xxl pt-[calc(var(--space-xl)+var(--space-xs))] pb-xs"
 						: "h-12 edge-b-m border-line-strong px-xxl",
 				)}
 				data-slot="skill-version-toolbar"
@@ -97,7 +97,7 @@ export function HistoricalSkillDetailContent({
 						<Button
 							type="button"
 							size="xs"
-							variant="ghost"
+							variant="quiet"
 							aria-pressed={raw}
 							className="text-ink-3-60 hover:text-ink"
 							onClick={() => setRaw((value) => !value)}
@@ -114,7 +114,7 @@ export function HistoricalSkillDetailContent({
 					"min-h-0 flex-1 overflow-y-auto overscroll-none",
 					variant === "card"
 						? "p-xxl"
-						: "p-xxl sm:p-[calc(var(--space-xxl)*1.25)]",
+						: "p-xxl sm:p-[calc(var(--space-xxl)+var(--space-xs))]",
 				)}
 			>
 				{isPending && previewContent ? (
@@ -208,13 +208,15 @@ function SkillVersionMenu({
 			>
 				<IconStack2
 					aria-hidden="true"
-					className="size-4 h-lh shrink-0 text-ink-2 dark:text-ink-3"
+					// design-escape-ok(colour): shipped value; #5d5d5d, #acaeb2 in dark
+					className="size-4 h-lh shrink-0 text-[#5d5d5d] dark:text-[#acaeb2]"
 				/>
 				<span>{label}</span>
 				<IconChevronDown
 					stroke={1.75}
 					aria-hidden="true"
-					className="size-4 shrink-0 text-ink-2 dark:text-ink-3"
+					// design-escape-ok(colour): shipped value; #5d5d5d, #acaeb2 in dark
+					className="size-4 shrink-0 text-[#5d5d5d] dark:text-[#acaeb2]"
 				/>
 			</Menu.Trigger>
 			<SessionMenuPopup aria-label="Skill versions">

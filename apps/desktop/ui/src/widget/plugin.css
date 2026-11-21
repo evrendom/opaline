@@ -58,13 +58,23 @@ html[data-host-styles] .dashboard-01-preview {
 	--dashboard-01-rail-active: var(--hover);
 }
 html[data-host-styles] :is(.menu-popover, .menu-surface) {
+	--menu-background: var(--canvas);
+	--menu-border: var(--line-strong);
+	--menu-label: var(--ink);
+	--menu-focused-label: var(--ink);
+	--menu-icon: var(--ink-3);
+	--menu-highlight: var(--hover);
+	--menu-checkbox-border: var(--line-strong);
+	--menu-accent: var(--ink);
+	--menu-check: var(--canvas);
 	/* A picked preset or interval: a step past the hover tint. */
+	--menu-selected: color-mix(in oklab, var(--ink) 12%, transparent);
 }
 /* The web's menus float on a soft black shadow, which a dark host swallows.
    With a host theme every menu, popover, dialog and tooltip keeps a hairline in
    the host's border colour instead. */
 html[data-host-styles] .menu-surface {
-	border: var(--menu-hairline) solid var(--line-strong);
+	border: var(--menu-hairline) solid var(--menu-border);
 }
 html[data-host-styles]
 	:is(

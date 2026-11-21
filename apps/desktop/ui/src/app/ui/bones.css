@@ -1,11 +1,15 @@
 @reference "../../index.css";
 
 :root {
+	/* design-escape-ok(colour): shipped value; the bone's black/7 */
+	--bone: rgb(0 0 0 / 0.07);
 	/* design-escape-ok(colour): no role renders this; the shimmer's white sheen */
 	--bone-shine: rgb(255 255 255 / 0.6);
 }
 
 .dark {
+	/* design-escape-ok(colour): shipped value; the bone's white/8 */
+	--bone: rgb(255 255 255 / 0.08);
 	/* design-escape-ok(colour): no role renders this; the shimmer's white sheen */
 	--bone-shine: rgb(255 255 255 / 0.1);
 }
@@ -56,7 +60,7 @@
 }
 
 html[data-intro] .intro-region :is([data-nav-icon], [data-workspace-mark]) {
-	background: var(--hover-strong);
+	background: var(--bone);
 	-webkit-mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
 	mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
 }
@@ -99,8 +103,8 @@ html[data-intro] .cost-metric-trend path {
 		"M 1.00 27.43 L 1.51 26.86 L 2.03 26.51 L 2.54 26.86 L 3.05 27.43 L 4.08 27.43 L 4.59 26.11 L 5.10 25.26 L 5.62 25.26 L 6.13 26.51 L 6.64 27.43 L 7.16 27.31 L 7.67 27.03 L 8.18 23.54 L 8.70 26.17 L 9.21 26.91 L 9.72 27.37 L 10.24 26.34 L 10.75 27.43 L 11.26 25.43 L 11.77 27.43 L 12.29 23.14 L 12.80 23.71 L 13.31 26.57 L 13.83 25.83 L 14.34 25.54 L 14.85 25.31 L 15.37 21.54 L 15.88 18.34 L 16.39 26.34 L 16.91 25.54 L 17.42 26.97 L 17.93 27.43 L 18.45 27.37 L 18.96 25.77 L 19.47 27.43 L 19.98 26.91 L 20.50 25.37 L 21.01 24.57 L 21.52 25.03 L 22.04 23.60 L 22.55 21.26 L 23.06 23.54 L 23.58 19.26 L 24.09 21.37 L 24.60 13.77 L 25.12 18.69 L 25.63 23.14 L 26.14 5.43 L 26.65 18.80 L 27.17 25.37 L 27.68 27.20 L 28.19 17.83 L 28.71 15.66 L 29.22 16.51 L 29.73 23.77 L 30.25 25.89 L 30.76 22.97 L 31.27 26.97 L 31.79 20.86 L 32.30 23.31 L 32.81 24.57 L 33.32 24.57 L 33.84 27.43 L 34.35 27.37 L 34.86 27.31 L 35.38 26.91 L 35.89 27.37 L 36.40 27.03 L 36.92 27.43 L 37.43 27.37 L 37.94 27.09 L 38.46 27.43 L 42.56 27.43 L 43.07 26.91 L 43.59 27.43 L 46.66 27.43 L 47.18 27.37 L 47.69 27.43 L 48.20 27.43 L 48.72 27.37 L 49.23 27.43 L 50.77 27.43 L 51.28 26.86 L 51.80 27.43 L 69.75 27.43 L 70.27 22.29 L 70.78 24.00 L 71.29 25.66 L 71.81 24.63 L 72.32 25.66 L 72.83 19.09 L 73.35 18.17 L 73.86 16.57 L 74.37 12.97 L 74.88 20.34 L 75.40 21.77 L 75.91 20.11 L 76.42 19.43 L 76.94 17.83 L 77.45 22.80 L 77.96 16.06 L 78.48 27.43 L 78.99 26.97 L 79.50 15.77 L 80.02 21.26 L 80.53 16.57 L 81.04 17.37 L 81.55 17.71 L 82.07 17.89 L 82.58 11.66 L 83.09 10.80 L 83.61 14.00 L 84.12 9.14 L 84.63 3.43 L 85.15 8.69 L 85.66 21.66 L 86.17 27.43 L 86.69 17.37 L 87.20 4.57 L 87.71 5.83 L 88.23 18.86 L 88.74 8.17 L 89.25 18.00 L 89.76 27.43 L 92.84 27.43 L 93.36 24.86 L 93.87 27.43 L 95.41 27.43 L 95.92 22.74 L 96.43 8.51 L 96.95 5.77 L 97.46 20.40 L 97.97 10.86 L 98.49 22.40 L 99.00 27.43"
 	);
 	fill: transparent;
-	stroke: var(--hover-strong);
-	stroke-width: var(--border-m);
+	stroke: var(--bone);
+	stroke-width: 1.2px;
 	vector-effect: non-scaling-stroke;
 }
 

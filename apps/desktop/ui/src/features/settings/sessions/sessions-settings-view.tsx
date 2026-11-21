@@ -62,7 +62,7 @@ export function SessionsSettingsView({
 							<code>{MANAGE_COMMAND}</code>
 							<Button
 								type="button"
-								variant="ghost"
+								variant="quiet"
 								size="sm"
 								className="corner-s transition-none active:not-aria-[haspopup]:translate-y-0"
 								onClick={onCopy}

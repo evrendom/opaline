@@ -140,7 +140,7 @@ export function AppSidebar({
 			    hover), tinted like a row hover. */}
 			<div
 				data-fluid-menu-root=""
-				className="flex min-h-0 flex-1 flex-col antialiased"
+				className="flex min-h-0 flex-1 flex-col antialiased [--fluid-fill:color-mix(in_oklab,var(--sidebar-accent)_70%,transparent)]"
 			>
 				<FluidMenuHover items="[data-sidebar-interactive]" bridgeGap={12} />
 				{/* The plugin's host already titles it "Opaline". */}

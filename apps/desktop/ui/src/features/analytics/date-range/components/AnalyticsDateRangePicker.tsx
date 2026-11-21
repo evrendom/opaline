@@ -336,7 +336,7 @@ export function AnalyticsDateRangePicker({
 			<>
 				<Button
 					type="button"
-					variant="ghost"
+					variant="quiet"
 					size="sm"
 					className="session-date-picker-action session-date-picker-cancel"
 					onClick={() => {

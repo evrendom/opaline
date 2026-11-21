@@ -353,13 +353,15 @@ export function ContextTiles({
 							aria-pressed={tile.key === picked}
 							aria-label={`Show what's in ${name}`}
 							onClick={(event) => pickBox(tile.key, event.shiftKey)}
-							className="absolute inset-0 corner-s-inset corner-squircle focus-outline transition-colors hover:bg-hover squircle:corner-xl-inset dark:hover:bg-hover"
+							className="absolute inset-0 corner-s-inset corner-squircle focus-outline transition-colors hover:bg-hover squircle:corner-l-inset dark:hover:bg-hover"
 						/>
 						<span
 							aria-hidden="true"
 							className={cn(
 								"pointer-events-none relative flex min-w-0 flex-col text-body-l",
-								showName ? "px-l py-xs" : "h-full items-center justify-center",
+								showName
+									? "px-[calc(var(--space-m)+var(--space-xxs))] py-xs"
+									: "h-full items-center justify-center",
 							)}
 						>
 							<span className="flex min-w-0 items-center gap-s">

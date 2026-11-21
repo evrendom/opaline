@@ -105,7 +105,8 @@ function SetupRow({
 					// design-escape-ok(type): shipped value; 13px on the card's 14/20 ratio (18.57)
 					"text-left text-[13px]/[calc(20/14)]",
 					"focus-outline",
-					"hover:bg-hover",
+					// design-escape-ok(opacity): shipped value; field/60
+					"hover:bg-field/60",
 				)}
 			>
 				<SetupMark file={file} />

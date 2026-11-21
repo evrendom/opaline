@@ -23,11 +23,11 @@
 }
 .cost-breakdown-tabs > button:hover {
 	color: var(--cost-foreground);
-	background: var(--hover);
+	background: var(--cost-hover);
 }
 .cost-breakdown-tabs > button[aria-selected="true"] {
 	color: var(--cost-foreground);
-	background: var(--hover);
+	background: var(--cost-hover);
 	font-weight: 500;
 }
 

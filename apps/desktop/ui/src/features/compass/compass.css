@@ -19,7 +19,7 @@
 	flex-direction: column;
 	min-width: 0;
 	min-height: 0;
-	border-right: 1px solid var(--line);
+	border-right: 1px solid var(--cost-border);
 }
 .compass-pane-toolbar {
 	display: flex;
@@ -96,7 +96,7 @@
 	outline: none;
 }
 .compass-item[aria-current="true"] {
-	background: var(--hover);
+	background: var(--cost-hover);
 }
 .compass-item:focus-visible {
 	outline: 2px solid var(--accent);
@@ -514,10 +514,14 @@
 	color: var(--cost-muted);
 	font-size: var(--size-m);
 }
+/* The cost page's muted ink on the page; ink-3 in a popover, outside it. */
 .compass-hint {
-	color: var(--cost-muted);
+	color: var(--ink-3);
 	font-size: var(--size-m);
 	font-weight: var(--weight-body-regular);
+}
+:is(.cost-page, .cost-range-controls, .cost-breakdown-dialog) .compass-hint {
+	color: var(--cost-muted);
 }
 .compass-error {
 	/* design-escape-ok(colour): shipped value; oklch(0.577 0.245 27.325) */
@@ -542,7 +546,7 @@
 	width: 100%;
 	min-height: 72px;
 	padding: 8px 10px;
-	border: 1px solid var(--line);
+	border: 1px solid var(--cost-border);
 	border-radius: var(--radius-s);
 	background: transparent;
 	font-size: var(--size-xl);

@@ -99,7 +99,8 @@ export function Breakdown({
 		<span className="truncate text-body-m text-ink-3">
 			{title}
 			{toggle?.label ? (
-				<span className="text-ink-disabled"> · {toggle.label}</span>
+				// design-escape-ok(opacity): shipped value; muted-foreground/70
+				<span className="text-ink-3/70"> · {toggle.label}</span>
 			) : null}
 		</span>
 	);

@@ -450,7 +450,7 @@ export function RunLanes({
 				key={lane.id}
 				className={cn(
 					"relative h-4 overflow-hidden",
-					// design-escape-ok(radius): shipped value; 4px
+					// design-escape-ok(radius): shipped value; 4px corner
 					"rounded-[4px]",
 					// design-escape-ok(opacity): no role renders this; field/60
 					"before:absolute before:inset-0 before:-z-10 before:bg-field/60",
@@ -479,7 +479,7 @@ export function RunLanes({
 							data-step={bar.stepId}
 							className={cn(
 								"absolute inset-y-[2px] flex min-w-[2px] items-center overflow-hidden",
-								// design-escape-ok(radius): shipped value; 3px
+								// design-escape-ok(radius): shipped value; 3px corner
 								"rounded-[3px]",
 								"hover:brightness-110",
 								own ? null : bar.className,
@@ -530,7 +530,7 @@ export function RunLanes({
 					<span
 						className={cn(
 							"absolute top-1/2 right-0.5",
-							// design-escape-ok(radius): shipped value; 3px
+							// design-escape-ok(radius): shipped value; 3px corner
 							"rounded-[3px] px-xxs",
 							"text-body-xxs tabular-nums",
 							// design-escape-ok(opacity): no role renders this; canvas/90
@@ -645,7 +645,8 @@ export function RunLanes({
 										: `Show all lanes, ${unused} this run didn't use`
 								}
 								onClick={() => setAllLanes((shown) => !shown)}
-								className="inline-flex items-center corner-xs px-xxs text-ink-disabled hover:bg-hover hover:text-ink focus-outline"
+								// design-escape-ok(radius,opacity): shipped value; 4px corner, muted-foreground/70
+								className="inline-flex items-center rounded-[4px] px-xxs text-ink-3/70 hover:bg-hover hover:text-ink focus-outline"
 							>
 								{allLanes ? (
 									<IconChevronUp aria-hidden="true" className="size-2.5" />
@@ -682,7 +683,8 @@ export function RunLanes({
 							/>
 						) : null}
 					</div>
-					<div className="relative flex justify-between gap-m px-xxs text-body-xxs line-solid text-ink-disabled tabular-nums">
+					{/* design-escape-ok(opacity): shipped value; muted-foreground/70 */}
+					<div className="relative flex justify-between gap-m px-xxs text-body-xxs line-solid text-ink-3/70 tabular-nums">
 						<span className={cn(brush && "invisible")}>
 							{offset(view.from)}
 						</span>

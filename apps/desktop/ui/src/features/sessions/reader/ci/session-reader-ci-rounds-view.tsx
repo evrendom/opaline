@@ -294,8 +294,8 @@ function PushRun({ run }: { run: SummaryCiRun }) {
 
 const END_DOT = {
 	closed: "bg-rose-mark",
-	// design-escape-ok(base): a category colour from the opal sheen (data paint)
-	merged: "bg-color-2",
+	// design-escape-ok(colour): shipped value; violet-500 data paint
+	merged: "bg-violet-500",
 	open: "edge-m border-ink-3-50",
 };
 

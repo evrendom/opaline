@@ -197,7 +197,7 @@ export function SortableHead<K extends string>({
 			<span
 				className={cn(
 					"inline-flex flex-row-reverse items-center gap-s text-ink",
-					align === "right" && "-mr-xxl",
+					align === "right" && "-mr-[calc(var(--space-xl)+var(--space-xs))]",
 				)}
 			>
 				<Arrow
@@ -259,7 +259,8 @@ export function SearchInput({
 	return (
 		<InputGroup variant="toolbar" className={cn("w-56", className)}>
 			<InputGroupAddon>
-				<IconSearch className="size-3.5 dark:text-ink-disabled text-ink-3" />
+				{/* design-escape-ok(colour): shipped value; #B8B8B8, #5B5B5B in dark */}
+				<IconSearch className="size-3.5 dark:text-[#5B5B5B] text-[#B8B8B8]" />
 			</InputGroupAddon>
 			<InputGroupInput
 				value={value}
@@ -396,7 +397,8 @@ export function PaginationFooter({
 			className={cn(
 				"flex items-center justify-end gap-xs",
 				"edge-t-m px-xxl pt-xl",
-				"border-line-soft",
+				// design-escape-ok(opacity): shipped value; border/50, /40 in dark, as line-strong
+				"border-line-strong/50 dark:border-line-strong/40",
 			)}
 		>
 			<span className="text-body-m text-ink-3-50 tabular-nums">

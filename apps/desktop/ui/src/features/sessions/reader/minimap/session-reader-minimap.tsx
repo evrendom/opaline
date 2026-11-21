@@ -296,8 +296,8 @@ export function ReaderMinimap({
 					/>
 				))}
 				<path
-					// design-escape-ok(base): a category colour from the opal sheen (data paint)
-					className="fill-none stroke-color-2/30"
+					// design-escape-ok(colour): shipped value; violet-500/30 data paint (violet-400/30 in dark)
+					className="fill-none stroke-violet-500/30 dark:stroke-violet-400/30"
 					d={`${line.rail} ${line.branches}`}
 					strokeLinecap="round"
 					strokeWidth={1.5}
@@ -320,8 +320,8 @@ export function ReaderMinimap({
 						clipPath={`url(#${litId})`}
 					>
 						<path
-							// design-escape-ok(base): a category colour from the opal sheen (data paint)
-							className="fill-none stroke-color-2"
+							// design-escape-ok(colour): shipped value; violet-500 data paint (violet-400 in dark)
+							className="fill-none stroke-violet-500 dark:stroke-violet-400"
 							d={`${line.rail} ${line.branches}`}
 							strokeLinecap="round"
 							strokeWidth={1.75}
@@ -399,9 +399,10 @@ export function ReaderMinimap({
 							node.kind === "subagent"
 								? "fill-canvas"
 								: node.alert
-									? "fill-error stroke-error"
-									: // design-escape-ok(base): a category colour from the opal sheen (data paint)
-										"fill-canvas stroke-color-2/60"
+									? // design-escape-ok(colour): shipped value; rose-500 alert dot (rose-400 in dark)
+										"fill-rose-500 stroke-rose-500 dark:fill-rose-400 dark:stroke-rose-400"
+									: // design-escape-ok(colour): shipped value; violet-500/60 data paint (violet-400/60 in dark)
+										"fill-canvas stroke-violet-500/60 dark:stroke-violet-400/60"
 						}
 						style={
 							node.kind === "subagent"

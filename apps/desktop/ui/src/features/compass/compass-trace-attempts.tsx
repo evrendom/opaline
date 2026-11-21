@@ -388,7 +388,8 @@ function Bubble({
 		<div
 			className={cn(
 				"min-w-0 flex-1 corner-m px-l py-[calc(var(--space-m)+var(--space-xxs))] corner-squircle squircle:corner-xl-inner",
-				!tint && "bg-wash",
+				// design-escape-ok(colour,opacity): shipped value; black/[0.025] (white/[0.04] in dark)
+				!tint && "bg-black/[0.025] dark:bg-white/[0.04]",
 			)}
 			style={tint ? tintedGround(tint) : undefined}
 		>

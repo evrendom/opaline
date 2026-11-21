@@ -20,7 +20,8 @@ type Report = AnalysisHistoryReportOutput;
 type ReportResult = Report["results"][number];
 
 const MARKDOWN_CLASS_NAME =
-	"[overflow-wrap:anywhere] [&_a]:underline [&_code]:corner-xs [&_code]:bg-field [&_code]:px-xs [&_code]:font-data [&_code]:text-body-l [&_h1]:mt-xl [&_h1]:font-heavy [&_h2]:mt-xl [&_h2]:font-heavy [&_h3]:mt-l [&_h3]:font-heavy [&_li]:my-xxs [&_ol]:my-m [&_ol]:list-decimal [&_ol]:pl-xxl [&_p]:my-m [&_pre]:my-m [&_pre]:overflow-x-auto [&_pre]:corner-s [&_pre]:bg-field [&_pre]:p-l [&_pre_code]:bg-transparent [&_pre_code]:p-zero [&_table]:my-m [&_td]:edge-m [&_td]:px-m [&_td]:py-xs [&_th]:edge-m [&_th]:px-m [&_th]:py-xs [&_ul]:my-m [&_ul]:list-disc [&_ul]:pl-xxl [&>*:first-child]:mt-zero [&>*:last-child]:mb-zero";
+	// design-escape-ok(radius): shipped value; 4px corner
+	"[overflow-wrap:anywhere] [&_a]:underline [&_code]:rounded-[4px] [&_code]:bg-field [&_code]:px-xs [&_code]:font-data [&_code]:text-body-l [&_h1]:mt-xl [&_h1]:font-heavy [&_h2]:mt-xl [&_h2]:font-heavy [&_h3]:mt-l [&_h3]:font-heavy [&_li]:my-xxs [&_ol]:my-m [&_ol]:list-decimal [&_ol]:pl-[calc(var(--space-xl)+var(--space-xs))] [&_p]:my-m [&_pre]:my-m [&_pre]:overflow-x-auto [&_pre]:corner-s [&_pre]:bg-field [&_pre]:p-l [&_pre_code]:bg-transparent [&_pre_code]:p-zero [&_table]:my-m [&_td]:edge-m [&_td]:px-m [&_td]:py-xs [&_th]:edge-m [&_th]:px-m [&_th]:py-xs [&_ul]:my-m [&_ul]:list-disc [&_ul]:pl-[calc(var(--space-xl)+var(--space-xs))] [&>*:first-child]:mt-zero [&>*:last-child]:mb-zero";
 const REMARK_PLUGINS = [remarkGfm, remarkAppLinks];
 
 export function ReportView({
@@ -47,7 +48,7 @@ export function ReportView({
 		>
 			<header className="flex flex-col gap-m">
 				<p className="text-body-m text-ink-3">Saved analysis</p>
-				<h1 className="text-display-xxs font-medium text-balance">
+				<h1 className="text-display-xxs tracking-s font-medium text-balance">
 					{report.question}
 				</h1>
 				<div className="flex flex-wrap items-center gap-x-m gap-y-xs text-ink-3">
@@ -86,7 +87,7 @@ export function ReportView({
 					Findings
 				</h2>
 				{findings.length ? (
-					<ol className="flex list-decimal flex-col gap-l pl-xxl">
+					<ol className="flex list-decimal flex-col gap-l pl-[calc(var(--space-xl)+var(--space-xs))]">
 						{findings.map((step) => (
 							<li key={step.id} className="pl-xs">
 								<p>{step.finding}</p>
@@ -229,7 +230,10 @@ function CitedRuns({
 
 function ResultTable({ result }: { result: ReportResult }) {
 	return (
-		<div className="flex flex-col gap-xs corner-s edge-m border-line-soft p-m">
+		<div
+			// design-escape-ok(opacity): shipped value; border/60 as line-strong at 60%
+			className="flex flex-col gap-xs corner-s edge-m border-line-strong/60 p-m"
+		>
 			<p className="text-body-m text-ink-3">
 				{result.title}
 				{result.truncated ? " (cut)" : ""}

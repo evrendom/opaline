@@ -111,7 +111,7 @@ export function ContextLane({
 		<div
 			className={cn(
 				"relative h-8 overflow-hidden",
-				// design-escape-ok(radius): shipped value; 5px
+				// design-escape-ok(radius): shipped value; 5px corner
 				"rounded-[5px]",
 				// design-escape-ok(opacity): no role renders this; field/60
 				"before:absolute before:inset-0 before:-z-10 before:bg-field/60",

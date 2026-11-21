@@ -14,7 +14,8 @@ import {
 function TurnTag({ index, turnId }: { index: number; turnId: string }) {
 	return (
 		<span className="flex shrink-0 items-baseline gap-s tabular-nums">
-			<span className="w-5 text-ink-disabled">{index + 1}</span>
+			{/* design-escape-ok(opacity): shipped value; muted-foreground/70 */}
+			<span className="w-5 text-ink-3/70">{index + 1}</span>
 			<span className="font-mono text-ink-3">{shortRunId(turnId)}</span>
 		</span>
 	);

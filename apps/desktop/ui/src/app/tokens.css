@@ -161,6 +161,9 @@
 	--emerald-mark: oklch(69.6% 0.17 162.48);
 	--cost-foreground: #292a2f;
 	--cost-muted: #828387;
+	--cost-border: rgb(0 0 0 / 0.07);
+	--cost-hover: rgb(0 0 0 / 0.05);
+	--cost-row-hover: rgb(0 0 0 / 0.015);
 	--session-overview-muted: rgb(0 0 0 / 0.63);
 	--session-overview-subtle: rgb(0 0 0 / 0.5);
 	--cost-blue: oklch(0.623 0.188 259.815); /* both modes */
@@ -185,7 +188,7 @@
 	--shadow-chip: 0 0 0 0.5px rgb(255 255 255 / 0.1);
 	--shadow-inset: inset 0 0 0 0.5px rgb(255 255 255 / 0.06);
 	--shadow-float: 0 0 #0000;
-	--mark-fill: var(--hover-strong);
+	--mark-fill: color-mix(in oklab, var(--ink) 8%, transparent);
 	--ink-soft: var(--ink-3);
 	--ink-meta: var(--color-1-translucent);
 
@@ -200,6 +203,9 @@
 	--emerald-ink: oklch(76.5% 0.177 163.223);
 	--cost-foreground: #e6e6e9;
 	--cost-muted: #919299;
+	--cost-border: rgb(255 255 255 / 0.09);
+	--cost-hover: rgb(255 255 255 / 0.07);
+	--cost-row-hover: rgb(255 255 255 / 0.03);
 	--session-overview-muted: rgb(255 255 255 / 0.65);
 	--session-overview-subtle: rgb(255 255 255 / 0.5);
 }
@@ -259,6 +265,7 @@
 	--color-emerald-mark: var(--emerald-mark);
 	--color-cost-foreground: var(--cost-foreground);
 	--color-cost-muted: var(--cost-muted);
+	--color-cost-border: var(--cost-border);
 	--color-session-overview-muted: var(--session-overview-muted);
 	--color-session-overview-subtle: var(--session-overview-subtle);
 	--color-cost-blue: var(--cost-blue);
@@ -280,9 +287,11 @@
 
 /* Inset corners: a child drawn 1px inside a surface keeps its corners
    concentric with the surface's (`corner-s-inset squircle:corner-xl-inset`
-   inside a `corner-s squircle:corner-xl` tile: a hover or focus overlay). */
+   inside a `corner-s squircle:corner-xl` tile, `squircle:corner-l-inset`
+   inside a `squircle:corner-l` one: a hover or focus overlay). */
 @theme inline {
 	--corner-s-inset: calc(var(--radius-s) - 1px);
+	--corner-l-inset: calc(var(--radius-l) - 1px);
 	--corner-xl-inset: calc(var(--radius-xl) - 1px);
 	/* nested one space step inside or outside an xl squircle: a row highlight
 	   inset 4px in a card (18), a drop outline 4px around a shelf (26) */

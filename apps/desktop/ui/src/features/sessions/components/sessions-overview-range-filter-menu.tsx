@@ -66,8 +66,8 @@ export function SessionOverviewRangeFilterPanel({
 		<div
 			className={
 				variant === "linear"
-					? "min-h-0 flex-1 px-m pt-l pb-m [--slider-range-card-inset:0.5rem] [--slider-range-card-radius:var(--radius-xl)] [--session-range-slider-background:var(--inset)] dark:[--session-range-slider-background:color-mix(in_srgb,var(--ink)_6%,transparent)]"
-					: "px-m pt-l pb-m [--slider-range-card-inset:0.5rem] [--slider-range-card-radius:var(--radius-xl)] [--session-range-slider-background:color-mix(in_srgb,var(--ink)_4%,var(--canvas))] dark:[--session-range-slider-background:color-mix(in_srgb,var(--ink)_6%,transparent)]"
+					? "min-h-0 flex-1 px-m pt-[calc(var(--space-m)+var(--space-xxs))] pb-m [--slider-range-card-inset:0.5rem] [--slider-range-card-radius:var(--radius-l)] [--session-range-slider-background:var(--inset)] dark:[--session-range-slider-background:color-mix(in_srgb,var(--ink)_6%,transparent)]"
+					: "px-m pt-l pb-m [--slider-range-card-inset:0.5rem] [--slider-range-card-radius:var(--radius-l)] [--session-range-slider-background:color-mix(in_srgb,var(--ink)_4%,var(--canvas))] dark:[--session-range-slider-background:color-mix(in_srgb,var(--ink)_6%,transparent)]"
 			}
 		>
 			<SliderRangeInput

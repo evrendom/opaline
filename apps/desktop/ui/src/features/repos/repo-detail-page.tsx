@@ -287,7 +287,7 @@ export function RepoDetailPage({
 	};
 	const sessions = <UsageSessionsPane {...sessionsProps} />;
 	return (
-		<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-inset text-dashboardy-heading [--reader-page:var(--canvas)]">
+		<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-inset dark:bg-canvas text-dashboardy-heading [--reader-page:var(--canvas)]">
 			<RepoDetailHeader
 				repoKey={repoKey}
 				name={name}
@@ -481,7 +481,8 @@ export function RepoDetailHeader({
 		<>
 			<nav
 				aria-label="Repo breadcrumb"
-				className="flex min-w-0 flex-1 items-center gap-s text-body-xxl font-medium"
+				// design-escape-ok(type): shipped value; -0.025em title tracking
+				className="flex min-w-0 flex-1 items-center gap-s text-body-xxl font-medium tracking-[-0.025em]"
 			>
 				<button
 					type="button"

@@ -304,6 +304,11 @@
   --weight-body-regular: 400;
   --weight-body-medium: 500;
   --weight-body-heavy: 600;
+  --weight-display-regular: 400;
+  --weight-display-medium: 500;
+  --weight-display-heavy: 600;
+  --weight-data-regular: 400;
+  --weight-data-heavy: 600;
   --weight-data-medium: 500;
   --weight-regular: var(--weight-body-regular);
   --weight-medium: var(--weight-body-medium);
@@ -312,7 +317,7 @@
   /* Body text */
   --size-xxs: 8px;
   --line-xxs: 12px;
-  --letter-spacing-xxs: 0.02em;
+  --letter-spacing-xxs: 0em;
   --size-xs: 10px;
   --line-xs: 14px;
   --letter-spacing-xs: 0em;
@@ -330,7 +335,7 @@
   --letter-spacing-xl: 0em;
   --size-xxl: 16px;
   --line-xxl: 24px;
-  --letter-spacing-xxl: -0.015em;
+  --letter-spacing-xxl: 0em;
   --tracking-xs: -0.015em;
   --tracking-s: 0em;
   --tracking-m: 0em;

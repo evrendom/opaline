@@ -26,9 +26,10 @@ function InputGroup({
 				"group/input-group relative flex w-full min-w-0 items-center",
 				"transition-[color,box-shadow] outline-none",
 				variant === "toolbar"
-					? // The hover tint is half the hover role in light and all of it in
+					? // The hover tint is half the field in light and all of it in
 						// dark; no role holds that step, so it stays a dark: pair.
-						"h-8 corner-full bg-card shadow-control hover:bg-hover-50 dark:hover:bg-hover"
+						// design-escape-ok(opacity): shipped value; muted/50 toolbar hover, field at 50% (all of it in dark)
+						"h-8 corner-full bg-card shadow-control hover:bg-field/50 dark:hover:bg-field"
 					: // design-escape-ok(opacity): no role renders this; line/50 edge and line-strong/30 fill in dark
 						"h-9 corner-s corner-squircle shadow-card squircle:corner-l dark:shadow-none dark:edge-s dark:border-line/50 dark:bg-line-strong/30",
 				"in-data-[slot=combobox-content]:focus-within:border-inherit",
@@ -57,12 +58,13 @@ const inputGroupAddonVariants = cva(
 		variants: {
 			align: {
 				"inline-start":
-					"order-first pl-l has-[>button]:-ml-xs has-[>kbd]:-ml-xxs",
-				"inline-end": "order-last pr-l has-[>button]:-mr-xs has-[>kbd]:-mr-xxs",
+					"order-first pl-[calc(var(--space-m)+var(--space-xxs))] has-[>button]:-ml-xs has-[>kbd]:-ml-xxs",
+				"inline-end":
+					"order-last pr-[calc(var(--space-m)+var(--space-xxs))] has-[>button]:-mr-xs has-[>kbd]:-mr-xxs",
 				"block-start":
-					"order-first w-full justify-start px-l pt-m group-has-[>input]/input-group:pt-m [.border-b]:pb-m",
+					"order-first w-full justify-start px-[calc(var(--space-m)+var(--space-xxs))] pt-m group-has-[>input]/input-group:pt-m [.border-b]:pb-m",
 				"block-end":
-					"order-last w-full justify-start px-l pb-m group-has-[>input]/input-group:pb-m [.border-t]:pt-m",
+					"order-last w-full justify-start px-[calc(var(--space-m)+var(--space-xxs))] pb-m group-has-[>input]/input-group:pb-m [.border-t]:pt-m",
 			},
 		},
 		defaultVariants: {

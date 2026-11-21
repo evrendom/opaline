@@ -230,7 +230,7 @@ export function ContextZoom({
 								onClick={(event) =>
 									item.more ? open.go() : onPick(item.label, event.shiftKey)
 								}
-								className="absolute inset-0 corner-s-inset corner-squircle focus-outline transition-colors hover:bg-hover squircle:corner-xl-inset dark:hover:bg-hover"
+								className="absolute inset-0 corner-s-inset corner-squircle focus-outline transition-colors hover:bg-hover squircle:corner-l-inset dark:hover:bg-hover"
 							/>
 							<span
 								className={cn(

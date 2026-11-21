@@ -191,7 +191,7 @@ export function WorkspaceMembersTable({
 								signInLink.canCopy(member) ? (
 									<Button
 										type="button"
-										variant="ghost"
+										variant="quiet"
 										size="icon-sm"
 										className="settings-icon-button"
 										aria-label={
@@ -215,7 +215,7 @@ export function WorkspaceMembersTable({
 							{canEdit && member.role !== "owner" ? (
 								<Button
 									type="button"
-									variant="ghost"
+									variant="quiet"
 									size="icon-sm"
 									className="settings-icon-button"
 									aria-label={
@@ -251,7 +251,8 @@ export function WorkspaceMembersTable({
 					<DialogFooter>
 						<Button
 							type="button"
-							variant="outline"
+							variant="bordered"
+							size="md"
 							onClick={() => setRemoving(null)}
 						>
 							Cancel
@@ -259,6 +260,7 @@ export function WorkspaceMembersTable({
 						<Button
 							type="button"
 							variant="destructive"
+							size="md"
 							onClick={() => {
 								if (removing) onRemove(removing.id);
 								setRemoving(null);

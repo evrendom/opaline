@@ -89,6 +89,7 @@ function DeleteWorkspaceDialogBody({
 						Type {organization.name} to confirm
 					</FieldLabel>
 					<Input
+						variant="plain"
 						id="delete-workspace-confirm"
 						value={confirmName}
 						onChange={(event) => setConfirmName(event.target.value)}
@@ -102,7 +103,8 @@ function DeleteWorkspaceDialogBody({
 			<DialogFooter>
 				<Button
 					type="button"
-					variant="outline"
+					variant="bordered"
+					size="md"
 					onClick={() => onOpenChange(false)}
 					disabled={isDeleting}
 				>
@@ -111,6 +113,7 @@ function DeleteWorkspaceDialogBody({
 				<Button
 					type="button"
 					variant="destructive"
+					size="md"
 					onClick={handleDelete}
 					disabled={!canDelete}
 				>

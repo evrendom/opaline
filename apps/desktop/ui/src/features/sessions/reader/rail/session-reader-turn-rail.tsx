@@ -287,7 +287,8 @@ export const TurnRailList = memo(function TurnRailList({
 				className={cn(
 					"flex shrink-0 items-center justify-between gap-m",
 					"edge-b-m py-m pr-m pl-xl",
-					"border-line-soft",
+					// design-escape-ok(opacity): shipped value; border/60
+					"border-line-strong/60",
 				)}
 			>
 				<h2 className="truncate text-body-xl font-medium">Agent runs</h2>
@@ -325,7 +326,11 @@ export const TurnRailList = memo(function TurnRailList({
 						rect={active.rect}
 						session={0}
 						transition={false}
-						className="z-0 corner-s bg-card-soft shadow-raised corner-squircle squircle:corner-l"
+						className={cn(
+							"z-0 corner-s bg-card-soft corner-squircle squircle:corner-l",
+							// design-escape-ok(shadow): shipped value; the picked turn's 1px and 2px/6px drops (the card shadow in dark)
+							"shadow-[0_0_0_0.5px_rgb(0_0_0/0.08),0_1px_2px_-0.5px_rgb(0_0_0/0.1),0_2px_6px_-2px_rgb(0_0_0/0.12)] dark:shadow-card",
+						)}
 					/>
 					{whole ? (
 						<button

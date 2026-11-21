@@ -287,7 +287,8 @@ function ReadRuler({
 			title={title}
 			className="flex w-10 shrink-0 flex-col items-end gap-xxs"
 		>
-			<span className="text-body-xs line-solid text-ink-disabled tabular-nums">
+			{/* design-escape-ok(opacity): shipped value; muted-foreground/70 */}
+			<span className="text-body-xs line-solid text-ink-3/70 tabular-nums">
 				{count === null
 					? "all lines"
 					: `${count.toLocaleString()} ${count === 1 ? "line" : "lines"}`}
@@ -319,7 +320,8 @@ function RepoRow({ root }: { root: string }) {
 				"flex h-6 items-center gap-s",
 				"px-m pt-xs",
 				"text-body-s font-medium",
-				"text-ink-disabled",
+				// design-escape-ok(opacity): shipped value; muted-foreground/70
+				"text-ink-3/70",
 			)}
 		>
 			<IconFolderOpenFilled
@@ -360,7 +362,8 @@ function FolderRow({
 				"flex min-h-6 items-start gap-s",
 				"pt-s pr-m pb-xxs",
 				"text-body-s",
-				"text-ink-disabled",
+				// design-escape-ok(opacity): shipped value; muted-foreground/70
+				"text-ink-3/70",
 				inRepo ? "pl-xxl" : "pl-m",
 			)}
 		>

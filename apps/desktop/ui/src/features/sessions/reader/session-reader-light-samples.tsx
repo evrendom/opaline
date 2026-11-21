@@ -109,7 +109,8 @@ function RunCardSample() {
 				className={cn(
 					"flex h-[55px] shrink-0 items-center gap-l",
 					"edge-b-m px-l",
-					"border-line-soft",
+					// design-escape-ok(opacity): shipped value; border/60
+					"border-line-strong/60",
 				)}
 			>
 				<Bone className="size-6 shrink-0 corner-full" />
@@ -117,7 +118,8 @@ function RunCardSample() {
 				<span className="flex-1" />
 				<Bone className="h-3 w-20 corner-xs" />
 			</div>
-			<div className="grid grid-cols-4 gap-xl edge-b-m border-line-soft px-l py-l">
+			{/* design-escape-ok(opacity): shipped value; border/60 */}
+			<div className="grid grid-cols-4 gap-xl edge-b-m border-line-strong/60 px-l py-l">
 				{CARD_FIGURES.map((key) => (
 					<div key={key} className="flex flex-col gap-m">
 						<Bone className="h-3 w-10 corner-xs" />
@@ -218,7 +220,8 @@ export function RailSample() {
 				className={cn(
 					"flex h-[45px] shrink-0 items-center justify-between gap-m",
 					"edge-b-m pr-m pl-xl",
-					"border-line-soft",
+					// design-escape-ok(opacity): shipped value; border/60
+					"border-line-strong/60",
 				)}
 			>
 				<Bone className="h-3.5 w-20 corner-xs" />

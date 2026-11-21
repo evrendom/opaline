@@ -40,7 +40,7 @@ function DropdownMenuContent({
 						"z-50 max-h-(--available-height) w-(--anchor-width) min-w-32 overflow-x-hidden overflow-y-auto",
 						"corner-s corner-squircle p-xs",
 						"origin-(--transform-origin) bg-surface text-ink shadow-card duration-(--motion-quick-duration) outline-none",
-						"squircle:corner-xl",
+						"squircle:corner-xl-inner",
 						"data-[side=bottom]:slide-in-from-top-2",
 						"data-[side=inline-end]:slide-in-from-left-2",
 						"data-[side=inline-start]:slide-in-from-right-2",
@@ -80,8 +80,8 @@ function DropdownMenuItem({
 				"corner-xs px-m py-s",
 				"text-body-xl",
 				"outline-hidden select-none",
-				"focus:bg-hover focus:text-ink",
-				"not-data-[variant=destructive]:focus:**:text-ink",
+				"focus:bg-hover focus:text-sidebar-accent-foreground",
+				"not-data-[variant=destructive]:focus:**:text-sidebar-accent-foreground",
 				"data-inset:pl-[calc(var(--space-xxl)*4/3)]",
 				// design-escape-ok(opacity): no role renders this; error/10 destructive highlight
 				"data-[variant=destructive]:text-error data-[variant=destructive]:focus:bg-error/10 data-[variant=destructive]:focus:text-error",
@@ -116,7 +116,7 @@ function DropdownMenuCheckboxItem({
 				"corner-xs py-s pr-[calc(var(--space-xxl)*4/3)] pl-m",
 				"text-body-xl",
 				"outline-hidden select-none",
-				"focus:bg-hover focus:text-ink focus:**:text-ink",
+				"focus:bg-hover focus:text-sidebar-accent-foreground focus:**:text-sidebar-accent-foreground",
 				"data-inset:pl-[calc(var(--space-xxl)*4/3)]",
 				"data-disabled:pointer-events-none data-disabled:opacity-50",
 				"[&_svg]:pointer-events-none [&_svg]:shrink-0",
@@ -146,8 +146,8 @@ function DropdownMenuSeparator({
 	return (
 		<MenuPrimitive.Separator
 			data-slot="dropdown-menu-separator"
-			// design-escape-ok(opacity): no role renders this; line/60 menu rule
-			className={cn("-mx-xs my-xs h-px bg-line/60", className)}
+			// design-escape-ok(opacity): shipped value; border/60 menu rule, line-strong at 60%
+			className={cn("-mx-xs my-xs h-px bg-line-strong/60", className)}
 			{...props}
 		/>
 	);

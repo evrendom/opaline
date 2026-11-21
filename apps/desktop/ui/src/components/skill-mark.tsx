@@ -26,7 +26,11 @@ export function SkillMark({
 			<OpalChip
 				tint={mark.tint}
 				open={expandable ? expanded : undefined}
-				className={cn("size-9 text-display-xxs text-ink-3", className)}
+				className={cn(
+					// design-escape-ok(type): shipped value; main's text-xl set no tracking, so the emoji keeps its context's
+					"size-9 text-display-xxs tracking-[inherit] text-ink-3",
+					className,
+				)}
 			>
 				<span aria-hidden="true">{emoji ?? mark.emoji}</span>
 			</OpalChip>

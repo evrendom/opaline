@@ -97,7 +97,7 @@ export function SidebarWorkspaceSwitcher() {
 						render={
 							<SidebarMenuButton
 								data-sidebar-interactive=""
-								className="pr-m pl-m [&_svg]:size-3.5"
+								className="pr-m pl-[calc(var(--space-s)+var(--space-xxs)/2)] [&_svg]:size-3.5"
 							/>
 						}
 					>

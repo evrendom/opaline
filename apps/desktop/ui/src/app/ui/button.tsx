@@ -24,6 +24,16 @@ const buttonVariants = cva(
 					"shadow-control bg-card hover:bg-hover hover:text-ink aria-expanded:bg-hover aria-expanded:text-ink [&_svg:not([class*='text-'])]:text-ink-3",
 				ghost:
 					"hover:bg-hover hover:text-ink aria-expanded:bg-hover aria-expanded:text-ink [&_svg:not([class*='text-'])]:text-ink-3",
+				// The plain ghost the dialogs, the date picker, the calendar and the
+				// settings tables shipped with: a 1px clear edge, a field fill on hover
+				// (half of it in dark), and icons that follow the text at 16px.
+				quiet:
+					// design-escape-ok(opacity): shipped value; muted/50 hover in dark, field at 50%
+					"border border-transparent hover:bg-field hover:text-ink aria-expanded:bg-field aria-expanded:text-ink dark:hover:bg-field/50 [&_svg:not([class*='size-'])]:size-4",
+				// The plain outline those places shipped with: a 1px line-strong edge on
+				// the canvas (clear in dark), a field fill on hover, 16px icons.
+				bordered:
+					"border border-line-strong bg-canvas hover:bg-field hover:text-ink aria-expanded:bg-field aria-expanded:text-ink dark:bg-transparent dark:hover:bg-hover [&_svg:not([class*='size-'])]:size-4",
 				// The error fill is stronger in dark (10/20% light, 20/30% dark);
 				// error-tint is 11/17%, so the fill keeps its own dark: steps. Like the
 				// filled button it sits flat inside a 1px clear edge, with no shadow.
@@ -39,7 +49,7 @@ const buttonVariants = cva(
 				// e.g. filters applied) or open lifts it to foreground text on the
 				// stronger shadow.
 				toolbar:
-					"bg-card font-regular text-ink-3 shadow-control hover:bg-hover aria-expanded:bg-hover data-popup-open:bg-hover aria-pressed:text-ink aria-pressed:shadow-raised data-active:text-ink data-active:shadow-raised [&>svg]:size-3.5",
+					"bg-card font-regular text-ink-3 shadow-control hover:bg-[color-mix(in_oklab,var(--field)_50%,var(--card))] aria-expanded:bg-[color-mix(in_oklab,var(--field)_50%,var(--card))] data-popup-open:bg-[color-mix(in_oklab,var(--field)_50%,var(--card))] aria-pressed:text-ink aria-pressed:shadow-raised data-active:text-ink data-active:shadow-raised [&>svg]:size-3.5",
 			},
 			size: {
 				xs: "h-6 gap-xs corner-full px-[calc(var(--space-xxs)*5)] text-body-m in-data-[slot=button-group]:corner-full has-[>svg:first-child]:pl-m has-[>svg:last-child]:pr-m [&_svg:not([class*='size-'])]:size-[11px]",
@@ -47,6 +57,8 @@ const buttonVariants = cva(
 				sm: "h-8 gap-xs corner-full px-l in-data-[slot=button-group]:corner-full has-[>svg:first-child]:pl-m has-[>svg:last-child]:pr-m",
 				default:
 					"h-8 gap-s px-l in-data-[slot=button-group]:corner-full has-[>svg:first-child]:pl-l has-[>svg:last-child]:pr-l",
+				// The plain buttons' 36px size: 6px gap, 12px sides, 10px beside an icon.
+				md: "h-9 gap-s px-l has-data-[icon=inline-end]:pr-[calc(var(--space-m)+var(--space-xxs))] has-data-[icon=inline-start]:pl-[calc(var(--space-m)+var(--space-xxs))]",
 				icon: "size-8",
 				"icon-xs":
 					"size-6 corner-full in-data-[slot=button-group]:corner-full [&_svg:not([class*='size-'])]:size-3",
@@ -67,6 +79,12 @@ const buttonVariants = cva(
 				className:
 					// design-escape-ok(space): shipped value; 5.5px gap
 					"gap-[5.5px] has-[>svg:first-child]:pl-[calc(var(--space-xxs)*5)] has-[>svg:last-child]:pr-[calc(var(--space-xxs)*5)] has-[>svg+[data-button-text]:last-child]:pr-[calc(var(--space-xxs)*5)]",
+			},
+			// The plain buttons' small size kept its 12px sides beside an icon.
+			{
+				variant: ["quiet", "bordered"],
+				size: "sm",
+				className: "has-[>svg:first-child]:pl-l has-[>svg:last-child]:pr-l",
 			},
 		],
 		defaultVariants: {

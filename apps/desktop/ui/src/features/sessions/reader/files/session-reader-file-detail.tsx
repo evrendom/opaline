@@ -174,7 +174,8 @@ export function FileDetail({
 				/>
 			</ReaderPaneHeader>
 			<span
-				className="-mt-xs truncate pl-m text-left text-body-m text-ink-disabled [direction:rtl]"
+				// design-escape-ok(opacity): shipped value; muted-foreground/70
+				className="-mt-xs truncate pl-m text-left text-body-m text-ink-3/70 [direction:rtl]"
 				title={directory}
 			>
 				{`‎${directory}‎`}

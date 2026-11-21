@@ -181,7 +181,8 @@ export function Row({ children }: { children: ReactNode }) {
 				"corner-s px-m py-xs",
 				// design-escape-ok(type): shipped value; 13px on the card's 14/20 ratio (18.57)
 				"text-[13px]/[calc(20/14)]",
-				"hover:bg-hover",
+				// design-escape-ok(opacity): shipped value; field/60
+				"hover:bg-field/60",
 			)}
 		>
 			{children}
@@ -228,10 +229,11 @@ export function PlaceLink({
 			onClick={() => onOpen(first.turnId, first.agent)}
 			className={cn(
 				"shrink-0",
-				"corner-xs px-xs",
+				// design-escape-ok(radius): shipped value; 4px
+				"rounded-[4px] px-xs",
 				"text-body-m font-medium tabular-nums",
 				"text-ink-3 focus-outline",
-				"hover:bg-hover hover:text-ink",
+				"hover:bg-field hover:text-ink",
 			)}
 		>
 			{shortRunId(first.turnId)}
