@@ -90,7 +90,7 @@ export function SupportEmailButton() {
 	const docked = useSupportDocked();
 	if (docked || !showsSupportEmail(selfHost)) return null;
 	return (
-		<SupportEmailLink className="fixed right-[max(1rem,env(safe-area-inset-right))] bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 size-9 bg-surface shadow-float ring-1 ring-ink/10 hover:bg-hover" />
+		<SupportEmailLink className="fixed right-[max(1rem,env(safe-area-inset-right))] bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 size-9 bg-surface shadow-float ring-1 ring-line hover:bg-hover" />
 	);
 }
 
@@ -108,7 +108,7 @@ export function DockedSupportEmailButton({
 	return (
 		<SupportEmailLink
 			className={cn(
-				"relative size-5 text-body-s ring-1 ring-ink/10 transition-colors hover:bg-hover",
+				"relative size-5 text-body-s ring-1 ring-line transition-colors hover:bg-hover",
 				className,
 			)}
 		/>

@@ -18,8 +18,8 @@
 		transparent
 	);
 	transition:
-		--scroll-fade-top 200ms ease,
-		--scroll-fade-bottom 200ms ease;
+		--scroll-fade-top var(--motion-medium-duration) var(--motion-easing),
+		--scroll-fade-bottom var(--motion-medium-duration) var(--motion-easing);
 }
 .scroll-fade[data-fade-top] {
 	--scroll-fade-top: var(--scroll-fade-top-depth, 40px);

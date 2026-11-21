@@ -127,8 +127,8 @@ export function SettingsLayout() {
 												"relative flex h-8 items-center",
 												"corner-s px-l corner-squircle",
 												"text-body-xl font-medium",
-												"outline-none",
-												"squircle:corner-l focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--dashboard-01-metric-button-focus-ring)] pointer-coarse:h-12",
+												"focus-outline",
+												"squircle:corner-l pointer-coarse:h-12",
 												active
 													? "text-ink"
 													: "text-ink-3 hover:text-ink hover:transition-colors",
@@ -142,7 +142,7 @@ export function SettingsLayout() {
 														duration: 0.2,
 														ease: [0.32, 0.72, 0, 1],
 													}}
-													className="absolute inset-0 z-0 corner-s bg-card shadow-card corner-squircle squircle:corner-l dark:bg-ink-3/10"
+													className="absolute inset-0 z-0 corner-s bg-card-soft shadow-card corner-squircle squircle:corner-l"
 												/>
 											) : null}
 											<span className="relative z-10 flex items-center gap-s">

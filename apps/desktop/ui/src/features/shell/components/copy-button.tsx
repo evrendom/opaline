@@ -113,7 +113,8 @@ export function CopyButton({
 			className={cn(
 				"copy-button inline-flex shrink-0 items-center justify-center",
 				"corner-xs p-xs",
-				"text-ink-3/60 transition-colors",
+				// design-escape-ok(opacity): no role renders this; ink-3 at 60%
+				"text-ink-3/60 transition-colors focus-outline",
 				"hover:text-ink",
 				className,
 			)}

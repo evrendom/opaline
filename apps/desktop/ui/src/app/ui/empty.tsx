@@ -10,8 +10,8 @@ function Empty({ className, ...props }: React.ComponentProps<"div">) {
 				"flex w-full min-w-0 flex-1 flex-col items-center justify-center gap-xl",
 				"corner-l corner-squircle border-dashed edge-m p-[calc(var(--space-xxl)*2)] py-[calc(var(--space-xxl)*8/3)]",
 				"text-center text-balance",
-				// design-escape-ok: 26px squircle, between corner steps; no step holds it yet
-				"squircle:rounded-4xl dark:border-line/50",
+				// design-escape-ok(opacity): no role renders this; line/50 dashed edge in dark
+				"squircle:corner-xl-outer dark:border-line/50",
 				className,
 			)}
 			{...props}
@@ -74,7 +74,7 @@ function EmptyDescription({ className, ...props }: React.ComponentProps<"p">) {
 		<div
 			data-slot="empty-description"
 			className={cn(
-				// design-escape-ok: 12 / 19.5 description; body-m's 16 line would tighten it
+				// design-escape-ok(type): no role renders this; 12 / 19.5 description (body-m's 16 line would tighten it)
 				"text-xs/relaxed text-ink-3 [&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary",
 				className,
 			)}

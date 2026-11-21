@@ -1,10 +1,12 @@
 @reference "../../index.css";
 
 :root {
+	/* design-escape-ok(colour): no role renders this; the shimmer's white sheen */
 	--bone-shine: rgb(255 255 255 / 0.6);
 }
 
 .dark {
+	/* design-escape-ok(colour): no role renders this; the shimmer's white sheen */
 	--bone-shine: rgb(255 255 255 / 0.1);
 }
 
@@ -48,9 +50,9 @@
 .cost-chart-canvas,
 .cost-metric-trend path {
 	transition:
-		opacity 320ms ease,
-		fill 320ms ease,
-		stroke 320ms ease;
+		opacity var(--motion-large-duration) var(--motion-easing),
+		fill var(--motion-large-duration) var(--motion-easing),
+		stroke var(--motion-large-duration) var(--motion-easing);
 }
 
 html[data-intro] .intro-region :is([data-nav-icon], [data-workspace-mark]) {

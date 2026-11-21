@@ -59,7 +59,7 @@ export function WorkspaceMenuButton({
 						data-sidebar-workspace-row
 						className={cn(
 							isHeaderVariant
-								? "relative flex size-7 shrink-0 items-center justify-center corner-s text-ink outline-none hover:bg-hover active:scale-95"
+								? "relative flex size-7 shrink-0 items-center justify-center corner-s text-ink focus-outline hover:bg-hover active:scale-95"
 								: getUtilityRailItemClassName(),
 							isBottomRailVariant &&
 								"!size-9 !w-9 self-auto overflow-visible corner-m",

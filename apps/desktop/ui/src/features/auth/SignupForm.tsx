@@ -297,7 +297,9 @@ export function SignupForm(props: SignupFormProps) {
 						<div
 							role="alert"
 							aria-live="polite"
-							className="corner-m bg-error/5 px-l py-m text-error ring-1 ring-error/15"
+							className={
+								/* design-escape-ok(opacity): no role renders this; error at 5% fill, 15% ring */ "corner-m bg-error/5 px-l py-m text-error ring-1 ring-error/15"
+							}
 						>
 							{feedback.message}
 						</div>
@@ -364,8 +366,9 @@ export function SignupForm(props: SignupFormProps) {
 							className={cn(
 								"corner-xl px-l py-m text-body-xl ring-1",
 								feedback.kind === "error"
-									? "bg-error/5 text-error ring-error/15"
-									: "bg-field/35 text-ink-3 ring-line/60",
+									? // design-escape-ok(opacity): no role renders this; error at 5% fill, 15% ring
+										"bg-error/5 text-error ring-error/15"
+									: "bg-inset text-ink-3 ring-line-soft",
 							)}
 						>
 							{feedback.message}

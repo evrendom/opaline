@@ -97,8 +97,8 @@ function SidebarNavTile({
 				className={cn(
 					"flex h-10 w-full items-center justify-center",
 					"corner-l corner-squircle edge-m",
-					"border-(--opal-ring) bg-(--opal-fill) outline-none transition-[background-color,border-color] duration-(--motion-duration)",
-					"squircle:corner-xl focus-visible:ring-2 focus-visible:ring-focus/50",
+					"border-(--opal-ring) bg-(--opal-fill) focus-outline transition-[background-color,border-color] duration-(--motion-duration)",
+					"squircle:corner-xl",
 					active && route.tone ? route.tone.chip : restingChipClassName,
 					!active &&
 						"hover:[--opal-fill:color-mix(in_oklab,var(--dashboard-01-rail-active)_55%,white)] dark:[--opal-fill:rgb(255_255_255/0.03)] dark:[--opal-ring:rgb(255_255_255/0.05)] dark:hover:[--opal-fill:rgb(255_255_255/0.06)]",

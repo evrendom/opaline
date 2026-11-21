@@ -217,8 +217,8 @@ function CalendarDayButton({
 			className={cn(
 				"relative isolate z-10 flex aspect-square size-auto w-full min-w-(--cell-size) flex-col gap-xs",
 				"edge-none",
-				// design-escape-ok: day numbers sit in a square cell, their line box hugs the text
-				"leading-none font-regular",
+				// set solid: day numbers sit in a square cell, their line box hugs the text
+				"line-solid font-regular",
 				"group-data-[focused=true]/day:relative group-data-[focused=true]/day:z-10",
 				"data-[range-end=true]:corner-full data-[range-end=true]:bg-primary data-[range-end=true]:text-primary-fg",
 				"data-[range-middle=true]:corner-zero data-[range-middle=true]:bg-field data-[range-middle=true]:text-ink",

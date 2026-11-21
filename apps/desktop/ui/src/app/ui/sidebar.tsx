@@ -388,6 +388,7 @@ function SidebarGroupLabel({
 					"flex h-8 shrink-0 items-center",
 					"corner-s px-m",
 					"text-body-m font-medium",
+					// design-escape-ok(opacity): no role renders this; sidebar-foreground/70 group label
 					"text-sidebar-foreground/70 ring-sidebar-ring outline-hidden transition-[margin,opacity] duration-(--motion-medium-duration) ease-linear",
 					"group-data-[collapsible=icon]:-mt-[calc(var(--space-xxl)*4/3)] group-data-[collapsible=icon]:opacity-0 [&>svg]:size-4 [&>svg]:shrink-0",
 					className,
@@ -443,11 +444,13 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
 // border-radius but not its corner-shape, so a squircle active row would not
 // match the hover highlight.
 const sidebarMenuButtonVariants = cva(
-	"peer/menu-button group/menu-button flex w-full cursor-default items-center gap-m overflow-hidden corner-l p-m text-left text-body-xl ring-sidebar-ring outline-hidden transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-[calc(var(--space-xxl)*4/3)] group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-m! hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent/70 active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground data-active:bg-sidebar-accent/70 data-active:text-sidebar-accent-foreground [&_svg]:size-4.5 [&_svg]:shrink-0 [&>span:last-child]:truncate",
+	// design-escape-ok(opacity): no role renders this; sidebar-accent/70 active and selected fill
+	"peer/menu-button group/menu-button flex w-full cursor-default items-center gap-m overflow-hidden corner-l p-m text-left text-body-xl ring-sidebar-ring focus-outline transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-[calc(var(--space-xxl)*4/3)] group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-m! hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent/70 active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground data-active:bg-sidebar-accent/70 data-active:text-sidebar-accent-foreground [&_svg]:size-4.5 [&_svg]:shrink-0 [&>span:last-child]:truncate",
 	{
 		variants: {
 			variant: {
 				default:
+					// design-escape-ok(opacity): no role renders this; sidebar-accent/70 hover
 					"hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground",
 				outline:
 					"bg-canvas hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",

@@ -9,8 +9,8 @@ function Label({ className, ...props }: React.ComponentProps<"label">) {
 			data-slot="label"
 			className={cn(
 				"flex items-center gap-m",
-				// design-escape-ok: the label's line box hugs its text (shadcn), so it sits centred beside a control
-				"text-body-xl leading-none font-medium",
+				// set solid: the label's line box hugs its text, so it sits centred beside a control
+				"text-body-xl line-solid font-medium",
 				"select-none",
 				"group-data-[disabled=true]:pointer-events-none group-data-[disabled=true]:opacity-50 peer-disabled:cursor-not-allowed peer-disabled:opacity-50",
 				className,

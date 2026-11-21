@@ -23,6 +23,7 @@ function DialogOverlay({
 			data-slot="dialog-overlay"
 			className={cn(
 				"fixed inset-0 isolate z-50",
+				// design-escape-ok(opacity): no role renders this; ink/20 backdrop
 				"bg-ink/20 duration-(--motion-quick-duration)",
 				"supports-backdrop-filter:backdrop-blur-[2px] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
 				className,
@@ -121,8 +122,8 @@ function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
 		<DialogPrimitive.Title
 			data-slot="dialog-title"
 			className={cn(
-				// design-escape-ok: the title's line box hugs its text (shadcn)
-				"font-body text-body-xxl leading-none font-medium",
+				// set solid: the title's line box hugs its text
+				"font-body text-body-xxl line-solid font-medium",
 				className,
 			)}
 			{...props}

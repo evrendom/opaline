@@ -13,9 +13,11 @@ function Checkbox({ className, ...props }: CheckboxPrimitive.Root.Props) {
 				"hover:opacity-80",
 				"group-has-disabled/field:opacity-50",
 				"after:absolute after:-inset-x-3 after:-inset-y-2",
-				"focus-visible:border-focus focus-visible:ring-[1.5px] focus-visible:ring-focus/50",
+				"focus-visible:border-focus focus-visible:ring-[1.5px] focus-visible:ring-focus-ring",
 				"disabled:cursor-not-allowed disabled:opacity-50",
+				// design-escape-ok(opacity): no role renders this; error/20 invalid ring
 				"aria-invalid:border-error aria-invalid:ring-[1.5px] aria-invalid:ring-error/20 aria-invalid:aria-checked:border-primary",
+				// design-escape-ok(opacity): no role renders this; line-strong/30 dark fill, error/40–/50 invalid marks
 				"dark:bg-line-strong/30 dark:aria-invalid:border-error/50 dark:aria-invalid:ring-error/40",
 				"data-checked:border-primary data-checked:bg-primary data-checked:text-primary-fg",
 				"dark:data-checked:bg-primary",

@@ -9,8 +9,9 @@
 }
 
 .reports-settings-link:focus-visible {
-	outline: 2px solid var(--dashboard-01-metric-button-focus-ring);
-	outline-offset: 2px;
+	/* the focus-outline mark */
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
 }
 
 .reports-settings-title {

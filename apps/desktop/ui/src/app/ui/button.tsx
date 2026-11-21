@@ -6,14 +6,17 @@ import { cn } from "@/lib/utils";
 
 // An invalid button's edge is the full error colour in light and half of it
 // in dark; error-line is a ring-strength tint, so that edge stays a dark: pair.
+// Keyboard focus is the system's one mark, `focus-outline`.
 const buttonVariants = cva(
-	"group/button inline-flex shrink-0 items-center justify-center corner-full bg-clip-padding text-body-xl font-medium whitespace-nowrap transition-all hover:duration-(--motion-duration) outline-none select-none active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-error aria-invalid:ring-[1.5px] aria-invalid:ring-error-line dark:aria-invalid:border-error/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
+	// design-escape-ok(opacity): no role renders this; error/50 invalid edge in dark
+	"group/button inline-flex shrink-0 items-center justify-center corner-full bg-clip-padding text-body-xl font-medium whitespace-nowrap transition-all hover:duration-(--motion-duration) focus-outline select-none active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-error aria-invalid:ring-[1.5px] aria-invalid:ring-error-line dark:aria-invalid:border-error/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
 	{
 		variants: {
 			variant: {
 				// The fill lightens on hover by mode (80% light, 90% dark); no
 				// role holds a per-mode opacity, so the step stays a dark: pair.
 				default:
+					// design-escape-ok(opacity): no role renders this; primary/80 and /90 hover
 					"bg-primary shadow-primary text-primary-fg hover:bg-primary/80 dark:hover:bg-primary/90 [&_svg:not([class*='text-'])]:text-ink-disabled",
 				outline:
 					"shadow-control bg-card hover:bg-hover hover:text-ink aria-expanded:bg-hover aria-expanded:text-ink [&_svg:not([class*='text-'])]:text-ink-3",
@@ -22,9 +25,11 @@ const buttonVariants = cva(
 				// The error fill is stronger in dark (10/20% light, 20/30% dark);
 				// error-tint is 11/17%, so the fill keeps its own dark: steps.
 				destructive:
+					// design-escape-ok(opacity): no role renders this; error/10–/30 fills
 					"bg-error/10 shadow-destructive text-error hover:bg-error/20 dark:bg-error/20 dark:hover:bg-error/30",
 				// Underline stays rendered but transparent at rest, fading its opacity
 				// in on hover — the base `transition-all` animates the decoration color.
+				// design-escape-ok(opacity): no role renders this; ink/20 underline at rest
 				link: "text-ink underline decoration-ink/20 underline-offset-4 hover:decoration-ink",
 				// The toolbar pill: a card surface with muted text and 14px icons
 				// (whatever size the icon asks for). Pressed, active (`data-active`,

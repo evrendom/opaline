@@ -32,6 +32,7 @@
 .cli-onboarding-surface h1 {
 	font-size: var(--display-size-s);
 	line-height: var(--display-line-s);
+	/* design-escape-ok(type): no role renders this; -0.035em display tracking */
 	letter-spacing: -0.035em;
 	font-weight: var(--weight-body-heavy);
 	margin: var(--space-zero) var(--space-zero) var(--space-l);
@@ -132,6 +133,7 @@
 	border: var(--border-m) solid var(--line-strong);
 	border-radius: var(--radius-l);
 	background: var(--canvas);
+	/* design-escape-ok(colour): no role renders this; a faint 2% green drop */
 	box-shadow: 0 2px 8px #20332406;
 }
 .cli-onboarding-card button {
@@ -145,8 +147,9 @@
 }
 .cli-onboarding-card button:focus-visible,
 .cli-onboarding-card input:focus-visible {
-	outline: 2px solid #428363;
-	outline-offset: 3px;
+	/* the focus-outline mark */
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
 }
 .cli-onboarding-auth-options {
 	display: grid;
@@ -207,6 +210,7 @@
 .cli-onboarding-email input {
 	min-width: 0;
 	width: 100%;
+	/* design-escape-ok(base): no role renders this; neutral-5 edge */
 	border: var(--border-m) solid var(--neutral-5);
 	border-radius: var(--radius-s);
 	padding: var(--space-l) var(--space-l);
@@ -256,22 +260,15 @@
 }
 
 /* Dark: only the rules the current sign-in and welcome screens still render. */
-.dark .cli-onboarding-surface {
-	color: oklch(0.985 0 0);
-}
-.dark .cli-onboarding-surface p {
-	color: oklch(0.708 0 0);
-}
 .dark .cli-onboarding-auth-options button {
+	/* design-escape-ok(colour): no role renders this; a 15% white edge */
 	border-color: rgb(255 255 255 / 15%);
 	background: var(--card);
 }
 .dark .cli-onboarding-divider {
-	color: oklch(0.556 0 0);
-}
-.dark .cli-onboarding-surface .cli-onboarding-error {
-	color: oklch(0.704 0.191 22.216);
+	color: var(--ink-disabled);
 }
 .dark .cli-onboarding-email input {
+	/* design-escape-ok(colour): no role renders this; a 15% white edge */
 	border-color: rgb(255 255 255 / 15%);
 }

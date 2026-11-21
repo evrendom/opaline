@@ -28,14 +28,18 @@ function InputGroup({
 				variant === "toolbar"
 					? // The hover tint is half the hover role in light and all of it in
 						// dark; no role holds that step, so it stays a dark: pair.
+						// design-escape-ok(opacity): no role renders this; hover/50 toolbar hover
 						"h-8 corner-full bg-card shadow-control hover:bg-hover/50 dark:hover:bg-hover"
-					: "h-9 corner-s corner-squircle shadow-card squircle:corner-l dark:shadow-none dark:edge-s dark:border-line/50 dark:bg-line-strong/30",
+					: // design-escape-ok(opacity): no role renders this; line/50 edge and line-strong/30 fill in dark
+						"h-9 corner-s corner-squircle shadow-card squircle:corner-l dark:shadow-none dark:edge-s dark:border-line/50 dark:bg-line-strong/30",
 				"in-data-[slot=combobox-content]:focus-within:border-inherit",
-				"has-[[data-slot=input-group-control]:focus-visible]:border-focus has-[[data-slot=input-group-control]:focus-visible]:ring-[1.5px] has-[[data-slot=input-group-control]:focus-visible]:ring-focus/50",
+				"has-[[data-slot=input-group-control]:focus-visible]:border-focus has-[[data-slot=input-group-control]:focus-visible]:ring-[1.5px] has-[[data-slot=input-group-control]:focus-visible]:ring-focus-ring",
+				// design-escape-ok(opacity): no role renders this; error/20 invalid ring
 				"has-[[data-slot][aria-invalid=true]]:border-error has-[[data-slot][aria-invalid=true]]:ring-[1.5px] has-[[data-slot][aria-invalid=true]]:ring-error/20",
 				"has-[>[data-align=block-end]]:h-auto has-[>[data-align=block-end]]:flex-col",
 				"has-[>[data-align=block-start]]:h-auto has-[>[data-align=block-start]]:flex-col",
 				"has-[>textarea]:h-auto",
+				// design-escape-ok(opacity): no role renders this; error/40 invalid ring in dark
 				"dark:has-[[data-slot][aria-invalid=true]]:ring-error/40",
 				"has-[>[data-align=block-end]]:[&>input]:pt-l",
 				"has-[>[data-align=block-start]]:[&>input]:pb-l",

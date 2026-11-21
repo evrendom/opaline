@@ -23,7 +23,10 @@ export function DetailIdentityBreadcrumb({
 					const current = index === items.length - 1;
 					const className = cn(
 						"max-w-80 truncate",
-						current ? "text-neutral-10/87.5 dark:text-ink" : "text-ink-3",
+						current
+							? // design-escape-ok(base): no role renders this; neutral-10 at 87.5% in light
+								"text-neutral-10/87.5 dark:text-ink"
+							: "text-ink-3",
 						item.mono && "tabular-nums",
 					);
 					return (
@@ -41,7 +44,7 @@ export function DetailIdentityBreadcrumb({
 									type="button"
 									className={cn(
 										className,
-										"corner-xs outline-none hover:text-ink",
+										"corner-xs focus-outline hover:text-ink",
 									)}
 									onClick={item.onClick}
 								>

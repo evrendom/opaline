@@ -83,7 +83,9 @@ function DropdownMenuItem({
 				"focus:bg-hover focus:text-ink",
 				"not-data-[variant=destructive]:focus:**:text-ink",
 				"data-inset:pl-[calc(var(--space-xxl)*4/3)]",
+				// design-escape-ok(opacity): no role renders this; error/10 destructive highlight
 				"data-[variant=destructive]:text-error data-[variant=destructive]:focus:bg-error/10 data-[variant=destructive]:focus:text-error",
+				// design-escape-ok(opacity): no role renders this; error/20 destructive highlight in dark
 				"dark:data-[variant=destructive]:focus:bg-error/20",
 				"data-disabled:pointer-events-none data-disabled:opacity-50",
 				"[&_svg]:pointer-events-none [&_svg]:shrink-0",
@@ -144,6 +146,7 @@ function DropdownMenuSeparator({
 	return (
 		<MenuPrimitive.Separator
 			data-slot="dropdown-menu-separator"
+			// design-escape-ok(opacity): no role renders this; line/60 menu rule
 			className={cn("-mx-xs my-xs h-px bg-line/60", className)}
 			{...props}
 		/>

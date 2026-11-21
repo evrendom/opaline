@@ -1,10 +1,12 @@
 html[data-auth-shell] {
 	--auth-code-shadow:
-		inset 0 0 0 1px rgb(23 23 23 / 15%), 0 1px 2px rgb(0 0 0 / 4%);
+		inset 0 0 0 1px rgb(23 23 23 / 15%), /* design-escape-ok(colour): no role renders this; a 15% ink ring and 4% drop */
+		0 1px 2px rgb(0 0 0 / 4%);
 }
 
 /* Dark: the app's window surface, with controls one step up like cards. */
 html.dark[data-auth-shell] {
+	/* design-escape-ok(colour): no role renders this; a 15% white ring */
 	--auth-code-shadow: inset 0 0 0 1px rgb(255 255 255 / 15%);
 }
 
@@ -71,13 +73,15 @@ html[data-auth-shell],
 	margin-bottom: var(--space-m);
 	font-size: var(--size-s);
 	font-weight: var(--weight-body-heavy);
+	/* design-escape-ok(type): no role renders this; 0.14em eyebrow tracking */
 	letter-spacing: 0.14em;
 	line-height: var(--line-s);
 	text-transform: uppercase;
 }
 
 .opaline-auth-stage {
-	animation: opaline-auth-stage-enter 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+	animation: opaline-auth-stage-enter var(--motion-medium-duration)
+		var(--motion-strong-easing) both;
 }
 
 .opaline-email-verification {
@@ -150,6 +154,7 @@ html[data-auth-shell],
 	line-height: var(--line-xxl);
 	font-variant-numeric: tabular-nums;
 	font-weight: var(--weight-body-medium);
+	/* design-escape-ok(type): no role renders this; 0.22em code tracking */
 	letter-spacing: 0.22em;
 	text-align: center;
 }

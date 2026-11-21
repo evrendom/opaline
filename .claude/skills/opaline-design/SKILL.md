@@ -63,7 +63,7 @@ Tailwind reads the same roles as colours: `bg-surface`, `text-ink-3`, `border-li
 7. **Data in the data face.** Money, times, counts, percentages and code are Geist Mono (`font-data`) with `tabular-nums`. Headings that need a voice use the display face, Nunito (`font-display`).
 8. **Controls have fixed heights.** Toolbar pills 32 (`Button variant="toolbar"`), inputs 36, buttons 24 / 28 / 32 by size, menu rows 32. Toolbar controls hold a choice with `aria-pressed` or `data-active`.
    Keyboard focus is one mark: `focus-outline` (a 2px accent outline just outside the control) on Button and on anything clickable that isn't a Button; fields keep `focus-visible:border-focus` with `ring-focus-ring`. An icon-only button is `Button size="icon" | "icon-sm" | "icon-xs"` with an `aria-label`, never a raw `<button>` with its own focus style.
-9. **It's a Mac app.** No pointer cursor on controls. The sidebar stays translucent so the window's vibrancy shows through. Small controls get a `TouchTarget`.
+9. **It's a Mac app.** No pointer cursor on controls. The sidebar stays translucent so the window's vibrancy shows through: that translucency (`src/app/app-surface.css`, the shell's chrome) is the one literal colour family kept there, each value behind a per-rule marker; the sidebar primitive's other names (`--sidebar-foreground`, `--sidebar-accent` …) come from `tokens.css`. Small controls get a `TouchTarget`.
 10. **Motion is quiet.** Buttons press to .97, menus share the fluid hover highlight, numbers count with `FlowNumber`, skeletons reveal with `Bones`. Popups zoom in from 95% and out to it (`zoom-in-95` / `zoom-out-95`, in the primitives); the theme's `--motion-popup-scale` is not read. Respect reduced motion. Time every transition with a motion role, never a literal; a loop's period (a spinner, a shimmer, a pulse: 1s or longer) is the one literal duration, and `linear` the one literal easing:
 
    | Role | Value | Used for |
@@ -83,7 +83,7 @@ Tailwind reads the same roles as colours: `bg-surface`, `text-ink-3`, `border-li
 
 ## Snapping table
 
-How an escape maps onto the system. The goal is that nothing visibly changes: pick the role or step whose rendered value is nearest in both modes. When nothing is within about one step, keep the value and mark it (see the check) rather than invent a role.
+How an escape maps onto the system. Nothing may visibly change: take the role or step only when it renders the same in both modes (within about 1px, or a colour difference you can't see; a motion timing may snap, since motion isn't a look at rest). When the nearest role would visibly change something, keep the value and mark it, `design-escape-ok(<rule>): no role renders this; <value>` (see the check), rather than force a snap or invent a role.
 
 | Escape | Becomes |
 |---|---|
@@ -135,7 +135,7 @@ How an escape maps onto the system. The goal is that nothing visibly changes: pi
 
 ## The check
 
-`bun run check:design` (from the repo root or `apps/desktop/ui`; `tools/design-escapes.ts`) reads the class strings under `src` and lists every escape: Tailwind's default type (`text-sm`, `text-[13px]`, `leading-*`, `tracking-wide`), spacing (`p-3`, `gap-[10px]`), every `rounded-*`, palette colours (`bg-rose-500`, `text-white`), a hex, `rgb()` or `oklch()` in a class, and Tailwind's or literal shadows. It fails only on the path prefixes in `ENFORCED`; widen that list as areas are cleaned, until it is `["src/"]`. Data paint passes by a whole-file entry in `DATA_PAINT` (with its reason and the rules it lifts) or a `design-escape-ok: <reason>` comment on the line or the line above. The web tests and CI run it.
+`bun run check:design` (from the repo root or `apps/desktop/ui`; `tools/design-escapes.ts`) reads the class strings under `src` and lists every escape: Tailwind's default type (`text-sm`, `text-[13px]`, `leading-*`, `tracking-wide`), spacing (`p-3`, `gap-[10px]`), every `rounded-*`, palette colours (`bg-rose-500`, `text-white`), a hex, `rgb()` or `oklch()` in a class, and Tailwind's or literal shadows. It enforces all of `src/` (`ENFORCED`). It also reads every CSS declaration: colour, font and motion literals, an opacity modifier on a theme colour, and a direct Layer 1 read (`neutral-N`, `color-N`). Data paint passes by a whole-file entry in `DATA_PAINT` (with its reason and the rules it lifts) or a per-rule marker, `design-escape-ok(<rule>[,<rule>…]): <reason>`, in a comment on the line or the line above; it lifts only the named rules. A bare `design-escape-ok:` exempts nothing and is itself flagged, as is a marker with nothing left to exempt. Counts are held by a ratchet in `tools/design-escapes.baseline.json`; `--path <prefix>` and `--rule <name>` narrow what it prints. The web tests and CI run it.
 
 ## Levers
 

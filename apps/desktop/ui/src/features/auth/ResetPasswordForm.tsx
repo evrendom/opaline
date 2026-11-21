@@ -105,8 +105,9 @@ export function ResetPasswordForm({
 							className={cn(
 								"corner-xl px-l py-m text-body-xl ring-1",
 								feedback.kind === "error"
-									? "bg-error/5 text-error ring-error/15"
-									: "bg-field/35 text-ink-3 ring-line/60",
+									? // design-escape-ok(opacity): no role renders this; error at 5% fill, 15% ring
+										"bg-error/5 text-error ring-error/15"
+									: "bg-inset text-ink-3 ring-line-soft",
 							)}
 						>
 							{feedback.message}

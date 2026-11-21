@@ -38,16 +38,20 @@ export function ThemeSwitcher() {
 						className={cn(
 							"relative flex size-7 items-center justify-center",
 							"corner-full",
-							"outline-none transition-colors",
-							"focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--dashboard-01-metric-button-focus-ring)]",
-							active ? "text-ink" : "text-ink-3/60 hover:text-ink",
+							"focus-outline transition-colors",
+							active
+								? "text-ink"
+								: // design-escape-ok(opacity): no role renders this; ink-3 at 60%
+									"text-ink-3/60 hover:text-ink",
 						)}
 					>
 						{active ? (
 							<motion.span
 								layoutId={pillId}
 								transition={MORPH}
-								className="absolute inset-0 corner-full bg-line-strong/50 shadow-card"
+								className={
+									/* design-escape-ok(opacity): no role renders this; line-strong at 50% */ "absolute inset-0 corner-full bg-line-strong/50 shadow-card"
+								}
 							/>
 						) : null}
 						<Icon aria-hidden="true" className="relative z-10 size-3.5" />

@@ -140,13 +140,17 @@ const MOTION = [
 		"--motion-easing",
 		"hover tints, a check appearing",
 	],
-	["--motion-duration", "--motion-easing", "small changes (theme)"],
+	["--motion-duration", "--motion-easing", "ease-base: small changes (theme)"],
 	[
 		"--motion-medium-duration",
 		"--motion-easing",
 		"fades, sheets, a panel's width",
 	],
-	["--motion-large-duration", "--motion-large-easing", "large changes (theme)"],
+	[
+		"--motion-large-duration",
+		"--motion-large-easing",
+		"ease-large: large changes (theme)",
+	],
 	["--motion-slow-duration", "--motion-strong-easing", "a chart drawing in"],
 	[
 		"--motion-duration",
@@ -267,6 +271,32 @@ function Scales() {
 				<div className="size-16 bg-card shadow-card corner-m squircle:corner-xl corner-squircle" />
 				<div className="size-16 bg-card shadow-overlay corner-s squircle:corner-l corner-squircle" />
 			</Row>
+			<Row label="xl inner / outer">
+				<div className="relative size-16 bg-card shadow-card corner-m squircle:corner-xl corner-squircle">
+					<div className="absolute inset-xs bg-hover-strong corner-s squircle:corner-xl-inner corner-squircle" />
+				</div>
+				<div className="relative p-xs">
+					<div className="absolute inset-0 edge-s border-dashed border-accent-line corner-l squircle:corner-xl-outer corner-squircle" />
+					<div className="size-16 bg-shelf corner-m squircle:corner-xl corner-squircle" />
+				</div>
+			</Row>
+			<Row label="line-solid">
+				<span className="inline-flex h-5 items-center corner-full bg-field px-m text-body-s line-solid text-ink-2">
+					set solid in a chip
+				</span>
+			</Row>
+			<Row label="line-tight">
+				<span className="text-body-xs line-tight text-ink-2">
+					A dense 10 / 12 tag
+					<br />
+					on two lines
+				</span>
+			</Row>
+			<Row label="tracking-caps">
+				<span className="text-body-m font-medium uppercase tracking-caps text-ink-3">
+					Eyebrow
+				</span>
+			</Row>
 		</Section>
 	);
 }
@@ -344,6 +374,19 @@ function Buttons() {
 					open
 					<IconChevronDown />
 				</Button>
+			</Row>
+			<Row label="focus-outline">
+				{/* The mark drawn at rest (it shows only on keyboard focus); tab
+				    to the button beside it to see the real one. */}
+				<span className="inline-flex h-8 items-center corner-full bg-card px-l text-body-xl font-medium shadow-control outline-2 outline-offset-1 outline-accent">
+					focused
+				</span>
+				<Button variant="outline">Tab to me</Button>
+			</Row>
+			<Row label="focus-ring">
+				<span className="inline-flex h-9 w-48 items-center corner-s edge-s border-focus px-l text-body-xl text-ink-3 ring-[1.5px] ring-focus-ring corner-squircle squircle:corner-xl">
+					A focused field
+				</span>
 			</Row>
 			<Row label="icon">
 				<Button variant="outline" size="icon-xs" aria-label="Add">

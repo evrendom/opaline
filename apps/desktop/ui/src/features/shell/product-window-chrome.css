@@ -34,15 +34,16 @@
 .product-window-frame {
 	overflow: hidden;
 	border-radius: var(--radius-l);
+	/* design-escape-ok(base): no role renders this; the glass frame's neutral-5 translucent fill */
 	background: var(--neutral-5-translucent);
 	box-shadow:
-		inset 0 1px 0 oklch(1 0 0 / 0.82),
+		inset 0 1px 0 oklch(1 0 0 / 0.82), /* design-escape-ok(colour): no role renders this; the window frame's glass edge and drop */
 		inset 0 -1px 0 oklch(0.18 0.012 275 / 0.1),
-		0 0 0 0.75px oklch(0.18 0.012 275 / 0.16),
+		0 0 0 0.75px oklch(0.18 0.012 275 / 0.16), /* design-escape-ok(colour): no role renders this; the window frame's glass edge and drop */
 		0 1px 2px oklch(0.18 0.012 275 / 0.2),
-		0 5px 10px -3px oklch(0.18 0.018 275 / 0.2),
+		0 5px 10px -3px oklch(0.18 0.018 275 / 0.2), /* design-escape-ok(colour): no role renders this; the window frame's glass edge and drop */
 		0 14px 30px -9px oklch(0.18 0.022 275 / 0.18),
-		0 32px 68px -20px oklch(0.18 0.026 275 / 0.16),
+		0 32px 68px -20px oklch(0.18 0.026 275 / 0.16), /* design-escape-ok(colour): no role renders this; the window frame's glass edge and drop */
 		0 64px 128px -42px oklch(0.18 0.03 275 / 0.14);
 	backdrop-filter: blur(20px);
 	-webkit-backdrop-filter: blur(20px);
@@ -51,9 +52,10 @@
 /* Dark: the shell's own solid canvas behind a hairline edge (self-contained,
    since the landing page has none of the app's shadow tokens). */
 .dark .product-window-frame {
+	/* design-escape-ok(colour): no role renders this; the dark shell oklch(0.145 0 0) */
 	background: oklch(0.145 0 0);
 	box-shadow:
-		0 0 0 1px rgb(255 255 255 / 0.07),
+		0 0 0 1px rgb(255 255 255 / 0.07), /* design-escape-ok(colour): no role renders this; the window frame's glass edge and drop */
 		0 24px 48px -12px rgb(0 0 0 / 0.5);
 	backdrop-filter: none;
 	-webkit-backdrop-filter: none;
@@ -82,6 +84,7 @@
 	pointer-events: none;
 	border-radius: var(--radius-full);
 	filter: blur(50px);
+	/* design-escape-ok(colour): artwork, the backdrop's connection-state glow */
 	background: linear-gradient(115deg, #fff1b9, #fff3c9 48%, #ffe4b2);
 }
 
@@ -97,9 +100,9 @@
 :where(html).dark[data-app-shell] body > .product-window-backdrop {
 	background: linear-gradient(
 		115deg,
-		oklch(0.26 0.06 90),
+		oklch(0.26 0.06 90) /* design-escape-ok(colour): artwork glow */,
 		oklch(0.24 0.05 95) 48%,
-		oklch(0.26 0.07 75)
+		oklch(0.26 0.07 75) /* design-escape-ok(colour): artwork glow */
 	);
 }
 
@@ -109,28 +112,30 @@
 	position: absolute;
 	inset: 0;
 	opacity: 0;
-	transition: opacity 1800ms ease-in-out;
+	transition: opacity 1800ms var(--motion-wave-easing);
 }
 .product-window-backdrop::before {
+	/* design-escape-ok(colour): artwork, the backdrop's connection-state glow */
 	background: linear-gradient(115deg, #d5f7eb, #daf4f7 48%, #dce8fb);
 }
 .product-window-backdrop::after {
+	/* design-escape-ok(colour): artwork, the backdrop's connection-state glow */
 	background: linear-gradient(115deg, #ffd3cb, #ffe0ca 48%, #ffcfbf);
 }
 .dark .product-window-backdrop::before {
 	background: linear-gradient(
 		115deg,
-		oklch(0.25 0.05 170),
+		oklch(0.25 0.05 170) /* design-escape-ok(colour): artwork glow */,
 		oklch(0.24 0.045 200) 48%,
-		oklch(0.25 0.05 255)
+		oklch(0.25 0.05 255) /* design-escape-ok(colour): artwork glow */
 	);
 }
 .dark .product-window-backdrop::after {
 	background: linear-gradient(
 		115deg,
-		oklch(0.26 0.07 30),
+		oklch(0.26 0.07 30) /* design-escape-ok(colour): artwork glow */,
 		oklch(0.25 0.06 50) 48%,
-		oklch(0.26 0.07 35)
+		oklch(0.26 0.07 35) /* design-escape-ok(colour): artwork glow */
 	);
 }
 .product-window-backdrop[data-hero-canvas-palette="connected"]::before,

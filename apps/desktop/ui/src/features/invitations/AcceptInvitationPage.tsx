@@ -210,7 +210,9 @@ export function AcceptInvitationPage() {
 						<div className="opaline-auth-stage flex flex-col gap-m">
 							{error ? (
 								<p
-									className="text-pretty corner-m bg-error/5 px-l py-m text-body-xxl text-error ring-1 ring-error/15 sm:text-body-xl"
+									className={
+										/* design-escape-ok(opacity): no role renders this; error at 5% fill, 15% ring */ "text-pretty corner-m bg-error/5 px-l py-m text-body-xxl text-error ring-1 ring-error/15 sm:text-body-xl"
+									}
 									role="alert"
 								>
 									{error}

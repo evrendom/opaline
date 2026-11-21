@@ -39,8 +39,9 @@
 	color: var(--ink);
 }
 .cli-welcome-back:focus-visible {
-	outline: 2px solid var(--ink);
-	outline-offset: 3px;
+	/* the focus-outline mark */
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
 }
 .cli-welcome-back:disabled {
 	opacity: 0.55;
@@ -55,8 +56,9 @@
 }
 .cli-welcome-brand:focus-visible,
 .cli-welcome-footer a:focus-visible {
-	outline: 2px solid var(--ink);
-	outline-offset: 3px;
+	/* the focus-outline mark */
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
 	border-radius: 4px;
 }
 .cli-welcome-body {
@@ -159,8 +161,9 @@
 }
 .cli-welcome-form button:focus-visible,
 .cli-welcome-avatar:focus-within {
-	outline: 2px solid var(--ink);
-	outline-offset: 3px;
+	/* the focus-outline mark */
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
 }
 .cli-welcome-form .cli-onboarding-primary {
 	background: var(--primary);
@@ -188,14 +191,16 @@
    with light frosted glass over the same opal glow. */
 .dark .cli-welcome-command.instant-v2-button-primary,
 .dark .cli-welcome-command.instant-v2-button-primary:focus-visible {
+	/* design-escape-ok(colour): no role renders this; neutral-200 pill */
 	background: oklch(0.922 0 0);
+	/* design-escape-ok(colour): no role renders this; neutral-900 text */
 	color: oklch(0.205 0 0);
 }
 .dark .cli-welcome-command .instant-v2-button-glass {
-	background: var(--neutral-8-translucent);
+	background: color-mix(in oklab, var(--ink-2) 40%, transparent);
 	box-shadow:
-		inset 0 0 0 0.5px oklch(0 0 0 / 0.1),
-		inset 0 1px 0 oklch(1 0 0 / 0.6);
+		inset 0 0 0 0.5px color-mix(in oklab, var(--primary-fg) 10%, transparent),
+		inset 0 1px 0 color-mix(in oklab, var(--ink) 60%, transparent);
 }
 .cli-welcome-command svg {
 	flex-shrink: 0;
@@ -467,7 +472,8 @@
 	background: var(--hover);
 }
 .cli-welcome-step-content {
-	animation: welcome-form-enter 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+	animation: welcome-form-enter var(--motion-large-duration)
+		var(--motion-strong-easing) both;
 }
 /* The preview uses the same surface, row tracks and badges as the dashboard. */
 .cli-welcome-preview [data-session-disabled] [data-dashboard-grid-row-scope] {

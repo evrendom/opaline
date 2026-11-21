@@ -35,7 +35,7 @@
 	height: 100%;
 	border-radius: var(--radius-xs);
 	background: var(--ink);
-	transition: width var(--motion-large-duration) ease-out;
+	transition: width var(--motion-large-duration) var(--motion-easing);
 }
 
 .github-connection-progress-value {

@@ -106,7 +106,7 @@
 	line-height: var(--line-xl);
 	letter-spacing: var(--letter-spacing-xl);
 	outline: none;
-	transition: box-shadow var(--motion-duration) ease;
+	transition: box-shadow var(--motion-duration) var(--motion-easing);
 }
 .toolbar-search::placeholder {
 	color: var(--ink-3);
@@ -122,9 +122,9 @@
 	border-radius: var(--radius-s);
 	font: inherit;
 	transition:
-		background-color 140ms ease,
-		border-color 140ms ease,
-		color 140ms ease;
+		background-color var(--motion-duration) var(--motion-easing),
+		border-color var(--motion-duration) var(--motion-easing),
+		color var(--motion-duration) var(--motion-easing);
 }
 .form-button[data-variant="outline"] {
 	border-color: transparent;
@@ -336,7 +336,7 @@
 	white-space: nowrap;
 	outline: none;
 	user-select: none;
-	transition: color var(--motion-quick-duration) ease-in-out;
+	transition: color var(--motion-quick-duration) var(--motion-wave-easing);
 }
 .menu-row::before {
 	content: "";
@@ -432,7 +432,7 @@
 	color: var(--surface);
 	-webkit-mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
 	mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
-	transition: background-color 80ms;
+	transition: background-color var(--motion-quick-duration);
 }
 .menu-checkbox::before {
 	content: "";
@@ -441,7 +441,7 @@
 	background: var(--surface);
 	-webkit-mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
 	mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
-	transition: opacity 80ms;
+	transition: opacity var(--motion-quick-duration);
 }
 .menu-checkbox > svg {
 	position: relative;
@@ -496,11 +496,12 @@
 .menu-popover[data-open],
 .menu-sort[data-open],
 .session-date-picker[data-open] {
-	animation: menu-enter 217ms linear both;
+	animation: menu-enter var(--motion-medium-duration) linear both;
 }
 /* Category changes keep the flyout's icons and text on fixed pixel positions. */
 .menu-flyout {
-	animation: menu-flyout-enter var(--motion-quick-duration) ease-out both;
+	animation: menu-flyout-enter var(--motion-quick-duration) var(--motion-easing)
+		both;
 }
 @keyframes menu-flyout-enter {
 	from {
@@ -513,7 +514,7 @@
 .menu-popover[data-closed],
 .menu-sort[data-closed],
 .session-date-picker[data-closed] {
-	animation: menu-exit 170ms linear both;
+	animation: menu-exit var(--motion-duration) linear both;
 }
 @keyframes menu-enter {
 	0% {
@@ -647,7 +648,7 @@
 .menu-picks .menu-row::before {
 	background: var(--hover);
 	opacity: 0;
-	transition: opacity var(--motion-quick-duration) ease-in-out;
+	transition: opacity var(--motion-quick-duration) var(--motion-wave-easing);
 	will-change: opacity;
 }
 .menu-picks .menu-row[data-checked]::before {
@@ -731,7 +732,7 @@
 }
 
 .settings-group-rows > * + * {
-	border-top: var(--border-m) solid var(--line, #0000000f);
+	border-top: var(--border-m) solid var(--line);
 }
 
 .settings-row,
@@ -759,7 +760,7 @@
 }
 
 .settings-list > * + * {
-	border-top: var(--border-m) solid var(--line, #0000000d);
+	border-top: var(--border-m) solid var(--line);
 }
 
 .settings-subsection {

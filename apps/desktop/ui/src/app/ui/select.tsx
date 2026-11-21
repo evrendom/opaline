@@ -81,13 +81,17 @@ function SelectTrigger({
 				"text-body-xl whitespace-nowrap",
 				"shadow-card bg-transparent transition-all outline-none",
 				"squircle:corner-xl",
+				// design-escape-ok(opacity): no role renders this; line/50 dark edge
 				"dark:shadow-none dark:edge-s dark:border-line/50",
 				"disabled:cursor-not-allowed disabled:opacity-50",
+				// design-escape-ok(opacity): no role renders this; error/20 invalid ring
 				"aria-invalid:border-error aria-invalid:ring-[1.5px] aria-invalid:ring-error/20",
+				// design-escape-ok(opacity): no role renders this; ink-3/50 placeholder
 				"data-placeholder:text-ink-3/50",
 				"data-[size=default]:h-9",
 				"data-[size=sm]:h-8",
 				"*:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-s",
+				// design-escape-ok(opacity): no role renders this; line-strong/30 and /50 dark fills, error/40–/50 invalid marks
 				"dark:bg-line-strong/30 dark:hover:bg-line-strong/50 dark:aria-invalid:border-error/50 dark:aria-invalid:ring-error/40",
 				"[&_svg]:pointer-events-none [&_svg]:shrink-0",
 				"[&_svg:not([class*='size-'])]:size-4",
@@ -98,6 +102,7 @@ function SelectTrigger({
 			{children}
 			<SelectPrimitive.Icon
 				render={
+					// design-escape-ok(opacity): no role renders this; ink-3/50 chevron
 					<IconSelector className="pointer-events-none size-3.5 text-ink-3/50" />
 				}
 			/>
