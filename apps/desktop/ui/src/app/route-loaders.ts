@@ -20,9 +20,7 @@ export const routeLoaders = {
 	adminFeatures: once(
 		() => import("@/features/admin/WorkspaceFeaturesAdminPage"),
 	),
-	cliOnboarding: once(
-		() => import("@/features/cli-onboarding/cli-onboarding-page"),
-	),
+	welcome: once(() => import("@/features/self-hosted/SelfHostedWelcome")),
 	compass: once(() => import("@/features/compass/CompassPage")),
 	dashboard: once(() => import("@/features/dashboard/DashboardPage")),
 	mcp: once(() => import("@/features/mcp/McpPage")),
@@ -73,7 +71,7 @@ const ROUTE_PRELOADS: readonly (readonly [
 	[/^\/admin$/u, () => [routeLoaders.admin]],
 	[/^\/admin\/run-questions$/u, () => [routeLoaders.adminRunQuestions]],
 	[/^\/admin\/features$/u, () => [routeLoaders.adminFeatures]],
-	[/^\/welcome$/u, () => [routeLoaders.cliOnboarding]],
+	[/^\/welcome$/u, () => [routeLoaders.welcome]],
 ];
 
 export function preloadRoute(to: string) {

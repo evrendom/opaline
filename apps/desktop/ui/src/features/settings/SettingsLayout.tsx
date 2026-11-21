@@ -10,7 +10,6 @@ import {
 	IconIdFilled,
 	IconMessage2,
 	IconMessage2Filled,
-	IconPlug,
 	IconSettings,
 	IconSettingsFilled,
 	IconSquareRoundedPlus,
@@ -34,12 +33,10 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/app/ui/select";
-import { IconPlugFilled } from "@/components/ui/icon-plug-filled";
 import {
 	LOCAL_APP_HIDDEN_SETTINGS,
 	useLocalDesktopApp,
 } from "@/features/desktop/local-app";
-import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import { showsGitHubSettings } from "@/features/self-hosted/surfaces";
 import {
 	getActiveSettingsRouteId,
@@ -62,21 +59,17 @@ const settingsTabIcons: Record<SettingsRouteId, [Icon, Icon]> = {
 	members: [IconUser, IconUserFilled],
 	team: [IconChartArea, IconChartAreaFilled],
 	account: [IconId, IconIdFilled],
-	mcp: [IconPlug, IconPlugFilled],
 	"create-workspace": [IconSquareRoundedPlus, IconSquareRoundedPlusFilled],
 };
 
 export function SettingsLayout() {
 	const { state } = useOrganization();
 	const { query } = useGitHubConnection(state.activeOrg?.id ?? null);
-	const selfHost = useSelfHost();
 	const localApp = useLocalDesktopApp();
 	const routes = primarySettingsRoutes.filter((route) =>
 		localApp && LOCAL_APP_HIDDEN_SETTINGS.has(route.id)
 			? false
-			: route.id === "github"
-				? showsGitHubSettings(query.data)
-				: route.id !== "mcp" || selfHost !== null,
+			: route.id !== "github" || showsGitHubSettings(query.data),
 	);
 	const getShellRoutePath = useShellRoutePath();
 	const location = useLocation();

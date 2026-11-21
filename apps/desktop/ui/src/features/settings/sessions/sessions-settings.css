@@ -32,26 +32,6 @@
 	color: var(--muted-foreground);
 	text-wrap: pretty;
 }
-.sessions-settings-manage {
-	display: flex;
-	flex-direction: column;
-	gap: 10px;
-}
-.sessions-settings-command {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 12px;
-	padding: 8px 10px 8px 14px;
-	border: 1px solid var(--border);
-	border-radius: 8px;
-	background: var(--settings-section-fill);
-}
-.sessions-settings-command code {
-	min-width: 0;
-	overflow-wrap: anywhere;
-	font-size: 13px;
-}
 .sessions-settings .sessions-settings-note {
 	font-size: 12px;
 	line-height: 18px;
@@ -210,7 +190,6 @@
 	.sessions-settings,
 	.sessions-settings h2,
 	.sessions-settings p,
-	.sessions-settings-command code,
 	.sessions-settings-search input,
 	.sessions-settings-table {
 		font-size: 1rem;
