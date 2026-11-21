@@ -245,15 +245,6 @@ function Scales() {
 					<span className={`${style} font-medium text-ink`}>Account</span>
 				</Row>
 			))}
-			<Row label="Nunito">
-				{/* The display face has one use: the conversation trace's heading. */}
-				<span className="font-display text-body-l font-heavy text-ink">
-					Conversation
-				</span>
-				<span className="text-body-m text-ink-3">
-					the conversation trace's heading, its only use
-				</span>
-			</Row>
 			<Row label="space">
 				{SPACE.map((step) => (
 					<div key={step} className="flex flex-col items-center gap-xs">
@@ -309,11 +300,6 @@ function Scales() {
 					A dense 10 / 12 tag
 					<br />
 					on two lines
-				</span>
-			</Row>
-			<Row label="tracking-caps">
-				<span className="text-body-m font-medium uppercase tracking-caps text-ink-3">
-					Eyebrow
 				</span>
 			</Row>
 		</Section>

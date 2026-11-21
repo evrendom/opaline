@@ -36,10 +36,10 @@ Palette: color-1 is Opaline's brand blue (opal-1); colors 2–5 are the rest of 
 | Role | Family | Regular / Medium / Heavy |
 | --- | --- | --- |
 | Body | `"Inter Variable", sans-serif` | 400 / 500 / 600 |
-| Display | `"Nunito", "Inter Variable", sans-serif` | 600 / 700 / 800 |
+| Display | `"Inter Variable", sans-serif` (the display steps are larger Inter; there is no second face) | 400 / 500 / 600 |
 | Data | `"Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace` | 400 / 500 / 600 |
 
-Loaded by `@fontsource-variable/inter` (src/index.css) and `@fontsource/nunito` 600–800 and `@fontsource/geist-mono` 400–600 (src/app/preset-extensions.css). Classes: `font-body`, `font-display`, `font-data`; weights `font-regular`, `font-medium`, `font-heavy`.
+Loaded by `@fontsource-variable/inter` (src/index.css) and `@fontsource/geist-mono` 400–600 (src/app/preset-extensions.css). Classes: `font-body`, `font-display`, `font-data`; weights `font-regular`, `font-medium`, `font-heavy`.
 
 ## Type
 

@@ -32,7 +32,7 @@ Tailwind reads the same roles as colours: `bg-surface`, `text-ink-3`, `border-li
    | `xl` | 14 / 20 | body copy, card and row titles |
    | `xxl` | 16 / 24 | card headings, emphasised values |
 
-   A label set solid to centre in a fixed-height chip, bar or cell takes `line-solid` (line height 1) beside its step; a dense figure row or a 10 / 12 tag takes `line-tight` (1.2). An uppercase eyebrow takes `tracking-caps`. These are the only line and tracking utilities; never `leading-*` or a `tracking-[…]`.
+   A label set solid to centre in a fixed-height chip, bar or cell takes `line-solid` (line height 1) beside its step; a dense figure row or a 10 / 12 tag takes `line-tight` (1.2). These are the only line utilities; never `leading-*`. Tracking comes with the step; there is no tracking utility.
 
    Display: `xxs` 20 / 28, `xs` 24 / 32 (page titles), `s` 30 / 36, up to `xxl` 88 for artwork glyphs. Body tracking is 0 from `xs` to `xl`; `xxs` opens to +2%, and `xxl` and display tighten to −1.5%.
 4. Space only through the steps: `gap-m`, `px-l`, `mt-xs` (`zero` 0, `xxs` 2, `xs` 4, `s` 6, `m` 8, `l` 12, `xl` 16, `xxl` 24). Past 24px, a multiple: `gap-[calc(var(--space-xxl)*4/3)]` for 32.
@@ -60,7 +60,7 @@ Tailwind reads the same roles as colours: `bg-surface`, `text-ink-3`, `border-li
 4. **Three inks.** `ink` for what you read, `ink-2` for secondary copy, `ink-3` for meta, labels, icons and placeholders. `ink-disabled` is disabled text and the faintest hints (an empty value's dash, a separator glyph). No literal grey, no fourth ink, and no opacity on an ink: `text-ink-3/50` is a fourth grey, so it takes `ink-disabled`. See the snapping table below.
 5. **White space first, a line next, a card last.** Separate with space; then a `line`; a `surface-card` only when the group is independently actionable. Edges are hairline shadows (`shadow-card`, `shadow-control`), not borders.
 6. **Squircles on surfaces, pills on controls.** Corners are `xs` 6, `s` 8, `m` 10, `l` 14, `xl` 22. A squircle needs a larger radius to read as round as an arc, so the pair goes together: cards and panels `corner-m squircle:corner-xl corner-squircle`, menus and popovers `corner-s squircle:corner-l corner-squircle`. Toolbar buttons, badges and avatars are `corner-full`; chips are `corner-xs`. A child drawn 1px inside a surface (a hover or focus overlay on a tile) keeps the corners concentric with `corner-s-inset squircle:corner-xl-inset`; one drawn a space step (4px) inside an xl squircle (a row highlight in a card) takes `squircle:corner-xl-inner` (18), and an outline 4px outside one (a drop target around a shelf) `squircle:corner-xl-outer` (26). A skeleton bar too small for `xs` still takes `corner-xs`.
-7. **Data in the data face.** Money, times, counts, percentages and code are Geist Mono (`font-data`) with `tabular-nums`. Everything else, headings and page titles included, is Inter: a page title is `text-display-xs font-medium`. The theme's display face, Nunito (`font-display`), has one use, the conversation trace's heading; don't reach for it elsewhere.
+7. **Data in the data face.** Money, times, counts, percentages and code are Geist Mono (`font-data`) with `tabular-nums`. Everything else, headings and page titles included, is Inter: a page title is `text-display-xs font-medium`.
 8. **Controls have fixed heights.** Toolbar pills 32 (`Button variant="toolbar"`), inputs 36, buttons 24 / 28 / 32 by size, menu rows 32. Toolbar controls hold a choice with `aria-pressed` or `data-active`.
    Keyboard focus is one mark: `focus-outline` (a 2px accent outline just outside the control) on Button and on anything clickable that isn't a Button; fields keep `focus-visible:border-focus` with `ring-focus-ring`. An icon-only button is `Button size="icon" | "icon-sm" | "icon-xs"` with an `aria-label`, never a raw `<button>` with its own focus style.
 9. **It's a Mac app.** No pointer cursor on controls. The sidebar stays translucent so the window's vibrancy shows through: that translucency (`src/app/app-surface.css`, the shell's chrome) is the one literal colour family kept there, each value behind a per-rule marker; the sidebar primitive's other names (`--sidebar-foreground`, `--sidebar-accent` …) come from `tokens.css`. Small controls get a `TouchTarget`.
@@ -116,7 +116,7 @@ How an escape maps onto the system. Nothing may visibly change: take the role or
 | `delay-300` | `delay-(--motion-large-duration)` |
 | `leading-none`, set solid | `line-solid` |
 | 10 / 12, 13 / 16, 9 / 12 | the body step plus `line-tight` |
-| `tracking-[0.18em]`…`[0.24em]` | `tracking-caps` |
+| `tracking-[…]` | the step's own tracking; a wider uppercase label keeps its value behind a marker |
 | 18px / 26px squircle | `corner-xl-inner` / `corner-xl-outer` |
 | 4px skeleton corner | `corner-xs` |
 | CSS `font-size` / `line-height` literal | the body step's variables (`var(--size-m)` with `var(--line-m)` …) or the utility class on the element |

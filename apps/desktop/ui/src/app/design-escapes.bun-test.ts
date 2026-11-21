@@ -53,7 +53,6 @@ describe("design-system escape check", () => {
 			"h-8",
 			"line-solid",
 			"line-tight",
-			"tracking-caps",
 		])
 			expect(classifyClass(ok)).toBeUndefined();
 	});

@@ -34,7 +34,6 @@ const twMerge = extendTailwindMerge(graphicalClasses, (config) =>
 			classGroups: {
 				corner: [{ corner: ["s-inset", "xl-inset", "xl-inner", "xl-outer"] }],
 				leading: ["line-solid", "line-tight"],
-				tracking: ["tracking-caps"],
 			},
 		},
 	}),

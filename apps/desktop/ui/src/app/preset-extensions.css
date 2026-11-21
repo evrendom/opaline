@@ -1,9 +1,6 @@
 @import "@fontsource/geist-mono/400.css";
 @import "@fontsource/geist-mono/500.css";
 @import "@fontsource/geist-mono/600.css";
-@import "@fontsource/nunito/600.css";
-@import "@fontsource/nunito/700.css";
-@import "@fontsource/nunito/800.css";
 
 /* Browsers that implement corner-shape (Chromium today). Squircle corners read
    less round than circular arcs at the same radius, so the larger radius only

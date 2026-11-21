@@ -337,16 +337,13 @@
 /* Line and tracking for text that a body step can't carry on its own:
    `line-solid` sets a label solid (line height 1) to centre it in a fixed-height
    chip, bar or cell; `line-tight` is the dense 1.2 line of a figure row or a
-   10/12 tag; `tracking-caps` opens an uppercase eyebrow. Pair each with a
+   10/12 tag. Pair each with a
    `text-body-*` step, never a size. */
 @utility line-solid {
 	line-height: 1;
 }
 @utility line-tight {
 	line-height: 1.2;
-}
-@utility tracking-caps {
-	letter-spacing: 0.2em;
 }
 
 /* The one keyboard-focus mark for buttons and anything clickable: a 2px

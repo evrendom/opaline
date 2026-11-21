@@ -78,7 +78,7 @@
           }
         },
         "display": {
-          "family": "\"Nunito\", \"Inter Variable\", sans-serif",
+          "family": "\"Inter Variable\", sans-serif",
           "weights": {
             "regular": 600,
             "medium": 700,
@@ -369,7 +369,7 @@
       "--color-opal-3": "oklch(0.621 0.262 302.391)",
       "--color-opal-4": "oklch(0.668 0.273 323.991)",
       "--color-opal-5": "oklch(0.691 0.256 344.619)",
-      "--app-font-heading": "\"Nunito\", var(--font-sans)",
+      "--app-font-heading": "var(--font-sans)",
       "--opal-1-tint": "oklch(0.95 0.035 262.833)",
       "--opal-2-tint": "oklch(0.95 0.035 281.458)",
       "--opal-3-tint": "oklch(0.95 0.035 302.391)",

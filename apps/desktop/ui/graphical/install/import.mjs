@@ -101,8 +101,8 @@ const document = {
 				weights: { regular: 400, medium: 500, heavy: 600 },
 			},
 			display: {
-				family: '"Nunito", "Inter Variable", sans-serif',
-				weights: { regular: 600, medium: 700, heavy: 800 },
+				family: '"Inter Variable", sans-serif',
+				weights: { regular: 400, medium: 500, heavy: 600 },
 			},
 			data: {
 				family: '"Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace',

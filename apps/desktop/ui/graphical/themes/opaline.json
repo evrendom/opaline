@@ -123,7 +123,7 @@
         }
       },
       "display": {
-        "family": "\"Nunito\", \"Inter Variable\", sans-serif",
+        "family": "\"Inter Variable\", sans-serif",
         "weights": {
           "regular": 600,
           "medium": 700,

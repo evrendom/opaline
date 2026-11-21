@@ -9,7 +9,8 @@ export function NotFoundPage() {
 	return (
 		<div className="flex min-h-screen items-center justify-center px-xxl py-[calc(var(--space-xxl)*2)]">
 			<div className="flex max-w-md flex-col items-center gap-xl text-center">
-				<div className="text-body-xl font-medium uppercase tracking-caps text-ink-3">
+				{/* design-escape-ok(type): the 404 label's tracking, kept as authored */}
+				<div className="text-body-xl font-medium uppercase tracking-[0.18em] text-ink-3">
 					404
 				</div>
 				<h1 className="text-display-s font-heavy text-ink">Page not found</h1>

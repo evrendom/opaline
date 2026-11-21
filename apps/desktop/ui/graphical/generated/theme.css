@@ -81,14 +81,14 @@
 
   /* Fonts */
   --font-body: "Inter Variable", sans-serif;
-  --font-display: "Nunito", "Inter Variable", sans-serif;
+  --font-display: "Inter Variable", sans-serif;
   --font-data: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --weight-body-regular: 400;
   --weight-body-medium: 500;
   --weight-body-heavy: 600;
-  --weight-display-regular: 600;
-  --weight-display-medium: 700;
-  --weight-display-heavy: 800;
+  --weight-display-regular: 400;
+  --weight-display-medium: 500;
+  --weight-display-heavy: 600;
   --weight-data-regular: 400;
   --weight-data-medium: 500;
   --weight-data-heavy: 600;
