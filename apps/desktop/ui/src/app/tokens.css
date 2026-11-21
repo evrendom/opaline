@@ -152,6 +152,7 @@
 	--emerald-mark: oklch(69.6% 0.17 162.48);
 	--cost-foreground: #292a2f;
 	--cost-muted: #828387;
+	--cost-border: rgb(0 0 0 / 0.07);
 	--session-overview-muted: rgb(0 0 0 / 0.63);
 	--session-overview-subtle: rgb(0 0 0 / 0.5);
 	--cost-blue: oklch(0.623 0.188 259.815); /* both modes */
@@ -191,6 +192,7 @@
 	--emerald-ink: oklch(76.5% 0.177 163.223);
 	--cost-foreground: #e6e6e9;
 	--cost-muted: #919299;
+	--cost-border: rgb(255 255 255 / 0.09);
 	--session-overview-muted: rgb(255 255 255 / 0.65);
 	--session-overview-subtle: rgb(255 255 255 / 0.5);
 }
@@ -245,6 +247,7 @@
 	--color-emerald-mark: var(--emerald-mark);
 	--color-cost-foreground: var(--cost-foreground);
 	--color-cost-muted: var(--cost-muted);
+	--color-cost-border: var(--cost-border);
 	--color-session-overview-muted: var(--session-overview-muted);
 	--color-session-overview-subtle: var(--session-overview-subtle);
 	--color-cost-blue: var(--cost-blue);

@@ -310,6 +310,11 @@
   --weight-body-regular: 400;
   --weight-body-medium: 500;
   --weight-body-heavy: 600;
+  --weight-display-regular: 400;
+  --weight-display-medium: 500;
+  --weight-display-heavy: 600;
+  --weight-data-regular: 400;
+  --weight-data-heavy: 600;
   --weight-data-medium: 500;
   --weight-regular: var(--weight-body-regular);
   --weight-medium: var(--weight-body-medium);
