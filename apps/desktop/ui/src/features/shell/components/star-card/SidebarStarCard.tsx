@@ -4,8 +4,8 @@ import { mountStarCard } from "./star-card-controller";
 import { useStarPrompt } from "./star-prompt";
 import "./sidebar-star-card.css";
 
-const TITLE = "Enjoying Opaline?";
-const BODY_OFF = "Add your star to the count.";
+const TITLE = "Star us right here";
+const BODY_OFF = "Your GitHub star, without leaving Opaline.";
 const BODY_ON = "Thank you for starring!";
 const HINT = "Drag the star all the way across.";
 

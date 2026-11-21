@@ -65,7 +65,10 @@
 	font-weight: 500;
 }
 .star-card-body {
-	min-height: 16px;
+	/* Two lines held, so a shorter "thank you" doesn't shrink the card mid-celebration. */
+	display: grid;
+	align-content: center;
+	min-height: 32px;
 	margin: 2px 0 0;
 	font-size: 12px;
 	line-height: 16px;
