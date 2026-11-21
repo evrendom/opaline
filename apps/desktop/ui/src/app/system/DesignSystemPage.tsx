@@ -1,13 +1,15 @@
 import {
 	IconAdjustmentsHorizontal,
+	IconChartBar,
 	IconCheck,
 	IconChevronDown,
 	IconFolder,
+	IconList,
 	IconPlus,
 	IconSearch,
 	IconTrash,
 } from "@tabler/icons-react";
-import { type ReactNode, useLayoutEffect, useRef } from "react";
+import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import { Avatar, AvatarFallback } from "@/app/ui/avatar";
 import { Badge } from "@/app/ui/badge";
 import { Button } from "@/app/ui/button";
@@ -41,6 +43,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/app/ui/table";
+import { PillTabs } from "@/features/repos/pill-tabs";
 
 /**
  * The system page (dev only, /dev/design-system): every role, scale step,
@@ -110,6 +113,9 @@ const SHADOWS = [
 	"float",
 	"sheet",
 	"contact",
+	"jump",
+	"flyout",
+	"window",
 ];
 // Full class names, so Tailwind sees each one in the source.
 const BODY = [
@@ -135,46 +141,23 @@ const CORNERS = [
 	["xl", "corner-xl"],
 	["full", "corner-full"],
 ] as const;
-const MOTION = [
+const DURATIONS = [
+	["quick", "--motion-quick-duration", "100ms: hover tints, a check appearing"],
+	["base", "--motion-duration", "150ms: small changes"],
 	[
-		"--motion-quick-duration",
-		"--motion-easing",
-		"hover tints, a check appearing",
-	],
-	["--motion-duration", "--motion-easing", "ease-base: small changes (theme)"],
-	[
+		"medium",
 		"--motion-medium-duration",
-		"--motion-easing",
-		"fades, sheets, a panel's width",
+		"200ms: fades, sheets, a panel's width",
 	],
-	[
-		"--motion-large-duration",
-		"--motion-large-easing",
-		"ease-large: large changes (theme)",
-	],
-	["--motion-slow-duration", "--motion-strong-easing", "a chart drawing in"],
-	[
-		"--motion-duration",
-		"--motion-strong-easing",
-		"ease-strong: presses, entering",
-	],
-	[
-		"--motion-duration",
-		"--motion-drawer-easing",
-		"ease-drawer: drawers, rails",
-	],
-	["--motion-duration", "--motion-wave-easing", "ease-wave: strips, loops"],
+	["large", "--motion-large-duration", "300ms: large changes"],
+	["slow", "--motion-slow-duration", "650ms: a chart drawing in"],
 ] as const;
-
-const BUTTON_VARIANTS = [
-	"default",
-	"outline",
-	"ghost",
-	"destructive",
-	"link",
-	"toolbar",
+const EASINGS = [
+	["ease-base", "--motion-easing", "the default: eases out, small changes"],
+	["ease-strong", "--motion-strong-easing", "presses, things entering"],
+	["ease-drawer", "--motion-drawer-easing", "drawers, rails"],
+	["ease-wave", "--motion-wave-easing", "strips growing, loops"],
 ] as const;
-const BUTTON_SIZES = ["xs", "sm", "default"] as const;
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
 	return (
@@ -189,11 +172,24 @@ function Row({ label, children }: { label?: string; children: ReactNode }) {
 	return (
 		<div className="flex flex-wrap items-center gap-m">
 			{label ? (
-				<span className="w-24 shrink-0 font-data text-body-xs text-ink-3">
-					{label}
-				</span>
+				<span className="w-24 shrink-0 text-body-s text-ink-3">{label}</span>
 			) : null}
 			{children}
+		</div>
+	);
+}
+
+function Specimen2({
+	label,
+	children,
+}: {
+	label: string;
+	children: ReactNode;
+}) {
+	return (
+		<div className="flex flex-col items-center gap-xs">
+			{children}
+			<span className="text-body-xs text-ink-3">{label}</span>
 		</div>
 	);
 }
@@ -207,7 +203,7 @@ function Swatches({ names }: { names: string[] }) {
 						className="h-8 corner-xs shadow-inset"
 						style={{ background: `var(--${name})` }}
 					/>
-					<span className="font-data text-body-xs text-ink-3">{name}</span>
+					<span className="text-body-xs text-ink-3">{name}</span>
 				</div>
 			))}
 		</div>
@@ -246,9 +242,18 @@ function Scales() {
 			))}
 			{DISPLAY.map(([step, style]) => (
 				<Row key={step} label={`display-${step}`}>
-					<span className={`font-display ${style} text-ink`}>Opaline</span>
+					<span className={`${style} font-medium text-ink`}>Account</span>
 				</Row>
 			))}
+			<Row label="Nunito">
+				{/* The display face has one use: the conversation trace's heading. */}
+				<span className="font-display text-body-l font-heavy text-ink">
+					Conversation
+				</span>
+				<span className="text-body-m text-ink-3">
+					the conversation trace's heading, its only use
+				</span>
+			</Row>
 			<Row label="space">
 				{SPACE.map((step) => (
 					<div key={step} className="flex flex-col items-center gap-xs">
@@ -256,7 +261,7 @@ function Scales() {
 							className="h-4 bg-accent"
 							style={{ width: `var(--space-${step})` }}
 						/>
-						<span className="font-data text-body-xs text-ink-3">{step}</span>
+						<span className="text-body-xs text-ink-3">{step}</span>
 					</div>
 				))}
 			</Row>
@@ -264,22 +269,35 @@ function Scales() {
 				{CORNERS.map(([step, corner]) => (
 					<div key={step} className="flex flex-col items-center gap-xs">
 						<div className={`size-10 bg-field shadow-inset ${corner}`} />
-						<span className="font-data text-body-xs text-ink-3">{step}</span>
+						<span className="text-body-xs text-ink-3">{step}</span>
 					</div>
 				))}
 			</Row>
 			<Row label="squircle">
-				<div className="size-16 bg-card shadow-card corner-m squircle:corner-xl corner-squircle" />
-				<div className="size-16 bg-card shadow-overlay corner-s squircle:corner-l corner-squircle" />
+				<Specimen2 label="card, panel">
+					<div className="size-16 bg-card shadow-card corner-m squircle:corner-xl corner-squircle" />
+				</Specimen2>
+				<Specimen2 label="menu, popover">
+					<div className="size-16 bg-card shadow-overlay corner-s squircle:corner-l corner-squircle" />
+				</Specimen2>
 			</Row>
-			<Row label="xl inner / outer">
-				<div className="relative size-16 bg-card shadow-card corner-m squircle:corner-xl corner-squircle">
-					<div className="absolute inset-xs bg-hover-strong corner-s squircle:corner-xl-inner corner-squircle" />
-				</div>
-				<div className="relative p-xs">
-					<div className="absolute inset-0 edge-s border-dashed border-accent-line corner-l squircle:corner-xl-outer corner-squircle" />
-					<div className="size-16 bg-shelf corner-m squircle:corner-xl corner-squircle" />
-				</div>
+			<Row label="nested">
+				<Specimen2 label="xl-inset (1px)">
+					<div className="relative size-16 bg-card shadow-card corner-s squircle:corner-xl corner-squircle">
+						<div className="absolute inset-px bg-hover-strong corner-s-inset squircle:corner-xl-inset corner-squircle" />
+					</div>
+				</Specimen2>
+				<Specimen2 label="xl-inner (18)">
+					<div className="relative size-16 bg-card shadow-card corner-m squircle:corner-xl corner-squircle">
+						<div className="absolute inset-xs bg-hover-strong corner-s squircle:corner-xl-inner corner-squircle" />
+					</div>
+				</Specimen2>
+				<Specimen2 label="xl-outer (26)">
+					<div className="relative p-xs">
+						<div className="absolute inset-0 edge-s border-dashed border-accent-line corner-l squircle:corner-xl-outer corner-squircle" />
+						<div className="size-14 bg-shelf corner-m squircle:corner-xl corner-squircle" />
+					</div>
+				</Specimen2>
 			</Row>
 			<Row label="line-solid">
 				<span className="inline-flex h-5 items-center corner-full bg-field px-m text-body-s line-solid text-ink-2">
@@ -312,7 +330,7 @@ function Elevation() {
 							className="h-10 w-full corner-s bg-card"
 							style={{ boxShadow: `var(--shadow-${name})` }}
 						/>
-						<span className="font-data text-body-xs text-ink-3">{name}</span>
+						<span className="text-body-xs text-ink-3">{name}</span>
 					</div>
 				))}
 			</div>
@@ -320,25 +338,54 @@ function Elevation() {
 	);
 }
 
+function MotionBar({
+	label,
+	duration,
+	easing,
+	use,
+}: {
+	label: string;
+	duration: string;
+	easing: string;
+	use: string;
+}) {
+	return (
+		<div className="group flex flex-wrap items-center gap-m">
+			<span className="w-24 shrink-0 text-body-s text-ink-3">{label}</span>
+			<div className="h-2 w-40 corner-full bg-field">
+				<div
+					className="h-2 w-4 corner-full bg-ink transition-[width] group-hover:w-40"
+					style={{
+						transitionDuration: `var(${duration})`,
+						transitionTimingFunction: `var(${easing})`,
+					}}
+				/>
+			</div>
+			<span className="text-body-m text-ink-3">{use}</span>
+		</div>
+	);
+}
+
 function Motion() {
 	return (
-		<Section title="Motion (hover a bar)">
-			{MOTION.map(([duration, easing, use]) => (
-				<Row
-					key={`${duration}${easing}`}
-					label={duration.replace("--motion-", "")}
-				>
-					<div className="group h-2 w-40 corner-full bg-field">
-						<div
-							className="h-2 w-4 corner-full bg-ink transition-[width] group-hover:w-40"
-							style={{
-								transitionDuration: `var(${duration})`,
-								transitionTimingFunction: `var(${easing})`,
-							}}
-						/>
-					</div>
-					<span className="text-body-m text-ink-3">{use}</span>
-				</Row>
+		<Section title="Motion (hover a row to play it)">
+			{DURATIONS.map(([label, duration, use]) => (
+				<MotionBar
+					key={label}
+					label={label}
+					duration={duration}
+					easing="--motion-easing"
+					use={use}
+				/>
+			))}
+			{EASINGS.map(([label, easing, use]) => (
+				<MotionBar
+					key={label}
+					label={label}
+					duration="--motion-large-duration"
+					easing={easing}
+					use={use}
+				/>
 			))}
 		</Section>
 	);
@@ -347,22 +394,51 @@ function Motion() {
 function Buttons() {
 	return (
 		<Section title="Button">
-			{BUTTON_VARIANTS.map((variant) => (
-				<Row key={variant} label={variant}>
-					{BUTTON_SIZES.map((size) => (
-						<Button key={size} variant={variant} size={size}>
-							<IconPlus />
-							{size}
-						</Button>
-					))}
-					<Button variant={variant} disabled>
-						disabled
+			<Row label="default">
+				<Button>Save</Button>
+				<Button size="sm">Save</Button>
+				<Button size="xs">Save</Button>
+				<Button disabled>Disabled</Button>
+			</Row>
+			<Row label="outline">
+				<Button variant="outline">Cancel</Button>
+				<Button variant="outline" size="sm">
+					<IconPlus />
+					Add
+				</Button>
+				<Button variant="outline" size="sm" disabled>
+					Disabled
+				</Button>
+			</Row>
+			<Row label="ghost">
+				<Button variant="ghost">Cancel</Button>
+				<Button variant="ghost" size="sm">
+					Show more
+				</Button>
+				<Button variant="ghost" size="xs" aria-pressed>
+					Pressed
+				</Button>
+			</Row>
+			<Row label="destructive">
+				<Button variant="destructive">Delete workspace</Button>
+				<Button variant="destructive" size="sm">
+					Remove
+				</Button>
+			</Row>
+			<Row label="link">
+				<span className="text-body-l text-ink-2">
+					Couldn't load.{" "}
+					<Button variant="link" size="inline">
+						Try again
 					</Button>
-					<Button variant={variant} aria-invalid>
-						invalid
-					</Button>
-				</Row>
-			))}
+				</span>
+			</Row>
+			<Row label="toolbar">
+				<Button variant="toolbar">Last 30 days</Button>
+				<Button variant="toolbar" disabled>
+					Disabled
+				</Button>
+			</Row>
 			<Row label="toolbar states">
 				<Button variant="toolbar" aria-pressed>
 					<IconAdjustmentsHorizontal />
@@ -390,21 +466,18 @@ function Buttons() {
 				</span>
 			</Row>
 			<Row label="icon">
-				<Button variant="outline" size="icon-xs" aria-label="Add">
-					<IconPlus />
+				<Button variant="ghost" size="icon-sm" aria-label="Delete">
+					<IconTrash />
 				</Button>
 				<Button variant="outline" size="icon-sm" aria-label="Add">
 					<IconPlus />
 				</Button>
-				<Button variant="ghost" size="icon" aria-label="Delete">
-					<IconTrash />
+				<Button variant="outline" size="icon-xs" aria-label="Add">
+					<IconPlus />
 				</Button>
-				<span className="text-body-l text-ink-2">
-					Couldn't load.{" "}
-					<Button variant="link" size="inline">
-						Try again
-					</Button>
-				</span>
+				<Button variant="toolbar" size="icon" aria-label="Filters">
+					<IconAdjustmentsHorizontal />
+				</Button>
 			</Row>
 		</Section>
 	);
@@ -414,13 +487,13 @@ function Fields() {
 	return (
 		<Section title="Input, Checkbox, Label, Badge, Avatar">
 			<Row label="input">
-				<div className="w-48">
+				<div className="w-36">
 					<Input placeholder="Placeholder" />
 				</div>
-				<div className="w-48">
+				<div className="w-36">
 					<Input defaultValue="Invalid" aria-invalid />
 				</div>
-				<div className="w-48">
+				<div className="w-36">
 					<Input defaultValue="Disabled" disabled />
 				</div>
 			</Row>
@@ -438,7 +511,7 @@ function Fields() {
 					Disabled
 				</Label>
 			</Row>
-			<Row label="badge">
+			<Row label="badge, state chip">
 				<Badge>Secondary</Badge>
 				<Badge variant="outline">Outline</Badge>
 				<span className="inline-flex h-5 items-center corner-full bg-success-tint px-m text-body-m font-medium text-success">
@@ -504,6 +577,24 @@ function Surfaces() {
 	);
 }
 
+const SPECIMEN_TABS = [
+	{ id: "data", label: "Data", icon: IconChartBar },
+	{ id: "traces", label: "Agent traces", icon: IconList },
+] as const;
+
+function TabsSpecimen() {
+	const [tab, setTab] = useState<"data" | "traces">("data");
+	return (
+		<PillTabs
+			tabs={SPECIMEN_TABS}
+			value={tab}
+			onChange={setTab}
+			label="Specimen tabs"
+			pillClassName="tab-pill"
+		/>
+	);
+}
+
 function Patterns() {
 	return (
 		<Section title="Patterns (patterns.css)">
@@ -550,21 +641,8 @@ function Patterns() {
 					</Button>
 				</div>
 			</Row>
-			<Row label="tab pills">
-				<span className="tab-track inline-flex h-8 items-center corner-s px-l text-body-xl">
-					On a track
-				</span>
-				<span className="tab-pill inline-flex h-8 items-center corner-s px-l text-body-xl">
-					Lifted
-				</span>
-				<span className="inline-flex h-8 items-center corner-s bg-accent px-l text-body-xl text-accent-fg">
-					accent-fg
-				</span>
-			</Row>
-			<Row label="inset corner">
-				<div className="relative size-16 corner-s bg-card shadow-card corner-squircle squircle:corner-xl">
-					<div className="absolute inset-px corner-s-inset bg-hover-strong corner-squircle squircle:corner-xl-inset" />
-				</div>
+			<Row label="PillTabs">
+				<TabsSpecimen />
 			</Row>
 			<Row label="toolbar-search">
 				<div className="relative w-56">
@@ -650,7 +728,9 @@ function Specimen({ mode }: { mode: "light" | "dark" }) {
 			ref={ref}
 			className="flex min-w-0 flex-col gap-[calc(var(--space-xxl)*4/3)] bg-canvas p-xxl font-body text-body-xl text-ink"
 		>
-			<h1 className="font-display text-display-xs text-ink">{mode}</h1>
+			<h1 className="text-display-xs font-medium text-ink capitalize">
+				{mode}
+			</h1>
 			<Roles />
 			<Scales />
 			<Elevation />
