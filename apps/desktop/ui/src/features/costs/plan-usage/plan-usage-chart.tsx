@@ -5,6 +5,7 @@ import {
 	useLayoutEffect,
 	useRef,
 	useState,
+	useSyncExternalStore,
 } from "react";
 import {
 	Bar,
@@ -62,6 +63,9 @@ const FAINTEST_DOT = 0.14;
 const SEGMENT_GAP_PX = 3;
 const X_AXIS_HEIGHT = 40;
 const SEGMENT_RADIUS_PX = 2;
+// Axis labels sit Recharts' 6px tick size plus their tick margin from the plot.
+const VALUE_TICK_OFFSET_PX = 6 + 10;
+const DATE_TICK_OFFSET_PX = 6 + 14;
 const TICK_STYLE = { fill: "var(--cost-muted)", fontSize: 11 };
 const DAY_MS = 86_400_000;
 
@@ -184,6 +188,40 @@ function resetX(periods: readonly Period[], at: string): number | null {
 			return period.x - 0.5 + (time - start) / (end - start);
 	}
 	return null;
+}
+
+// The limit resets a daily chart marks, one icon per day it has room for.
+function resetDaysOf(
+	window: UsageWindow,
+	periods: readonly Period[],
+	interval: ChartInterval,
+	pitch: number,
+): Map<number, string> {
+	const resetDays = new Map<number, string>();
+	if (interval !== "daily") return resetDays;
+	let lastReset = Number.NEGATIVE_INFINITY;
+	for (const at of window.resets) {
+		const x = resetX(periods, at);
+		if (x === null) continue;
+		const day = Math.round(x);
+		if ((day - lastReset) * pitch < RESET_ICON_PX + RESET_ICON_SPACE_PX)
+			continue;
+		lastReset = day;
+		resetDays.set(day, `Limit reset ${resetTickFormat.format(new Date(at))}`);
+	}
+	return resetDays;
+}
+
+const noSubscription = () => () => {};
+
+// True while rendering to HTML ahead of time (the marketing demo) and during
+// that HTML's hydration; false in a page React renders itself.
+function usePrerendered() {
+	return useSyncExternalStore(
+		noSubscription,
+		() => false,
+		() => true,
+	);
 }
 
 function useWidth<T extends HTMLElement>() {
@@ -530,6 +568,28 @@ function UsageCanvas({
 	const [canvasRef, width] = useWidth<HTMLDivElement>();
 	const [morphing] = useState(morph !== undefined);
 	const started = useRef(false);
+	// Recharts measures in the browser, so prerendered HTML has no chart and
+	// the marketing demo hydrates only once the landing page is idle. Until
+	// Recharts has drawn its bars, a static copy of them stands in.
+	const [previewing, setPreviewing] = useState(usePrerendered());
+	useLayoutEffect(() => {
+		const canvas = canvasRef.current;
+		if (!previewing || !canvas || width === 0) return;
+		let frame = 0;
+		let tries = 0;
+		const check = () => {
+			if (
+				canvas.querySelector(".recharts-bar-rectangle") === null &&
+				tries++ < 30
+			) {
+				frame = requestAnimationFrame(check);
+				return;
+			}
+			setPreviewing(false);
+		};
+		frame = requestAnimationFrame(check);
+		return () => cancelAnimationFrame(frame);
+	}, [canvasRef, previewing, width]);
 	useLayoutEffect(() => {
 		const canvas = canvasRef.current;
 		if (!morphing || started.current || !canvas || width === 0) return;
@@ -598,18 +658,7 @@ function UsageCanvas({
 	const periods = periodsOf(window, interval);
 	const count = Math.max(1, periods.length);
 	const { pitch, spare, bar, snap } = barGeometry(width, count);
-	const resetDays = new Map<number, string>();
-	let lastReset = Number.NEGATIVE_INFINITY;
-	if (interval === "daily")
-		for (const at of window.resets) {
-			const x = resetX(periods, at);
-			if (x === null) continue;
-			const day = Math.round(x);
-			if ((day - lastReset) * pitch < RESET_ICON_PX + RESET_ICON_SPACE_PX)
-				continue;
-			lastReset = day;
-			resetDays.set(day, `Limit reset ${resetTickFormat.format(new Date(at))}`);
-		}
+	const resetDays = resetDaysOf(window, periods, interval, pitch);
 	const axisHover = useAxisHover();
 	const hoverDates = useHoverDateStore();
 	return (
@@ -619,6 +668,19 @@ function UsageCanvas({
 			data-morphing={morphing || undefined}
 			skullet-ignore=""
 		>
+			{previewing ? (
+				<UsagePreview
+					periods={periods}
+					interval={interval}
+					// Days far enough apart for a full-width chart's icons.
+					resetDays={resetDaysOf(
+						window,
+						periods,
+						interval,
+						RESET_ICON_PX + RESET_ICON_SPACE_PX,
+					)}
+				/>
+			) : null}
 			{width > 0 ? (
 				<ResponsiveContainer width="100%" height="100%" minWidth={0}>
 					<ComposedChart
@@ -703,6 +765,150 @@ function UsageCanvas({
 					</ComposedChart>
 				</ResponsiveContainer>
 			) : null}
+		</div>
+	);
+}
+
+// UsageCanvas's chart without measuring it: the same plot margins, bars and
+// labels, laid out in CSS from the canvas's width (plan-usage.css), with each
+// bar's pitch and width rounded to device pixels like barGeometry.
+function UsagePreview({
+	periods,
+	interval,
+	resetDays,
+}: {
+	periods: readonly Period[];
+	interval: ChartInterval;
+	resetDays: ReadonlyMap<number, string>;
+}) {
+	const count = Math.max(1, periods.length);
+	const top =
+		resetDays.size > 0 ? RESET_ICON_PX + RESET_ICON_GAP_PX + 4 : MARGIN.top;
+	const center = (x: number) =>
+		`(${Y_AXIS_WIDTH}px + ${x + 0.5} * var(--pitch))`;
+	const plotY = (value: number) =>
+		`calc(${top}px + ${1 - value / 100} * (100% - ${top + X_AXIS_HEIGHT}px))`;
+	const label = (anchor: "start" | "middle" | "end", x: number) =>
+		anchor === "start"
+			? { left: `calc(${center(x)} - var(--bar) / 2)` }
+			: anchor === "end"
+				? {
+						left: `calc(${center(x)} + var(--bar) / 2)`,
+						transform: "translate(-100%, -50%)",
+					}
+				: { left: `calc(${center(x)})`, transform: "translate(-50%, -50%)" };
+	const last = periods.length - 1;
+	const dates =
+		last <= 0 || last === 1
+			? periods.map((period) => ({ period, anchor: "middle" as const }))
+			: [
+					{ period: periods[0], anchor: "start" as const },
+					{ period: periods[last], anchor: "end" as const },
+				];
+	return (
+		<div
+			aria-hidden="true"
+			className="plan-usage-preview"
+			style={
+				{
+					"--bars": count,
+					"--plot-inset": `${Y_AXIS_WIDTH + MARGIN.left + MARGIN.right}px`,
+				} as CSSProperties
+			}
+		>
+			<svg
+				aria-hidden="true"
+				viewBox="0 0 1000 1000"
+				preserveAspectRatio="none"
+				overflow="visible"
+				style={{
+					position: "absolute",
+					left: Y_AXIS_WIDTH,
+					top,
+					width: `calc(${count} * var(--pitch))`,
+					height: `calc(100% - ${top + X_AXIS_HEIGHT}px)`,
+				}}
+			>
+				{Y_TICKS.map((tick) => (
+					<line
+						key={tick}
+						x1={0}
+						x2={1000}
+						y1={(1 - tick / 100) * 1000}
+						y2={(1 - tick / 100) * 1000}
+						stroke="var(--cost-border)"
+						strokeDasharray="3 4"
+						vectorEffect="non-scaling-stroke"
+					/>
+				))}
+			</svg>
+			{Y_TICKS.map((tick) => (
+				<span
+					key={tick}
+					className="plan-usage-preview-label"
+					style={{
+						right: `calc(100% - ${Y_AXIS_WIDTH - VALUE_TICK_OFFSET_PX}px)`,
+						top: plotY(tick),
+						transform: "translateY(-50%)",
+					}}
+				>
+					{tick}%
+				</span>
+			))}
+			{periods.map((period) =>
+				period.solid === null ? null : (
+					<div
+						key={period.date}
+						className="plan-usage-preview-bar"
+						style={{
+							// Recharts offsets a bar in its slot by whole pixels.
+							left: `round(calc(${Y_AXIS_WIDTH}px + ${period.x} * var(--pitch) + round(down, (var(--pitch) - var(--bar)) / 2, 1px)), var(--px))`,
+							top,
+							bottom: X_AXIS_HEIGHT + MARGIN.bottom,
+							gap: SEGMENT_GAP_PX,
+						}}
+					>
+						{/* SplitBar's segments, top to bottom: used, then what was left. */}
+						{[
+							{ size: period.used ?? 0, fill: usedColor(period) },
+							{ size: period.solid, fill: solidColor(period) },
+						]
+							.filter((part) => part.size > 0.05)
+							.map((part, _, parts) => (
+								<span
+									key={part.fill}
+									style={{
+										height: `max(1px, (100% - ${(parts.length - 1) * SEGMENT_GAP_PX}px) * ${part.size / 100})`,
+										background: part.fill,
+									}}
+								/>
+							))}
+						{resetDays.has(period.x) ? (
+							<IconRefresh
+								className="plan-usage-preview-reset"
+								size={RESET_ICON_PX}
+								stroke={1.75}
+								color="var(--cost-muted)"
+								style={{ top: -(RESET_ICON_PX + RESET_ICON_GAP_PX) }}
+							/>
+						) : null}
+					</div>
+				),
+			)}
+			{dates.map(({ period, anchor }) => (
+				<span
+					key={period.date}
+					className="plan-usage-preview-label"
+					style={{
+						// Recharts' baseline sits 0.71em below the tick; centre on it.
+						top: `calc(100% - ${X_AXIS_HEIGHT - DATE_TICK_OFFSET_PX}px + 0.355em)`,
+						transform: "translateY(-50%)",
+						...label(anchor, period.x),
+					}}
+				>
+					{formatChartDate(period.date, interval)}
+				</span>
+			))}
 		</div>
 	);
 }

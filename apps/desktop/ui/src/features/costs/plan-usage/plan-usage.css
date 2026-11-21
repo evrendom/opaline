@@ -53,3 +53,50 @@
 .plan-usage-loading {
 	display: block;
 }
+
+/* UsagePreview: --pitch and --bar follow barGeometry, rounded to device pixels. */
+.plan-usage-preview {
+	--px: 1px;
+	--pitch: max(
+		var(--px),
+		round(down, (100cqw - var(--plot-inset)) / var(--bars), var(--px))
+	);
+	--bar: min(18px, max(2 * var(--px), round(var(--pitch) * 0.6, var(--px))));
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	container-type: inline-size;
+}
+@media (min-resolution: 2dppx) {
+	.plan-usage-preview {
+		--px: 0.5px;
+	}
+}
+@media (min-resolution: 3dppx) {
+	.plan-usage-preview {
+		--px: calc(1px / 3);
+	}
+}
+.plan-usage-preview-bar {
+	position: absolute;
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-end;
+	width: var(--bar);
+}
+.plan-usage-preview-bar > span {
+	flex: none;
+	border-radius: min(2px, var(--bar) / 2);
+}
+.plan-usage-preview-reset {
+	position: absolute;
+	left: 50%;
+	translate: -50% 0;
+}
+.plan-usage-preview-label {
+	position: absolute;
+	color: var(--cost-muted);
+	font-size: 11px;
+	line-height: 1;
+	white-space: nowrap;
+}
