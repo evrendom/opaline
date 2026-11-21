@@ -194,6 +194,7 @@ export function SessionReaderStepDetail({
 						{skillHref && step?.toolEvent?.skillContent ? (
 							<Link
 								to={skillHref}
+								// design-escape-ok(opacity): no role renders this; decoration-ink/20
 								className="truncate underline decoration-ink/20 underline-offset-4 transition-colors hover:decoration-ink"
 							>
 								{step?.name}
@@ -228,7 +229,7 @@ export function SessionReaderStepDetail({
 								"corner-full py-xs pr-m pl-l",
 								"text-body-m font-medium",
 								"bg-card shadow-card transition-colors",
-								"hover:bg-hover dark:bg-ink-3/10",
+								"hover:bg-hover dark:bg-wash",
 							)}
 						>
 							Open details
@@ -264,7 +265,7 @@ export function SessionReaderStepDetail({
 										"grid shrink-0 grid-cols-2 gap-xl px-xxl",
 										!shell &&
 											(subagent || payloads.length > 0) &&
-											"edge-b-m border-line/40 pb-xxl",
+											"edge-b-m border-line-soft pb-xxl",
 									)}
 								>
 									{fields.map((field) => (
@@ -281,7 +282,7 @@ export function SessionReaderStepDetail({
 										"flex flex-col gap-l",
 										frozen
 											? "min-h-0 flex-1"
-											: "edge-b-m border-line/40 pb-xxl",
+											: "edge-b-m border-line-soft pb-xxl",
 									)}
 								>
 									{shell && !expanded ? (
@@ -313,6 +314,7 @@ export function SessionReaderStepDetail({
 								</div>
 							) : null}
 							{step?.isError && step.result && step.kind !== "ci" && !carded ? (
+								// design-escape-ok(opacity): no role renders this; bg-error/20
 								<div className="mx-xxl flex flex-col gap-xs corner-m bg-error/20 px-l py-l text-body-xl text-error corner-squircle">
 									<span className="flex items-center gap-s font-medium">
 										<IconAlertTriangleFilled className="size-3.5 shrink-0" />
@@ -329,7 +331,7 @@ export function SessionReaderStepDetail({
 										"flex flex-col gap-xl",
 										subagent &&
 											payloads.length > 0 &&
-											"edge-b-m border-line/40 pb-xxl",
+											"edge-b-m border-line-soft pb-xxl",
 									)}
 								>
 									<RunOverview
@@ -344,7 +346,7 @@ export function SessionReaderStepDetail({
 									key={`${selectionKey}:${payload.label}`}
 									className={cn(
 										index < payloads.length - 1 &&
-											"edge-b-m border-line/40 pb-xxl",
+											"edge-b-m border-line-soft pb-xxl",
 									)}
 									{...payload}
 								/>

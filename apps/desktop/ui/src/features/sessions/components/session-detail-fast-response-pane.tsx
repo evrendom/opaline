@@ -1118,6 +1118,7 @@ function flashTranscriptAnchors(elements: readonly HTMLElement[]) {
 				},
 				{ backgroundColor: "transparent" },
 			],
+			// design-escape-ok(motion): no role renders this; ease-out
 			{ duration: 300, easing: "ease-out" },
 		);
 	}

@@ -180,7 +180,7 @@ export function Row({ children }: { children: ReactNode }) {
 				"flex min-h-8 min-w-0 items-center gap-l",
 				"corner-s px-m py-xs",
 				"text-body-l",
-				"hover:bg-hover/60",
+				"hover:bg-hover",
 			)}
 		>
 			{children}

@@ -343,20 +343,25 @@ export function SessionsOverviewFiltersMenu({
 							className={cn(
 								"flex h-11 items-center justify-between gap-m",
 								"edge-b-m px-l",
-								"border-line/60",
+								"border-line-soft",
 							)}
 						>
 							<div className="flex min-w-0 items-center gap-s">
 								{selectedFilter ? (
-									<button
+									<Button
 										type="button"
+										variant="ghost"
+										size="icon-sm"
 										aria-label="Back to all filters"
-										className="relative flex size-7 shrink-0 items-center justify-center corner-s text-ink-3 outline-none hover:bg-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-focus/40"
+										className="relative size-7 corner-s text-ink-3"
 										onClick={() => setSelectedFilterKey(null)}
 									>
-										<IconArrowLeft aria-hidden="true" className="size-4" />
+										<IconArrowLeft
+											aria-hidden="true"
+											className="size-4 text-current"
+										/>
 										<TouchTarget className="size-12" />
-									</button>
+									</Button>
 								) : null}
 								<PopoverTitle className="truncate text-body-xl font-heavy">
 									{selectedFilter ? selectedFilter.label : "Filters"}
@@ -369,7 +374,7 @@ export function SessionsOverviewFiltersMenu({
 										? `Clear ${selectedFilter.label} filter`
 										: "Clear all filters"
 								}
-								className="shrink-0 corner-s px-s py-xs text-body-m font-medium text-primary outline-none hover:bg-hover focus-visible:ring-2 focus-visible:ring-focus/40 disabled:pointer-events-none disabled:opacity-40"
+								className="shrink-0 corner-s px-s py-xs text-body-m font-medium text-primary focus-outline hover:bg-hover disabled:pointer-events-none disabled:opacity-40"
 								disabled={
 									selectedFilter
 										? !isToolbarFilterActive(
@@ -447,7 +452,7 @@ export function SessionsOverviewFiltersMenu({
 											key={filter.key}
 											type="button"
 											aria-label={`Configure ${filter.label} filter`}
-											className="flex min-h-9 w-full items-center gap-l corner-m px-l py-s text-left text-body-xl font-medium outline-none hover:bg-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-focus/40"
+											className="flex min-h-9 w-full items-center gap-l corner-m px-l py-s text-left text-body-xl font-medium focus-outline hover:bg-hover hover:text-ink"
 											onClick={() => setSelectedFilterKey(filter.key)}
 										>
 											<span className="min-w-0 flex-1 truncate">

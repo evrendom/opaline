@@ -38,6 +38,7 @@ type FileLanguage = { color: string; Icon: Icon; label: string };
 const BY_EXTENSION: Record<string, FileLanguage> = {
 	astro: { color: "#BC52EE", Icon: IconBrandAstro, label: "Astro" },
 	cjs: { color: "#CA8A04", Icon: IconBrandJavascript, label: "JavaScript" },
+	// design-escape-ok(base): a category colour from the opal sheen (data paint)
 	css: { color: "var(--color-1)", Icon: IconBrandCss3, label: "CSS" },
 	cts: { color: "#3178C6", Icon: IconBrandTypescript, label: "TypeScript" },
 	go: { color: "#00ADD8", Icon: IconBrandGolang, label: "Go" },

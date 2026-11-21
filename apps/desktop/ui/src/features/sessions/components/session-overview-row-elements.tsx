@@ -7,10 +7,10 @@ import {
 } from "./newsesh-session-language-signal";
 
 export const SESSION_OVERVIEW_ROW_CLASS_NAME =
-	"group/session grid h-12 w-full text-left outline-none focus-visible:z-20 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent";
+	"group/session grid h-12 w-full text-left focus-outline focus-visible:z-20";
 
 export const SESSION_OVERVIEW_MODEL_LABEL_CLASS_NAME =
-	// design-escape-ok: 16/20 applies below sm only
+	// design-escape-ok(type): no role renders this; 16/20 below sm
 	"text-base/5 font-medium tracking-m text-ink sm:text-body-l";
 
 export const SESSION_OVERVIEW_CELL_CLASS_NAME =

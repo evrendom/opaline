@@ -60,8 +60,10 @@ const OUTCOME = {
 const duration = (ms: number) => formatReaderDuration(ms / 1000);
 
 const DOT: Record<CiRoundOutcome, string> = {
+	// design-escape-ok(opacity): no role renders this; border-ink-3/50
 	cancelled: "edge-m border-ink-3/50",
 	failed: "bg-error",
+	// design-escape-ok(opacity): no role renders this; bg-ink-3/40
 	other: "bg-ink-3/40",
 	passed: "bg-success",
 	flaky: "bg-warning",
@@ -117,8 +119,7 @@ export function CiRoundMarks({
 				<span
 					className={cn(
 						"text-ink-3 tabular-nums",
-						// design-escape-ok: a one-line compact badge
-						compact ? "text-body-xs leading-none" : "text-body-xs",
+						compact ? "text-body-xs line-solid" : "text-body-xs",
 					)}
 				>
 					+{rest}
@@ -160,6 +161,7 @@ export function CiRoundDots({
 								"size-2 corner-full transition-transform group-hover/dot:scale-125",
 								DOT[round.outcome],
 								picked &&
+									// design-escape-ok(opacity): no role renders this; ring-ink/70
 									"scale-125 ring-2 ring-ink/70 ring-offset-1 ring-offset-canvas",
 							)}
 						/>
@@ -183,6 +185,7 @@ export function CiPushDetail({
 }) {
 	const look = OUTCOME[round.outcome];
 	return (
+		// design-escape-ok(opacity): no role renders this; bg-field/40
 		<section className="flex flex-col gap-m corner-m bg-field/40 py-l">
 			<div className="flex min-w-0 flex-col gap-xs px-l">
 				<div className="flex min-w-0 items-center gap-m text-body-xl">
@@ -293,7 +296,9 @@ function PushRun({ run }: { run: SummaryCiRun }) {
 
 const END_DOT = {
 	closed: "bg-error",
+	// design-escape-ok(base): a category colour from the opal sheen (data paint)
 	merged: "bg-color-2",
+	// design-escape-ok(opacity): no role renders this; border-ink-3/50
 	open: "edge-m border-ink-3/50",
 };
 
@@ -346,6 +351,7 @@ export function CiRounds({
 	const ending = pullEndWords(rounds, pull);
 	return (
 		<section className="flex flex-col gap-xs">
+			{/* design-escape-ok(opacity): no role renders this; text-ink/80 */}
 			<h3 className="px-l text-body-m font-medium text-ink/80">Pushes</h3>
 			<ol className="flex flex-col">
 				{rounds.map((round, index) => {
@@ -366,6 +372,7 @@ export function CiRounds({
 									"corner-m px-l py-s",
 									"text-left",
 									"transition-colors",
+									// design-escape-ok(opacity): no role renders this; hover:bg-hover/40
 									picked ? "bg-field ring-1 ring-line" : "hover:bg-hover/40",
 								)}
 							>
@@ -403,6 +410,7 @@ export function CiRounds({
 										<span className="h-1.5 min-w-0 flex-1">
 											{round.ciMs !== null ? (
 												<span
+													// design-escape-ok(opacity): no role renders this; bg-ink-3/35
 													className="block h-full min-w-[2px] corner-full bg-ink-3/35"
 													style={{
 														width: `${(round.ciMs / longest) * 100}%`,

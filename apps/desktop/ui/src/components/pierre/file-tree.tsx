@@ -67,7 +67,8 @@ function RowTags({
 						tag.color
 							? ""
 							: tag.changed
-								? "bg-opal-2-tint text-color-3 hover:bg-opal-2/20"
+								? // design-escape-ok(base,opacity): a changed file's run tag in its opal colour
+									"bg-opal-2-tint text-color-3 hover:bg-opal-2/20"
 								: "bg-field text-ink-3 hover:text-ink",
 					)}
 					style={
@@ -93,7 +94,7 @@ function RowTags({
 			))}
 			{rest > 0 ? (
 				<span
-					className="text-body-xs font-regular text-ink-3/70 tabular-nums"
+					className="text-body-xs font-regular text-ink-disabled tabular-nums"
 					title={tags
 						.slice(ROW_TAGS)
 						.map((tag) => tag.label)
@@ -121,8 +122,9 @@ const STATUS_TITLE: Record<FileTreeStatus, string> = {
 };
 
 const STATUS_LOOK: Record<FileTreeStatus, string> = {
+	// design-escape-ok(base): file status marks in the opal palette
 	added: "text-color-1",
-	deleted: "text-color-5",
+	deleted: "text-color-5", // design-escape-ok(base): file status marks
 	modified: "text-color-2",
 	read: "",
 };
@@ -141,7 +143,10 @@ function RowIcon({
 	if (folder) {
 		const Folder = expanded ? IconFolderOpenFilled : IconFolderFilled;
 		return (
-			<Folder className="size-3.5 shrink-0 text-ink-3/50 transition-colors group-hover/row:text-ink-3" />
+			<Folder
+				// design-escape-ok(opacity): no role renders this; text-ink-3/50
+				className="size-3.5 shrink-0 text-ink-3/50 transition-colors group-hover/row:text-ink-3"
+			/>
 		);
 	}
 	const { Icon } = getFileLanguage(name);
@@ -150,6 +155,7 @@ function RowIcon({
 			aria-hidden="true"
 			className={cn(
 				"size-3.5 shrink-0 transition-colors",
+				// design-escape-ok(opacity): no role renders this; text-ink-3/50
 				selected ? "text-ink" : "text-ink-3/50 group-hover/row:text-ink-3",
 			)}
 		/>
@@ -258,7 +264,7 @@ export function FileTree({
 		<div className="flex flex-col">
 			{model.rootLabel ? (
 				<div
-					className="truncate px-l pb-xs text-body-m text-ink-3/70 [direction:rtl] text-left"
+					className="truncate px-l pb-xs text-body-m text-ink-disabled [direction:rtl] text-left"
 					title={model.rootLabel}
 				>
 					{`‎${model.rootLabel}‎`}
@@ -327,6 +333,7 @@ export function FileTree({
 									<IconChevronRight
 										aria-hidden="true"
 										className={cn(
+											// design-escape-ok(opacity): no role renders this; text-ink-3/60
 											"size-3 shrink-0 text-ink-3/60 transition-transform",
 											row.isExpanded && "rotate-90",
 										)}
@@ -348,7 +355,13 @@ export function FileTree({
 									{row.segments.map((segment, part) => (
 										<span key={row.segments.slice(0, part + 1).join("/")}>
 											{part > 0 ? (
-												<span className="text-ink-3/50"> / </span>
+												<span
+													// design-escape-ok(opacity): no role renders this; text-ink-3/50
+													className="text-ink-3/50"
+												>
+													{" "}
+													/{" "}
+												</span>
 											) : null}
 											{segment}
 										</span>
@@ -358,7 +371,7 @@ export function FileTree({
 									<RowTags onPick={onPickTag} tags={row.item.tags} />
 								) : null}
 								{row.item?.badge ? (
-									<span className="shrink-0 text-body-m font-regular text-ink-3/70 tabular-nums">
+									<span className="shrink-0 text-body-m font-regular text-ink-disabled tabular-nums">
 										{row.item.badge}
 									</span>
 								) : null}
@@ -373,11 +386,13 @@ export function FileTree({
 										{status === "read" ? (
 											<IconEyeFilled
 												aria-hidden="true"
+												// design-escape-ok(opacity): no role renders this; text-ink-3/60
 												className="size-3 text-ink-3/60"
 											/>
 										) : status ? (
 											STATUS_LETTER[status]
 										) : row.containsChange ? (
+											// design-escape-ok(base): a changed folder's mark in the modified opal
 											<span className="size-1.5 corner-full bg-color-2/60" />
 										) : null}
 									</span>

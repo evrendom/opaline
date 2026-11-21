@@ -287,7 +287,7 @@ export const TurnRailList = memo(function TurnRailList({
 				className={cn(
 					"flex shrink-0 items-center justify-between gap-m",
 					"edge-b-m py-m pr-m pl-xl",
-					"border-line/60",
+					"border-line-soft",
 				)}
 			>
 				<h2 className="truncate text-body-xl font-medium">Agent runs</h2>
@@ -338,7 +338,7 @@ export const TurnRailList = memo(function TurnRailList({
 								"relative flex h-(--rail-line-height) shrink-0 items-center justify-between gap-s",
 								"corner-s px-s corner-squircle",
 								"text-left text-body-m tabular-nums",
-								"transition-opacity duration-(--motion-large-duration) ease-out",
+								"transition-opacity duration-(--motion-large-duration) ease-base",
 								"squircle:corner-l",
 								whole.disabled &&
 									"cursor-default opacity-40 starting:opacity-100",

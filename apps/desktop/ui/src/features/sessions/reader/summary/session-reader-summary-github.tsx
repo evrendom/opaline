@@ -35,6 +35,7 @@ export function pullRequestLook(pull: SessionPullRequest): {
 } {
 	if (pull.mergedAt)
 		return {
+			// design-escape-ok(base): a category colour from the opal sheen (data paint)
 			className: "text-color-2",
 			icon: IconGitMerge,
 			label: "Merged",

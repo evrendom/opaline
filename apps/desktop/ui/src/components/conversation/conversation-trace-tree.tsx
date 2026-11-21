@@ -143,6 +143,7 @@ const CONVERSATION_TRACE_TREE_COMPACT_ROW_HEIGHT = 32;
 const TRACE_EVENT_ICON_RAIL_OFFSET = 14;
 const COLLAPSED_TRACE_ICON_LIMIT = 25;
 const traceCollapsiblePanelClassName =
+	// design-escape-ok(motion): no role renders this; cubic-bezier(0.2,0,0,1)
 	"h-(--collapsible-panel-height) min-w-0 overflow-clip transition-[height,opacity] duration-(--motion-medium-duration) ease-[cubic-bezier(0.2,0,0,1)] data-ending-style:h-0 data-ending-style:opacity-0 data-starting-style:h-0 data-starting-style:opacity-0 motion-reduce:transition-none";
 type ConversationTraceTreeConnectorShape = "branch" | "through";
 
@@ -1286,8 +1287,8 @@ export function AgentCollapsedTraceIcons({
 						data-trace-tree-line
 					/>
 					<span
-						// design-escape-ok: digits packed into a 16px glyph
-						className="flex shrink-0 items-center justify-center font-body text-body-xxs leading-none font-medium tracking-[-0.08em] tabular-nums [text-indent:-1.5px]"
+						// design-escape-ok(type): digits packed into a 16px glyph
+						className="flex shrink-0 items-center justify-center font-body text-body-xxs line-solid font-medium tracking-[-0.08em] tabular-nums [text-indent:-1.5px]"
 						data-trace-collapsed-flow-count
 						data-trace-icon
 						data-trace-icon-tone="neutral"
@@ -1488,7 +1489,7 @@ function AgentTraceTreeRenderedSectionItem({
 							sticky={false}
 						>
 							<Collapsible.Trigger
-								className="group block w-full text-left outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+								className="group block w-full text-left focus-outline"
 								data-trace-hover-row
 							>
 								<span className="-ml-l block">
@@ -1506,7 +1507,7 @@ function AgentTraceTreeRenderedSectionItem({
 						subtree={branchPanel}
 					>
 						<Collapsible.Trigger
-							className="group block w-full text-left outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+							className="group block w-full text-left focus-outline"
 							data-trace-hover-row
 						>
 							<span className="-ml-l block">
@@ -1674,7 +1675,7 @@ export function AgentTraceTreeSection({
 					style={headerHeight ? { minHeight: headerHeight } : undefined}
 				>
 					{expandable ? (
-						<Collapsible.Trigger className="group flex min-h-10 min-w-0 flex-1 items-center gap-m text-left outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent">
+						<Collapsible.Trigger className="group flex min-h-10 min-w-0 flex-1 items-center gap-m text-left focus-outline">
 							{modelHeader}
 						</Collapsible.Trigger>
 					) : (

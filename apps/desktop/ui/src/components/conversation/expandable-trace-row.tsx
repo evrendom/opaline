@@ -348,7 +348,7 @@ export function ExpandableTraceRow({
 						aria-label={disclosureLabel}
 						aria-expanded={expanded}
 						aria-controls={panelId}
-						className="group flex min-w-0 flex-1 items-center gap-zero text-left outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[color:var(--dashboard-01-metric-button-focus-ring)]"
+						className="group flex min-w-0 flex-1 items-center gap-zero text-left focus-outline"
 					>
 						{disclosureLabel ? null : label}
 						{children}

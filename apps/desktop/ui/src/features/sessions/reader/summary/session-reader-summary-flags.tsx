@@ -111,7 +111,7 @@ function SnippetLines({
 				</span>
 			))}
 			{snippets.length > SNIPPETS ? (
-				<span className="text-body-m text-ink-3/70 tabular-nums">
+				<span className="text-body-m text-ink-disabled tabular-nums">
 					+{snippets.length - SNIPPETS} more
 				</span>
 			) : null}
@@ -245,7 +245,7 @@ export function SummaryFlags({
 	)
 		return null;
 	return (
-		<ul className="flex flex-col divide-y divide-line/60">
+		<ul className="flex flex-col divide-y divide-line-soft">
 			{before ? (
 				<Row
 					chip={<FlagChip kind="user_frustrated" />}

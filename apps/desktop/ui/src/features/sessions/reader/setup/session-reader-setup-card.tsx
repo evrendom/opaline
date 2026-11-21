@@ -68,7 +68,7 @@ export function SetupCard({
 	);
 	return (
 		<div className="flex min-h-0 min-w-0 flex-1 flex-col">
-			<header className="flex flex-col gap-m edge-b-m border-line/50 px-xxl py-xl">
+			<header className="flex flex-col gap-m edge-b-m border-line-soft px-xxl py-xl">
 				<div className="flex min-w-0 items-center gap-m">
 					<span className="flex shrink-0">
 						<SetupMark file={file} />

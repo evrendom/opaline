@@ -66,7 +66,8 @@ export function ToolCard({
 				"flex min-h-0 flex-col overflow-hidden",
 				prose
 					? null
-					: "edge-m border-line/60 bg-field/40 corner-squircle dark:bg-wash",
+					: // design-escape-ok(opacity): no role renders this; bg-field/40
+						"edge-m border-line-soft bg-field/40 corner-squircle dark:bg-wash",
 				!prose &&
 					(fit
 						? "corner-l squircle:corner-xl"
@@ -105,7 +106,7 @@ export function ToolCard({
 						Result
 						<span
 							title={size.title}
-							className="font-regular text-ink-3/70 tabular-nums"
+							className="font-regular text-ink-disabled tabular-nums"
 						>
 							{size.label}
 						</span>
@@ -162,6 +163,7 @@ export function ToolCard({
 										className={cn(
 											"absolute top-0 right-1 flex items-center gap-xxs",
 											"corner-s",
+											// design-escape-ok(opacity): no role renders this; bg-canvas/80
 											"bg-canvas/80 opacity-0 backdrop-blur-sm transition-opacity",
 											"group-hover/output:opacity-100 focus-within:opacity-100 has-[[aria-pressed=true]]:opacity-100",
 										)}
@@ -191,6 +193,7 @@ export function ToolCard({
 					) : null}
 				</AnimatePresence>
 				{text ? null : (
+					// design-escape-ok(opacity): no role renders this; text-ink-3/60
 					<p className="px-l pb-xs text-body-m text-ink-3/60">No output</p>
 				)}
 			</div>

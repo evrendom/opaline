@@ -109,7 +109,7 @@ function RunCardSample() {
 				className={cn(
 					"flex h-[55px] shrink-0 items-center gap-l",
 					"edge-b-m px-l",
-					"border-line/60",
+					"border-line-soft",
 				)}
 			>
 				<Bone className="size-6 shrink-0 corner-full" />
@@ -117,7 +117,7 @@ function RunCardSample() {
 				<span className="flex-1" />
 				<Bone className="h-3 w-20 corner-xs" />
 			</div>
-			<div className="grid grid-cols-4 gap-xl edge-b-m border-line/60 px-l py-l">
+			<div className="grid grid-cols-4 gap-xl edge-b-m border-line-soft px-l py-l">
 				{CARD_FIGURES.map((key) => (
 					<div key={key} className="flex flex-col gap-m">
 						<Bone className="h-3 w-10 corner-xs" />
@@ -131,6 +131,7 @@ function RunCardSample() {
 					<div key={lane.id} className="flex h-4 items-center gap-m">
 						<Bone className="size-4 shrink-0 corner-s" />
 						<Bone className="h-3 w-3 shrink-0 corner-xs" />
+						{/* design-escape-ok(opacity): no role renders this; bg-field/40 */}
 						<div className="relative h-4 min-w-0 flex-1 corner-xs bg-field/40">
 							{lane.bars.map((left) => (
 								<Bone
@@ -142,6 +143,7 @@ function RunCardSample() {
 						</div>
 					</div>
 				))}
+				{/* design-escape-ok(opacity): no role renders this; bg-field/40 */}
 				<div className="mt-xs h-12 corner-xs bg-field/40" />
 			</div>
 		</div>
@@ -216,7 +218,7 @@ export function RailSample() {
 				className={cn(
 					"flex h-[45px] shrink-0 items-center justify-between gap-m",
 					"edge-b-m pr-m pl-xl",
-					"border-line/60",
+					"border-line-soft",
 				)}
 			>
 				<Bone className="h-3.5 w-20 corner-xs" />

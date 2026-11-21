@@ -9,7 +9,7 @@ export function SessionTurnCompactionRow({
 }) {
 	return (
 		<tr
-			// design-escape-ok: deliberate exception, dark lifts the compaction label to amber-300 on its warning wash; dark's warning is amber-500, visibly darker
+			// design-escape-ok(opacity,colour): no role renders this; border-warning-line/70, dark:border-warning/15, dark:bg-warning/10, dark:text-amber-300
 			className="flex h-7 min-w-full items-center edge-y-m border-warning-line/70 bg-inset px-l text-body-m font-medium text-warning dark:border-warning/15 dark:bg-warning/10 dark:text-amber-300"
 			title={new Date(compaction.timestamp).toLocaleString()}
 		>
@@ -33,7 +33,7 @@ export function SessionTurnEpisodeRow({
 				<button
 					type="button"
 					aria-expanded={!collapsed}
-					className="flex min-h-9 w-full items-center gap-m px-l text-left text-body-m font-medium text-ink outline-none"
+					className="flex min-h-9 w-full items-center gap-m px-l text-left text-body-m font-medium text-ink focus-outline"
 					onClick={onToggle}
 				>
 					{collapsed ? (

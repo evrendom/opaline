@@ -6,7 +6,7 @@ import { formatNumber, formatShortCount } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export const TOGGLE =
-	"text-ink-3 active:not-aria-[haspopup]:translate-y-0 aria-pressed:bg-card aria-pressed:text-ink aria-pressed:shadow-card dark:aria-pressed:bg-ink-3/10";
+	"text-ink-3 active:not-aria-[haspopup]:translate-y-0 aria-pressed:bg-card aria-pressed:text-ink aria-pressed:shadow-card dark:aria-pressed:bg-wash";
 
 export function ViewToggle<View extends string>({
 	iconsOnly = false,
@@ -62,7 +62,7 @@ export function ViewToggle<View extends string>({
 						"corner-s corner-squircle",
 						"text-body-m font-medium",
 						"transition-colors outline-none",
-						"focus-visible:ring-2 focus-visible:ring-focus/50 disabled:cursor-default disabled:opacity-45 squircle:corner-l",
+						"focus-visible:ring-2 focus-visible:ring-focus-ring disabled:cursor-default disabled:opacity-45 squircle:corner-l",
 						iconsOnly ? "px-s" : "px-m",
 						id === value ? "text-ink" : "text-ink-3 enabled:hover:text-ink",
 					)}
@@ -156,6 +156,7 @@ export function Crumb({
 				"inline-flex min-w-0 items-center gap-xs",
 				"corner-s py-xxs pr-xxs pl-m",
 				"text-body-xl font-medium",
+				// design-escape-ok(opacity): no role renders this; bg-field/70
 				"bg-field/70",
 			)}
 			title={title}
@@ -178,5 +179,6 @@ export function Crumb({
 }
 
 export function CrumbSeparator() {
+	// design-escape-ok(opacity): no role renders this; text-ink-3/50
 	return <span className="shrink-0 text-ink-3/50">›</span>;
 }

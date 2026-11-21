@@ -25,12 +25,12 @@ describe("session constellation tree tokens", () => {
 		expect(css).toContain("stroke-width: var(--active-turn-rail-width)");
 		expect(css).toContain("transform: scale(1.5)");
 		expect(css).toContain("var(--ink-3)");
-		expect(css).toContain('font-family: "Inter Variable"');
+		expect(css).toContain("font-family: var(--font-body)");
 		expect(css).toContain(
 			"[data-trace-preview]:not([data-trace-shell-command-preview])",
 		);
-		expect(css).toContain("font-size: 12px");
-		expect(css).toContain("line-height: 16px");
+		expect(css).toContain("font-size: var(--size-m)");
+		expect(css).toContain("line-height: var(--line-m)");
 		expect(css).toContain("width: 20px");
 		expect(css).toContain("width: 14px");
 		expect(css).toContain("border-radius: 0");

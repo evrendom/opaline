@@ -128,7 +128,7 @@ function Counts({ rows }: { rows: { count: string; name: string }[] }) {
 					return (
 						<tr
 							key={`${row.name}:${row.count}`}
-							className={cn(total && "edge-t-m border-line/60")}
+							className={cn(total && "edge-t-m border-line-soft")}
 						>
 							<td className="pr-l text-right tabular-nums">{row.count}</td>
 							<td>
@@ -175,7 +175,7 @@ function Table({
 		<div className="overflow-x-auto px-l">
 			<table className="w-full border-collapse font-data text-body-m">
 				<thead>
-					<tr className="edge-b-m border-line/60 text-ink-3">
+					<tr className="edge-b-m border-line-soft text-ink-3">
 						{header.map((cell, column) => (
 							<th
 								key={columns[column]}
@@ -197,7 +197,7 @@ function Table({
 						return (
 							<tr
 								key={`${id}#${repeat}`}
-								className="edge-b-m border-line/30 last:edge-b-none"
+								className="edge-b-m border-line-soft last:edge-b-none"
 							>
 								{columns.map((columnKey, column) => (
 									<td
@@ -208,6 +208,7 @@ function Table({
 											wrap ? "[overflow-wrap:anywhere]" : "whitespace-nowrap",
 										)}
 									>
+										{/* design-escape-ok(opacity): no role renders this; text-ink-3/40 */}
 										{row[column] || <span className="text-ink-3/40">—</span>}
 									</td>
 								))}
@@ -305,7 +306,7 @@ export function ShellOutput({
 						key={`${part.text}#${repeat}`}
 						className={cn(
 							"flex flex-col gap-xs",
-							index > 0 && "mt-m edge-t-m border-line/60 pt-m",
+							index > 0 && "mt-m edge-t-m border-line-soft pt-m",
 						)}
 					>
 						{several && label ? (

@@ -113,6 +113,7 @@ export function RunSummaryBar({
 								</span>
 							) : null}
 							{setting ? (
+								// design-escape-ok(opacity): no role renders this; text-ink-3/60
 								<span className="shrink-0 text-ink-3/60">{setting}</span>
 							) : null}
 							{mode?.planMode ? <ConversationTracePlanTag /> : null}
@@ -122,11 +123,13 @@ export function RunSummaryBar({
 						expanded ? (
 							<IconArrowsDiagonalMinimize2
 								aria-hidden="true"
+								// design-escape-ok(opacity): no role renders this; text-ink-3/60
 								className="size-4 shrink-0 text-ink-3/60 transition-colors group-hover/run:text-ink"
 							/>
 						) : (
 							<IconArrowsDiagonal
 								aria-hidden="true"
+								// design-escape-ok(opacity): no role renders this; text-ink-3/60
 								className="size-4 shrink-0 text-ink-3/60 transition-colors group-hover/run:text-ink"
 							/>
 						)
@@ -171,7 +174,7 @@ function StepStrip({
 	return (
 		<span
 			aria-hidden="true"
-			className="relative h-2 w-full shrink-0 overflow-hidden corner-xs bg-ink-3/10"
+			className="relative h-2 w-full shrink-0 overflow-hidden corner-xs bg-wash"
 		>
 			{steps.map((step) => {
 				const { offset, width } = barGeometry(
@@ -325,12 +328,14 @@ function RunStepTags({
 						"inline-flex h-5 items-center gap-xs",
 						"corner-full pr-m pl-xxs",
 						"tabular-nums",
+						// design-escape-ok(opacity): no role renders this; text-ink/80
 						"bg-canvas text-ink/80 shadow-control",
 						"dark:bg-card",
 					)}
 				>
 					<OpalChip
 						tint="var(--color-indigo-500)"
+						// design-escape-ok(base): a category colour from the opal sheen (data paint)
 						className="size-4 text-color-3"
 					>
 						<IconGhost
@@ -457,6 +462,7 @@ function RunTag({
 				"inline-flex h-5 items-center",
 				"corner-full px-m",
 				"tabular-nums",
+				// design-escape-ok(opacity): no role renders this; text-ink/80
 				"bg-canvas text-ink/80 shadow-control",
 				"dark:bg-card",
 				className,

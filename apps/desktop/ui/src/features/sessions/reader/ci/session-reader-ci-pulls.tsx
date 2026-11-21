@@ -167,6 +167,7 @@ function CiLine({
 			{parts.map((part, index) => (
 				<span key={part.text} className="inline-flex items-baseline gap-s">
 					{index > 0 ? (
+						// design-escape-ok(opacity): no role renders this; text-ink-3/50
 						<span aria-hidden="true" className="text-ink-3/50">
 							·
 						</span>
@@ -226,13 +227,14 @@ export function PullLine({
 					aria-hidden="true"
 					className={cn(
 						"mt-xxs size-4 shrink-0",
-						look.className || "text-ink-3/70",
+						look.className || "text-ink-disabled",
 					)}
 				/>
 				<span
 					title={pull?.title ?? undefined}
 					className={cn(
 						"min-w-0 flex-1 truncate text-body-m",
+						// design-escape-ok(opacity): no role renders this; text-ink/90
 						isPicked ? "text-ink" : "text-ink/90",
 					)}
 				>
@@ -254,8 +256,7 @@ export function PullLine({
 						/>
 					) : null}
 					{meta ? (
-						// design-escape-ok: one-line status glyphs sit on the row's centre
-						<span className="ml-auto flex shrink-0 items-center leading-none [&>*]:leading-none">
+						<span className="ml-auto flex shrink-0 items-center line-solid [&>*]:line-solid">
 							{meta}
 						</span>
 					) : null}
@@ -287,7 +288,7 @@ export function CiPullCard({
 	const push = row.rounds[pushIndex];
 	return (
 		<div className="flex min-h-0 min-w-0 flex-1 flex-col">
-			<header className="flex flex-col gap-s edge-b-m border-line/50 px-xxl py-xl">
+			<header className="flex flex-col gap-s edge-b-m border-line-soft px-xxl py-xl">
 				<div className="flex min-w-0 items-center gap-m">
 					<PullGlyph
 						aria-hidden="true"

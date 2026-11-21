@@ -215,12 +215,12 @@ export const TurnTrace = memo(function TurnTrace({
 						)}
 					>
 						{headNode ? (
-							<div className="shrink-0 edge-b-m border-line/60 px-l py-l">
+							<div className="shrink-0 edge-b-m border-line-soft px-l py-l">
 								{headNode}
 							</div>
 						) : null}
 						{headNode && step ? (
-							<div className="shrink-0 edge-b-m border-line/60 px-l py-m">
+							<div className="shrink-0 edge-b-m border-line-soft px-l py-m">
 								<StepBreakdowns
 									model={model}
 									step={step}
@@ -234,7 +234,7 @@ export const TurnTrace = memo(function TurnTrace({
 								className={cn(
 									"grid shrink-0 gap-xl",
 									"edge-b-m px-l py-m",
-									"border-line/60",
+									"border-line-soft",
 									"empty:hidden",
 									agent ? "grid-cols-2" : "grid-cols-4",
 								)}
@@ -273,19 +273,19 @@ export const TurnTrace = memo(function TurnTrace({
 						<div
 							ref={setRunningSlot}
 							className={cn(
-								"shrink-0 edge-t-m border-line/60 px-l py-m empty:hidden",
+								"shrink-0 edge-t-m border-line-soft px-l py-m empty:hidden",
 								(!subagentsAtStep || expanded) && "hidden",
 							)}
 						/>
 						<div
 							ref={setSubagentSlot}
 							className={cn(
-								"shrink-0 edge-t-m border-line/60 px-m py-m empty:hidden",
+								"shrink-0 edge-t-m border-line-soft px-m py-m empty:hidden",
 								step && "hidden",
 							)}
 						/>
 						{step ? (
-							<div className="flex min-h-0 flex-1 flex-col edge-t-m border-line/60">
+							<div className="flex min-h-0 flex-1 flex-col edge-t-m border-line-soft">
 								<SessionReaderStepDetail
 									bare
 									expanded={expanded}

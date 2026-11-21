@@ -99,7 +99,7 @@ export function Breakdown({
 		<span className="truncate text-body-m text-ink-3">
 			{title}
 			{toggle?.label ? (
-				<span className="text-ink-3/70"> · {toggle.label}</span>
+				<span className="text-ink-disabled"> · {toggle.label}</span>
 			) : null}
 		</span>
 	);
@@ -118,11 +118,11 @@ export function Breakdown({
 			) : (
 				heading
 			)}
-			{/* design-escape-ok: deliberate exception, 13/16 keeps the figure row dense; body-l's 20px line grows it */}
+			{/* design-escape-ok(type): deliberate exception, 13/16 keeps the figure row dense; body-l's 20px line grows it */}
 			<span className="truncate text-[13px]/4 text-ink tabular-nums">
 				{value}
 			</span>
-			<span className="flex h-1 gap-xxs overflow-hidden corner-full bg-ink-3/10">
+			<span className="flex h-1 gap-xxs overflow-hidden corner-full bg-wash">
 				{shown.map((part) => (
 					<Tip
 						key={part.label}

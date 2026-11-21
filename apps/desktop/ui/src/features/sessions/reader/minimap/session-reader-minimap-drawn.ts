@@ -53,8 +53,8 @@ export function movesOnMap(last: Drawn, next: Drawn): boolean {
 }
 
 const EASE_MS = 300;
-const BOX_EASE = `transform ${EASE_MS}ms ease-out, height ${EASE_MS}ms ease-out`;
-const LIT_EASE = `y ${EASE_MS}ms ease-out, height ${EASE_MS}ms ease-out`;
+const BOX_EASE = `transform ${EASE_MS}ms var(--motion-easing), height ${EASE_MS}ms var(--motion-easing)`;
+const LIT_EASE = `y ${EASE_MS}ms var(--motion-easing), height ${EASE_MS}ms var(--motion-easing)`;
 const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
 
 export function minimapBox(

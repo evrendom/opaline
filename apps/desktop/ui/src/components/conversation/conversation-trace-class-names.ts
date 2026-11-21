@@ -1,4 +1,5 @@
 export const conversationTraceLabelClassName =
+	// design-escape-ok(opacity): no role renders this; text-ink/[0.608], dark:text-ink/[0.685]
 	"shrink-0 font-body text-body-m font-regular text-ink/[0.608] dark:text-ink/[0.685]";
 
 // Sticky headers alone need an opaque pane-colored surface: it masks rails

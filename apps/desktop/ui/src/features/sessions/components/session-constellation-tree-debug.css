@@ -1,7 +1,15 @@
 /* Append ?debug=colors to expose every div boundary in the trace tree. */
 [data-debug-sticky-colors] .session-constellation-tree div {
-	--trace-debug-div-fill: rgb(255 64 64 / 8%);
-	--trace-debug-div-outline: rgb(255 64 64 / 70%);
+	--trace-debug-fill-rgb: 255 64 64;
+	--trace-debug-outline-rgb: 255 64 64;
+	--trace-debug-outline-alpha: 70%;
+	/* design-escape-ok(colour): no role renders this; one rainbow hue per depth */
+	--trace-debug-div-fill: rgb(var(--trace-debug-fill-rgb) / 8%);
+	/* design-escape-ok(colour): no role renders this; one rainbow hue per depth */
+	--trace-debug-div-outline: rgb(
+		var(--trace-debug-outline-rgb) /
+		var(--trace-debug-outline-alpha)
+	);
 	background-image: linear-gradient(
 		var(--trace-debug-div-fill),
 		var(--trace-debug-div-fill)
@@ -11,28 +19,33 @@
 }
 
 [data-debug-sticky-colors] .session-constellation-tree div div {
-	--trace-debug-div-fill: rgb(255 145 48 / 8%);
-	--trace-debug-div-outline: rgb(255 145 48 / 70%);
+	--trace-debug-fill-rgb: 255 145 48;
+	--trace-debug-outline-rgb: 255 145 48;
+	--trace-debug-outline-alpha: 70%;
 }
 
 [data-debug-sticky-colors] .session-constellation-tree div div div {
-	--trace-debug-div-fill: rgb(245 210 40 / 8%);
-	--trace-debug-div-outline: rgb(190 145 0 / 75%);
+	--trace-debug-fill-rgb: 245 210 40;
+	--trace-debug-outline-rgb: 190 145 0;
+	--trace-debug-outline-alpha: 75%;
 }
 
 [data-debug-sticky-colors] .session-constellation-tree div div div div {
-	--trace-debug-div-fill: rgb(50 205 90 / 8%);
-	--trace-debug-div-outline: rgb(20 155 65 / 75%);
+	--trace-debug-fill-rgb: 50 205 90;
+	--trace-debug-outline-rgb: 20 155 65;
+	--trace-debug-outline-alpha: 75%;
 }
 
 [data-debug-sticky-colors] .session-constellation-tree div div div div div {
-	--trace-debug-div-fill: rgb(25 195 220 / 8%);
-	--trace-debug-div-outline: rgb(0 145 175 / 75%);
+	--trace-debug-fill-rgb: 25 195 220;
+	--trace-debug-outline-rgb: 0 145 175;
+	--trace-debug-outline-alpha: 75%;
 }
 
 [data-debug-sticky-colors] .session-constellation-tree div div div div div div {
-	--trace-debug-div-fill: rgb(65 120 255 / 8%);
-	--trace-debug-div-outline: rgb(45 90 225 / 75%);
+	--trace-debug-fill-rgb: 65 120 255;
+	--trace-debug-outline-rgb: 45 90 225;
+	--trace-debug-outline-alpha: 75%;
 }
 
 [data-debug-sticky-colors]
@@ -44,8 +57,9 @@
 	div
 	div
 	div {
-	--trace-debug-div-fill: rgb(160 75 255 / 8%);
-	--trace-debug-div-outline: rgb(125 45 220 / 75%);
+	--trace-debug-fill-rgb: 160 75 255;
+	--trace-debug-outline-rgb: 125 45 220;
+	--trace-debug-outline-alpha: 75%;
 }
 
 [data-debug-sticky-colors]
@@ -58,6 +72,7 @@
 	div
 	div
 	div {
-	--trace-debug-div-fill: rgb(255 70 180 / 8%);
-	--trace-debug-div-outline: rgb(220 35 145 / 75%);
+	--trace-debug-fill-rgb: 255 70 180;
+	--trace-debug-outline-rgb: 220 35 145;
+	--trace-debug-outline-alpha: 75%;
 }

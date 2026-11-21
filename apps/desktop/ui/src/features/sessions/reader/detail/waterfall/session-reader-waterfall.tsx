@@ -271,7 +271,9 @@ export function SessionReaderWaterfallView({
 				<div key={String(open)} className="relative h-5">
 					<ProgressBar
 						ref={progress.barRef}
+						// design-escape-ok(opacity): no role renders this; bg-primary/50
 						baseClassName="bg-primary/50 opacity-35"
+						// design-escape-ok(opacity): no role renders this; bg-primary/50
 						fillClassName="bg-primary/50"
 						left={0}
 						width={(runMs / total) * 100}
@@ -298,7 +300,7 @@ export function SessionReaderWaterfallView({
 				<span
 					ref={cursorLabelRef}
 					style={{ display: "none" }}
-					// design-escape-ok: deliberate exception, a 10px label floating over the bars
+					// design-escape-ok(type): deliberate exception, a 10px label floating over the bars
 					className="pointer-events-none absolute top-0 z-10 corner-xs border bg-canvas px-s py-xxs text-[10px] whitespace-nowrap text-ink-3 tabular-nums shadow-label"
 				/>
 			</div>
@@ -345,6 +347,7 @@ export function SessionReaderWaterfallView({
 										<div
 											ref={cursorRef}
 											style={{ display: "none" }}
+											// design-escape-ok(opacity): no role renders this; bg-ink/25
 											className="absolute inset-y-0 w-px bg-ink/25"
 										/>
 									</div>
@@ -371,8 +374,8 @@ export function SessionReaderWaterfallView({
 												/>
 											))}
 											{bare ? (
-												// design-escape-ok: deliberate exception, 9/12 ruler ticks
-												<div className="absolute inset-x-0 top-0 flex justify-between px-xs text-[9px] leading-3 text-ink-3/70 tabular-nums">
+												// design-escape-ok(type): deliberate exception, 9/12 ruler ticks
+												<div className="absolute inset-x-0 top-0 flex justify-between px-xs text-[9px] leading-3 text-ink-disabled tabular-nums">
 													<span>0s</span>
 													<span>{formatWholeDuration(total)}</span>
 												</div>

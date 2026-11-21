@@ -25,6 +25,7 @@ export function PickStrip({
 				"flex h-8 shrink-0 items-center gap-s",
 				"corner-s pr-xs",
 				"text-body-m",
+				// design-escape-ok(opacity): no role renders this; bg-field/50
 				"bg-field/50",
 				untitled && !run && !agent ? "w-max min-w-full pl-xs" : "pl-m",
 			)}

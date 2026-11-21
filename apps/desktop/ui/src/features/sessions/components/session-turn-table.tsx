@@ -233,7 +233,7 @@ function SessionTurnTableViewedRowsButton({
 					? `Scroll ${direction === "above" ? "up" : "down"} to visible transcript rows`
 					: "Scroll to visible transcript rows"
 			}
-			className="group absolute left-2 z-30 flex size-6 items-center justify-center corner-full bg-surface opacity-100 shadow-jump outline-none data-[direction=above]:top-16 data-[direction=below]:bottom-11 data-[direction=none]:pointer-events-none data-[direction=none]:opacity-0"
+			className="group absolute left-2 z-30 flex size-6 items-center justify-center corner-full bg-surface opacity-100 shadow-jump focus-outline data-[direction=above]:top-16 data-[direction=below]:bottom-11 data-[direction=none]:pointer-events-none data-[direction=none]:opacity-0"
 			data-direction={direction ?? "none"}
 			disabled={direction === undefined}
 			onClick={scrollToViewedRows}
@@ -241,11 +241,11 @@ function SessionTurnTableViewedRowsButton({
 		>
 			<IconChevronUp
 				aria-hidden="true"
-				className="hidden size-4 shrink-0 stroke-color-1 group-data-[direction=above]:block"
+				className="hidden size-4 shrink-0 stroke-accent group-data-[direction=above]:block"
 			/>
 			<IconChevronDown
 				aria-hidden="true"
-				className="hidden size-4 shrink-0 stroke-color-1 group-data-[direction=below]:block"
+				className="hidden size-4 shrink-0 stroke-accent group-data-[direction=below]:block"
 			/>
 			<TouchTarget />
 		</button>

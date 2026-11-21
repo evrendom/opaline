@@ -287,18 +287,18 @@ function ReadRuler({
 			title={title}
 			className="flex w-10 shrink-0 flex-col items-end gap-xxs"
 		>
-			{/* design-escape-ok: a one-line count beside a glyph */}
-			<span className="text-body-xs leading-none text-ink-3/70 tabular-nums">
+			<span className="text-body-xs line-solid text-ink-disabled tabular-nums">
 				{count === null
 					? "all lines"
 					: `${count.toLocaleString()} ${count === 1 ? "line" : "lines"}`}
 			</span>
-			<span className="relative h-1 w-full overflow-hidden corner-full bg-ink-3/15">
+			<span className="relative h-1 w-full overflow-hidden corner-full bg-hover-strong">
 				{ranges.map((range) => {
 					const to = range.to ?? total;
 					return (
 						<span
 							key={`${range.from}-${range.to}`}
+							// design-escape-ok(opacity): no role renders this; bg-ink-3/55
 							className="absolute inset-y-0 min-w-0.5 corner-full bg-ink-3/55"
 							style={{
 								left: share(range.from - 1),
@@ -319,11 +319,12 @@ function RepoRow({ root }: { root: string }) {
 				"flex h-6 items-center gap-s",
 				"px-m pt-xs",
 				"text-body-s font-medium",
-				"text-ink-3/70",
+				"text-ink-disabled",
 			)}
 		>
 			<IconFolderOpenFilled
 				aria-hidden="true"
+				// design-escape-ok(opacity): no role renders this; text-ink-3/40
 				className="size-3 shrink-0 text-ink-3/40"
 			/>
 			<span className="min-w-0 truncate">{root.split("/").at(-1)}</span>
@@ -360,15 +361,17 @@ function FolderRow({
 				"flex min-h-6 items-start gap-s",
 				"pt-s pr-m pb-xxs",
 				"text-body-s",
-				"text-ink-3/70",
+				"text-ink-disabled",
 				inRepo ? "pl-xxl" : "pl-m",
 			)}
 		>
 			<IconFolderOpenFilled
 				aria-hidden="true"
+				// design-escape-ok(opacity): no role renders this; text-ink-3/40
 				className="mt-xxs size-3 shrink-0 text-ink-3/40"
 			/>
 			<span className="min-w-0 [overflow-wrap:anywhere]">
+				{/* design-escape-ok(opacity): no role renders this; text-ink-3/40 */}
 				{same ? <span className="text-ink-3/40">{`${same} / `}</span> : null}
 				{fresh}
 			</span>
@@ -422,6 +425,7 @@ function StepRow({
 					"before:absolute before:inset-x-0 before:inset-y-px before:-z-10 before:corner-s before:transition-colors",
 					depth === 1 && "pl-xxl",
 					depth === 2 && "pl-[calc(var(--space-xxl)*4/3)]",
+					// design-escape-ok(opacity): no role renders this; hover:before:bg-hover/50
 					selected ? "before:bg-field" : "hover:before:bg-hover/50",
 					step.failed
 						? "text-error"
@@ -436,8 +440,9 @@ function StepRow({
 						"size-3 shrink-0",
 						step.kind === "check" &&
 							!step.failed &&
-							// design-escape-ok: deliberate exception, dark lifts a passed check to green-400 for contrast; dark's success is emerald-500, a visibly different green
+							// design-escape-ok(colour): deliberate exception, dark lifts a passed check to green-400 for contrast; dark's success is emerald-500, a visibly different green
 							"text-success dark:text-green-400",
+						// design-escape-ok(base): a category colour from the opal sheen (data paint)
 						step.kind === "edit" && "text-color-3",
 						!failedCheck &&
 							step.kind !== "check" &&
@@ -450,6 +455,7 @@ function StepRow({
 						aria-hidden="true"
 						className={cn(
 							"size-3.5 shrink-0 transition-colors",
+							// design-escape-ok(opacity): no role renders this; text-ink-3/50
 							selected ? "text-ink" : "text-ink-3/50",
 						)}
 					/>
@@ -477,11 +483,11 @@ function StepRow({
 				) : null}
 				{edit ? (
 					<span className="shrink-0 text-body-s tabular-nums">
-						{/* design-escape-ok: diff paint: added lines */}
+						{/* design-escape-ok(colour): diff paint: added lines */}
 						<span className="text-success dark:text-green-400">
 							+{edit.added}
 						</span>{" "}
-						{/* design-escape-ok: diff paint: removed lines */}
+						{/* design-escape-ok(colour): diff paint: removed lines */}
 						<span className="text-error dark:text-red-400">
 							−{edit.removed}
 						</span>

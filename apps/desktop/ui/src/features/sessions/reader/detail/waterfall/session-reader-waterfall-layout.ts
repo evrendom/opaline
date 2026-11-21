@@ -6,7 +6,7 @@ export const INDENT =
 	"pl-[calc(var(--depth)*var(--space-m)+var(--space-xs))] @lg:pl-[calc(var(--depth)*var(--space-l)+var(--space-xs))]";
 
 export const MESSAGE_INDENT =
-	// design-escape-ok: 1px puts the rail on its parent's hairline
+	// design-escape-ok(space): 1px puts the rail on its parent's hairline
 	"ml-[calc(var(--depth)*8px+1px)] @lg:ml-[calc(var(--depth)*12px+1px)]";
 
 export const GRID =
@@ -24,8 +24,9 @@ export const ROW =
 
 export function rowState(selected: boolean): string {
 	return selected
-		? "bg-hover dark:bg-hover/70"
-		: "hover:bg-hover/80 dark:hover:bg-hover/50";
+		? "bg-hover dark:bg-hover"
+		: // design-escape-ok(opacity): no role renders this; dark:hover:bg-hover/50
+			"hover:bg-hover dark:hover:bg-hover/50";
 }
 
 export function barGeometry(

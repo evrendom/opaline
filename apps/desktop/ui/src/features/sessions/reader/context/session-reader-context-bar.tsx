@@ -87,6 +87,7 @@ export function tileLook(
 	if (kind === "free")
 		return {
 			className:
+				// design-escape-ok(opacity): no role renders this; dark:border-ink/16
 				"border-dashed border-line-soft text-ink-3 bg-[repeating-linear-gradient(135deg,transparent_0_6px,color-mix(in_srgb,var(--ink)_3.5%,transparent)_6px_7px)] dark:border-ink/16 dark:bg-[repeating-linear-gradient(135deg,transparent_0_6px,color-mix(in_srgb,var(--ink)_5%,transparent)_6px_7px)]",
 		};
 	if (strong)
@@ -110,10 +111,7 @@ export function ContextMark({ className }: { className?: string }) {
 			viewBox="0 0 16 16"
 			fill="none"
 			aria-hidden="true"
-			className={cn(
-				"shrink-0 text-color-1-translucent dark:text-color-1",
-				className,
-			)}
+			className={cn("shrink-0 text-accent-line dark:text-accent", className)}
 		>
 			<rect
 				x="1.8"
@@ -229,7 +227,8 @@ export function ContextBar({
 										? "bg-error-tint text-error"
 										: warns && share >= CONTEXT_WARN
 											? "bg-warning-tint text-warning"
-											: "bg-wash text-ink-3 dark:bg-ink/8",
+											: // design-escape-ok(opacity): no role renders this; dark:bg-ink/8
+												"bg-wash text-ink-3 dark:bg-ink/8",
 								)}
 							>
 								{share}%
@@ -293,6 +292,7 @@ function MeasureToggle({
 	onMeasure: (measure: ContextMeasure) => void;
 }) {
 	return (
+		// design-escape-ok(opacity): no role renders this; dark:bg-ink/6
 		<fieldset className="m-zero flex shrink-0 items-center gap-xxs corner-m edge-none bg-wash p-xxs corner-squircle squircle:corner-xl dark:bg-ink/6">
 			<legend className="sr-only">Measure the map by</legend>
 			{MEASURES.map((each) => {
@@ -318,7 +318,8 @@ function MeasureToggle({
 							"disabled:cursor-default disabled:opacity-40 squircle:corner-l",
 							pressed
 								? cn("bg-card font-medium", PILL_SHADOW)
-								: "text-ink-3 hover:text-ink/88 dark:hover:text-ink",
+								: // design-escape-ok(opacity): no role renders this; hover:text-ink/88
+									"text-ink-3 hover:text-ink/88 dark:hover:text-ink",
 						)}
 					>
 						{MEASURE_LOOK[each].label}

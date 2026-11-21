@@ -64,6 +64,7 @@ export function SessionOverviewSubagentCountTag({
 			className={cn(
 				SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME,
 				SESSION_OVERVIEW_ICON_TAG_CLASS_NAME,
+				// design-escape-ok(base): the subagent tag keeps its opal-5 category tint
 				"shrink-0 bg-color-5-translucent text-error dark:bg-color-5-transparent dark:text-color-5",
 			)}
 			data-session-overview-subagent-count={count}

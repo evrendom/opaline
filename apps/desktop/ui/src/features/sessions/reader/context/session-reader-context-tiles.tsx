@@ -334,9 +334,9 @@ export function ContextTiles({
 							its && !markedInside && !focused && markGlow(its.tone),
 							focused &&
 								(tile.part
-									? // design-escape-ok: the focused tile's glow is tinted from its category
+									? // design-escape-ok(shadow): the focused tile's glow is tinted from its category
 										"bg-[color-mix(in_oklab,var(--tint)_34%,transparent)] shadow-[0_2px_10px_-2px_color-mix(in_oklab,var(--tint)_45%,transparent)] dark:bg-[color-mix(in_oklab,var(--tint)_40%,transparent)] dark:shadow-[0_2px_12px_-2px_color-mix(in_oklab,var(--tint)_55%,transparent)]"
-									: // design-escape-ok: the focused untinted tile's lift pairs with the tinted tiles' glow
+									: // design-escape-ok(shadow,opacity): the focused untinted tile's lift pairs with the tinted tiles' glow
 										"bg-wash shadow-[0_2px_10px_-2px_rgba(0,0,0,0.2)] dark:bg-ink/6 dark:shadow-[0_2px_12px_-2px_rgba(0,0,0,0.6)]"),
 						)}
 						style={{
@@ -353,7 +353,7 @@ export function ContextTiles({
 							aria-pressed={tile.key === picked}
 							aria-label={`Show what's in ${name}`}
 							onClick={(event) => pickBox(tile.key, event.shiftKey)}
-							className="absolute inset-0 corner-s-inset corner-squircle outline-none transition-colors hover:bg-ink/3 squircle:corner-xl-inset dark:hover:bg-ink/4"
+							className="absolute inset-0 corner-s-inset corner-squircle outline-none transition-colors hover:bg-hover squircle:corner-xl-inset dark:hover:bg-hover"
 						/>
 						<span
 							aria-hidden="true"

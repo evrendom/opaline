@@ -32,7 +32,7 @@ export function SessionTurnTableSortableHeader({
 			className={cn(
 				"relative flex h-full w-full min-w-0 items-center gap-xs",
 				"text-left text-body-m font-medium whitespace-nowrap",
-				"text-ink-3 outline-none",
+				"text-ink-3 focus-outline",
 				"focus-visible:z-10",
 				columnIndex === 0 ? "pr-s pl-l" : "px-s",
 				className,

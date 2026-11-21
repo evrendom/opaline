@@ -104,7 +104,7 @@ function SetupRow({
 					"corner-s px-m py-xs",
 					"text-left text-body-l",
 					"outline-none",
-					"hover:bg-hover/60",
+					"hover:bg-hover",
 				)}
 			>
 				<SetupMark file={file} />
