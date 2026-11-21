@@ -143,6 +143,9 @@ const PASSTHROUGH_ENV = [
 	"XDG_CONFIG_HOME",
 	"CLAUDE_CONFIG_DIR",
 	"CODEX_HOME",
+	// Where the retired CLI kept its sign-in, so the app can remove it.
+	"OPALINE_CONFIG_DIR",
+	"RUDEL_CONFIG_DIR",
 	"HTTP_PROXY",
 	"HTTPS_PROXY",
 	"NO_PROXY",

@@ -9,8 +9,8 @@ import { SidebarInset, SidebarProvider } from "@/app/ui/sidebar";
 import { TooltipProvider } from "@/app/ui/tooltip";
 import "@/features/dashboard/dashboard-theme.css";
 import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
-import { CliUpdateNotice } from "@/features/cli-update/CliUpdateNotice";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
+import { RetiredCliBanner } from "@/features/retired-cli/RetiredCliBanner";
 import { ServiceStatusBanner } from "@/features/service-status/ServiceStatusBanner";
 import "./product-window-chrome.css";
 import "./welcome-shell.css";
@@ -146,7 +146,10 @@ export function LeftSidebarAppShellLayout() {
 	const shellWindowContent = (
 		<>
 			{import.meta.env.MODE !== "plugin" && !demo && !isWelcome ? (
-				<ServiceStatusBanner />
+				<>
+					<ServiceStatusBanner />
+					<RetiredCliBanner />
+				</>
 			) : null}
 			{isHomeWorkspaceRoute ? null : (
 				<SiteHeader
@@ -184,9 +187,6 @@ export function LeftSidebarAppShellLayout() {
 					</div>
 				</div>
 			</div>
-			{import.meta.env.MODE !== "plugin" && !demo && !isWelcome ? (
-				<CliUpdateNotice />
-			) : null}
 		</>
 	);
 
