@@ -658,7 +658,7 @@
 		padding: var(--sheet-card) 14px var(--space-l);
 		border-radius: var(--radius-xl);
 		background: var(--card);
-		box-shadow: var(--shadow-overlay);
+		box-shadow: var(--shadow-card);
 		animation: cost-metric-sheet-in var(--motion-medium-duration)
 			var(--motion-easing);
 	}

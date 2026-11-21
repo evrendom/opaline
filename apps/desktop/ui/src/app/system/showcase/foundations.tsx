@@ -93,22 +93,16 @@ const CORNERS = [
 	["full", "corner-full"],
 ] as const;
 const SHADOWS = [
-	["card", "cards, panels"],
-	["control", "outline and toolbar buttons"],
-	["raised", "a pressed or active toolbar pill"],
-	["overlay", "the dashboard's floating chart card"],
-	["primary", "the primary button"],
-	["destructive", "the destructive button"],
-	["chip", "reader chips, context tiles"],
-	["selected", "the selected rail row"],
+	["card", "cards, panels, menus, popovers, dialogs, tooltips"],
+	[
+		"control",
+		"buttons (filled, outline, toolbar, destructive), inputs, checkbox",
+	],
+	["raised", "a pressed toolbar pill, a picked row"],
+	["chip", "reader chips, context tiles, the compass lens"],
 	["inset", "summary figure cards"],
-	["label", "the sidebar rail label"],
-	["float", "turn table view tabs"],
-	["sheet", "the mobile sidebar sheet"],
-	["contact", "the checkbox"],
-	["jump", "the turn table's jump button"],
-	["flyout", "the activity strip flyout"],
-	["window", "compass run lanes"],
+	["label", "the sidebar rail label, the jump-to-latest button"],
+	["float", "turn table view tabs, sheets, the activity flyout"],
 ] as const;
 const DURATIONS = [
 	["quick 100ms", "--motion-quick-duration", "menu rows, hover tints"],

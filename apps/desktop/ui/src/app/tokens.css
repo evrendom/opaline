@@ -52,7 +52,6 @@
 	--accent-line: var(--color-1-translucent);
 	--accent-fg: #ffffff; /* text and icons on an accent fill, white in both modes */
 	--success-tint: var(--success-transparent);
-	--success-line: var(--success-translucent);
 	--warning-tint: var(--warning-transparent);
 	--warning-line: var(--warning-translucent);
 	--error-tint: var(--error-transparent);
@@ -73,24 +72,10 @@
 	--shadow-raised:
 		0 0 0 0.5px rgb(0 0 0 / 0.08), 0 0.5px 2px -0.5px rgb(0 0 0 / 0.08),
 		0 2px 4px 0 rgb(0 0 0 / 0.05);
-	--shadow-overlay:
-		0 0 0 0.5px rgb(0 0 0 / 0.08), 0 1px 2px -0.5px rgb(0 0 0 / 0.06),
-		0 6px 12px -4px rgb(0 0 0 / 0.1), 0 16px 32px -8px rgb(0 0 0 / 0.16);
-	--shadow-primary:
-		0 0 0 0.5px rgb(0 0 0 / 0.6), 0 0.5px 2px -0.5px rgb(0 0 0 / 0.4),
-		0 2px 4px 0 rgb(0 0 0 / 0.18);
-	--shadow-destructive:
-		0 0 0 0.5px color-mix(in srgb, var(--error) 25%, transparent),
-		0 0.5px 2px -0.5px color-mix(in srgb, var(--error) 18%, transparent),
-		0 2px 4px 0 color-mix(in srgb, var(--error) 12%, transparent);
 	/* chips, tags and pills, and the reader's light cards */
 	--shadow-chip:
 		0 0 0 0.5px rgb(0 0 0 / 0.06), 0 1px 1px -1px rgb(0 0 0 / 0.1),
 		0 1px 2px 0 rgb(0 0 0 / 0.05);
-	/* a picked row lifted off its shelf (the reader rails) */
-	--shadow-selected:
-		0 0 0 0.5px rgb(0 0 0 / 0.08), 0 1px 2px -0.5px rgb(0 0 0 / 0.1),
-		0 2px 6px -2px rgb(0 0 0 / 0.12);
 	/* the inner hairline of a recessed shelf or well */
 	--shadow-inset: inset 0 0 0 0.5px rgb(0 0 0 / 0.06);
 	/* a small label floating over content: a scrub readout, a sticky hint */
@@ -99,17 +84,6 @@
 	   toast. Its edge is a ring at the call site; dark keeps only the ring. */
 	--shadow-float:
 		0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-	/* a sheet sliding over the window from an edge */
-	--shadow-sheet:
-		0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-	/* the contact shadow under a small box control: checkbox */
-	--shadow-contact: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-	/* a small round button floating over a scrolling list (jump to the
-	   latest turn): a tight drop; dark trades it for a faint ink ring */
-	--shadow-jump: 0 2px 6px rgb(0 0 0 / 0.14);
-	/* a translucent flyout dropping from a strip (the activity strip's menu):
-	   one wide, faint drop; dark deepens it to the full near-black */
-	--shadow-flyout: 0 8px 32px rgb(8 9 10 / 0.05);
 
 	/* -- Motion. The theme holds two timings: --motion-duration (150ms) and
 	   --motion-easing for small changes, --motion-large-duration (300ms) and
@@ -142,34 +116,19 @@
 	/* -- Third-party names (shadcn registry code, the sidebar primitive).
 	   Our code reads the roles above; these exist for code we don't own. */
 	--background: var(--canvas);
-	--foreground: var(--ink);
-	--card-foreground: var(--ink);
-	--popover: var(--surface);
-	--popover-foreground: var(--ink);
-	--primary-foreground: var(--primary-fg);
 	--secondary: var(--field);
-	--secondary-foreground: var(--ink);
-	--muted: var(--field);
-	--muted-foreground: var(--ink-3);
-	--accent-foreground: var(--ink);
 	--destructive: var(--error);
-	--destructive-foreground: var(--on-error);
-	--border: var(--line-strong);
 	--input: var(--line-strong);
 	--ring: var(--focus);
 	--radius: var(
 		--radius-m
 	); /* shadcn's base radius; its sm…4xl multiples scale from it */
-	--scrollbar-thumb: var(--line);
-	/* --- roles added by reader --- */
 	--mark-fill: var(
 		--wash
 	); /* model marks, run tags and placeholder bars; firmer in dark */
 	--ink-soft: var(--ink-2); /* secondary icons that quiet to ink-3 in dark */
 	--ink-meta: var(--ink-3); /* the activity panels' meta; opal-tinted in dark */
-	/* --- end reader --- */
 
-	/* --- roles added by product --- */
 	/* a card that sits on a recessed ground (a tab track's active pill, a
 	   toolbar flag button, the reader's picked row); dark softens it to a
 	   translucent ink wash instead of the solid surface */
@@ -181,13 +140,6 @@
 	--shelf: var(--field);
 	/* a faint edge ringing a small avatar or logo on any ground */
 	--line-faint: color-mix(in oklab, var(--ink) 5%, transparent);
-	/* text and counts on an accent fill: white in both modes */
-	/* a window or lens floating over a chart: a 1px ring and a soft drop;
-	   dark keeps only the ring */
-	--shadow-window:
-		0 0 0 1px color-mix(in oklab, var(--neutral-10) 10%, transparent),
-		0 1px 2px rgb(0 0 0 / 0.06), 0 2px 8px -2px rgb(0 0 0 / 0.08);
-	/* --- end product --- */
 }
 
 .dark {
@@ -206,37 +158,17 @@
 	--shadow-raised:
 		inset 0 0.5px 0 0 rgb(255 255 255 / 0.04),
 		0 0 0 0.5px rgb(255 255 255 / 0.08), 0 0.5px 2px 0 rgb(0 0 0 / 0.25);
-	--shadow-overlay:
-		inset 0 0.75px 0 0 rgb(255 255 255 / 0.06),
-		inset 0 0 0 0.75px rgb(255 255 255 / 0.05), 0 0 0 0.75px rgb(0 0 0 / 0.3),
-		0 4px 8px 0 rgb(0 0 0 / 0.25), 0 12px 24px 0 rgb(0 0 0 / 0.35),
-		0 24px 48px -8px rgb(0 0 0 / 0.4);
-	--shadow-primary:
-		inset 0 0.5px 0 0 rgb(255 255 255 / 0.45),
-		0 0 0 0.5px rgb(255 255 255 / 0.55), 0 0.5px 2px 0 rgb(0 0 0 / 0.5);
-	--shadow-destructive:
-		inset 0 0.5px 0 0 color-mix(in srgb, var(--error) 3%, transparent),
-		0 0 0 0.5px color-mix(in srgb, var(--error) 18%, transparent),
-		0 0.5px 2px 0 color-mix(in srgb, var(--error) 10%, transparent);
 	--shadow-chip: 0 0 0 0.5px rgb(255 255 255 / 0.1);
-	--shadow-selected: var(--shadow-card);
 	--shadow-inset: inset 0 0 0 0.5px rgb(255 255 255 / 0.06);
 	--shadow-float: 0 0 #0000;
-	--shadow-jump: 0 0 0 1px color-mix(in oklab, var(--ink) 10%, transparent);
-	--shadow-flyout: 0 8px 32px rgb(8 9 10);
-	/* --- roles added by reader --- */
 	--mark-fill: var(--hover-strong);
 	--ink-soft: var(--ink-3);
 	--ink-meta: var(--color-1-translucent);
-	/* --- end reader --- */
 
-	/* --- roles added by product --- */
 	--card-soft: color-mix(in oklab, var(--ink-3) 10%, transparent);
 	--track: color-mix(in oklab, var(--field) 50%, transparent);
 	--shelf: var(--card);
 	--line-faint: color-mix(in oklab, var(--ink) 10%, transparent);
-	--shadow-window: 0 0 0 1px rgb(255 255 255 / 0.15);
-	/* --- end product --- */
 }
 
 /* Layer 2 as Tailwind colours: `bg-surface`, `text-ink-3`, `border-line`. */
@@ -258,7 +190,6 @@
 	--color-line-strong: var(--line-strong);
 	--color-line-soft: var(--line-soft);
 	--color-primary: var(--primary);
-	--color-primary-hover: var(--primary-hover);
 	--color-primary-fg: var(--primary-fg);
 	--color-focus: var(--focus);
 	--color-focus-ring: var(--focus-ring);
@@ -267,23 +198,18 @@
 	--color-accent-line: var(--accent-line);
 	--color-accent-fg: var(--accent-fg);
 	--color-success-tint: var(--success-tint);
-	--color-success-line: var(--success-line);
 	--color-warning-tint: var(--warning-tint);
 	--color-warning-line: var(--warning-line);
 	--color-error-tint: var(--error-tint);
 	--color-error-line: var(--error-line);
-	/* --- roles added by reader --- */
 	--color-mark-fill: var(--mark-fill);
 	--color-ink-soft: var(--ink-soft);
 	--color-ink-meta: var(--ink-meta);
-	/* --- end reader --- */
 
-	/* --- roles added by product --- */
 	--color-card-soft: var(--card-soft);
 	--color-track: var(--track);
 	--color-shelf: var(--shelf);
 	--color-line-faint: var(--line-faint);
-	/* --- end product --- */
 }
 
 /* Layer 2 elevation as Tailwind shadows: `shadow-card`, `shadow-control`,
@@ -294,21 +220,10 @@
 	--shadow-card: var(--shadow-card);
 	--shadow-control: var(--shadow-control);
 	--shadow-raised: var(--shadow-raised);
-	--shadow-overlay: var(--shadow-overlay);
-	--shadow-primary: var(--shadow-primary);
-	--shadow-destructive: var(--shadow-destructive);
 	--shadow-chip: var(--shadow-chip);
-	--shadow-selected: var(--shadow-selected);
 	--shadow-inset: var(--shadow-inset);
 	--shadow-label: var(--shadow-label);
 	--shadow-float: var(--shadow-float);
-	--shadow-sheet: var(--shadow-sheet);
-	--shadow-contact: var(--shadow-contact);
-	--shadow-jump: var(--shadow-jump);
-	--shadow-flyout: var(--shadow-flyout);
-	/* --- roles added by product --- */
-	--shadow-window: var(--shadow-window);
-	/* --- end product --- */
 }
 
 /* Inset corners: a child drawn 1px inside a surface keeps its corners

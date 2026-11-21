@@ -536,7 +536,7 @@ export function SessionDetailActivityStrip({
 				{flyoutsEnabled && panelFrames.length > 0 ? (
 					<div
 						// design-escape-ok(opacity): a translucent flyout over backdrop blur; no translucent ground role (also text-ink/90, ring-ink/8)
-						className="session-detail-opaline-menu absolute top-[calc(100%+1px)] right-0 left-0 overflow-hidden corner-l bg-canvas/90 text-ink/90 shadow-flyout ring-1 ring-ink/8 backdrop-blur-2xl outline-none dark:text-ink"
+						className="session-detail-opaline-menu absolute top-[calc(100%+1px)] right-0 left-0 overflow-hidden corner-l bg-canvas/90 text-ink/90 shadow-float ring-1 ring-ink/8 backdrop-blur-2xl outline-none dark:text-ink"
 						data-state={popupState}
 						onPointerEnter={() => clearTimer(closeTimerRef.current)}
 						onPointerLeave={scheduleClose}

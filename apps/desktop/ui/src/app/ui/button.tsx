@@ -17,7 +17,7 @@ const buttonVariants = cva(
 				// role holds a per-mode opacity, so the step stays a dark: pair.
 				default:
 					// design-escape-ok(opacity): no role renders this; primary/80 and /90 hover
-					"bg-primary shadow-primary text-primary-fg hover:bg-primary/80 dark:hover:bg-primary/90 [&_svg:not([class*='text-'])]:text-ink-disabled",
+					"bg-primary shadow-control text-primary-fg hover:bg-primary/80 dark:hover:bg-primary/90 [&_svg:not([class*='text-'])]:text-ink-disabled",
 				outline:
 					"shadow-control bg-card hover:bg-hover hover:text-ink aria-expanded:bg-hover aria-expanded:text-ink [&_svg:not([class*='text-'])]:text-ink-3",
 				ghost:
@@ -26,7 +26,7 @@ const buttonVariants = cva(
 				// error-tint is 11/17%, so the fill keeps its own dark: steps.
 				destructive:
 					// design-escape-ok(opacity): no role renders this; error/10–/30 fills
-					"bg-error/10 shadow-destructive text-error hover:bg-error/20 dark:bg-error/20 dark:hover:bg-error/30",
+					"bg-error/10 shadow-control text-error hover:bg-error/20 dark:bg-error/20 dark:hover:bg-error/30",
 				// Underline stays rendered but transparent at rest, fading its opacity
 				// in on hover — the base `transition-all` animates the decoration color.
 				// design-escape-ok(opacity): no role renders this; ink/20 underline at rest
