@@ -83,7 +83,8 @@ export function ToolbarSortMenu<K extends string>({
 			>
 				<IconSortDescending
 					aria-hidden="true"
-					className="size-4 h-lh shrink-0 text-ink-soft"
+					// design-escape-ok(colour): shipped value; #5d5d5d (#acaeb2 in dark)
+					className="size-4 h-lh shrink-0 text-[#5d5d5d] dark:text-[#acaeb2]"
 				/>
 				{/* design-escape-ok(colour): shipped value; black/63 (white/65 in dark) */}
 				<span className="text-black/63 dark:text-white/65">Sorted by</span>

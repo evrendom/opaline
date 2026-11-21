@@ -77,7 +77,7 @@ export function HighlightedCode({
 			className={cn(
 				"overflow-hidden [overflow-wrap:anywhere]",
 				"corner-s py-m",
-				"font-mono text-body-m whitespace-pre-wrap",
+				"font-mono text-body-m whitespace-pre-wrap [line-height:var(--line-l)]",
 				"bg-field",
 				className,
 			)}
