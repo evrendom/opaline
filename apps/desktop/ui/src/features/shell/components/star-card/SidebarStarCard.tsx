@@ -77,7 +77,7 @@ function StarCard({
 		<div className="star-card-dock">
 			<section
 				ref={cardRef}
-				className="star-card rounded-[14px] squircle:rounded-[22px] corner-squircle"
+				className="star-card corner-l squircle:corner-xl corner-squircle"
 				aria-label="Star Opaline"
 			>
 				<span className="star-card-beam is-glow" aria-hidden="true" />

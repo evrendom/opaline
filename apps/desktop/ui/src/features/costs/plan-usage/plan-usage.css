@@ -96,7 +96,7 @@
 .plan-usage-preview-label {
 	position: absolute;
 	color: var(--cost-muted);
-	font-size: 11px;
+	font-size: var(--size-s);
 	line-height: 1;
 	white-space: nowrap;
 }
