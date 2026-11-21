@@ -42,7 +42,7 @@ Launch Opaline and it starts its bundled local stack automatically, imports exis
   </picture>
 </p>
 
-On macOS, the Dock icon shows how much of your weekly Claude Code or Codex limit is left. Right-click it for each agent's number, its reset time, and which one the icon shows.
+On macOS, once you connect Claude Code or Codex (**Connect your agents** in the app), the Dock icon shows how much of that agent's weekly limit is left. Right-click it for each agent's number, its reset time, and which one the icon shows.
 
 ## Features
 
@@ -101,7 +101,7 @@ Everything runs inside one local bundle. There is no cloud service, no telemetry
 </p>
 
 - **Code layout:** `apps/desktop/shell` (Electron + runtime manager), `apps/desktop/ui` (React + Vite), `apps/desktop/server` (Bun + oRPC + MCP), `packages/ch-schema` & `packages/sql-schema` (database schemas), `plugin/` (agent skill).
-- **Plan usage:** Opaline asks your installed CLIs for your plan's rate limits: `claude -p` with a `get_usage` control request, and `codex app-server` with `account/rateLimits/read`. It samples every 5 minutes while agents are running and every 30 minutes when idle, and the Dock icon shows 100 minus the weekly percent used.
+- **Plan usage:** Opaline asks your installed CLIs for your plan's rate limits: `claude -p` with a `get_usage` control request, and `codex app-server` with `account/rateLimits/read`. It checks every 30 minutes, or every 5 while a connected agent is working (the plugin's hooks tell it). The Dock icon shows the weekly percent left for agents you've connected with **Connect your agents**: Claude Code by default, or Codex or the average of both from its right-click menu.
 - **Local data:** Stored under `~/Library/Application Support/Opaline/server` on macOS or `~/.config/Opaline/server` on Linux.
 - **Privacy:** Transcripts may include source code, prompts, command output, and secrets. Opaline never sends them off your machine.
 

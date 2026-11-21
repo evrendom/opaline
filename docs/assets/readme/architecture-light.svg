@@ -228,11 +228,11 @@
   <text x="314" y="108" text-anchor="middle" fill="#525252" font-size="10.5" font-weight="500" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace">rate limits</text>
   <text x="314" y="129" text-anchor="middle" fill="#a1a1a1" font-size="10" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">every 5-30 min</text>
 
-  <!-- 3. Local Server <-> Agent CLIs (optional MCP) -->
-  <line x1="272" y1="146" x2="376" y2="146" stroke="#a1a1a1" stroke-width="1.25" stroke-dasharray="4 3" marker-start="url(#arr-soft-light)" marker-end="url(#arr-soft-light)" />
-  <path d="M 295 134 L 333 134 C 341.18 134 342 134.82 342 143 L 342 149 C 342 157.18 341.18 158 333 158 L 295 158 C 286.82 158 286 157.18 286 149 L 286 143 C 286 134.82 286.82 134 295 134 Z" fill="#ffffff" stroke="#e5e5e5" stroke-width="1" />
-  <text x="314" y="150" text-anchor="middle" fill="#737373" font-size="10.5" font-weight="500" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace">MCP</text>
-  <text x="314" y="171" text-anchor="middle" fill="#a1a1a1" font-size="10" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">optional retros</text>
+  <!-- 3. Agent CLIs <-> Local Server: plugin MCP and activity hooks, after Connect your agents -->
+  <line x1="257" y1="146" x2="376" y2="146" stroke="#a1a1a1" stroke-width="1.25" stroke-dasharray="4 3" marker-start="url(#arr-soft-light)" marker-end="url(#arr-soft-light)" />
+  <path d="M 281 134 L 351 134 C 359.18 134 360 134.82 360 143 L 360 149 C 360 157.18 359.18 158 351 158 L 281 158 C 272.82 158 272 157.18 272 149 L 272 143 C 272 134.82 272.82 134 281 134 Z" fill="#ffffff" stroke="#e5e5e5" stroke-width="1" />
+  <text x="314" y="150" text-anchor="middle" fill="#737373" font-size="10.5" font-weight="500" font-family="'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace">MCP · hooks</text>
+  <text x="314" y="171" text-anchor="middle" fill="#a1a1a1" font-size="10" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">Connect your agents</text>
 
   <!-- 4. Local Server <-> GitHub API (optional outbound HTTPS) -->
   <path d="M 420 166 L 420 176 Q 420 180 416 180 L 318 180 Q 314 180 314 184 L 314 371 Q 314 375 310 375 L 272 375" stroke="#a1a1a1" stroke-width="1.25" stroke-dasharray="4 3" marker-start="url(#arr-soft-light)" marker-end="url(#arr-soft-light)" />
