@@ -83,7 +83,7 @@ resources="$app/resources"
 dest="$resources/app"
 mkdir -p "$dest/local-server" "$resources/server" "$resources/runtimes"
 cp "$here/package.json" "$here/main.js" "$here/deep-link.js" "$here/agents.js" "$here/analyze.js" "$here/folder-access.js" "$here/pricing.js" "$here/updates.js" "$here/window-state.js" \
-	"$here/preload.js" "$here/onboarding-preload.js" "$here/environments.js" "$here/environment-preload.js" "$here/dock-usage.js" "$dest/"
+	"$here/preload.js" "$here/onboarding-preload.js" "$here/environments.js" "$here/environment-preload.js" "$here/dock-usage.js" "$here/star-prompt.js" "$dest/"
 cp -R "$here/stack" "$here/analysis" "$here/onboarding" "$here/onboarding-window" "$here/environment-window" "$here/start-window" "$dest/"
 mkdir -p "$dest/icon"
 cp "$here/icon/Opaline.png" "$dest/icon/"
