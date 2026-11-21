@@ -13,17 +13,17 @@
 	padding: 3px 10px;
 	white-space: nowrap;
 	border-radius: 7px;
-	color: var(--ink-3);
+	color: var(--cost-muted);
 	font-size: var(--size-l);
 	transition:
 		background-color var(--motion-duration) var(--motion-easing),
 		color var(--motion-duration) var(--motion-easing);
 }
 .cost-chart-kind > button:hover {
-	color: var(--ink);
+	color: var(--cost-foreground);
 }
 .cost-chart-kind > button[aria-pressed="true"] {
-	color: var(--ink);
+	color: var(--cost-foreground);
 	background: var(--hover);
 }
 
@@ -61,7 +61,7 @@
 	/* design-escape-ok(type): no role renders this; a 12px line in the 12px axis cell */
 	line-height: 12px;
 	font-weight: 500;
-	color: var(--ink-3);
+	color: var(--cost-muted);
 	white-space: nowrap;
 	font-variant-numeric: tabular-nums;
 }
@@ -70,7 +70,7 @@
 	left: var(--axis-at);
 }
 .cost-dot-axis > div[data-selected] {
-	color: var(--ink);
+	color: var(--cost-foreground);
 }
 .cost-dot-axis > div {
 	transition: filter var(--motion-duration) var(--motion-easing);
@@ -176,7 +176,7 @@
 	transform: scale(1.12);
 }
 .cost-dot[data-outside] {
-	--dot-fill: color-mix(in oklab, var(--ink-3) 60%, transparent);
+	--dot-fill: color-mix(in oklab, var(--cost-muted) 60%, transparent);
 }
 .cost-dot[data-outside]::before {
 	mask-image: var(--pebble-dotted, none);
@@ -201,13 +201,13 @@
 }
 .cost-dot-label {
 	font-size: var(--size-s);
-	color: var(--ink-3);
+	color: var(--cost-muted);
 	white-space: nowrap;
 }
 .cost-dot-halo {
 	position: absolute;
 	pointer-events: none;
-	background: color-mix(in oklab, var(--ink) 12%, transparent);
+	background: color-mix(in oklab, var(--cost-foreground) 12%, transparent);
 	mask:
 		linear-gradient(#000 0 0),
 		var(--pebble-fill) var(--halo-pad) var(--halo-pad) / var(--halo-size)
@@ -236,7 +236,7 @@ button.cost-dot-grid {
 .cost-dot-crosshair {
 	transition: opacity var(--motion-medium-duration) var(--motion-easing);
 	--cross-gap: 3px;
-	--cross-line: color-mix(in oklab, var(--ink) 22%, transparent);
+	--cross-line: color-mix(in oklab, var(--cost-foreground) 22%, transparent);
 	position: absolute;
 	inset: 0;
 	pointer-events: none;
@@ -254,10 +254,10 @@ button.cost-dot-grid {
 	top: calc(var(--cross-y) - var(--cross-gap));
 	width: calc(var(--cross-size) + 2 * var(--cross-gap));
 	height: calc(var(--cross-size) + 2 * var(--cross-gap));
-	color: var(--ink);
+	color: var(--cost-foreground);
 }
 .cost-dot-crosshair[data-tone="hover"] > [data-part="ring"] {
-	color: color-mix(in oklab, var(--ink) 55%, transparent);
+	color: color-mix(in oklab, var(--cost-foreground) 55%, transparent);
 }
 .cost-dot-crosshair > [data-part="ring"] > svg {
 	display: block;

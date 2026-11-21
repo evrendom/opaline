@@ -132,6 +132,7 @@ export function McpPageView({
 							<Button
 								type="button"
 								size="sm"
+								className="h-8 gap-xs"
 								variant="outline"
 								onClick={() => setSearch("")}
 							>
@@ -167,7 +168,8 @@ export function McpCardsGrid({
 		<ScrollColumn className="min-w-0 overscroll-contain">
 			<ul
 				aria-label="MCP servers"
-				className="grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,13.5rem),1fr))] gap-xxl p-xl sm:p-xxl lg:p-xxl"
+				// design-escape-ok(space): shipped value; gap 20px, sm:p 20px
+				className="grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,13.5rem),1fr))] gap-[20px] p-xl sm:p-[20px] lg:p-xxl"
 			>
 				{servers.map((server) => (
 					<li key={server.file.setupFile} className="min-w-0">
@@ -222,19 +224,25 @@ function McpCard({
 							className="flex min-w-0 items-baseline gap-m"
 						>
 							<span
-								// design-escape-ok(opacity): no role renders this; ink/75
-								className="min-w-0 truncate text-ink/75"
+								// design-escape-ok(opacity): shipped value; dashboardy-heading/75
+								className="min-w-0 truncate text-dashboardy-heading/75"
 							>
 								{tool.name}
 							</span>
-							<span className="ml-auto shrink-0 text-body-m text-ink-3 tabular-nums">
+							<span
+								// design-escape-ok(colour): shipped value; dashboardy-subtle #98a2b3 / #77787e
+								className="ml-auto shrink-0 text-body-m text-[#98a2b3] tabular-nums dark:text-[#77787e]"
+							>
 								{tool.calls.toLocaleString()}
 							</span>
 						</li>
 					))}
 				</ul>
 			) : (
-				<p className="pt-s text-body-m text-ink-3">
+				<p
+					// design-escape-ok(type,colour): shipped value; 12px / 20px, dashboardy-subtle #98a2b3 / #77787e
+					className="pt-s text-xs leading-5 text-[#98a2b3] dark:text-[#77787e]"
+				>
 					Connected in {server.sessions.toLocaleString()}{" "}
 					{server.sessions === 1 ? "session" : "sessions"}, never called.
 				</p>

@@ -185,7 +185,7 @@ export function ReposOverview({
 						icon={IconBook}
 						title="Repos couldn’t be loaded"
 						description="Your historical sessions are still available. Try loading this view again."
-						action={<RetryButton onRetry={onRetry} />}
+						action={<RetryButton className="h-8 gap-xs" onRetry={onRetry} />}
 					/>
 				) : !isPending && (repos?.length ?? 0) === 0 ? (
 					<PageEmptyState
@@ -206,6 +206,7 @@ export function ReposOverview({
 							<Button
 								type="button"
 								size="sm"
+								className="h-8 gap-xs"
 								variant="outline"
 								onClick={() => {
 									setSearch("");
@@ -351,14 +352,14 @@ const RepoRow = memo(function RepoRow({
 					<div className="flex min-w-0 flex-1 flex-col gap-xxs">
 						<div className="flex min-w-0 items-center gap-m">
 							<p
-								className="min-w-0 truncate text-body-xl font-medium text-ink"
+								className="min-w-0 truncate text-body-xl font-medium text-session-overview-text"
 								title={identity.repoLabel}
 							>
 								{identity.repoLabel}
 							</p>
 							<RepoSignals repo={repo} />
 						</div>
-						<div className="flex min-w-0 items-center gap-s text-body-m text-ink-3">
+						<div className="flex min-w-0 items-center gap-s text-body-m text-session-overview-muted">
 							<OverviewMembers
 								avatarMap={avatarMap}
 								topUserIds={repo.topUsers.map((user) => user.userId)}
@@ -388,7 +389,7 @@ const RepoRow = memo(function RepoRow({
 				<div
 					className={cn(
 						OVERVIEW_METRIC_CELL_CLASS_NAME,
-						"font-medium text-ink",
+						"font-medium text-session-overview-text",
 					)}
 					title={
 						repo.estimatedCost === null
@@ -427,13 +428,17 @@ export function RepoSignals({ repo }: { repo: RepositorySummary }) {
 			count: repo.signals.userNegative,
 			label: "negative",
 			title: "Negative user signals",
-			color: "bg-error-tint text-error",
+			color:
+				// design-escape-ok(colour): shipped value; the negative chip's rose
+				"bg-[#ffe4e6] text-[#be123c] dark:bg-[#411b25] dark:text-[#fda4af]",
 		},
 		{
 			count: repo.signals.modelApologies,
 			label: "apologies",
 			title: "Model apologies",
-			color: "bg-warning-tint text-warning",
+			color:
+				// design-escape-ok(colour): shipped value; the apologies chip's amber
+				"bg-[#fef3c7] text-[#b45309] dark:bg-[#40321b] dark:text-[#fcd34d]",
 		},
 	].filter((signal) => signal.count > 0);
 	if (signals.length === 0) return null;

@@ -165,7 +165,7 @@ export function SkillsPageView({
 						icon={IconBook}
 						title="Skills couldn’t be loaded"
 						description="Your historical sessions are still available. Try loading this view again."
-						action={<RetryButton onRetry={onRetry} />}
+						action={<RetryButton className="h-8 gap-xs" onRetry={onRetry} />}
 					/>
 				) : !isPending && (skills?.length ?? 0) === 0 ? (
 					<PageEmptyState
@@ -186,6 +186,7 @@ export function SkillsPageView({
 							<Button
 								type="button"
 								size="sm"
+								className="h-8 gap-xs"
 								variant="outline"
 								onClick={() => {
 									setSearch("");

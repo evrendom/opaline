@@ -33,7 +33,8 @@ export function SkillCardsGrid({
 		<ScrollColumn className="min-w-0 overscroll-contain">
 			<ul
 				aria-label="Skills"
-				className="grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,13rem),1fr))] gap-xxl p-xl sm:p-xxl lg:p-xxl"
+				// design-escape-ok(space): shipped value; gap 20px, sm:p 20px
+				className="grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,13.5rem),1fr))] gap-[20px] p-xl sm:p-[20px] lg:p-xxl"
 			>
 				{skills.map((skill) => (
 					<li key={skill.name} className="min-w-0">
@@ -84,8 +85,8 @@ const SkillCard = memo(function SkillCard({
 		>
 			{description ? (
 				<p
-					// design-escape-ok(opacity): no role renders this; ink/75
-					className="pt-s text-body-l text-pretty text-ink/75"
+					// design-escape-ok(opacity): shipped value; dashboardy-heading/75
+					className="pt-s text-body-l text-pretty text-dashboardy-heading/75"
 				>
 					{description}
 				</p>
@@ -94,7 +95,10 @@ const SkillCard = memo(function SkillCard({
 					<RichSkillDocument content={skill.contentPreview} variant="preview" />
 				</div>
 			) : (
-				<p className="pt-s text-body-m text-ink-3">
+				<p
+					// design-escape-ok(type,colour): shipped value; 12px / 20px, dashboardy-subtle #98a2b3 / #77787e
+					className="pt-s text-xs leading-5 text-[#98a2b3] dark:text-[#77787e]"
+				>
 					No description was recovered for this skill.
 				</p>
 			)}
@@ -155,7 +159,10 @@ export function OverviewCard({
 						{pills}
 					</div>
 				</div>
-				<div className="relative -mt-xxl flex min-w-0 shrink-0 flex-col gap-m px-xl">
+				<div
+					// design-escape-ok(space): shipped value; -mt 20px
+					className="relative -mt-[20px] flex min-w-0 shrink-0 flex-col gap-m px-xl"
+				>
 					<span className="relative grid size-11 place-items-center">
 						<span
 							aria-hidden="true"
@@ -170,7 +177,8 @@ export function OverviewCard({
 						/>
 					</span>
 					<h2
-						className="min-w-0 truncate text-body-xxl font-heavy text-ink"
+						// design-escape-ok(type): shipped value; 17px / 24px, -0.015em
+						className="min-w-0 truncate text-[17px] leading-6 font-heavy tracking-[-0.015em] text-dashboardy-heading"
 						title={name}
 					>
 						{name}

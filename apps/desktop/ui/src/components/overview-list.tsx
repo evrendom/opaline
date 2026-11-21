@@ -24,8 +24,8 @@ import { cn } from "@/lib/utils";
 export const OVERVIEW_ROW_LEAD_CELL_CLASS_NAME =
 	"flex min-w-0 items-center gap-l pr-l pl-xxl";
 export const OVERVIEW_METRIC_CELL_CLASS_NAME =
-	"flex min-w-0 items-center justify-end px-l text-right text-body-m whitespace-nowrap tabular-nums text-ink-3";
-export const OVERVIEW_METRIC_UNIT_CLASS_NAME = "text-ink-3";
+	"flex min-w-0 items-center justify-end px-l text-right text-body-m whitespace-nowrap tabular-nums text-session-overview-muted";
+export const OVERVIEW_METRIC_UNIT_CLASS_NAME = "text-session-overview-subtle";
 export const OVERVIEW_ROW_CLASS_NAME =
 	"grid h-16 w-full text-left outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent";
 
@@ -129,7 +129,10 @@ function MemberAvatar({ avatarUrl }: { avatarUrl: string | undefined }) {
 				<AvatarImage alt="" src={avatarUrl} decoding="async" loading="lazy" />
 			) : null}
 			<AvatarFallback className="bg-hover">
-				<IconUser aria-hidden="true" className="size-2.5 shrink-0 text-ink-3" />
+				<IconUser
+					aria-hidden="true"
+					className="size-2.5 shrink-0 text-session-overview-muted"
+				/>
 			</AvatarFallback>
 		</Avatar>
 	);

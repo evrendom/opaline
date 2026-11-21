@@ -273,6 +273,7 @@ export function DesktopRepositoryPicker({
 				<Button
 					type="button"
 					size="sm"
+					className="h-8 gap-xs"
 					disabled={!canSubmit}
 					onClick={() => void submit()}
 				>

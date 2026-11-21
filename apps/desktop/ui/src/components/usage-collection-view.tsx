@@ -57,7 +57,7 @@ const USAGE_GRID_CLASS_NAME =
 	"grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,13.5rem),1fr))] gap-xl px-xl pt-xs pb-xxl sm:px-[calc(var(--space-xxl)*4/3)]";
 // Card: a squircle on its soft hairline shadow, no border.
 const USAGE_CARD_CLASS_NAME =
-	"relative flex h-full w-full min-w-0 flex-col overflow-hidden corner-m bg-card text-left text-ink shadow-card squircle:corner-xl corner-squircle";
+	"relative flex h-full w-full min-w-0 flex-col overflow-hidden corner-m bg-card text-left text-session-overview-text shadow-card squircle:corner-xl corner-squircle";
 const USAGE_METADATA_ICON_CLASS_NAME = "size-3.5 shrink-0 text-ink-3";
 
 type SkillAttribution = NonNullable<HistoricalSkillSummary["attribution"]>;
@@ -217,7 +217,7 @@ function UsageCollectionState({
 				icon={IconBook}
 				title={`${kind === "skills" ? "Skills" : "Repos"} couldn’t be loaded`}
 				description="Your historical sessions are still available. Try loading this view again."
-				action={<RetryButton onRetry={onRetry} />}
+				action={<RetryButton className="h-8 gap-xs" onRetry={onRetry} />}
 			/>
 		);
 	}
@@ -246,6 +246,7 @@ function UsageCollectionState({
 					<Button
 						type="button"
 						size="sm"
+						className="h-8 gap-xs"
 						variant="outline"
 						onClick={onClearSearch}
 					>
@@ -409,7 +410,7 @@ function UsageSummary({
 	);
 
 	return (
-		<dl className="grid min-w-0 gap-s text-body-m text-ink-3">
+		<dl className="grid min-w-0 gap-s text-body-m text-session-overview-muted">
 			<div className="flex min-w-0 items-center">
 				<dt className="sr-only">Sessions</dt>
 				<dd className="flex min-w-0 items-center gap-m">
@@ -438,14 +439,14 @@ function UsageSummary({
 							<UsageUserAvatar avatarUrl={undefined} title={undefined} />
 						)}
 						{hiddenUserCount > 0 ? (
-							<AvatarGroupCount className="bg-hover font-body text-body-m text-ink-3 ring-canvas tabular-nums">
+							<AvatarGroupCount className="bg-hover font-body text-body-m text-session-overview-muted ring-canvas tabular-nums">
 								+{hiddenUserCount.toLocaleString()}
 								<span className="sr-only"> more users</span>
 							</AvatarGroupCount>
 						) : null}
 					</AvatarGroup>
 					<span
-						className="font-body font-regular text-ink tabular-nums"
+						className="font-body font-regular text-session-overview-text tabular-nums"
 						title={formatCompactSessionCount(sessionCount)}
 					>
 						{sessionCount.toLocaleString()}
@@ -474,7 +475,7 @@ function UsageSummary({
 									"shrink-0 px-s",
 								)}
 							>
-								<span className="font-body font-regular text-ink-3 tabular-nums">
+								<span className="font-body font-regular text-session-overview-muted tabular-nums">
 									+{hiddenRepoCount.toLocaleString()}
 									<span className="sr-only"> more repositories</span>
 								</span>
@@ -534,7 +535,7 @@ function RepositoryChip({
 					"shrink-0",
 					"edge-l-m pl-s",
 					"font-body tabular-nums",
-					"border-line text-ink-3",
+					"border-line text-session-overview-subtle",
 				)}
 			>
 				{sessionCount.toLocaleString()}

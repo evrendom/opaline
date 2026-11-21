@@ -1,26 +1,41 @@
 .rich-skill-document {
-	--skill-document-code-highlight: color-mix(
-		in oklab,
-		var(--canvas) 70%,
-		transparent
-	);
+	/* design-escape-ok(colour): shipped value; rgba(255, 255, 255, 0.7) */
+	--skill-document-code-highlight: rgba(255, 255, 255, 0.7);
 	min-width: 0;
-	color: var(--ink);
+	color: var(--dashboardy-heading);
 	font-family: var(--font-sans);
-	font-size: var(--size-xl);
-	letter-spacing: var(--letter-spacing-xl);
+	/* design-escape-ok(type): shipped value; 15px */
+	font-size: 15px;
 	font-weight: var(--weight-body-regular);
-	line-height: var(--line-xl);
+	/* design-escape-ok(type): shipped value; 24px */
+	line-height: 24px;
 	overflow-wrap: anywhere;
+	/* design-escape-ok(colour): shipped value; rgba(242, 241, 238, 0.62) */
+	--skill-document-table-background: rgba(242, 241, 238, 0.62);
+	/* design-escape-ok(colour): shipped value; rgba(15, 23, 42, 0.12) */
+	--skill-document-border: rgba(15, 23, 42, 0.12);
+	/* design-escape-ok(colour): shipped value; rgba(135, 131, 120, 0.15) */
+	--skill-document-inline-code-background: rgba(135, 131, 120, 0.15);
+	/* design-escape-ok(colour): shipped value; rgba(31, 35, 40, 0.08) */
+	--skill-document-code-border: rgba(31, 35, 40, 0.08);
+	/* design-escape-ok(colour): shipped value; #f6f8fa */
+	--skill-document-code-background: #f6f8fa;
 }
 
 .dark .rich-skill-document {
 	/* Hairlines: a 7% edge and a barely-there inner highlight. */
-	--skill-document-code-highlight: color-mix(
-		in oklab,
-		var(--ink) 3%,
-		transparent
-	);
+	/* design-escape-ok(colour): shipped value; rgba(255, 255, 255, 0.03) */
+	--skill-document-code-highlight: rgba(255, 255, 255, 0.03);
+	/* design-escape-ok(colour): shipped value; rgba(255, 255, 255, 0.055) */
+	--skill-document-table-background: rgba(255, 255, 255, 0.055);
+	/* design-escape-ok(colour): shipped value; rgba(255, 255, 255, 0.16) */
+	--skill-document-border: rgba(255, 255, 255, 0.16);
+	/* design-escape-ok(colour): shipped value; rgba(255, 255, 255, 0.09) */
+	--skill-document-inline-code-background: rgba(255, 255, 255, 0.09);
+	/* design-escape-ok(colour): shipped value; rgba(255, 255, 255, 0.07) */
+	--skill-document-code-border: rgba(255, 255, 255, 0.07);
+	/* design-escape-ok(colour): shipped value; oklch(0.205 0 0) */
+	--skill-document-code-background: oklch(0.205 0 0);
 }
 
 .rich-skill-document > :first-child {
@@ -34,7 +49,7 @@
 .rich-skill-document p {
 	min-height: 24px;
 	margin: var(--space-zero) var(--space-zero) var(--space-m);
-	color: var(--ink);
+	color: var(--dashboardy-heading);
 	font: inherit;
 }
 
@@ -43,7 +58,7 @@
 .rich-skill-document h3,
 .rich-skill-document h4 {
 	position: relative;
-	color: var(--ink);
+	color: var(--dashboardy-heading);
 	font-family: var(--font-sans);
 	letter-spacing: var(--tracking-m);
 }
@@ -51,33 +66,39 @@
 .rich-skill-document h1,
 .rich-skill-document h2 {
 	margin: calc(var(--space-xxl) * 4 / 3) var(--space-zero) var(--space-zero);
-	font-size: var(--display-size-xxs);
-	letter-spacing: var(--display-letter-spacing-xxs);
-	font-weight: var(--weight-body-heavy);
+	/* design-escape-ok(type): shipped value; 19px */
+	font-size: 19px;
+	font-weight: 700;
 	line-height: var(--display-line-xxs);
 }
 
 .rich-skill-document h3 {
 	margin: var(--space-xxl) var(--space-zero) var(--space-s);
-	font-size: var(--size-xxl);
-	letter-spacing: var(--letter-spacing-xxl);
+	/* design-escape-ok(type): shipped value; 17px */
+	font-size: 17px;
 	font-weight: var(--weight-body-heavy);
 	line-height: var(--line-xxl);
 }
 
 .rich-skill-document h4 {
-	margin: var(--space-xl) var(--space-zero) var(--space-zero);
-	font-size: var(--size-xl);
-	letter-spacing: var(--letter-spacing-xl);
+	margin: 18px 0 0;
+	/* design-escape-ok(type): shipped value; 15px */
+	font-size: 15px;
 	font-weight: var(--weight-body-heavy);
-	line-height: var(--line-xl);
+	/* design-escape-ok(type): shipped value; 24px */
+	line-height: 24px;
 }
 
 .rich-skill-document blockquote {
-	margin: var(--space-l) var(--space-zero) var(--space-m);
-	padding: var(--space-xs) var(--space-xl);
-	border-left: var(--border-l) solid var(--line);
-	color: var(--ink-3);
+	margin: 10px 0 8px;
+	padding: 4px 14px;
+	border-left: 3px solid var(--skill-document-border);
+	/* design-escape-ok(colour): shipped value; #667085 (main's dashboardy-muted) */
+	color: #667085;
+}
+.dark .rich-skill-document blockquote {
+	/* design-escape-ok(colour): shipped value; #a1a2a8 */
+	color: #a1a2a8;
 }
 
 .rich-skill-document blockquote p {
@@ -87,9 +108,9 @@
 
 .rich-skill-document ul,
 .rich-skill-document ol {
-	margin: var(--space-s) var(--space-zero);
-	padding-left: calc(var(--space-xxl) * 1.25);
-	color: var(--ink);
+	margin: 5px 0;
+	padding-left: 28px;
+	color: var(--dashboardy-heading);
 	font: inherit;
 }
 
@@ -112,10 +133,12 @@
 
 .rich-skill-document code:not(.rich-skill-document__code) {
 	padding: var(--space-xxs) var(--space-xs);
-	border-radius: var(--radius-xs);
-	background: var(--hover-strong);
-	color: var(--error);
-	font-family: var(--font-data);
+	border-radius: 4px;
+	background: var(--skill-document-inline-code-background);
+	/* design-escape-ok(colour): shipped value; #c43c4b */
+	color: #c43c4b;
+	/* design-escape-ok(type): shipped value; "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace */
+	font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 	/* design-escape-ok(type): no role renders this; 0.85em, inline code scales with its heading */
 	font-size: 0.85em;
 }
@@ -127,15 +150,18 @@
 }
 
 .rich-skill-document__plain-code-block {
-	margin: var(--space-l) var(--space-zero) var(--space-xl);
-	padding: var(--space-xl) var(--space-xl);
+	margin: 12px 0 14px;
+	padding: 14px 16px;
 	overflow: auto;
-	border: var(--border-s) solid var(--line);
+	border: 0.5px solid var(--skill-document-code-border);
 	border-radius: var(--radius-s);
-	background: var(--inset);
+	background: var(--skill-document-code-background);
 	box-shadow: inset 0 0 0 1px var(--skill-document-code-highlight);
-	color: var(--ink);
-	font-family: var(--font-data);
+	/* design-escape-ok(colour): shipped value; #1f2328 */
+	color: #1f2328;
+	/* design-escape-ok(type): shipped value; "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", Menlo, monos */
+	font-family:
+		"SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
 	font-size: inherit;
 	line-height: inherit;
 	tab-size: 2;
@@ -143,8 +169,8 @@
 
 .rich-skill-document[data-variant="preview"]
 	.rich-skill-document__plain-code-block {
-	margin: var(--space-m) var(--space-zero) var(--space-l);
-	padding: var(--space-m) var(--space-l);
+	margin: 8px 0 10px;
+	padding: 9px 10px;
 	border-radius: var(--radius-xs);
 }
 
@@ -155,9 +181,9 @@
 
 .rich-skill-document hr {
 	height: 1px;
-	margin: var(--space-xxl) var(--space-xxs);
+	margin: 20px 2px;
 	border: 0;
-	background: var(--line);
+	background: var(--skill-document-border);
 }
 
 .rich-skill-document__table-scroll {
@@ -170,24 +196,24 @@
 	width: 100%;
 	border-collapse: collapse;
 	table-layout: fixed;
-	color: var(--ink);
+	color: var(--dashboardy-heading);
 	font-family: var(--font-sans);
 	font-size: var(--size-xl);
-	letter-spacing: var(--letter-spacing-xl);
-	line-height: var(--line-xl);
+	/* design-escape-ok(type): shipped value; 21px */
+	line-height: 21px;
 }
 
 .rich-skill-document th,
 .rich-skill-document td {
 	min-width: 92px;
-	padding: var(--space-m) var(--space-m);
-	border: var(--border-m) solid var(--line);
+	padding: 7px 9px;
+	border: 1px solid var(--skill-document-border);
 	vertical-align: top;
 }
 
 .rich-skill-document th {
-	background: var(--wash);
-	font-weight: var(--weight-body-heavy);
+	background: var(--skill-document-table-background);
+	font-weight: 650;
 	text-align: left;
 }
 
@@ -201,21 +227,23 @@
 }
 
 .rich-skill-document a {
-	color: var(--accent);
+	/* design-escape-ok(colour): shipped value; #2563eb (main's dashboardy-accent) */
+	color: #2563eb;
 	text-decoration: underline;
 	text-decoration-color: color-mix(in srgb, currentcolor 34%, transparent);
 	text-underline-offset: 3px;
 }
 
 .rich-skill-document strong {
-	font-weight: var(--weight-body-heavy);
+	font-weight: 650;
 }
 
 .rich-skill-document[data-variant="preview"] {
 	font-size: var(--size-xxl);
-	letter-spacing: var(--letter-spacing-xxl);
 	line-height: var(--line-xxl);
-	color: var(--ink-3);
+	color: var(--session-overview-muted);
+	--skill-document-inline-code-background: var(--session-overview-hover);
+	--skill-document-code-background: var(--session-overview-hover);
 }
 
 .rich-skill-document[data-variant="preview"] p {
@@ -230,7 +258,7 @@
 	font-size: inherit;
 	font-weight: var(--weight-body-medium);
 	line-height: inherit;
-	color: var(--ink);
+	color: var(--session-overview-text);
 }
 
 .rich-skill-document[data-variant="preview"] h3 {
@@ -255,23 +283,23 @@
 
 .rich-skill-document[data-variant="preview"] ul,
 .rich-skill-document[data-variant="preview"] ol {
-	margin: var(--space-xs) var(--space-zero);
-	padding-left: var(--space-xl);
+	margin: 3px 0;
+	padding-left: 17px;
 }
 
 .rich-skill-document[data-variant="preview"]
 	code:not(.rich-skill-document__code) {
-	padding: var(--space-xxs) var(--space-xs);
-	border-radius: var(--radius-xs);
+	padding: 1px 3px;
+	border-radius: 3px;
 }
 
 .rich-skill-document[data-variant="preview"] hr {
-	margin: var(--space-l) var(--space-xxs);
+	margin: 10px 1px;
 }
 
 .rich-skill-document[data-variant="preview"]
 	.rich-skill-document__table-scroll {
-	margin: var(--space-m) var(--space-zero);
+	margin: 7px 0;
 }
 
 .rich-skill-document[data-variant="preview"] table {
@@ -282,7 +310,7 @@
 .rich-skill-document[data-variant="preview"] th,
 .rich-skill-document[data-variant="preview"] td {
 	min-width: 58px;
-	padding: var(--space-xs) var(--space-s);
+	padding: 4px 5px;
 }
 
 .rich-skill-document[data-variant="preview"] > :first-child {
@@ -296,11 +324,16 @@
 @media (min-width: 40rem) {
 	.rich-skill-document[data-variant="preview"] {
 		font-size: var(--size-xl);
-		letter-spacing: var(--letter-spacing-xl);
-		line-height: var(--line-xl);
+		/* design-escape-ok(type): shipped value; 1.375rem */
+		line-height: 1.375rem;
 	}
 }
 
 .rich-skill-document[data-variant="preview"] :is(pre, code) {
 	color: inherit;
+}
+
+.dark .rich-skill-document a {
+	/* design-escape-ok(colour): shipped value; #93c5fd */
+	color: #93c5fd;
 }

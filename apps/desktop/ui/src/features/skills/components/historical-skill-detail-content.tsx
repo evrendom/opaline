@@ -125,7 +125,7 @@ export function HistoricalSkillDetailContent({
 						<h3 className="text-body-xxl font-medium">
 							Skill details couldn’t load
 						</h3>
-						<RetryButton onRetry={onRetry} />
+						<RetryButton className="h-8 gap-xs" onRetry={onRetry} />
 					</div>
 				) : (
 					<Reveal
@@ -144,7 +144,7 @@ export function HistoricalSkillDetailContent({
 								<>
 									{allowedTools.length > 0 ? (
 										<div className="mb-xxl flex flex-wrap items-center gap-m">
-											<span className="text-body-l font-medium text-ink-3">
+											<span className="text-body-l font-medium text-session-overview-muted">
 												Allowed tools
 											</span>
 											<ul
@@ -179,7 +179,7 @@ export function HistoricalSkillDetailContent({
 									/>
 								</>
 							) : (
-								<div className="py-[calc(var(--space-xxl)*5/3)] text-center text-body-xl text-ink-3">
+								<div className="py-[calc(var(--space-xxl)*5/3)] text-center text-body-xl text-session-overview-muted">
 									No complete content was recovered
 								</div>
 							)

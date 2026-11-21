@@ -141,17 +141,20 @@
 	/* a faint edge ringing a small avatar or logo on any ground */
 	--line-faint: color-mix(in oklab, var(--ink) 5%, transparent);
 
-	/* round 4 · reader */
+	/* Shipped inks: values the app renders exactly as main does, with no other role holding them. */
 	--dashboardy-heading: #111827;
 	--session-overview-text: #101112;
-	/* the reader's status inks and marks: Tailwind's rose, amber and emerald */
 	--rose-ink: oklch(58.6% 0.253 17.585);
 	--amber-ink: oklch(66.6% 0.179 58.318);
 	--emerald-ink: oklch(59.6% 0.145 163.225);
 	--rose-mark: oklch(64.5% 0.246 16.439);
 	--amber-mark: oklch(76.9% 0.188 70.08);
 	--emerald-mark: oklch(69.6% 0.17 162.48);
-	/* end round 4 · reader */
+	--cost-foreground: #292a2f;
+	--cost-muted: #828387;
+	--session-overview-muted: rgb(0 0 0 / 0.63);
+	--session-overview-subtle: rgb(0 0 0 / 0.5);
+	--cost-blue: oklch(0.623 0.188 259.815); /* both modes */
 }
 
 .dark {
@@ -181,14 +184,15 @@
 	--track: color-mix(in oklab, var(--field) 50%, transparent);
 	--shelf: var(--card);
 	--line-faint: color-mix(in oklab, var(--ink) 10%, transparent);
-
-	/* round 4 · reader */
 	--dashboardy-heading: #e6e6e9;
 	--session-overview-text: #e6e6e9;
 	--rose-ink: oklch(71.2% 0.194 13.428);
 	--amber-ink: oklch(82.8% 0.189 84.429);
 	--emerald-ink: oklch(76.5% 0.177 163.223);
-	/* end round 4 · reader */
+	--cost-foreground: #e6e6e9;
+	--cost-muted: #919299;
+	--session-overview-muted: rgb(255 255 255 / 0.65);
+	--session-overview-subtle: rgb(255 255 255 / 0.5);
 }
 
 /* Layer 2 as Tailwind colours: `bg-surface`, `text-ink-3`, `border-line`. */
@@ -231,7 +235,6 @@
 	--color-shelf: var(--shelf);
 	--color-line-faint: var(--line-faint);
 
-	/* round 4 · reader */
 	--color-dashboardy-heading: var(--dashboardy-heading);
 	--color-session-overview-text: var(--session-overview-text);
 	--color-rose-ink: var(--rose-ink);
@@ -240,7 +243,11 @@
 	--color-rose-mark: var(--rose-mark);
 	--color-amber-mark: var(--amber-mark);
 	--color-emerald-mark: var(--emerald-mark);
-	/* end round 4 · reader */
+	--color-cost-foreground: var(--cost-foreground);
+	--color-cost-muted: var(--cost-muted);
+	--color-session-overview-muted: var(--session-overview-muted);
+	--color-session-overview-subtle: var(--session-overview-subtle);
+	--color-cost-blue: var(--cost-blue);
 }
 
 /* Layer 2 elevation as Tailwind shadows: `shadow-card`, `shadow-control`,

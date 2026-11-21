@@ -18,10 +18,14 @@ const SIGNAL_MARK_BASE_CLASS_NAME =
 const SIGNAL_MARK_CATEGORY_CLASS_NAMES: Readonly<
 	Record<LanguageSignalMatch["category"], string>
 > = {
-	negative: "bg-error-tint text-error",
-	swear: "bg-error-tint text-error",
-	apology: "bg-warning-tint text-warning",
-	positive: "bg-success-tint text-success",
+	// design-escape-ok(colour): shipped value; the negative chip's rose
+	negative: "bg-[#ffe4e6] text-[#be123c] dark:bg-[#4c1d25] dark:text-[#fb7185]",
+	// design-escape-ok(colour): shipped value; the negative chip's rose
+	swear: "bg-[#ffe4e6] text-[#be123c] dark:bg-[#4c1d25] dark:text-[#fb7185]",
+	// design-escape-ok(colour): shipped value; the apology chip's amber
+	apology: "bg-[#fef3c7] text-[#b45309] dark:bg-[#493719] dark:text-[#fbbf24]",
+	// design-escape-ok(colour): shipped value; the positive chip's green
+	positive: "bg-[#dcfce7] text-[#15803d] dark:bg-[#173d2a] dark:text-[#4ade80]",
 };
 
 export const signalMarkClassName = (
