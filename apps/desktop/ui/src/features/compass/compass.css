@@ -162,7 +162,9 @@
 	overflow-y: auto;
 	overscroll-behavior: contain;
 }
-.compass-back {
+/* Outranks the text-button pattern's display, so the link stays hidden
+   until the narrow layout below shows it. */
+.compass-detail-pane > .compass-back {
 	display: none;
 }
 .compass-detail {
@@ -588,7 +590,7 @@
 	.compass-split[data-reading] .compass-list-pane {
 		display: none;
 	}
-	.compass-back {
+	.compass-detail-pane > .compass-back {
 		display: inline-flex;
 		align-items: center;
 		gap: var(--space-xs);
