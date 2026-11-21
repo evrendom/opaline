@@ -455,7 +455,7 @@ function RunRow({
 				"relative flex w-full items-center gap-l",
 				"corner-s px-l py-s corner-squircle",
 				"text-left",
-				"outline-none transition-colors",
+				"focus-outline transition-colors",
 				"squircle:corner-l",
 				isPicked && "bg-field",
 			)}

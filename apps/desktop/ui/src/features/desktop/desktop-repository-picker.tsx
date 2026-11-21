@@ -246,7 +246,7 @@ export function DesktopRepositoryPicker({
 			{list && !loadError && !query && hiddenCount > 0 && (
 				<button
 					type="button"
-					className="desktop-repository-more"
+					className="desktop-repository-more focus-outline"
 					aria-expanded={showAll}
 					onClick={() => setShowAll((value) => !value)}
 				>

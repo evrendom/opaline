@@ -522,7 +522,7 @@ function SessionTile({
 				onPointerEnter={onIntent}
 				onFocus={onIntent}
 				title={`${session.sessionId}\n${figure}`}
-				className="absolute inset-0 corner-s-inset corner-squircle outline-none transition-colors hover:bg-hover squircle:corner-xl-inset"
+				className="absolute inset-0 corner-s-inset corner-squircle focus-outline transition-colors hover:bg-hover squircle:corner-xl-inset"
 			/>
 			<span
 				aria-hidden="true"

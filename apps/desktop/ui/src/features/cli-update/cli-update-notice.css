@@ -43,7 +43,6 @@
 	border-radius: var(--cli-update-notice-inner-radius);
 	background: transparent;
 	color: var(--ink-3);
-	outline: none;
 	transition:
 		background-color var(--motion-quick-duration) var(--motion-wave-easing),
 		color var(--motion-quick-duration) var(--motion-wave-easing);

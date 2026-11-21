@@ -990,7 +990,7 @@ export function CostChart({
 									<>
 										<button
 											type="button"
-											className="cost-legend-item cost-duration-legend"
+											className="cost-legend-item cost-duration-legend focus-outline"
 											data-percentile="median"
 											aria-label="Median duration"
 											title={
@@ -1013,7 +1013,7 @@ export function CostChart({
 										</button>
 										<button
 											type="button"
-											className="cost-legend-item cost-duration-legend"
+											className="cost-legend-item cost-duration-legend focus-outline"
 											data-percentile="p95"
 											aria-label="P95 duration"
 											title={
@@ -1036,7 +1036,7 @@ export function CostChart({
 								) : metric === "mergedPullRequests" && !ciChart ? (
 									<button
 										type="button"
-										className="cost-legend-item cost-duration-legend"
+										className="cost-legend-item cost-duration-legend focus-outline"
 										data-percentile="p95"
 										aria-label="CI failures per PR"
 										title="Failed CI attempts per merged PR, counting only PRs whose CI history is available. Re-runs count. Grouped by merge date (UTC)."
@@ -1171,6 +1171,7 @@ export function CostChart({
 									<button
 										key={value}
 										type="button"
+										className="focus-outline"
 										aria-pressed={selectedMetric === value}
 										onClick={() => onMetricChange(value)}
 										onPointerEnter={
@@ -1188,6 +1189,7 @@ export function CostChart({
 									<button
 										key={value}
 										type="button"
+										className="focus-outline"
 										aria-pressed={kind === value}
 										onClick={() => setKind(value)}
 									>

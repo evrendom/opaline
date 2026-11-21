@@ -138,7 +138,7 @@ export function RailHighlightProvider({
 				type="button"
 				aria-label={`Stop filtering by ${name}`}
 				onClick={onClear}
-				className="grid size-5 shrink-0 place-items-center corner-full outline-none"
+				className="grid size-5 shrink-0 place-items-center corner-full focus-outline"
 			>
 				{TabIcon ? (
 					<TabIcon

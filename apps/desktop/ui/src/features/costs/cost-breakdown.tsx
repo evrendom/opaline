@@ -131,7 +131,7 @@ export function CostBreakdown({
 						<p className="cost-breakdown-empty">
 							<button
 								type="button"
-								className="cost-breakdown-load"
+								className="cost-breakdown-load focus-outline"
 								onClick={onLoadDeferred}
 							>
 								Show {label.toLowerCase()}
@@ -477,7 +477,7 @@ function ToolButton({
 				render={
 					<button
 						type="button"
-						className="cost-tool-button"
+						className="cost-tool-button focus-outline"
 						aria-label={label}
 						aria-pressed={pressed}
 						onClick={onClick}

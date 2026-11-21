@@ -759,7 +759,7 @@ function ReadCommand({ bash, text }: { bash: boolean; text: string }) {
 				type="button"
 				aria-expanded={open}
 				onClick={() => setOpen(!open)}
-				className="flex w-full items-center gap-s corner-s px-m py-s text-left text-body-m text-ink-3 outline-none transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-focus-ring"
+				className="flex w-full items-center gap-s corner-s px-m py-s text-left text-body-m text-ink-3 transition-colors hover:text-ink focus-outline"
 			>
 				<SelectorMark open={open} />
 				View command

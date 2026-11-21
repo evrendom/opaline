@@ -369,8 +369,8 @@ function RunRow({
 				"relative flex w-full items-center gap-s",
 				"corner-s px-m py-s corner-squircle",
 				"text-left text-body-m font-medium tabular-nums",
-				"outline-none transition-colors",
-				"squircle:corner-l focus-visible:ring-2 focus-visible:ring-focus-ring",
+				"focus-outline transition-colors",
+				"squircle:corner-l",
 				isPicked ? PICKED_ROW : undefined,
 			)}
 		>

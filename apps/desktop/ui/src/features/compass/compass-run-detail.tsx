@@ -248,7 +248,7 @@ function FlagItem({ flag }: { flag: RunFlag }) {
 		<li>
 			<button
 				type="button"
-				className="compass-flag-item"
+				className="compass-flag-item focus-outline"
 				style={{ "--glyph-color": kind.color } as CSSProperties}
 				onClick={() =>
 					document
@@ -464,7 +464,7 @@ function ContextGroup({
 			{head.starting.length > 0 ? <FlagMarkers flags={head.starting} /> : null}
 			<button
 				type="button"
-				className="compass-timeline-line compass-timeline-group"
+				className="compass-timeline-line compass-timeline-group focus-outline"
 				onClick={() => setOpen(true)}
 			>
 				<IconFileText aria-hidden="true" className="compass-timeline-icon" />
@@ -542,7 +542,7 @@ function TimelineItem({
 			{record.text && record.kind !== "file_change" ? (
 				<button
 					type="button"
-					className="compass-timeline-text"
+					className="compass-timeline-text focus-outline"
 					data-open={open || undefined}
 					data-long={long || undefined}
 					aria-expanded={long ? open : undefined}

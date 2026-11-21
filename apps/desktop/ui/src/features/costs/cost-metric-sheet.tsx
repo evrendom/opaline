@@ -255,7 +255,7 @@ export function ExpandButton({
 	return (
 		<button
 			type="button"
-			className="cost-metric-expand"
+			className="cost-metric-expand focus-outline"
 			aria-expanded={expanded}
 			aria-label={expanded ? "Collapse details" : "Expand details"}
 			onClick={onToggle}

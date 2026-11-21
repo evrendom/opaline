@@ -87,7 +87,7 @@ export function PillTabs<T extends string>({
 							"relative flex h-8 items-center",
 							"corner-s px-l corner-squircle",
 							"text-body-xl font-medium",
-							"transition-colors outline-none",
+							"transition-colors focus-outline",
 							"squircle:corner-l",
 							active && !pill && cn("bg-track", pillClassName),
 							active

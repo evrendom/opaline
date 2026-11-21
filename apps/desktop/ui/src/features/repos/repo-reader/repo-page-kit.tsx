@@ -284,7 +284,7 @@ export function Bars({
 						title={labels?.[index]}
 						onClick={onPick ? () => onPick(index) : undefined}
 						className={cn(
-							"min-w-0 flex-1 corner-xs transition-opacity",
+							"min-w-0 flex-1 corner-xs transition-opacity focus-outline",
 							onPick ? "hover:opacity-100" : "cursor-default",
 							highlight === undefined ||
 								highlight === null ||

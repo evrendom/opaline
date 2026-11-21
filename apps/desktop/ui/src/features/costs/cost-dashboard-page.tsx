@@ -414,6 +414,7 @@ export function CostDashboardView({
 										<button
 											key={dimension}
 											type="button"
+											className="focus-outline"
 											role="tab"
 											aria-selected={dimension === activeTab}
 											onClick={() => setBreakdownTab(dimension)}

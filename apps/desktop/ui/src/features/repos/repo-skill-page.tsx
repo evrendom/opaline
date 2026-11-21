@@ -208,7 +208,7 @@ function SkillHeader({
 	const shellRoute = useCurrentShellRoute();
 	if (!headerPortal) return null;
 	const crumbClassName =
-		"flex shrink-0 items-center gap-m text-ink-3 transition-colors hover:text-ink";
+		"flex shrink-0 items-center gap-m text-ink-3 transition-colors hover:text-ink focus-outline";
 	const separator = (
 		<IconChevronRight
 			aria-hidden="true"
