@@ -192,7 +192,7 @@ export function StatCard({
 			size="sm"
 			skullet-block={onSelect ? "" : undefined}
 			className={cn(
-				"data-[size=sm]:py-xl",
+				"data-[size=sm]:py-[calc(var(--space-l)+var(--space-xxs))]",
 				onSelect && "relative transition-shadow hover:shadow-raised",
 			)}
 			style={
