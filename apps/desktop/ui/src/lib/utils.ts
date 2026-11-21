@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from "clsx";
 import { extendTailwindMerge, mergeConfigs } from "tailwind-merge";
-import graphicalClasses from "../../graphical/generated/tailwind-merge.cjs";
+import { systemClasses } from "./tailwind-merge-config";
 
 // The Layer 2 role shadows registered in src/app/tokens.css, so `shadow-card`
 // reads as a shadow (not a shadow colour) and overrides `shadow-none`.
@@ -23,11 +23,11 @@ const ROLE_SHADOWS = [
 	"window",
 ];
 
-// tailwind-merge with Graphical's classes, so text styles, weights,
+// tailwind-merge with the system's classes, so text styles, weights,
 // `corner-*` and `edge-*` override each other the way their CSS does, plus
 // the role shadows, the derived corners and the line and tracking utilities
 // in src/app/tokens.css.
-const twMerge = extendTailwindMerge(graphicalClasses, (config) =>
+const twMerge = extendTailwindMerge(systemClasses, (config) =>
 	mergeConfigs(config, {
 		extend: {
 			theme: { shadow: ROLE_SHADOWS },

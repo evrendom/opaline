@@ -10,10 +10,11 @@ apps/desktop/ui/src/
   app/providers/     # ThemeProvider, AppProviders
   components/        # app composites built from primitives (data table, conversation trace, …)
   features/<area>/   # screens and their feature-only parts
-  index.css          # Tailwind entry: imports Graphical's generated theme, then the files below
-  app/tokens.css     # Opaline tokens: Layer 1 primitives (from Graphical) and the Layer 2 roles screens read
+  index.css          # Tailwind entry: imports the files below in order
+  app/theme.css      # Layer 1: the primitives (ramps, palette, type, space, corners, motion) and their utilities
+  app/tokens.css     # Layer 2: the roles screens read
   app/patterns.css   # Opaline patterns: controls app/ui doesn't cover, and recurring patterns, each state as a class
-  app/preset-extensions.css  # squircle corner utilities and the opal-1…5 names mapped onto Graphical's palette
+  app/preset-extensions.css  # squircle corner utilities and the opal-1…5 names mapped onto the palette
 ```
 
 The `opaline-design` skill (`.claude/skills/opaline-design/SKILL.md`) holds the rules for using these files.
@@ -55,11 +56,11 @@ Opaline's primitives are shadcn-derived and built on Base UI, with the Mac app's
 - **Never** style a raw `<button>`, `<input>`, `<select>` or `<textarea>` to look like a control, with classes or a feature CSS class. Use the primitive, or add a variant to it. A raw `<button>` is fine for an unstyled clickable surface: a list row, a chart mark, a tree node.
 - **Never** restyle a primitive from feature CSS (`.my-page [data-slot="button"] { … }`). If a look recurs, it is a variant.
 
-## Tokens and styling — Graphical on Tailwind v4
+## Tokens and styling — Tailwind v4
 
-Two layers, with the rules in the `opaline-design` skill. Layer 1 is Graphical's theme, named Opaline: `graphical/themes/opaline.json` → `graphical/generated/theme.css`, with every value in [gui/themes.md](gui/themes.md). Change it through the development editor or `graphical-adopt`, never by editing `graphical/generated/`. Layer 2 is `src/app/tokens.css`: the roles screens are written against. Follow [GUI.md](GUI.md) and the `graphical-ui` skill for UI work.
+Two layers, with the rules in the `opaline-design` skill. Layer 1 is `src/app/theme.css`: the primitives. Layer 2 is `src/app/tokens.css`: the roles screens are written against. The system page (`/dev/design-system` in development) shows every component the app uses, in light and dark.
 
-- **Always** colour with the Layer 2 roles: ground `bg-canvas`, `bg-surface`, `bg-card`, `bg-card-soft`, `bg-inset`, `bg-field`, `bg-track`, `bg-shelf`, `bg-hover`, `bg-hover-strong`, `bg-wash`, `bg-mark-fill`; ink `text-ink`, `text-ink-2`, `text-ink-3`, `text-ink-disabled`, `text-ink-inverse`, `text-ink-soft`, `text-ink-meta`; lines `border-line`, `border-line-strong`, `border-line-soft`; action `primary`, `accent`, `accent-tint`, `accent-line`, `accent-fg` (on an accent fill), `focus`; state `success`, `warning`, `error`, each with `-tint` and `-line`. Feature CSS reads them as `var(--surface)`. **Never** read Layer 1 (`neutral-1`…`neutral-10`, `color-1`…`color-5`, their `-translucent`/`-transparent` levels) in a screen or primitive; a colour no role covers is a new role in `tokens.css` and `graphical/role-map.json` first. The shadcn names in `tokens.css` (`--background`, `--muted-foreground`, …) exist for third-party code only.
+- **Always** colour with the Layer 2 roles: ground `bg-canvas`, `bg-surface`, `bg-card`, `bg-card-soft`, `bg-inset`, `bg-field`, `bg-track`, `bg-shelf`, `bg-hover`, `bg-hover-strong`, `bg-wash`, `bg-mark-fill`; ink `text-ink`, `text-ink-2`, `text-ink-3`, `text-ink-disabled`, `text-ink-inverse`, `text-ink-soft`, `text-ink-meta`; lines `border-line`, `border-line-strong`, `border-line-soft`; action `primary`, `accent`, `accent-tint`, `accent-line`, `accent-fg` (on an accent fill), `focus`; state `success`, `warning`, `error`, each with `-tint` and `-line`. Feature CSS reads them as `var(--surface)`. **Never** read Layer 1 (`neutral-1`…`neutral-10`, `color-1`…`color-5`, their `-translucent`/`-transparent` levels) in a screen or primitive; a colour no role covers is a new role in `tokens.css` first. The shadcn names in `tokens.css` (`--background`, `--muted-foreground`, …) exist for third-party code only.
 - **Never** switch roles with `dark:`. Roles flip with the mode; a `dark:` swap means a role is missing. A primitive keeps a `dark:` pair only where the two modes differ by an opacity step no role holds, with a comment saying so.
 - **Always** set text with a text style: `text-body-{xxs…xxl}` or `text-display-{xxs…xxl}`, which carry size, line height and tracking (body `xxs` tracks +2%, `xxl` and display −1.5%, the rest 0). Faces are `font-body`, `font-display`, `font-data`; weights `font-regular`, `font-medium`, `font-heavy`. Don't add `leading-*` beside a text style.
 - **Always** space with the steps: `p-m`, `gap-l`, `mt-xs` (`zero`, `xxs`…`xxl`). Past XXL, use a multiple such as `gap-[calc(var(--space-xxl)*4/3)]`. Sizes (`w-*`, `h-*`, `size-*`) keep Tailwind's scale.
@@ -68,7 +69,7 @@ Two layers, with the rules in the `opaline-design` skill. Layer 1 is Graphical's
 - **Never** hard-code a hex, `rgb()` or `oklch()` colour, or an arbitrary text size or spacing value, in `className` or `style`. Data and artwork colours (charts, lanes, syntax, brand art) are the exception; keep them with their data.
 - **Always** time motion with the roles: the theme's `--motion-duration` (150ms) / `--motion-easing` and `--motion-large-duration` (300ms) / `--motion-large-easing`, and the Layer 2 roles in `tokens.css`: `--motion-quick-duration` (100ms), `--motion-medium-duration` (200ms), `--motion-slow-duration` (650ms), `--motion-strong-easing`, `--motion-drawer-easing`, `--motion-wave-easing`. Tailwind: `duration-(--motion-medium-duration)`, `ease-strong`, `ease-drawer`, `ease-wave`. A timing none of them holds stays literal with a reason, or becomes a role.
 - **Always** keep `bun run check:design` clean (`tools/design-escapes.ts`). It lists every class that leaves the scales and roles (Tailwind default type, spacing, `rounded-*`, palette colours, `[#hex]`/`rgb(`/`oklch(` in a class, default and literal shadows) across `src`, and fails on the paths in its `ENFORCED` list; the web tests (`src/app/design-escapes.bun-test.ts`) and CI run it. Data paint is allowed by a file entry in its `DATA_PAINT` list (with the reason) or a `design-escape-ok: <reason>` comment on or above the line.
-- **Always** merge classes with `cn()` from `@/lib/utils`: it knows Graphical's classes and the role shadows. Every component takes `className` and merges it on its root element.
+- **Always** merge classes with `cn()` from `@/lib/utils`: it knows the system's classes and the role shadows. Every component takes `className` and merges it on its root element.
 - **Never** bake outer margins into a component. The call site spaces it.
 - **Never** add a CSS file for something a utility or a primitive already covers. Feature CSS is for what Tailwind can't express (keyframes, `::part`, shadow-root styles, complex `:has()` chains), and reads the roles.
 
@@ -95,7 +96,7 @@ Two layers, with the rules in the `opaline-design` skill. Layer 1 is Graphical's
 
 These predate the rules above. Move them onto the roles and primitives when you touch them; don't extend them.
 
-- Tailwind's default scales still compile next to Graphical's: `text-sm`, `p-3`, `rounded-lg`, `shadow-md`, `bg-rose-500` build silently. `bun run check:design` lists what remains outside its enforced scope (the sessions reader, the dashboard and the other product features); `index.css` keeps `--radius-sm…4xl`, which keeps `rounded-md…4xl` alive.
+- Tailwind's default scales still compile next to the system's: `text-sm`, `p-3`, `rounded-lg`, `shadow-md`, `bg-rose-500` build silently. `bun run check:design` lists what remains outside its enforced scope (the sessions reader, the dashboard and the other product features); `index.css` keeps `--radius-sm…4xl`, which keeps `rounded-md…4xl` alive.
 - About 195 `dark:` variants swap one role for another where a role is missing, and about 100 more swap in palette, white/black or literal colours.
 - Feature CSS islands with hand-written surfaces, controls and literal values: costs (`costs/cost-dashboard*.css`), the dashboard (`dashboard/dashboard-theme.css`, 22 control-like classes), Compass (`compass/compass.css`), `app/app-surface.css` (the `--dashboard-01-*` chrome and `--team-lineup-*` card colours, with Layer 1 reads), `session-constellation-tree.css` (type literals) and `product-window-chrome.css`.
 - Duplicate controls: search fields outside `InputGroup` (`.toolbar-search`, `.cost-search`, `.sessions-settings-search`, which renders as a bordered rectangle, not a pill); `.compass-chip` repeats `.filter-chip`; `.cli-onboarding-primary` is a second primary button (`cli-onboarding.css`, re-overridden in `welcome.css`), with `.cli-onboarding-text-button` beside it.

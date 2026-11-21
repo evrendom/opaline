@@ -210,7 +210,7 @@ export function FoundationsGroup() {
 
 			<Specimen
 				name="Type"
-				source="graphical/generated/theme.css"
+				source="app/theme.css"
 				where="One typeface, Inter; display steps are larger Inter. Geist Mono (font-data) for figures, ids and code."
 				className="flex-col gap-m"
 			>

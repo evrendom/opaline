@@ -1,19 +1,8 @@
 import path from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { loadEnv, type Plugin } from "vite";
+import { loadEnv } from "vite";
 import { configDefaults, defineConfig } from "vitest/config";
-
-// Graphical writes its tailwind-merge classes as CommonJS
-// (graphical/generated/tailwind-merge.cjs). Serve that one file as a module so
-// `cn()` can extend tailwind-merge with them.
-const graphicalMergeConfig: Plugin = {
-	name: "graphical-merge-config",
-	transform(code, id) {
-		if (!id.endsWith("/graphical/generated/tailwind-merge.cjs")) return;
-		return code.replace(/\bmodule\.exports\s*=/, "export default");
-	},
-};
 
 // Point the dev proxy at a remote API (e.g. RUDEL_API_TARGET=https://opaline.so)
 // instead of the default local API server. For https targets the proxy rewrites
@@ -82,7 +71,7 @@ export default defineConfig(({ mode }) => {
 		env.RUDEL_API_BEARER_TOKEN ?? process.env.RUDEL_API_BEARER_TOKEN;
 
 	return {
-		plugins: [react(), tailwindcss(), graphicalMergeConfig],
+		plugins: [react(), tailwindcss()],
 		build:
 			mode === "plugin"
 				? undefined

@@ -23,10 +23,7 @@
 			"!apps/desktop/shell/onboarding",
 			"!apps/desktop/shell/icon",
 			"!apps/desktop/shell/dmg",
-			"!apps/desktop/ui/graphical/generated",
-			"!apps/desktop/ui/graphical/install",
-			"!apps/desktop/ui/graphical/packages",
-			"!apps/desktop/ui/graphical/**/*.json"
+			"!apps/desktop/ui/src/app/theme.css"
 		]
 	},
 	"formatter": {

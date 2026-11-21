@@ -1,17 +1,13 @@
-/* Cascade layers, lowest first. graphical-editor and graphical-host hold
-   Graphical's editor styles in development (graphical/editor-styles.css);
-   they stay empty in production. */
-@layer theme, base, graphical-editor, graphical-host, components, utilities;
+/* Cascade layers, lowest first. */
+@layer theme, base, components, utilities;
 @import "tailwindcss";
-@import "../graphical/generated/tailwind-theme.css";
-@import "../graphical/generated/theme.css";
+@import "./app/theme.css";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/inter";
 @import "./app/preset-extensions.css";
 @import "./app/tokens.css";
 @import "./app/patterns.css";
-@import "../graphical/generated/aliases.css";
 
 @custom-variant dark (&:is(.dark *));
 

@@ -1,10 +1,8 @@
 /* ============================================================
    Opaline · tokens.css
-   Layer 1 is the primitive set Graphical's theme defines
-   (graphical/themes/opaline.json → graphical/generated/theme.css): the
-   neutral ramp, the opal palette, success / warning / error, type, space,
-   corners, strokes, elevation and motion. Edit it through the Graphical
-   editor or graphical-adopt, never by hand.
+   Layer 1, the primitives, is src/app/theme.css: the neutral ramp, the
+   opal palette, success / warning / error, type, space, corners, strokes,
+   elevation and motion.
    Layer 2, below, is the set of roles Opaline's screens are written against.
    Components and patterns read Layer 2 only. `.dark` swaps Layer 1 and the
    few roles that change character.
@@ -155,6 +153,7 @@
 	--muted-foreground: var(--ink-3);
 	--accent-foreground: var(--ink);
 	--destructive: var(--error);
+	--destructive-foreground: var(--on-error);
 	--border: var(--line-strong);
 	--input: var(--line-strong);
 	--ring: var(--focus);

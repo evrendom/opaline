@@ -49,8 +49,8 @@
  *            an escape on its line or the next).
  *
  * What it reads, under src (skipping site/, dev/, test dirs, fixtures, tests,
- * stories, .d.ts, anything under graphical/ and src/app/tokens.css, which
- * defines the roles): the string literals of every .ts/.tsx file (class names
+ * stories, .d.ts, and src/app/theme.css and src/app/tokens.css, which define
+ * the primitives and the roles): the string literals of every .ts/.tsx file (class names
  * live in strings), the `@apply` lines of every .css file, and every
  * declaration of every .css file (comments skipped, line numbers kept).
  *
@@ -188,17 +188,15 @@ export const BASELINE_FILE = path.join(
 	"design-escapes.baseline.json",
 );
 
-const SKIP_DIRS = new Set([
-	"site",
-	"dev",
-	"test",
-	"__tests__",
-	"fixtures",
-	"graphical",
-]);
+const SKIP_DIRS = new Set(["site", "dev", "test", "__tests__", "fixtures"]);
 const SKIP_FILE =
 	/\.(test|bun-test|spec|stories)\.[cm]?tsx?$|fixtures?\.[cm]?tsx?$|\.d\.ts$/;
-const SKIP_PATH = new Set(["src/app/tokens.css"]);
+const SKIP_PATH = new Set([
+	"src/app/theme.css",
+	"src/app/tokens.css",
+	// tailwind-merge's class lists name every utility, rounded-* included
+	"src/lib/tailwind-merge-config.ts",
+]);
 
 const SPACE_PREFIX =
 	/^(p|px|py|pt|pr|pb|pl|ps|pe|m|mx|my|mt|mr|mb|ml|ms|me|gap|gap-x|gap-y|space-x|space-y)-(.+)$/;

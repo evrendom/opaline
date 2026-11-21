@@ -1,15 +1,8 @@
-import {
-	lazy,
-	type ReactNode,
-	StrictMode,
-	Suspense,
-	useLayoutEffect,
-} from "react";
+import { lazy, StrictMode, Suspense, useLayoutEffect } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, useLocation } from "react-router-dom";
+import { BrowserRouter } from "react-router-dom";
 import { takeFirstOpenIntro } from "@/app/first-open";
 import { AppProviders } from "@/app/providers/AppProviders";
-import { useTheme } from "@/app/providers/ThemeProvider";
 import { BonesProvider } from "@/app/ui/bones";
 import { currentHandoffPage, mayHandOff } from "@/features/desktop/app-handoff";
 import {
@@ -17,7 +10,6 @@ import {
 	type SelfHostInfo,
 	whenSelfHostInfoKnown,
 } from "@/features/self-hosted/self-host-info";
-import GraphicalEditorRoot from "../graphical/editor-root";
 import App from "./App.tsx";
 import { useMountEffect } from "./app/hooks/useMountEffect";
 import "./index.css";
@@ -69,22 +61,6 @@ const isStandaloneDevRoute =
 		window.location.pathname === "/dev/transcript-mask" ||
 		window.location.pathname === "/dev/design-system");
 
-// Graphical's editor around the app, in development only (the root loads
-// nothing in production). It follows the router and Opaline's own theme.
-function GraphicalEditor({ children }: { children: ReactNode }) {
-	const location = useLocation();
-	const { resolvedTheme, setTheme } = useTheme();
-	return (
-		<GraphicalEditorRoot
-			route={`${location.pathname}${location.search}`}
-			colorMode={resolvedTheme}
-			onColorModeChange={setTheme}
-		>
-			{children}
-		</GraphicalEditorRoot>
-	);
-}
-
 function BootDone() {
 	useLayoutEffect(() => {
 		document.documentElement.removeAttribute("data-boot");
@@ -113,12 +89,10 @@ function renderApp(selfHost: SelfHostInfo | null) {
 					) : (
 						<AppProviders>
 							<GlobalLumaScope />
-							<GraphicalEditor>
-								<div className="h-full">
-									<App />
-									{import.meta.env.DEV ? <DevControls /> : null}
-								</div>
-							</GraphicalEditor>
+							<div className="h-full">
+								<App />
+								{import.meta.env.DEV ? <DevControls /> : null}
+							</div>
 						</AppProviders>
 					)}
 				</BonesProvider>
