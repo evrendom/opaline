@@ -73,12 +73,13 @@ const INK = [
 	"ink-soft",
 	"ink-meta",
 ];
-const LINES = ["line", "line-strong", "line-soft"];
+const LINES = ["line", "line-strong", "line-soft", "line-faint"];
 const ACTION = [
 	"primary",
 	"primary-hover",
 	"primary-fg",
 	"focus",
+	"focus-ring",
 	"accent",
 	"accent-tint",
 	"accent-line",
