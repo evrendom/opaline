@@ -213,7 +213,7 @@ export function SessionReaderStepDetail({
 						{isTool && step?.kind !== "agent" && step?.isError ? (
 							<IconAlertTriangleFilled
 								aria-label="Failed"
-								className="size-3.5 shrink-0 text-error"
+								className="size-3.5 shrink-0 text-rose-mark"
 							/>
 						) : null}
 					</div>

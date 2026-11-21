@@ -15,7 +15,7 @@ const TEXT: Record<Tone, string> = {
 	// design-escape-ok(base): a category colour from the opal sheen (data paint)
 	later: "text-color-4",
 	minor: "",
-	never: "text-error",
+	never: "text-rose-ink",
 };
 
 const nameOf = (label: string, files: boolean) =>

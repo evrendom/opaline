@@ -68,7 +68,7 @@ export function SetupCard({
 	);
 	return (
 		<div className="flex min-h-0 min-w-0 flex-1 flex-col">
-			<header className="flex flex-col gap-m edge-b-m border-line-soft px-xxl py-xl">
+			<header className="flex flex-col gap-m edge-b-m border-line-soft px-[calc(var(--space-xl)+var(--space-xs))] py-xl">
 				<div className="flex min-w-0 items-center gap-m">
 					<span className="flex shrink-0">
 						<SetupMark file={file} />
@@ -116,7 +116,11 @@ export function SetupCard({
 								key={version.version}
 								size="xs"
 								variant="ghost"
-								className={cn("font-data", TOGGLE)}
+								className={cn(
+									"font-mono",
+									TOGGLE,
+									"px-[calc(var(--space-m)+var(--space-xxs))] [&_svg:not([class*='size-'])]:size-3",
+								)}
 								aria-pressed={version === shown}
 								title={`First received ${new Date(version.firstAt).toLocaleString()}, by ${version.runs} ${version.runs === 1 ? "run" : "runs"}`}
 								onClick={() => pick(version.version)}
@@ -130,7 +134,7 @@ export function SetupCard({
 			<div className="flex min-h-0 flex-1">
 				<div className="flex min-h-0 min-w-0 flex-1 flex-col">
 					{!query.isLoading && !shown ? (
-						<p className="px-xxl py-xl text-body-l text-ink-3">
+						<p className="px-[calc(var(--space-xl)+var(--space-xs))] py-xl text-body-l text-ink-3">
 							{query.isError
 								? "Its text could not be read."
 								: "Its text was not kept for this session."}
@@ -142,7 +146,7 @@ export function SetupCard({
 							label="Reading its text"
 							loading={query.isLoading}
 							sample={
-								<div className="flex flex-col gap-m px-xxl py-xl">
+								<div className="flex flex-col gap-m px-[calc(var(--space-xl)+var(--space-xs))] py-xl">
 									{[88, 72, 80, 56, 64].map((width) => (
 										<Bone
 											key={width}
@@ -156,7 +160,7 @@ export function SetupCard({
 						>
 							{() =>
 								shown ? (
-									<ScrollColumn className="px-xxl py-xl">
+									<ScrollColumn className="px-[calc(var(--space-xl)+var(--space-xs))] py-xl">
 										{hunks ? (
 											hunks.length === 0 ? (
 												<p className="text-body-l text-ink-3">

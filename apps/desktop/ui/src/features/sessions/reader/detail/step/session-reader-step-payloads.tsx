@@ -77,7 +77,7 @@ export function HighlightedCode({
 			className={cn(
 				"overflow-hidden [overflow-wrap:anywhere]",
 				"corner-s py-m",
-				"font-data text-body-m whitespace-pre-wrap",
+				"font-mono text-body-m whitespace-pre-wrap",
 				"bg-field",
 				className,
 			)}
@@ -96,10 +96,10 @@ export function HighlightedCode({
 						key={`${id}#${repeat}`}
 						className={cn(
 							"flex px-l",
-							// design-escape-ok(opacity): no role renders this; bg-success/10
-							kind === "addition" && "bg-success/10",
-							// design-escape-ok(opacity): no role renders this; bg-error/10
-							kind === "deletion" && "bg-error/10",
+							// design-escape-ok(opacity): shipped value; emerald-500/10
+							kind === "addition" && "bg-emerald-mark/10",
+							// design-escape-ok(opacity): shipped value; rose-500/10
+							kind === "deletion" && "bg-rose-mark/10",
 						)}
 					>
 						{startLine !== undefined || lineNumbers ? (
@@ -117,7 +117,7 @@ export function HighlightedCode({
 								aria-hidden="true"
 								className={cn(
 									"mr-m shrink-0 select-none",
-									kind === "addition" ? "text-success" : "text-error",
+									kind === "addition" ? "text-emerald-ink" : "text-rose-ink",
 								)}
 							>
 								{kind === "addition" ? "+" : "−"}
@@ -167,7 +167,7 @@ function FilePath({ path }: { path: string }) {
 	const slash = path.lastIndexOf("/");
 	return (
 		<SessionFileLink path={path} className="corner-xs hover:underline">
-			<span className="font-data text-body-m [overflow-wrap:anywhere]">
+			<span className="font-mono text-body-m [overflow-wrap:anywhere]">
 				<span className="text-ink-3">{path.slice(0, slash + 1)}</span>
 				<span className="font-medium">{path.slice(slash + 1)}</span>
 			</span>
@@ -221,7 +221,7 @@ function FieldValue({ value }: { value: unknown }) {
 		);
 	}
 	if (typeof value === "number" || typeof value === "boolean") {
-		return <span className="font-data text-body-m">{String(value)}</span>;
+		return <span className="font-mono text-body-m">{String(value)}</span>;
 	}
 	return (
 		<HighlightedCode

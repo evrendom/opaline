@@ -47,8 +47,7 @@ const DASHED =
 function SubagentRoleMark({ role }: { role: SubagentRole }) {
 	const { Icon, className, label } = {
 		finish: {
-			// design-escape-ok(colour): deliberate exception, emerald-500 in both modes; success is green-600 in light, visibly darker (dark's success is this emerald)
-			className: "text-emerald-500",
+			className: "text-emerald-mark",
 			Icon: IconCircleCheckFilled,
 			label: "Finished",
 		},
@@ -115,8 +114,7 @@ export const StepRowView = memo(function StepRowView({
 	const subagentTint = useSubagentTint(step);
 	const subagentRole = useSubagentRole(step);
 	const bar = step.isError
-		? // design-escape-ok(colour): an error step's bar beside the lane-tinted bars
-			{ className: "bg-rose-500" }
+		? { className: "bg-rose-mark" }
 		: { style: { backgroundColor: subagentTint ?? stepTint(step) } };
 	const timed = isToolStep(step) || step.kind === "ci" || durationMs > 0;
 	const running = subagent ? null : solidSpan(step, startMs, total);
@@ -139,7 +137,8 @@ export const StepRowView = memo(function StepRowView({
 					data-mark=""
 					data-width={width}
 					className={cn(
-						"absolute top-1/2 min-w-0.5 -translate-y-1/2 corner-xs",
+						// design-escape-ok(radius): shipped value; 2px bar corners
+						"absolute top-1/2 min-w-0.5 -translate-y-1/2 rounded-[2px]",
 						bar.className,
 						runsOn && !subagent ? `h-0.5 ${DASHED}` : "h-2",
 						running && !runsOn && "opacity-35",

@@ -122,7 +122,8 @@ export function Breakdown({
 			<span className="truncate text-[13px]/4 text-ink tabular-nums">
 				{value}
 			</span>
-			<span className="flex h-1 gap-xxs overflow-hidden corner-full bg-wash">
+			{/* design-escape-ok(space,opacity): shipped value; 1px gaps on ink-3/10 */}
+			<span className="flex h-1 gap-px overflow-hidden corner-full bg-ink-3/10">
 				{shown.map((part) => (
 					<Tip
 						key={part.label}

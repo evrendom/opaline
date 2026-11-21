@@ -144,7 +144,7 @@ export function SubagentStrip({
 								: "Foreground"}
 						</span>
 						{launch.isError ? (
-							<span className="inline-flex items-center gap-xxs text-error">
+							<span className="inline-flex items-center gap-xxs text-rose-mark">
 								<IconAlertTriangle aria-hidden="true" className="size-3" />
 								Failed
 							</span>
@@ -247,7 +247,7 @@ export function ReaderStrip({
 					{failed ? (
 						<>
 							<FactDot />
-							<span className="inline-flex items-center gap-xxs text-error">
+							<span className="inline-flex items-center gap-xxs text-rose-mark">
 								<IconAlertTriangle aria-hidden="true" className="size-3" />
 								{failed}
 							</span>

@@ -60,7 +60,7 @@ const SESSION_THEME_CLASS_NAME = "";
 
 export function TranscriptMaskFixturePage() {
 	return (
-		<main className="transcript-mask-demo dashboardy-page grid h-dvh min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-canvas font-body text-ink">
+		<main className="transcript-mask-demo dashboardy-page grid h-dvh min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-canvas font-body text-dashboardy-heading">
 			<header className="flex min-h-12 items-center justify-between edge-b-m border-line px-xl">
 				<div>
 					<h1 className="text-body-xl font-heavy">Transcript gap texture</h1>

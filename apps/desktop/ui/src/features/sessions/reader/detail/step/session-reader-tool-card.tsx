@@ -141,7 +141,7 @@ export function ToolCard({
 									) : (
 										<pre
 											className={cn(
-												"px-l font-data text-body-m",
+												"px-l font-mono text-body-m",
 												wrap
 													? "whitespace-pre-wrap [overflow-wrap:anywhere]"
 													: "overflow-x-auto whitespace-pre",

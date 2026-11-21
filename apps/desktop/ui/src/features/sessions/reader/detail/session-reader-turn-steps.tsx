@@ -422,7 +422,10 @@ function RunAlertTags({
 						onHover ? (turn.errorCount === 1 ? "error" : "errors") : undefined
 					}
 				>
-					<OpalChip tint="var(--color-rose-500)" className="size-4 text-error">
+					<OpalChip
+						tint="var(--color-rose-500)"
+						className="size-4 text-rose-ink"
+					>
 						<IconAlertTriangle aria-hidden="true" className="size-2.5" />
 					</OpalChip>
 					{turn.errorCount}
@@ -436,7 +439,7 @@ function RunAlertTags({
 				>
 					<OpalChip
 						tint="var(--color-amber-500)"
-						className="size-4 text-warning"
+						className="size-4 text-amber-ink"
 					>
 						<IconAlertTriangle aria-hidden="true" className="size-2.5" />
 					</OpalChip>

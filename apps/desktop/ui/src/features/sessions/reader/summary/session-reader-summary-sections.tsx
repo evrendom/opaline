@@ -177,9 +177,10 @@ export function Row({ children }: { children: ReactNode }) {
 	return (
 		<li
 			className={cn(
-				"flex min-h-8 min-w-0 items-center gap-l",
+				"flex min-h-8 min-w-0 items-center gap-[calc(var(--space-m)+var(--space-xxs))]",
 				"corner-s px-m py-xs",
-				"text-body-l",
+				// design-escape-ok(type): shipped value; 13px on the card's 14/20 ratio (18.57)
+				"text-[13px]/[calc(20/14)]",
 				"hover:bg-hover",
 			)}
 		>
@@ -279,7 +280,7 @@ export function SummaryActivityLine({
 						<span
 							className={cn(
 								"text-ink tabular-nums",
-								label === "errors" && "text-error",
+								label === "errors" && "text-rose-ink",
 							)}
 						>
 							{formatCompactNumber(value)}
@@ -288,7 +289,7 @@ export function SummaryActivityLine({
 					</span>
 				))}
 			{activity.slashCommands.map((command) => (
-				<span key={command} className="font-data">
+				<span key={command} className="font-mono">
 					{command}
 				</span>
 			))}
@@ -307,7 +308,7 @@ export function SkillRow({
 }) {
 	return (
 		<Row>
-			<Glyph icon={IconSparkles} className="text-warning" />
+			<Glyph icon={IconSparkles} className="text-amber-mark" />
 			<ConversationSkillLink
 				name={skill.name}
 				className="min-w-0 flex-1 truncate hover:underline"
@@ -408,7 +409,7 @@ export function SummarySubagents({
 				const label = (
 					<>
 						<SubagentChip selected={false} subagentId={subagent.subagentId} />
-						<span className="font-data text-body-m">
+						<span className="font-mono text-body-m">
 							{shortSubagentId(subagent.subagentId)}
 						</span>
 						<span className="min-w-0 flex-1 truncate text-ink-3">
@@ -422,7 +423,7 @@ export function SummarySubagents({
 							<Link
 								to={places.hrefs.subagent(subagent.subagentId)}
 								title="Read its thread"
-								className="flex min-w-0 flex-1 items-center gap-l hover:underline"
+								className="flex min-w-0 flex-1 items-center gap-[calc(var(--space-m)+var(--space-xxs))] hover:underline"
 							>
 								{label}
 							</Link>
@@ -431,12 +432,12 @@ export function SummarySubagents({
 								type="button"
 								title="Open it in focus in the detail"
 								onClick={() => onOpen(turnId, subagent.subagentId)}
-								className="flex min-w-0 flex-1 items-center gap-l text-left hover:underline"
+								className="flex min-w-0 flex-1 items-center gap-[calc(var(--space-m)+var(--space-xxs))] text-left hover:underline"
 							>
 								{label}
 							</button>
 						) : (
-							<span className="flex min-w-0 flex-1 items-center gap-l">
+							<span className="flex min-w-0 flex-1 items-center gap-[calc(var(--space-m)+var(--space-xxs))]">
 								{label}
 							</span>
 						)}
@@ -459,9 +460,23 @@ export function SummarySubagents({
 }
 
 export function Empty({ children }: { children: ReactNode }) {
-	return <p className="text-body-l text-ink-3">{children}</p>;
+	return (
+		<p
+			// design-escape-ok(type): shipped value; 13px on the card's 14/20 ratio (18.57)
+			className="text-[13px]/[calc(20/14)] text-ink-3"
+		>
+			{children}
+		</p>
+	);
 }
 
 export function Pending() {
-	return <p className="text-body-l text-ink-3">Loading…</p>;
+	return (
+		<p
+			// design-escape-ok(type): shipped value; 13px on the card's 14/20 ratio (18.57)
+			className="text-[13px]/[calc(20/14)] text-ink-3"
+		>
+			Loading…
+		</p>
+	);
 }

@@ -78,7 +78,7 @@ export function ChangeBlock({
 					<Button
 						size="xs"
 						variant="ghost"
-						className="ml-auto text-ink-3"
+						className="ml-auto text-ink-3 px-[calc(var(--space-m)+var(--space-xxs))] [&_svg:not([class*='size-'])]:size-3"
 						onClick={() => onOpenTurn(turnId, change.agentId || undefined)}
 					>
 						Turn {shortRunId(turnId)}
