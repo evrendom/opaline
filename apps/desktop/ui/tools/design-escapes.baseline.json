@@ -1,12 +1,12 @@
 {
-	"type": 71,
-	"space": 9,
-	"radius": 15,
-	"colour": 290,
-	"shadow": 17,
-	"opacity": 415,
-	"motion": 147,
-	"base": 60,
-	"marker": 93,
-	"markers": 0
+	"type": 0,
+	"space": 0,
+	"radius": 0,
+	"colour": 0,
+	"shadow": 0,
+	"opacity": 0,
+	"motion": 0,
+	"base": 0,
+	"marker": 0,
+	"markers": 441
 }
