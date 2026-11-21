@@ -28,8 +28,7 @@ function summary(value: object): string {
 function Primitive({ value }: { value: unknown }) {
 	if (typeof value === "string")
 		return value === "" ? (
-			// design-escape-ok(opacity): no role renders this; text-ink-3/50
-			<span className="text-ink-3/50">""</span>
+			<span className="text-ink-3-50">""</span>
 		) : (
 			<span className="whitespace-pre-wrap text-ink [overflow-wrap:anywhere]">
 				{value}
@@ -54,16 +53,14 @@ function Entry({
 	const nested = isNested(value) && entriesOf(value).length > 0;
 	const [open, setOpen] = useState(depth < OPEN_LEVELS);
 	const key = (
-		// design-escape-ok(opacity): no role renders this; text-ink-3/60
-		<span className={cn("text-ink-3", index && "text-ink-3/60")}>{name}</span>
+		<span className={cn("text-ink-3", index && "text-ink-3-60")}>{name}</span>
 	);
 	if (!nested)
 		return (
 			<>
 				{key}
 				{isNested(value) ? (
-					// design-escape-ok(opacity): no role renders this; text-ink-3/50
-					<span className="text-ink-3/50">
+					<span className="text-ink-3-50">
 						{Array.isArray(value) ? "[]" : "{}"}
 					</span>
 				) : (
@@ -82,15 +79,13 @@ function Entry({
 				<IconChevronRight
 					aria-hidden="true"
 					className={cn(
-						// design-escape-ok(opacity): no role renders this; text-ink-3/60
-						"size-3.5 shrink-0 text-ink-3/60 transition-transform",
+						"size-3.5 shrink-0 text-ink-3-60 transition-transform",
 						open && "rotate-90",
 					)}
 				/>
 				{key}
 			</button>
-			{/* design-escape-ok(opacity): no role renders this; text-ink-3/50 */}
-			<span className="text-ink-3/50">{open ? null : summary(value)}</span>
+			<span className="text-ink-3-50">{open ? null : summary(value)}</span>
 			{open ? (
 				<div className="col-span-2 pl-xl">
 					<Entries depth={depth + 1} value={value} />

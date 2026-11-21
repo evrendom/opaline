@@ -141,8 +141,7 @@ function BreakdownStrip({
 							style={{ backgroundColor: part.color }}
 						/>
 						{part.label} {format(part.value)}
-						{/* design-escape-ok(opacity): no role renders this; text-ink-3/60 */}
-						<span className="text-ink-3/60">{share(part.value)}</span>
+						<span className="text-ink-3-60">{share(part.value)}</span>
 					</span>
 				))}
 			</span>
@@ -282,8 +281,7 @@ function Touched({ marks }: { marks: readonly SessionReaderTurnMark[] }) {
 						<span className="flex items-center gap-s text-body-m text-ink-3">
 							<Icon aria-hidden="true" className={cn("size-3.5", className)} />
 							{label}
-							{/* design-escape-ok(opacity): no role renders this; text-ink-3/60 */}
-							<span className="text-ink-3/60 tabular-nums">
+							<span className="text-ink-3-60 tabular-nums">
 								{mark.items.length}
 							</span>
 						</span>
@@ -384,8 +382,7 @@ function StepKinds({
 									"flex w-full items-center gap-m",
 									"corner-s px-m py-xs",
 									"text-left focus-outline",
-									// design-escape-ok(opacity): no role renders this; dark:hover:bg-hover/50
-									"hover:bg-hover dark:hover:bg-hover/50",
+									"hover:bg-hover dark:hover:bg-hover-50",
 									on && "bg-hover dark:bg-hover",
 								)}
 							>

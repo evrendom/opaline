@@ -146,9 +146,7 @@ export function SiteHeader({
 						</Link>
 						<IconChevronRight
 							aria-hidden="true"
-							className={
-								/* design-escape-ok(opacity): no role renders this; ink-3 at 50% */ "size-4 shrink-0 text-ink-3/50"
-							}
+							className={"size-4 shrink-0 text-ink-3-50"}
 							stroke={1.5}
 						/>
 						{modelChip ? (

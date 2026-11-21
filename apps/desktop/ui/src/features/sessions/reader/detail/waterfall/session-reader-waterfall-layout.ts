@@ -25,8 +25,7 @@ export const ROW =
 export function rowState(selected: boolean): string {
 	return selected
 		? "bg-hover dark:bg-hover"
-		: // design-escape-ok(opacity): no role renders this; dark:hover:bg-hover/50
-			"hover:bg-hover dark:hover:bg-hover/50";
+		: "hover:bg-hover dark:hover:bg-hover-50";
 }
 
 export function barGeometry(

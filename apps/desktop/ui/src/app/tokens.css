@@ -140,6 +140,16 @@
 	/* a faint edge ringing a small avatar or logo on any ground */
 	--line-faint: color-mix(in oklab, var(--ink) 5%, transparent);
 
+	/* Shipped shades: a role at the strength the app renders it, defined
+	   exactly as Tailwind's opacity modifier is (`text-ink-3/50` renders the
+	   same as `text-ink-3-50`), so they follow the mode with their role. */
+	--ink-90: color-mix(in oklab, var(--ink) 90%, transparent);
+	--ink-80: color-mix(in oklab, var(--ink) 80%, transparent);
+	--ink-3-60: color-mix(in oklab, var(--ink-3) 60%, transparent);
+	--ink-3-50: color-mix(in oklab, var(--ink-3) 50%, transparent);
+	--ink-3-40: color-mix(in oklab, var(--ink-3) 40%, transparent);
+	--hover-50: color-mix(in oklab, var(--hover) 50%, transparent);
+
 	/* Shipped inks: values the app renders exactly as main does, with no other role holding them. */
 	--dashboardy-heading: #111827;
 	--session-overview-text: #101112;
@@ -233,6 +243,12 @@
 	--color-shelf: var(--shelf);
 	--color-line-faint: var(--line-faint);
 
+	--color-ink-90: var(--ink-90);
+	--color-ink-80: var(--ink-80);
+	--color-ink-3-60: var(--ink-3-60);
+	--color-ink-3-50: var(--ink-3-50);
+	--color-ink-3-40: var(--ink-3-40);
+	--color-hover-50: var(--hover-50);
 	--color-dashboardy-heading: var(--dashboardy-heading);
 	--color-session-overview-text: var(--session-overview-text);
 	--color-rose-ink: var(--rose-ink);

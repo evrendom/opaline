@@ -113,8 +113,7 @@ export function RunSummaryBar({
 								</span>
 							) : null}
 							{setting ? (
-								// design-escape-ok(opacity): no role renders this; text-ink-3/60
-								<span className="shrink-0 text-ink-3/60">{setting}</span>
+								<span className="shrink-0 text-ink-3-60">{setting}</span>
 							) : null}
 							{mode?.planMode ? <ConversationTracePlanTag /> : null}
 						</span>
@@ -123,14 +122,12 @@ export function RunSummaryBar({
 						expanded ? (
 							<IconArrowsDiagonalMinimize2
 								aria-hidden="true"
-								// design-escape-ok(opacity): no role renders this; text-ink-3/60
-								className="size-4 shrink-0 text-ink-3/60 transition-colors group-hover/run:text-ink"
+								className="size-4 shrink-0 text-ink-3-60 transition-colors group-hover/run:text-ink"
 							/>
 						) : (
 							<IconArrowsDiagonal
 								aria-hidden="true"
-								// design-escape-ok(opacity): no role renders this; text-ink-3/60
-								className="size-4 shrink-0 text-ink-3/60 transition-colors group-hover/run:text-ink"
+								className="size-4 shrink-0 text-ink-3-60 transition-colors group-hover/run:text-ink"
 							/>
 						)
 					) : null}
@@ -328,8 +325,7 @@ function RunStepTags({
 						"inline-flex h-5 items-center gap-xs",
 						"corner-full pr-m pl-xxs",
 						"tabular-nums",
-						// design-escape-ok(opacity): no role renders this; text-ink/80
-						"bg-canvas text-ink/80 shadow-control",
+						"bg-canvas text-ink-80 shadow-control",
 						"dark:bg-card",
 					)}
 				>
@@ -465,8 +461,7 @@ function RunTag({
 				"inline-flex h-5 items-center",
 				"corner-full px-m",
 				"tabular-nums",
-				// design-escape-ok(opacity): no role renders this; text-ink/80
-				"bg-canvas text-ink/80 shadow-control",
+				"bg-canvas text-ink-80 shadow-control",
 				"dark:bg-card",
 				className,
 			)}

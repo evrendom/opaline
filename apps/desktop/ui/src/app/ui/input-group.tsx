@@ -28,8 +28,7 @@ function InputGroup({
 				variant === "toolbar"
 					? // The hover tint is half the hover role in light and all of it in
 						// dark; no role holds that step, so it stays a dark: pair.
-						// design-escape-ok(opacity): no role renders this; hover/50 toolbar hover
-						"h-8 corner-full bg-card shadow-control hover:bg-hover/50 dark:hover:bg-hover"
+						"h-8 corner-full bg-card shadow-control hover:bg-hover-50 dark:hover:bg-hover"
 					: // design-escape-ok(opacity): no role renders this; line/50 edge and line-strong/30 fill in dark
 						"h-9 corner-s corner-squircle shadow-card squircle:corner-l dark:shadow-none dark:edge-s dark:border-line/50 dark:bg-line-strong/30",
 				"in-data-[slot=combobox-content]:focus-within:border-inherit",

@@ -126,8 +126,7 @@ export function OpalTag({
 			onPointerEnter={onHover ? () => onHover(true) : undefined}
 			onPointerLeave={onHover ? () => onHover(false) : undefined}
 			className={cn(
-				// design-escape-ok(opacity): no role renders this; text-ink/80
-				"group/tag relative inline-flex h-5 items-center pr-s pl-xxs text-ink/80 tabular-nums",
+				"group/tag relative inline-flex h-5 items-center pr-s pl-xxs text-ink-80 tabular-nums",
 				className,
 			)}
 		>

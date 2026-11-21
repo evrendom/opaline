@@ -60,11 +60,9 @@ const OUTCOME = {
 const duration = (ms: number) => formatReaderDuration(ms / 1000);
 
 const DOT: Record<CiRoundOutcome, string> = {
-	// design-escape-ok(opacity): no role renders this; border-ink-3/50
-	cancelled: "edge-m border-ink-3/50",
+	cancelled: "edge-m border-ink-3-50",
 	failed: "bg-rose-mark",
-	// design-escape-ok(opacity): no role renders this; bg-ink-3/40
-	other: "bg-ink-3/40",
+	other: "bg-ink-3-40",
 	passed: "bg-emerald-mark",
 	flaky: "bg-amber-mark",
 	running: "animate-pulse bg-warning-translucent",
@@ -298,8 +296,7 @@ const END_DOT = {
 	closed: "bg-rose-mark",
 	// design-escape-ok(base): a category colour from the opal sheen (data paint)
 	merged: "bg-color-2",
-	// design-escape-ok(opacity): no role renders this; border-ink-3/50
-	open: "edge-m border-ink-3/50",
+	open: "edge-m border-ink-3-50",
 };
 
 function LineNode({
@@ -351,8 +348,7 @@ export function CiRounds({
 	const ending = pullEndWords(rounds, pull);
 	return (
 		<section className="flex flex-col gap-xs">
-			{/* design-escape-ok(opacity): no role renders this; text-ink/80 */}
-			<h3 className="px-l text-body-m font-medium text-ink/80">Pushes</h3>
+			<h3 className="px-l text-body-m font-medium text-ink-80">Pushes</h3>
 			<ol className="flex flex-col">
 				{rounds.map((round, index) => {
 					const picked = isRoundPicked(round, pickedRun);

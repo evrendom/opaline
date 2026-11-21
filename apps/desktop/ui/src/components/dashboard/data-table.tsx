@@ -274,8 +274,7 @@ export function SearchInput({
 						size="icon-xs"
 						aria-label="Clear search"
 						onClick={() => onChange("")}
-						// design-escape-ok(opacity): no role renders this; ink-3/60
-						className="corner-full text-ink-3/60 hover:text-ink"
+						className="corner-full text-ink-3-60 hover:text-ink"
 					>
 						<IconX className="size-3.5" />
 					</InputGroupButton>
@@ -308,8 +307,7 @@ export function ToggleChip({
 				// (outline would pin the icon to neutral, hence the svg override).
 				"font-regular transition-[color,box-shadow] active:scale-100",
 				!active &&
-					// design-escape-ok(opacity): no role renders this; ink-3/50 text, hover/50 fill
-					"text-ink-3/50 hover:text-ink-3/50 bg-card hover:bg-hover/50 aria-expanded:bg-hover/50 dark:hover:bg-hover dark:aria-expanded:bg-hover [&_svg:not([class*='text-'])]:text-ink-3/50 dark:[&_svg:not([class*='text-'])]:text-ink-3/50",
+					"text-ink-3-50 hover:text-ink-3-50 bg-card hover:bg-hover-50 aria-expanded:bg-hover-50 dark:hover:bg-hover dark:aria-expanded:bg-hover [&_svg:not([class*='text-'])]:text-ink-3-50 dark:[&_svg:not([class*='text-'])]:text-ink-3-50",
 			)}
 		>
 			{children}
@@ -339,8 +337,7 @@ export function ClearFiltersButton({
 					<Button
 						variant="outline"
 						onClick={onClick}
-						// design-escape-ok(opacity): no role renders this; hover/50
-						className="text-ink-3 gap-xs bg-card hover:bg-hover/50 aria-expanded:bg-hover/50 dark:hover:bg-hover dark:aria-expanded:bg-hover"
+						className="text-ink-3 gap-xs bg-card hover:bg-hover-50 aria-expanded:bg-hover-50 dark:hover:bg-hover dark:aria-expanded:bg-hover"
 					>
 						<IconX />
 						Clear
@@ -402,10 +399,7 @@ export function PaginationFooter({
 				"border-line-soft",
 			)}
 		>
-			<span
-				// design-escape-ok(opacity): no role renders this; ink-3/50
-				className="text-body-m text-ink-3/50 tabular-nums"
-			>
+			<span className="text-body-m text-ink-3-50 tabular-nums">
 				<FlowNumber
 					value={count}
 					format={count >= 1000 ? COMPACT_COUNT : undefined}
@@ -431,8 +425,7 @@ export function PaginationFooter({
 							"h-auto gap-s",
 							"corner-s edge-none p-zero",
 							"text-body-m tabular-nums",
-							// design-escape-ok(opacity): no role renders this; ink-3/50
-							"bg-transparent text-ink-3/50 shadow-none transition-[color,box-shadow]",
+							"bg-transparent text-ink-3-50 shadow-none transition-[color,box-shadow]",
 							"data-[size=default]:h-auto",
 							"squircle:corner-s",
 							"hover:text-ink",
@@ -455,12 +448,7 @@ export function PaginationFooter({
 					</SelectContent>
 				</Select>
 			) : (
-				<span
-					// design-escape-ok(opacity): no role renders this; ink-3/50
-					className="text-body-m text-ink-3/50 tabular-nums"
-				>
-					{range}
-				</span>
+				<span className="text-body-m text-ink-3-50 tabular-nums">{range}</span>
 			)}
 			<div className="ml-s flex items-center gap-xs">
 				<Button

@@ -470,8 +470,7 @@ function RunRow({
 			<span
 				className={cn(
 					"min-w-0 flex-1 truncate text-body-m tabular-nums",
-					// design-escape-ok(opacity): no role renders this; ink/90
-					isPicked ? "text-ink" : "text-ink/90",
+					isPicked ? "text-ink" : "text-ink-90",
 				)}
 			>
 				{run.agentId

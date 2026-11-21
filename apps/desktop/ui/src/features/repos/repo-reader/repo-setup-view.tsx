@@ -576,8 +576,7 @@ function ToolRows({
 									<span
 										className={cn(
 											"min-w-0 truncate",
-											// design-escape-ok(opacity): no role renders this; ink/80
-											isPicked ? "text-ink" : "text-ink/80",
+											isPicked ? "text-ink" : "text-ink-80",
 										)}
 									>
 										{tool.name}
@@ -664,8 +663,7 @@ function VersionRows({
 									<span
 										className={cn(
 											"shrink-0",
-											// design-escape-ok(opacity): no role renders this; ink/80
-											isShown ? "text-ink" : "text-ink/80",
+											isShown ? "text-ink" : "text-ink-80",
 										)}
 									>
 										v{numbers.get(version.version)}
@@ -741,8 +739,7 @@ function RepoSetupRow({
 			title={file.setupFile}
 			className={cn(
 				"truncate text-body-m",
-				// design-escape-ok(opacity): no role renders this; ink/90
-				isPicked ? "text-ink" : "text-ink/90",
+				isPicked ? "text-ink" : "text-ink-90",
 			)}
 		>
 			{setupName(file)}

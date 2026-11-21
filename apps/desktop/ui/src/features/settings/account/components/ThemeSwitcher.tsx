@@ -39,10 +39,7 @@ export function ThemeSwitcher() {
 							"relative flex size-7 items-center justify-center",
 							"corner-full",
 							"focus-outline transition-colors",
-							active
-								? "text-ink"
-								: // design-escape-ok(opacity): no role renders this; ink-3 at 60%
-									"text-ink-3/60 hover:text-ink",
+							active ? "text-ink" : "text-ink-3-60 hover:text-ink",
 						)}
 					>
 						{active ? (

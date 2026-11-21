@@ -175,8 +175,7 @@ function SessionLink({
 			<span className="truncate">{shortSessionId(session.sessionId)}</span>
 			<IconArrowUpRight
 				aria-hidden="true"
-				// design-escape-ok(opacity): no role renders this; ink-3/60
-				className="size-3 shrink-0 text-ink-3/60 transition-colors group-hover/session:text-ink group-focus-visible/session:text-ink"
+				className="size-3 shrink-0 text-ink-3-60 transition-colors group-hover/session:text-ink group-focus-visible/session:text-ink"
 			/>
 		</Link>
 	);

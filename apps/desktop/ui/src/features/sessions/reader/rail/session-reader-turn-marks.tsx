@@ -171,8 +171,7 @@ export function RunTouchTags({
 					"inline-flex h-5 items-center gap-xs",
 					"corner-full pr-m pl-xxs",
 					"tabular-nums",
-					// design-escape-ok(opacity): no role renders this; text-ink/80
-					"bg-canvas text-ink/80 shadow-control",
+					"bg-canvas text-ink-80 shadow-control",
 					"dark:bg-card",
 				)}
 			>

@@ -281,8 +281,7 @@ function renderRow(
 					{line.newNumber}
 				</span>
 				<span skullet-ignore="" className="w-2 shrink-0" />
-				{/* design-escape-ok(opacity): no role renders this; text-ink-3/40 */}
-				<span className={cn("whitespace-pre", !isLit && "text-ink-3/40")}>
+				<span className={cn("whitespace-pre", !isLit && "text-ink-3-40")}>
 					{isLit ? lineContent(line.text, tokens, line.marks, "") : line.text}
 				</span>
 			</div>
@@ -303,8 +302,7 @@ function renderRow(
 			)}
 		>
 			<span
-				// design-escape-ok(opacity): no role renders this; text-ink-3/50
-				className="shrink-0 text-right text-ink-3/50 tabular-nums select-none"
+				className="shrink-0 text-right text-ink-3-50 tabular-nums select-none"
 				style={numberStyle}
 			>
 				{line.kind === "removed" ? line.oldNumber : line.newNumber}

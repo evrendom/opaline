@@ -25,7 +25,7 @@ export function RowTotals({
 		<div className="flex flex-col items-end pr-xs text-right">
 			{durationMs !== null ? (
 				// design-escape-ok(type,opacity): deliberate exception, waterfall figures inherit the row's line; no step
-				<span className="text-[11px] font-medium text-ink/80 tabular-nums">
+				<span className="text-[11px] font-medium text-ink-80 tabular-nums">
 					{formatSpanDuration(durationMs)}
 				</span>
 			) : null}
@@ -56,7 +56,7 @@ export function TimeRuler({ total }: { total: number }) {
 						// One line: a label at the track's end has no width left to
 						// lay out in, so "4m 10s" would otherwise stack its words.
 						// design-escape-ok(type,opacity): deliberate exception, ruler labels at 10px inherit the ruler's line
-						"absolute top-0 text-[10px] whitespace-nowrap text-ink-3/50 tabular-nums",
+						"absolute top-0 text-[10px] whitespace-nowrap text-ink-3-50 tabular-nums",
 						fraction === 1 && "-translate-x-full",
 						// The inner labels collide on a short track, so only the two
 						// ends show there.

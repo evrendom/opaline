@@ -32,8 +32,7 @@ export type SubagentSummary =
 
 export function FactDot() {
 	return (
-		// design-escape-ok(opacity): no role renders this; text-ink-3/50
-		<span aria-hidden="true" className="text-ink-3/50">
+		<span aria-hidden="true" className="text-ink-3-50">
 			·
 		</span>
 	);

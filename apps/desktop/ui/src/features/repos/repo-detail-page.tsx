@@ -467,8 +467,7 @@ export function RepoDetailHeader({
 	const separator = (
 		<IconChevronRight
 			aria-hidden="true"
-			// design-escape-ok(opacity): no role renders this; ink-3/50
-			className="size-4 shrink-0 text-ink-3/50"
+			className="size-4 shrink-0 text-ink-3-50"
 			stroke={1.5}
 		/>
 	);

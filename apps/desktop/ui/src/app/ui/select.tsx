@@ -86,8 +86,7 @@ function SelectTrigger({
 				"disabled:cursor-not-allowed disabled:opacity-50",
 				// design-escape-ok(opacity): no role renders this; error/20 invalid ring
 				"aria-invalid:border-error aria-invalid:ring-[1.5px] aria-invalid:ring-error/20",
-				// design-escape-ok(opacity): no role renders this; ink-3/50 placeholder
-				"data-placeholder:text-ink-3/50",
+				"data-placeholder:text-ink-3-50",
 				"data-[size=default]:h-9",
 				"data-[size=sm]:h-8",
 				"*:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-s",
@@ -102,8 +101,7 @@ function SelectTrigger({
 			{children}
 			<SelectPrimitive.Icon
 				render={
-					// design-escape-ok(opacity): no role renders this; ink-3/50 chevron
-					<IconSelector className="pointer-events-none size-3.5 text-ink-3/50" />
+					<IconSelector className="pointer-events-none size-3.5 text-ink-3-50" />
 				}
 			/>
 		</SelectPrimitive.Trigger>

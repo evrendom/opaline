@@ -167,8 +167,7 @@ function CiLine({
 			{parts.map((part, index) => (
 				<span key={part.text} className="inline-flex items-baseline gap-s">
 					{index > 0 ? (
-						// design-escape-ok(opacity): no role renders this; text-ink-3/50
-						<span aria-hidden="true" className="text-ink-3/50">
+						<span aria-hidden="true" className="text-ink-3-50">
 							·
 						</span>
 					) : null}
@@ -234,8 +233,7 @@ export function PullLine({
 					title={pull?.title ?? undefined}
 					className={cn(
 						"min-w-0 flex-1 truncate text-body-m",
-						// design-escape-ok(opacity): no role renders this; text-ink/90
-						isPicked ? "text-ink" : "text-ink/90",
+						isPicked ? "text-ink" : "text-ink-90",
 					)}
 				>
 					{pullTitle(row.entry)}

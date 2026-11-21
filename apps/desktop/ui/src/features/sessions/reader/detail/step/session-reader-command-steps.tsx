@@ -258,8 +258,7 @@ function StageText({
 	span: Span;
 }) {
 	return open ? (
-		// design-escape-ok(opacity): no role renders this; text-ink/80">
-		<span className="text-body-l text-ink/80">
+		<span className="text-body-l text-ink-80">
 			{keyed(gluePunctuation(capitalized(sentence)), (part) =>
 				segmentText(part.segment),
 			).map(({ item, key }) => (
@@ -380,7 +379,7 @@ function Spaces({ count }: { count: number }) {
 	return (
 		<span
 			title={`${count} space${count === 1 ? "" : "s"}`}
-			className="text-ink-3/50 select-none"
+			className="text-ink-3-50 select-none"
 		>
 			{"·".repeat(count)}
 		</span>
@@ -406,7 +405,7 @@ function WordsButton({
 			className={cn(
 				"inline-flex size-5 shrink-0 items-center justify-center",
 				"ml-auto corner-xs focus-outline",
-				"text-ink-3/60 transition-colors",
+				"text-ink-3-60 transition-colors",
 				"hover:bg-hover hover:text-ink",
 				open && "bg-field text-ink",
 			)}

@@ -208,8 +208,7 @@ function Table({
 											wrap ? "[overflow-wrap:anywhere]" : "whitespace-nowrap",
 										)}
 									>
-										{/* design-escape-ok(opacity): no role renders this; text-ink-3/40 */}
-										{row[column] || <span className="text-ink-3/40">—</span>}
+										{row[column] || <span className="text-ink-3-40">—</span>}
 									</td>
 								))}
 							</tr>

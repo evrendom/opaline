@@ -50,8 +50,7 @@ export function MarkLegend({
 				className,
 			)}
 		>
-			{/* design-escape-ok(opacity): no role renders this; text-ink-3/60 */}
-			<span className="flex h-6 items-center px-m text-ink-3/60">Errors</span>
+			<span className="flex h-6 items-center px-m text-ink-3-60">Errors</span>
 			<ul aria-label="Errors" className="flex min-w-0 items-center gap-xxs">
 				{shown.map((tone) => (
 					<li key={tone} className="flex h-6 items-center gap-s px-m">

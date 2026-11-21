@@ -117,8 +117,7 @@ export function ReachedBy({
 										subagentId={reacher.agent ?? ""}
 										selected={lit === reacher.key}
 									/>
-									{/* design-escape-ok(opacity): no role renders this; text-ink/80 */}
-									<span className="min-w-0 flex-1 truncate text-ink/80">
+									<span className="min-w-0 flex-1 truncate text-ink-80">
 										{reacher.task ?? "Subagent"}
 									</span>
 									<HowWords link={link} />
@@ -168,8 +167,7 @@ export function PullTouchers({
 							{reacher.agent ? (
 								<SubagentTag subagentId={reacher.agent} />
 							) : null}
-							{/* design-escape-ok(opacity): no role renders this; text-ink/80 */}
-							<span className="min-w-0 flex-1 truncate text-ink/80">
+							<span className="min-w-0 flex-1 truncate text-ink-80">
 								{reacher.agent
 									? (reacher.task ?? "Subagent")
 									: (reacher.prompt ?? "No prompt")}

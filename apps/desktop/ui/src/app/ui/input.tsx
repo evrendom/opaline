@@ -19,8 +19,7 @@ function Input({ className, type, ...props }: React.ComponentProps<"input">) {
 				// design-escape-ok(opacity): no role renders this; line/70 dark edge on hover
 				"hover:dark:border-line/70",
 				"file:inline-flex file:h-7 file:edge-none file:bg-transparent file:text-body-xl file:font-medium file:text-ink",
-				// design-escape-ok(opacity): no role renders this; ink-3/50 placeholder
-				"placeholder:text-ink-3/50",
+				"placeholder:text-ink-3-50",
 				"disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
 				// design-escape-ok(opacity): no role renders this; error/20 invalid ring
 				"aria-invalid:border-error aria-invalid:ring-[1.5px] aria-invalid:ring-error/20",

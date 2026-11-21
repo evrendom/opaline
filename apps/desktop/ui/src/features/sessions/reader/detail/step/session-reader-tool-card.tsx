@@ -193,8 +193,7 @@ export function ToolCard({
 					) : null}
 				</AnimatePresence>
 				{text ? null : (
-					// design-escape-ok(opacity): no role renders this; text-ink-3/60
-					<p className="px-l pb-xs text-body-m text-ink-3/60">No output</p>
+					<p className="px-l pb-xs text-body-m text-ink-3-60">No output</p>
 				)}
 			</div>
 		</section>

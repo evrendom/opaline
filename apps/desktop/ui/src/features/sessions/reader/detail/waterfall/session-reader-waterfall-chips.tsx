@@ -58,8 +58,7 @@ function ciTone(ci: SessionReaderStep["ci"]): {
 				: ci.run.conclusion;
 	if (conclusion === undefined)
 		return {
-			// design-escape-ok(opacity): no role renders this; bg-ink-3/40
-			bar: "bg-ink-3/40",
+			bar: "bg-ink-3-40",
 			text: "text-ink-3",
 			tint: "var(--ink-3)",
 		};

@@ -136,8 +136,7 @@ function ContextRange({
 						stroke="currentColor"
 						strokeDasharray={`${Math.max(start * 100, 1)} 100`}
 						strokeWidth="2"
-						// design-escape-ok(opacity): no role renders this; text-ink-3/40
-						className="text-ink-3/40"
+						className="text-ink-3-40"
 					/>
 					<circle
 						cx="6"

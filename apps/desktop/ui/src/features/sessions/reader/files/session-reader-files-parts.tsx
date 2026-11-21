@@ -179,6 +179,5 @@ export function Crumb({
 }
 
 export function CrumbSeparator() {
-	// design-escape-ok(opacity): no role renders this; text-ink-3/50
-	return <span className="shrink-0 text-ink-3/50">›</span>;
+	return <span className="shrink-0 text-ink-3-50">›</span>;
 }
