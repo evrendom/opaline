@@ -83,7 +83,10 @@ const SkillCard = memo(function SkillCard({
 			}
 		>
 			{description ? (
-				<p className="pt-s text-body-l text-pretty text-ink/75">
+				<p
+					// design-escape-ok(opacity): no role renders this; ink/75
+					className="pt-s text-body-l text-pretty text-ink/75"
+				>
 					{description}
 				</p>
 			) : skill.contentPreview ? (
@@ -144,8 +147,7 @@ export function OverviewCard({
 					<span
 						aria-hidden="true"
 						skullet-ignore=""
-						// design-escape-ok: the card's emoji watermark is artwork, set solid
-						className="absolute -right-3 -bottom-7 rotate-[-14deg] text-display-xxl leading-none opacity-15"
+						className="absolute -right-3 -bottom-7 rotate-[-14deg] text-display-xxl line-solid opacity-15"
 					>
 						<span>{emoji}</span>
 					</span>
@@ -213,7 +215,7 @@ export function StripPill({
 				"inline-flex items-center gap-xs",
 				"corner-full px-m py-xxs",
 				"text-body-s font-medium tabular-nums",
-				// design-escape-ok: a scrim pill over the card's tinted artwork; reads the same in both modes
+				// design-escape-ok(colour): a scrim pill over the card's tinted artwork; reads the same in both modes
 				"bg-black/30 text-white",
 			)}
 		>

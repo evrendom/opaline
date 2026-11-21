@@ -45,8 +45,8 @@
 	color: var(--ink-3);
 	outline: none;
 	transition:
-		background-color var(--motion-quick-duration) ease-in-out,
-		color var(--motion-quick-duration) ease-in-out;
+		background-color var(--motion-quick-duration) var(--motion-wave-easing),
+		color var(--motion-quick-duration) var(--motion-wave-easing);
 }
 
 .cli-update-notice-dismiss:is(:hover, :focus-visible) {
@@ -69,7 +69,8 @@
 
 @media (prefers-reduced-motion: no-preference) {
 	.cli-update-notice {
-		animation: cli-update-notice-in 180ms ease-out both;
+		animation: cli-update-notice-in var(--motion-medium-duration)
+			var(--motion-easing) both;
 	}
 }
 

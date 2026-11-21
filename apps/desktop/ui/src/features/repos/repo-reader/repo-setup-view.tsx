@@ -162,7 +162,7 @@ function CalledServerCard({
 function ListedSkillCard({ skill }: { skill: RepositoryListedSkill }) {
 	return (
 		<div className="flex min-h-0 min-w-0 flex-1 flex-col">
-			<header className="flex flex-col gap-m edge-b-m border-line/50 px-xxl py-xl">
+			<header className="flex flex-col gap-m edge-b-m border-line-soft px-xxl py-xl">
 				<div className="flex min-w-0 items-center gap-m">
 					<span className="flex shrink-0 opacity-60 grayscale">
 						<SkillMarkGlyph />
@@ -326,6 +326,7 @@ export function RepoSetupView({
 							"flex h-8 shrink-0 items-center gap-s",
 							"corner-s pr-xs pl-m",
 							"text-body-m",
+							// design-escape-ok(opacity): no role renders this; field/50
 							"bg-field/50",
 						)}
 					>
@@ -575,6 +576,7 @@ function ToolRows({
 									<span
 										className={cn(
 											"min-w-0 truncate",
+											// design-escape-ok(opacity): no role renders this; ink/80
 											isPicked ? "text-ink" : "text-ink/80",
 										)}
 									>
@@ -662,6 +664,7 @@ function VersionRows({
 									<span
 										className={cn(
 											"shrink-0",
+											// design-escape-ok(opacity): no role renders this; ink/80
 											isShown ? "text-ink" : "text-ink/80",
 										)}
 									>
@@ -738,6 +741,7 @@ function RepoSetupRow({
 			title={file.setupFile}
 			className={cn(
 				"truncate text-body-m",
+				// design-escape-ok(opacity): no role renders this; ink/90
 				isPicked ? "text-ink" : "text-ink/90",
 			)}
 		>
@@ -823,7 +827,10 @@ function SetupSkeleton() {
 		>
 			<div className="flex h-full min-h-0 gap-xxl">
 				<div className="-mb-m flex min-h-0 w-[320px] shrink-0 flex-col gap-s">
-					<div className="flex h-8 shrink-0 items-center corner-s bg-field/50 pl-m">
+					<div
+						// design-escape-ok(opacity): no role renders this; field/50
+						className="flex h-8 shrink-0 items-center corner-s bg-field/50 pl-m"
+					>
 						<Bar className="h-2.5 w-20 corner-full" />
 					</div>
 					<div className="flex flex-col gap-xxs">

@@ -470,6 +470,7 @@ function RunRow({
 			<span
 				className={cn(
 					"min-w-0 flex-1 truncate text-body-m tabular-nums",
+					// design-escape-ok(opacity): no role renders this; ink/90
 					isPicked ? "text-ink" : "text-ink/90",
 				)}
 			>
@@ -962,7 +963,7 @@ function OpenRunLink({
 			className={
 				compact
 					? "flex h-6 items-center gap-xs corner-xs px-s text-body-s text-ink-3 transition-colors hover:text-ink"
-					: "inline-flex h-8 items-center gap-xs corner-s edge-m border-line/60 px-l text-body-m font-medium transition-colors hover:bg-hover"
+					: "inline-flex h-8 items-center gap-xs corner-s edge-m border-line-soft px-l text-body-m font-medium transition-colors hover:bg-hover"
 			}
 		>
 			Open in session
@@ -1042,6 +1043,7 @@ function MiddleSample({ section }: { section: UseSection }) {
 					className={cn(
 						"flex h-8 shrink-0 items-center gap-s",
 						"corner-s px-m",
+						// design-escape-ok(opacity): no role renders this; field/50
 						"bg-field/50",
 					)}
 				>
@@ -1085,7 +1087,7 @@ function SkillTraceBody() {
 				</div>
 			</div>
 			<div
-				// design-escape-ok: skeleton rows indent past the trace's 36px glyph column and its 9px rule
+				// design-escape-ok(space): skeleton rows indent past the trace's 36px glyph column and its 9px rule
 				className="flex flex-col gap-xl pl-[calc(2.25rem+9px)]"
 			>
 				{TRACE_ROWS.map((row) => (
@@ -1117,7 +1119,7 @@ function McpCallsSample() {
 				className={cn(
 					"flex flex-col",
 					"divide-y corner-m edge-m px-l",
-					"divide-line/40 border-line/60 bg-canvas",
+					"divide-line-soft border-line-soft bg-canvas",
 				)}
 			>
 				<div className="flex items-center gap-s py-l">
@@ -1151,7 +1153,7 @@ const FILE_LINES = [94, 88, 96, 70, 0, 90, 84, 92, 60, 0, 86, 94, 78].map(
 function FileCardSample() {
 	return (
 		<div className="flex flex-col">
-			<div className="flex items-center gap-m edge-b-m border-line/50 px-xxl py-xl">
+			<div className="flex items-center gap-m edge-b-m border-line-soft px-xxl py-xl">
 				<Bone className="size-4 shrink-0 corner-full" />
 				<Bone className="h-3.5 w-28 corner-xs" />
 			</div>

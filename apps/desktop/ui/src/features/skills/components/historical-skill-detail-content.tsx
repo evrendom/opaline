@@ -99,6 +99,7 @@ export function HistoricalSkillDetailContent({
 							size="xs"
 							variant="ghost"
 							aria-pressed={raw}
+							// design-escape-ok(opacity): no role renders this; ink-3/60
 							className="text-ink-3/60 hover:text-ink"
 							onClick={() => setRaw((value) => !value)}
 						>

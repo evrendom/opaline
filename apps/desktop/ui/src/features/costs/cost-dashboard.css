@@ -2,6 +2,7 @@
    share its tokens. */
 .cost-page,
 .cost-range-controls {
+	/* design-escape-ok(colour): the p95 duration series, data paint */
 	--cost-duration-p95: oklch(0.606 0.219 292.717);
 	--cost-chart-fill-opacity: 0.08;
 }
@@ -128,6 +129,7 @@
 	initial-value: transparent;
 }
 .cost-metric {
+	/* design-escape-ok(colour): a grey derived from the metric's series colour, data paint */
 	--metric-tint: oklch(from var(--metric-color) l 0 h);
 	position: relative;
 	--metric-pad-x: 20px;
@@ -139,8 +141,8 @@
 	overflow: hidden;
 	text-align: left;
 	transition:
-		box-shadow var(--motion-duration) ease,
-		--metric-tint var(--motion-medium-duration) ease;
+		box-shadow var(--motion-duration) var(--motion-easing),
+		--metric-tint var(--motion-medium-duration) var(--motion-easing);
 }
 .cost-metric[data-primary="true"] {
 	--metric-tint: var(--metric-color);
@@ -176,7 +178,7 @@
 	border-radius: inherit;
 	pointer-events: none;
 	box-shadow: inset 0 0 0 1px transparent;
-	transition: box-shadow var(--motion-duration) ease;
+	transition: box-shadow var(--motion-duration) var(--motion-easing);
 }
 .cost-metric[data-primary="true"]::after {
 	box-shadow: inset 0 0 0 1px
@@ -270,10 +272,10 @@
    at full strength. Only the colour and the stroke's opacity move: easing a
    stroke into a color-mix() of currentColor fades it out and back in. */
 .cost-metric-sparkline {
-	transition: color var(--motion-duration) ease;
+	transition: color var(--motion-duration) var(--motion-easing);
 }
 .cost-metric-trend-line {
-	transition: stroke-opacity var(--motion-duration) ease;
+	transition: stroke-opacity var(--motion-duration) var(--motion-easing);
 }
 .cost-metric:is([data-primary="true"], :hover)
 	.cost-metric-sparkline:not([data-placeholder]) {
@@ -291,7 +293,7 @@
 .cost-metric-wave [data-session-chart-loading-flow] path.fill-none {
 	stroke: currentColor;
 	stroke-opacity: 0.5;
-	transition: stroke-opacity var(--motion-duration) ease;
+	transition: stroke-opacity var(--motion-duration) var(--motion-easing);
 }
 .cost-metric-wave [data-session-chart-loading-flow] stop {
 	stop-color: currentColor;
@@ -437,6 +439,7 @@
 	border-radius: var(--radius-zero);
 }
 .cost-duration-legend[data-percentile="p95"] i {
+	/* design-escape-ok(base): the p95 legend swatch, data paint */
 	border-top-color: var(--color-3);
 	border-top-style: dashed;
 }
@@ -458,8 +461,10 @@
 	padding: var(--space-l);
 	color: var(--ink);
 	background: var(--canvas);
+	/* design-escape-ok(colour): no role renders this; the tooltip's 6px 20px 8% drop */
+	--cost-tooltip-drop: 0 6px 20px rgb(0 0 0 / 8%);
 	box-shadow:
-		0 6px 20px rgb(0 0 0 / 8%),
+		var(--cost-tooltip-drop),
 		0 0 0 1px var(--line);
 	display: grid;
 	gap: var(--space-m);
@@ -605,7 +610,7 @@
 	height: 40px;
 	pointer-events: none;
 	opacity: 0;
-	transition: opacity var(--motion-duration) ease;
+	transition: opacity var(--motion-duration) var(--motion-easing);
 }
 .cost-scroll-fade-edge[data-edge="top"] {
 	top: 0;
@@ -631,7 +636,7 @@
 	letter-spacing: var(--letter-spacing-xl);
 	border-radius: var(--radius-zero);
 	border-top: var(--border-m) solid var(--line);
-	transition: background-color var(--motion-duration) ease;
+	transition: background-color var(--motion-duration) var(--motion-easing);
 }
 /* Of-type, not child: the fluid hover's layer sits among the rows. */
 .cost-breakdown-list .cost-breakdown-row:first-of-type,
@@ -753,8 +758,8 @@
 	background: color-mix(in srgb, var(--ink) 14%, var(--canvas));
 	box-shadow: 0 0 0 1px var(--line);
 	transition:
-		grid-template-columns var(--motion-medium-duration) ease,
-		grid-template-rows var(--motion-medium-duration) ease;
+		grid-template-columns var(--motion-medium-duration) var(--motion-easing),
+		grid-template-rows var(--motion-medium-duration) var(--motion-easing);
 }
 .cost-tools-inner {
 	display: flex;
@@ -765,8 +770,8 @@
 	opacity: 0;
 	transform: scale(0.25);
 	transition:
-		transform var(--motion-medium-duration) ease,
-		opacity var(--motion-duration) ease;
+		transform var(--motion-medium-duration) var(--motion-easing),
+		opacity var(--motion-duration) var(--motion-easing);
 	padding: var(--space-xs);
 }
 .cost-breakdown:hover .cost-tools,
@@ -775,8 +780,10 @@
 	grid-template-columns: 1fr;
 	grid-template-rows: 1fr;
 	background: var(--canvas);
+	/* design-escape-ok(colour): no role renders this; the tools panel's 2px 7px 8% drop */
+	--cost-tools-drop: 0 2px 7px rgb(0 0 0 / 8%);
 	box-shadow:
-		0 2px 7px rgb(0 0 0 / 8%),
+		var(--cost-tools-drop),
 		0 0 0 1px var(--line);
 }
 .cost-breakdown:hover .cost-tools-inner,
@@ -784,7 +791,7 @@
 .cost-tools[data-open="true"] .cost-tools-inner {
 	opacity: 1;
 	transform: scale(1);
-	transition-delay: 50ms;
+	transition-delay: var(--motion-quick-duration);
 }
 .cost-tool-button {
 	position: relative;
@@ -992,19 +999,19 @@
 }
 .cost-chart-canvas[data-phase="morph"]
 	:is(.recharts-cartesian-axis-ticks, .recharts-cartesian-grid) {
-	animation: cost-fade-in 500ms ease both;
+	animation: cost-fade-in var(--motion-slow-duration) var(--motion-easing) both;
 }
 .cost-chart-canvas[data-lines-entering] .recharts-line {
 	animation: cost-chart-draw var(--motion-slow-duration)
-		cubic-bezier(0.22, 1, 0.36, 1);
+		var(--motion-strong-easing);
 }
 .cost-chart-canvas[data-phase="morph"] .recharts-area-curve {
-	transition: stroke 800ms ease-in-out;
+	transition: stroke var(--motion-slow-duration) var(--motion-wave-easing);
 }
 .cost-chart-canvas[data-phase="morph"] .cost-chart-gradient stop {
 	transition:
-		stop-color 800ms ease-in-out,
-		stop-opacity 800ms ease-in-out;
+		stop-color var(--motion-slow-duration) var(--motion-wave-easing),
+		stop-opacity var(--motion-slow-duration) var(--motion-wave-easing);
 }
 .cost-chart-loading-guides {
 	position: absolute;
@@ -1017,7 +1024,8 @@
 }
 .cost-chart-skeleton[data-leaving] {
 	pointer-events: none;
-	animation: cost-chart-skeleton-out var(--motion-slow-duration) ease both;
+	animation: cost-chart-skeleton-out var(--motion-slow-duration)
+		var(--motion-easing) both;
 }
 .cost-metric[data-revealing] .cost-metric-wave {
 	position: absolute;
@@ -1043,7 +1051,7 @@
 .cost-chart-empty,
 .cost-metric,
 .cost-metric-value {
-	animation: cost-fade-in 240ms ease;
+	animation: cost-fade-in var(--motion-medium-duration) var(--motion-easing);
 }
 @keyframes cost-chart-skeleton-out {
 	0% {
@@ -1179,11 +1187,12 @@
 /* While newer numbers load, only the chart line dims, and only if the load
    outlasts a beat, so quick refreshes never flicker. Cards stay crisp. */
 .cost-chart-canvas {
-	transition: opacity var(--motion-duration) ease;
+	transition: opacity var(--motion-duration) var(--motion-easing);
 }
 .cost-page[data-updating="true"] .cost-chart-canvas {
 	opacity: 0.55;
-	transition: opacity var(--motion-medium-duration) ease 250ms;
+	transition: opacity var(--motion-medium-duration) var(--motion-easing)
+		var(--motion-medium-duration);
 }
 
 /* Only the Dashboard supplies this extra date-picker column. */
@@ -1297,6 +1306,7 @@
 	position: absolute;
 	inset: 0;
 	--ci-run: color-mix(in oklab, var(--ink) 18%, transparent);
+	/* design-escape-ok(colour): no role renders this; red-500, the error role is a different red */
 	--ci-failed: oklch(0.637 0.208 25.331);
 }
 .cost-ci-chart svg {
@@ -1318,7 +1328,7 @@
 }
 .cost-ci-day rect {
 	fill: var(--ci-run);
-	transition: opacity var(--motion-duration) ease;
+	transition: opacity var(--motion-duration) var(--motion-easing);
 }
 .cost-ci-day rect[data-failed] {
 	fill: var(--error);
@@ -1364,7 +1374,7 @@
 	fill: none;
 	stroke: color-mix(in oklab, var(--ink) 18%, transparent);
 	stroke-width: var(--border-l);
-	transition: stroke var(--motion-medium-duration) ease;
+	transition: stroke var(--motion-medium-duration) var(--motion-easing);
 }
 .cost-ci-ring path[data-failed] {
 	stroke: var(--error);

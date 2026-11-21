@@ -118,7 +118,7 @@ function ActivitySparkline({ values }: { values: readonly number[] }) {
 			viewBox={`0 0 ${SPARKLINE_WIDTH} ${SPARKLINE_HEIGHT}`}
 		>
 			<polyline
-				className="fill-none stroke-color-1"
+				className="fill-none stroke-accent"
 				points={buildSparklinePoints(values)}
 				strokeLinecap="round"
 				strokeLinejoin="round"
@@ -267,6 +267,7 @@ export function LastActive({
 				aria-hidden="true"
 				className={cn(
 					"size-1.5 shrink-0 corner-full",
+					// design-escape-ok(opacity): no role renders this; ink/20, dark ink/25
 					days < 7 ? "bg-success" : "bg-ink/20 dark:bg-ink/25",
 				)}
 			/>

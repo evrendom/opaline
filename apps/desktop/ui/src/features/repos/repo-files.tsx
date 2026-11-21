@@ -125,6 +125,7 @@ export function RepoFiles({ repoKey }: { repoKey: string }) {
 							"flex h-8 shrink-0 items-center gap-s",
 							"corner-s pr-xs pl-m",
 							"text-body-m",
+							// design-escape-ok(opacity): no role renders this; field/50
 							"bg-field/50",
 						)}
 					>
@@ -325,7 +326,7 @@ function RepoFileDetail({
 					"shrink-0 [direction:rtl]",
 					"-mt-xs pl-m",
 					"truncate text-left text-body-m",
-					"text-ink-3/70",
+					"text-ink-disabled",
 				)}
 				title={directory}
 			>

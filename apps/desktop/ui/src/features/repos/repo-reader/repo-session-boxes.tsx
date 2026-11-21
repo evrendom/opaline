@@ -508,7 +508,7 @@ function SessionTile({
 				"transition-[filter] duration-(--motion-medium-duration)",
 				dimmed && "[filter:opacity(0.4)]",
 				picked &&
-					// design-escape-ok: the picked tile glows in its own session tint (data paint)
+					// design-escape-ok(shadow): the picked tile glows in its own session tint (data paint)
 					"z-40 bg-[color-mix(in_oklab,var(--tint)_34%,transparent)] shadow-[0_2px_10px_-2px_color-mix(in_oklab,var(--tint)_45%,transparent)] dark:bg-[color-mix(in_oklab,var(--tint)_40%,transparent)] dark:shadow-[0_2px_12px_-2px_color-mix(in_oklab,var(--tint)_55%,transparent)]",
 			)}
 			style={{ height: h, left: tile.x, top: tile.y, width: w }}

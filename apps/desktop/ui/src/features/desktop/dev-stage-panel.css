@@ -19,6 +19,7 @@
 	border: var(--border-m) solid var(--line-strong);
 	background: var(--surface);
 	color: var(--ink);
+	/* design-escape-ok(colour): no role renders this; the dev panel's 6px 24px 14% drop */
 	box-shadow: 0 6px 24px rgb(0 0 0 / 0.14);
 }
 

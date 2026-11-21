@@ -1,5 +1,9 @@
 .rich-skill-document {
-	--skill-document-code-highlight: rgba(255, 255, 255, 0.7);
+	--skill-document-code-highlight: color-mix(
+		in oklab,
+		var(--canvas) 70%,
+		transparent
+	);
 	min-width: 0;
 	color: var(--ink);
 	font-family: var(--font-sans);
@@ -12,7 +16,11 @@
 
 .dark .rich-skill-document {
 	/* Hairlines: a 7% edge and a barely-there inner highlight. */
-	--skill-document-code-highlight: rgba(255, 255, 255, 0.03);
+	--skill-document-code-highlight: color-mix(
+		in oklab,
+		var(--ink) 3%,
+		transparent
+	);
 }
 
 .rich-skill-document > :first-child {
@@ -108,6 +116,7 @@
 	background: var(--hover-strong);
 	color: var(--error);
 	font-family: var(--font-data);
+	/* design-escape-ok(type): no role renders this; 0.85em, inline code scales with its heading */
 	font-size: 0.85em;
 }
 

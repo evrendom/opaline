@@ -221,7 +221,12 @@ function McpCard({
 							data-card-row=""
 							className="flex min-w-0 items-baseline gap-m"
 						>
-							<span className="min-w-0 truncate text-ink/75">{tool.name}</span>
+							<span
+								// design-escape-ok(opacity): no role renders this; ink/75
+								className="min-w-0 truncate text-ink/75"
+							>
+								{tool.name}
+							</span>
 							<span className="ml-auto shrink-0 text-body-m text-ink-3 tabular-nums">
 								{tool.calls.toLocaleString()}
 							</span>

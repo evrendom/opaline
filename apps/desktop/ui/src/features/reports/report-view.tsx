@@ -229,7 +229,7 @@ function CitedRuns({
 
 function ResultTable({ result }: { result: ReportResult }) {
 	return (
-		<div className="flex flex-col gap-xs corner-s edge-m border-line/60 p-m">
+		<div className="flex flex-col gap-xs corner-s edge-m border-line-soft p-m">
 			<p className="text-body-m text-ink-3">
 				{result.title}
 				{result.truncated ? " (cut)" : ""}

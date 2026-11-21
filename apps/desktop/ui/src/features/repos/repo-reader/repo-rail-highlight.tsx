@@ -121,7 +121,7 @@ export function RailHighlightProvider({
 	const name = filter?.name ?? repoTabLabel(tab);
 	const TabIcon = repoTabIcon(onClear && tab === "summary" ? "sessions" : tab);
 	const swap =
-		"[grid-area:1/1] size-3.5 transition-[opacity,scale] duration-(--motion-duration) ease-out motion-reduce:transition-none";
+		"[grid-area:1/1] size-3.5 transition-[opacity,scale] duration-(--motion-duration) ease-base motion-reduce:transition-none";
 	const lead = onClear ? (
 		<span
 			title={name}

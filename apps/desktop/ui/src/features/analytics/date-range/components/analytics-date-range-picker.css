@@ -4,7 +4,7 @@
    column, its Cancel/Apply footer, its fluid hover and its pebble-shaped
    selected days. */
 .session-date-picker {
-	--ring: var(--neutral-6);
+	--ring: var(--focus);
 	width: fit-content;
 	max-width: calc(100vw - 32px);
 	max-height: min(var(--available-height, 100svh), calc(100svh - 32px));

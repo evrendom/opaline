@@ -451,6 +451,7 @@ export function RunLanes({
 				className={cn(
 					"relative h-4 overflow-hidden",
 					"corner-xs",
+					// design-escape-ok(opacity): no role renders this; field/60
 					"before:absolute before:inset-0 before:-z-10 before:bg-field/60",
 				)}
 			>
@@ -482,7 +483,7 @@ export function RunLanes({
 								own ? null : bar.className,
 								"transition-[opacity,filter] duration-(--motion-medium-duration)",
 								bar.stepId === selected &&
-									// design-escape-ok: the picked bar's ring is white over its lane colour in both modes (data paint)
+									// design-escape-ok(colour): the picked bar's ring is white over its lane colour in both modes (data paint)
 									"z-10 ring-2 ring-white/90 ring-inset",
 								anyPicked &&
 									bar.stepId !== selected &&
@@ -492,7 +493,7 @@ export function RunLanes({
 								runsOn &&
 									"inset-y-[7px] [mask-image:repeating-linear-gradient(to_right,#000_0_3px,transparent_3px_5px)]",
 								base !== undefined &&
-									"transition-[left,width,opacity,filter] duration-500 ease-drawer",
+									"transition-[left,width,opacity,filter] duration-(--motion-slow-duration) ease-drawer",
 							)}
 							style={{
 								...(own ? { backgroundColor: own } : {}),
@@ -512,8 +513,8 @@ export function RunLanes({
 						>
 							{bar.name && !bar.open && at.width > 18 ? (
 								<span
-									// design-escape-ok: the step name is printed on its painted lane bar, white in both modes and set solid
-									className="pointer-events-none truncate pl-xs font-data text-body-xxs leading-none text-white"
+									// design-escape-ok(colour): the step name is printed on its painted lane bar, white in both modes and set solid
+									className="pointer-events-none truncate pl-xs font-data text-body-xxs line-solid text-white"
 								>
 									{bar.name}
 								</span>
@@ -529,6 +530,7 @@ export function RunLanes({
 							"absolute top-1/2 right-0.5",
 							"corner-xs px-xxs",
 							"text-body-xxs tabular-nums",
+							// design-escape-ok(opacity): no role renders this; canvas/90
 							"pointer-events-none -translate-y-1/2 bg-canvas/90 text-ink-3",
 						)}
 					>
@@ -640,7 +642,7 @@ export function RunLanes({
 										: `Show all lanes, ${unused} this run didn't use`
 								}
 								onClick={() => setAllLanes((shown) => !shown)}
-								className="inline-flex items-center corner-xs px-xxs text-ink-3/70 hover:bg-hover hover:text-ink"
+								className="inline-flex items-center corner-xs px-xxs text-ink-disabled hover:bg-hover hover:text-ink"
 							>
 								{allLanes ? (
 									<IconChevronUp aria-hidden="true" className="size-2.5" />
@@ -668,6 +670,7 @@ export function RunLanes({
 						<span ref={windowRef} className={TRACE_WINDOW} />
 						{brush ? (
 							<span
+								// design-escape-ok(opacity): no role renders this; the brush's ink/30 edge and ink/5 fill
 								className="pointer-events-none absolute -inset-y-0.5 corner-xs edge-m border-ink/30 bg-ink/5"
 								style={{
 									left: `${pct(brush.from)}%`,
@@ -676,10 +679,7 @@ export function RunLanes({
 							/>
 						) : null}
 					</div>
-					<div
-						// design-escape-ok: axis ticks set solid under the lanes
-						className="relative flex justify-between gap-m px-xxs text-body-xxs leading-none text-ink-3/70 tabular-nums"
-					>
+					<div className="relative flex justify-between gap-m px-xxs text-body-xxs line-solid text-ink-disabled tabular-nums">
 						<span className={cn(brush && "invisible")}>
 							{offset(view.from)}
 						</span>
@@ -772,6 +772,7 @@ export function RunLanes({
 									<span ref={agentWindowRef} className={TRACE_WINDOW} />
 									{brush ? (
 										<span
+											// design-escape-ok(opacity): no role renders this; the brush's ink/30 edge and ink/5 fill
 											className="pointer-events-none absolute -inset-y-0.5 corner-xs edge-m border-ink/30 bg-ink/5"
 											style={{
 												left: `${pct(brush.from)}%`,

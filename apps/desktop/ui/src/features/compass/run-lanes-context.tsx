@@ -18,8 +18,7 @@ const COMPACTION_FROM = 0.3;
 const CONTEXT_HEADROOM = 1.1;
 
 export const LANE_LABEL =
-	// design-escape-ok: a lane label set solid to sit inside its bar
-	"absolute text-body-xxs leading-none font-medium tabular-nums";
+	"absolute text-body-xxs line-solid font-medium tabular-nums";
 
 export function ContextLane({
 	compactions: recorded,
@@ -113,6 +112,7 @@ export function ContextLane({
 			className={cn(
 				"relative h-8 overflow-hidden",
 				"corner-xs",
+				// design-escape-ok(opacity): no role renders this; field/60
 				"before:absolute before:inset-0 before:-z-10 before:bg-field/60",
 			)}
 		>
@@ -124,10 +124,12 @@ export function ContextLane({
 			>
 				<path
 					d={`${path} L ${x(points.at(-1)?.atMs ?? view.to)} 100 L ${x(points[0]?.atMs ?? view.from)} 100 Z`}
+					// design-escape-ok(base): the context curve is a chart series (data paint)
 					className="fill-color-2/15"
 				/>
 				<path
 					d={path}
+					// design-escape-ok(base): the context curve is a chart series (data paint)
 					className="fill-none stroke-color-2"
 					strokeWidth={1.25}
 					vectorEffect="non-scaling-stroke"
@@ -157,10 +159,16 @@ export function ContextLane({
 					{formatCompactNumber(window)}
 				</span>
 			</Tip>
-			<span className={cn(LANE_LABEL, "bottom-1 left-1 text-color-2")}>
+			<span
+				// design-escape-ok(base): the context curve is a chart series (data paint)
+				className={cn(LANE_LABEL, "bottom-1 left-1 text-color-2")}
+			>
 				{fillAt(view.from)}
 			</span>
-			<span className={cn(LANE_LABEL, "right-1 bottom-1 text-color-2")}>
+			<span
+				// design-escape-ok(base): the context curve is a chart series (data paint)
+				className={cn(LANE_LABEL, "right-1 bottom-1 text-color-2")}
+			>
 				{fillAt(view.to)}
 			</span>
 		</div>

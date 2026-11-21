@@ -28,11 +28,10 @@ function shouldHideModelBadge(model: string) {
 // Model badges set their type solid and a hair tight so the cap-trimmed label
 // centres in a fixed-height pill.
 const BADGE_TRACKING =
-	// design-escape-ok: the badge's -1% tracking; no text step carries it
+	// design-escape-ok(type): the badge's -1% tracking; no text step carries it
 	"tracking-[-0.01em]";
 const CAP_TRIM_LABEL =
-	// design-escape-ok: solid line height for the label's cap trim
-	"flex min-w-0 items-center leading-none [text-box-edge:cap_alphabetic] [text-box-trim:trim-both]";
+	"flex min-w-0 items-center line-solid [text-box-edge:cap_alphabetic] [text-box-trim:trim-both]";
 
 function getModelBadgeSizeClasses(
 	size: DashboardModelBadgeSize,
@@ -159,8 +158,7 @@ export function DashboardModelBadges({
 				return (
 					<span
 						key={model}
-						// design-escape-ok: solid line height so the cap-trimmed label centres in the fixed-height badge
-						className={`inline-flex max-w-full items-center justify-center corner-full edge-m leading-none tabular-nums ${sizeClasses.badgeClassName} ${sizeClasses.paddingClassName} ${badgeTone.chipClassName}`}
+						className={`inline-flex max-w-full items-center justify-center corner-full edge-m line-solid tabular-nums ${sizeClasses.badgeClassName} ${sizeClasses.paddingClassName} ${badgeTone.chipClassName}`}
 					>
 						{badgeTone.icon ? (
 							<ModelChip

@@ -139,6 +139,7 @@
 	font-variant-numeric: tabular-nums;
 }
 .compass-row-title {
+	/* design-escape-ok(type): no role renders this; 1.35 (18.9px on the 14px row) */
 	line-height: 1.35;
 }
 .compass-row-sub {
@@ -214,6 +215,7 @@
 }
 .compass-detail-summary {
 	color: var(--ink-3);
+	/* design-escape-ok(type): no role renders this; 1.5 (21px on the 14px summary) */
 	line-height: 1.5;
 	text-wrap: pretty;
 }
@@ -581,6 +583,7 @@
 	gap: var(--space-xs);
 	padding: var(--space-l) var(--space-xl);
 	border-radius: var(--radius-l);
+	/* design-escape-ok(colour): no role renders this; green-500 at 10%, success-tint is a different green */
 	background: color-mix(in oklch, oklch(0.723 0.192 149.579) 10%, transparent);
 	font-size: var(--size-l);
 	line-height: var(--line-l);

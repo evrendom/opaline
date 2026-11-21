@@ -96,6 +96,7 @@ export function usePickedRun() {
 }
 
 export const RAIL_SHELF =
+	// design-escape-ok(opacity): no role renders this; field/60, dark field/15
 	"-mr-xxl flex min-h-0 shrink-0 flex-col gap-xs corner-m bg-field/60 pr-xxl shadow-inset corner-squircle squircle:corner-xl dark:bg-field/15";
 
 export const PICKED_ROW = "bg-card-soft shadow-selected";
@@ -106,8 +107,7 @@ function ShelfOutline() {
 	return (
 		<span
 			aria-hidden="true"
-			// design-escape-ok: the dashed drop outline follows the 26px squircle of the shelf it sits in; no corner step
-			className="pointer-events-none absolute inset-y-4 right-0 left-4 corner-l edge-m edge-r-none border-dashed corner-squircle squircle:rounded-4xl dark:border-line/50"
+			className="pointer-events-none absolute inset-y-4 right-0 left-4 corner-l edge-m edge-r-none border-dashed corner-squircle squircle:corner-xl-outer dark:border-line-soft"
 		/>
 	);
 }
@@ -370,7 +370,7 @@ function RunRow({
 				"corner-s px-m py-s corner-squircle",
 				"text-left text-body-m font-medium tabular-nums",
 				"outline-none transition-colors",
-				"squircle:corner-l focus-visible:ring-2 focus-visible:ring-focus/50",
+				"squircle:corner-l focus-visible:ring-2 focus-visible:ring-focus-ring",
 				isPicked ? PICKED_ROW : undefined,
 			)}
 		>

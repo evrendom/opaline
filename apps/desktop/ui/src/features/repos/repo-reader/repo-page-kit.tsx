@@ -93,6 +93,7 @@ export function SessionLink({
 			to={href(session.session_id)}
 			title={session.session_id}
 			className={cn(
+				// design-escape-ok(opacity): no role renders this; ink/90
 				"min-w-0 truncate text-ink/90 underline-offset-2 hover:text-ink hover:underline",
 				className,
 			)}
@@ -111,6 +112,7 @@ export function SkillLink({ name }: { name: string }) {
 				"inline-flex h-6 max-w-full items-center",
 				"corner-full px-l",
 				"truncate text-body-s",
+				// design-escape-ok(opacity): no role renders this; ink/90
 				"bg-card text-ink/90 shadow-control",
 				"hover:text-ink",
 			)}
@@ -138,6 +140,7 @@ export function PullLink({
 			rel="noreferrer"
 			title={pull.pull.title ?? undefined}
 			className={cn(
+				// design-escape-ok(opacity): no role renders this; ink/90
 				"inline-flex min-w-0 items-center gap-s text-ink/90 hover:text-ink",
 				className,
 			)}
@@ -254,6 +257,7 @@ export function Bars({
 	highlight,
 	labels,
 	onPick,
+	// design-escape-ok(opacity): no role renders this; ink/70
 	tone = "bg-ink/70",
 	values,
 }: {
