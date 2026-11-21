@@ -8,12 +8,12 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
-import { parse as parseTOML } from "smol-toml";
 import {
 	CREDENTIALS_FILE,
 	STATE_DIRECTORIES,
 	STATE_FILES,
 } from "@rudel/cli-retire";
+import { parse as parseTOML } from "smol-toml";
 import {
 	fakeBundle,
 	makeHome,

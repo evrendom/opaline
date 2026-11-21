@@ -1,8 +1,9 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const CLOUD_URL = "https://opaline.so";
-const ENVIRONMENT_KINDS = ["local", "server", "cloud"];
+// "cloud" (opaline.so) is retired: a saved choice of it reads as unset,
+// which opens this Mac.
+const ENVIRONMENT_KINDS = ["local", "server"];
 
 function isLoopback(hostname) {
 	return (
@@ -56,7 +57,6 @@ function normalizeServerUrl(input) {
 function environmentLabel(environment) {
 	if (!environment) return "Not set up";
 	if (environment.kind === "local") return "This Mac";
-	if (environment.kind === "cloud") return "Opaline Cloud";
 	try {
 		return new URL(environment.url).host;
 	} catch {
@@ -68,7 +68,6 @@ function environmentOrigin(environment, localUrl) {
 	if (!environment) return undefined;
 	if (environment.kind === "local")
 		return localUrl ? new URL(localUrl).origin : undefined;
-	if (environment.kind === "cloud") return CLOUD_URL;
 	return environment.url ? new URL(environment.url).origin : undefined;
 }
 
@@ -80,7 +79,6 @@ function validateEnvironment(value) {
 	)
 		return undefined;
 	if (value.kind === "local") return { kind: "local" };
-	if (value.kind === "cloud") return { kind: "cloud", url: CLOUD_URL };
 	const normalized = normalizeServerUrl(value.url);
 	return normalized.ok
 		? { kind: "server", url: normalized.url, plaintext: normalized.plaintext }
@@ -135,7 +133,6 @@ function createSettingsStore(directory) {
 }
 
 module.exports = {
-	CLOUD_URL,
 	createSettingsStore,
 	environmentLabel,
 	environmentOrigin,

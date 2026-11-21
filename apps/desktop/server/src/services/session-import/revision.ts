@@ -1,6 +1,4 @@
 import { SESSION_INGEST_FILTER_VERSION } from "@rudel/api-routes/transcript-slim";
-import * as databases from "../../db.js";
-import { recordUserCliVersion } from "../cli-version.service.js";
 import { timedIngestPhase } from "../ingest-phase-timings.js";
 import { passIngestProcessingBoundary } from "../ingest-processing-boundary.js";
 import { getNextIngestedAt } from "../ingest-timestamp.service.js";
@@ -69,11 +67,5 @@ export async function storeRevision(run: ImportRun): Promise<StoredRevision> {
 		store: "postgres",
 		target: "raw-receipt",
 	});
-	// Feeds the web app's CLI update notice; direct and R2 uploads both pass here.
-	await recordUserCliVersion(
-		databases.sqlClient,
-		context.user.id,
-		input.cli_version,
-	);
 	return { ingestedAt, revision };
 }

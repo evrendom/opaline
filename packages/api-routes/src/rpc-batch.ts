@@ -5,7 +5,6 @@ export const WORKSPACE_REQUEST_HEADER = "x-opaline-workspace";
 export const BATCHED_RPC_PROCEDURES: ReadonlySet<string> = new Set([
 	"sessionAccess",
 	"analytics/moments/access",
-	"cli/updateStatus",
 	"repositorySettings/list",
 	"analytics/repositories/navigation",
 	"analytics/sessions/lastUpload",
