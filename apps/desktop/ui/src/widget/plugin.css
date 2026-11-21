@@ -189,3 +189,8 @@ html.dark .plugin-loading {
 	border-radius: var(--radius-s);
 	padding: var(--space-m) var(--space-xl);
 }
+.plugin-card button:focus-visible {
+	/* the focus-outline mark; the card loads without Tailwind's utilities */
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
+}

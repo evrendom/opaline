@@ -14,21 +14,6 @@
 	line-height: var(--line-xl);
 	text-align: left;
 }
-.cli-onboarding-heading {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	gap: var(--space-xxl);
-	margin: 0 auto 36px;
-	max-width: 1160px;
-}
-.cli-onboarding-eyebrow {
-	font-size: var(--size-m);
-	line-height: var(--line-m);
-	letter-spacing: var(--letter-spacing-m);
-	color: var(--ink-3);
-	margin: var(--space-zero) var(--space-zero) var(--space-m);
-}
 .cli-onboarding-surface h1 {
 	font-size: var(--display-size-s);
 	line-height: var(--display-line-s);
@@ -47,109 +32,6 @@
 .cli-onboarding-surface p {
 	color: var(--ink-3);
 	margin: var(--space-zero) var(--space-zero) var(--space-xxl);
-}
-.cli-onboarding-steps {
-	display: flex;
-	list-style: none;
-	padding: var(--space-zero);
-	margin: var(--space-zero);
-	gap: var(--space-xxl);
-	color: var(--ink-3);
-	white-space: nowrap;
-}
-.cli-onboarding-steps li {
-	display: flex;
-	align-items: center;
-	gap: var(--space-m);
-}
-.cli-onboarding-steps span {
-	display: grid;
-	place-items: center;
-	width: 24px;
-	height: 24px;
-	border: var(--border-m) solid var(--line-strong);
-	border-radius: 50%;
-	font-size: var(--size-s);
-	line-height: var(--line-s);
-	letter-spacing: var(--letter-spacing-s);
-}
-.cli-onboarding-steps [aria-current] {
-	color: var(--success);
-}
-.cli-onboarding-steps [aria-current] span {
-	background: var(--line-strong);
-	border-color: var(--success-translucent);
-}
-.cli-onboarding-columns {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
-	align-items: start;
-	gap: calc(var(--space-xxl) * 5 / 3);
-	max-width: 1160px;
-	margin: auto;
-}
-.cli-onboarding-repositories h2 {
-	display: flex;
-	justify-content: space-between;
-	gap: var(--space-xl);
-	align-items: center;
-}
-.cli-onboarding-repositories h2 span {
-	font-size: var(--size-m);
-	line-height: var(--line-m);
-	font-weight: var(--weight-body-regular);
-	color: var(--ink-3);
-	letter-spacing: var(--letter-spacing-m);
-}
-.cli-onboarding-repository-scroll {
-	max-height: 45svh;
-	overflow: auto;
-}
-.cli-onboarding-repository {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr) auto auto;
-	gap: var(--space-xxl);
-	padding: var(--space-xl) var(--space-zero);
-	border-bottom: var(--border-m) solid var(--line-strong);
-}
-.cli-onboarding-repository span:first-child {
-	overflow-wrap: anywhere;
-}
-.cli-onboarding-repository span:not(:first-child) {
-	color: var(--ink-3);
-	font-size: var(--size-m);
-	line-height: var(--line-m);
-	letter-spacing: var(--letter-spacing-m);
-}
-.cli-onboarding-surface .cli-onboarding-empty {
-	font-size: var(--size-m);
-	line-height: var(--line-m);
-	letter-spacing: var(--letter-spacing-m);
-	margin-top: var(--space-xxl);
-	max-width: 430px;
-}
-.cli-onboarding-card {
-	padding: calc(var(--space-xxl) * 1.25);
-	border: var(--border-m) solid var(--line-strong);
-	border-radius: var(--radius-l);
-	background: var(--canvas);
-	/* design-escape-ok(colour): no role renders this; a faint 2% green drop */
-	box-shadow: 0 2px 8px #20332406;
-}
-.cli-onboarding-card button {
-	min-height: 44px;
-	border-radius: var(--radius-s);
-	font: inherit;
-}
-.cli-onboarding-card button:disabled {
-	opacity: 0.55;
-	cursor: wait;
-}
-.cli-onboarding-card button:focus-visible,
-.cli-onboarding-card input:focus-visible {
-	/* the focus-outline mark */
-	outline: 2px solid var(--accent);
-	outline-offset: 1px;
 }
 .cli-onboarding-auth-options {
 	display: grid;
@@ -174,16 +56,6 @@
 	background: var(--success);
 	color: white;
 	padding: var(--space-l) var(--space-xl);
-}
-.cli-onboarding-card .cli-onboarding-text-button {
-	border: 0;
-	background: transparent;
-	color: var(--ink-3);
-	padding: var(--space-m) var(--space-zero);
-	font-size: var(--size-m);
-	line-height: var(--line-m);
-	letter-spacing: var(--letter-spacing-m);
-	text-decoration: underline;
 }
 .cli-onboarding-surface .cli-onboarding-terms {
 	font-size: var(--size-s);
@@ -216,47 +88,6 @@
 	padding: var(--space-l) var(--space-l);
 	min-height: 44px;
 	font: inherit;
-}
-.cli-setup-command,
-.cli-setup-open {
-	border: var(--border-m) solid var(--success-translucent);
-	border-radius: var(--radius-xs);
-	background: var(--canvas);
-	padding: var(--space-s) var(--space-l);
-}
-.cli-setup-command {
-	justify-self: end;
-	white-space: nowrap;
-}
-.cli-setup-open {
-	align-self: center;
-	margin: var(--space-l);
-}
-@media (max-width: 800px) {
-	.cli-onboarding-heading {
-		align-items: start;
-		flex-direction: column;
-		gap: var(--space-m);
-		margin-bottom: calc(var(--space-xxl) * 1.25);
-	}
-	.cli-onboarding-columns {
-		grid-template-columns: 1fr;
-		gap: calc(var(--space-xxl) * 1.25);
-	}
-	.cli-onboarding-card {
-		grid-row: 1;
-		max-width: 440px;
-		width: 100%;
-	}
-	.cli-onboarding-repository {
-		gap: var(--space-l);
-	}
-	.cli-onboarding-steps {
-		gap: var(--space-xl);
-		font-size: var(--size-m);
-		line-height: var(--line-m);
-		letter-spacing: var(--letter-spacing-m);
-	}
 }
 
 /* Dark: only the rules the current sign-in and welcome screens still render. */
