@@ -215,7 +215,7 @@ export const TurnTrace = memo(function TurnTrace({
 						)}
 					>
 						{headNode ? (
-							<div className="shrink-0 edge-b-m border-line-soft px-l py-l">
+							<div className="shrink-0 edge-b-m border-line-soft px-l py-[calc(var(--space-m)+var(--space-xxs))]">
 								{headNode}
 							</div>
 						) : null}

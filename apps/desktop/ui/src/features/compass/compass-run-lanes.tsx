@@ -412,7 +412,7 @@ export function RunLanes({
 							className={cn(
 								"inline-flex shrink-0 items-center gap-xxs",
 								"text-body-m tabular-nums",
-								"text-error transition-[opacity,filter] duration-(--motion-medium-duration)",
+								"text-rose-mark transition-[opacity,filter] duration-(--motion-medium-duration)",
 								anyPicked &&
 									!pickedLanes.has(lane.id) &&
 									"opacity-35 saturate-[0.15]",
