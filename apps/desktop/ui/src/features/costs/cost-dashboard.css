@@ -434,10 +434,6 @@
 .cost-duration-legend:hover {
 	background: var(--hover);
 }
-.cost-duration-legend:focus-visible {
-	outline: 2px solid var(--accent);
-	outline-offset: 2px;
-}
 .cost-duration-legend[aria-pressed="false"] {
 	opacity: 0.45;
 }
@@ -799,7 +795,6 @@
 	align-items: center;
 	justify-content: center;
 	flex-shrink: 0;
-	outline: none;
 }
 .cost-tool-button[aria-pressed="true"],
 .cost-tool-button[data-popup-open] {

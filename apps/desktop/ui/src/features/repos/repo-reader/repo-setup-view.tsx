@@ -568,7 +568,7 @@ function ToolRows({
 										"relative flex w-full items-baseline gap-s",
 										"corner-s py-xs pr-l pl-l corner-squircle",
 										"text-left text-body-s tabular-nums",
-										"outline-none transition-colors",
+										"focus-outline transition-colors",
 										"squircle:corner-l",
 										isPicked && "bg-field",
 									)}
@@ -656,7 +656,7 @@ function VersionRows({
 										"relative flex w-full items-baseline gap-s",
 										"corner-s py-xs pr-l pl-l corner-squircle",
 										"text-left text-body-s tabular-nums",
-										"outline-none transition-colors",
+										"focus-outline transition-colors",
 										"squircle:corner-l",
 										isShown && "bg-field",
 									)}
@@ -759,7 +759,7 @@ function RepoSetupRow({
 				"relative flex w-full items-center gap-l",
 				"corner-s px-l py-s corner-squircle",
 				"text-left",
-				"outline-none transition-colors",
+				"focus-outline transition-colors",
 				"squircle:corner-l",
 				isPicked && "bg-field",
 			)}

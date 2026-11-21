@@ -200,7 +200,7 @@ export function SelfHostedAuthForm({
 					<button
 						type="button"
 						onClick={switchMode}
-						className="underline underline-offset-4 hover:text-primary"
+						className="underline underline-offset-4 hover:text-primary focus-outline"
 					>
 						Sign in
 					</button>
@@ -412,7 +412,7 @@ export function SelfHostedAuthForm({
 				<button
 					type="button"
 					onClick={switchMode}
-					className="underline underline-offset-4 hover:text-primary"
+					className="underline underline-offset-4 hover:text-primary focus-outline"
 				>
 					{mode === "sign-in" ? "Create one" : "Sign in"}
 				</button>

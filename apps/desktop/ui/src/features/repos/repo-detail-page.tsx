@@ -463,7 +463,7 @@ export function RepoDetailHeader({
 	const repoHue = useRepositoryHue(repoKey);
 	if (!headerPortal) return null;
 	const crumbClassName =
-		"flex items-center gap-s text-ink-3 transition-colors hover:text-ink";
+		"flex items-center gap-s text-ink-3 transition-colors hover:text-ink focus-outline";
 	const separator = (
 		<IconChevronRight
 			aria-hidden="true"

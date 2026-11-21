@@ -390,7 +390,7 @@ export function RunLanes({
 						type="button"
 						aria-label={`Open ${lane.label}'s thread`}
 						onClick={onOpen}
-						className="group/open flex corner-full"
+						className="group/open flex corner-full focus-outline"
 					>
 						{mark}
 					</button>
@@ -642,7 +642,7 @@ export function RunLanes({
 										: `Show all lanes, ${unused} this run didn't use`
 								}
 								onClick={() => setAllLanes((shown) => !shown)}
-								className="inline-flex items-center corner-xs px-xxs text-ink-disabled hover:bg-hover hover:text-ink"
+								className="inline-flex items-center corner-xs px-xxs text-ink-disabled hover:bg-hover hover:text-ink focus-outline"
 							>
 								{allLanes ? (
 									<IconChevronUp aria-hidden="true" className="size-2.5" />

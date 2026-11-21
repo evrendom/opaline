@@ -53,6 +53,7 @@ export function DevStagePanel() {
 				<div className="dev-stage-list">
 					<button
 						type="button"
+						className="focus-outline"
 						aria-pressed={stage === null}
 						onClick={() => pick(null)}
 					>
@@ -66,6 +67,7 @@ export function DevStagePanel() {
 									<button
 										key={item.id}
 										type="button"
+										className="focus-outline"
 										aria-pressed={stage === item.id}
 										onClick={() => pick(item.id)}
 									>
@@ -81,7 +83,7 @@ export function DevStagePanel() {
 			)}
 			<button
 				type="button"
-				className="dev-stage-toggle"
+				className="dev-stage-toggle focus-outline"
 				onClick={() => setOpen((value) => !value)}
 			>
 				{index >= 0

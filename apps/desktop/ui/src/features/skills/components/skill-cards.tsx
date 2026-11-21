@@ -138,7 +138,7 @@ export function OverviewCard({
 				type="button"
 				aria-label={`Open ${name}`}
 				onClick={() => onSelect(name)}
-				className="absolute inset-0 z-20 corner-m corner-squircle squircle:corner-xl outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--dashboard-01-metric-button-focus-ring)]"
+				className="absolute inset-0 z-20 corner-m corner-squircle squircle:corner-xl focus-outline"
 			/>
 			<div className="pointer-events-none flex min-h-0 flex-1 flex-col">
 				<div

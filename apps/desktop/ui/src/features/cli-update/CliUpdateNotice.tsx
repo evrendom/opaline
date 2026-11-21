@@ -116,7 +116,7 @@ function CliUpdateNoticeView({
 				</p>
 				<button
 					type="button"
-					className="cli-update-notice-dismiss"
+					className="cli-update-notice-dismiss focus-outline"
 					aria-label="Dismiss CLI update notice"
 					onClick={onDismiss}
 				>

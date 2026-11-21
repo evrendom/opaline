@@ -19,7 +19,7 @@ export function SelfHostedCommand({
 			</pre>
 			<button
 				type="button"
-				className="self-hosted-command-copy copy-button"
+				className="self-hosted-command-copy copy-button focus-outline"
 				data-copied={copied ? "true" : undefined}
 				aria-label={copied ? `${label} copied` : `Copy ${label}`}
 				onClick={() => void copy()}
