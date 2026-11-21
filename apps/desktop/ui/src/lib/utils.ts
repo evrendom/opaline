@@ -25,9 +25,19 @@ const ROLE_SHADOWS = [
 
 // tailwind-merge with Graphical's classes, so text styles, weights,
 // `corner-*` and `edge-*` override each other the way their CSS does, plus
-// the role shadows.
+// the role shadows, the derived corners and the line and tracking utilities
+// in src/app/tokens.css.
 const twMerge = extendTailwindMerge(graphicalClasses, (config) =>
-	mergeConfigs(config, { extend: { theme: { shadow: ROLE_SHADOWS } } }),
+	mergeConfigs(config, {
+		extend: {
+			theme: { shadow: ROLE_SHADOWS },
+			classGroups: {
+				corner: [{ corner: ["s-inset", "xl-inset", "xl-inner", "xl-outer"] }],
+				leading: ["line-solid", "line-tight"],
+				tracking: ["tracking-caps"],
+			},
+		},
+	}),
 );
 
 export function cn(...inputs: ClassValue[]) {

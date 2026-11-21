@@ -44,6 +44,11 @@
 	--primary-hover: color-mix(in oklch, var(--primary) 85%, var(--canvas));
 	--primary-fg: var(--neutral-1);
 	--focus: var(--neutral-6);
+	--focus-ring: color-mix(
+		in oklab,
+		var(--focus) 50%,
+		transparent
+	); /* the soft ring around a focused control */
 	--accent: var(--color-1); /* Opaline blue: links, selection, info */
 	--accent-tint: var(--color-1-transparent);
 	--accent-line: var(--color-1-translucent);
@@ -257,6 +262,7 @@
 	--color-primary-hover: var(--primary-hover);
 	--color-primary-fg: var(--primary-fg);
 	--color-focus: var(--focus);
+	--color-focus-ring: var(--focus-ring);
 	--color-accent: var(--accent);
 	--color-accent-tint: var(--accent-tint);
 	--color-accent-line: var(--accent-line);
@@ -312,13 +318,35 @@
 @theme inline {
 	--corner-s-inset: calc(var(--radius-s) - 1px);
 	--corner-xl-inset: calc(var(--radius-xl) - 1px);
+	/* nested one space step inside or outside an xl squircle: a row highlight
+	   inset 4px in a card (18), a drop outline 4px around a shelf (26) */
+	--corner-xl-inner: calc(var(--radius-xl) - var(--space-xs));
+	--corner-xl-outer: calc(var(--radius-xl) + var(--space-xs));
 }
 
-/* Motion roles as Tailwind easings: `ease-strong`, `ease-drawer`, `ease-wave`. */
+/* Motion roles as Tailwind easings: `ease-base` and `ease-large` (the theme's
+   two timings), `ease-strong`, `ease-drawer`, `ease-wave`. */
 @theme reference {
+	--ease-base: var(--motion-easing);
+	--ease-large: var(--motion-large-easing);
 	--ease-strong: var(--motion-strong-easing);
 	--ease-drawer: var(--motion-drawer-easing);
 	--ease-wave: var(--motion-wave-easing);
+}
+
+/* Line and tracking for text that a body step can't carry on its own:
+   `line-solid` sets a label solid (line height 1) to centre it in a fixed-height
+   chip, bar or cell; `line-tight` is the dense 1.2 line of a figure row or a
+   10/12 tag; `tracking-caps` opens an uppercase eyebrow. Pair each with a
+   `text-body-*` step, never a size. */
+@utility line-solid {
+	line-height: 1;
+}
+@utility line-tight {
+	line-height: 1.2;
+}
+@utility tracking-caps {
+	letter-spacing: 0.2em;
 }
 
 /* -- Kept as authored: chart series (data paint) and the sidebar primitive's

@@ -24,7 +24,7 @@ Files: active theme `graphical/themes/opaline.json` (named Opaline), role map `g
 | `--neutral-9` | `#262626` | `#e5e5e5` |
 | `--neutral-10` | `#0a0a0a` | `#fafafa` |
 | `--success` | `#16a34a` | `#00bc7d` |
-| `--warning` | `#f54900` | `#fe9a00` |
+| `--warning` | `#e17100` | `#fe9a00` |
 | `--error` | `#e7000b` | `#ff6467` |
 
 Every color also has `-translucent` (stronger) and `-transparent` (lighter) levels, and `--on-<color>` for readable text on it. These are Layer 1: screens and primitives read the Layer 2 roles in `src/app/tokens.css` built on them (`bg-surface`, `text-ink-3`, `border-line`, `bg-error-tint`; see `FRONTEND.md`), never `bg-neutral-3` or `text-neutral-7` directly.
