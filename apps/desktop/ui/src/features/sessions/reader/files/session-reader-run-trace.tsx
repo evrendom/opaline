@@ -421,7 +421,7 @@ function StepRow({
 				className={cn(
 					"relative isolate flex h-6 w-full items-center gap-s",
 					"px-m",
-					"text-left text-body-m",
+					"text-left text-body-m focus-outline",
 					"before:absolute before:inset-x-0 before:inset-y-px before:-z-10 before:corner-s before:transition-colors",
 					depth === 1 && "pl-xxl",
 					depth === 2 && "pl-[calc(var(--space-xxl)*4/3)]",

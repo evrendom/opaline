@@ -91,7 +91,7 @@ export function ToolInvocation({
 					"px-xl py-xl",
 					"text-left",
 					"transition-colors",
-					"hover:bg-field focus-visible:bg-field",
+					"focus-outline hover:bg-field",
 				)}
 			>
 				{isExpanded ? (

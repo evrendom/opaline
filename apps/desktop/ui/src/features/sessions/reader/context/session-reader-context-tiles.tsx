@@ -353,7 +353,7 @@ export function ContextTiles({
 							aria-pressed={tile.key === picked}
 							aria-label={`Show what's in ${name}`}
 							onClick={(event) => pickBox(tile.key, event.shiftKey)}
-							className="absolute inset-0 corner-s-inset corner-squircle outline-none transition-colors hover:bg-hover squircle:corner-xl-inset dark:hover:bg-hover"
+							className="absolute inset-0 corner-s-inset corner-squircle focus-outline transition-colors hover:bg-hover squircle:corner-xl-inset dark:hover:bg-hover"
 						/>
 						<span
 							aria-hidden="true"

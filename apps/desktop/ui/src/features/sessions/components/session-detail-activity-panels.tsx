@@ -25,7 +25,7 @@ export function SessionDetailActivityPanel({
 						{group.occurrences.map((occurrence) => (
 							<li key={occurrence.key}>
 								<button
-									className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-l corner-s px-xl py-l text-left hover:bg-hover"
+									className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-l corner-s px-xl py-l text-left focus-outline hover:bg-hover"
 									onClick={() => onSelectOccurrence(occurrence)}
 									type="button"
 								>

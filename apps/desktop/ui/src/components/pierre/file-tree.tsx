@@ -60,7 +60,7 @@ function RowTags({
 						onPick?.(tag.id);
 					}}
 					className={cn(
-						"inline-flex items-center gap-xxs",
+						"inline-flex items-center gap-xxs focus-outline",
 						// design-escape-ok(radius,type): shipped value; 4px corners, 10/16
 						"rounded-[4px] px-xs font-mono text-[10px]/4 font-regular tabular-nums",
 						"transition-colors",

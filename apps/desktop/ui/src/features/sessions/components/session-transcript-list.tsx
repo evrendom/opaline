@@ -1287,7 +1287,7 @@ function TranscriptRowContent({
 			return (
 				<button
 					type="button"
-					className="min-h-11 w-full edge-y-m border-line-strong px-l text-left text-body-m text-ink-3"
+					className="min-h-11 w-full edge-y-m border-line-strong px-l text-left text-body-m text-ink-3 focus-outline"
 				>
 					Show {row.hidden.events.toLocaleString()} more {row.hidden.kindLabel}
 				</button>

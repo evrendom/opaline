@@ -405,7 +405,7 @@ function WordsButton({
 			onClick={onToggle}
 			className={cn(
 				"inline-flex size-5 shrink-0 items-center justify-center",
-				"ml-auto corner-xs",
+				"ml-auto corner-xs focus-outline",
 				"text-ink-3/60 transition-colors",
 				"hover:bg-hover hover:text-ink",
 				open && "bg-field text-ink",

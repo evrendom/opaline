@@ -78,7 +78,7 @@ export function TurnsPending({
 					<button
 						type="button"
 						onClick={onRetry}
-						className="underline underline-offset-2 hover:text-ink"
+						className="underline underline-offset-2 focus-outline hover:text-ink"
 					>
 						Retry
 					</button>

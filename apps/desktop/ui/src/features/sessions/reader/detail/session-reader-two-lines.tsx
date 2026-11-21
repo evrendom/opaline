@@ -40,7 +40,7 @@ export function TwoLines({
 				<button
 					type="button"
 					onClick={() => setExpanded((value) => !value)}
-					className="text-body-m text-ink-3 hover:text-ink"
+					className="text-body-m text-ink-3 focus-outline hover:text-ink"
 				>
 					{expanded ? "Show less" : "Show more"}
 				</button>

@@ -61,8 +61,8 @@ export function ViewToggle<View extends string>({
 						"relative flex h-6 items-center gap-xs",
 						"corner-s corner-squircle",
 						"text-body-m font-medium",
-						"transition-colors outline-none",
-						"focus-visible:ring-2 focus-visible:ring-focus-ring disabled:cursor-default disabled:opacity-45 squircle:corner-l",
+						"transition-colors focus-outline",
+						"disabled:cursor-default disabled:opacity-45 squircle:corner-l",
 						iconsOnly ? "px-s" : "px-m",
 						id === value ? "text-ink" : "text-ink-3 enabled:hover:text-ink",
 					)}
@@ -167,7 +167,7 @@ export function Crumb({
 					type="button"
 					aria-label="Let go"
 					onClick={onClear}
-					className="shrink-0 corner-xs p-xxs text-ink-3 hover:bg-hover hover:text-ink"
+					className="shrink-0 corner-xs p-xxs text-ink-3 focus-outline hover:bg-hover hover:text-ink"
 				>
 					<IconX className="size-3" />
 				</button>

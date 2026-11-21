@@ -39,7 +39,7 @@ export function SentMessage({
 						"inline-flex w-fit items-center gap-xs",
 						"corner-xs",
 						"text-body-m font-medium",
-						"text-ink-3 outline-none",
+						"text-ink-3 focus-outline",
 						"hover:text-ink",
 						selected && "text-ink",
 					)}

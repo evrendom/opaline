@@ -379,7 +379,7 @@ function SetupUseRow({
 				"relative flex w-full items-center gap-[calc(var(--space-m)+var(--space-xxs))]",
 				"corner-s py-xs pr-[calc(var(--space-m)+var(--space-xxs))] corner-squircle",
 				"text-left",
-				"outline-none transition-colors",
+				"focus-outline transition-colors",
 				"squircle:corner-l",
 				indent,
 				isPicked && "bg-field",
@@ -458,7 +458,7 @@ function SetupFileRow({
 				"relative flex w-full items-start gap-[calc(var(--space-m)+var(--space-xxs))]",
 				"corner-s px-[calc(var(--space-m)+var(--space-xxs))] py-s corner-squircle",
 				"text-left",
-				"outline-none transition-colors",
+				"focus-outline transition-colors",
 				"squircle:corner-l",
 				isPicked && "bg-field",
 			)}

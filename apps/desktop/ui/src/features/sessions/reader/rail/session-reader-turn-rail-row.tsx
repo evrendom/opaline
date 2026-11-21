@@ -98,7 +98,7 @@ export const RailRow = memo(function RailRow({
 			className={cn(
 				"group/row relative grid auto-rows-[minmax(var(--rail-line-height),auto)] grid-cols-[minmax(0,1fr)_auto] items-center gap-x-s gap-y-(--rail-line-gap)",
 				"corner-s px-s corner-squircle",
-				"text-left text-body-m",
+				"text-left text-body-m focus-outline",
 				"squircle:corner-l",
 				shown.length > 0 && "pb-(--rail-line-gap)",
 			)}
@@ -228,7 +228,7 @@ function GroupToggle({
 			className={cn(
 				"inline-flex shrink-0 items-center",
 				"-ml-xs corner-xs px-xxs",
-				"text-ink-3 transition-colors",
+				"text-ink-3 transition-colors focus-outline",
 				"hover:text-ink",
 			)}
 		>

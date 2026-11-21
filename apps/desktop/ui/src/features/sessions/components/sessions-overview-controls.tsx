@@ -34,7 +34,7 @@ export function SessionsOverviewControls({
 				<button
 					type="button"
 					onClick={tableState.onRetryFilterCatalog}
-					className="corner-s px-m py-xs text-body-xl hover:bg-hover"
+					className="corner-s px-m py-xs text-body-xl focus-outline hover:bg-hover"
 				>
 					Retry filters
 				</button>

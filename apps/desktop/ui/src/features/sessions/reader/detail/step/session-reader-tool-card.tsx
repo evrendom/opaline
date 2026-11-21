@@ -92,7 +92,7 @@ export function ToolCard({
 							"flex w-fit items-center gap-xs",
 							"-mb-xs corner-s px-s py-xs",
 							"text-body-s font-medium",
-							"text-ink-3 transition-colors",
+							"text-ink-3 transition-colors focus-outline",
 							"hover:text-ink",
 						)}
 					>
@@ -154,7 +154,7 @@ export function ToolCard({
 										<button
 											type="button"
 											onClick={() => setFull(true)}
-											className="w-fit px-l text-body-m text-ink-3 hover:text-ink"
+											className="w-fit px-l text-body-m text-ink-3 focus-outline hover:text-ink"
 										>
 											Show all {size.label}
 										</button>
@@ -177,7 +177,7 @@ export function ToolCard({
 												className={cn(
 													"inline-flex size-6 items-center justify-center",
 													"corner-xs",
-													"text-ink-3 transition-colors",
+													"text-ink-3 transition-colors focus-outline",
 													"hover:text-ink",
 													wrap && "text-ink",
 												)}

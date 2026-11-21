@@ -153,7 +153,7 @@ export function CiRoundDots({
 						className={cn(
 							"group/dot flex size-4 items-center justify-center",
 							"corner-full",
-							"pointer-events-auto outline-none",
+							"pointer-events-auto focus-outline",
 						)}
 					>
 						<span
@@ -368,7 +368,7 @@ export function CiRounds({
 								title={roundWords(round, index)}
 								onClick={() => onPickRun(round.run.ciRunId)}
 								className={cn(
-									"grid w-full grid-cols-[16px_minmax(0,1fr)] gap-x-l",
+									"grid w-full grid-cols-[16px_minmax(0,1fr)] gap-x-l focus-outline",
 									"corner-m px-l py-s",
 									"text-left",
 									"transition-colors",

@@ -321,7 +321,7 @@ export function ChipToggle({
 					aria-expanded={open}
 					aria-label={open ? `Fold ${label}` : `Show ${label}`}
 					onClick={onToggle}
-					className="pointer-events-auto size-4.5 corner-full"
+					className="pointer-events-auto size-4.5 corner-full focus-outline"
 				/>
 			</Tip>
 		</div>

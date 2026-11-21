@@ -219,7 +219,7 @@ export function PullLine({
 				className={cn(
 					"flex w-full items-start gap-l",
 					"text-left",
-					"outline-none",
+					"focus-outline",
 					"after:absolute after:inset-0 after:corner-s",
 				)}
 			>

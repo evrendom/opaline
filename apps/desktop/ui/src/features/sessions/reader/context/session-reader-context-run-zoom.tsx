@@ -112,7 +112,7 @@ export function RunZoom({
 									"corner-s pr-xs pl-m",
 									"text-body-m font-medium",
 									// design-escape-ok(opacity): no role renders this; bg-field/70
-									"bg-field/70 text-ink-3 transition-colors outline-none",
+									"bg-field/70 text-ink-3 transition-colors focus-outline",
 									"hover:bg-hover hover:text-ink",
 								)}
 							>

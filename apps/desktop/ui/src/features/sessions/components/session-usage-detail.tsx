@@ -127,7 +127,7 @@ export function SessionUsageDetail({
 								type="button"
 								onClick={onBack}
 								data-fluid-menu-root=""
-								className="flex shrink-0 items-center gap-m text-ink-3 transition-colors hover:text-ink"
+								className="flex shrink-0 items-center gap-m text-ink-3 transition-colors focus-outline hover:text-ink"
 							>
 								<ShellNavIcon
 									icon={shellRoute.icon}

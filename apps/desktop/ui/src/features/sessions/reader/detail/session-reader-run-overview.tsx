@@ -353,7 +353,7 @@ function StepKinds({
 					type="button"
 					aria-expanded={open}
 					onClick={() => setOpen((value) => !value)}
-					className="flex items-center gap-xs text-body-m text-ink-3 hover:text-ink"
+					className="flex items-center gap-xs text-body-m text-ink-3 focus-outline hover:text-ink"
 				>
 					<IconChevronRight
 						aria-hidden="true"
@@ -367,7 +367,7 @@ function StepKinds({
 						onClick={() => {
 							for (const key of filter) onToggle(key);
 						}}
-						className="text-body-m text-ink-3 hover:text-ink"
+						className="text-body-m text-ink-3 focus-outline hover:text-ink"
 					>
 						Show all
 					</button>
@@ -388,7 +388,7 @@ function StepKinds({
 								className={cn(
 									"flex w-full items-center gap-m",
 									"corner-s px-m py-xs",
-									"text-left",
+									"text-left focus-outline",
 									// design-escape-ok(opacity): no role renders this; dark:hover:bg-hover/50
 									"hover:bg-hover dark:hover:bg-hover/50",
 									on && "bg-hover dark:bg-hover",

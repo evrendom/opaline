@@ -142,7 +142,7 @@ function ConversationTraceInteractionEpisodeEvents({
 							),
 						)
 					}
-					className="min-h-11 px-l text-left text-body-m font-medium text-ink-3"
+					className="min-h-11 px-l text-left text-body-m font-medium text-ink-3 focus-outline"
 					data-trace-interaction-episode-more
 				>
 					{`Show ${Math.min(

@@ -169,7 +169,7 @@ export function ContextRunTiles({
 									onPick?.({ key: each.key, thing: null }, event.shiftKey)
 								}
 								className={cn(
-									"absolute inset-x-0 top-0 flex h-5 items-center gap-xs",
+									"absolute inset-x-0 top-0 flex h-5 items-center gap-xs focus-outline",
 									"px-s",
 									"text-left text-body-s font-medium",
 								)}
@@ -291,7 +291,7 @@ function Thing({
 			className={cn(
 				"absolute z-10 flex items-center justify-center",
 				"corner-xs corner-squircle",
-				"pointer-events-auto transition-colors",
+				"pointer-events-auto transition-colors focus-outline",
 				"squircle:corner-xs",
 				lit
 					? litLook

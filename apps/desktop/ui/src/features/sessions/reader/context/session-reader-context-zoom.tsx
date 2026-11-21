@@ -230,7 +230,7 @@ export function ContextZoom({
 								onClick={(event) =>
 									item.more ? open.go() : onPick(item.label, event.shiftKey)
 								}
-								className="absolute inset-0 corner-s-inset corner-squircle outline-none transition-colors hover:bg-hover squircle:corner-xl-inset dark:hover:bg-hover"
+								className="absolute inset-0 corner-s-inset corner-squircle focus-outline transition-colors hover:bg-hover squircle:corner-xl-inset dark:hover:bg-hover"
 							/>
 							<span
 								className={cn(
@@ -267,7 +267,7 @@ export function ContextZoom({
 										"corner-s pr-xs pl-m",
 										"text-body-m font-medium",
 										// design-escape-ok(opacity): no role renders this; bg-field/70
-										"bg-field/70 text-ink-3 transition-colors outline-none",
+										"bg-field/70 text-ink-3 transition-colors focus-outline",
 										"hover:bg-hover hover:text-ink",
 									)}
 								>
