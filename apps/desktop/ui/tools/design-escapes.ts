@@ -119,6 +119,10 @@ export const DATA_PAINT: Record<string, { rules: Rule[]; why: string }> = {
 		rules: ["colour"],
 		why: "the trace icon tone palette (data paint)",
 	},
+	"src/features/shell/components/star-card/sidebar-star-card.css": {
+		rules: ["colour", "motion"],
+		why: "the star card's split-flap counter, knob, gold star, shimmer and celebration are artwork; its lifted shadow is main's, which no role holds",
+	},
 	"src/app/ui/context-utilization-gradients.tsx": {
 		rules: ["colour"],
 		why: "the context-use gradient's stops: green to red heat",
