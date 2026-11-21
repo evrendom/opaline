@@ -349,6 +349,18 @@
 	letter-spacing: 0.2em;
 }
 
+/* The one keyboard-focus mark for buttons and anything clickable: a 2px
+   accent outline just outside the control, following its corners. An outline,
+   so it never fights the control's role shadow. Fields keep their own
+   `focus-visible:border-focus ring-focus-ring` pair. */
+@utility focus-outline {
+	outline: none;
+	&:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 1px;
+	}
+}
+
 /* -- Kept as authored: chart series (data paint) and the sidebar primitive's
    tokens (the window chrome, translucent for macOS vibrancy in app-surface.css). */
 :root {
