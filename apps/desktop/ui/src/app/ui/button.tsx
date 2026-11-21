@@ -80,6 +80,12 @@ const buttonVariants = cva(
 					// design-escape-ok(space): shipped value; 5.5px gap
 					"gap-[5.5px] has-[>svg:first-child]:pl-[calc(var(--space-xxs)*5)] has-[>svg:last-child]:pr-[calc(var(--space-xxs)*5)] has-[>svg+[data-button-text]:last-child]:pr-[calc(var(--space-xxs)*5)]",
 			},
+			// The plain buttons' small size kept its 12px sides beside an icon.
+			{
+				variant: ["quiet", "bordered"],
+				size: "sm",
+				className: "has-[>svg:first-child]:pl-l has-[>svg:last-child]:pr-l",
+			},
 		],
 		defaultVariants: {
 			variant: "default",

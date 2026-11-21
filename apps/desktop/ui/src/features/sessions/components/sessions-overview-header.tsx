@@ -114,7 +114,8 @@ function SessionOverviewSortableHeader({
 			className={cn(
 				"relative flex h-full min-w-0 flex-1 items-center gap-xs",
 				"px-l",
-				"text-left text-body-xxl font-medium whitespace-nowrap",
+				// design-escape-ok(type): shipped value; -0.01em header tracking
+				"text-left text-body-xxl font-medium tracking-[-0.01em] whitespace-nowrap",
 				"text-ink focus-outline",
 				"hover:bg-hover",
 				"focus-visible:z-10",

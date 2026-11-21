@@ -176,7 +176,8 @@ export function SetupProse({
 							<List
 								key={key}
 								className={cn(
-									"space-y-xxs pl-[calc(var(--space-xl)+var(--space-xs))] marker:text-ink-disabled",
+									// design-escape-ok(opacity): shipped value; muted-foreground/70
+									"space-y-xxs pl-[calc(var(--space-xl)+var(--space-xs))] marker:text-ink-3/70",
 									block.ordered ? "list-decimal" : "list-disc",
 								)}
 							>
@@ -206,7 +207,8 @@ export function SetupProse({
 							</div>
 						);
 					case "rule":
-						return <hr key={key} className="border-line-soft" />;
+						// design-escape-ok(opacity): shipped value; border/60
+						return <hr key={key} className="border-line-strong/60" />;
 					default:
 						return null;
 				}

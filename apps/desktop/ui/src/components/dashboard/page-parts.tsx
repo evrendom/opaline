@@ -241,7 +241,7 @@ export function StatCard({
 					</div>
 					<div
 						className={cn(
-							"flex items-center gap-l",
+							"flex items-center gap-[calc(var(--space-m)+var(--space-xxs))]",
 							note ? "min-w-0 gap-m" : "shrink-0",
 						)}
 					>
@@ -249,7 +249,8 @@ export function StatCard({
 							<CardTitle
 								className={cn(
 									"inline-flex min-w-0 items-center gap-xs overflow-hidden",
-									"tracking-xs whitespace-nowrap tabular-nums",
+									// design-escape-ok(type): shipped value; -0.025em title tracking
+									"tracking-[-0.025em] whitespace-nowrap tabular-nums",
 									"opacity-45",
 								)}
 							>
@@ -279,7 +280,8 @@ export function StatCard({
 					</div>
 				</div>
 				{note && noteBelow && !loading ? (
-					<CardTitle className="min-w-0 tracking-xs text-pretty tabular-nums opacity-45">
+					// design-escape-ok(type): shipped value; -0.025em title tracking
+					<CardTitle className="min-w-0 tracking-[-0.025em] text-pretty tabular-nums opacity-45">
 						{note}
 					</CardTitle>
 				) : null}
@@ -301,7 +303,11 @@ function StatValue({
 }) {
 	if (!tip)
 		return (
-			<CardTitle className="shrink-0 tracking-xs tabular-nums" title={title}>
+			<CardTitle
+				// design-escape-ok(type): shipped value; -0.025em title tracking
+				className="shrink-0 tracking-[-0.025em] tabular-nums"
+				title={title}
+			>
 				{children}
 			</CardTitle>
 		);
@@ -310,7 +316,8 @@ function StatValue({
 			<TooltipTrigger
 				render={
 					<CardTitle
-						className="relative z-20 shrink-0 cursor-default tracking-xs tabular-nums"
+						// design-escape-ok(type): shipped value; -0.025em title tracking
+						className="relative z-20 shrink-0 cursor-default tracking-[-0.025em] tabular-nums"
 						onClick={onSelect}
 					/>
 				}

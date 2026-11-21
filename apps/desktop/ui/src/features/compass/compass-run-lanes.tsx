@@ -645,8 +645,8 @@ export function RunLanes({
 										: `Show all lanes, ${unused} this run didn't use`
 								}
 								onClick={() => setAllLanes((shown) => !shown)}
-								// design-escape-ok(radius): shipped value; 4px corner
-								className="inline-flex items-center rounded-[4px] px-xxs text-ink-disabled hover:bg-hover hover:text-ink"
+								// design-escape-ok(radius,opacity): shipped value; 4px corner, muted-foreground/70
+								className="inline-flex items-center rounded-[4px] px-xxs text-ink-3/70 hover:bg-hover hover:text-ink"
 							>
 								{allLanes ? (
 									<IconChevronUp aria-hidden="true" className="size-2.5" />
@@ -683,7 +683,8 @@ export function RunLanes({
 							/>
 						) : null}
 					</div>
-					<div className="relative flex justify-between gap-m px-xxs text-body-xxs line-solid text-ink-disabled tabular-nums">
+					{/* design-escape-ok(opacity): shipped value; muted-foreground/70 */}
+					<div className="relative flex justify-between gap-m px-xxs text-body-xxs line-solid text-ink-3/70 tabular-nums">
 						<span className={cn(brush && "invisible")}>
 							{offset(view.from)}
 						</span>

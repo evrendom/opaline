@@ -326,7 +326,8 @@ function RepoFileDetail({
 					"shrink-0 [direction:rtl]",
 					"-mt-xs pl-m",
 					"truncate text-left text-body-m",
-					"text-ink-disabled",
+					// design-escape-ok(opacity): shipped value; muted-foreground/70
+					"text-ink-3/70",
 				)}
 				title={directory}
 			>

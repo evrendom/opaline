@@ -94,7 +94,8 @@ function RowTags({
 			))}
 			{rest > 0 ? (
 				<span
-					className="text-body-xs font-regular text-ink-disabled tabular-nums"
+					// design-escape-ok(opacity): shipped value; muted-foreground/70
+					className="text-body-xs font-regular text-ink-3/70 tabular-nums"
 					title={tags
 						.slice(ROW_TAGS)
 						.map((tag) => tag.label)
@@ -264,7 +265,8 @@ export function FileTree({
 		<div className="flex flex-col">
 			{model.rootLabel ? (
 				<div
-					className="truncate px-l pb-xs text-body-m text-ink-disabled [direction:rtl] text-left"
+					// design-escape-ok(opacity): shipped value; muted-foreground/70
+					className="truncate px-[calc(var(--space-m)+var(--space-xxs))] pb-xs text-body-m text-ink-3/70 [direction:rtl] text-left"
 					title={model.rootLabel}
 				>
 					{`‎${model.rootLabel}‎`}
@@ -306,7 +308,7 @@ export function FileTree({
 								onKeyDown={(event) => onKeyDown(event, index)}
 								className={cn(
 									"group/row flex h-7 items-center gap-s",
-									"corner-s pr-l pl-xs corner-squircle",
+									"corner-s pr-[calc(var(--space-m)+var(--space-xxs))] pl-xs corner-squircle",
 									// design-escape-ok(type): shipped value; 13px on the card's 14/20 ratio (18.57)
 									"text-[13px]/[calc(20/14)]",
 									"outline-none select-none",
@@ -372,7 +374,8 @@ export function FileTree({
 									<RowTags onPick={onPickTag} tags={row.item.tags} />
 								) : null}
 								{row.item?.badge ? (
-									<span className="shrink-0 text-body-m font-regular text-ink-disabled tabular-nums">
+									// design-escape-ok(opacity): shipped value; muted-foreground/70
+									<span className="shrink-0 text-body-m font-regular text-ink-3/70 tabular-nums">
 										{row.item.badge}
 									</span>
 								) : null}

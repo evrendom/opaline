@@ -92,12 +92,14 @@ export function ToolbarSortMenu<K extends string>({
 				{sort.direction === "asc" ? (
 					<IconChevronUp
 						aria-hidden="true"
-						className="size-4 shrink-0 text-ink-soft"
+						// design-escape-ok(colour): shipped value; #5d5d5d (#acaeb2 in dark)
+						className="size-4 shrink-0 text-[#5d5d5d] dark:text-[#acaeb2]"
 					/>
 				) : (
 					<IconChevronDown
 						aria-hidden="true"
-						className="size-4 shrink-0 text-ink-soft"
+						// design-escape-ok(colour): shipped value; #5d5d5d (#acaeb2 in dark)
+						className="size-4 shrink-0 text-[#5d5d5d] dark:text-[#acaeb2]"
 					/>
 				)}
 				<TouchTarget className="size-12" />

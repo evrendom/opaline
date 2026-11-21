@@ -319,7 +319,8 @@ function SetupPicked({
 							<SetupCard file={shown} versions={versions} />
 						</div>
 						{detailStep && pickedTurn && runUses.waterfall ? (
-							<div className="flex min-h-0 flex-1 flex-col edge-t-m border-line-soft">
+							// design-escape-ok(opacity): shipped value; border/50
+							<div className="flex min-h-0 flex-1 flex-col edge-t-m border-line-strong/50">
 								<SessionReaderStepDetail
 									bare
 									fields={false}

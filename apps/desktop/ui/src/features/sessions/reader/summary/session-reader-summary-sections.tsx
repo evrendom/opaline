@@ -229,7 +229,8 @@ export function PlaceLink({
 			onClick={() => onOpen(first.turnId, first.agent)}
 			className={cn(
 				"shrink-0",
-				"corner-xs px-xs",
+				// design-escape-ok(radius): shipped value; 4px
+				"rounded-[4px] px-xs",
 				"text-body-m font-medium tabular-nums",
 				"text-ink-3",
 				"hover:bg-field hover:text-ink",

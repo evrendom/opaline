@@ -151,7 +151,7 @@ export function OverviewCard({
 					<span
 						aria-hidden="true"
 						skullet-ignore=""
-						className="absolute -right-3 -bottom-7 rotate-[-14deg] text-display-xxl line-solid opacity-15"
+						className="absolute -right-3 -bottom-7 rotate-[-14deg] text-display-xxl line-solid tracking-s opacity-15"
 					>
 						<span>{emoji}</span>
 					</span>

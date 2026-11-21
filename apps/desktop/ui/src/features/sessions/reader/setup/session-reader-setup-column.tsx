@@ -139,7 +139,8 @@ export function SetupColumn({
 					<FluidList
 						className={cn(
 							"flex flex-col gap-xxs",
-							uses && "mt-l edge-t-m border-line-soft pt-m",
+							// design-escape-ok(opacity): shipped value; border/50
+							uses && "mt-l edge-t-m border-line-strong/50 pt-m",
 							calls && "hidden",
 						)}
 					>
@@ -159,7 +160,8 @@ export function SetupColumn({
 						))}
 					</FluidList>
 					{receivedBy ? (
-						<div className="mt-l edge-t-m border-line-soft pt-xs">
+						// design-escape-ok(opacity): shipped value; border/50
+						<div className="mt-l edge-t-m border-line-strong/50 pt-xs">
 							{receivedBy}
 						</div>
 					) : null}

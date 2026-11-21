@@ -287,7 +287,8 @@ export const TurnRailList = memo(function TurnRailList({
 				className={cn(
 					"flex shrink-0 items-center justify-between gap-m",
 					"edge-b-m py-m pr-m pl-xl",
-					"border-line-soft",
+					// design-escape-ok(opacity): shipped value; border/60
+					"border-line-strong/60",
 				)}
 			>
 				<h2 className="truncate text-body-xl font-medium">Agent runs</h2>

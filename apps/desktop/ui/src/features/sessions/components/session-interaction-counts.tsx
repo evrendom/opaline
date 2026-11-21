@@ -27,10 +27,10 @@ function SessionUserIdentity({
 								alt=""
 								width={16}
 								height={16}
-								className="size-4 shrink-0 corner-full object-cover outline-(length:--border-m) -outline-offset-1 outline-line dark:outline-line"
+								className="size-4 shrink-0 corner-full object-cover outline-(length:--border-m) -outline-offset-1 outline-line-faint"
 							/>
 						) : (
-							<span className="flex size-4 shrink-0 items-center justify-center corner-full bg-field outline-(length:--border-m) -outline-offset-1 outline-line dark:outline-line">
+							<span className="flex size-4 shrink-0 items-center justify-center corner-full bg-field outline-(length:--border-m) -outline-offset-1 outline-line-faint">
 								<IconUser className="size-3 shrink-0" />
 							</span>
 						)}

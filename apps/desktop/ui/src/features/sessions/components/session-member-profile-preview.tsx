@@ -45,7 +45,8 @@ function MemberActivitySparkline({ values }: { values: readonly number[] }) {
 			viewBox={`0 0 ${SPARKLINE_WIDTH} ${SPARKLINE_HEIGHT}`}
 		>
 			<polyline
-				className="fill-none stroke-accent"
+				// design-escape-ok(colour): shipped value; #266df0
+				className="fill-none stroke-[#266df0]"
 				points={buildSparklinePoints(values)}
 				strokeLinecap="round"
 				strokeLinejoin="round"
@@ -65,7 +66,7 @@ function SessionMemberAvatar({
 }) {
 	const isTrigger = size === "trigger";
 	const avatarClassName = cn(
-		"shrink-0 corner-full object-cover outline-(length:--border-m) -outline-offset-1 outline-line dark:outline-line",
+		"shrink-0 corner-full object-cover outline-(length:--border-m) -outline-offset-1 outline-line-faint",
 		isTrigger ? "size-4.5" : "size-6",
 	);
 
@@ -87,8 +88,8 @@ function SessionMemberAvatar({
 			className={cn(
 				"flex shrink-0 items-center justify-center",
 				"corner-full",
-				"bg-field -outline-offset-1 outline-line",
-				"outline-(length:--border-m) dark:outline-line",
+				"bg-field -outline-offset-1 outline-line-faint",
+				"outline-(length:--border-m)",
 				isTrigger ? "size-4.5" : "size-6",
 			)}
 		>
@@ -148,7 +149,7 @@ export function SessionMemberProfilePreview({
 				>
 					<PreviewCard.Popup
 						// design-escape-ok(opacity): no role renders this; ring-ink/10, dark:ring-ink/15
-						className="w-52 origin-(--transform-origin) corner-m bg-surface p-l text-ink ring-1 ring-ink/10 outline-none transition-[opacity,transform] duration-(--motion-quick-duration) data-ending-style:scale-98 data-ending-style:opacity-0 data-starting-style:scale-98 data-starting-style:opacity-0 dark:ring-ink/15"
+						className="w-52 origin-(--transform-origin) corner-m bg-surface p-[calc(var(--space-m)+var(--space-xxs))] text-ink ring-1 ring-ink/10 outline-none transition-[opacity,transform] duration-(--motion-quick-duration) data-ending-style:scale-98 data-ending-style:opacity-0 data-starting-style:scale-98 data-starting-style:opacity-0 dark:ring-ink/15"
 						data-slot="session-member-profile-preview"
 					>
 						<div className="flex min-w-0 items-center gap-m">

@@ -48,7 +48,7 @@ export function ReportView({
 		>
 			<header className="flex flex-col gap-m">
 				<p className="text-body-m text-ink-3">Saved analysis</p>
-				<h1 className="text-display-xxs font-medium text-balance">
+				<h1 className="text-display-xxs tracking-s font-medium text-balance">
 					{report.question}
 				</h1>
 				<div className="flex flex-wrap items-center gap-x-m gap-y-xs text-ink-3">

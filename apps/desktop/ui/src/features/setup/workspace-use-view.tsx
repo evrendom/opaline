@@ -787,7 +787,8 @@ function RunTrace({
 					className={cn(
 						"flex h-6 items-center gap-xs",
 						"corner-xs px-s",
-						"text-body-s",
+						// design-escape-ok(type): shipped value; 11px on main's inherited 4/3 line
+						"text-body-s leading-[calc(4/3)]",
 						"text-ink-3 transition-colors",
 						"hover:text-ink",
 					)}
@@ -963,7 +964,8 @@ function OpenRunLink({
 			to={sessionPagePath(getShellRoutePath, undefined, run.sessionId, params)}
 			className={
 				compact
-					? "flex h-6 items-center gap-xs corner-xs px-s text-body-s text-ink-3 transition-colors hover:text-ink"
+					? // design-escape-ok(type): shipped value; 11px on main's inherited 4/3 line
+						"flex h-6 items-center gap-xs corner-xs px-s text-body-s leading-[calc(4/3)] text-ink-3 transition-colors hover:text-ink"
 					: // design-escape-ok(opacity): shipped value; border/60 as line-strong at 60%
 						"inline-flex h-8 items-center gap-xs corner-s edge-m border-line-strong/60 px-l text-body-m font-medium transition-colors hover:bg-field"
 			}

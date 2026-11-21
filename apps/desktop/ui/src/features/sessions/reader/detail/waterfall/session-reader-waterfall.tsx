@@ -374,8 +374,8 @@ export function SessionReaderWaterfallView({
 												/>
 											))}
 											{bare ? (
-												// design-escape-ok(type): deliberate exception, 9/12 ruler ticks
-												<div className="absolute inset-x-0 top-0 flex justify-between px-xs text-[9px] leading-3 text-ink-disabled tabular-nums">
+												// design-escape-ok(type,opacity): deliberate exception, 9/12 ruler ticks; muted-foreground/70 as shipped
+												<div className="absolute inset-x-0 top-0 flex justify-between px-xs text-[9px] leading-3 text-ink-3/70 tabular-nums">
 													<span>0s</span>
 													<span>{formatWholeDuration(total)}</span>
 												</div>

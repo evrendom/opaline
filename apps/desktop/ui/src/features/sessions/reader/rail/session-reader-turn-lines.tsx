@@ -100,7 +100,8 @@ function PromptTokens({
 				.join("\n")}
 		>
 			~{formatCompactNumber(estimate.tokens)} tokens
-			{share ? <span className="text-ink-disabled"> · {share}</span> : null}
+			{/* design-escape-ok(opacity): shipped value; muted-foreground/70 */}
+			{share ? <span className="text-ink-3/70"> · {share}</span> : null}
 		</span>
 	);
 }

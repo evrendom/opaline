@@ -389,7 +389,8 @@ function CallCard({
 						"[direction:rtl]",
 						"-mt-xs pr-m pl-m",
 						"truncate text-left text-body-m",
-						"text-ink-disabled",
+						// design-escape-ok(opacity): shipped value; muted-foreground/70
+						"text-ink-3/70",
 					)}
 					title={call.path}
 				>
@@ -528,7 +529,8 @@ function CallPayloads({ call }: { call: RepositoryRunCall }) {
 					wrapLines={!shell}
 				/>
 				{cut ? (
-					<p className="text-body-m text-ink-disabled">
+					// design-escape-ok(opacity): shipped value; muted-foreground/70
+					<p className="text-body-m text-ink-3/70">
 						Cut short here; the rest is in the session's transcript.
 					</p>
 				) : null}
@@ -590,7 +592,8 @@ function CallSection({
 			<h3 className="text-body-m font-medium text-ink-3">{title}</h3>
 			{children}
 			{cut ? (
-				<p className="text-body-m text-ink-disabled">
+				// design-escape-ok(opacity): shipped value; muted-foreground/70
+				<p className="text-body-m text-ink-3/70">
 					Cut short here; the rest is in the session's transcript.
 				</p>
 			) : null}

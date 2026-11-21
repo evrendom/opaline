@@ -42,7 +42,7 @@ export function SessionUploadFailureDetail({
 		>
 			<div className="flex min-w-0 max-w-3xl flex-col gap-xxl">
 				<div className="flex min-w-0 flex-col gap-l">
-					<h1 className="text-balance text-display-xxs font-medium">
+					<h1 className="text-balance text-display-xxs tracking-s font-medium">
 						Upload failed
 					</h1>
 					<p className="whitespace-pre-wrap wrap-anywhere text-pretty text-dashboardy-heading">

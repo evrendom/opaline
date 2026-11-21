@@ -213,7 +213,8 @@ function FieldValue({ value }: { value: unknown }) {
 	if (typeof value === "string") {
 		const long = value.length > 80 || value.includes("\n");
 		return long ? (
-			<p className="corner-s bg-field px-l py-m text-body-l whitespace-pre-wrap [overflow-wrap:anywhere]">
+			// design-escape-ok(type): shipped value; 13px on a relaxed 1.625 line
+			<p className="corner-s bg-field px-l py-m text-body-l leading-[1.625] whitespace-pre-wrap [overflow-wrap:anywhere]">
 				{value}
 			</p>
 		) : (

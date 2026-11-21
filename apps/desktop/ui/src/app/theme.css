@@ -323,7 +323,7 @@
   /* Body text */
   --size-xxs: 8px;
   --line-xxs: 12px;
-  --letter-spacing-xxs: 0.02em;
+  --letter-spacing-xxs: 0em;
   --size-xs: 10px;
   --line-xs: 14px;
   --letter-spacing-xs: 0em;
@@ -341,7 +341,7 @@
   --letter-spacing-xl: 0em;
   --size-xxl: 16px;
   --line-xxl: 24px;
-  --letter-spacing-xxl: -0.015em;
+  --letter-spacing-xxl: 0em;
   --tracking-xs: -0.015em;
   --tracking-s: 0em;
   --tracking-m: 0em;

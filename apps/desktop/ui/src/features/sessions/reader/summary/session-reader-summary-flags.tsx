@@ -111,7 +111,8 @@ function SnippetLines({
 				</span>
 			))}
 			{snippets.length > SNIPPETS ? (
-				<span className="text-body-m text-ink-disabled tabular-nums">
+				// design-escape-ok(opacity): shipped value; muted-foreground/70
+				<span className="text-body-m text-ink-3/70 tabular-nums">
 					+{snippets.length - SNIPPETS} more
 				</span>
 			) : null}
@@ -245,7 +246,8 @@ export function SummaryFlags({
 	)
 		return null;
 	return (
-		<ul className="flex flex-col divide-y divide-line-soft">
+		// design-escape-ok(opacity): shipped value; border/60
+		<ul className="flex flex-col divide-y divide-line-strong/60">
 			{before ? (
 				<Row
 					chip={<FlagChip kind="user_frustrated" />}

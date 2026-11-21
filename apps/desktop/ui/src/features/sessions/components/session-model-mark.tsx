@@ -23,7 +23,11 @@ const MODEL_ICON_CLASS_NAME =
 
 export function SessionModelLoadingMark() {
 	return (
-		<span aria-hidden="true" className={cn(MODEL_MARK_CLASS_NAME, "text-ink")}>
+		<span
+			aria-hidden="true"
+			// design-escape-ok(colour): shipped value; #111 (white in dark)
+			className={cn(MODEL_MARK_CLASS_NAME, "text-[#111] dark:text-white")}
+		>
 			<span className={cn(MODEL_BACKGROUND_CLASS_NAME, "bg-mark-fill")}>
 				<SessionModelProgressRing progress="loading" />
 			</span>
@@ -118,8 +122,10 @@ export function SessionModelMark({
 			className={cn(
 				MODEL_MARK_CLASS_NAME,
 				"corner-full",
-				tone.icon === "claude" && "text-warning",
-				tone.icon === "codex" && "text-ink",
+				// design-escape-ok(colour): shipped value; #b96949
+				tone.icon === "claude" && "text-[#b96949]",
+				// design-escape-ok(colour): shipped value; #111 (white in dark)
+				tone.icon === "codex" && "text-[#111] dark:text-white",
 				tone.icon === null && "text-ink-3",
 			)}
 		>
@@ -127,8 +133,8 @@ export function SessionModelMark({
 				{...iconAccessibility}
 				className={cn(
 					MODEL_BACKGROUND_CLASS_NAME,
-					// design-escape-ok(opacity): no role renders this; bg-warning/10
-					tone.icon === "claude" && "bg-warning/10",
+					// design-escape-ok(colour,opacity): shipped value; #cc7d5e/10
+					tone.icon === "claude" && "bg-[#cc7d5e]/10",
 					tone.icon !== "claude" && "bg-mark-fill",
 					progress && tone.identityIconClassName,
 				)}

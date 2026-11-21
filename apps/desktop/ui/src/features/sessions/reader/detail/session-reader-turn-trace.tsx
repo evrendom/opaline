@@ -215,12 +215,14 @@ export const TurnTrace = memo(function TurnTrace({
 						)}
 					>
 						{headNode ? (
-							<div className="shrink-0 edge-b-m border-line-soft px-l py-l">
+							// design-escape-ok(opacity): shipped value; border/60
+							<div className="shrink-0 edge-b-m border-line-strong/60 px-l py-[calc(var(--space-m)+var(--space-xxs))]">
 								{headNode}
 							</div>
 						) : null}
 						{headNode && step ? (
-							<div className="shrink-0 edge-b-m border-line-soft px-l py-m">
+							// design-escape-ok(opacity): shipped value; border/60
+							<div className="shrink-0 edge-b-m border-line-strong/60 px-l py-m">
 								<StepBreakdowns
 									model={model}
 									step={step}
@@ -234,7 +236,8 @@ export const TurnTrace = memo(function TurnTrace({
 								className={cn(
 									"grid shrink-0 gap-xl",
 									"edge-b-m px-l py-m",
-									"border-line-soft",
+									// design-escape-ok(opacity): shipped value; border/60
+									"border-line-strong/60",
 									"empty:hidden",
 									agent ? "grid-cols-2" : "grid-cols-4",
 								)}
@@ -273,19 +276,22 @@ export const TurnTrace = memo(function TurnTrace({
 						<div
 							ref={setRunningSlot}
 							className={cn(
-								"shrink-0 edge-t-m border-line-soft px-l py-m empty:hidden",
+								// design-escape-ok(opacity): shipped value; border/60
+								"shrink-0 edge-t-m border-line-strong/60 px-l py-m empty:hidden",
 								(!subagentsAtStep || expanded) && "hidden",
 							)}
 						/>
 						<div
 							ref={setSubagentSlot}
 							className={cn(
-								"shrink-0 edge-t-m border-line-soft px-m py-m empty:hidden",
+								// design-escape-ok(opacity): shipped value; border/60
+								"shrink-0 edge-t-m border-line-strong/60 px-m py-m empty:hidden",
 								step && "hidden",
 							)}
 						/>
 						{step ? (
-							<div className="flex min-h-0 flex-1 flex-col edge-t-m border-line-soft">
+							// design-escape-ok(opacity): shipped value; border/60
+							<div className="flex min-h-0 flex-1 flex-col edge-t-m border-line-strong/60">
 								<SessionReaderStepDetail
 									bare
 									expanded={expanded}

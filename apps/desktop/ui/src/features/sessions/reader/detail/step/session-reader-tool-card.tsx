@@ -66,8 +66,8 @@ export function ToolCard({
 				"flex min-h-0 flex-col overflow-hidden",
 				prose
 					? null
-					: // design-escape-ok(opacity): no role renders this; bg-field/40
-						"edge-m border-line-soft bg-field/40 corner-squircle dark:bg-wash",
+					: // design-escape-ok(opacity,colour): shipped value; border/60, bg-muted/40, dark:bg-white/[0.02]
+						"edge-m border-line-strong/60 bg-field/40 corner-squircle dark:bg-white/[0.02]",
 				!prose &&
 					(fit
 						? "corner-l squircle:corner-xl"
@@ -106,7 +106,8 @@ export function ToolCard({
 						Result
 						<span
 							title={size.title}
-							className="font-regular text-ink-disabled tabular-nums"
+							// design-escape-ok(opacity): shipped value; muted-foreground/70
+							className="font-regular text-ink-3/70 tabular-nums"
 						>
 							{size.label}
 						</span>
@@ -133,7 +134,8 @@ export function ToolCard({
 									)}
 								>
 									{prose ? (
-										<p className="pr-[calc(var(--space-xxl)*4/3)] text-body-l whitespace-pre-wrap [overflow-wrap:anywhere]">
+										// design-escape-ok(type): shipped value; 13px on a relaxed 1.625 line
+										<p className="pr-[calc(var(--space-xxl)*4/3)] text-body-l leading-[1.625] whitespace-pre-wrap [overflow-wrap:anywhere]">
 											{text}
 										</p>
 									) : text.length <= LAYOUT_CHARS ? (
@@ -141,7 +143,7 @@ export function ToolCard({
 									) : (
 										<pre
 											className={cn(
-												"px-l font-mono text-body-m",
+												"px-l font-mono text-body-m [line-height:var(--line-l)]",
 												wrap
 													? "whitespace-pre-wrap [overflow-wrap:anywhere]"
 													: "overflow-x-auto whitespace-pre",
