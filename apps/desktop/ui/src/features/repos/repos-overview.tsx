@@ -286,7 +286,7 @@ const SAMPLE_REPOS: RepositorySummary[] = [
 	};
 });
 
-function ReposList({
+export function ReposList({
 	avatarMap,
 	getRepoHref,
 	repos,

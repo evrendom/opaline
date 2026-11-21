@@ -209,7 +209,7 @@ const setupFile = (
 	path,
 	runs: 12,
 	scope,
-	setupFile: `${scope}:${owner}:${path}`,
+	setupFile: `${scope}:${owner}:${kind}:${path}`,
 	subagents: false,
 	versions: 1,
 });

@@ -43,7 +43,7 @@ const footerRoutes = shellNavigationRoutes.filter(
 	(route) => route.id === "settings",
 );
 
-function SidebarNavItem({
+export function SidebarNavItem({
 	route,
 	active,
 }: {
@@ -77,7 +77,7 @@ function SidebarNavItem({
 	);
 }
 
-function SidebarNavTile({
+export function SidebarNavTile({
 	route,
 	active,
 }: {

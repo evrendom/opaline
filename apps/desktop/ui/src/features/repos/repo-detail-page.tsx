@@ -443,7 +443,7 @@ function RepoDashboard({
  * breadcrumb whose section leads back to the list, extended by the open
  * session's id (the repo crumb then leads back to its sessions), and a slot
  * at the row's right end for the open session's controls. */
-function RepoDetailHeader({
+export function RepoDetailHeader({
 	repoKey,
 	name,
 	onBack,

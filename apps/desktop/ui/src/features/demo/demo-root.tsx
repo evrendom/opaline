@@ -37,6 +37,59 @@ export function createDemoQueryClient() {
 	});
 }
 
+/** The answers the demo renders before its backend connects: the seed's
+ *  dashboard, stat card trends, repositories, navigation and last upload. */
+export function demoSeedQueries(seed: DemoSeed): Array<[QueryKey, unknown]> {
+	const answers = [seed.dashboard, ...seed.previews];
+	const seededMetrics = Object.fromEntries(
+		answers
+			.filter(({ input }) => input.splitBy === "none")
+			.map(({ input, data }) => {
+				const metric = input.requestedMetric ?? "cost";
+				return [metric, data.metrics[metric]];
+			}),
+	);
+	const seeded: Array<[QueryKey, unknown]> = [
+		...(seed.queries ?? []),
+		...answers.map(({ input, data }): [QueryKey, unknown] => [
+			[
+				"org",
+				seed.organization.id,
+				...orpc.analytics.overview.costs.queryOptions({ input }).queryKey,
+			],
+			input.splitBy === "none"
+				? { ...data, metrics: { ...data.metrics, ...seededMetrics } }
+				: data,
+		]),
+		[
+			[
+				"org",
+				seed.organization.id,
+				...orpc.analytics.repositories.list.queryOptions({}).queryKey,
+			],
+			seed.repositories,
+		],
+		[
+			[
+				"org",
+				seed.organization.id,
+				...orpc.analytics.repositories.navigation.queryOptions({}).queryKey,
+			],
+			seed.navigation,
+		],
+		[
+			[
+				"org",
+				seed.organization.id,
+				...orpc.analytics.sessions.lastUpload.queryOptions().queryKey,
+			],
+			seed.lastUpload,
+		],
+		[planUsageQueryKey(DEMO_RANGE), seed.planUsage],
+	];
+	return seeded;
+}
+
 export function DemoRoot({
 	seed,
 	client: givenClient,
@@ -54,53 +107,7 @@ export function DemoRoot({
 		// Render the actual dashboard and its stat card trends before activation.
 		// The stat cards read every session metric from one answer, so each
 		// seeded answer carries every seeded metric.
-		const answers = [seed.dashboard, ...seed.previews];
-		const seededMetrics = Object.fromEntries(
-			answers
-				.filter(({ input }) => input.splitBy === "none")
-				.map(({ input, data }) => {
-					const metric = input.requestedMetric ?? "cost";
-					return [metric, data.metrics[metric]];
-				}),
-		);
-		const seeded: Array<[QueryKey, unknown]> = [
-			...(seed.queries ?? []),
-			...answers.map(({ input, data }): [QueryKey, unknown] => [
-				[
-					"org",
-					seed.organization.id,
-					...orpc.analytics.overview.costs.queryOptions({ input }).queryKey,
-				],
-				input.splitBy === "none"
-					? { ...data, metrics: { ...data.metrics, ...seededMetrics } }
-					: data,
-			]),
-			[
-				[
-					"org",
-					seed.organization.id,
-					...orpc.analytics.repositories.list.queryOptions({}).queryKey,
-				],
-				seed.repositories,
-			],
-			[
-				[
-					"org",
-					seed.organization.id,
-					...orpc.analytics.repositories.navigation.queryOptions({}).queryKey,
-				],
-				seed.navigation,
-			],
-			[
-				[
-					"org",
-					seed.organization.id,
-					...orpc.analytics.sessions.lastUpload.queryOptions().queryKey,
-				],
-				seed.lastUpload,
-			],
-			[planUsageQueryKey(DEMO_RANGE), seed.planUsage],
-		];
+		const seeded = demoSeedQueries(seed);
 		for (const [queryKey, data] of seeded)
 			client.setQueryData(queryKey, data, { updatedAt: 0 });
 		return { client, seeded };

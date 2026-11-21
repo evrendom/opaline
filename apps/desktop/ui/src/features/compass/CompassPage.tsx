@@ -386,7 +386,7 @@ function CompassView({ observable }: { observable: boolean }) {
 }
 
 /** The scrolling list of rows. */
-function ListBody({ children }: { children: ReactNode }) {
+export function ListBody({ children }: { children: ReactNode }) {
 	return (
 		<div className="compass-list" data-fluid-menu-root="">
 			<FluidMenuHover items="[data-compass-item]" />

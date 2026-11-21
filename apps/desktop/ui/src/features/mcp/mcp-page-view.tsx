@@ -156,7 +156,7 @@ export function McpPageView({
 	);
 }
 
-function McpCardsGrid({
+export function McpCardsGrid({
 	servers,
 	onSelect,
 }: {

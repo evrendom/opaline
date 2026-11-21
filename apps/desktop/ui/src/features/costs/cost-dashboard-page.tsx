@@ -4,6 +4,7 @@ import {
 } from "@rudel/api-routes";
 import { IconAlertTriangle, IconX } from "@tabler/icons-react";
 import {
+	type ComponentProps,
 	type CSSProperties,
 	type ReactNode,
 	type RefObject,
@@ -60,6 +61,33 @@ const GITHUB_CARDS: readonly DashboardMetric[] = [
 	"mergedPullRequests",
 	"ciRuns",
 ];
+
+/** An active dashboard filter in the chart card's header: its dimension,
+ *  its value and a cross that removes it. `inactive` dims a filter the
+ *  charted metric ignores. */
+export function CostFilterChip({
+	dimension,
+	value,
+	inactive,
+	...props
+}: ComponentProps<"button"> & {
+	dimension: string;
+	value: string;
+	inactive: boolean;
+}) {
+	return (
+		<button
+			type="button"
+			className="filter-chip"
+			data-inactive={inactive}
+			{...props}
+		>
+			<span className="filter-chip-dimension">{dimension}</span>
+			<span className="truncate">{value}</span>
+			<IconX size={12} className="shrink-0" />
+		</button>
+	);
+}
 
 export function CostDashboardPage() {
 	const dashboard = useCostDashboard();
@@ -240,11 +268,11 @@ export function CostDashboardView({
 								}}
 								onBlur={() => setFocusedFilter(null)}
 								render={
-									<button
-										type="button"
+									<CostFilterChip
 										key={`${dimension}:${id}`}
-										className="filter-chip"
-										data-inactive={inactive}
+										dimension={COST_LABELS[dimension]}
+										value={costLabel(dimension, label) || "Unattributed"}
+										inactive={inactive}
 										aria-describedby={
 											inactive
 												? `cost-filter-description-${dimension}-${encodeURIComponent(id)}`
@@ -253,15 +281,7 @@ export function CostDashboardView({
 										onClick={() => toggle(dimension, id)}
 										title={`${COST_LABELS[dimension]}: ${costLabel(dimension, label) || "Unattributed"}`}
 										aria-label={`Remove ${dimension === "members" ? "member" : dimension === "models" ? "model" : COST_LABELS[dimension].toLowerCase()} filter ${costLabel(dimension, label)}${inactive ? ` (not applied to ${METRIC_LABELS[metric]})` : ""}`}
-									>
-										<span className="filter-chip-dimension">
-											{COST_LABELS[dimension]}
-										</span>
-										<span className="truncate">
-											{costLabel(dimension, label) || "Unattributed"}
-										</span>
-										<IconX size={12} className="shrink-0" />
-									</button>
+									/>
 								}
 							/>
 							{inactive ? (

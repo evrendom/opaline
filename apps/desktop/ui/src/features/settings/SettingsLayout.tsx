@@ -69,6 +69,55 @@ const settingsTabIcons: Record<SettingsRouteId, [Icon, Icon]> = {
 	"create-workspace": [IconSquareRoundedPlus, IconSquareRoundedPlusFilled],
 };
 
+/** One section in the settings sidebar: its outline icon at rest, the
+ *  filled one and the sliding card under it when it is the open section. */
+export function SettingsSectionTab({
+	routeId,
+	to,
+	active,
+}: {
+	routeId: SettingsRouteId;
+	to: string;
+	active: boolean;
+}) {
+	const [OutlineIcon, FilledIcon] = settingsTabIcons[routeId];
+	const TabIcon = active ? FilledIcon : OutlineIcon;
+	return (
+		<li>
+			<Link
+				to={to}
+				aria-current={active ? "page" : undefined}
+				className={cn(
+					"relative flex h-8 items-center",
+					"corner-s px-l corner-squircle",
+					"text-body-xl font-medium",
+					"focus-outline",
+					"squircle:corner-l pointer-coarse:h-12",
+					active
+						? "text-ink"
+						: "text-ink-3 hover:text-ink hover:transition-colors",
+				)}
+			>
+				{active ? (
+					<motion.span
+						layoutId="settings-tab-bg"
+						initial={false}
+						transition={{
+							duration: 0.2,
+							ease: [0.32, 0.72, 0, 1],
+						}}
+						className="absolute inset-0 z-0 corner-s bg-card-soft shadow-card corner-squircle squircle:corner-l"
+					/>
+				) : null}
+				<span className="relative z-10 flex items-center gap-s">
+					<TabIcon aria-hidden="true" className="size-3.5" />
+					{settingsRouteMap[routeId].label}
+				</span>
+			</Link>
+		</li>
+	);
+}
+
 export function SettingsLayout() {
 	const { state } = useOrganization();
 	const { query } = useGitHubConnection(state.activeOrg?.id ?? null);
@@ -114,45 +163,14 @@ export function SettingsLayout() {
 				>
 					<nav aria-label="Settings sections">
 						<ul className="flex flex-col gap-xs">
-							{routes.map((route) => {
-								const active = route.id === activeRouteId;
-								const [OutlineIcon, FilledIcon] = settingsTabIcons[route.id];
-								const TabIcon = active ? FilledIcon : OutlineIcon;
-								return (
-									<li key={route.id}>
-										<Link
-											to={getShellRoutePath(route.path)}
-											aria-current={active ? "page" : undefined}
-											className={cn(
-												"relative flex h-8 items-center",
-												"corner-s px-l corner-squircle",
-												"text-body-xl font-medium",
-												"focus-outline",
-												"squircle:corner-l pointer-coarse:h-12",
-												active
-													? "text-ink"
-													: "text-ink-3 hover:text-ink hover:transition-colors",
-											)}
-										>
-											{active ? (
-												<motion.span
-													layoutId="settings-tab-bg"
-													initial={false}
-													transition={{
-														duration: 0.2,
-														ease: [0.32, 0.72, 0, 1],
-													}}
-													className="absolute inset-0 z-0 corner-s bg-card-soft shadow-card corner-squircle squircle:corner-l"
-												/>
-											) : null}
-											<span className="relative z-10 flex items-center gap-s">
-												<TabIcon aria-hidden="true" className="size-3.5" />
-												{route.label}
-											</span>
-										</Link>
-									</li>
-								);
-							})}
+							{routes.map((route) => (
+								<SettingsSectionTab
+									key={route.id}
+									routeId={route.id}
+									to={getShellRoutePath(route.path)}
+									active={route.id === activeRouteId}
+								/>
+							))}
 						</ul>
 					</nav>
 				</aside>
