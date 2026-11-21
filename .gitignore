@@ -89,3 +89,7 @@ dist-selfhost/
 
 # CI scratch (test shards, packed CLI smoke)
 .tmp/
+
+# Graphical import logs: written by each install run, not source
+apps/desktop/ui/graphical/install/install-report.json
+apps/desktop/ui/graphical/install/install-report.md
