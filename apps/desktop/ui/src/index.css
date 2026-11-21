@@ -85,8 +85,12 @@
 	}
 }
 
-:focus {
-	outline: none;
+/* The browser's default focus ring is off; the system's `focus-outline` and the
+   fields' own rings draw focus instead. In the base layer, so a utility wins. */
+@layer base {
+	:focus {
+		outline: none;
+	}
 }
 
 @theme {

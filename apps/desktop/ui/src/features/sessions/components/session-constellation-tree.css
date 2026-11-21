@@ -2,55 +2,36 @@
 @import "./session-constellation-tree-debug.css";
 
 .session-constellation-tree {
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-amber-bg: oklch(0.94 0.055 85);
 
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-amber-fg: oklch(0.72 0.14 85);
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-blue-bg: oklch(0.94 0.045 250);
 
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-blue-fg: oklch(0.72 0.13 250);
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-claude-bg: oklch(0.94 0.045 45);
 
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-claude-fg: oklch(0.72 0.13 45);
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-cyan-bg: oklch(0.94 0.04 205);
 
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-cyan-fg: oklch(0.72 0.11 205);
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-grass-bg: oklch(0.94 0.045 145);
 
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-grass-fg: oklch(0.72 0.14 145);
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-neutral-bg: oklch(0.94 0.006 250);
 
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-neutral-fg: oklch(0.72 0.006 250);
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-openai-bg: oklch(0.94 0.006 250);
 
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-openai-fg: #111111;
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-tomato-bg: oklch(0.94 0.045 30);
 
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-tomato-fg: oklch(0.72 0.15 30);
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-violet-bg: oklch(0.94 0.045 295);
 
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-violet-fg: oklch(0.72 0.14 295);
 	--conversation-trace-connector-color: var(--line);
 	--conversation-trace-connector-width: 0.5;
 	--active-turn-rail-width: var(--conversation-trace-connector-width);
-	/* design-escape-ok(colour): no role renders this; #f9233b */
 	--active-turn-rail: #f9233b;
 	font-family: var(--font-body);
 	font-feature-settings: "ss03";
@@ -174,50 +155,32 @@
 }
 
 .dark .session-constellation-tree {
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-amber-bg: oklch(0.31 0.055 85);
 
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-amber-fg: oklch(0.82 0.1 85);
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-blue-bg: oklch(0.31 0.045 250);
 
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-blue-fg: oklch(0.82 0.1 250);
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-claude-bg: oklch(0.31 0.045 45);
 
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-claude-fg: oklch(0.82 0.1 45);
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-cyan-bg: oklch(0.31 0.04 205);
 
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-cyan-fg: oklch(0.82 0.1 205);
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-grass-bg: oklch(0.31 0.045 145);
 
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-grass-fg: oklch(0.82 0.1 145);
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-neutral-bg: oklch(0.31 0.006 250);
 
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-neutral-fg: oklch(0.82 0.006 250);
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-openai-bg: oklch(0.31 0.006 250);
 
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-openai-fg: #fff;
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-tomato-bg: oklch(0.31 0.045 30);
 
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-tomato-fg: oklch(0.82 0.1 30);
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-violet-bg: oklch(0.31 0.045 295);
 
-	/* design-escape-ok(colour): the trace icon tone palette (data paint) */
 	--trace-icon-violet-fg: oklch(0.82 0.1 295);
 }
 
@@ -429,15 +392,12 @@
 .session-constellation-tree [data-trace-code-block-header] {
 	height: 32px;
 	padding-inline: 10px;
-	/* design-escape-ok(colour): no role renders this; black at 6% in both modes */
 	border-color: rgba(0, 0, 0, 0.06) !important;
 	border-bottom-width: 0.5px;
 }
 
 .session-constellation-tree [data-trace-code-github-icon] {
-	/* design-escape-ok(colour): GitHub's black mark */
 	background: #000 !important;
-	/* design-escape-ok(colour): GitHub's black mark */
 	color: #fff !important;
 }
 
@@ -463,7 +423,6 @@
 .session-constellation-tree [data-trace-code-line-kind="deletion"] {
 	background: linear-gradient(
 		to right,
-		/* design-escape-ok(colour): no role renders this */
 		rgba(223, 38, 0, 0.03),
 		transparent
 	) !important;
@@ -472,7 +431,6 @@
 .session-constellation-tree [data-trace-code-line-kind="addition"] {
 	background: linear-gradient(
 		to right,
-		/* design-escape-ok(colour): no role renders this */
 		rgba(0, 163, 47, 0.043),
 		transparent
 	) !important;
@@ -589,7 +547,6 @@
 .session-constellation-tree
 	[data-trace-tree-row-content]
 	.session-turn-table-model-icon-shell {
-	/* design-escape-ok(colour): no role renders this; black at 14% */
 	filter: drop-shadow(0 0 0.75px rgb(0 0 0 / 14%));
 }
 
@@ -609,7 +566,6 @@
 
 .session-constellation-tree
 	.session-turn-table-model-icon[data-trace-icon-tone="claude"] {
-	/* design-escape-ok(colour): Claude's brand colour */
 	--trace-icon-fg: #cc7d5e;
 }
 
@@ -618,22 +574,18 @@
 	--trace-tool-icon-light-chroma: 0.006;
 	--trace-tool-icon-dark-chroma: 0.006;
 	--trace-tool-icon-pastel-chroma: 0.045;
-	/* design-escape-ok(colour): each tool icon's tint from its hue (data paint) */
 	--trace-icon-bg: oklch(
 		0.94 var(--trace-tool-icon-pastel-chroma) var(--trace-tool-icon-hue)
 	);
-	/* design-escape-ok(colour): each tool icon's tint from its hue (data paint) */
 	--trace-icon-fg: oklch(
 		0.72 var(--trace-tool-icon-light-chroma) var(--trace-tool-icon-hue)
 	);
 }
 
 .dark .session-constellation-tree [data-trace-tool-icon] {
-	/* design-escape-ok(colour): each tool icon's tint from its hue (data paint) */
 	--trace-icon-bg: oklch(
 		0.31 var(--trace-tool-icon-pastel-chroma) var(--trace-tool-icon-hue)
 	);
-	/* design-escape-ok(colour): each tool icon's tint from its hue (data paint) */
 	--trace-icon-fg: oklch(
 		0.82 var(--trace-tool-icon-dark-chroma) var(--trace-tool-icon-hue)
 	);

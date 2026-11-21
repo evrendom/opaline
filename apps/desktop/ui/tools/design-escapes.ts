@@ -111,6 +111,14 @@ export const ENFORCED: string[] = ["src/"];
  * and stay as authored. Only the rules listed for a file are lifted.
  */
 export const DATA_PAINT: Record<string, { rules: Rule[]; why: string }> = {
+	"src/features/sessions/reader/detail/session-reader-run-overview.tsx": {
+		rules: ["colour"],
+		why: "legend swatches repeat the activity lanes' colours",
+	},
+	"src/features/sessions/components/session-constellation-tree.css": {
+		rules: ["colour"],
+		why: "the trace icon tone palette (data paint)",
+	},
 	"src/app/ui/context-utilization-gradients.tsx": {
 		rules: ["colour"],
 		why: "the context-use gradient's stops: green to red heat",
