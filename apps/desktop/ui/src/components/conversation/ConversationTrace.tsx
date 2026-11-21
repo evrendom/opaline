@@ -102,7 +102,7 @@ export {
 
 const speakerLabelClassName =
 	// design-escape-ok(type): no role renders this; 13/18
-	"shrink-0 text-[0.8125rem]/[1.125rem] font-heavy text-ink";
+	"shrink-0 text-[0.8125rem]/[1.125rem] font-heavy text-dashboardy-heading";
 
 function AgentSection({
 	events,
@@ -276,7 +276,7 @@ function UserTraceContent({ content }: { content: UserContent }) {
 					) : null}
 				</div>
 				{slashCommandInfo.commandArgs ? (
-					<p className="max-w-[65ch] whitespace-pre-wrap break-words font-data text-body-l text-ink [overflow-wrap:anywhere]">
+					<p className="max-w-[65ch] whitespace-pre-wrap break-words font-mono text-body-l text-dashboardy-heading [overflow-wrap:anywhere]">
 						{slashCommandInfo.commandArgs}
 					</p>
 				) : null}
@@ -369,7 +369,7 @@ function TraceRow({
 					leading={<TraceIcon icon={TraceFileIcon} tone="grass" />}
 					textDisclosure
 					body={
-						<p className="whitespace-pre-wrap text-body-l text-ink">
+						<p className="whitespace-pre-wrap text-body-l text-dashboardy-heading">
 							<SignalText text={item.text} />
 						</p>
 					}
@@ -400,7 +400,7 @@ function TraceRow({
 					timestamp={timestamp}
 					textDisclosure
 					body={
-						<p className="whitespace-pre-wrap font-data text-body-l text-ink">
+						<p className="whitespace-pre-wrap font-mono text-body-l text-dashboardy-heading">
 							{item.text}
 						</p>
 					}

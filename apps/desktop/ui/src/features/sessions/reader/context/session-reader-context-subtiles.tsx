@@ -58,7 +58,8 @@ export function MarkLegend({
 						<span
 							aria-hidden="true"
 							className={cn(
-								"size-2.5 shrink-0 corner-xs edge-m corner-squircle",
+								// design-escape-ok(radius): shipped value; 3px swatch corners
+								"size-2.5 shrink-0 rounded-[3px] edge-m corner-squircle",
 								markGlow(tone),
 							)}
 						/>
@@ -90,7 +91,7 @@ const TEXT: Record<Tone, string> = {
 	later: "text-color-4",
 	// design-escape-ok(base): a category colour from the opal sheen (data paint)
 	minor: "text-color-2",
-	never: "text-error",
+	never: "text-rose-mark",
 };
 
 const ICON_ROOM = 16;

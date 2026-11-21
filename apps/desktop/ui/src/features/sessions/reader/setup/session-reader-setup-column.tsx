@@ -277,7 +277,7 @@ function SetupUseGroup({
 	const total = group.tools.reduce((sum, tool) => sum + tool.uses.length, 0);
 	return (
 		<div className="flex flex-col gap-xxs pb-s">
-			<div className="flex items-center gap-l px-l py-s">
+			<div className="flex items-center gap-[calc(var(--space-m)+var(--space-xxs))] px-[calc(var(--space-m)+var(--space-xxs))] py-s">
 				<span className="flex shrink-0">
 					<SetupMark file={group.file} />
 				</span>
@@ -376,8 +376,8 @@ function SetupUseRow({
 			onClick={onPick}
 			onFocus={item.onFocus}
 			className={cn(
-				"relative flex w-full items-center gap-l",
-				"corner-s py-xs pr-l corner-squircle",
+				"relative flex w-full items-center gap-[calc(var(--space-m)+var(--space-xxs))]",
+				"corner-s py-xs pr-[calc(var(--space-m)+var(--space-xxs))] corner-squircle",
 				"text-left",
 				"outline-none transition-colors",
 				"squircle:corner-l",
@@ -455,8 +455,8 @@ function SetupFileRow({
 			onClick={() => onPick(file.setupFile)}
 			onFocus={item.onFocus}
 			className={cn(
-				"relative flex w-full items-start gap-l",
-				"corner-s px-l py-s corner-squircle",
+				"relative flex w-full items-start gap-[calc(var(--space-m)+var(--space-xxs))]",
+				"corner-s px-[calc(var(--space-m)+var(--space-xxs))] py-s corner-squircle",
 				"text-left",
 				"outline-none transition-colors",
 				"squircle:corner-l",

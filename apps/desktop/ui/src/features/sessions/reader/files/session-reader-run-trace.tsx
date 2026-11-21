@@ -469,7 +469,7 @@ function StepRow({
 						(step.kind === "search" ||
 							step.kind === "shell" ||
 							step.kind === "git") &&
-							"font-data text-body-s",
+							"font-mono text-body-s",
 					)}
 				>
 					{step.kind === "check" && step.check ? `${step.check} · ` : ""}

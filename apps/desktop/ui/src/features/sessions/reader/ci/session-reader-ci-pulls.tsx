@@ -25,11 +25,11 @@ import {
 import { pullRequestUrl } from "./session-reader-run-ci";
 
 const TONE: Record<CiLinePart["tone"], string> = {
-	failed: "text-error",
-	flaky: "text-warning",
+	failed: "text-rose-ink",
+	flaky: "text-amber-ink",
 	muted: "text-ink-3",
-	passed: "text-success",
-	running: "text-warning",
+	passed: "text-emerald-ink",
+	running: "text-amber-ink",
 };
 
 export type CiPullRow = {
@@ -326,7 +326,7 @@ export function CiPullCard({
 						</span>
 					)}
 					{pull?.headRef ? (
-						<span className="truncate font-data text-body-s">
+						<span className="truncate font-mono text-body-s">
 							{pull.headRef}
 						</span>
 					) : null}

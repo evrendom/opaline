@@ -399,7 +399,7 @@ function MessagePreviewText({ text }: { text: string }) {
 					<SignalText text={part.content} />
 				</strong>
 			) : (
-				<span className="font-data">{part.content}</span>
+				<span className="font-mono">{part.content}</span>
 			)}
 		</span>
 	));
@@ -438,7 +438,7 @@ export function ConversationTraceEventRow({
 				treeBodyClassName="-ml-l"
 				textDisclosure
 				body={
-					<p className="whitespace-pre-wrap font-body text-body-l font-regular text-ink text-pretty">
+					<p className="whitespace-pre-wrap font-body text-body-l font-regular text-dashboardy-heading text-pretty">
 						<SignalText text={event.text} />
 					</p>
 				}
@@ -561,7 +561,7 @@ export function ConversationTraceEventRow({
 						value={shellCommand}
 					>
 						<code
-							className="min-w-0 truncate whitespace-pre font-data font-regular tracking-m [font-variant-ligatures:none]"
+							className="min-w-0 truncate whitespace-pre font-mono font-regular tracking-m [font-variant-ligatures:none]"
 							data-trace-preview
 							data-trace-shell-command-preview
 						>
@@ -712,7 +712,7 @@ export function ConversationTraceEventRow({
 				<p
 					className={cn(
 						conversationTracePreviewClassName,
-						"font-data text-body-m",
+						"font-mono text-body-m",
 					)}
 					data-trace-preview
 				>

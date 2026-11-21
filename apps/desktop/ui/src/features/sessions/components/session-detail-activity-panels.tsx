@@ -122,7 +122,7 @@ export function SessionDetailActivityOccurrencePanel({
 					{occurrence.time ? ` · ${occurrence.time}` : ""}
 				</p>
 				<Button
-					className="mt-l"
+					className="mt-l px-[calc(var(--space-m)+var(--space-xxs))] [&_svg:not([class*='size-'])]:size-3"
 					onClick={() => {
 						onJump({
 							eventId: occurrence.eventId,

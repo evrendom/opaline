@@ -108,7 +108,8 @@ export function ProgressBar({
 			data-mark=""
 			data-progress-host=""
 			data-width={width}
-			className="group/host absolute top-1/2 h-2 min-w-0.5 -translate-y-1/2 overflow-hidden corner-xs *:absolute *:inset-y-0 *:duration-(--motion-large-duration) *:ease-out"
+			// design-escape-ok(radius): shipped value; 2px bar corners
+			className="group/host absolute top-1/2 h-2 min-w-0.5 -translate-y-1/2 overflow-hidden rounded-[2px] *:absolute *:inset-y-0 *:duration-(--motion-large-duration) *:ease-out"
 			style={{ left: `${left}%`, width: `${width}%` }}
 		>
 			<div
@@ -157,7 +158,8 @@ export function RunningBar({
 		<div
 			aria-hidden="true"
 			className={cn(
-				"pointer-events-none absolute top-1/2 h-2 min-w-0.5 -translate-y-1/2 corner-xs",
+				// design-escape-ok(radius): shipped value; 2px bar corners
+				"pointer-events-none absolute top-1/2 h-2 min-w-0.5 -translate-y-1/2 rounded-[2px]",
 				bar.className,
 			)}
 			style={{ ...bar.style, left: `${span.offset}%`, width: `${span.width}%` }}

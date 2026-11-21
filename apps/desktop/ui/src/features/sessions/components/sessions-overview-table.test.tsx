@@ -320,7 +320,7 @@ describe("SessionsOverviewTable", () => {
 		);
 		expect(chart.querySelector("path")).toHaveAttribute("stroke-width", "3");
 		expect(chart.querySelector("path")).not.toHaveAttribute("stroke-dasharray");
-		expect(cost).toHaveClass("text-body-m", "font-regular", "text-ink-3");
+		expect(cost).toHaveClass("text-body-m", "font-regular", "text-[#787774]");
 		expect(cost).not.toHaveAttribute("data-slot");
 		expect(cost).toHaveAttribute(
 			"data-session-overview-token-tooltip-label",
@@ -342,7 +342,7 @@ describe("SessionsOverviewTable", () => {
 			"[data-session-overview-repository-label]",
 		);
 		expect(repositoryLabel).toHaveClass(
-			"text-ink-3",
+			"text-[#0000009b]",
 			"text-body-m",
 			"font-regular",
 			"truncate",
@@ -365,7 +365,7 @@ describe("SessionsOverviewTable", () => {
 			"[data-session-overview-branch-label]",
 		);
 		expect(branchLabel).toHaveClass(
-			"text-ink-3",
+			"text-[#00000044]",
 			"text-body-m",
 			"font-regular",
 			"tabular-nums",

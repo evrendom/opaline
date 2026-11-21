@@ -470,7 +470,7 @@ export function DiffView({
 			aria-label="Diff"
 			data-selectable=""
 			className={cn(
-				"scroll-fade-x -mx-s overflow-x-auto font-data text-body-s outline-none",
+				"scroll-fade-x -mx-s overflow-x-auto font-mono text-body-s outline-none",
 				className,
 			)}
 		>

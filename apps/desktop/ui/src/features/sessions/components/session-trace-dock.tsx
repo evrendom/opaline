@@ -110,7 +110,7 @@ export function SessionTraceDock({
 				className={cn(
 					"min-w-16 shrink-0",
 					"px-xs",
-					"text-center font-data text-body-xxl font-medium whitespace-nowrap tabular-nums",
+					"text-center font-mono text-body-xxl font-medium whitespace-nowrap tabular-nums",
 					"text-ink-3",
 					"sm:min-w-20 sm:text-body-xl",
 				)}

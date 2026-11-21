@@ -61,8 +61,8 @@ function RowTags({
 					}}
 					className={cn(
 						"inline-flex items-center gap-xxs",
-						"corner-xs px-xs",
-						"font-data text-body-xs font-regular tabular-nums",
+						// design-escape-ok(radius,type): shipped value; 4px corners, 10/16
+						"rounded-[4px] px-xs font-mono text-[10px]/4 font-regular tabular-nums",
 						"transition-colors",
 						tag.color
 							? ""
@@ -307,7 +307,8 @@ export function FileTree({
 								className={cn(
 									"group/row flex h-7 items-center gap-s",
 									"corner-s pr-l pl-xs corner-squircle",
-									"text-body-l",
+									// design-escape-ok(type): shipped value; 13px on the card's 14/20 ratio (18.57)
+									"text-[13px]/[calc(20/14)]",
 									"outline-none select-none",
 									"squircle:corner-l",
 									row.item?.dimmed && !isSelected && "opacity-40",

@@ -311,7 +311,7 @@ export function SessionReaderFilesView({
 											/>
 										) : filePath ? (
 											<p className="px-xxl py-xl text-body-l text-ink-3">
-												<span className="font-data">{filePath}</span> isn't
+												<span className="font-mono">{filePath}</span> isn't
 												among the files this session changed or read.
 											</p>
 										) : (

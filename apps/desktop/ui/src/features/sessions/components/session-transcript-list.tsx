@@ -1347,6 +1347,7 @@ function TranscriptRowContent({
 				<div className="flex min-h-48 flex-col items-center justify-center gap-l p-xxl text-body-xl text-ink-3">
 					<p>This turn could not be loaded.</p>
 					<Button
+						className="h-8 [&_svg:not([class*='size-'])]:size-4"
 						onClick={() => onRetryTurn?.(row.turnId)}
 						size="sm"
 						type="button"

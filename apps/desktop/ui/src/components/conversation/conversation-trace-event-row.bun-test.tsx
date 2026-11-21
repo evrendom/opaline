@@ -196,7 +196,7 @@ describe("ConversationTraceEventRow shell calls", () => {
 		expect(markup).toContain("pr-s");
 		expect(markup).toContain("dashboardy-mono");
 		expect(markup).toContain(
-			'<code class="min-w-0 truncate whitespace-pre font-data font-regular tracking-m [font-variant-ligatures:none]"',
+			'<code class="min-w-0 truncate whitespace-pre font-mono font-regular tracking-m [font-variant-ligatures:none]"',
 		);
 		expect(markup).toContain("data-trace-shell-command-preview");
 		expect(

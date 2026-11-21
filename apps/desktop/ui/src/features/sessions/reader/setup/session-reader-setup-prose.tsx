@@ -111,8 +111,8 @@ function Inline({ text }: { text: string }) {
 				return (
 					<code
 						key={key}
-						// design-escape-ok(type): inline code scales with its prose
-						className="corner-xs bg-field px-xs py-xxs font-data text-[0.85em]"
+						// design-escape-ok(type,radius): shipped value; code at 0.85em of its prose, 4px corners
+						className="rounded-[4px] bg-field px-xs py-[calc(var(--space-xxs)/2)] font-mono text-[0.85em]"
 					>
 						{part.slice(1, -1)}
 					</code>
@@ -137,7 +137,8 @@ export function SetupProse({
 		<div
 			data-selectable=""
 			className={cn(
-				"flex flex-col gap-l text-body-l [overflow-wrap:anywhere]",
+				// design-escape-ok(type): shipped value; 13/21.125 prose
+				"flex flex-col gap-[calc(var(--space-m)+var(--space-xxs))] text-[13px] leading-relaxed [overflow-wrap:anywhere]",
 				className,
 			)}
 		>
@@ -150,7 +151,8 @@ export function SetupProse({
 								key={key}
 								className={cn(
 									"font-heavy text-balance",
-									block.level <= 2 ? "mt-xs text-body-l" : "text-body-xl",
+									// design-escape-ok(type): shipped value; 13px on the prose's line
+									block.level <= 2 ? "mt-xs text-body-xl" : "text-[13px]",
 								)}
 							>
 								<Inline text={block.text} />
@@ -174,7 +176,7 @@ export function SetupProse({
 							<List
 								key={key}
 								className={cn(
-									"space-y-xxs pl-xxl marker:text-ink-disabled",
+									"space-y-xxs pl-[calc(var(--space-xl)+var(--space-xs))] marker:text-ink-disabled",
 									block.ordered ? "list-decimal" : "list-disc",
 								)}
 							>
@@ -191,14 +193,15 @@ export function SetupProse({
 						return (
 							<pre
 								key={key}
-								className="overflow-x-auto corner-s bg-field px-l py-m font-data text-body-s"
+								// design-escape-ok(type): shipped value; 11/20
+								className="overflow-x-auto corner-s bg-field px-l py-m font-mono text-[11px]/5"
 							>
 								{block.lines.join("\n")}
 							</pre>
 						);
 					case "tag":
 						return (
-							<div key={key} className="font-data text-body-s text-ink-3">
+							<div key={key} className="font-mono text-body-s text-ink-3">
 								{block.text}
 							</div>
 						);

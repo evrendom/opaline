@@ -37,7 +37,7 @@ export function SessionUploadFailureDetail({
 	}).filter(([, value]) => value !== undefined && value !== "");
 	return (
 		<article
-			className="h-full min-w-0 overflow-y-auto px-xxl py-xxl text-body-xxl text-ink sm:px-[calc(var(--space-xxl)*4/3)] sm:py-[calc(var(--space-xxl)*4/3)] sm:text-body-xl"
+			className="h-full min-w-0 overflow-y-auto px-xxl py-xxl text-body-xxl text-dashboardy-heading sm:px-[calc(var(--space-xxl)*4/3)] sm:py-[calc(var(--space-xxl)*4/3)] sm:text-body-xl"
 			aria-label="Session upload failure"
 		>
 			<div className="flex min-w-0 max-w-3xl flex-col gap-xxl">
@@ -45,7 +45,7 @@ export function SessionUploadFailureDetail({
 					<h1 className="text-balance text-display-xxs font-medium">
 						Upload failed
 					</h1>
-					<p className="whitespace-pre-wrap wrap-anywhere text-pretty text-ink">
+					<p className="whitespace-pre-wrap wrap-anywhere text-pretty text-dashboardy-heading">
 						{failure.error}
 					</p>
 					<p className="text-pretty text-ink-3">

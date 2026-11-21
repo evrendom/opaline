@@ -16,7 +16,8 @@ export function ContextMapFrame({
 			className={cn(
 				"flex min-w-0 flex-col",
 				!preview &&
-					"p-m corner-m corner-squircle squircle:corner-xl bg-card shadow-chip",
+					// design-escape-ok(radius): shipped value; a 20px squircle
+					"p-m corner-m corner-squircle squircle:rounded-[20px] bg-card shadow-chip",
 				className,
 			)}
 		>

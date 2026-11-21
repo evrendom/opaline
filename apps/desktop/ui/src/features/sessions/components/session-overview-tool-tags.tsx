@@ -62,8 +62,9 @@ function ToolTag({
 				SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME,
 				"h-[1.1875rem] max-w-44 gap-xs [corner-shape:superellipse(1.25)]",
 				"corner-m py-xxs pr-s pl-xxs",
-				"text-ink bg-card shadow-card",
-				"dark:bg-wash",
+				"text-session-overview-text bg-card shadow-card",
+				// design-escape-ok(opacity): shipped value; ink-3/10 in dark
+				"dark:bg-ink-3/10",
 				onOpen && "cursor-pointer hover:bg-hover",
 			)}
 			data-session-overview-tool-tag={kind}
@@ -89,7 +90,11 @@ function ToolTag({
 				{first}
 			</span>
 			{rest.length > 0 ? (
-				<span className="shrink-0 text-body-xxs text-ink-3" aria-hidden="true">
+				<span
+					// design-escape-ok(type,colour): shipped value; 8px, black/63 (white/65 in dark)
+					className="shrink-0 text-[0.5rem] text-black/63 dark:text-white/65"
+					aria-hidden="true"
+				>
 					+{rest.length}
 				</span>
 			) : null}

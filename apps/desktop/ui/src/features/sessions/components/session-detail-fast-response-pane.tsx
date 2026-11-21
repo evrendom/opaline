@@ -1328,7 +1328,13 @@ function PaneMessage({
 		<div className="flex min-h-48 flex-col items-center justify-center gap-l p-xxl text-center text-body-xl text-ink-3">
 			<p>{message}</p>
 			{actionLabel && onAction ? (
-				<Button onClick={onAction} size="sm" type="button" variant="outline">
+				<Button
+					className="h-8 [&_svg:not([class*='size-'])]:size-4"
+					onClick={onAction}
+					size="sm"
+					type="button"
+					variant="outline"
+				>
 					{actionLabel}
 				</Button>
 			) : null}

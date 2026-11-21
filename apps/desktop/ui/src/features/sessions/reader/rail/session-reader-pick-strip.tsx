@@ -41,7 +41,10 @@ export function PickStrip({
 				<span className="shrink-0 font-medium">Entire session</span>
 			)}
 			{summary ? (
-				<span className="min-w-0 truncate text-body-s text-ink-3">
+				<span
+					// design-escape-ok(type): shipped value; 11px on the strip's 12/16 ratio
+					className="min-w-0 truncate text-[11px]/[calc(16/12)] text-ink-3"
+				>
 					{summary}
 				</span>
 			) : null}

@@ -58,7 +58,7 @@ function SegmentView({ color, segment }: { color?: string; segment: Segment }) {
 		return hasName(segment.file) ? (
 			<FileTag className="align-middle" path={segment.file} />
 		) : (
-			<code style={style} className={cn(CHIP, "font-data text-body-m")}>
+			<code style={style} className={cn(CHIP, "font-mono text-body-m")}>
 				{segment.file}
 			</code>
 		);
@@ -76,7 +76,7 @@ function SegmentView({ color, segment }: { color?: string; segment: Segment }) {
 		);
 	if ("code" in segment)
 		return (
-			<code style={style} className={cn(CHIP, "font-data text-body-m")}>
+			<code style={style} className={cn(CHIP, "font-mono text-body-m")}>
 				{segment.code}
 			</code>
 		);
@@ -301,7 +301,7 @@ function CommandText({
 		);
 		const close = words({ end: quoted.end, start: quoted.end - 1 }, NO_FILES);
 		return (
-			<code className="font-data text-body-m">
+			<code className="font-mono text-body-m">
 				{words({ end: quoted.start, start: span.start })}{" "}
 				<span className={WHOLE}>
 					{open}
@@ -324,7 +324,7 @@ function CommandText({
 	}
 	const [pattern] = alternativesIn(raw, span, orSyntax(raw, span));
 	if (!pattern)
-		return <code className="font-data text-body-m">{words(span)}</code>;
+		return <code className="font-mono text-body-m">{words(span)}</code>;
 	const { alternatives, quoted } = pattern;
 	const openQuote = words(
 		{ end: quoted.start + 1, start: quoted.start },
@@ -335,7 +335,7 @@ function CommandText({
 		NO_FILES,
 	);
 	return (
-		<code className="font-data text-body-m">
+		<code className="font-mono text-body-m">
 			{words({ end: quoted.start, start: span.start })}
 			<span className="block pl-[2ch]">
 				{keyed(alternatives, (part) => raw.slice(part.start, part.end)).map(

@@ -26,7 +26,7 @@ export const TURN_MARKS: Record<
 	{ className: string; Icon: Icon; label: string; tint: string }
 > = {
 	"file-added": {
-		className: "text-success",
+		className: "text-emerald-ink",
 		Icon: IconFilePlus,
 		label: "Added",
 		tint: "var(--color-emerald-500)",
@@ -38,13 +38,13 @@ export const TURN_MARKS: Record<
 		tint: "var(--color-blue-500)",
 	},
 	"file-removed": {
-		className: "text-error",
+		className: "text-rose-ink",
 		Icon: IconFileMinus,
 		label: "Removed",
 		tint: "var(--color-rose-500)",
 	},
 	skill: {
-		className: "text-warning",
+		className: "text-amber-ink",
 		Icon: IconBolt,
 		label: "Skill",
 		tint: "var(--color-amber-500)",
@@ -98,19 +98,19 @@ function MarkStack({ marks }: { marks: readonly StackMark[] }) {
 
 const SIGNAL_MARKS: Record<SessionReaderTurnSignal, Omit<StackMark, "key">> = {
 	apology: {
-		className: "text-warning",
+		className: "text-amber-ink",
 		Icon: IconAlertTriangle,
 		tint: "var(--color-amber-500)",
 		title: "Apology",
 	},
 	positive: {
-		className: "text-success",
+		className: "text-emerald-ink",
 		Icon: IconThumbUp,
 		tint: "var(--color-emerald-500)",
 		title: "Positive signal",
 	},
 	trouble: {
-		className: "text-error",
+		className: "text-rose-ink",
 		Icon: IconAlertTriangle,
 		tint: "var(--color-rose-500)",
 		title: "Error or negative signal",

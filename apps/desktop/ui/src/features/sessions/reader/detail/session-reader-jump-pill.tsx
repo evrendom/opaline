@@ -98,7 +98,7 @@ export function JumpPill({
 			onClick={onClick}
 			className={cn(
 				"flex h-8 items-center gap-s",
-				"corner-full pr-l pl-s",
+				"corner-full pr-[calc(var(--space-m)+var(--space-xxs))] pl-s",
 				"bg-canvas text-ink-3 shadow-card transition-[opacity,translate,color] duration-(--motion-medium-duration) ease-base",
 				"hover:text-ink dark:bg-card",
 				where

@@ -85,7 +85,8 @@ export function ToolbarSortMenu<K extends string>({
 					aria-hidden="true"
 					className="size-4 h-lh shrink-0 text-ink-soft"
 				/>
-				<span className="text-ink-3">Sorted by</span>
+				{/* design-escape-ok(colour): shipped value; black/63 (white/65 in dark) */}
+				<span className="text-black/63 dark:text-white/65">Sorted by</span>
 				<span>{activeSortLabel}</span>
 				{sort.direction === "asc" ? (
 					<IconChevronUp

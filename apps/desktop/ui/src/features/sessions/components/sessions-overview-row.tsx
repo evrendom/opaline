@@ -319,7 +319,8 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 							<span
 								key={limit}
 								className={cn(
-									"shrink-0 whitespace-nowrap text-body-xs font-regular text-ink-3",
+									// design-escape-ok(colour): shipped value; black/50 (white/50 in dark)
+									"shrink-0 whitespace-nowrap text-body-xs font-regular text-black/50 dark:text-white/50",
 									className,
 								)}
 								data-session-overview-skill-overflow-tag
@@ -413,7 +414,12 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 						data-session-overview-model-label
 					>
 						{session.subagent_of ? (
-							<span className="text-ink-3">Subagent </span>
+							<span
+								// design-escape-ok(colour): shipped value; black/63 (white/65 in dark)
+								className="text-black/63 dark:text-white/65"
+							>
+								Subagent{" "}
+							</span>
 						) : null}
 						{formatModelDisplayLabel(displayModel)}
 						{failure ? (
@@ -426,7 +432,8 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 					<SessionPlaceLabel session={session} showPlace={showPlace} />
 					{branchLabel ? (
 						<p
-							className="min-w-0 truncate text-left font-body text-body-m font-regular tracking-m text-ink-3 tabular-nums"
+							// design-escape-ok(colour): shipped value; #00000044 (#ffffff55 in dark)
+							className="min-w-0 truncate text-left font-body text-body-m font-regular tracking-m text-[#00000044] tabular-nums dark:text-[#ffffff55]"
 							data-session-overview-branch-label
 							dir="rtl"
 							title={branchLabel}

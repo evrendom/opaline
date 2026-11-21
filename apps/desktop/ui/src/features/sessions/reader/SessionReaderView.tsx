@@ -224,7 +224,7 @@ export const SessionReaderView = memo(function SessionReaderView({
 		<SessionPlacesContext.Provider value={places}>
 			<SubagentsCountedProvider>
 				<ConversationSkillLinkContext.Provider value={getSkillHref}>
-					<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-inset text-ink [--reader-page:var(--canvas)]">
+					<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-canvas text-dashboardy-heading [--reader-page:var(--canvas)]">
 						<SessionDetailHeader
 							avatarMap={avatarMap}
 							headerRef={() => undefined}

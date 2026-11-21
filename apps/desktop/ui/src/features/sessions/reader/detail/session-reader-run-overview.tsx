@@ -407,7 +407,7 @@ function StepKinds({
 									×{option.count}
 								</span>
 								{option.errorCount > 0 ? (
-									<span className="shrink-0 text-body-s text-error tabular-nums">
+									<span className="shrink-0 text-body-s text-rose-ink tabular-nums">
 										{option.errorCount} failed
 									</span>
 								) : null}
