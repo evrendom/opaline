@@ -3,7 +3,6 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import pkg from "../package.json" with { type: "json" };
 import {
 	type CleanupReport,
 	type Environment,
@@ -11,6 +10,7 @@ import {
 	parsePrevious,
 	retire,
 } from "@rudel/cli-retire";
+import pkg from "../package.json" with { type: "json" };
 
 export const APP_URL = "https://opaline.evren.so";
 

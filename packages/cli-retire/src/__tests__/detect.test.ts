@@ -131,7 +131,9 @@ test("finds the CLI's hooks in global Claude Code settings, current and legacy",
 		hooks: {
 			SessionEnd: [
 				{
-					hooks: [{ type: "command", command: "rudel hooks claude session-end" }],
+					hooks: [
+						{ type: "command", command: "rudel hooks claude session-end" },
+					],
 				},
 			],
 		},

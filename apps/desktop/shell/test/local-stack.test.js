@@ -381,7 +381,10 @@ describe("the local stack controller", () => {
 		expect(calls()).toEqual([["stop"]]);
 		fs.writeFileSync(process.env.FAKE_LOG, "");
 		const other = createLocalStack({ app: fakeApp() });
-		await other.useEnvironment({ kind: "cloud" });
+		await other.useEnvironment({
+			kind: "server",
+			url: base.replace("127.0.0.1", "localhost"),
+		});
 		await until(() => calls().length === 1);
 		expect(calls()).toEqual([["stop"]]);
 		fs.writeFileSync(process.env.FAKE_LOG, "");

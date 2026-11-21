@@ -59,14 +59,12 @@ describe("environments", () => {
 
 	test("labels, origins and validation", () => {
 		expect(environmentLabel({ kind: "local" })).toBe("This Mac");
-		expect(environmentLabel({ kind: "cloud" })).toBe("Opaline Cloud");
 		expect(
 			environmentLabel({ kind: "server", url: "http://nas.local:4100" }),
 		).toBe("nas.local:4100");
 		expect(environmentOrigin({ kind: "local" }, "http://localhost:4100")).toBe(
 			"http://localhost:4100",
 		);
-		expect(environmentOrigin({ kind: "cloud" })).toBe("https://opaline.so");
 		expect(
 			validateEnvironment({ kind: "server", url: "nas.local:4100/" }),
 		).toEqual({
@@ -75,8 +73,8 @@ describe("environments", () => {
 			plaintext: true,
 		});
 		expect(
-			validateEnvironment({ kind: "cloud", url: "https://evil.dev" }),
-		).toEqual({ kind: "cloud", url: "https://opaline.so" });
+			validateEnvironment({ kind: "cloud", url: "https://opaline.so" }),
+		).toBeUndefined();
 		expect(validateEnvironment({ kind: "elsewhere" })).toBeUndefined();
 	});
 

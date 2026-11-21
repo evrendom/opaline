@@ -80,12 +80,6 @@ function createEnvironmentMenu({
 						},
 					]
 				: []),
-			{
-				label: "Opaline Cloud",
-				type: "radio",
-				checked: environment.kind === "cloud",
-				click: () => switchTo({ kind: "cloud" }),
-			},
 			{ type: "separator" },
 			{ label: "Connect to Your Server…", click: openPrompt },
 		];

@@ -41,7 +41,6 @@ import {
 	resolveAnalysisUploadWorkspace,
 } from "./services/analysis-log/analysis-uploads.js";
 import { findUploadedSessionIds } from "./services/cli-session-upload-status.service.js";
-import { getCliUpdateStatus } from "./services/cli-version.service.js";
 import {
 	getActiveOrganizationId,
 	resolveIngestOrganizationId,
@@ -138,10 +137,6 @@ import { readsEverySession } from "./services/session-visibility.js";
 import { reportUploadFailures } from "./services/upload-failure.service.js";
 
 const logger = getLogger(["rudel", "api", "router"]);
-const cliUpdateStatus = os.cli.updateStatus
-	.use(authMiddleware)
-	.handler(({ context }) => getCliUpdateStatus(sqlClient, context.user.id));
-
 const health = os.health.handler(() => {
 	return {
 		status: "ok" as const,
@@ -1091,7 +1086,6 @@ export const router: Router<typeof contract, AppContext> = os.router({
 		authStatus: cliAuthStatus,
 		revokeToken: revokeCliToken,
 		setupStatus: cliSetupStatus,
-		updateStatus: cliUpdateStatus,
 		sessionUploadStatus: cliSessionUploadStatus,
 		sessionInventory: cliSessionInventory,
 		reportUploadFailures: cliReportUploadFailures,
