@@ -34,6 +34,7 @@ import {
 import { isPluginTool, PLUGIN_TOOLS } from "../mcp/plugin-tools.js";
 import { withRedactedOutput } from "../mcp/redacted-tools.js";
 import { toolsListedFor, workspacesListing } from "../mcp/retro-listing.js";
+import { mcpInstructions } from "../mcp/server-instructions.js";
 import {
 	recoveryHint,
 	unknownToolMessage,
@@ -61,8 +62,6 @@ const SERVER_INFO = {
 	version: "1.0.0",
 	icons: [OPALINE_ICON],
 };
-const SERVER_INSTRUCTIONS =
-	"Opaline helps a team find where their coding agents get stuck or waste time, so they can fix their setup (instructions, docs, scripts, CI). No tool changes or deletes sessions. find and read record their calls in a private draft of the current analysis; save_answer publishes that draft once (saving is append-only) and share_answer shares a saved answer. Dates are UTC.";
 // OpenAI MCP extension: native settings on the plugin page.
 const SETTINGS = { readTool: "settings_read", updateTool: "settings_update" };
 const CAPABILITIES = {
@@ -347,7 +346,7 @@ async function handleMcpRequest(
 					: PROTOCOL_VERSIONS[0],
 				capabilities: CAPABILITIES,
 				serverInfo: SERVER_INFO,
-				instructions: SERVER_INSTRUCTIONS,
+				instructions: mcpInstructions(),
 			});
 		case "ping":
 			return rpcResult(message.id, {});

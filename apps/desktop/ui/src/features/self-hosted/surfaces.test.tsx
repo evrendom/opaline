@@ -4,7 +4,6 @@ import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SettingsLayout } from "@/features/settings/SettingsLayout";
-import { McpSettingsView } from "./McpSettingsPage";
 import { SelfHostContext, type SelfHostInfo } from "./self-host-info";
 import {
 	linkableProviders,
@@ -120,11 +119,10 @@ describe("settings navigation", () => {
 			"Reports",
 			"Members",
 			"Account",
-			"MCP",
 		]);
 	});
 
-	it("adds MCP and drops an unconfigured GitHub on a self-hosted server", () => {
+	it("drops an unconfigured GitHub on a self-hosted server", () => {
 		github.status = connection(false);
 		render(withSelfHost(info, <SettingsLayout />));
 		expect(tabs()).toEqual([
@@ -133,26 +131,6 @@ describe("settings navigation", () => {
 			"Reports",
 			"Members",
 			"Account",
-			"MCP",
 		]);
-	});
-});
-
-describe("MCP settings", () => {
-	it("show this server's commands and configs with a placeholder key", () => {
-		const { container } = render(
-			withSelfHost(info, <McpSettingsView origin="http://localhost:4790" />),
-		);
-		const text = container.textContent ?? "";
-		expect(text).toContain("opaline mcp install");
-		expect(text).toContain(
-			"npx opaline@latest login --api-base http://localhost:4790",
-		);
-		expect(text).toContain(
-			'claude mcp add --scope user --transport http opaline http://localhost:4790/api/mcp --header "Authorization: Bearer <your CLI API key>"',
-		);
-		expect(text).toContain("[mcp_servers.opaline]");
-		expect(text).toContain('"mcpServers"');
-		expect(text).not.toMatch(/Bearer (?!<your CLI API key>)/u);
 	});
 });

@@ -7,7 +7,6 @@
 	"scripts": {
 		"dev": "vite",
 		"dev:demo": "vite --mode product-demo --config vite.local-demo.config.ts",
-		"dev:onboarding": "vite --config vite.onboarding-dev.config.ts",
 		"build": "vite build",
 		"build:demo": "bun tools/build-demo.mjs",
 		"build:widget": "bun tools/build-widget.mjs",

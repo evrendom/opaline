@@ -1,40 +1,24 @@
 import type { RepositorySettings } from "@rudel/api-routes";
-import {
-	IconCheck,
-	IconCopy,
-	IconFolder,
-	IconSearch,
-} from "@tabler/icons-react";
-import type { ReactNode } from "react";
+import { IconFolder, IconSearch } from "@tabler/icons-react";
 import { Button } from "@/app/ui/button";
 import { Skeleton } from "@/app/ui/skeleton";
 import "@/features/settings/components/settings-section.css";
 import "./sessions-settings.css";
 
-export const MANAGE_COMMAND = "npx opaline@latest upload";
-
 type Repository = RepositorySettings["repositories"][number];
 
 export function SessionsSettingsView({
-	copied,
 	error,
 	fetching,
-	localManager,
-	onCopy,
 	onRefresh,
 	onSearch,
 	pending,
 	repositories,
 	search,
-	signInCommand,
 	visible,
 }: {
-	signInCommand?: string;
-	copied: boolean;
 	error: boolean;
 	fetching: boolean;
-	localManager?: ReactNode;
-	onCopy: () => void;
 	onRefresh: () => void;
 	onSearch: (search: string) => void;
 	pending: boolean;
@@ -44,55 +28,6 @@ export function SessionsSettingsView({
 }) {
 	return (
 		<div className="sessions-settings">
-			<section
-				className="sessions-settings-section"
-				aria-labelledby="repository-upload-heading"
-			>
-				<div className="sessions-settings-heading">
-					<h2 id="repository-upload-heading">Automatic uploads</h2>
-					<p>
-						{localManager
-							? "Choose which repositories on this Mac send new sessions to Opaline."
-							: "Choose which repositories send new sessions to Opaline. Run this command in your terminal to turn uploads on or off."}
-					</p>
-				</div>
-				{localManager ? (
-					<div className="sessions-settings-card settings-section-surface">
-						{localManager}
-					</div>
-				) : (
-					<div className="sessions-settings-card sessions-settings-manage settings-section-surface">
-						<div className="sessions-settings-command">
-							<code>{MANAGE_COMMAND}</code>
-							<Button
-								type="button"
-								variant="ghost"
-								size="sm"
-								className="rounded-md transition-none active:not-aria-[haspopup]:translate-y-0"
-								onClick={onCopy}
-								aria-label="Copy repository management command"
-							>
-								{copied ? (
-									<IconCheck size={16} aria-hidden="true" />
-								) : (
-									<IconCopy size={16} aria-hidden="true" />
-								)}
-								{copied ? "Copied" : "Copy"}
-							</Button>
-						</div>
-						<p className="sessions-settings-note">
-							Changes apply on the computer running the command. Existing
-							sessions stay in your workspace.
-						</p>
-						{signInCommand ? (
-							<p className="sessions-settings-note">
-								On a computer that has not signed in to this server yet, run{" "}
-								<code>{signInCommand}</code> first.
-							</p>
-						) : null}
-					</div>
-				)}
-			</section>
 			<section
 				className="sessions-settings-section"
 				aria-labelledby="repository-list-heading"
@@ -184,7 +119,7 @@ export function SessionsSettingsView({
 						<p className="sessions-settings-empty">
 							{search
 								? "No repositories match your search."
-								: "No repositories yet. Run the command above to upload your first sessions."}
+								: "No repositories yet."}
 						</p>
 					)}
 					{repositories?.some((repo) => !repo.reports.length) && (
@@ -247,10 +182,8 @@ function SampleRows() {
 export function SessionsSettingsSample() {
 	return (
 		<SessionsSettingsView
-			copied={false}
 			error={false}
 			fetching
-			onCopy={() => {}}
 			onRefresh={() => {}}
 			onSearch={() => {}}
 			pending

@@ -6,7 +6,6 @@ const path = require("node:path");
 const { EventEmitter } = require("node:events");
 const { createCliRunner } = require("./cli-runner");
 const {
-	CLOUD_URL,
 	createSettingsStore,
 	environmentOrigin,
 	normalizeServerUrl,
@@ -487,8 +486,6 @@ function createLocalStack(options) {
 		win.webContents.once("did-finish-load", loaded);
 		try {
 			if (current.kind === "local") return await openLocal(win, target, intro);
-			if (current.kind === "cloud")
-				return await win.loadURL(shape(target ?? `${CLOUD_URL}/dashboard`));
 			return await win.loadURL(shape(target ?? `${current.url}/`));
 		} catch (error) {
 			win.webContents.removeListener?.("did-finish-load", loaded);

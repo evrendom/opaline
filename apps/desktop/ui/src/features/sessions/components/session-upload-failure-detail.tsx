@@ -46,19 +46,15 @@ export function SessionUploadFailureDetail({
 					<p className="whitespace-pre-wrap wrap-anywhere text-pretty text-(--dashboardy-heading)">
 						{failure.error}
 					</p>
-					<p className="text-pretty text-(--dashboardy-muted)">
-						{failure.retryable ? (
-							<>
-								Retry this session with <code>opaline upload</code>.
-							</>
-						) : failure.totalBytes !== null &&
+					{failure.retryable ? null : (
+						<p className="text-pretty text-(--dashboardy-muted)">
+							{failure.totalBytes !== null &&
 							failure.maxBytes !== undefined &&
-							failure.totalBytes > failure.maxBytes ? (
-							"We don’t support sessions of that size yet."
-						) : (
-							"This session needs attention before retrying. Uploading it unchanged will fail again."
-						)}
-					</p>
+							failure.totalBytes > failure.maxBytes
+								? "We don’t support sessions of that size yet."
+								: "This session needs attention before retrying. Uploading it unchanged will fail again."}
+						</p>
+					)}
 				</div>
 				<dl className="min-w-0 divide-y divide-black/6 dark:divide-white/8">
 					{fields.map(([label, value]) => (

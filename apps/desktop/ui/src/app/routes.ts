@@ -22,7 +22,6 @@ const SETTINGS_REPORTS_PATH = `${SETTINGS_ROOT_PATH}/reports`;
 const SETTINGS_MEMBERS_PATH = `${SETTINGS_ROOT_PATH}/members`;
 const SETTINGS_TEAM_PATH = `${SETTINGS_ROOT_PATH}/team`;
 const SETTINGS_ACCOUNT_PATH = `${SETTINGS_ROOT_PATH}/account`;
-const SETTINGS_MCP_PATH = `${SETTINGS_ROOT_PATH}/mcp`;
 const SETTINGS_CREATE_WORKSPACE_PATH = `${SETTINGS_ROOT_PATH}/create-workspace`;
 
 // Canonical routes shared by navigation and authentication.
@@ -73,7 +72,6 @@ export const appRoutes = {
 	settingsMembers: () => SETTINGS_MEMBERS_PATH,
 	settingsTeam: () => SETTINGS_TEAM_PATH,
 	settingsAccount: () => SETTINGS_ACCOUNT_PATH,
-	settingsMcp: () => SETTINGS_MCP_PATH,
 	settingsCreateWorkspace: () => SETTINGS_CREATE_WORKSPACE_PATH,
 };
 
