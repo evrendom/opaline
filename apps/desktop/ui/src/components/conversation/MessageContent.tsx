@@ -100,7 +100,7 @@ function XmlBlock({
 				aria-expanded={isOpen}
 				aria-controls={panelId}
 				className={cn(
-					"flex w-full items-start gap-l",
+					"flex w-full items-start gap-l focus-outline",
 					"edge-b-m px-xl py-l",
 					"text-left",
 					"border-line bg-[color:color-mix(in_srgb,var(--inset)_82%,white)]",

@@ -314,7 +314,7 @@ function MeasureToggle({
 							"h-6",
 							"corner-s px-l corner-squircle",
 							"text-body-l",
-							"outline-none",
+							"focus-outline",
 							"disabled:cursor-default disabled:opacity-40 squircle:corner-l",
 							pressed
 								? cn("bg-card font-medium", PILL_SHADOW)

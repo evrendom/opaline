@@ -60,7 +60,7 @@ export function MemberBubble({
 					<button
 						type="button"
 						onClick={() => setExpanded((value) => !value)}
-						className="mt-s text-body-m text-ink-3 hover:text-ink"
+						className="mt-s text-body-m text-ink-3 focus-outline hover:text-ink"
 					>
 						{expanded ? "Show less" : "Show more"}
 					</button>

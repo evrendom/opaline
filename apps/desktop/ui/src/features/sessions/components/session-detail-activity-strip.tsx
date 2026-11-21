@@ -88,7 +88,7 @@ function SessionDetailActivityMenuItem({
 				aria-haspopup={flyoutsEnabled ? "menu" : undefined}
 				className={cn(
 					// design-escape-ok(opacity): no role renders this; border-ink/20, text-ink/60, dark:border-ink/25, dark:text-ink/70
-					"session-detail-opaline-trigger relative inline-flex shrink-0 items-center justify-center gap-s corner-s border-[0.5px] border-ink/20 bg-canvas px-[calc(var(--space-m)+var(--space-xxs))] py-xs text-body-l font-medium text-ink/60 disabled:pointer-events-none dark:border-ink/25 dark:text-ink/70",
+					"session-detail-opaline-trigger relative inline-flex shrink-0 items-center justify-center gap-s corner-s border-[0.5px] border-ink/20 bg-canvas px-[calc(var(--space-m)+var(--space-xxs))] py-xs text-body-l font-medium text-ink/60 focus-outline disabled:pointer-events-none dark:border-ink/25 dark:text-ink/70",
 					flyoutsEnabled &&
 						// design-escape-ok(opacity): no role renders this; hover:bg-ink/[0.063], hover:text-ink/90, dark:hover:bg-ink/[0.071], dark:hover:text-ink/95
 						"hover:bg-ink/[0.063] hover:text-ink/90 dark:hover:bg-ink/[0.071] dark:hover:text-ink/95",

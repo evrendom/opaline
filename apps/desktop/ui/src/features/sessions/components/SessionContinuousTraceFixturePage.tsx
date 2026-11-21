@@ -603,7 +603,7 @@ export function SessionContinuousTraceFixturePage() {
 			) : null}
 			{streamsTurnBodies ? (
 				<button
-					className="sr-only"
+					className="sr-only focus-outline"
 					data-trace-fixture-hydrate
 					onClick={hydrateTurnBodies}
 					type="button"
@@ -613,7 +613,7 @@ export function SessionContinuousTraceFixturePage() {
 			) : null}
 			{profilesScrolling ? (
 				<button
-					className="sr-only"
+					className="sr-only focus-outline"
 					data-trace-fixture-reset-profile
 					onClick={resetRenderProfile}
 					type="button"
@@ -622,7 +622,7 @@ export function SessionContinuousTraceFixturePage() {
 				</button>
 			) : null}
 			<button
-				className="sr-only"
+				className="sr-only focus-outline"
 				data-trace-fixture-prepend
 				onClick={prependFixtureTurns}
 				type="button"
@@ -630,7 +630,7 @@ export function SessionContinuousTraceFixturePage() {
 				Prepend turns
 			</button>
 			<button
-				className="sr-only"
+				className="sr-only focus-outline"
 				data-trace-fixture-jump-first
 				onClick={() => {
 					const turnId = options[0]?.turnId;
@@ -646,7 +646,7 @@ export function SessionContinuousTraceFixturePage() {
 				Jump to first turn
 			</button>
 			<button
-				className="sr-only"
+				className="sr-only focus-outline"
 				data-trace-fixture-jump-last
 				onClick={() => {
 					const turnId = options.at(-1)?.turnId;
@@ -662,7 +662,7 @@ export function SessionContinuousTraceFixturePage() {
 				Jump to last turn
 			</button>
 			<button
-				className="sr-only"
+				className="sr-only focus-outline"
 				data-trace-fixture-reset-row-paints
 				onClick={() => setDebugPaintEpoch((current) => current + 1)}
 				type="button"
@@ -670,7 +670,7 @@ export function SessionContinuousTraceFixturePage() {
 				Reset row paint markers
 			</button>
 			<button
-				className="sr-only"
+				className="sr-only focus-outline"
 				data-trace-fixture-toggle-level
 				onClick={() =>
 					setTraceCallDisplayMode((current) =>

@@ -39,7 +39,7 @@ export function PayloadSection({
 					className={cn(
 						"flex min-w-0 items-center gap-s",
 						"text-body-m",
-						"text-ink-3 transition-colors",
+						"text-ink-3 transition-colors focus-outline",
 						"hover:text-ink",
 					)}
 				>
@@ -77,7 +77,7 @@ export function PayloadSection({
 				<button
 					type="button"
 					onClick={() => setFull(true)}
-					className="w-fit text-body-m text-ink-3 hover:text-ink"
+					className="w-fit text-body-m text-ink-3 focus-outline hover:text-ink"
 				>
 					Show all {sizeHint(value)}
 				</button>

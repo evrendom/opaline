@@ -77,7 +77,7 @@ function Entry({
 				type="button"
 				aria-expanded={open}
 				onClick={() => setOpen((current) => !current)}
-				className="flex items-center gap-xxs text-left hover:text-ink"
+				className="flex items-center gap-xxs text-left focus-outline hover:text-ink"
 			>
 				<IconChevronRight
 					aria-hidden="true"

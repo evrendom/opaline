@@ -228,7 +228,7 @@ function AgentSection({
 					aria-controls={panelId}
 					className={cn(
 						traceRowClassName,
-						"group gap-m",
+						"group gap-m focus-outline",
 						open &&
 							"corner-t-l edge-m border-line bg-inset [border-bottom-color:var(--line)]",
 					)}

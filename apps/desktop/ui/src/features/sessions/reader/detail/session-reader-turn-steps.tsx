@@ -147,7 +147,7 @@ export function RunSummaryBar({
 			aria-expanded={expanded}
 			aria-label={expanded ? "Fold the trace" : "Expand the trace"}
 			onClick={onToggle}
-			className={className}
+			className={cn(className, "focus-outline")}
 		>
 			{content}
 		</button>

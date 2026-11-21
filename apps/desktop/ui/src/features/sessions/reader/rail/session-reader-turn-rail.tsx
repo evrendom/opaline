@@ -337,7 +337,7 @@ export const TurnRailList = memo(function TurnRailList({
 							className={cn(
 								"relative flex h-(--rail-line-height) shrink-0 items-center justify-between gap-s",
 								"corner-s px-s corner-squircle",
-								"text-left text-body-m tabular-nums",
+								"text-left text-body-m tabular-nums focus-outline",
 								"transition-opacity duration-(--motion-large-duration) ease-base",
 								"squircle:corner-l",
 								whole.disabled &&

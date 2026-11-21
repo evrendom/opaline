@@ -100,7 +100,7 @@ export function ShowAll({
 		<button
 			type="button"
 			onClick={onClick}
-			className="w-fit text-body-m text-ink-3 tabular-nums hover:text-ink"
+			className="w-fit text-body-m text-ink-3 tabular-nums focus-outline hover:text-ink"
 		>
 			{children}
 		</button>
@@ -230,7 +230,7 @@ export function PlaceLink({
 				"shrink-0",
 				"corner-xs px-xs",
 				"text-body-m font-medium tabular-nums",
-				"text-ink-3",
+				"text-ink-3 focus-outline",
 				"hover:bg-hover hover:text-ink",
 			)}
 		>
@@ -432,7 +432,7 @@ export function SummarySubagents({
 								type="button"
 								title="Open it in focus in the detail"
 								onClick={() => onOpen(turnId, subagent.subagentId)}
-								className="flex min-w-0 flex-1 items-center gap-[calc(var(--space-m)+var(--space-xxs))] text-left hover:underline"
+								className="flex min-w-0 flex-1 items-center gap-[calc(var(--space-m)+var(--space-xxs))] text-left focus-outline hover:underline"
 							>
 								{label}
 							</button>

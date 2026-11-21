@@ -20,7 +20,7 @@ export const GRID_UNTIMED =
 export const GRID_UNTIMED_TRACK = "right-4 left-35 @lg:left-52";
 
 export const ROW =
-	"min-h-10 w-full items-center corner-s py-xs text-left text-body-xl";
+	"min-h-10 w-full items-center corner-s py-xs text-left text-body-xl focus-outline";
 
 export function rowState(selected: boolean): string {
 	return selected
