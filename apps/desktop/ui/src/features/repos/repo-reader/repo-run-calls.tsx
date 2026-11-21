@@ -286,8 +286,9 @@ function SplitPanes({ bottom, top }: { bottom: ReactNode; top: ReactNode }) {
 				className={cn(
 					"relative z-10 h-px shrink-0",
 					"edge-none",
-					"cursor-row-resize touch-none select-none bg-line/60 outline-none transition-colors",
+					"cursor-row-resize touch-none select-none bg-line-soft outline-none transition-colors",
 					"before:absolute before:inset-x-0 before:top-1/2 before:h-3 before:-translate-y-1/2",
+					// design-escape-ok(opacity): no role renders this; focus/60
 					"hover:bg-focus/60",
 					"focus-visible:bg-focus",
 					"data-[resizing=true]:bg-focus",
@@ -388,7 +389,7 @@ function CallCard({
 						"[direction:rtl]",
 						"-mt-xs pr-m pl-m",
 						"truncate text-left text-body-m",
-						"text-ink-3/70",
+						"text-ink-disabled",
 					)}
 					title={call.path}
 				>
@@ -445,7 +446,7 @@ export function CallBody({
 	if (file && changes.length === 0) return <FileCall call={call} file={file} />;
 	if (changes.length > 0)
 		return (
-			<ol className="flex flex-col divide-y divide-line/40 pb-xl">
+			<ol className="flex flex-col divide-y divide-line-soft pb-xl">
 				{changes.map((change, index) => (
 					<ChangeBlock
 						// biome-ignore lint/suspicious/noArrayIndexKey: one call's edits, in order
@@ -527,7 +528,7 @@ function CallPayloads({ call }: { call: RepositoryRunCall }) {
 					wrapLines={!shell}
 				/>
 				{cut ? (
-					<p className="text-body-m text-ink-3/70">
+					<p className="text-body-m text-ink-disabled">
 						Cut short here; the rest is in the session's transcript.
 					</p>
 				) : null}
@@ -589,7 +590,7 @@ function CallSection({
 			<h3 className="text-body-m font-medium text-ink-3">{title}</h3>
 			{children}
 			{cut ? (
-				<p className="text-body-m text-ink-3/70">
+				<p className="text-body-m text-ink-disabled">
 					Cut short here; the rest is in the session's transcript.
 				</p>
 			) : null}
@@ -750,12 +751,15 @@ function ReadCommand({ bash, text }: { bash: boolean; text: string }) {
 	const [open, setOpen] = useState(false);
 	const hunks = useMemo(() => wholeText(text), [text]);
 	return (
-		<div className="flex flex-col gap-xs corner-s bg-field/50">
+		<div
+			// design-escape-ok(opacity): no role renders this; field/50
+			className="flex flex-col gap-xs corner-s bg-field/50"
+		>
 			<button
 				type="button"
 				aria-expanded={open}
 				onClick={() => setOpen(!open)}
-				className="flex w-full items-center gap-s corner-s px-m py-s text-left text-body-m text-ink-3 outline-none transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-focus/50"
+				className="flex w-full items-center gap-s corner-s px-m py-s text-left text-body-m text-ink-3 outline-none transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-focus-ring"
 			>
 				<SelectorMark open={open} />
 				View command
@@ -771,7 +775,7 @@ function ReadCommand({ bash, text }: { bash: boolean; text: string }) {
 
 function SelectorMark({ open }: { open: boolean }) {
 	const turn = cn(
-		"[transform-box:fill-box] origin-center transition-transform duration-(--motion-duration) ease-out motion-reduce:transition-none",
+		"[transform-box:fill-box] origin-center transition-transform duration-(--motion-duration) ease-base motion-reduce:transition-none",
 		open && "-scale-y-100",
 	);
 	return (

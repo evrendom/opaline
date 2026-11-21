@@ -209,8 +209,7 @@ export function RepoSkillSessions({
 				<div className="pl-xl">
 					<SessionsOverviewFluidList
 						fillHeight={false}
-						// design-escape-ok: row highlight's 18px squircle; the card pair's 22 would round it visibly more
-						highlightClassName="corner-m corner-squircle squircle:rounded-2xl"
+						highlightClassName="corner-m corner-squircle squircle:corner-xl-inner"
 					>
 						{({ registerItem, setActiveIndex }) =>
 							rows.map((trace, index) => {

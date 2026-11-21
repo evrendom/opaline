@@ -220,8 +220,7 @@ export function RepoDetailPage({
 							sessionFilter={{ repoKey }}
 							range={range}
 							sessionCount={undefined}
-							// design-escape-ok: row highlight's 18px squircle; the card pair's 22 would round it visibly more
-							rowHighlightClassName="corner-m corner-squircle squircle:rounded-2xl"
+							rowHighlightClassName="corner-m corner-squircle squircle:corner-xl-inner"
 							detailHref={(id) =>
 								id
 									? appRoutes.repoDetail(repoKey, id)
@@ -278,8 +277,7 @@ export function RepoDetailPage({
 			? { startDate: pickedRange.start, endDate: pickedRange.end }
 			: range,
 		sessionCount: undefined,
-		// design-escape-ok: row highlight's 18px squircle; the card pair's 22 would round it visibly more
-		rowHighlightClassName: "corner-m corner-squircle squircle:rounded-2xl",
+		rowHighlightClassName: "corner-m corner-squircle squircle:corner-xl-inner",
 		detailHref: (id) =>
 			id
 				? appRoutes.repoDetail(repoKey, id)
@@ -469,6 +467,7 @@ function RepoDetailHeader({
 	const separator = (
 		<IconChevronRight
 			aria-hidden="true"
+			// design-escape-ok(opacity): no role renders this; ink-3/50
 			className="size-4 shrink-0 text-ink-3/50"
 			stroke={1.5}
 		/>

@@ -104,7 +104,10 @@ function RunSteps({
 	const onPr = all.filter((call) => tiedToCi(stepOf(call), run)).length;
 	return (
 		<section className="flex items-baseline gap-m px-l">
-			<h3 className="text-body-m font-medium text-ink/80">
+			<h3
+				// design-escape-ok(opacity): no role renders this; ink/80
+				className="text-body-m font-medium text-ink/80"
+			>
 				Run {run.turnId ? shortRunId(run.turnId) : run.turn}
 			</h3>
 			{query.data ? (

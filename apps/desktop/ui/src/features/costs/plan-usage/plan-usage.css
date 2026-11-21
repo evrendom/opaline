@@ -27,7 +27,7 @@
 	gap: var(--segment-gap);
 	transform-origin: bottom;
 	will-change: transform;
-	animation: plan-usage-bar-wave 1.6s ease-in-out infinite;
+	animation: plan-usage-bar-wave 1.6s var(--motion-wave-easing) infinite;
 }
 .plan-usage-loading-bar > span {
 	border-radius: var(--segment-radius);

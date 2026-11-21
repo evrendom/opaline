@@ -356,8 +356,7 @@ const UsageCard = memo(function UsageCard({
 				aria-label={`Open ${skill.name}`}
 				onClick={() => onSelectItem(skill.id)}
 				onFocus={() => setActiveIndex(index)}
-				// design-escape-ok: the hit area follows its card's corner
-				className="absolute inset-0 z-20 rounded-[inherit] outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+				className="absolute inset-0 z-20 corner-m corner-squircle squircle:corner-xl focus-outline focus-visible:-outline-offset-2"
 			/>
 			<div className="pointer-events-none flex min-h-0 flex-1 flex-col">
 				<header className="flex min-h-16 flex-1 items-center gap-l px-xxl py-xl">

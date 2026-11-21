@@ -20,8 +20,8 @@
 	line-height: var(--line-xl);
 	letter-spacing: var(--letter-spacing-xl);
 	transition:
-		background-color 120ms ease,
-		color 120ms ease;
+		background-color var(--motion-duration) var(--motion-easing),
+		color var(--motion-duration) var(--motion-easing);
 }
 .cost-breakdown-tabs > button:hover {
 	color: var(--ink);
@@ -640,7 +640,7 @@
 		color: var(--ink-3);
 		box-shadow: var(--shadow-control);
 		opacity: 0;
-		transition: opacity 120ms ease;
+		transition: opacity var(--motion-duration) var(--motion-easing);
 	}
 	& .cost-metric:hover .cost-metric-expand,
 	& .cost-metric-expand:focus-visible,
@@ -659,7 +659,8 @@
 		border-radius: var(--radius-xl);
 		background: var(--card);
 		box-shadow: var(--shadow-overlay);
-		animation: cost-metric-sheet-in 180ms ease-out;
+		animation: cost-metric-sheet-in var(--motion-medium-duration)
+			var(--motion-easing);
 	}
 	& .cost-metric-sheet[data-upward] {
 		padding: var(--space-l) 14px var(--sheet-card);
@@ -723,7 +724,7 @@
 	width: var(--deep-share);
 	border-radius: inherit;
 	background: color-mix(in oklab, var(--metric-color) 55%, transparent);
-	transition: width var(--motion-medium-duration) ease-out;
+	transition: width var(--motion-medium-duration) var(--motion-easing);
 }
 .cost-metric-deep-value {
 	position: relative;

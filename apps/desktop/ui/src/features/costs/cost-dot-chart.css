@@ -16,8 +16,8 @@
 	color: var(--ink-3);
 	font-size: var(--size-l);
 	transition:
-		background-color 120ms ease,
-		color 120ms ease;
+		background-color var(--motion-duration) var(--motion-easing),
+		color var(--motion-duration) var(--motion-easing);
 }
 .cost-chart-kind > button:hover {
 	color: var(--ink);
@@ -58,6 +58,7 @@
 	position: absolute;
 	height: 12px;
 	font-size: var(--size-s);
+	/* design-escape-ok(type): no role renders this; a 12px line in the 12px axis cell */
 	line-height: 12px;
 	font-weight: 500;
 	color: var(--ink-3);
@@ -72,7 +73,7 @@
 	color: var(--ink);
 }
 .cost-dot-axis > div {
-	transition: filter 120ms ease-out;
+	transition: filter var(--motion-duration) var(--motion-easing);
 }
 .cost-dot-axis > div[data-faded] {
 	filter: opacity(0.35);
@@ -85,10 +86,10 @@
 	transform: translateX(
 		clamp(0px, calc(var(--axis-at) - 50%), calc(var(--axis-span) - 100%))
 	);
-	transition: transform 160ms ease-out;
+	transition: transform var(--motion-duration) var(--motion-easing);
 }
 .cost-dot-axis[data-axis="y"] > div[data-hover] {
-	transition: top 160ms ease-out;
+	transition: top var(--motion-duration) var(--motion-easing);
 }
 .cost-dot-axis[data-axis="x"] > div[data-end] {
 	left: auto;
@@ -148,7 +149,7 @@
 	width: var(--dot-cell);
 	height: var(--dot-cell);
 	border-radius: 28%;
-	transition: transform 120ms ease;
+	transition: transform var(--motion-duration) var(--motion-easing);
 }
 .cost-dot::before {
 	content: "";
@@ -194,6 +195,7 @@
 	width: 36%;
 	aspect-ratio: 1;
 	border-radius: var(--radius-full);
+	/* design-escape-ok(colour): the white pip on a cost-heat dot, artwork over data paint */
 	background: rgb(255 255 255 / 0.45);
 	transform: translate(-50%, -50%);
 }
@@ -232,7 +234,7 @@ button.cost-dot-grid {
 	position: relative;
 }
 .cost-dot-crosshair {
-	transition: opacity 180ms ease-out;
+	transition: opacity var(--motion-medium-duration) var(--motion-easing);
 	--cross-gap: 3px;
 	--cross-line: color-mix(in oklab, var(--ink) 22%, transparent);
 	position: absolute;
@@ -242,10 +244,10 @@ button.cost-dot-grid {
 .cost-dot-crosshair > span {
 	position: absolute;
 	transition:
-		left 110ms ease-out,
-		top 110ms ease-out,
-		width 110ms ease-out,
-		height 110ms ease-out;
+		left var(--motion-quick-duration) var(--motion-easing),
+		top var(--motion-quick-duration) var(--motion-easing),
+		width var(--motion-quick-duration) var(--motion-easing),
+		height var(--motion-quick-duration) var(--motion-easing);
 }
 .cost-dot-crosshair > [data-part="ring"] {
 	left: calc(var(--cross-x) - var(--cross-gap));
