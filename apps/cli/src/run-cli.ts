@@ -4,9 +4,13 @@ import { homedir } from "node:os";
 import { dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import pkg from "../package.json" with { type: "json" };
-import { type CleanupReport, retire } from "./retire/cleanup.js";
-import { PREVIOUS_NOTIFY_FLAG, parsePrevious } from "./retire/codex.js";
-import type { Environment } from "./retire/paths.js";
+import {
+	type CleanupReport,
+	type Environment,
+	PREVIOUS_NOTIFY_FLAG,
+	parsePrevious,
+	retire,
+} from "@rudel/cli-retire";
 
 export const APP_URL = "https://opaline.evren.so";
 

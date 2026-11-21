@@ -13,7 +13,7 @@ import {
 	CREDENTIALS_FILE,
 	STATE_DIRECTORIES,
 	STATE_FILES,
-} from "../retire/state.js";
+} from "@rudel/cli-retire";
 import {
 	fakeBundle,
 	makeHome,

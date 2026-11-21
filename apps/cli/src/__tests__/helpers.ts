@@ -8,8 +8,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import type { CleanupReport } from "../retire/cleanup.js";
-import { retire } from "../retire/cleanup.js";
+import { type CleanupReport, retire } from "@rudel/cli-retire";
 import { type CliOptions, runCli } from "../run-cli.js";
 
 /** A throwaway home directory; nothing here reaches the real one. */
