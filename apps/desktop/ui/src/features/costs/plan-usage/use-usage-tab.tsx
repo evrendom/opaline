@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { useLocalDesktopApp } from "@/features/desktop/local-app";
 import { type ChartInterval, chartPeriodDates } from "../chart-interval";
 import type { UsageTab } from "../cost-chart";
+import { UsageSessionsContext } from "../cost-rail-override";
 import { formatPoints, PlanUsageChart, periodsOf } from "./plan-usage-chart";
 import { UsageBreakdowns } from "./usage-breakdowns";
 import { useUsageSelection } from "./usage-selection";
@@ -28,6 +29,7 @@ export function useUsageTab(
 	const desktop = useLocalDesktopApp() && enabled;
 	const { selected, setSelected } = useUsageSelection();
 	const [provider, setProvider] = useState<PlanProvider>("claude");
+	const picked = useContext(UsageSessionsContext);
 	const repository = repositories !== undefined;
 	const query = usePlanUsage(
 		desktop && (!repository || repositories.length > 0),
@@ -42,7 +44,16 @@ export function useUsageTab(
 	const window = usage?.window ?? null;
 	const periods = window ? periodsOf(window, interval) : [];
 	if (repository) {
-		const used = window?.repositoryPoints ?? null;
+		const used =
+			picked === undefined
+				? (window?.repositoryPoints ?? null)
+				: picked === null || !window
+					? null
+					: picked.reduce(
+							(sum, sessionId) =>
+								sum + (window.sessionPoints?.[sessionId] ?? 0),
+							0,
+						);
 		return {
 			deselect,
 			tab: {

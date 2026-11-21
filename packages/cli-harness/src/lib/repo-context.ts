@@ -12,10 +12,10 @@ import {
 	type LocalContextBundle,
 	serializeLocalContextBundle,
 } from "@rudel/local-context-source";
+import { getOrCreateCliInstallationId } from "./cli-installation.js";
 import { loadCredentials } from "./credentials.js";
 import { exec } from "./exec.js";
 import { getGitRemoteUrl } from "./git-info.js";
-import { getOrCreateCliInstallationId } from "./product-analytics.js";
 import { getProjectOrgId } from "./project-config.js";
 import {
 	createRepositorySpoolBinding,

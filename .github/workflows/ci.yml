@@ -9,66 +9,65 @@ on:
       - main
 
 permissions:
+  actions: read
   contents: read
   pull-requests: read
-
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# Lint, type checks, the build and every test shard run side by side. Tests
+# are split by their recorded run time (scripts/ci-tests.ts), and a pull
+# request runs only the tests of the workspaces its diff can reach; main runs
+# everything, and saves the times its shards measured for later plans.
+#
+# Each shard plans the whole suite itself and runs its own slice, so no test
+# waits for a planning job. The plans agree because they read the same
+# inputs: the checkout and the newest timings main saved at least five
+# minutes before the run began. The gates prove it from the shard logs.
+#
+# `verify`, `integration` and `cli-smoke-required` are the checks the main
+# ruleset requires, so they stay as small jobs that gate on the parts.
 jobs:
   # Job-level conditions skip drafts before allocating a runner.
-  changes:
+  plan:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
-      integration: ${{ steps.integration.outputs.integration == 'true' || steps.integration.outputs.skill == 'true' }}
+      cli: ${{ steps.plan.outputs.cli }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 20
+          fetch-depth: 2
 
-      # Integration exercises the API, CLI, marketing build, packages and
-      # scripts. The web app, the MCP plugin code (no integration test reaches
-      # it) and Markdown outside the plugin skill cannot change its outcome, so
-      # PRs touching only those skip it. Every listed condition must hold for a
-      # changed file of the integration filter; the skill filter runs the
-      # skill's SQL examples.
-      - name: Detect integration changes
-        id: integration
-        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          base: main
-          predicate-quantifier: every
-          filters: |
-            integration:
-              - "{apps/desktop/server/**,apps/cli/**,packages/cli-harness/**,packages/**,scripts/**,.github/actions/setup/**,.github/workflows/ci.yml,bun.lock,package.json,turbo.json}"
-              - "!apps/desktop/server/src/mcp/**"
-              - "!apps/desktop/server/src/handlers/mcp-http*"
-              - "!**/*.md"
-            skill:
-              - "plugin/skills/**"
+          bun-version: 1.3.14
 
-  verify:
+      # A pull request's checkout is its merge commit, whose first parent is
+      # the base it merges into.
+      - name: Does the diff reach the CLI
+        id: plan
+        env:
+          PULL_REQUEST: ${{ github.event_name == 'pull_request' }}
+        run: |
+          base=()
+          [[ "${PULL_REQUEST}" == "true" ]] && base=(--base "$(git rev-parse HEAD^1)")
+          bun scripts/ci-tests.ts reaches --name cli --packages apps/cli,packages/opaline,packages/rudel-alias "${base[@]}"
+
+  checks:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    # 8vcpu: the api unit suite runs in one bun process whose accumulated heap
-    # OOM-killed (exit 137) the 4vcpu runner even at turbo concurrency 1.
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 24
-          package-manager-cache: false
 
       - name: Setup Bun
         uses: ./.github/actions/setup
@@ -79,17 +78,6 @@ jobs:
       - name: Check for accidental disclosures
         run: bun run check:disclosure
 
-      - name: Test disclosure checker
-        run: bun test scripts/check-disclosure.test.ts
-
-      - name: Test the self-hosted artifact packer
-        run: bun test ./scripts/selfhost-artifact.test.ts
-
-      # Lists every design-system escape in the Mac app UI; fails on the
-      # enforced scope (ENFORCED in apps/desktop/ui/tools/design-escapes.ts).
-      - name: Check design-system escapes
-        run: bun run check:design
-
       - name: Check pull request disclosure channels
         if: github.event_name == 'pull_request'
         env:
@@ -98,26 +86,128 @@ jobs:
           bun scripts/check-disclosure.ts --commits "${{ github.event.pull_request.base.sha }}"
           bun scripts/check-disclosure.ts --pull-request "${{ github.event.pull_request.number }}"
 
-      - name: Verify
-        run: |
-          bun run turbo run lint check-types test --concurrency=1
+      - name: Test the repository scripts
+        run: bun test ./scripts/check-disclosure.test.ts ./scripts/selfhost-artifact.test.ts ./scripts/ci-tests.test.ts
+
+      # Every design-system escape in the Mac app UI, held by a ratchet
+      # (apps/desktop/ui/tools/design-escapes.ts and its baseline).
+      - name: Check design-system escapes
+        run: bun run check:design
+
+      - name: Lint
+        run: bun run lint
+
+  typecheck:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup
+
+      - name: Type check
+        run: bun run turbo run check-types
+
+  build:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup
 
       - name: Build
-        run: bun run turbo run build --concurrency=1
+        run: bun run turbo run build
 
       - name: Verify browser resource budgets in Chrome
         run: bun run --cwd apps/desktop/ui test:resource-budgets:chrome
 
-  integration:
-    # Pushes to main follow the same filter; manual runs always run it.
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      ((github.event_name == 'push' ||
-      github.event.pull_request.draft == false) &&
-      needs.changes.outputs.integration == 'true')
-    needs: changes
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+  unit:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    name: unit (${{ matrix.shard }})
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+
+      - name: Setup Bun for planning
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.3.14
+
+      - name: Pick the recorded test times
+        id: timings
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun scripts/ci-tests.ts pick-timings
+
+      - name: Restore the recorded test times
+        if: steps.timings.outputs.key != ''
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tmp/test-timings.json
+          key: ${{ steps.timings.outputs.key }}
+          fail-on-cache-miss: true
+
+      - name: Plan this shard
+        id: plan
+        env:
+          PULL_REQUEST: ${{ github.event_name == 'pull_request' }}
+          TIMINGS_KEY: ${{ steps.timings.outputs.key }}
+          SKIP: "false"
+        run: |
+          timings=.github/test-timings.json
+          [[ -n "${TIMINGS_KEY}" ]] && timings=.tmp/test-timings.json
+          base=()
+          [[ "${PULL_REQUEST}" == "true" ]] && base=(--base "$(git rev-parse HEAD^1)")
+          bun scripts/ci-tests.ts shard --suite unit --shards 3 --index ${{ matrix.shard }} \
+            --timings "${timings}" --timings-key "${TIMINGS_KEY}" --skip "${SKIP}" "${base[@]}"
+
+      - name: Setup Node.js
+        if: steps.plan.outputs.empty != 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Setup Bun
+        if: steps.plan.outputs.empty != 'true'
+        uses: ./.github/actions/setup
+
+      - name: Run unit tests
+        if: steps.plan.outputs.empty != 'true'
+        env:
+          ITEMS: ${{ steps.plan.outputs.items }}
+        run: bun scripts/ci-tests.ts run --suite unit --items "${ITEMS}"
+
+  integration-shard:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    name: integration (${{ matrix.shard }})
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:17.10-alpine
@@ -155,17 +245,67 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 24
-          package-manager-cache: false
+          fetch-depth: 2
 
-      - name: Setup Bun
-        uses: ./.github/actions/setup
+      - name: Setup Bun for planning
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.3.14
 
+      - name: Pick the recorded test times
+        id: timings
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun scripts/ci-tests.ts pick-timings
+
+      - name: Restore the recorded test times
+        if: steps.timings.outputs.key != ''
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tmp/test-timings.json
+          key: ${{ steps.timings.outputs.key }}
+          fail-on-cache-miss: true
+
+      # Integration exercises the server, the CLI, the packages and the
+      # scripts. The dashboard, the MCP plugin code (no integration test
+      # reaches it) and Markdown outside the plugin skill cannot change its
+      # outcome, so PRs touching only those skip it. Every listed condition
+      # must hold for a changed file of the integration filter; the skill
+      # filter runs the skill's SQL examples. Pushes to main follow the same
+      # filter; manual runs always run it.
+      - name: Detect integration changes
+        id: integration
+        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
+        with:
+          base: main
+          predicate-quantifier: every
+          filters: |
+            integration:
+              - "{apps/desktop/server/**,apps/cli/**,packages/**,scripts/**,.github/actions/setup/**,.github/workflows/ci.yml,bun.lock,package.json,turbo.json}"
+              - "!apps/desktop/server/src/mcp/**"
+              - "!apps/desktop/server/src/handlers/mcp-http*"
+              - "!**/*.md"
+            skill:
+              - "plugin/skills/**"
+
+      - name: Plan this shard
+        id: plan
+        env:
+          PULL_REQUEST: ${{ github.event_name == 'pull_request' }}
+          TIMINGS_KEY: ${{ steps.timings.outputs.key }}
+          SKIP: "${{ github.event_name != 'workflow_dispatch' && steps.integration.outputs.integration != 'true' && steps.integration.outputs.skill != 'true' }}"
+        run: |
+          timings=.github/test-timings.json
+          [[ -n "${TIMINGS_KEY}" ]] && timings=.tmp/test-timings.json
+          base=()
+          [[ "${PULL_REQUEST}" == "true" ]] && base=(--base "$(git rev-parse HEAD^1)")
+          bun scripts/ci-tests.ts shard --suite integration --shards 8 --index ${{ matrix.shard }} \
+            --timings "${timings}" --timings-key "${TIMINGS_KEY}" --skip "${SKIP}" "${base[@]}"
+
+      # Started before the install so ClickHouse boots while Bun installs.
       - name: Start ClickHouse
+        if: steps.plan.outputs.empty != 'true'
         run: |
           docker run --detach \
             --name rudel-ci-clickhouse \
@@ -185,7 +325,19 @@ jobs:
             --env CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1 \
             clickhouse/clickhouse-server:26.3.17.56
 
+      - name: Setup Node.js
+        if: steps.plan.outputs.empty != 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Setup Bun
+        if: steps.plan.outputs.empty != 'true'
+        uses: ./.github/actions/setup
+
       - name: Wait for ClickHouse
+        if: steps.plan.outputs.empty != 'true'
         run: |
           wait_for_clickhouse() {
             local container="$1"
@@ -213,6 +365,7 @@ jobs:
             http://localhost:8124
 
       - name: Provision ClickHouse credential test user
+        if: steps.plan.outputs.empty != 'true'
         run: |
           curl --fail --silent --show-error \
             --user default:default-ci \
@@ -220,15 +373,21 @@ jobs:
             http://localhost:8124/
 
       - name: Run Postgres migrations
+        if: steps.plan.outputs.empty != 'true'
         run: bun run --cwd packages/sql-schema migrate
 
       - name: Bootstrap fresh ClickHouse (original checksums and controlled F16 verification)
+        if: steps.plan.outputs.empty != 'true'
         run: bun run --cwd packages/ch-schema ch:bootstrap
 
       - name: Run integration tests
-        run: bun run turbo run test:integration --concurrency=1 --log-order=stream
+        if: steps.plan.outputs.empty != 'true'
+        env:
+          ITEMS: ${{ steps.plan.outputs.items }}
+        run: bun scripts/ci-tests.ts run --suite integration --items "${ITEMS}"
 
       - name: Fetch the published rudel@0.1.17 CLI
+        if: steps.plan.outputs.empty != 'true' && matrix.shard == 0
         run: |
           mkdir -p .tmp/old-cli
           curl -fsSL -o .tmp/old-cli/rudel-0.1.17.tgz https://registry.npmjs.org/rudel/-/rudel-0.1.17.tgz
@@ -236,12 +395,105 @@ jobs:
           node .tmp/old-cli/package/dist/cli.js --version
 
       - name: Run version-skew tests against the published 0.1.17 CLI
+        if: steps.plan.outputs.empty != 'true' && matrix.shard == 0
         run: bun run --cwd packages/cli-harness test:integration:skew
         env:
           RUDEL_OLD_CLI_PATH: ${{ github.workspace }}/.tmp/old-cli/package/dist/cli.js
 
+
+  verify:
+    if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
+    needs: [plan, checks, typecheck, build, unit]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every part to pass or be skipped
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          failed="$(jq --raw-output 'to_entries[] | select(.value.result != "success" and .value.result != "skipped") | "\(.key): \(.value.result)"' <<< "${RESULTS}")"
+          if [[ -n "${failed}" ]]; then
+            echo "${failed}"
+            exit 1
+          fi
+
+      # The shard counts here match the matrices above.
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.3.14
+
+      - name: Prove the unit shards agreed on one plan and ran all of it
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun scripts/ci-tests.ts verify-shards --suite unit --shards 3
+
+  integration:
+    if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
+    needs: [integration-shard]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every shard to pass or be skipped
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          failed="$(jq --raw-output 'to_entries[] | select(.value.result != "success" and .value.result != "skipped") | "\(.key): \(.value.result)"' <<< "${RESULTS}")"
+          if [[ -n "${failed}" ]]; then
+            echo "${failed}"
+            exit 1
+          fi
+
+      # The shard counts here match the matrices above.
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.3.14
+
+      - name: Prove the integration shards agreed on one plan and ran all of it
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun scripts/ci-tests.ts verify-shards --suite integration --shards 8
+
+  # Main saves the times its shards measured, over the snapshot and the last
+  # passing runs, for the plans of later runs (`pick-timings`).
+  record-timings:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [unit, integration-shard]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.3.14
+
+      # A new key every run: the cache saves this file when the job ends.
+      - name: Save the recorded test times
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tmp/test-timings.json
+          key: ci-test-timings-${{ github.run_id }}
+
+      - name: Read the times this run and the last passing runs measured
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun scripts/ci-tests.ts recorded --timings .github/test-timings.json --out .tmp/test-timings.json --run "${{ github.run_id }}"
+
+  # The published CLI on every supported OS and Node version; pull requests
+  # run it only when they can reach the CLI or its npm launchers.
   cli-smoke:
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    needs: plan
+    if: needs.plan.outputs.cli == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -267,13 +519,12 @@ jobs:
           node-version: ${{ matrix.node }}
           package-manager-cache: false
 
+      # The CLI depends on no other workspace, and its npm launchers have no
+      # dependencies of their own.
       - name: Setup Bun
         uses: ./.github/actions/setup
-
-      - name: Verify settings recovery and hook migration
-        env:
-          POSTHOG_ENABLED: "false"
-        run: bun test apps/cli/src/__tests__/auto-upload-config.test.ts apps/cli/src/__tests__/upload-manager-migration.test.ts
+        with:
+          filter: "@opalinehq/cli"
 
       - name: Pack and install all three CLI packages
         shell: bash
@@ -292,6 +543,8 @@ jobs:
             ".tmp/cli-smoke/package/${primary_tarball}" \
             ".tmp/cli-smoke/package/${rudel_tarball}"
 
+      # Every command of the retired CLI cleans up the computer it runs on, so
+      # each run gets a throwaway home directory.
       - name: Verify canonical and alias behavior
         shell: bash
         run: |
@@ -304,63 +557,48 @@ jobs:
             test "$(node -p "require('./${package_dir}/package.json').version")" = "${version}"
             test "$(node -p "require('./${package_dir}/package.json').dependencies['@opalinehq/cli']")" = "${version}"
           done
+          # The retired CLI is one self-contained bundle: installing it pulls in nothing.
+          test "$(node -p "Object.keys(require('./apps/cli/package.json').dependencies ?? {}).length")" = "0"
+
+          home_dir() {
+            rm -rf ".tmp/cli-smoke/$1" && mkdir -p ".tmp/cli-smoke/$1"
+            if command -v cygpath > /dev/null; then cygpath -w "$(pwd)/.tmp/cli-smoke/$1"; else echo "$(pwd)/.tmp/cli-smoke/$1"; fi
+          }
+          run() {
+            local name="$1" cli="$2" home
+            shift 2
+            home="$(home_dir "home-${name}")"
+            printf '%s' '{"session_id":"","transcript_path":"","cwd":""}' |
+              HOME="${home}" USERPROFILE="${home}" node "${cli}" "$@" \
+                > ".tmp/cli-smoke/${name}.stdout" 2> ".tmp/cli-smoke/${name}.stderr"
+          }
 
           for cli in "${opaline_cli}" "${primary_cli}" "${rudel_cli}"; do
-            test "$(node "${cli}" --version)" = "${version}"
+            home="$(home_dir home-version)"
+            test "$(HOME="${home}" USERPROFILE="${home}" node "${cli}" --version)" = "${version}"
           done
 
-          node "${opaline_cli}" --help > .tmp/cli-smoke/opaline-help.stdout 2> .tmp/cli-smoke/opaline-help.stderr
-          node "${primary_cli}" --help > .tmp/cli-smoke/primary-help.stdout 2> .tmp/cli-smoke/primary-help.stderr
-          node "${rudel_cli}" --help > .tmp/cli-smoke/rudel-help.stdout 2> .tmp/cli-smoke/rudel-help.stderr
-          cmp .tmp/cli-smoke/opaline-help.stdout .tmp/cli-smoke/primary-help.stdout
-          cmp .tmp/cli-smoke/opaline-help.stderr .tmp/cli-smoke/primary-help.stderr
-          cmp .tmp/cli-smoke/opaline-help.stdout .tmp/cli-smoke/rudel-help.stdout
-          test "$(head -n 1 .tmp/cli-smoke/rudel-help.stderr)" = "rudel is now opaline"
-          tail -n +2 .tmp/cli-smoke/rudel-help.stderr | cmp .tmp/cli-smoke/opaline-help.stderr -
-
-          set +e
-          node "${opaline_cli}" not-a-command > .tmp/cli-smoke/opaline-error.stdout 2> .tmp/cli-smoke/opaline-error.stderr
-          opaline_exit=$?
-          node "${primary_cli}" not-a-command > .tmp/cli-smoke/primary-error.stdout 2> .tmp/cli-smoke/primary-error.stderr
-          primary_exit=$?
-          node "${rudel_cli}" not-a-command > .tmp/cli-smoke/rudel-error.stdout 2> .tmp/cli-smoke/rudel-error.stderr
-          rudel_exit=$?
-          set -e
-
-          test "${opaline_exit}" -ne 0
-          test "${opaline_exit}" -eq "${rudel_exit}"
-          test "${opaline_exit}" -eq "${primary_exit}"
-          cmp .tmp/cli-smoke/opaline-error.stdout .tmp/cli-smoke/primary-error.stdout
-          cmp .tmp/cli-smoke/opaline-error.stderr .tmp/cli-smoke/primary-error.stderr
-          cmp .tmp/cli-smoke/opaline-error.stdout .tmp/cli-smoke/rudel-error.stdout
-          tail -n +2 .tmp/cli-smoke/rudel-error.stderr | cmp .tmp/cli-smoke/opaline-error.stderr -
-
-          mkdir -p .tmp/cli-smoke/opaline-config .tmp/cli-smoke/primary-config .tmp/cli-smoke/rudel-config
-          hook_input='{"session_id":"","transcript_path":"","cwd":""}'
-          printf '%s' "${hook_input}" | OPALINE_CONFIG_DIR=.tmp/cli-smoke/opaline-config node "${opaline_cli}" hooks claude session-end > .tmp/cli-smoke/opaline-stdin.stdout 2> .tmp/cli-smoke/opaline-stdin.stderr
-          opaline_stdin_exit=$?
-          printf '%s' "${hook_input}" | OPALINE_CONFIG_DIR=.tmp/cli-smoke/primary-config node "${primary_cli}" hooks claude session-end > .tmp/cli-smoke/primary-stdin.stdout 2> .tmp/cli-smoke/primary-stdin.stderr
-          primary_stdin_exit=$?
-          printf '%s' "${hook_input}" | OPALINE_CONFIG_DIR=.tmp/cli-smoke/rudel-config node "${rudel_cli}" hooks claude session-end > .tmp/cli-smoke/rudel-stdin.stdout 2> .tmp/cli-smoke/rudel-stdin.stderr
-          rudel_stdin_exit=$?
-
-          test "${opaline_stdin_exit}" -eq "${rudel_stdin_exit}"
-          test "${opaline_stdin_exit}" -eq "${primary_stdin_exit}"
-          cmp .tmp/cli-smoke/opaline-stdin.stdout .tmp/cli-smoke/primary-stdin.stdout
-          cmp .tmp/cli-smoke/opaline-stdin.stderr .tmp/cli-smoke/primary-stdin.stderr
-          cmp .tmp/cli-smoke/opaline-stdin.stdout .tmp/cli-smoke/rudel-stdin.stdout
-          tail -n +2 .tmp/cli-smoke/rudel-stdin.stderr | cmp .tmp/cli-smoke/opaline-stdin.stderr -
+          for command in "--help" "not-a-command" "hooks claude session-end"; do
+            # shellcheck disable=SC2086
+            run opaline "${opaline_cli}" ${command}
+            # shellcheck disable=SC2086
+            run primary "${primary_cli}" ${command}
+            # shellcheck disable=SC2086
+            run rudel "${rudel_cli}" ${command}
+            for name in primary rudel; do
+              cmp .tmp/cli-smoke/opaline.stdout ".tmp/cli-smoke/${name}.stdout"
+              cmp .tmp/cli-smoke/opaline.stderr ".tmp/cli-smoke/${name}.stderr"
+            done
+            test ! -s .tmp/cli-smoke/opaline.stderr
+          done
+          # A hook handler prints nothing: Claude Code adds hook output to the session.
+          test ! -s .tmp/cli-smoke/opaline.stdout
 
       - name: Run packed CLI smoke suite through opaline
         shell: bash
         run: bun run --cwd apps/cli test:packed-smoke
         env:
           OPALINE_PACKED_CLI: ${{ github.workspace }}/.tmp/cli-smoke/install/node_modules/opaline/bin/opaline.js
-
-      - name: Verify Windows browser opening
-        if: runner.os == 'Windows'
-        shell: bash
-        run: bun test ./apps/cli/src/__tests__/browser-opener.windows.integration.ts
 
   cli-smoke-required:
     if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)

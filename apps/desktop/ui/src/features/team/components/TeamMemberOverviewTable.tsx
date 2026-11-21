@@ -6,10 +6,6 @@ import { SearchInput } from "@/components/dashboard/data-table";
 import { DashboardModelBadges } from "@/features/dashboard/components/DashboardModelBadges";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
 import { ToolbarSortMenu } from "@/features/sessions/components/sessions-overview-sort-menu";
-import {
-	TeamInviteLinkActionsSample,
-	TeamInviteLinkSurface,
-} from "@/features/team/components/TeamInviteLinkSurface";
 import type {
 	TeamPageMemberModelUsage,
 	TeamPageMemberOverviewRow,
@@ -390,14 +386,10 @@ const SAMPLE_ROWS: TeamPageMemberOverviewRow[] = [
 }));
 
 export function TeamMemberOverviewTable({
-	canInviteTeamMembers,
 	loading = false,
-	organizationId,
 	rows,
 }: {
-	canInviteTeamMembers: boolean;
 	loading?: boolean;
-	organizationId: string | null;
 	rows: readonly TeamPageMemberOverviewRow[];
 }) {
 	const [search, setSearch] = useState("");
@@ -418,7 +410,6 @@ export function TeamMemberOverviewTable({
 			sort,
 		);
 	}, [rows, search, sort]);
-	const showInvite = canInviteTeamMembers && organizationId !== null;
 
 	return (
 		<div className="-mx-m">
@@ -439,25 +430,6 @@ export function TeamMemberOverviewTable({
 					onSortChange={setSort}
 					sort={sort}
 				/>
-				{loading || showInvite ? (
-					<div className="ml-auto min-w-0">
-						<Reveal
-							label="Loading invite links"
-							loading={loading}
-							sample={<TeamInviteLinkActionsSample />}
-							sampleId="team-invite-links"
-						>
-							{() =>
-								organizationId ? (
-									<TeamInviteLinkSurface
-										layout="toolbar"
-										organizationId={organizationId}
-									/>
-								) : null
-							}
-						</Reveal>
-					</div>
-				) : null}
 			</div>
 			<Reveal
 				label="Loading teammates"

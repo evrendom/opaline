@@ -1,5 +1,4 @@
 import { sqlClient } from "../db.js";
-import { cancelOrganizationBillingSubscription } from "./billing.service.js";
 import {
 	enqueueClickHousePurge,
 	wakeClickHousePurgeWorker,
@@ -30,7 +29,6 @@ export async function deleteOrganizationPostgresData(input: {
 			[input.organizationId, input.userId],
 		);
 		if (!lockedOwnership) throw new OrganizationDeletionForbiddenError();
-		await cancelOrganizationBillingSubscription(input.organizationId);
 		await enqueueClickHousePurge(
 			{ targetId: input.organizationId, targetType: "organization" },
 			transaction,

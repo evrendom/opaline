@@ -103,7 +103,7 @@ export function DateRangeControl() {
 
 /** The date range control on Sessions and Compass, without an interval. */
 export function SessionsDateControl() {
-	return <DashboardDateControls sourceComponent="sessions_date_picker" />;
+	return <DashboardDateControls />;
 }
 
 /** The sessions list's "Sorted by" menu. */

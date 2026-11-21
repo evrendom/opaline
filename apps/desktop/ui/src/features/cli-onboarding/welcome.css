@@ -1,9 +1,6 @@
 /* Onboarding colours. Light keeps the original values; dark maps them onto
    the app's neutral dark tokens. */
 
-.cli-welcome-field textarea {
-	overscroll-behavior: none;
-}
 .cli-welcome-panel-content {
 	display: flex;
 	flex-direction: column;
@@ -326,7 +323,6 @@
 	letter-spacing: var(--letter-spacing-l);
 }
 .cli-welcome-field input:not([type="file"]),
-.cli-welcome-field textarea,
 .cli-welcome-field select,
 .cli-welcome-form .cli-onboarding-email input {
 	width: 100%;
@@ -338,12 +334,6 @@
 	background: var(--surface);
 	color: var(--ink);
 	font: inherit;
-}
-.cli-welcome-field textarea {
-	resize: none;
-	height: 82px;
-	min-height: 82px;
-	max-height: 220px;
 }
 .cli-welcome-url-input {
 	display: flex;
@@ -389,12 +379,10 @@
 .cli-welcome-field #welcome-workspace-name {
 	border-radius: var(--radius-l);
 }
-.cli-welcome-field input::placeholder,
-.cli-welcome-field textarea::placeholder {
+.cli-welcome-field input::placeholder {
 	color: var(--ink-3);
 }
 .cli-welcome-field input:focus-visible,
-.cli-welcome-field textarea:focus-visible,
 .cli-welcome-field select:focus-visible,
 .cli-welcome-form .cli-onboarding-email input:focus-visible {
 	outline: 2px solid var(--ink);
@@ -448,29 +436,6 @@
 	opacity: 0;
 	width: 100%;
 }
-.cli-welcome-invite-label {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: var(--space-l);
-}
-.cli-welcome-form .cli-welcome-copy-link {
-	display: flex;
-	gap: var(--space-s);
-	align-items: center;
-	background: transparent;
-	border: var(--border-m) solid var(--line);
-	color: var(--ink);
-	font-size: var(--size-m);
-	line-height: var(--line-m);
-	letter-spacing: var(--letter-spacing-m);
-	font-weight: var(--weight-body-medium);
-	min-height: 32px;
-	padding: var(--space-s) var(--space-l);
-}
-.cli-welcome-form .cli-welcome-copy-link:hover:not(:disabled) {
-	background: var(--hover);
-}
 .cli-welcome-step-content {
 	animation: welcome-form-enter var(--motion-large-duration)
 		var(--motion-strong-easing) both;
@@ -496,8 +461,7 @@
 	}
 	.cli-welcome-form p,
 	.cli-welcome-form button,
-	.cli-welcome-field input:not([type="file"]),
-	.cli-welcome-field textarea {
+	.cli-welcome-field input:not([type="file"]) {
 		font-size: var(--size-xxl);
 		line-height: var(--line-xxl);
 		letter-spacing: var(--letter-spacing-xxl);

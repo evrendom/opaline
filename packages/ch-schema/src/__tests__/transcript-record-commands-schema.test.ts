@@ -75,12 +75,9 @@ describe("transcript record commands migration", () => {
 		);
 	});
 
-	test("bootstrap and the production gate run its runner", () => {
+	test("bootstrap runs its runner", () => {
 		expect(read("../../scripts/bootstrap.ts")).toContain(
 			'"20261109200000_transcript_record_commands.sql",\n\t\t"migrate-transcript-record-commands.ts",',
-		);
-		expect(read("../../package.json")).toMatch(
-			/"ch:migrate:production": "[^"]* ch:migrate:transcript-record-commands[ "]/u,
 		);
 	});
 });

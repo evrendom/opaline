@@ -12,7 +12,6 @@ import { routeLoaders } from "@/app/route-loaders";
 import { appRoutes } from "@/app/routes";
 import { NotFoundPage } from "@/app/system/NotFoundPage";
 import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
-import { AcceptInvitationPage } from "@/features/invitations/AcceptInvitationPage";
 import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import { SessionReaderFallback } from "@/features/sessions/reader/session-reader-light-samples";
 import { SettingsPageSkeleton } from "@/features/settings/components/settings-page-skeleton";
@@ -87,10 +86,6 @@ const McpSettingsPage = lazyNamed(
 	"McpSettingsPage",
 );
 const ReportPage = lazyNamed(routeLoaders.report, "ReportPage");
-const TeamInviteAcceptPage = lazyNamed(
-	() => import("@/features/team/TeamInviteAcceptPage"),
-	"TeamInviteAcceptPage",
-);
 const LEGACY_DASHBOARDY_PATH = "/dashboardy";
 const LEGACY_DASHBOARD_SESSIONS_PATH = "/dashboard/sessions";
 const LEGACY_SESSION_FULL_PATH = "/session/full";
@@ -107,7 +102,6 @@ type ShellRoutePaths = {
 	team: string;
 	settings: string;
 	settingsMembers: string;
-	settingsAccount: string;
 	settingsWorkspace: string;
 };
 
@@ -122,7 +116,6 @@ const canonicalShellRoutePaths: ShellRoutePaths = {
 	team: appRoutes.team(),
 	settings: appRoutes.settings(),
 	settingsMembers: appRoutes.settingsMembers(),
-	settingsAccount: appRoutes.settingsAccount(),
 	settingsWorkspace: appRoutes.settingsWorkspace(),
 };
 
@@ -137,7 +130,6 @@ const workspaceShellRoutePaths: ShellRoutePaths = {
 	team: "/:workspaceSlug/team",
 	settings: "/:workspaceSlug/settings",
 	settingsMembers: "/:workspaceSlug/settings/members",
-	settingsAccount: "/:workspaceSlug/settings/account",
 	settingsWorkspace: "/:workspaceSlug/settings/workspace",
 };
 
@@ -309,14 +301,6 @@ function getShellRouteElements(
 					element={<ShellRedirect to={routePaths.settingsMembers} />}
 				/>
 				<Route
-					path={settingsRouteMap.invitations.segment}
-					element={
-						<ShellRedirect
-							to={`${routePaths.settingsAccount}#workspace-invitations`}
-						/>
-					}
-				/>
-				<Route
 					path={settingsRouteMap.account.segment}
 					element={
 						<LazyRoute
@@ -366,14 +350,6 @@ export function AppRouterRoutes({
 		<Routes>
 			<Route path="/" element={<Navigate to={rootRedirect} replace />} />
 			<Route
-				path="/invitation/:invitationId"
-				element={<AcceptInvitationPage />}
-			/>
-			<Route
-				path="/team/invite/:token"
-				element={<LazyRoute Component={TeamInviteAcceptPage} />}
-			/>
-			<Route
 				path={appRoutes.admin()}
 				element={<LazyRoute Component={AdminDashboardPage} />}
 			/>
@@ -384,10 +360,6 @@ export function AppRouterRoutes({
 			<Route
 				path={appRoutes.adminFeatures()}
 				element={<LazyRoute Component={WorkspaceFeaturesAdminPage} />}
-			/>
-			<Route
-				path="/:workspaceSlug/join/:token"
-				element={<LazyRoute Component={TeamInviteAcceptPage} />}
 			/>
 			<Route element={<LeftSidebarAppShellLayout />}>
 				{getShellRouteElements(

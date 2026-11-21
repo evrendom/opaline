@@ -1,27 +1,17 @@
 import { Fragment, useState } from "react";
-import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
 import { submitCliDeviceDecision } from "./cli-onboarding-auth";
 import { WelcomeProgress } from "./welcome-panel";
 
 type DeviceAuthorizationStatus = "pending" | "approved" | "denied";
 type DeviceDecision = "approve" | "deny";
 
-export function CliDeviceAuthorization({
-	userCode,
-	userId,
-}: {
-	userCode: string;
-	userId: string;
-}) {
+export function CliDeviceAuthorization({ userCode }: { userCode: string }) {
 	const normalizedCode = userCode.replaceAll("-", "");
 	const codeCells = Array.from(normalizedCode).map((character, index) => ({
 		character,
 		id: normalizedCode.slice(0, index + 1),
 	}));
 	const separatorIndex = Math.ceil(codeCells.length / 2);
-	const { trackAuthenticationAction } = useAnalyticsTracking({
-		pageName: "device_login",
-	});
 	const [status, setStatus] = useState<DeviceAuthorizationStatus>("pending");
 	const [processingAction, setProcessingAction] =
 		useState<DeviceDecision | null>(null);
@@ -29,14 +19,6 @@ export function CliDeviceAuthorization({
 
 	async function submit(action: DeviceDecision) {
 		if (processingAction) return;
-		trackAuthenticationAction({
-			actionName:
-				action === "approve" ? "approve_device_login" : "deny_device_login",
-			sourceComponent: "device_login",
-			authMethod: "device_code",
-			targetId: userCode,
-			userId,
-		});
 		setProcessingAction(action);
 		setError(null);
 		try {

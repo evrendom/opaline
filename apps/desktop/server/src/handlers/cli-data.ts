@@ -30,10 +30,7 @@ import {
 	type CliWorkspace,
 	resolveCliWorkspace,
 } from "../services/cli-workspace.service.js";
-import {
-	createSearchAccess,
-	postgresSubscriptions,
-} from "../services/transcript-search/access.js";
+import { createSearchAccess } from "../services/transcript-search/access.js";
 import {
 	readEmbeddingQuotaLimits,
 	transcriptEmbedder,
@@ -69,7 +66,7 @@ export function defaultCliDataEnv(): CliDataRouterEnv {
 					readEmbeddingQuotaLimits(),
 				),
 				embedderFor: transcriptEmbedder,
-				access: createSearchAccess(postgresSubscriptions(sqlClient)),
+				access: createSearchAccess(),
 			}),
 		],
 	};

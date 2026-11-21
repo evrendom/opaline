@@ -2,58 +2,6 @@
 	color: var(--ink-3);
 }
 
-.github-connection-actions {
-	display: flex;
-	flex-wrap: nowrap;
-	white-space: nowrap;
-	align-items: center;
-	justify-content: flex-end;
-	gap: var(--space-m);
-}
-
-.github-connection-error {
-	padding: var(--space-l) var(--space-zero);
-	color: var(--error);
-}
-
-.github-connection-progress {
-	display: flex;
-	width: 100%;
-	align-items: center;
-	gap: var(--space-l);
-}
-
-.github-connection-progress-track {
-	height: 4px;
-	flex: 1;
-	overflow: hidden;
-	border-radius: var(--radius-xs);
-	background: var(--line-strong);
-}
-
-.github-connection-progress-fill {
-	height: 100%;
-	border-radius: var(--radius-xs);
-	background: var(--ink);
-	transition: width var(--motion-large-duration) var(--motion-easing);
-}
-
-.github-connection-progress-value {
-	min-width: 3ch;
-	color: var(--ink-3);
-	font-size: var(--size-m);
-	line-height: var(--line-m);
-	letter-spacing: var(--letter-spacing-m);
-	font-variant-numeric: tabular-nums;
-	text-align: right;
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.github-connection-progress-fill {
-		transition: none;
-	}
-}
-
 .github-token-fix {
 	display: grid;
 	gap: var(--space-m);

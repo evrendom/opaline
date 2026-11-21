@@ -29,7 +29,7 @@ const job = (
 	handler: async () => handle,
 });
 
-test("without providers only the jobs that need none run, and billing, trends and digests never do", () => {
+test("without providers only the jobs that need none run", () => {
 	expect(selfHostedJobs({}).map((job) => job.name)).toEqual([
 		"l1-edges",
 		"run-index-heal",

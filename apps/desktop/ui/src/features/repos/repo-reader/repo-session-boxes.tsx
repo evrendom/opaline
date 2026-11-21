@@ -236,6 +236,7 @@ export function RepoSessionBoxes({ fill = false }: { fill?: boolean }) {
 							mergedPullRequests: pickedSession.mergedPullRequests,
 							ciRuns: pickedSession.ciRuns,
 						},
+						sessionIds: [pickedSession.sessionId],
 						name: shortId(pickedSession.sessionId),
 						focus: pickedSession.startedAt.slice(0, 10),
 						onClear: () => setPickedKey(null),

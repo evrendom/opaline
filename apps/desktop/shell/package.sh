@@ -76,7 +76,10 @@ mkdir -p "$dest/icon/dock"
 cp -R "$here/icon/dock/light" "$here/icon/dock/dark" "$here/icon/dock/draw.html" "$here/icon/dock/draw.js" "$dest/icon/dock/"
 build_dirty=false
 [ -z "$(git -C "$repo" status --porcelain --untracked-files=no)" ] || build_dirty=true
-printf '{"commit":"%s","dirty":%s}\n' "$(git -C "$repo" rev-parse --short=9 HEAD)" "$build_dirty" > "$dest/build.json"
+# A release is signed with a Developer ID; anything else is a development build and looks like Xcode in the Dock.
+build_release=false
+[ "$identity" = "-" ] || build_release=true
+printf '{"commit":"%s","dirty":%s,"release":%s}\n' "$(git -C "$repo" rev-parse --short=9 HEAD)" "$build_dirty" "$build_release" > "$dest/build.json"
 cp "$repo/packages/local-server/dist/local-server.js" "$dest/local-server/"
 printf '{"type":"module"}\n' > "$dest/local-server/package.json"
 cp -R "$repo/plugin" "$dest/agent-plugin"
@@ -121,7 +124,10 @@ else
 			codesign --force --timestamp --options runtime --entitlements "$entitlements" --sign "$identity" "$binary"
 		fi
 	done
-	find "$app/Contents/Frameworks" -type f -perm -u+x ! -name '*.dylib' | while read -r binary; do
+	# Deepest first: codesign refuses a binary whose bundle holds unsigned code,
+	# and Electron's x64 build ships its helpers unsigned (arm64 binaries are
+	# always ad-hoc signed, which hid the order).
+	find "$app/Contents/Frameworks" -type f -perm -u+x ! -name '*.dylib' | awk '{ print gsub("/", "/"), $0 }' | sort -rn | cut -d' ' -f2- | while read -r binary; do
 		if file "$binary" | grep -q Mach-O; then
 			codesign --force --timestamp --options runtime --entitlements "$entitlements" --sign "$identity" "$binary"
 		fi

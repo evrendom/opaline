@@ -77,7 +77,7 @@ describe("run index messages migration", () => {
 			).toEqual(added);
 	});
 
-	test("bootstrap and the production gate run its runner", () => {
+	test("bootstrap runs its runner", () => {
 		expect(
 			readFileSync(
 				new URL("../../scripts/bootstrap.ts", import.meta.url),
@@ -86,9 +86,6 @@ describe("run index messages migration", () => {
 		).toContain(
 			'["20261012170000_run_index_messages.sql", "migrate-run-index-messages.ts"]',
 		);
-		expect(
-			readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
-		).toMatch(/ ch:migrate:run-index-messages[ "]/u);
 	});
 
 	test("publication proof rejects lagging replicas and other definitions", () => {

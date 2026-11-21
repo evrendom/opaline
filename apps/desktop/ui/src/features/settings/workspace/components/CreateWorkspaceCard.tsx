@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { appRoutes, getWorkspaceAppPath } from "@/app/routes";
 import { Button } from "@/app/ui/button";
 import { Input } from "@/app/ui/input";
-import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
 import {
 	WorkspaceSettingsGroup,
 	WorkspaceSettingsRow,
@@ -29,9 +28,6 @@ export function CreateWorkspaceCard({
 	title?: string;
 }) {
 	const navigate = useNavigate();
-	const { trackOrganizationAction } = useAnalyticsTracking({
-		pageName: "organization_create",
-	});
 	const [name, setName] = useState("");
 	const [isCreating, setIsCreating] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -46,12 +42,6 @@ export function CreateWorkspaceCard({
 			return;
 		}
 
-		trackOrganizationAction({
-			actionName: "create_organization",
-			targetType: "organization",
-			sourceComponent: "create_workspace_card",
-			targetId: slug,
-		});
 		setIsCreating(true);
 		setError(null);
 

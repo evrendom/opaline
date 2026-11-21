@@ -14,7 +14,6 @@ import "./welcome.css";
 export function CliOnboardingContent({
 	snapshot,
 	authorization,
-	invitedWorkspaceId,
 	deviceUserCode,
 	connectionError,
 	displayCommand,
@@ -24,7 +23,6 @@ export function CliOnboardingContent({
 }: {
 	snapshot: CliConnectionSnapshot | null;
 	authorization: CliAuthorization | null;
-	invitedWorkspaceId: string | null;
 	deviceUserCode: string | null;
 	connectionError: string | null;
 	displayCommand: string;
@@ -50,7 +48,6 @@ export function CliOnboardingContent({
 								mode="paired"
 								snapshot={snapshot}
 								authorization={authorization}
-								invitedWorkspaceId={invitedWorkspaceId}
 								onFinish={onFinish}
 							/>
 						) : (

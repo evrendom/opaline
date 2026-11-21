@@ -1,5 +1,3 @@
-export * from "./billing.js";
-
 export const SESSION_MCP_SERVERS_MAX_SESSIONS = 100;
 export {
 	CI_EVENT_LABELS,
@@ -17,18 +15,6 @@ export {
 	SessionArrivalsPageSchema,
 } from "./session-arrivals.js";
 
-import {
-	BillingConfigurationOutputSchema,
-	BillingPricingStateInputSchema,
-	BillingPricingStateOutputSchema,
-	CreateOrganizationBillingPortalOutputSchema,
-	CreateOrganizationCheckoutInputSchema,
-	CreateOrganizationCheckoutOutputSchema,
-	OrganizationBillingInputSchema,
-	OrganizationBillingSummaryOutputSchema,
-	RequestOrganizationBillingUpgradeOutputSchema,
-	SelectOrganizationPlanOutputSchema,
-} from "./billing.js";
 import { cliDataContract } from "./cli-data.js";
 import { CliUpdateStatusSchema } from "./cli-version.js";
 import {
@@ -54,7 +40,6 @@ import {
 	ReportUploadFailuresInputSchema,
 	UploadFailuresPageSchema,
 } from "./upload-failure.js";
-import { usageDigestContract } from "./usage-digest.js";
 
 export { CliConnectionIdSchema } from "./cli-connection.js";
 export {
@@ -79,10 +64,6 @@ export {
 	UploadFailureSchema,
 	UploadFailuresPageSchema,
 } from "./upload-failure.js";
-export {
-	type UsageDigestPreferences,
-	UsageDigestPreferencesSchema,
-} from "./usage-digest.js";
 
 import {
 	RepositoryDetailSchema,
@@ -389,22 +370,10 @@ export {
 } from "./schemas/cost-dashboard.js";
 
 import {
-	GitHubCreateInstallationInputSchema,
-	GitHubCreateInstallationOutputSchema,
-	GitHubDisconnectInputSchema,
-	GitHubDisconnectOutputSchema,
 	GitHubRepositoryEvidenceStatusSchema,
 	GitHubSyncCommitInputSchema,
 	GitHubSyncCommitOutputSchema,
 } from "./github-repository-evidence.js";
-import {
-	DashboardDrilldownOpenedCaptureInputSchema,
-	DashboardFilterChangedCaptureInputSchema,
-	DashboardViewedCaptureInputSchema,
-	ProductAnalyticsClientSurfaceSchema,
-	ProductAnalyticsPlatformOsSchema,
-	ProductAnalyticsUploadModeSchema,
-} from "./product-analytics.js";
 import {
 	RepositoryEvidenceCommitInputSchema,
 	RepositoryEvidenceCommitOutputSchema,
@@ -446,7 +415,6 @@ export * from "./live-session-view.js";
 export * from "./model-pricing.js";
 export * from "./model-rate-card.js";
 export * from "./plugin-tool-names.js";
-export * from "./product-analytics.js";
 export {
 	dashboardRepositoryId,
 	MAX_DASHBOARD_REPOSITORY_IDS,
@@ -827,19 +795,6 @@ export const OrganizationSchema = z.object({
 	logo: z.string().nullable(),
 });
 
-export const TeamInviteLinkSchema = z.object({
-	expires_at: z.string().datetime(),
-	invite_url: z.string().url(),
-	organization_id: z.string(),
-	organization_name: z.string(),
-});
-
-export const TeamInviteAcceptResultSchema = z.object({
-	organization_id: z.string(),
-	organization_name: z.string(),
-	status: z.enum(["already_member", "joined"]),
-});
-
 export const SessionTagSchema = z.enum([
 	"research",
 	"new_feature",
@@ -928,10 +883,10 @@ const ingestSessionInputSchema = (maxCodeUnits: number) =>
 			.optional(),
 		organizationId: z.string().max(200).optional(),
 		operationId: z.string().uuid().optional(),
-		client_surface: ProductAnalyticsClientSurfaceSchema.optional(),
-		upload_mode: ProductAnalyticsUploadModeSchema.optional(),
+		client_surface: z.enum(["cli", "hook"]).optional(),
+		upload_mode: z.enum(["hook", "manual", "retry"]).optional(),
 		cli_version: z.string().max(200).optional(),
-		platform_os: ProductAnalyticsPlatformOsSchema.optional(),
+		platform_os: z.enum(["macos", "windows", "linux"]).optional(),
 		filter_version: z.number().int().min(0).max(65_535).optional(),
 		force_replace: z.boolean().optional(),
 		/**
@@ -1177,10 +1132,6 @@ export const UpdateProfileInputSchema = z.object({
 
 export type UpdateProfileInput = z.infer<typeof UpdateProfileInputSchema>;
 
-const ProductAnalyticsCaptureResultSchema = z.object({
-	success: z.literal(true),
-});
-
 const IngestSessionErrors = {
 	[REDACTION_BUDGET_EXCEEDED_CODE]: {
 		status: 422,
@@ -1231,47 +1182,8 @@ export const contract = {
 		...analysisCoverageContract,
 		history: analysisHistoryContract,
 	},
-	billing: {
-		configuration: oc.output(BillingConfigurationOutputSchema),
-		current: oc.output(OrganizationBillingSummaryOutputSchema),
-		pricing: oc
-			.input(BillingPricingStateInputSchema)
-			.output(BillingPricingStateOutputSchema),
-		summary: oc
-			.input(OrganizationBillingInputSchema)
-			.output(OrganizationBillingSummaryOutputSchema),
-		createCheckout: oc
-			.input(CreateOrganizationCheckoutInputSchema)
-			.output(CreateOrganizationCheckoutOutputSchema),
-		createPortal: oc
-			.input(OrganizationBillingInputSchema)
-			.output(CreateOrganizationBillingPortalOutputSchema),
-		selectPlan: oc
-			.input(CreateOrganizationCheckoutInputSchema)
-			.output(SelectOrganizationPlanOutputSchema),
-		requestUpgrade: oc
-			.input(CreateOrganizationCheckoutInputSchema)
-			.output(RequestOrganizationBillingUpgradeOutputSchema),
-	},
 	githubRepositoryEvidence: {
 		status: oc.output(GitHubRepositoryEvidenceStatusSchema),
-		createInstallation: oc
-			.input(GitHubCreateInstallationInputSchema)
-			.output(GitHubCreateInstallationOutputSchema),
-		disconnect: oc
-			.input(GitHubDisconnectInputSchema)
-			.errors({
-				WORKSPACE_CHANGED: {
-					status: 409,
-					message:
-						"The active workspace changed in another tab. Reload and try again.",
-				},
-				GITHUB_UNINSTALL_FAILED: {
-					status: 502,
-					message: "GitHub could not be disconnected. Please try again.",
-				},
-			})
-			.output(GitHubDisconnectOutputSchema),
 		syncCommit: oc
 			.input(GitHubSyncCommitInputSchema)
 			.output(GitHubSyncCommitOutputSchema),
@@ -1287,11 +1199,7 @@ export const contract = {
 			.output(RepositoryEvidenceCommitOutputSchema),
 	},
 	repositorySettings: repositorySettingsContract,
-	usageDigest: usageDigestContract,
-	/**
-	 * Live transcript lines of running Claude Code sessions (CLI → API). Not
-	 * under `ingest`: Vercel routes `/rpc/ingest/*` to the ingest function.
-	 */
+	/** Live transcript lines of running Claude Code sessions (CLI → API). */
 	liveSession: {
 		state: oc
 			.input(LiveSessionStateInputSchema)
@@ -1364,17 +1272,6 @@ export const contract = {
 	deleteOrganization: oc
 		.input(z.object({ organizationId: z.string() }))
 		.output(z.object({ success: z.literal(true) })),
-	teamInviteLink: {
-		create: oc
-			.input(z.object({ organizationId: z.string() }))
-			.output(TeamInviteLinkSchema),
-		revoke: oc
-			.input(z.object({ organizationId: z.string() }))
-			.output(z.object({ success: z.literal(true) })),
-		accept: oc
-			.input(z.object({ token: z.string().min(1) }))
-			.output(TeamInviteAcceptResultSchema),
-	},
 	admin: {
 		listUsers: oc
 			.input(
@@ -1399,17 +1296,6 @@ export const contract = {
 		runQuestions: runQuestionsAdminContract,
 		runIndexHeal: runIndexHealAdminContract,
 		workspaceFeatures: workspaceFeaturesAdminContract,
-	},
-	productAnalytics: {
-		dashboardViewed: oc
-			.input(DashboardViewedCaptureInputSchema)
-			.output(ProductAnalyticsCaptureResultSchema),
-		dashboardFilterChanged: oc
-			.input(DashboardFilterChangedCaptureInputSchema)
-			.output(ProductAnalyticsCaptureResultSchema),
-		dashboardDrilldownOpened: oc
-			.input(DashboardDrilldownOpenedCaptureInputSchema)
-			.output(ProductAnalyticsCaptureResultSchema),
 	},
 	analytics: {
 		/** Moments, observations and patterns (`moments.ts`). */

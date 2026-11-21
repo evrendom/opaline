@@ -8,8 +8,6 @@ import {
 	IconFileAnalyticsFilled,
 	IconId,
 	IconIdFilled,
-	IconMail,
-	IconMailFilled,
 	IconMessage2,
 	IconMessage2Filled,
 	IconPlug,
@@ -63,7 +61,6 @@ const settingsTabIcons: Record<SettingsRouteId, [Icon, Icon]> = {
 	reports: [IconFileAnalytics, IconFileAnalyticsFilled],
 	members: [IconUser, IconUserFilled],
 	team: [IconChartArea, IconChartAreaFilled],
-	invitations: [IconMail, IconMailFilled],
 	account: [IconId, IconIdFilled],
 	mcp: [IconPlug, IconPlugFilled],
 	"create-workspace": [IconSquareRoundedPlus, IconSquareRoundedPlusFilled],
@@ -127,7 +124,7 @@ export function SettingsLayout() {
 		localApp && LOCAL_APP_HIDDEN_SETTINGS.has(route.id)
 			? false
 			: route.id === "github"
-				? showsGitHubSettings(selfHost, query.data)
+				? showsGitHubSettings(query.data)
 				: route.id !== "mcp" || selfHost !== null,
 	);
 	const getShellRoutePath = useShellRoutePath();

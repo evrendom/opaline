@@ -8,18 +8,14 @@ import {
 	getConsoleSink,
 	jsonLinesFormatter,
 } from "@logtape/logtape";
-import { isVercelRuntime } from "./lib/api-runtime.js";
 
-const isProduction =
-	process.env.NODE_ENV === "production" || !!process.env.FLY_APP_NAME;
+const isProduction = process.env.NODE_ENV === "production";
 const PROJECT_ROOT = resolve(
 	dirname(fileURLToPath(import.meta.url)),
 	"../../../..",
 );
 
 function getLogFilePath(): string | null {
-	// Vercel functions have no durable filesystem for a daily log file.
-	if (isVercelRuntime()) return null;
 	const logDir = process.env.RUDEL_LOG_DIR;
 	if (!logDir) return null;
 	const day = new Date().toISOString().slice(0, 10);

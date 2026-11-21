@@ -116,8 +116,6 @@ The plugin skill, rewritten around SQL and the run view:
 | Every new table (embeddings, setup files, run question answers, GitHub evidence, stored SQL results, finding impact) covered by the account and workspace purge | The privacy policy promises deletion within 7 days |
 | A search box in the app over the same hybrid search | People search their team's transcripts, not only agents |
 
-Gaps seen in production while checking this (2026-10-12): `repository` is empty and `not_found` is 0 on recent runs of the Evren+data workspace, which also has no edges yet (OPL-378); Claude Code skill listings were not found in recent records of a customer workspace.
-
 ## Capacity and backfills
 
 - Every SQL query runs as a read-only user with limits on time, memory and rows; each workspace has quotas for SQL and for OpenAI spend.

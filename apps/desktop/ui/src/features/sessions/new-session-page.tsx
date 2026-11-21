@@ -3,7 +3,6 @@ import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useParams } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
-import { useAnalyticsTracking } from "@/features/analytics/tracking/useAnalyticsTracking";
 import { SessionDetailView } from "@/features/sessions/components/SessionDetailView";
 import { SessionDetailErrorBoundary } from "@/features/sessions/components/session-detail-view-parts";
 import { sessionPaneMotionStyle } from "@/features/sessions/components/session-pane-motion";
@@ -15,20 +14,17 @@ import { useSessionsPageData } from "@/features/sessions/use-sessions-page-data"
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { useShellBottomNavigationPortal } from "@/features/shell/shell-bottom-navigation-portal";
 import { useCanViewSession } from "@/features/workspace/hooks/useCanViewSession";
-import { markSessionOpen } from "./session-open-timing";
 import { transcriptSubagentId } from "./session-row-key";
 
 export function NewSessionPage() {
 	const params = useParams<{ sessionId?: string }>();
 	const data = useSessionsPageData({
-		trackPageView: false,
 		paginated: false,
 	});
 	const canViewSession = useCanViewSession();
 	const navigate = useNavigate();
 	const getShellRoutePath = useShellRoutePath();
 	const shellBottomNavigationPortal = useShellBottomNavigationPortal();
-	const { trackDrilldown } = useAnalyticsTracking();
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	const viewableSessions = data.orderedSessions.filter(
 		(session) =>
@@ -60,22 +56,8 @@ export function NewSessionPage() {
 		return getShellRoutePath(appRoutes.newSessionDetail(sessionId));
 	}
 
-	function handleSessionClick(session: SessionAnalytics) {
-		if (!canViewSession(session.user_id)) return;
-
-		const targetPath = getDetailPath(session.session_id);
-		trackDrilldown({
-			drilldownMethod: "table_row",
-			sourceComponent: "newsesh_sessions_list",
-			targetType: "session",
-			targetId: session.session_id,
-			targetPath,
-		});
-	}
-
 	function navigateToSession(session: SessionAnalytics | undefined) {
 		if (!session) return;
-		markSessionOpen(session.session_id);
 
 		navigate(getDetailPath(session.session_id), {
 			replace: true,
@@ -107,7 +89,6 @@ export function NewSessionPage() {
 						getSessionHref={(session) => getDetailPath(session.session_id)}
 						data={data}
 						layout="workspace"
-						onSessionClick={handleSessionClick}
 						scrollContainerRef={scrollContainerRef}
 					/>
 				</section>

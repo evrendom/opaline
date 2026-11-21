@@ -52,9 +52,6 @@ describe("mayHandOff", () => {
 			["/device", ""],
 			["/reset-password", "?token=x"],
 			["/get-started", ""],
-			["/invitation/inv1", ""],
-			["/team/invite/t1", ""],
-			["/acme/join/t1", ""],
 			["/", "?redirect=%2Facme"],
 			["/", ""],
 		] as const)

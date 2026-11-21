@@ -6,10 +6,6 @@ import {
 	isSelfHosted,
 	parseGitHubHistoryDays,
 } from "../lib/self-hosted.js";
-import {
-	type GitHubRepositoryAppConfig,
-	readGitHubRepositoryAppConfig,
-} from "./github-app.service.js";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -30,9 +26,7 @@ export interface GitHubTokenCredentials {
 	readonly read: () => Promise<string>;
 }
 
-export type GitHubRepositoryCredentials =
-	| GitHubRepositoryAppConfig
-	| GitHubTokenCredentials;
+export type GitHubRepositoryCredentials = GitHubTokenCredentials;
 
 export type GitHubTokenResolution =
 	| { readonly token: string; readonly source: GitHubTokenSource }
@@ -93,12 +87,6 @@ export class GitHubTokenUnavailableError extends Error {
 	}
 }
 
-export function isGitHubTokenCredentials(
-	credentials: GitHubRepositoryCredentials,
-): credentials is GitHubTokenCredentials {
-	return "kind" in credentials && credentials.kind === "token";
-}
-
 export function readGitHubHost(env: Environment = process.env): string {
 	const raw = env.GH_HOST?.trim().toLowerCase();
 	if (!raw) return DEFAULT_HOST;
@@ -124,13 +112,13 @@ export function readGitHubHistoryDays(env: Environment = process.env): number {
 export function isGitHubRepositoryCollectionConfigured(
 	env: Environment = process.env,
 ): boolean {
-	return isSelfHosted(env) || readGitHubRepositoryAppConfig(env) !== null;
+	return isSelfHosted(env);
 }
 
 export async function readGitHubRepositoryCredentials(
 	env: Environment = process.env,
 ): Promise<GitHubRepositoryCredentials | null> {
-	if (!isSelfHosted(env)) return readGitHubRepositoryAppConfig(env);
+	if (!isSelfHosted(env)) return null;
 	return readResolvedGitHubTokenCredentials(env);
 }
 

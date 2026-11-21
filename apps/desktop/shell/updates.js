@@ -259,6 +259,7 @@ function createUpdater(options) {
 		log(`update ${release.version} downloaded`);
 		interactive = false;
 		set({ kind: "ready", release });
+		ui.notifyReady?.(release, () => offer({ asked: true }));
 		offer();
 	});
 
@@ -333,13 +334,21 @@ function createUpdater(options) {
 		return running;
 	}
 
+	let asking = false;
+
 	async function offer({ asked = false } = {}) {
-		if (state.kind !== "ready") return;
+		if (state.kind !== "ready" || asking) return;
 		if (!asked && !ui.canPrompt()) {
 			log(`update ${state.release.version} waits for a quit or the menu`);
 			return;
 		}
-		const restart = await ui.askToRestart(state.release);
+		asking = true;
+		let restart;
+		try {
+			restart = await ui.askToRestart(state.release);
+		} finally {
+			asking = false;
+		}
 		if (state.kind !== "ready") return;
 		if (restart) return install();
 		log(`update ${state.release.version} postponed until Opaline quits`);
@@ -416,15 +425,157 @@ function createUpdater(options) {
 	};
 }
 
-function createUpdateDialogs({ dialog, window, canPrompt }) {
+function releasePageUrl(version, repository = REPOSITORY) {
+	return `https://github.com/${repository}/releases/tag/${releaseTag(version)}`;
+}
+
+/**
+ * For builds that cannot install an update themselves (Linux, Windows): reads the
+ * same feed as the macOS updater and, once per version, offers to open the
+ * release page.
+ */
+function createUpdateNotifier(options) {
+	const {
+		currentVersion,
+		env = process.env,
+		arch = process.arch,
+		platform = process.platform,
+		fetch = globalThis.fetch,
+		log = () => {},
+		ui,
+		openDownload,
+		stateFile,
+		timers = { setTimeout, clearTimeout, setInterval, clearInterval },
+	} = options;
+	const feedUrl =
+		env.OPALINE_UPDATE_FEED_URL?.trim() || defaultFeedUrl(arch, platform);
+	const fetcher = createFetcher({ fetch });
+	const emitter = new EventEmitter();
+	let available;
+	let running;
+	let first;
+	let every;
+
+	function notifiedVersion() {
+		try {
+			return JSON.parse(fs.readFileSync(stateFile, "utf8")).version;
+		} catch {
+			return undefined;
+		}
+	}
+
+	function remember(version) {
+		try {
+			fs.mkdirSync(path.dirname(stateFile), { recursive: true });
+			fs.writeFileSync(stateFile, JSON.stringify({ version }));
+		} catch (error) {
+			log(`could not save the notified version: ${error.message}`);
+		}
+	}
+
+	async function offer(release, { asked }) {
+		if (!asked && (!ui.canPrompt() || notifiedVersion() === release.version))
+			return;
+		remember(release.version);
+		if (!asked)
+			ui.notifyAvailable?.(release, () =>
+				openDownload(releasePageUrl(release.version)),
+			);
+		if (await ui.offerDownload(release, currentVersion))
+			openDownload(releasePageUrl(release.version));
+	}
+
+	async function run({ asked }) {
+		let release;
+		try {
+			release = parseFeed(await fetcher.json(feedUrl));
+		} catch (error) {
+			log(`update check failed: ${error.message}`);
+			if (asked)
+				await (isQuietFailure(error)
+					? ui.upToDate(currentVersion)
+					: ui.failed(error));
+			return;
+		}
+		if (compareVersions(release.version, currentVersion) <= 0) {
+			log(`up to date: ${currentVersion}, feed ${release.version}`);
+			if (asked) await ui.upToDate(currentVersion);
+			return;
+		}
+		log(`update ${release.version} is out`);
+		if (available?.version !== release.version) {
+			available = release;
+			emitter.emit("change", { kind: "available", release });
+		}
+		await offer(release, { asked });
+	}
+
+	function check({ interactive = false } = {}) {
+		running ??= run({ asked: interactive }).finally(() => {
+			running = undefined;
+		});
+		return running;
+	}
+
+	return {
+		on: (event, listener) => emitter.on(event, listener),
+		start() {
+			first = timers.setTimeout(() => check(), FIRST_CHECK_MS);
+			every = timers.setInterval(() => check(), CHECK_EVERY_MS);
+		},
+		stop() {
+			timers.clearTimeout(first);
+			timers.clearInterval(every);
+		},
+		check,
+		pending: () => false,
+		menuItem: () => ({
+			label: available
+				? `Download Opaline ${available.version}…`
+				: "Check for Updates…",
+			click: () =>
+				available
+					? openDownload(releasePageUrl(available.version))
+					: check({ interactive: true }),
+		}),
+	};
+}
+
+function createUpdateDialogs({ dialog, window, canPrompt, Notification }) {
 	const show = (options) => {
 		const parent = window();
 		return parent
 			? dialog.showMessageBox(parent, options)
 			: dialog.showMessageBox(options);
 	};
+	// A system notification, so an update is seen with Opaline in the
+	// background or behind onboarding too. Kept referenced: a collected
+	// notification loses its click handler.
+	let shown;
+	const notify = (title, body, onClick) => {
+		if (!Notification?.isSupported?.()) return;
+		shown?.close();
+		shown = new Notification({ title, body });
+		shown.on("click", () => {
+			shown = undefined;
+			onClick();
+		});
+		shown.show();
+	};
 	return {
 		canPrompt,
+		notifyReady: (release, onClick) =>
+			notify(
+				`Opaline ${release.version} is ready to install`,
+				"Click to restart Opaline now, or it updates the next time you quit.",
+				onClick,
+			),
+		notifyAvailable: (release, onClick) =>
+			notify(
+				`Opaline ${release.version} is available`,
+				"Click to open its download page.",
+				onClick,
+			),
 		upToDate: (version) =>
 			show({
 				type: "info",
@@ -446,6 +597,17 @@ function createUpdateDialogs({ dialog, window, canPrompt }) {
 				detail: error.message,
 				buttons: ["OK"],
 			}),
+		offerDownload: async (release, currentVersion) => {
+			const { response } = await show({
+				type: "info",
+				message: `Opaline ${release.version} is available`,
+				detail: `You have ${currentVersion}. Download the new version from its release page and install it over this one.`,
+				buttons: ["Download", "Later"],
+				defaultId: 0,
+				cancelId: 1,
+			});
+			return response === 0;
+		},
 		askToRestart: async (release) => {
 			const { response } = await show({
 				type: "info",
@@ -467,12 +629,14 @@ module.exports = {
 	buildFeed,
 	compareVersions,
 	createUpdateDialogs,
+	createUpdateNotifier,
 	createUpdater,
 	defaultFeedUrl,
 	feedAssetName,
 	githubAsset,
 	isQuietFailure,
 	parseFeed,
+	releasePageUrl,
 	releaseTag,
 	updateZipName,
 };

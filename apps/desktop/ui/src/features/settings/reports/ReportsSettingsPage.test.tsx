@@ -10,7 +10,6 @@ type Analysis = AnalysisHistorySearchOutput["analyses"][number];
 const api = vi.hoisted(() => ({
 	calls: [] as { limit?: number }[],
 	answer: (): Promise<unknown> => Promise.resolve({ analyses: [] }),
-	tracked: [] as unknown[],
 }));
 
 vi.mock("@/lib/orpc", () => ({
@@ -44,12 +43,6 @@ vi.mock("@/features/workspace/hooks/useUserMap", () => ({
 		isLoading: false,
 		userMap: { "user-2": "Ada Lovelace" },
 	}),
-}));
-
-vi.mock("@/features/analytics/tracking/useTrackProductPageView", () => ({
-	useTrackProductPageView: (options: unknown) => {
-		api.tracked.push(options);
-	},
 }));
 
 function analysis(overrides: Partial<Analysis>): Analysis {
@@ -93,7 +86,6 @@ function renderAt(path: string) {
 describe("ReportsSettingsPage", () => {
 	beforeEach(() => {
 		api.calls = [];
-		api.tracked = [];
 	});
 
 	it("lists finished analyses newest first, each row linking to its report", async () => {
@@ -145,10 +137,6 @@ describe("ReportsSettingsPage", () => {
 			"Saved Oct 2, 2026 by you · Data 2026-09-01 to 2026-09-30",
 		);
 		expect(oldest).toHaveTextContent("Not shared");
-		expect(api.tracked.at(-1)).toMatchObject({
-			isLoading: false,
-			metrics: [{ id: "reports", value: 2 }],
-		});
 	});
 
 	it("says how reports appear when there are none", async () => {

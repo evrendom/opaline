@@ -26,7 +26,7 @@ Code that treats a missing transcript as "expired" (`frozenReason: "transcript g
 
 ### Production step
 
-Production runs the migration in the Vercel build: `ch:migrate:production` ends with `ch:migrate:l1-retention` (`packages/ch-schema/scripts/migrate-l1-retention.ts`). It does not need a manual run. To run it by hand, `bun run --cwd packages/ch-schema ch:migrate:l1-retention` with the production `CLICKHOUSE_URL`.
+To run it by hand, `bun run --cwd packages/ch-schema ch:migrate:l1-retention` with the production `CLICKHOUSE_URL`.
 
 - `ALTER TABLE ... REMOVE TTL` is a metadata change: no mutation, no rewrite of parts, and fast on large tables.
 - `REMOVE TTL` fails on a table or column without a TTL. The runner therefore reads the endpoint it executes against and runs only the statements that still apply, so an interrupted run is finished, not failed.
@@ -97,7 +97,7 @@ Each purge runs inline, is retried by the purge worker, and runs a second pass a
 
 ### Gaps not fixed
 
-- Staged upload objects of ingest jobs that are still in flight when the account or workspace is deleted. `ingest_job` cascades away, so its object manifest cannot clean them. They are removed by the `ingest/` bucket lifecycle rule (seven days, `docs/operations/vercel-production.md`, "Direct-to-R2 Ingest Lifecycle Backstop"); this rule must exist in production. This existed before this change.
+- Staged upload objects of ingest jobs that are still in flight when the account or workspace is deleted. `ingest_job` cascades away, so its object manifest cannot clean them. They are removed by the `ingest/` bucket lifecycle rule (seven days, set on the hosted bucket); this rule must exist in production. This existed before this change.
 - A user removed from a workspace (or leaving it) keeps their sessions in it until the workspace or account is deleted. Nothing deletes one session or one member's sessions without deleting the whole account. The DPA says the customer may delete sessions; with no expiry, a session-level deletion request has no path.
 - `ingest_processing_ledger` has no user column (see the table).
 
@@ -109,4 +109,4 @@ Each purge runs inline, is retried by the purge worker, and runs a second pass a
 
 ## Retention that is unchanged
 
-Convex query results 90 days (a year when shared or pinned) and drafts 7 days (ADR 0001, the hosted service's Convex retention job); stored `sql` results (`analysis_sql_result`) 90 days (the daily `sql-results` maintenance step); ingest staging objects seven days (`docs/operations/vercel-production.md`); succeeded purge jobs 30 days (`clickhouse-purge.service.ts:41`); session revision receipts 30 days (`session-revision-receipt-cleanup.service.ts:3`); GitHub webhook deliveries 30 days; `dependency_health_probes` one day; `session_language_signals` keeps its 365-day TTL (`src/db/schema/session-language-signals.ts:81`): it holds derived phrase matches and counts, not L1 data, so the owner decision does not cover it; it is the only L1-adjacent TTL left, and it is purged by account and workspace deletion; the 365-day window of `list_workspaces` (`sessionsLast365Days`) is a count window, not retention.
+Convex query results 90 days (a year when shared or pinned) and drafts 7 days (ADR 0001, the hosted service's Convex retention job); stored `sql` results (`analysis_sql_result`) 90 days (the daily `sql-results` maintenance step); ingest staging objects seven days (hosted bucket lifecycle rule); succeeded purge jobs 30 days (`clickhouse-purge.service.ts:41`); session revision receipts 30 days (`session-revision-receipt-cleanup.service.ts:3`); GitHub webhook deliveries 30 days; `dependency_health_probes` one day; `session_language_signals` keeps its 365-day TTL (`src/db/schema/session-language-signals.ts:81`): it holds derived phrase matches and counts, not L1 data, so the owner decision does not cover it; it is the only L1-adjacent TTL left, and it is purged by account and workspace deletion; the 365-day window of `list_workspaces` (`sessionsLast365Days`) is a count window, not retention.

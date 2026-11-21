@@ -8,9 +8,7 @@ export const DEV_STAGES = [
 	{ id: "choose", label: "Choose repositories", group: "flow" },
 	{ id: "picker-connecting", label: "Connecting", group: "flow" },
 	{ id: "sign-in", label: "Sign in", group: "flow" },
-	{ id: "github", label: "GitHub", group: "flow" },
 	{ id: "profile", label: "Profile", group: "flow" },
-	{ id: "invite", label: "Invite teammates", group: "flow" },
 	{ id: "completed", label: "Done", group: "flow" },
 	{ id: "picker-error", label: "Connect failed", group: "edge" },
 	{ id: "picker-load-error", label: "Can't read repositories", group: "edge" },
@@ -71,21 +69,17 @@ const SNAPSHOT_STATES: Partial<
 	Record<DevStage, CliConnectionSnapshot["state"]>
 > = {
 	"sign-in": "awaiting_login",
-	github: "ready",
 	profile: "uploading",
-	invite: "uploading",
 	completed: "completed",
 	interrupted: "cancelled",
 	expired: "expired",
 };
 
 const WELCOME_STEPS: Partial<
-	Record<DevStage, "workspace" | "github" | "profile" | "invite" | "done">
+	Record<DevStage, "workspace" | "profile" | "done">
 > = {
 	"sign-in": "workspace",
-	github: "github",
 	profile: "profile",
-	invite: "invite",
 	completed: "done",
 };
 
@@ -152,7 +146,6 @@ export function devOnboardingOverride(
 				JSON.stringify({
 					step,
 					organizationId: step === "workspace" ? null : organizationId,
-					github: "pending",
 				}),
 			);
 		} catch {}
@@ -169,7 +162,7 @@ export function devOnboardingOverride(
 			? null
 			: organizationId,
 		totals:
-			stage === "profile" || stage === "invite"
+			stage === "profile"
 				? { uploaded: Math.round(total / 3), skipped: 0, failed: 0 }
 				: stage === "completed"
 					? { uploaded: total, skipped: 0, failed: 0 }

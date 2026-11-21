@@ -21,7 +21,6 @@ import GraphicalEditorRoot from "../graphical/editor-root";
 import App from "./App.tsx";
 import { useMountEffect } from "./app/hooks/useMountEffect";
 import "./index.css";
-import { initProductAnalytics } from "./lib/product-analytics";
 
 const DevTools = import.meta.env.DEV
 	? lazy(async () => {
@@ -61,23 +60,6 @@ function DevControls() {
 			) : null}
 		</>
 	);
-}
-
-function deferProductAnalyticsInit() {
-	if (typeof window === "undefined") {
-		return;
-	}
-
-	if ("requestIdleCallback" in window) {
-		window.requestIdleCallback(() => {
-			initProductAnalytics();
-		});
-		return;
-	}
-
-	setTimeout(() => {
-		initProductAnalytics();
-	}, 0);
 }
 
 const isStandaloneDevRoute =
@@ -143,10 +125,6 @@ function renderApp(selfHost: SelfHostInfo | null) {
 			</SelfHostContext>
 		</StrictMode>,
 	);
-
-	if (!isStandaloneDevRoute) {
-		deferProductAnalyticsInit();
-	}
 }
 
 function renderOrHandOff(selfHost: SelfHostInfo | null) {

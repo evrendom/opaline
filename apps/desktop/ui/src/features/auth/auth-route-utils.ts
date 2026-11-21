@@ -3,7 +3,6 @@ import { appRoutes } from "@/app/routes";
 import type { authClient } from "@/lib/auth-client";
 
 export type AppSession = ReturnType<typeof authClient.useSession>["data"];
-const PENDING_SIGNUP_REDIRECT_PARAM = "signup_redirect";
 const RELATIVE_URL_BASE = "https://rudel.local";
 const RELATIVE_URL_ORIGIN = new URL(RELATIVE_URL_BASE).origin;
 const REDIRECT_ENCODED_AMBIGUOUS_CHARACTER_PATTERN =
@@ -76,13 +75,6 @@ export function getValidRedirect(search?: string): string | null {
 	return validRedirect;
 }
 
-export function getPendingSignupRedirect(search?: string): string | null {
-	const params = new URLSearchParams(search ?? window.location.search);
-	return normalizeValidRelativeRedirect(
-		params.get(PENDING_SIGNUP_REDIRECT_PARAM),
-	);
-}
-
 function getDirectAuthDestination(
 	pathname = window.location.pathname,
 	search = window.location.search,
@@ -145,13 +137,6 @@ export function getAuthCallbackURL(
 	return `/?redirect=${encodeURIComponent(directDestination)}`;
 }
 
-export function getEmailSignupVerificationCallbackURL(
-	pathname = window.location.pathname,
-	search = window.location.search,
-): string {
-	return getEmailSignupSuccessDestination(pathname, search);
-}
-
 export function getSocialSignupRedirectOptions(
 	pathname = window.location.pathname,
 	search = window.location.search,
@@ -185,75 +170,4 @@ export function getSocialLoginRedirectOptions(
 		newUserCallbackURL:
 			getDirectAuthDestination(pathname, search) ?? "/welcome",
 	};
-}
-
-export function primePendingSignupRedirect(
-	destination: string,
-	pathname = window.location.pathname,
-	search = window.location.search,
-) {
-	if (
-		pathname !== "/" ||
-		getDeviceUserCode(search) ||
-		getValidRedirect(search)
-	) {
-		return;
-	}
-
-	const redirect = normalizeValidRelativeRedirect(destination);
-	if (!redirect) {
-		return;
-	}
-
-	const url = new URL(window.location.href);
-	url.searchParams.set(PENDING_SIGNUP_REDIRECT_PARAM, redirect);
-	window.history.replaceState(
-		window.history.state,
-		"",
-		`${url.pathname}${url.search}${url.hash}`,
-	);
-}
-
-export function clearPendingSignupRedirect() {
-	const url = new URL(window.location.href);
-	if (!url.searchParams.has(PENDING_SIGNUP_REDIRECT_PARAM)) {
-		return;
-	}
-
-	url.searchParams.delete(PENDING_SIGNUP_REDIRECT_PARAM);
-	window.history.replaceState(
-		window.history.state,
-		"",
-		`${url.pathname}${url.search}${url.hash}`,
-	);
-}
-
-export function getSessionUserId(
-	session: AppSession | null | undefined,
-): string | null {
-	return session?.user &&
-		"id" in session.user &&
-		typeof session.user.id === "string"
-		? session.user.id
-		: null;
-}
-
-export function getSessionUserEmail(
-	session: AppSession | null | undefined,
-): string | undefined {
-	return session?.user &&
-		"email" in session.user &&
-		typeof session.user.email === "string"
-		? session.user.email
-		: undefined;
-}
-
-export function getSessionUserName(
-	session: AppSession | null | undefined,
-): string | undefined {
-	return session?.user &&
-		"name" in session.user &&
-		typeof session.user.name === "string"
-		? session.user.name
-		: undefined;
 }

@@ -22,17 +22,12 @@ import {
 	readGitHubOutcomesReadiness,
 	refreshPrTotalsReadiness,
 } from "./github-outcomes-readiness.service.js";
-import {
-	getGitHubRepositoryConnectionStatus,
-	persistGitHubRepositoryInstallation,
-} from "./github-repository-binding.service.js";
+import { getGitHubRepositoryConnectionStatus } from "./github-repository-binding.service.js";
 import {
 	enqueueGitHubRepositorySweep,
 	isGitHubSweepEnabled,
 	runGitHubRepositorySweep,
 } from "./github-repository-sweep.service.js";
-import { recordGitHubWebhookDelivery } from "./github-webhook-delivery.service.js";
-import { mapGitHubWebhookEvent } from "./github-webhook-events.js";
 import {
 	deleteOrgSessions,
 	deleteUserSessions,
@@ -51,11 +46,33 @@ const RETENTION_BOUNDARY = "2025-09-01T00:00:00.000Z";
 const HEAD = "a".repeat(40);
 const ids: string[] = [];
 const users: string[] = [];
-const config = { appId: "1", privateKeyPem: "fixture", slug: "fixture" };
+const config = {
+	kind: "token" as const,
+	host: "github.com",
+	apiBaseUrl: "https://api.github.com",
+	read: async () => "fixture",
+};
 type Route = (url: URL) => Response | Promise<Response>;
+const GITHUB_FACT_TABLES = [
+	"github_pull_requests",
+	"github_pull_request_details",
+	"github_pull_request_commits",
+	"github_ci_runs",
+	"github_ci_jobs",
+	"github_ci_run_pull_requests",
+];
 
 afterAll(async () => {
-	for (const organizationId of ids) await deleteOrgSessions(organizationId);
+	// The sweep writes only these facts: one delete per table covers every
+	// fixture workspace. The deletion test exercises the real purge.
+	await Promise.all(
+		GITHUB_FACT_TABLES.map((table) =>
+			getClickhouse().execute({
+				query: `DELETE FROM rudel.${table} WHERE workspace_id IN {ids:Array(String)}`,
+				query_params: { ids },
+			}),
+		),
+	);
 	await sqlClient.unsafe(
 		"DELETE FROM clickhouse_purge_job WHERE target_id = ANY($1::text[])",
 		[[...ids, ...users]],
@@ -342,6 +359,7 @@ test("jobs of successful runs are collected once; only unsettled jobs are fetche
 		"/repos/fixture/repo/actions/runs/1/attempts/1/jobs",
 		"/repos/fixture/repo/actions/runs/2/attempts/1/jobs",
 	]);
+	await recordRetentionBoundary(scope.organizationId);
 	const later = new Date(NOW.getTime() + 2 * 86_400_000);
 	await enqueueGitHubRepositorySweep(scope, later, sqlClient);
 	// Run 1's jobs settled before this pass: only run 2, still running at the
@@ -472,58 +490,8 @@ test("repositories without Actions still collect external CI and keep retention 
 	expect(progress).toEqual({ status: "complete", retention_boundary: null });
 });
 
-test("provider updated_at resolves webhook/sweep races and sanitizes only allowed fields", async () => {
+test("provider updated_at resolves live/sweep races for CI runs", async () => {
 	const scope = await seed();
-	const webhook = mapGitHubWebhookEvent("pull_request", {
-		action: "closed",
-		installation: { id: Number(scope.installationId) },
-		repository: { id: 1 },
-		pull_request: pr(1, {
-			title: `ghp_${"A".repeat(36)} ${"x".repeat(700)}`,
-			updated_at: "2026-10-01T10:00:00Z",
-			additions: 12,
-			deletions: 3,
-			body: "private body",
-			user: { id: 4, login: "developer", email: "never@example.test" },
-		}),
-	});
-	expect(webhook?.intent.kind).toBe("refresh");
-	if (!webhook) throw new Error("fixture webhook must parse");
-	await recordGitHubWebhookDelivery({
-		database: sqlClient,
-		deliveryId: randomUUID(),
-		event: "pull_request",
-		action: webhook.action,
-		intent: webhook.intent,
-		now: () => NOW,
-	});
-	await sqlClient.begin(async (transaction) => {
-		await persistGitHubPullRequests(
-			scope,
-			[
-				sweepPullRequestSchema.parse(
-					pr(1, { title: "older", updated_at: "2026-09-30T10:00:00Z" }),
-				),
-			],
-			"sweep",
-			NOW,
-			transaction,
-		);
-	});
-	const [stored] = await queryFacts<{
-		title: string;
-		additions: number;
-		record: string;
-	}>(
-		`SELECT pr.title AS title, details.additions AS additions, toJSONString(tuple(pr.title, pr.author_login)) AS record FROM (SELECT * FROM rudel.github_pull_requests FINAL WHERE workspace_id = {workspace:String}) pr LEFT ALL JOIN (SELECT * FROM rudel.github_pull_request_details FINAL WHERE workspace_id = {workspace:String}) details USING (workspace_id, provider, repository_id, number)`,
-		scope.organizationId,
-	);
-	expect(stored?.title).not.toBe("older");
-	expect(stored?.title.length).toBeLessThanOrEqual(512);
-	expect(stored?.title).not.toContain(`ghp_${"A".repeat(36)}`);
-	expect(stored?.additions).toBe(12);
-	expect(stored?.record).not.toContain("private body");
-	expect(stored?.record).not.toContain("never@example.test");
 	const newRun = sweepRunSchema.parse(
 		run(5, undefined, {
 			updated_at: "2026-10-01T10:00:00Z",
@@ -575,7 +543,13 @@ test("the demo workspace's bindings are never swept, so no token is asked for an
 	const tokens: string[] = [];
 	const skipped = await runGitHubRepositorySweep({
 		database: sqlClient,
-		config,
+		config: {
+			...config,
+			read: async () => {
+				tokens.push("read");
+				return "fixture";
+			},
+		},
 		environment: { DEMO_ORGANIZATION_ID: ` ${scope.organizationId} ` },
 		organizationId: scope.organizationId,
 		fetch: Object.assign(
@@ -584,10 +558,6 @@ test("the demo workspace's bindings are never swept, so no token is asked for an
 			},
 			{ preconnect: fetch.preconnect },
 		),
-		createToken: async ({ installationId }) => {
-			tokens.push(installationId);
-			return "fixture";
-		},
 		now: () => NOW,
 	});
 	expect(skipped).toEqual({ enabled: true, requests: 0, hasMore: false });
@@ -681,69 +651,6 @@ test("initial quota discovery tolerates provider clock skew and scopes pending w
 	expect(result.hasMore).toBe(false);
 });
 
-test("binding activation enqueues a sweep; disconnect hides but retains all facts", async () => {
-	const scope = await seed();
-	await execute(scope.organizationId, deletionFixture);
-	await expectPopulated(scope.organizationId);
-	await persistGitHubRepositoryInstallation({
-		database: sqlClient,
-		organizationId: scope.organizationId,
-		installedByUserId: scope.userId,
-		now: new Date(NOW.getTime() + 2 * 86_400_000),
-		details: {
-			installationId: scope.installationId,
-			accountId: "1",
-			accountLogin: "fixture",
-			accountType: "Organization",
-			repositorySelection: "all",
-			permissions: {},
-		},
-		repositories: [
-			{
-				id: "1",
-				nodeId: "node",
-				owner: "fixture",
-				name: "repo",
-				fullName: "fixture/repo",
-				defaultBranch: "main",
-				isPrivate: true,
-			},
-		],
-	});
-	const [pending] = await sqlClient.unsafe<Array<{ count: number }>>(
-		`SELECT count(*)::int FROM github_repository_sweep WHERE organization_id = $1 AND status = 'pending'`,
-		[scope.organizationId],
-	);
-	expect(pending?.count).toBeGreaterThan(0);
-	await recordGitHubWebhookDelivery({
-		database: sqlClient,
-		deliveryId: randomUUID(),
-		event: "installation",
-		action: "deleted",
-		intent: {
-			kind: "installation",
-			installationId: scope.installationId,
-			change: "deleted",
-		},
-		now: () => NOW,
-	});
-	await expectPopulated(scope.organizationId);
-	const [binding] = await sqlClient.unsafe<Array<{ status: string }>>(
-		"SELECT status FROM github_repository_binding WHERE organization_id = $1",
-		[scope.organizationId],
-	);
-	expect(binding?.status).toBe("removed");
-	await expect(
-		persistGitHubRuns(
-			scope,
-			[sweepRunSchema.parse(run(2))],
-			"sweep",
-			NOW,
-			sqlClient,
-		),
-	).rejects.toThrow("binding-inactive");
-});
-
 test("workspace and sole-member account deletion durably purge stage-1 facts", async () => {
 	const organization = await seed();
 	await execute(organization.organizationId, deletionFixture);
@@ -790,7 +697,7 @@ test("an installation lease left by a crashed worker is taken over once it expir
 	const blocked = await execute(scope.organizationId, defaults);
 	expect(blocked.requests).toBe(0);
 	expect(blocked.hasMore).toBe(true);
-	await Bun.sleep(1_500);
+	await leaseExpired(lease);
 	const resumed = await execute(scope.organizationId, defaults);
 	expect(resumed.requests).toBeGreaterThan(0);
 	const [remaining] = await sqlClient<Array<{ count: number }>>`
@@ -843,6 +750,7 @@ test("a worker whose lease was taken over cannot commit its sweep cursor", async
 test("daily reconciliation finds re-runs on old commits without refetching unchanged commit maps", async () => {
 	const scope = await seed();
 	await execute(scope.organizationId, deletionFixture);
+	await recordRetentionBoundary(scope.organizationId);
 	await enqueueGitHubRepositorySweep(
 		scope,
 		new Date(NOW.getTime() + 2 * 86_400_000),
@@ -874,6 +782,7 @@ test("incremental PRs stop at the previous complete pass start minus one hour", 
 			? json([pr(1), pr(2), pr(3)])
 			: defaults(url),
 	);
+	await recordRetentionBoundary(scope.organizationId);
 	const nextPass = new Date(NOW.getTime() + 2 * 86_400_000);
 	await enqueueGitHubRepositorySweep(scope, nextPass, sqlClient);
 	const cutoff = new Date(NOW.getTime() - 3_600_000);
@@ -1040,86 +949,6 @@ test("each acknowledged page precedes its cursor commit; crash replay is idempot
 		scope.organizationId,
 	);
 	expect(replayed?.count).toBe(2);
-});
-
-test("webhook acknowledgement survives a Postgres delivery commit crash and older deliveries lose", async () => {
-	const scope = await seed();
-	const deliveryId = randomUUID();
-	const event = mapGitHubWebhookEvent("pull_request", {
-		action: "closed",
-		installation: { id: Number(scope.installationId) },
-		repository: { id: 1 },
-		pull_request: pr(1, {
-			updated_at: "2026-10-01T11:00:00Z",
-			title: "canonical",
-			additions: 0,
-		}),
-	});
-	if (!event) throw new Error("fixture webhook must parse");
-	const trigger = `s1_delivery_${randomUUID().replaceAll("-", "")}`;
-	await sqlClient.unsafe(
-		`CREATE FUNCTION ${trigger}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.delivery_id = '${deliveryId}' THEN RAISE EXCEPTION 'simulated-delivery-commit-crash'; END IF; RETURN NEW; END $$`,
-	);
-	await sqlClient.unsafe(
-		`CREATE TRIGGER ${trigger} BEFORE UPDATE ON github_webhook_delivery FOR EACH ROW EXECUTE FUNCTION ${trigger}()`,
-	);
-	const input = {
-		database: sqlClient,
-		deliveryId,
-		event: "pull_request",
-		action: event.action,
-		intent: event.intent,
-		now: () => NOW,
-	};
-	try {
-		await expect(recordGitHubWebhookDelivery(input)).rejects.toThrow(
-			"simulated-delivery-commit-crash",
-		);
-		const [stored] = await queryFacts<{ title: string }>(
-			"SELECT title FROM rudel.github_pull_requests FINAL WHERE workspace_id = {workspace:String}",
-			scope.organizationId,
-		);
-		expect(stored?.title).toBe("canonical");
-		const rows = await sqlClient.unsafe(
-			"SELECT delivery_id FROM github_webhook_delivery WHERE delivery_id = $1",
-			[deliveryId],
-		);
-		expect(rows).toHaveLength(0);
-	} finally {
-		await sqlClient.unsafe(
-			`DROP TRIGGER ${trigger} ON github_webhook_delivery`,
-		);
-		await sqlClient.unsafe(`DROP FUNCTION ${trigger}()`);
-	}
-	expect((await recordGitHubWebhookDelivery(input)).status).toBe("recorded");
-	expect((await recordGitHubWebhookDelivery(input)).status).toBe("duplicate");
-	const older = mapGitHubWebhookEvent("pull_request", {
-		action: "opened",
-		installation: { id: Number(scope.installationId) },
-		repository: { id: 1 },
-		pull_request: pr(1, {
-			updated_at: "2026-09-30T10:00:00Z",
-			title: "older",
-			additions: 12,
-		}),
-	});
-	if (!older) throw new Error("older webhook must parse");
-	await recordGitHubWebhookDelivery({
-		...input,
-		deliveryId: randomUUID(),
-		intent: older.intent,
-	});
-	const [stored] = await queryFacts<{ title: string; version: string }>(
-		"SELECT title, version FROM rudel.github_pull_requests FINAL WHERE workspace_id = {workspace:String}",
-		scope.organizationId,
-	);
-	expect(stored?.title).toBe("canonical");
-	expect(Number(stored?.version)).toBe(Date.parse("2026-10-01T11:00:00Z"));
-	const [details] = await queryFacts<{ additions: number }>(
-		"SELECT additions FROM rudel.github_pull_request_details FINAL WHERE workspace_id = {workspace:String}",
-		scope.organizationId,
-	);
-	expect(details?.additions).toBe(0);
 });
 
 test("retention disappearance preserves every fact and never advances the coverage floor", async () => {
@@ -1575,6 +1404,30 @@ async function seedCompletedHistory() {
 	return scope;
 }
 
+/**
+ * Records what a first pass that met the retention cliff stores: GitHub keeps
+ * Actions history only from the seeded window on. A daily pass then re-sweeps
+ * CI from there, not across two years of windows the seed never covered.
+ */
+async function recordRetentionBoundary(organizationId: string, days = 2) {
+	await sqlClient.unsafe(
+		"UPDATE github_repository_sweep SET retention_boundary = $2 WHERE organization_id = $1",
+		[organizationId, new Date(NOW.getTime() - days * 86_400_000).toISOString()],
+	);
+}
+
+/** Waits until the database clock, which every lease decision reads, passes the lease's expiry. */
+async function leaseExpired(name: string) {
+	for (;;) {
+		const [lease] = await sqlClient<Array<{ expired: boolean }>>`
+			SELECT expires_at <= now() AS expired FROM coordination_lease WHERE name = ${name}
+		`;
+		expect(lease).toBeDefined();
+		if (lease?.expired) return;
+		await Bun.sleep(25);
+	}
+}
+
 async function repositoryReadiness(
 	scope: { organizationId: string; repositoryId: string },
 	now: Date,
@@ -1682,7 +1535,6 @@ async function execute(
 			environment: {},
 			organizationId,
 			fetch: fixtureFetch,
-			createToken: async () => "fixture",
 			now: () => now,
 			budgetMs: 30_000,
 			maxRequests,
@@ -1709,14 +1561,7 @@ async function expectPopulated(organizationId: string) {
 	await expectFactCounts(organizationId, true);
 }
 async function expectFactCounts(organizationId: string, populated: boolean) {
-	for (const table of [
-		"github_pull_requests",
-		"github_pull_request_details",
-		"github_pull_request_commits",
-		"github_ci_runs",
-		"github_ci_jobs",
-		"github_ci_run_pull_requests",
-	]) {
+	for (const table of GITHUB_FACT_TABLES) {
 		const [row] = await queryFacts<{ count: number }>(
 			`SELECT count() AS count FROM rudel.${table} FINAL WHERE workspace_id = {workspace:String}`,
 			organizationId,

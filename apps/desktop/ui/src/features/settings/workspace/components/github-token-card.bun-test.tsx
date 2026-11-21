@@ -7,6 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { GitHubRepositoryList } from "@/features/settings/github/GitHubRepositoryList";
 import { markupText } from "@/test/markup-text";
 import { GitHubTokenCard } from "./GitHubTokenCard";
+import { WorkspaceGitHubConnectionView } from "./WorkspaceGitHubConnection";
 
 const READY: GitHubTokenStatus = {
 	state: "ready",
@@ -132,4 +133,38 @@ test("the repository list says the repositories come from sessions", () => {
 	);
 	expect(markup).not.toContain("Reconnect");
 	expect(markupText(markup)).toContain("Syncing 50%");
+});
+
+test("the GitHub section stays empty until the server shows a token", () => {
+	const render = (
+		evidenceStatus: Parameters<
+			typeof WorkspaceGitHubConnectionView
+		>[0]["evidenceStatus"],
+	) =>
+		renderToStaticMarkup(
+			<WorkspaceGitHubConnectionView evidenceStatus={evidenceStatus} />,
+		);
+	const connection: GitHubRepositoryConnectionStatus = {
+		accountLogin: null,
+		canManage: true,
+		configurationError: null,
+		configured: true,
+		connected: false,
+		installationId: null,
+		manageUrl: null,
+		repositories: [],
+		repositorySelection: null,
+	};
+	expect(render(undefined)).toBe("");
+	expect(render({ visibility: "hidden" })).toBe("");
+	expect(
+		render({ visibility: "visible", dashboard: "notConnected", connection }),
+	).toBe("");
+	expect(
+		render({
+			visibility: "visible",
+			dashboard: "visible",
+			connection: { ...connection, token: READY },
+		}),
+	).toContain("2 collected");
 });

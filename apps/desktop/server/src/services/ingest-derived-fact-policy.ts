@@ -1,4 +1,3 @@
-import { isVercelRuntime } from "../lib/api-runtime.js";
 import { isSelfHosted } from "../lib/self-hosted.js";
 
 export function shouldStartBestEffortLanguageSignals(input: {
@@ -15,9 +14,6 @@ export function shouldAwaitBestEffortLanguageSignals(input: {
 	awaitLanguageSignals: boolean;
 	durableProcessing: boolean;
 }): boolean {
-	// Vercel has no resident reconciliation worker, and Hobby cron jobs can run
-	// only daily. Run durable-upload signals after the other derived facts while
-	// keeping scanner failure outside the upload's success contract.
 	return (
 		input.awaitBestEffortLanguageSignals &&
 		!input.awaitLanguageSignals &&
@@ -37,5 +33,5 @@ export function shouldPersistUsageExtractionFailureReceipt(input: {
 export function awaitsDurableLanguageSignals(
 	environment: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
-	return isVercelRuntime(environment) || isSelfHosted(environment);
+	return isSelfHosted(environment);
 }

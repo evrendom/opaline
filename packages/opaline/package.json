@@ -1,6 +1,6 @@
 {
 	"name": "opaline",
-	"version": "0.17.1",
+	"version": "0.18.0",
 	"type": "module",
 	"description": "Opaline CLI for Claude Code and Codex session analytics",
 	"license": "Apache-2.0",
@@ -32,6 +32,6 @@
 		"README.md"
 	],
 	"dependencies": {
-		"@opalinehq/cli": "0.17.1"
+		"@opalinehq/cli": "0.18.0"
 	}
 }

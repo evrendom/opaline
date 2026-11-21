@@ -787,7 +787,7 @@ export function CostChart({
 							outlineIcon={IconBattery3}
 							color={USAGE_COLOR}
 							value={
-								held || usage.value === undefined
+								held || overridesLoading || usage.value === undefined
 									? undefined
 									: textFigure(usage.value)
 							}

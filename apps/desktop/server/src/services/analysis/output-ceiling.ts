@@ -16,8 +16,8 @@ type Header = AnalysisFindOutput["header"];
 
 /**
  * Largest find or read result, in UTF-8 bytes of its JSON. The analysis log
- * stores exactly the returned result, so one stored result stays a quarter of
- * Convex's 1 MiB document limit.
+ * stores exactly the returned result, so one stored result stays under
+ * 1 MiB.
  */
 export const ANALYSIS_OUTPUT_MAX_BYTES = 256 * 1024;
 /**

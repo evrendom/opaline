@@ -4,7 +4,6 @@ import {
 	type contract,
 	INGEST_DIRECT_CONTENT_MAX_BYTES,
 	LIVE_SESSIONS_DISABLED_CODE,
-	PRODUCT_ANALYTICS_EVENTS,
 	R2_INGEST_DISABLED_CODE,
 	REDACTION_BUDGET_EXCEEDED_CODE,
 	REDACTION_DID_NOT_CONVERGE_CODE,
@@ -14,24 +13,14 @@ import {
 } from "@rudel/api-routes";
 import { getClickhouse } from "./clickhouse.js";
 import { liveSessionSqlClient, sqlClient } from "./db.js";
-import { getFrontendOrigin } from "./frontend-origin.js";
 import { adminRouter } from "./handlers/admin/index.js";
 import { analysisRouter } from "./handlers/analysis/index.js";
 import { analyticsRouter } from "./handlers/analytics/index.js";
 import { createCliDataRouter } from "./handlers/cli-data.js";
-import { productAnalyticsRouter } from "./handlers/product-analytics.js";
 import { profileRouter } from "./handlers/profile.js";
 import { repositorySettingsRouter } from "./handlers/repository-settings.js";
-import { teamInviteLinkRouter } from "./handlers/team-invite-link.js";
-import { usageDigestRouter } from "./handlers/usage-digest-preferences.js";
-import { isVercelRuntime } from "./lib/api-runtime.js";
 import { ClickHouseWriteFencedError } from "./lib/clickhouse-write-fence.js";
-import {
-	isGitHubEvidenceUiEnabled,
-	readBooleanEnv,
-	readGitHubEvidenceUiForceOrgIds,
-} from "./lib/env.js";
-import { captureApiProductAnalyticsEvent } from "./lib/product-analytics.js";
+import { readBooleanEnv } from "./lib/env.js";
 import { readRepositoryEvidenceCapturePauseSeconds } from "./lib/repository-evidence-capture.js";
 import { isSelfHosted } from "./lib/self-hosted.js";
 import {
@@ -47,27 +36,10 @@ import {
 	checkManualIngestRateLimit,
 	checkOrganizationSessionCountRateLimit,
 } from "./rate-limit.js";
-import { readResendConfig } from "./resend-config.js";
 import {
 	createAnalysisUploadEnv,
 	resolveAnalysisUploadWorkspace,
 } from "./services/analysis-log/analysis-uploads.js";
-import {
-	createOrganizationBillingPortalSession,
-	createOrganizationCheckoutSession,
-	createOrganizationPlanSelectionSession,
-	readBillingPricingState,
-	readOrganizationBillingSummary,
-} from "./services/billing.service.js";
-import {
-	assertCanStartOrganizationAgentRun,
-	FreeWorkspaceMonthlyAgentRunLimitExceededError,
-} from "./services/billing-entitlements.service.js";
-import {
-	BillingUpgradeRequestForbiddenError,
-	BillingUpgradeRequestOwnerError,
-	requestOrganizationBillingUpgrade,
-} from "./services/billing-upgrade-request.service.js";
 import { findUploadedSessionIds } from "./services/cli-session-upload-status.service.js";
 import { getCliUpdateStatus } from "./services/cli-version.service.js";
 import {
@@ -76,13 +48,6 @@ import {
 } from "./services/cli-workspace.service.js";
 import { assertNoClickHousePurgeTombstone } from "./services/clickhouse-purge-tombstone.service.js";
 import {
-	createGitHubInstallationUrl,
-	type GitHubRepositoryAppConfig,
-	readGitHubInstallationStateSecret,
-	readGitHubRepositoryAppConfig,
-	readGitHubRepositoryAppUserAuthorizationConfig,
-} from "./services/github-app.service.js";
-import {
 	collectAndPersistGitHubCommitEvidence,
 	enqueueGitHubEvidenceCollection,
 	GitHubEvidenceCapacityError,
@@ -90,11 +55,7 @@ import {
 import { wakeGitHubEvidenceWorker } from "./services/github-evidence-worker.service.js";
 import { readGitHubOutcomesReadiness } from "./services/github-outcomes-readiness.service.js";
 import { getGitHubRepositoryConnectionStatus } from "./services/github-repository-binding.service.js";
-import { disconnectGitHubRepositoryInstallation } from "./services/github-repository-disconnect.service.js";
-import {
-	resolveGitHubRepositoryEvidenceStatus,
-	resolveGitHubTokenRepositoryEvidenceStatus,
-} from "./services/github-repository-evidence-status.service.js";
+import { resolveGitHubTokenRepositoryEvidenceStatus } from "./services/github-repository-evidence-status.service.js";
 import {
 	isGitHubRepositoryCollectionConfigured,
 	readGitHubHistoryDays,
@@ -137,10 +98,7 @@ import {
 	validateLiveSessionAppend,
 } from "./services/live-session/live-session-lines.js";
 import { getLiveSessionR2Client } from "./services/live-session/live-session-r2.js";
-import {
-	getCachedOrgSessionCount,
-	hasOrgUploadsInLastDays,
-} from "./services/org-session.service.js";
+import { getCachedOrgSessionCount } from "./services/org-session.service.js";
 import {
 	deleteOrganizationPostgresData,
 	OrganizationDeletionForbiddenError,
@@ -174,57 +132,12 @@ import {
 import {
 	type IngestErrorFactories,
 	processIngestSession,
-	rethrowAgentRunLimitAsForbidden,
 } from "./services/session-import/index.js";
 import { recordSessionInventory } from "./services/session-inventory.service.js";
 import { readsEverySession } from "./services/session-visibility.js";
 import { reportUploadFailures } from "./services/upload-failure.service.js";
-import { getStripeBillingConfiguration } from "./stripe-client.js";
 
 const logger = getLogger(["rudel", "api", "router"]);
-const GITHUB_NOT_CONFIGURED_MESSAGE =
-	"GitHub connection is not configured for this Opaline deployment.";
-const GITHUB_CONFIGURATION_INVALID_MESSAGE =
-	"GitHub connection is unavailable because its server configuration is invalid.";
-
-type GitHubSetupAvailability =
-	| {
-			readonly config: GitHubRepositoryAppConfig;
-			readonly configurationError: null;
-			readonly stateSecret: string;
-	  }
-	| {
-			readonly config: null;
-			readonly configurationError: string;
-			readonly stateSecret: null;
-	  };
-
-function readGitHubSetupAvailability(): GitHubSetupAvailability {
-	try {
-		const config = readGitHubRepositoryAppConfig();
-		const userAuthorizationConfig =
-			readGitHubRepositoryAppUserAuthorizationConfig();
-		if (!config || !userAuthorizationConfig) {
-			return {
-				config: null,
-				configurationError: GITHUB_NOT_CONFIGURED_MESSAGE,
-				stateSecret: null,
-			};
-		}
-		return {
-			config,
-			configurationError: null,
-			stateSecret: readGitHubInstallationStateSecret(),
-		};
-	} catch {
-		return {
-			config: null,
-			configurationError: GITHUB_CONFIGURATION_INVALID_MESSAGE,
-			stateSecret: null,
-		};
-	}
-}
-
 const cliUpdateStatus = os.cli.updateStatus
 	.use(authMiddleware)
 	.handler(({ context }) => getCliUpdateStatus(sqlClient, context.user.id));
@@ -451,7 +364,7 @@ const ingestSessionHandler = os.ingestSession
 				// Sessions above the direct size upload only through R2.
 				aggregateContentMaxBytes: INGEST_DIRECT_CONTENT_MAX_BYTES,
 				allowQuiescedIngest: context.ingestOperatorAuthorized,
-				awaitLanguageSignals: isVercelRuntime(),
+				awaitLanguageSignals: false,
 				context: {
 					apiKeyId: context.apiKeyId,
 					session: context.session,
@@ -682,43 +595,18 @@ const liveSessionAppend = os.liveSession.append
 const githubRepositoryEvidenceStatus = os.githubRepositoryEvidence.status
 	.use(orgMiddleware)
 	.handler(({ context }) => {
-		if (isSelfHosted())
-			return resolveGitHubTokenRepositoryEvidenceStatus({
-				isOrgAdmin: context.isOrgAdmin,
-				historyDays: readGitHubHistoryDays(),
-				readToken: () => readGitHubTokenStatus(),
-				loadConnection: () =>
-					getGitHubRepositoryConnectionStatus({
-						database: sqlClient,
-						organizationId: context.organizationId,
-					}),
-				loadCollection: () =>
-					readGitHubTokenCollection(sqlClient, context.organizationId),
-				loadDashboard: async () =>
-					(await readGitHubOutcomesReadiness(sqlClient, context.organizationId))
-						?.firstReadyAt
-						? "visible"
-						: "syncing",
-			});
-		return resolveGitHubRepositoryEvidenceStatus({
-			uiEnabled:
-				isGitHubEvidenceUiEnabled() ||
-				readGitHubEvidenceUiForceOrgIds().includes(context.organizationId),
+		if (!isSelfHosted()) return { visibility: "hidden" as const };
+		return resolveGitHubTokenRepositoryEvidenceStatus({
 			isOrgAdmin: context.isOrgAdmin,
-			readSetup: () => {
-				const availability = readGitHubSetupAvailability();
-				return availability.config
-					? { configured: true }
-					: {
-							configured: false,
-							configurationError: availability.configurationError,
-						};
-			},
+			historyDays: readGitHubHistoryDays(),
+			readToken: () => readGitHubTokenStatus(),
 			loadConnection: () =>
 				getGitHubRepositoryConnectionStatus({
 					database: sqlClient,
 					organizationId: context.organizationId,
 				}),
+			loadCollection: () =>
+				readGitHubTokenCollection(sqlClient, context.organizationId),
 			loadDashboard: async () =>
 				(await readGitHubOutcomesReadiness(sqlClient, context.organizationId))
 					?.firstReadyAt
@@ -727,59 +615,6 @@ const githubRepositoryEvidenceStatus = os.githubRepositoryEvidence.status
 		});
 	});
 
-const githubRepositoryEvidenceCreateInstallation =
-	os.githubRepositoryEvidence.createInstallation
-		.use(orgMiddleware)
-		.handler(async ({ context, input }) => {
-			if (!context.isOrgAdmin) {
-				throw new ORPCError("FORBIDDEN", {
-					message: "Workspace administrator access is required.",
-				});
-			}
-			const availability = readGitHubSetupAvailability();
-			if (!availability.config) {
-				throw new ORPCError("SERVICE_UNAVAILABLE", {
-					message: availability.configurationError,
-				});
-			}
-			const organizations = await sqlClient.unsafe<Array<{ slug: string }>>(
-				"SELECT slug FROM organization WHERE id = $1 LIMIT 1",
-				[context.organizationId],
-			);
-			const organization = organizations[0];
-			if (!organization) throw new ORPCError("NOT_FOUND");
-			return {
-				url: createGitHubInstallationUrl({
-					returnTo: input?.returnTo,
-					config: availability.config,
-					organizationId: context.organizationId,
-					stateSecret: availability.stateSecret,
-					userId: context.user.id,
-					workspaceSlug: organization.slug,
-				}),
-			};
-		});
-
-const githubRepositoryEvidenceDisconnect =
-	os.githubRepositoryEvidence.disconnect
-		.use(orgMiddleware)
-		.handler(async ({ context, errors, input }) => {
-			if (!context.isOrgAdmin) {
-				throw new ORPCError("FORBIDDEN", {
-					message: "Workspace administrator access is required.",
-				});
-			}
-			if (input.organizationId !== context.organizationId)
-				throw errors.WORKSPACE_CHANGED();
-			const result = await disconnectGitHubRepositoryInstallation({
-				database: sqlClient,
-				organizationId: context.organizationId,
-				readConfig: readGitHubRepositoryAppConfig,
-			});
-			if (result === "github-failed") throw errors.GITHUB_UNINSTALL_FAILED();
-			return { disconnected: result === "disconnected" };
-		});
-
 const githubRepositoryEvidenceSyncCommit =
 	os.githubRepositoryEvidence.syncCommit
 		.use(orgMiddleware)
@@ -787,9 +622,8 @@ const githubRepositoryEvidenceSyncCommit =
 			const config = await readGitHubRepositoryCredentials();
 			if (!config) {
 				throw new ORPCError("SERVICE_UNAVAILABLE", {
-					message: isSelfHosted()
-						? "This server has no GitHub token; Settings, GitHub says how to add one."
-						: "GitHub repository evidence is not configured.",
+					message:
+						"This server has no GitHub token; Settings, GitHub says how to add one.",
 				});
 			}
 			const availability = readR2IngestAvailability();
@@ -937,9 +771,6 @@ function toRepositoryEvidenceOrpcError(error: unknown): Error {
 	if (error instanceof ClickHouseWriteFencedError) {
 		return new ORPCError("CONFLICT", { message: error.message });
 	}
-	if (error instanceof FreeWorkspaceMonthlyAgentRunLimitExceededError) {
-		return new ORPCError("FORBIDDEN", { message: error.message });
-	}
 	if (!(error instanceof RepositoryEvidenceStateError)) {
 		return error instanceof Error ? error : new Error(String(error));
 	}
@@ -1006,11 +837,6 @@ const r2IngestInit = os.ingest.init
 			),
 			context.user.id,
 		);
-		await assertCanStartOrganizationAgentRun(
-			organizationId,
-			input.sessionId,
-		).catch(rethrowAgentRunLimitAsForbidden);
-
 		try {
 			return await initR2IngestJob({
 				database: sqlClient,
@@ -1217,55 +1043,9 @@ const deleteOrganization = os.deleteOrganization
 		);
 
 		try {
-			// These analytics pre-reads must stay before the transaction because the
-			// post-commit ClickHouse purge destroys the source rows they inspect.
-			const [targetOrganization] = await sqlClient<
-				Array<{ ageDays: number; id: string }>
-			>`
-				SELECT
-					id,
-					GREATEST(
-						0,
-						FLOOR(EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400)
-					)::int AS "ageDays"
-				FROM organization
-				WHERE id = ${orgId}
-				LIMIT 1
-			`;
-			const [memberCountResult] = await sqlClient<Array<{ count: number }>>`
-				SELECT COUNT(*)::int AS count
-				FROM member
-				WHERE organization_id = ${orgId}
-			`;
-			const memberCount = memberCountResult?.count ?? 0;
-			let hadUploadsLast30d = false;
-			try {
-				hadUploadsLast30d = await hasOrgUploadsInLastDays(orgId, 30);
-			} catch (analyticsError) {
-				logger.error(
-					"Failed to inspect uploads before organization deletion (organization_id={organizationId} error={error})",
-					{
-						error: String(analyticsError),
-						organizationId: orgId,
-					},
-				);
-			}
-
 			await deleteOrganizationPostgresData({
 				organizationId: orgId,
 				userId,
-			});
-
-			await captureApiProductAnalyticsEvent({
-				distinctId: userId,
-				event: PRODUCT_ANALYTICS_EVENTS.ORGANIZATION_DELETED,
-				payload: {
-					organization_id: orgId,
-					deleter_user_id: userId,
-					organization_age_days: targetOrganization?.ageDays ?? 0,
-					organization_member_count: memberCount,
-					had_uploads_last_30d: hadUploadsLast30d,
-				},
 			});
 
 			logger.info(
@@ -1290,187 +1070,12 @@ const deleteOrganization = os.deleteOrganization
 		}
 	});
 
-const getBillingConfiguration = os.billing.configuration
-	.use(authMiddleware)
-	.handler(() => getStripeBillingConfiguration());
-
-const getCurrentBillingSummary = os.billing.current
-	.use(authMiddleware)
-	.handler(async ({ context }) => {
-		const activeOrganizationId = getActiveOrganizationId(context.session);
-		const [membership] = await sqlClient<Array<{ organization_id: string }>>`
-			SELECT organization_id
-			FROM member
-			WHERE user_id = ${context.user.id}
-			ORDER BY (organization_id = ${activeOrganizationId ?? ""}) DESC,
-				created_at ASC, organization_id ASC
-			LIMIT 1
-		`;
-		return membership
-			? readOrganizationBillingSummary(membership.organization_id)
-			: { hasBillingAccount: false as const };
-	});
-
-const getBillingPricingState = os.billing.pricing
-	.use(authMiddleware)
-	.handler(async ({ input, context }) => {
-		const pricingState = await readBillingPricingState({
-			preferredOrganizationId: getActiveOrganizationId(context.session),
-			userId: context.user.id,
-			workspaceSlug: input.workspaceSlug,
-		});
-		if (input.workspaceSlug && !pricingState.hasWorkspace) {
-			throw new ORPCError("FORBIDDEN", {
-				message: "The requested workspace is not available to this user",
-			});
-		}
-		return pricingState;
-	});
-
-const getBillingSummary = os.billing.summary
-	.use(authMiddleware)
-	.handler(async ({ input, context }) => {
-		await requireOwnedBillingOrganization(
-			input.organizationId,
-			context.user.id,
-		);
-		return readOrganizationBillingSummary(input.organizationId);
-	});
-
-const createBillingCheckout = os.billing.createCheckout
-	.use(authMiddleware)
-	.use(settingsMutationMiddleware)
-	.handler(async ({ input, context }) => {
-		const organization = await requireOwnedBillingOrganization(
-			input.organizationId,
-			context.user.id,
-		);
-
-		const workspaceSettingsUrl = new URL(
-			`/${encodeURIComponent(organization.slug)}/settings/workspace`,
-			getFrontendOrigin(),
-		);
-
-		return createOrganizationCheckoutSession({
-			billingPeriod: input.billingPeriod,
-			cancelUrl: workspaceSettingsUrl.toString(),
-			organizationId: input.organizationId,
-			plan: input.plan,
-			successUrl: workspaceSettingsUrl.toString(),
-			userEmail: context.user.email,
-			userId: context.user.id,
-		});
-	});
-
-const createBillingPortal = os.billing.createPortal
-	.use(authMiddleware)
-	.use(settingsMutationMiddleware)
-	.handler(async ({ input, context }) => {
-		const organization = await requireOwnedBillingOrganization(
-			input.organizationId,
-			context.user.id,
-		);
-		const returnUrl = new URL(
-			`/${encodeURIComponent(organization.slug)}/settings/workspace`,
-			getFrontendOrigin(),
-		);
-		return createOrganizationBillingPortalSession({
-			organizationId: input.organizationId,
-			returnUrl: returnUrl.toString(),
-		});
-	});
-
-const selectBillingPlan = os.billing.selectPlan
-	.use(authMiddleware)
-	.use(settingsMutationMiddleware)
-	.handler(async ({ input, context }) => {
-		const organization = await requireOwnedBillingOrganization(
-			input.organizationId,
-			context.user.id,
-		);
-		const workspaceSettingsUrl = new URL(
-			`/${encodeURIComponent(organization.slug)}/settings/workspace`,
-			getFrontendOrigin(),
-		);
-		return createOrganizationPlanSelectionSession({
-			billingPeriod: input.billingPeriod,
-			cancelUrl: workspaceSettingsUrl.toString(),
-			organizationId: input.organizationId,
-			plan: input.plan,
-			successUrl: workspaceSettingsUrl.toString(),
-			userEmail: context.user.email,
-			userId: context.user.id,
-		});
-	});
-
-const requestBillingUpgrade = os.billing.requestUpgrade
-	.use(authMiddleware)
-	.use(settingsMutationMiddleware)
-	.handler(async ({ input, context }) => {
-		try {
-			await requestOrganizationBillingUpgrade(
-				{
-					billingPeriod: input.billingPeriod,
-					organizationId: input.organizationId,
-					plan: input.plan,
-					requesterUserId: context.user.id,
-				},
-				{
-					frontendOrigin: getFrontendOrigin(),
-					resend: readResendConfig(),
-				},
-			);
-			return { notified: true as const };
-		} catch (error) {
-			if (error instanceof BillingUpgradeRequestForbiddenError) {
-				throw new ORPCError("FORBIDDEN", { message: error.message });
-			}
-			if (error instanceof BillingUpgradeRequestOwnerError) {
-				throw new ORPCError("CONFLICT", { message: error.message });
-			}
-			throw error;
-		}
-	});
-
-async function requireOwnedBillingOrganization(
-	organizationId: string,
-	userId: string,
-): Promise<{ slug: string }> {
-	const [organization] = await sqlClient<Array<{ role: string; slug: string }>>`
-		SELECT m.role, o.slug
-		FROM member m
-		INNER JOIN organization o ON o.id = m.organization_id
-		WHERE m.organization_id = ${organizationId}
-			AND m.user_id = ${userId}
-		LIMIT 1
-	`;
-	if (!organization || organization.role !== "owner") {
-		throw new ORPCError("FORBIDDEN", {
-			message: "Only the organization owner can manage billing",
-		});
-	}
-	return { slug: organization.slug };
-}
-
 export const router: Router<typeof contract, AppContext> = os.router({
-	billing: {
-		configuration: getBillingConfiguration,
-		current: getCurrentBillingSummary,
-		pricing: getBillingPricingState,
-		summary: getBillingSummary,
-		createCheckout: createBillingCheckout,
-		createPortal: createBillingPortal,
-		selectPlan: selectBillingPlan,
-		requestUpgrade: requestBillingUpgrade,
-	},
 	githubRepositoryEvidence: {
-		disconnect: githubRepositoryEvidenceDisconnect,
-		createInstallation: githubRepositoryEvidenceCreateInstallation,
 		status: githubRepositoryEvidenceStatus,
 		syncCommit: githubRepositoryEvidenceSyncCommit,
 	},
 	repositorySettings: repositorySettingsRouter,
-	usageDigest: usageDigestRouter,
 	repositoryEvidence: {
 		commit: repositoryEvidenceCommit,
 		init: repositoryEvidenceInit,
@@ -1502,9 +1107,7 @@ export const router: Router<typeof contract, AppContext> = os.router({
 	},
 	getOrganizationSessionCount,
 	deleteOrganization,
-	teamInviteLink: teamInviteLinkRouter,
 	admin: adminRouter,
-	productAnalytics: productAnalyticsRouter,
 	analytics: analyticsRouter,
 	analysis: analysisRouter,
 });

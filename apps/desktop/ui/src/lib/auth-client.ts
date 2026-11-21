@@ -3,7 +3,6 @@ import { createAuthClient } from "better-auth/react";
 import { waitForDemoActivation } from "@/features/demo/demo-activation";
 import { openPluginLink, pluginAuthFetch } from "@/widget/host-bridge";
 import { getApiBaseUrl } from "./api-base-url";
-import { resetProductAnalytics } from "./product-analytics";
 import { queryClient } from "./query-client";
 
 export const authClient = createAuthClient({
@@ -52,7 +51,6 @@ export async function signOut() {
 		openPluginLink("/");
 		return;
 	}
-	resetProductAnalytics();
 	await authClient.signOut();
 	queryClient.clear();
 	localStorage.removeItem("dateRange");

@@ -115,9 +115,6 @@ describe("not-found migration", () => {
 		).toContain(
 			'["20261012120000_not_found_unknown.sql", "migrate-not-found-unknown.ts"]',
 		);
-		expect(
-			readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
-		).toMatch(/ch:migrate:weekly-totals ch:migrate:not-found-unknown\b/u);
 	});
 
 	test("publication proof rejects lagging replicas, old column types and the old view", () => {

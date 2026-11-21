@@ -6,12 +6,9 @@ import {
 	restrictsAnalysisResults,
 	setAnalysisLogForTests,
 } from "./config.js";
-import { createSigningKeys } from "./convex-token.js";
 
 const originalEnvironment = {
 	ANALYSIS_LOG_STORE: process.env.ANALYSIS_LOG_STORE,
-	CONVEX_URL: process.env.CONVEX_URL,
-	ANALYSIS_LOG_SIGNING_KEY: process.env.ANALYSIS_LOG_SIGNING_KEY,
 	OPENAI_API_KEY: process.env.OPENAI_API_KEY,
 	ANALYSIS_LOG_PURGE_BACKENDS: process.env.ANALYSIS_LOG_PURGE_BACKENDS,
 	ANALYSIS_LOG_WORKSPACES: process.env.ANALYSIS_LOG_WORKSPACES,
@@ -20,7 +17,6 @@ const originalEnvironment = {
 	OPALINE_SELF_HOSTED: process.env.OPALINE_SELF_HOSTED,
 };
 const WORKSPACE = "workspace_one";
-const { signingKey } = await createSigningKeys();
 
 beforeEach(() => {
 	process.env.ANALYSIS_LOG_WORKSPACES = WORKSPACE;
@@ -101,10 +97,8 @@ test("a workspace where every member reads every session never restricts results
 	}
 });
 
-test("memory logging needs neither Convex nor OpenAI and falls back to local vectors", () => {
+test("memory logging needs no OpenAI and falls back to local vectors", () => {
 	process.env.ANALYSIS_LOG_STORE = "memory";
-	delete process.env.CONVEX_URL;
-	delete process.env.ANALYSIS_LOG_SIGNING_KEY;
 	delete process.env.OPENAI_API_KEY;
 	setAnalysisLogForTests(undefined);
 	const log = getAnalysisLog(WORKSPACE);
@@ -112,133 +106,11 @@ test("memory logging needs neither Convex nor OpenAI and falls back to local vec
 	expect(getAnalysisLog(WORKSPACE)).toBe(log);
 });
 
-test("Convex logging stays off without a deployment URL", () => {
-	process.env.ANALYSIS_LOG_STORE = "convex";
-	process.env.OPENAI_API_KEY = "sk-test";
-	process.env.CONVEX_URL = " ";
-	process.env.ANALYSIS_LOG_SIGNING_KEY = JSON.stringify(signingKey);
-	setAnalysisLogForTests(undefined);
-	expect(getAnalysisLog(WORKSPACE)).toBeNull();
-});
-
-test("Convex logging stays off without a valid signing key", () => {
-	process.env.ANALYSIS_LOG_STORE = "convex";
-	process.env.OPENAI_API_KEY = "sk-test";
-	process.env.CONVEX_URL = "https://test-deployment.convex.cloud";
-	for (const value of [
-		"",
-		"not json",
-		JSON.stringify({ ...signingKey, d: undefined }),
-	]) {
-		process.env.ANALYSIS_LOG_SIGNING_KEY = value;
-		setAnalysisLogForTests(undefined);
-		expect(getAnalysisLog(WORKSPACE)).toBeNull();
-	}
-});
-
-test("Convex logging refuses local vectors: it stays off without OpenAI", () => {
-	process.env.ANALYSIS_LOG_STORE = "convex";
-	process.env.CONVEX_URL = "https://test-deployment.convex.cloud";
-	process.env.ANALYSIS_LOG_SIGNING_KEY = JSON.stringify(signingKey);
-	delete process.env.OPENAI_API_KEY;
-	setAnalysisLogForTests(undefined);
-	expect(getAnalysisLog(WORKSPACE)).toBeNull();
-});
-
-test("Convex logging stays off until the purge is told Convex may hold analyses", () => {
-	process.env.ANALYSIS_LOG_STORE = "convex";
-	process.env.CONVEX_URL = "https://test-deployment.convex.cloud";
-	process.env.ANALYSIS_LOG_SIGNING_KEY = JSON.stringify(signingKey);
-	process.env.OPENAI_API_KEY = "sk-test";
+test("without postgres the purge cleans the memory store, or nothing", async () => {
 	delete process.env.ANALYSIS_LOG_PURGE_BACKENDS;
-	setAnalysisLogForTests(undefined);
-	expect(getAnalysisLog(WORKSPACE)).toBeNull();
-});
-
-test("Convex logging stays off for a backend list the purge would reject", () => {
-	process.env.ANALYSIS_LOG_STORE = "convex";
-	process.env.CONVEX_URL = "https://test-deployment.convex.cloud";
-	process.env.ANALYSIS_LOG_SIGNING_KEY = JSON.stringify(signingKey);
-	process.env.OPENAI_API_KEY = "sk-test";
-	for (const backends of ["convex,mysql", "convex, convx"]) {
-		process.env.ANALYSIS_LOG_PURGE_BACKENDS = backends;
-		setAnalysisLogForTests(undefined);
-		expect(getAnalysisLog(WORKSPACE)).toBeNull();
-		expect(() => analysisPurgeStores(AbortSignal.timeout(1_000))).toThrow(
-			"only convex and postgres can hold analyses",
-		);
-	}
-});
-
-test("Convex logging embeds with OpenAI and is configured without contacting the deployment", () => {
-	process.env.ANALYSIS_LOG_STORE = "convex";
-	process.env.CONVEX_URL = "https://test-deployment.convex.cloud";
-	process.env.ANALYSIS_LOG_SIGNING_KEY = JSON.stringify(signingKey);
-	process.env.OPENAI_API_KEY = "sk-test";
-	process.env.ANALYSIS_LOG_PURGE_BACKENDS = "convex";
-	setAnalysisLogForTests(undefined);
-	expect(getAnalysisLog(WORKSPACE)?.embedder.model).toBe(
-		"text-embedding-3-small",
-	);
-});
-
-test("the purge cleans Convex whenever CONVEX_URL is set, even with capture off or in memory", () => {
-	process.env.CONVEX_URL = "https://test-deployment.convex.cloud";
-	process.env.ANALYSIS_LOG_SIGNING_KEY = JSON.stringify(signingKey);
-	for (const store of [undefined, "convex"]) {
-		if (store === undefined) delete process.env.ANALYSIS_LOG_STORE;
-		else process.env.ANALYSIS_LOG_STORE = store;
-		setAnalysisLogForTests(undefined);
-		expect(analysisPurgeStores(AbortSignal.timeout(1_000))).toHaveLength(1);
-	}
-
-	process.env.ANALYSIS_LOG_STORE = "memory";
-	setAnalysisLogForTests(undefined);
-	const stores = analysisPurgeStores(AbortSignal.timeout(1_000));
-	expect(stores).toHaveLength(2);
-	expect(stores[1]).toBe(getAnalysisLog(WORKSPACE)?.store);
-});
-
-test("the purge fails, so it is retried, when CONVEX_URL is set without a valid signing key", async () => {
-	process.env.CONVEX_URL = "https://test-deployment.convex.cloud";
-	for (const store of [undefined, "memory", "convex"]) {
-		if (store === undefined) delete process.env.ANALYSIS_LOG_STORE;
-		else process.env.ANALYSIS_LOG_STORE = store;
-		for (const value of ["", "not json"]) {
-			process.env.ANALYSIS_LOG_SIGNING_KEY = value;
-			setAnalysisLogForTests(undefined);
-			await expect(
-				purgeAnalysisLogs({ targetType: "account", targetId: "user" }),
-			).rejects.toThrow("analyses in Convex cannot be purged");
-		}
-	}
-});
-
-test("a purge fails while a declared backend lacks its URL, whatever capture uses", async () => {
-	delete process.env.CONVEX_URL;
-	delete process.env.ANALYSIS_LOG_SIGNING_KEY;
-	process.env.ANALYSIS_LOG_PURGE_BACKENDS = " convex ";
-	for (const store of [undefined, "memory", "convex"]) {
-		if (store === undefined) delete process.env.ANALYSIS_LOG_STORE;
-		else process.env.ANALYSIS_LOG_STORE = store;
-		setAnalysisLogForTests(undefined);
-		await expect(
-			purgeAnalysisLogs({ targetType: "account", targetId: "user" }),
-		).rejects.toThrow("declares convex but CONVEX_URL is not set");
-	}
-	process.env.ANALYSIS_LOG_PURGE_BACKENDS = "convex,mysql";
-	expect(() => analysisPurgeStores(AbortSignal.timeout(1_000))).toThrow(
-		"only convex and postgres can hold analyses",
-	);
-});
-
-test("without Convex the purge cleans the memory store, or nothing", async () => {
-	delete process.env.ANALYSIS_LOG_PURGE_BACKENDS;
-	delete process.env.CONVEX_URL;
-	delete process.env.ANALYSIS_LOG_SIGNING_KEY;
 	delete process.env.ANALYSIS_LOG_STORE;
 	setAnalysisLogForTests(undefined);
-	expect(analysisPurgeStores(AbortSignal.timeout(1_000))).toEqual([]);
+	expect(analysisPurgeStores()).toEqual([]);
 	await purgeAnalysisLogs({
 		targetType: "organization",
 		targetId: "workspace",
@@ -247,21 +119,22 @@ test("without Convex the purge cleans the memory store, or nothing", async () =>
 	process.env.ANALYSIS_LOG_STORE = "memory";
 	setAnalysisLogForTests(undefined);
 	const log = getAnalysisLog(WORKSPACE);
-	expect(analysisPurgeStores(AbortSignal.timeout(1_000))).toEqual(
-		log ? [log.store] : [],
-	);
+	expect(analysisPurgeStores()).toEqual(log ? [log.store] : []);
 	expect(log).not.toBeNull();
 });
 
 test("Postgres logging captures only once the purge is told Postgres may hold analyses", () => {
 	process.env.ANALYSIS_LOG_STORE = "postgres";
-	delete process.env.CONVEX_URL;
 	delete process.env.OPENAI_API_KEY;
-	for (const backends of [undefined, "convex", "convex,mysql"]) {
+	for (const backends of [undefined, "mysql", "postgres,mysql"]) {
 		if (backends === undefined) delete process.env.ANALYSIS_LOG_PURGE_BACKENDS;
 		else process.env.ANALYSIS_LOG_PURGE_BACKENDS = backends;
 		setAnalysisLogForTests(undefined);
 		expect(getAnalysisLog(WORKSPACE)).toBeNull();
+		if (backends?.includes("mysql"))
+			expect(() => analysisPurgeStores()).toThrow(
+				"only postgres can hold analyses",
+			);
 	}
 	process.env.ANALYSIS_LOG_PURGE_BACKENDS = " postgres ";
 	setAnalysisLogForTests(undefined);
@@ -277,15 +150,12 @@ test("Postgres logging captures only once the purge is told Postgres may hold an
 });
 
 test("the purge cleans Postgres whenever postgres is declared, without contacting it", () => {
-	delete process.env.CONVEX_URL;
 	process.env.ANALYSIS_LOG_PURGE_BACKENDS = "postgres";
 	for (const store of [undefined, "memory", "postgres"]) {
 		if (store === undefined) delete process.env.ANALYSIS_LOG_STORE;
 		else process.env.ANALYSIS_LOG_STORE = store;
 		setAnalysisLogForTests(undefined);
-		expect(analysisPurgeStores(AbortSignal.timeout(1_000))).toHaveLength(
-			store === "memory" ? 2 : 1,
-		);
+		expect(analysisPurgeStores()).toHaveLength(store === "memory" ? 2 : 1);
 	}
 });
 
@@ -293,9 +163,8 @@ test("a self-hosted server keeps every workspace's analyses in Postgres unless m
 	process.env.OPALINE_SELF_HOSTED = "1";
 	delete process.env.ANALYSIS_LOG_WORKSPACES;
 	delete process.env.ANALYSIS_LOG_PURGE_BACKENDS;
-	delete process.env.CONVEX_URL;
 	delete process.env.OPENAI_API_KEY;
-	for (const store of [undefined, "postgres", "convex"]) {
+	for (const store of [undefined, "postgres", "other"]) {
 		if (store === undefined) delete process.env.ANALYSIS_LOG_STORE;
 		else process.env.ANALYSIS_LOG_STORE = store;
 		setAnalysisLogForTests(undefined);
@@ -303,11 +172,11 @@ test("a self-hosted server keeps every workspace's analyses in Postgres unless m
 			"local-word-vectors-1",
 		);
 		expect(getAnalysisLog("")).toBeNull();
-		expect(analysisPurgeStores(AbortSignal.timeout(1_000))).toHaveLength(1);
+		expect(analysisPurgeStores()).toHaveLength(1);
 	}
 	process.env.ANALYSIS_LOG_STORE = "memory";
 	setAnalysisLogForTests(undefined);
-	const stores = analysisPurgeStores(AbortSignal.timeout(1_000));
+	const stores = analysisPurgeStores();
 	expect(stores).toHaveLength(2);
 	expect(stores[1]).toBe(getAnalysisLog("any_workspace")?.store);
 });

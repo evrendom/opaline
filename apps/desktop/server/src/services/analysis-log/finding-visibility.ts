@@ -8,7 +8,7 @@ const logger = getLogger(["rudel", "api", "analysis-log"]);
 
 /**
  * Finding impact rows follow the analysis log's visibility (ADR 0001 as
- * amended): the log (Convex) is authoritative and advances an analysis's
+ * amended): the log is authoritative and advances an analysis's
  * `visibilityRevision` with every share and unshare; the rows keep the
  * visibility of the highest revision they were handed, so writes that land
  * out of order cannot leave an unshared analysis readable. A share or

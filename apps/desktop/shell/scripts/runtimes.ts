@@ -1,3 +1,4 @@
+import { execFile, spawnSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join, relative } from "node:path";
@@ -71,20 +72,44 @@ if (mode === "download") {
 		platform,
 		log: (line) => process.stderr.write(`${line}\n`),
 	});
-	// Packaging for another platform (an Intel build on Apple silicon) cannot run
-	// its binaries, or only slowly (Rosetta translates ClickHouse for minutes).
-	// The downloads are checked against their pinned digests, so report the
-	// pinned versions instead of running them.
+	// ClickHouse's macOS binaries are self-extracting: their first run unpacks
+	// them in place, and only the unpacked binary can be signed. So whatever this
+	// machine can run is run, as on the target: an Intel build on Apple silicon
+	// runs under Rosetta, whose first translation of ClickHouse takes minutes.
+	// A target this machine cannot run at all (Linux, packaged on Linux anyway)
+	// is checked against its pinned digests only, and reports pinned versions.
 	const pinnedVersion = (command: string) =>
 		({
 			clickhouse: `ClickHouse ${CLICKHOUSE_VERSION}`,
 			postgres: `postgres (PostgreSQL) ${POSTGRES_VERSION}`,
 			bun: BUN_VERSION,
 		})[basename(command)];
+	const underRosetta =
+		platform === "darwin-x64" &&
+		detected === "darwin-arm64" &&
+		spawnSync("/usr/bin/arch", ["-x86_64", "/usr/bin/true"]).status === 0;
+	const translated = (command: string, args: readonly string[]) =>
+		new Promise<string | undefined>((resolve) =>
+			execFile(
+				"/usr/bin/arch",
+				["-x86_64", command, ...args],
+				{ encoding: "utf8", timeout: 30 * 60_000 },
+				(error, stdout) => resolve(error ? undefined : stdout.trim()),
+			),
+		);
+	if (platform !== detected && platform.startsWith("darwin-") && !underRosetta)
+		throw new Error(
+			`Packaging ${platform} on ${detected} needs to run its binaries once (ClickHouse unpacks itself on first run); install Rosetta or build on an Intel Mac.`,
+		);
 	const context =
 		platform === detected
 			? native
-			: { ...native, probe: async (command: string) => pinnedVersion(command) };
+			: underRosetta
+				? { ...native, probe: translated }
+				: {
+						...native,
+						probe: async (command: string) => pinnedVersion(command),
+					};
 	const runtimes = [
 		await resolveClickHouse(context),
 		await resolvePostgres(context),

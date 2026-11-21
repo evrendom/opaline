@@ -7,10 +7,7 @@ import {
 	acquirePostgresLease,
 	withPostgresLease,
 } from "./postgres-lease.service.js";
-import {
-	createSearchAccess,
-	postgresSubscriptions,
-} from "./transcript-search/access.js";
+import { createSearchAccess } from "./transcript-search/access.js";
 import {
 	readEmbeddingQuotaLimits,
 	transcriptEmbedder,
@@ -60,7 +57,7 @@ function postgresSearchHistoryLanes(
 	if (!embedder) return null;
 	const env = {
 		executor: getClickhouse(),
-		access: createSearchAccess(postgresSubscriptions(database)),
+		access: createSearchAccess(),
 		quota: createPostgresEmbeddingQuota(database, readEmbeddingQuotaLimits()),
 		listWorkspaces,
 		assertWritable: (target: { organizationId: string; userId: string }) =>

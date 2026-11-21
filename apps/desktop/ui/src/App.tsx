@@ -7,13 +7,10 @@ import {
 	getWorkspaceRelativePath,
 	getWorkspaceSlugFromPath,
 } from "@/app/routes";
-import { NotFoundPage } from "@/app/system/NotFoundPage";
 import { DesktopOnlyOverlay } from "@/app/ui/DesktopOnlyOverlay";
-import { ProductAnalyticsSessionSync } from "@/features/analytics/tracking/ProductAnalyticsSessionSync";
 import { AuthenticatedApp } from "@/features/auth/AuthenticatedApp";
 import {
 	getDeviceUserCode,
-	getPendingSignupRedirect,
 	getValidRedirect,
 	isGetStartedPath,
 	isResetPasswordPath,
@@ -23,9 +20,7 @@ import { useOAuthDebugAutoDump } from "@/features/auth/oauth-debug";
 import { ResetPasswordApp } from "@/features/auth/ResetPasswordApp";
 import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
 import { GetStartedRouteGate } from "@/features/get-started/GetStartedRouteGate";
-import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import { ProductLoadingScreen } from "@/features/shell/product-loading-screen";
-import { SupportEmailButton } from "@/features/support/SupportEmailButton";
 import { authClient } from "./lib/auth-client";
 
 const ConversationTraceFixturePage = import.meta.env.DEV
@@ -104,21 +99,11 @@ function SessionAwareApp() {
 	const isResolvingSession = isPending && !sessionResolved;
 	useOAuthDebugAutoDump(session);
 	const deviceUserCode = getDeviceUserCode(location.search);
-	const selfHost = useSelfHost();
 	const isCliSetupPath = location.pathname === CLI_SETUP_PATH;
-	const opensWithoutSession = isCliSetupPath && selfHost === null;
 	const isLegacyDevicePath = location.pathname === "/device";
-	const rootRedirectTarget =
-		getValidRedirect(location.search) ??
-		(location.pathname === "/"
-			? getPendingSignupRedirect(location.search)
-			: null);
+	const rootRedirectTarget = getValidRedirect(location.search);
 	const showDesktopOnlyOverlay =
 		!isCliSetupPath && !deviceUserCode && !isGetStartedPath(location.pathname);
-
-	if (/^\/(?:wrapped|dev\/wrapped|resume)(?:\/|$)/u.test(location.pathname)) {
-		return <NotFoundPage />;
-	}
 
 	if (isLegacyDevicePath || (deviceUserCode && !isCliSetupPath)) {
 		return (
@@ -132,17 +117,15 @@ function SessionAwareApp() {
 	if (isGetStartedPath(location.pathname)) {
 		return (
 			<>
-				<ProductAnalyticsSessionSync session={session} />
 				<GetStartedRouteGate />
 				{showDesktopOnlyOverlay ? <DesktopOnlyOverlay /> : null}
 			</>
 		);
 	}
 
-	if (isResolvingSession && !opensWithoutSession) {
+	if (isResolvingSession) {
 		return (
 			<>
-				<ProductAnalyticsSessionSync session={session} />
 				{getWorkspaceSlugFromPath(location.pathname) ||
 				getWorkspaceRelativePath(location.pathname) !== null ? (
 					<ProductLoadingScreen />
@@ -154,12 +137,10 @@ function SessionAwareApp() {
 		);
 	}
 
-	if (session || opensWithoutSession) {
+	if (session) {
 		return (
 			<>
-				<ProductAnalyticsSessionSync session={session} />
 				<AuthenticatedApp rootRedirectTarget={rootRedirectTarget} />
-				{session ? <SupportEmailButton /> : null}
 				{showDesktopOnlyOverlay ? <DesktopOnlyOverlay /> : null}
 			</>
 		);
@@ -168,7 +149,6 @@ function SessionAwareApp() {
 	if (isResetPasswordPath(location.pathname)) {
 		return (
 			<>
-				<ProductAnalyticsSessionSync session={session} />
 				<ResetPasswordApp />
 				{showDesktopOnlyOverlay ? <DesktopOnlyOverlay /> : null}
 			</>
@@ -177,7 +157,6 @@ function SessionAwareApp() {
 
 	return (
 		<>
-			<ProductAnalyticsSessionSync session={session} />
 			<GuestApp />
 			{showDesktopOnlyOverlay ? <DesktopOnlyOverlay /> : null}
 		</>

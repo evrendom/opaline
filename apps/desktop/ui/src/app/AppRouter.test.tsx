@@ -20,10 +20,6 @@ vi.mock("@/features/workspace/organization/useOrganization", () => ({
 	useOptionalOrganization: mockUseOrganization,
 }));
 
-vi.mock("@/features/invitations/AcceptInvitationPage", () => ({
-	AcceptInvitationPage: () => <div>Invitation Page</div>,
-}));
-
 vi.mock("@/features/shell/AppShellLayout", () => ({
 	LeftSidebarAppShellLayout: () => (
 		<div>
@@ -91,12 +87,12 @@ describe("AppRouter", () => {
 	it("preserves explicit authenticated root redirects", async () => {
 		render(
 			<MemoryRouter initialEntries={["/"]}>
-				<AppRouter rootRedirectTarget="/invitation/123" />
+				<AppRouter rootRedirectTarget="/mcp" />
 			</MemoryRouter>,
 		);
 
 		await waitFor(() => {
-			expect(screen.getByText("Invitation Page")).toBeInTheDocument();
+			expect(screen.getByText("MCP page")).toBeInTheDocument();
 		});
 	});
 

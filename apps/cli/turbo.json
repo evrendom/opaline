@@ -1,43 +1,8 @@
 {
 	"extends": ["//"],
 	"tasks": {
-		"build": {
-			"env": ["OPALINE_BUILD_POSTHOG_KEY", "OPALINE_BUILD_POSTHOG_HOST"]
-		},
-		"dev": {
-			"passThroughEnv": [
-				"DO_NOT_TRACK",
-				"NODE_ENV",
-				"OPALINE_ALLOW_INSECURE_API_BASE",
-				"OPALINE_ALLOW_INSECURE_ENDPOINT",
-				"OPALINE_API_BASE",
-				"OPALINE_CONFIG_DIR",
-				"OPALINE_LOG_LEVEL",
-				"POSTHOG_ENABLED",
-				"POSTHOG_HOST",
-				"POSTHOG_KEY",
-				"RUDEL_ALLOW_INSECURE_API_BASE",
-				"RUDEL_ALLOW_INSECURE_ENDPOINT",
-				"RUDEL_API_BASE",
-				"RUDEL_CONFIG_DIR"
-			]
-		},
 		"test": {
-			"passThroughEnv": [
-				"DO_NOT_TRACK",
-				"OPALINE_CONFIG_DIR",
-				"OPALINE_LOG_LEVEL",
-				"OPALINE_PACKED_CLI",
-				"RUDEL_CONFIG_DIR"
-			]
-		},
-		"test:integration": {
-			"passThroughEnv": [
-				"DO_NOT_TRACK",
-				"OPALINE_CONFIG_DIR",
-				"OPALINE_LOG_LEVEL",
-				"RUDEL_CONFIG_DIR"
-			]
+			"passThroughEnv": ["OPALINE_PACKED_CLI"]
 		}
 	}
 }

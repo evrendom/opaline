@@ -3,11 +3,9 @@ import { Link, useParams } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
 import { CardContent } from "@/app/ui/card";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
-import { useTrackProductPageView } from "@/features/analytics/tracking/useTrackProductPageView";
 import { dataWindow, formatDay } from "@/features/reports/report-dates";
 import { SettingsPageReveal } from "@/features/settings/components/settings-page-skeleton";
 import { SettingsSectionCard } from "@/features/settings/components/settings-section";
-import { buildReportsSettingsTracking } from "@/features/settings/settings-page-tracking";
 import {
 	WorkspaceSettingsGroup,
 	WorkspaceSettingsRow,
@@ -40,14 +38,6 @@ export function ReportsSettingsPage() {
 		.sort(
 			(left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt),
 		);
-
-	useTrackProductPageView(
-		buildReportsSettingsTracking({
-			isPending: query.isPending,
-			isError: query.isError,
-			reportCount: reports.length,
-		}),
-	);
 
 	if (!query.isPending && query.isError) {
 		return (

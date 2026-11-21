@@ -10,7 +10,16 @@ import type { R2EvidenceStorageClient } from "./r2-ingest-storage.service.js";
 
 const DEMO_ORG = "1zKtWzbRInKT6uNOqgXdcEGinGo2rXuW";
 const DEMO_ENV = { DEMO_ORGANIZATION_ID: DEMO_ORG };
-const config = { appId: "1", privateKeyPem: "fixture", slug: "fixture" };
+const tokenReads: string[] = [];
+const config = {
+	kind: "token" as const,
+	host: "github.com",
+	apiBaseUrl: "https://api.github.com",
+	read: async () => {
+		tokenReads.push("read");
+		return "fixture";
+	},
+};
 
 function untouchedDatabase(): postgres.Sql {
 	const refuse = () => {
@@ -50,11 +59,9 @@ describe("workspaces whose GitHub data is seeded, not synced", () => {
 			database,
 			config,
 			environment: DEMO_ENV,
-			createToken: async () => {
-				throw new Error("the sweep asked for a token");
-			},
 		});
 		expect(result).toEqual({ enabled: true, requests: 0, hasMore: false });
+		expect(tokenReads).toEqual([]);
 		expect(statements).toHaveLength(2);
 		for (const statement of statements) {
 			expect(statement.query).toContain("<> ALL($2::text[])");
@@ -89,16 +96,12 @@ describe("workspaces whose GitHub data is seeded, not synced", () => {
 	});
 
 	test("a direct evidence sync finds no binding and asks GitHub for nothing", async () => {
-		const tokens: string[] = [];
+		tokenReads.length = 0;
 		await expect(
 			collectAndPersistGitHubCommitEvidence({
 				commitSha: "a".repeat(40),
 				config,
 				contextId: null,
-				createInstallationToken: async (_config, installationId) => {
-					tokens.push(installationId);
-					return "fixture";
-				},
 				database: untouchedDatabase(),
 				environment: DEMO_ENV,
 				initiatedByUserId: "user",
@@ -108,6 +111,6 @@ describe("workspaces whose GitHub data is seeded, not synced", () => {
 				sessionId: "session",
 			}),
 		).rejects.toThrow("GitHub repository binding was not found.");
-		expect(tokens).toEqual([]);
+		expect(tokenReads).toEqual([]);
 	});
 });

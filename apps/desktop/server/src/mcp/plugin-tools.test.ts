@@ -16,8 +16,6 @@ describe("plugin tools", () => {
 		for (const write of [
 			"profile__updateMine",
 			"deleteOrganization",
-			"billing__createCheckout",
-			"teamInviteLink__create",
 			"ingestSession",
 		]) {
 			expect(names).not.toContain(`app_${write}`);

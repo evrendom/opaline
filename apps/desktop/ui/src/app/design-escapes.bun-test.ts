@@ -219,8 +219,10 @@ describe("design-system escape check", () => {
 		).toEqual({ type: 3, colour: 1, markers: 1, motion: 4 });
 	});
 
+	// Reads every source file under src: well under a second alone, but it can
+	// pass the 5s default when the suites share a loaded machine.
 	test("the tree is within the baseline", () => {
 		const { over } = compareToBaseline(countsOf(scanTree()), readBaseline());
 		expect(over).toEqual([]);
-	});
+	}, 30_000);
 });

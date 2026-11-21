@@ -2,6 +2,11 @@
 
 [← Back to the README](../README.md)
 
+> **The CLI is retired.** This page describes what the Opaline CLI uploaded
+> to Opaline's cloud, which has shut down. CLI releases from 0.18.0 on upload
+> nothing, send no usage analytics and make no network requests; they only
+> remove what earlier versions installed. See the [CLI guide](usage.md).
+
 ## Session uploads
 
 Opaline uploads **full coding-agent session transcripts and related metadata** to the destination workspace. Transcripts may contain prompts, model responses, source code, tool output, file contents, command output, URLs, repository metadata, and sub-agent transcripts.

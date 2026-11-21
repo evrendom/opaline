@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { getLogger } from "@logtape/logtape";
 import { APIError } from "better-auth/api";
 import type postgres from "postgres";
@@ -7,7 +6,7 @@ export const INVITE_HEADER = "x-opaline-invite";
 export const INVITE_COOKIE = "opaline_invite";
 export const INVITE_REQUIRED = "INVITE_REQUIRED";
 export const INVITE_REQUIRED_MESSAGE =
-	"This Opaline server is invite-only. Ask a workspace owner or admin for an invite link, then create your account from it.";
+	"This Opaline server is invite-only. Ask a workspace owner or admin to invite you, then create your account from the invitation.";
 
 const INVITE_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 const logger = getLogger(["rudel", "api", "selfhost"]);
@@ -40,11 +39,6 @@ export async function hasValidInvite(
 	if (!INVITE_PATTERN.test(invite)) return false;
 	const [row] = await sql<{ valid: boolean }[]>`
 		SELECT EXISTS (
-			SELECT 1 FROM team_invite_link
-			WHERE token_hash = ${createHash("sha256").update(invite).digest("base64url")}
-				AND revoked_at IS NULL
-				AND expires_at > now()
-		) OR EXISTS (
 			SELECT 1 FROM invitation
 			WHERE id = ${invite}
 				AND status = 'pending'

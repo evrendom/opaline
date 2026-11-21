@@ -3,7 +3,6 @@ import { APIError } from "better-auth";
 import { organization } from "better-auth/plugins";
 import type { InvitationEmailData } from "./email.js";
 
-/** Every plan, Free included, has unlimited members; this only bounds abuse. */
 const WORKSPACE_MEMBER_LIMIT = 10_000;
 
 const INVALID_ORGANIZATION_SLUG_MESSAGE =
@@ -14,18 +13,6 @@ export interface OrganizationPluginConfig {
 }
 
 export interface OrganizationPluginEnvironment {
-	readonly enqueueBillingTraitsForUser: (userId: string) => Promise<void>;
-	readonly logBillingTraitsError: (input: {
-		readonly error: unknown;
-		readonly userId: string;
-	}) => void;
-	readonly logSeatReconciliationError: (input: {
-		readonly error: unknown;
-		readonly organizationId: string;
-	}) => void;
-	readonly reconcileOrganizationBillingSeats: (
-		organizationId: string,
-	) => Promise<boolean>;
 	readonly sendOrganizationInvitationEmail: (
 		data: InvitationEmailData,
 	) => Promise<void>;
@@ -48,21 +35,6 @@ export function createOrganizationPlugin(
 		disableOrganizationDeletion: true,
 		membershipLimit: WORKSPACE_MEMBER_LIMIT,
 		organizationHooks: {
-			async afterRemoveMember({ member }) {
-				try {
-					await env.reconcileOrganizationBillingSeats(member.organizationId);
-				} catch (error) {
-					env.logSeatReconciliationError({
-						error,
-						organizationId: member.organizationId,
-					});
-				}
-				try {
-					await env.enqueueBillingTraitsForUser(member.userId);
-				} catch (error) {
-					env.logBillingTraitsError({ error, userId: member.userId });
-				}
-			},
 			async beforeCreateOrganization({ organization: organizationData }) {
 				assertValidOrganizationSlug(organizationData.slug ?? "");
 			},

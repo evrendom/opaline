@@ -3,14 +3,13 @@ import { validateOrgSlug } from "@rudel/api-routes/reserved-slugs";
 export type SitePageRoute =
 	| { kind: "app" }
 	| { kind: "workspace"; slug: string }
-	| { kind: "gone" }
 	| { kind: "not-found" };
 
 // Keep these paths aligned with AppRouter and the legacy navigation aliases.
 // Unlike a blanket SPA fallback, this cannot turn arbitrary public URLs into
 // successful login pages. Workspace existence is checked at the HTTP boundary.
 const SETTINGS_PATH =
-	/^\/settings(?:\/(?:account|workspace|github|sessions|reports|members|team|invitations|create-workspace))?$/u;
+	/^\/settings(?:\/(?:account|workspace|github|sessions|reports|members|team|create-workspace))?$/u;
 const SESSION_PATH = /^\/(?:session|sessions|newsesh)(?:\/[^/]+(?:\/v2)?)?$/u;
 const LEGACY_PATH =
 	/^\/(?:dashboard(?:\/(?:sessions(?:\/[^/]+)?|developers(?:\/[^/]+)?|projects|errors|roi|analytics))?|dashboardy|developers(?:\/[^/]+)?|projects|errors|roi|analytics|session\/full\/[^/]+)$/u;
@@ -25,15 +24,12 @@ export function getSitePageRoute(pathname: string): SitePageRoute {
 		return { kind: "not-found" };
 	}
 	if (/[\\\p{Cc}]/u.test(path)) return { kind: "not-found" };
-	if (/^\/(?:wrapped|dev\/wrapped|resume)(?:\/|$)/u.test(path)) {
-		return { kind: "gone" };
-	}
 	if (
 		AUTH_PATH.test(path) ||
 		SETTINGS_PATH.test(path) ||
 		SESSION_PATH.test(path) ||
 		LEGACY_PATH.test(path) ||
-		/^\/(?:admin(?:\/(?:run-questions|features))?|announcement|home|compass|skills|repos|mcp|team|invitation\/[^/]+)$/u.test(
+		/^\/(?:admin(?:\/(?:run-questions|features))?|announcement|home|compass|skills|repos|mcp|team)$/u.test(
 			path,
 		)
 	)

@@ -86,31 +86,6 @@ export const GitHubRepositoryEvidenceStatusSchema = z.discriminatedUnion(
 	],
 );
 
-export const GitHubCreateInstallationOutputSchema = z.object({
-	url: z.string().url(),
-});
-
-export const GitHubConnectionReturnToSchema = z.enum([
-	"settings",
-	"onboarding",
-]);
-export type GitHubConnectionReturnTo = z.infer<
-	typeof GitHubConnectionReturnToSchema
->;
-
-export const GitHubCreateInstallationInputSchema = z
-	.object({ returnTo: GitHubConnectionReturnToSchema.optional() })
-	.optional();
-
-export const GitHubDisconnectInputSchema = z.object({
-	// The workspace the user confirmed; it must still be the active one.
-	organizationId: z.string().min(1).max(200),
-});
-
-export const GitHubDisconnectOutputSchema = z.object({
-	disconnected: z.boolean(),
-});
-
 export const GitHubSyncCommitInputSchema = z.object({
 	commitSha: z.string().regex(/^[a-f0-9]{40}$/u),
 	contextId: z.string().uuid().nullable().default(null),

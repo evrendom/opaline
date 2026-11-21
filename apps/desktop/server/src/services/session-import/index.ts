@@ -12,7 +12,6 @@ export type {
 export {
 	createBackgroundIngestErrorFactories,
 	type IngestErrorFactories,
-	rethrowAgentRunLimitAsForbidden,
 } from "./errors.js";
 export {
 	processIngestSession,

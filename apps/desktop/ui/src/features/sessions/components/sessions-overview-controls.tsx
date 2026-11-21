@@ -57,7 +57,7 @@ export function SessionsOverviewControls({
 			{/* The range control trails at the toolbar's right. */}
 			{showDateControl ? (
 				<div className="ml-auto in-data-rail-beside:hidden">
-					<DashboardDateControls sourceComponent="sessions_date_picker" />
+					<DashboardDateControls />
 				</div>
 			) : null}
 		</div>

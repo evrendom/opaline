@@ -135,7 +135,7 @@ function CompassView({ observable }: { observable: boolean }) {
 			data-in-header={headerPortal ? "" : undefined}
 		>
 			<FluidMenuHover items="button" />
-			<DashboardDateControls sourceComponent="compass_date_picker" />
+			<DashboardDateControls />
 		</div>
 	);
 

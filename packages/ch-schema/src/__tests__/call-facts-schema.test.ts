@@ -67,12 +67,9 @@ describe("call facts migration", () => {
 		expect(definition?.orderBy).toEqual([...CALL_FACTS_KEY]);
 	});
 
-	test("bootstrap and the production gate run its runner", () => {
+	test("bootstrap runs its runner", () => {
 		expect(read("../../scripts/bootstrap.ts")).toContain(
 			`["${CALL_FACTS_MIGRATION}", "migrate-call-facts.ts"]`,
-		);
-		expect(read("../../package.json")).toMatch(
-			/"ch:migrate:production": "[^"]* ch:migrate:call-facts[ "]/u,
 		);
 	});
 });

@@ -5,11 +5,7 @@ import { getSitePageRoute } from "../../../server/src/lib/site-page-route";
 import { AppRouterRoutes } from "./AppRouter";
 
 const WORKSPACE_SLUG = "acme";
-const SERVED_BY_OTHER_REWRITES = new Set([
-	"/",
-	"/team/invite/param",
-	`/${WORKSPACE_SLUG}/join/param`,
-]);
+const SERVED_BY_OTHER_REWRITES = new Set(["/"]);
 
 function joinPath(parent: string, child: string | undefined) {
 	if (!child) return parent;

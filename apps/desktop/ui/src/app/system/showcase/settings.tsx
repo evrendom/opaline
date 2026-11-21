@@ -10,20 +10,15 @@ import { SettingsSectionCard } from "@/features/settings/components/settings-sec
 import { GitHubRepositoryList } from "@/features/settings/github/GitHubRepositoryList";
 import { SettingsSectionTab } from "@/features/settings/SettingsLayout";
 import { SessionsSettingsView } from "@/features/settings/sessions/sessions-settings-view";
-import { BillingManagementCard } from "@/features/settings/workspace/components/BillingManagementCard";
-import { GitHubConnectionCard } from "@/features/settings/workspace/components/GitHubConnectionCard";
 import { WorkspaceDangerZoneCard } from "@/features/settings/workspace/components/WorkspaceDangerZoneCard";
 import { WorkspaceIdentityCard } from "@/features/settings/workspace/components/WorkspaceIdentityCard";
-import { WorkspaceInviteMemberForm } from "@/features/settings/workspace/components/WorkspaceInviteMemberForm";
 import { WorkspaceMembersTable } from "@/features/settings/workspace/components/WorkspaceMembersTable";
 import { WorkspaceSettingsGroup } from "@/features/settings/workspace/components/workspace-settings-group";
-import { TeamInviteLinkSurface } from "@/features/team/components/TeamInviteLinkSurface";
 import type { TeamPageMemberRow } from "@/features/team/use-team-page-data";
 import { Group, Specimen, State } from "./kit";
 import { demoPortraits, seed } from "./providers";
 
 const NOOP = () => {};
-const DISCONNECTED = async () => false;
 
 // The demo workspace's three members, in the shapes the members page passes.
 const MEMBERS = [
@@ -119,15 +114,14 @@ const GITHUB_STATUS: GitHubRepositoryConnectionStatus = {
 	suspended: false,
 };
 
-/** The members list as Settings → Members renders it for an admin: invite
- *  form above, rows with the role select, the owner badge and remove. */
+/** The members list as Settings → Members renders it for an admin: rows with
+ *  the role select, the owner badge and remove. */
 export function MembersTableControl() {
 	return (
 		<WorkspaceSettingsGroup
 			title="People"
-			description="Invite teammates by email. Admins and owners can manage members. Usage covers the last 12 months."
+			description="Admins and owners can manage members. Usage covers the last 12 months."
 		>
-			<WorkspaceInviteMemberForm canManage onInvalidate={NOOP} />
 			<WorkspaceMembersTable
 				members={MEMBER_ROWS}
 				activity={ACTIVITY}
@@ -226,9 +220,9 @@ export function SettingsGroup() {
 			</Specimen>
 
 			<Specimen
-				name="WorkspaceInviteMemberForm, WorkspaceMembersTable"
+				name="WorkspaceMembersTable"
 				source="features/settings/workspace/components/WorkspaceMembersTable.tsx"
-				where="Settings → Members → People: invite by email, then each member with usage, role select (size sm), owner badge and remove."
+				where="Settings → Members → People: each member with usage, role select (size sm), owner badge and remove."
 			>
 				<Column>
 					<MembersTableControl />
@@ -248,24 +242,6 @@ export function SettingsGroup() {
 							pendingKey={null}
 							onRoleChange={NOOP}
 							onRemove={NOOP}
-						/>
-					</WorkspaceSettingsGroup>
-				</Column>
-			</Specimen>
-
-			<Specimen
-				name="TeamInviteLinkSurface (layout settings)"
-				source="features/team/components/TeamInviteLinkSurface.tsx"
-				where="Settings → Members → Invite link, before a link is made."
-			>
-				<Column>
-					<WorkspaceSettingsGroup
-						title="Invite link"
-						description="Share a link that lets teammates join this workspace as members."
-					>
-						<TeamInviteLinkSurface
-							layout="settings"
-							organizationId={seed.organization.id}
 						/>
 					</WorkspaceSettingsGroup>
 				</Column>
@@ -307,44 +283,12 @@ export function SettingsGroup() {
 			</Specimen>
 
 			<Specimen
-				name="GitHubConnectionCard"
-				source="features/settings/workspace/components/GitHubConnectionCard.tsx"
-				where="Settings → GitHub → Connection: account, dashboard, CI history and disconnect rows."
-			>
-				<Column>
-					<GitHubConnectionCard
-						status={GITHUB_STATUS}
-						isPending={false}
-						isError={false}
-						isConnecting={false}
-						actionError={null}
-						onConnect={NOOP}
-						onDisconnect={DISCONNECTED}
-						onRetry={NOOP}
-					/>
-				</Column>
-			</Specimen>
-
-			<Specimen
 				name="GitHubRepositoryList"
 				source="features/settings/github/GitHubRepositoryList.tsx"
 				where="Settings → GitHub → Repositories: search, visibility and sync."
 			>
 				<Column>
 					<GitHubRepositoryList status={GITHUB_STATUS} />
-				</Column>
-			</Specimen>
-
-			<Specimen
-				name="BillingManagementCard"
-				source="features/settings/workspace/components/BillingManagementCard.tsx"
-				where="Settings → Workspace → Billing; shows .settings-error when billing can't load, as in the demo."
-			>
-				<Column>
-					<BillingManagementCard
-						organizationId={seed.organization.id}
-						workspaceSlug={seed.organization.slug}
-					/>
 				</Column>
 			</Specimen>
 

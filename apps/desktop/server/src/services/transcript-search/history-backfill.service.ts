@@ -35,8 +35,7 @@ import { TRANSCRIPT_CHUNK_HITS_TABLE } from "./tables.js";
  * sessions uploaded before search indexing existed searchable, through the
  * same pass an upload runs (`indexSessionText`: secret filter, chunking,
  * deduplication, the workspace's OpenAI quota, purge fences), and only for
- * the workspaces uploads are indexed for (listed, or paid where paid plans
- * are on: `access.ts`).
+ * the workspaces uploads are indexed for (`access.ts`).
  *
  * - Preview by default: it reads ClickHouse and Postgres and reports the
  *   sessions, their estimated tokens and cost; it never calls OpenAI.
@@ -529,7 +528,7 @@ async function select(
 	if (indexed.length === 0) {
 		summary.message =
 			options.organizationId === undefined
-				? "No workspace is indexed for search: none is listed in TRANSCRIPT_EMBEDDINGS_WORKSPACES, or paid with TRANSCRIPT_EMBEDDINGS_PAID_PLANS=true."
+				? "No workspace is indexed for search: none is listed in TRANSCRIPT_EMBEDDINGS_WORKSPACES."
 				: `${env.access.notIndexed}, and TRANSCRIPT_EMBEDDINGS_WORKSPACES does not list it.`;
 		return { rows: [], full: false, outOfQuota: false, summary };
 	}

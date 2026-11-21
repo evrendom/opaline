@@ -82,12 +82,9 @@ describe("session images migration", () => {
 		);
 	});
 
-	test("bootstrap and the production gate run its runner", () => {
+	test("bootstrap runs its runner", () => {
 		expect(read("../../scripts/bootstrap.ts")).toContain(
 			'["20261016190000_session_images.sql", "migrate-session-images.ts"],',
-		);
-		expect(read("../../package.json")).toMatch(
-			/"ch:migrate:production": "[^"]* ch:migrate:session-images[ "]/u,
 		);
 	});
 });

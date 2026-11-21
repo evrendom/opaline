@@ -96,7 +96,7 @@ describe("transcript record uuid migration", () => {
 		expect(records?.indexes).toEqual(table?.indexes);
 	});
 
-	test("bootstrap and the production gate run its runner", () => {
+	test("bootstrap runs its runner", () => {
 		expect(
 			readFileSync(
 				new URL("../../scripts/bootstrap.ts", import.meta.url),
@@ -110,12 +110,6 @@ describe("transcript record uuid migration", () => {
 		) as { scripts: Record<string, string> };
 		expect(manifest.scripts["ch:migrate:transcript-record-uuid"]).toBe(
 			"bun scripts/migrate-transcript-record-uuid.ts",
-		);
-		const production = manifest.scripts["ch:migrate:production"] ?? "";
-		expect(production).toMatch(/ ch:migrate:transcript-record-uuid( |$)/u);
-		// The column joins a table the transcript records step creates.
-		expect(production.indexOf("ch:migrate:transcript-records ")).toBeLessThan(
-			production.indexOf("ch:migrate:transcript-record-uuid"),
 		);
 	});
 

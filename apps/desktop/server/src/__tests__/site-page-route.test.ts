@@ -1,17 +1,6 @@
 import { expect, test } from "bun:test";
 import { getSitePageRoute } from "../lib/site-page-route.js";
 
-test("retired products are gone, including deep links", () => {
-	for (const path of [
-		"/wrapped",
-		"/wrapped/report/123",
-		"/dev/wrapped/",
-		"/resume/123",
-	]) {
-		expect(getSitePageRoute(path)).toEqual({ kind: "gone" });
-	}
-});
-
 test("unknown public and workspace paths cannot become successful app pages", () => {
 	for (const path of [
 		"/pricing",
@@ -25,6 +14,10 @@ test("unknown public and workspace paths cannot become successful app pages", ()
 		"/admin/unknown",
 		"/%FF",
 		"/acme%5Cevil",
+		"/wrapped",
+		"/resume/123",
+		"/invitation/123",
+		"/acme/settings/invitations",
 	]) {
 		expect(getSitePageRoute(path)).toEqual({ kind: "not-found" });
 	}
@@ -48,7 +41,6 @@ test("workspace routes require an existence check", () => {
 		"/acme/reports/analysis-id",
 		"/acme/settings/reports",
 		"/acme/settings/team",
-		"/acme/settings/invitations",
 		"/acme/settings/account",
 		"/acme/settings/create-workspace",
 		"/acme/settings/workspace",
@@ -73,7 +65,6 @@ test("login, pairing, onboarding, and existing app aliases remain available", ()
 		"/session/full/123",
 		"/session/split",
 		"/dashboard/sessions/123",
-		"/invitation/123",
 		"/team",
 		"/skills",
 		"/repos",

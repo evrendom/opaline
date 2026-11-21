@@ -1,19 +1,9 @@
 import type { GitHubRepositoryConnectionStatus as ContractConnectionStatus } from "@rudel/api-routes";
 import type postgres from "postgres";
-import type {
-	GitHubInstallationDetails,
-	GitHubInstallationRepository,
-} from "./github-app.service.js";
 import {
 	type GitHubRepositoryReadiness,
 	readGitHubOutcomesReadiness,
-	refreshPrTotalsReadiness,
 } from "./github-outcomes-readiness.service.js";
-import { enqueueGitHubRepositorySweep } from "./github-repository-sweep.service.js";
-import {
-	enqueueL1EdgeDependents,
-	enqueueL1EdgeScope,
-} from "./l1-edges/l1-edge-queue.service.js";
 
 type GitHubRepositorySyncState = NonNullable<
 	ContractConnectionStatus["repositories"][number]["sync"]
@@ -42,13 +32,6 @@ export interface GitHubRepositoryConnectionStatus {
 	readonly repositorySelection: "all" | "selected" | null;
 }
 
-export class GitHubInstallationAlreadyBoundError extends Error {
-	constructor() {
-		super("GitHub installation is already bound to another organization.");
-		this.name = "GitHubInstallationAlreadyBoundError";
-	}
-}
-
 export function createGitHubInstallationManagementUrl(input: {
 	readonly accountLogin: string;
 	readonly accountType: "Organization" | "User";
@@ -64,105 +47,6 @@ export function createGitHubInstallationManagementUrl(input: {
 		`/settings/installations/${encodeURIComponent(input.installationId)}`,
 		"https://github.com",
 	).toString();
-}
-
-export async function persistGitHubRepositoryInstallation(input: {
-	readonly database: postgres.Sql;
-	readonly details: GitHubInstallationDetails;
-	readonly installedByUserId: string;
-	readonly now: Date;
-	readonly organizationId: string;
-	readonly repositories: readonly GitHubInstallationRepository[];
-}): Promise<void> {
-	await input.database.begin(async (transaction) => {
-		await transaction.unsafe(
-			"SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
-			[`github-installation-id:${input.details.installationId}`],
-		);
-		await transaction.unsafe(
-			"SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
-			[`github-installation:${input.organizationId}`],
-		);
-		const existing = await transaction.unsafe<
-			Array<{ organization_id: string }>
-		>(
-			"SELECT organization_id FROM github_app_installation WHERE installation_id = $1 FOR UPDATE",
-			[input.details.installationId],
-		);
-		if (existing[0] && existing[0].organization_id !== input.organizationId) {
-			throw new GitHubInstallationAlreadyBoundError();
-		}
-		await transaction.unsafe(
-			"UPDATE github_app_installation SET status = 'deleted', updated_at = $2 WHERE organization_id = $1 AND installation_id <> $3 AND status IN ('active', 'suspended')",
-			[
-				input.organizationId,
-				input.now.toISOString(),
-				input.details.installationId,
-			],
-		);
-		const installations = await transaction.unsafe<
-			Array<{ installation_id: string }>
-		>(
-			"INSERT INTO github_app_installation (installation_id, organization_id, account_id, account_login, account_type, repository_selection, permissions, status, installed_by_user_id, installed_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7::text::jsonb, 'active', $8, $9, $9) ON CONFLICT (installation_id) DO UPDATE SET account_id = EXCLUDED.account_id, account_login = EXCLUDED.account_login, account_type = EXCLUDED.account_type, repository_selection = EXCLUDED.repository_selection, permissions = EXCLUDED.permissions, status = 'active', installed_by_user_id = EXCLUDED.installed_by_user_id, updated_at = EXCLUDED.updated_at WHERE github_app_installation.organization_id = EXCLUDED.organization_id RETURNING installation_id",
-			[
-				input.details.installationId,
-				input.organizationId,
-				input.details.accountId,
-				input.details.accountLogin,
-				input.details.accountType,
-				input.details.repositorySelection,
-				JSON.stringify(input.details.permissions),
-				input.installedByUserId,
-				input.now.toISOString(),
-			],
-		);
-		if (installations.length !== 1)
-			throw new GitHubInstallationAlreadyBoundError();
-		await transaction.unsafe(
-			"UPDATE github_repository_binding SET status = 'removed', updated_at = $2 WHERE organization_id = $1",
-			[input.organizationId, input.now.toISOString()],
-		);
-		for (const repository of input.repositories) {
-			await transaction.unsafe(
-				"INSERT INTO github_repository_binding (organization_id, repository_id, installation_id, node_id, owner, name, full_name, default_branch, is_private, status, last_synced_at, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', $10, $10, $10) ON CONFLICT (organization_id, repository_id) DO UPDATE SET installation_id = EXCLUDED.installation_id, node_id = EXCLUDED.node_id, owner = EXCLUDED.owner, name = EXCLUDED.name, full_name = EXCLUDED.full_name, default_branch = EXCLUDED.default_branch, is_private = EXCLUDED.is_private, status = 'active', last_synced_at = EXCLUDED.last_synced_at, updated_at = EXCLUDED.updated_at",
-				[
-					input.organizationId,
-					repository.id,
-					input.details.installationId,
-					repository.nodeId,
-					repository.owner,
-					repository.name,
-					repository.fullName,
-					repository.defaultBranch,
-					repository.isPrivate,
-					input.now.toISOString(),
-				],
-			);
-			await enqueueGitHubRepositorySweep(
-				{ organizationId: input.organizationId, repositoryId: repository.id },
-				input.now,
-				transaction,
-				true,
-			);
-			// Sessions that named this repository while it was unbound can link now.
-			await enqueueL1EdgeScope(transaction, {
-				kind: "repository",
-				organizationId: input.organizationId,
-				repositoryId: repository.id,
-			});
-			await enqueueL1EdgeDependents(
-				transaction,
-				input.organizationId,
-				[`name:${repository.fullName.toLowerCase()}`],
-				{ limit: 1_000 },
-			);
-		}
-		await refreshPrTotalsReadiness(
-			transaction,
-			input.organizationId,
-			input.now,
-		);
-	});
 }
 
 export async function getGitHubRepositoryConnectionStatus(input: {

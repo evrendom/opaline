@@ -8,14 +8,12 @@ import { useDateRange } from "@/features/analytics/date-range/useDateRange";
 
 export function DashboardDateControls({
 	className,
-	sourceComponent = "dashboard_date_picker",
 	variant,
 	calendarControls,
 	triggerSuffix,
 	compact,
 }: {
 	className?: string;
-	sourceComponent?: string;
 	variant?: AnalyticsDateRangePickerProps["variant"];
 	calendarControls?: AnalyticsDateRangePickerProps["calendarControls"];
 	triggerSuffix?: AnalyticsDateRangePickerProps["triggerSuffix"];
@@ -30,7 +28,6 @@ export function DashboardDateControls({
 			endDate={state.endDate}
 			onDateRangeApply={actions.setDateRange}
 			align="end"
-			sourceComponent={sourceComponent}
 			variant={variant}
 			calendarControls={calendarControls}
 			triggerSuffix={triggerSuffix}

@@ -21,7 +21,7 @@ interface SessionLink extends QuerySession {
 	analysisId: string;
 }
 
-/** In-process store for tests and local development; Convex replaces it in production. */
+/** In-process store for tests and local development. */
 export function createMemoryAnalysisStore(): AnalysisStore {
 	const analyses = new Map<string, StoredAnalysis>();
 	const steps = new Map<string, StoredStep>();

@@ -79,70 +79,6 @@ html[data-auth-shell],
 	text-transform: uppercase;
 }
 
-.opaline-auth-stage {
-	animation: opaline-auth-stage-enter var(--motion-medium-duration)
-		var(--motion-strong-easing) both;
-}
-
-.opaline-email-verification {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-xxl);
-}
-
-.opaline-email-verification-intro {
-	display: flex;
-	min-width: 0;
-	flex-direction: column;
-	align-items: center;
-	gap: var(--space-s);
-	text-align: center;
-}
-
-.opaline-email-verification-intro p {
-	max-width: 36ch;
-	margin: var(--space-zero);
-	color: var(--ink-3);
-	font-size: var(--size-xl);
-	letter-spacing: var(--letter-spacing-xl);
-	line-height: var(--line-xl);
-	overflow-wrap: anywhere;
-	text-wrap: pretty;
-}
-
-.opaline-auth-email-switch {
-	position: relative;
-	padding: var(--space-zero);
-	border: 0;
-	background: transparent;
-	color: var(--ink-3);
-	font: inherit;
-	font-size: var(--size-l);
-	letter-spacing: var(--letter-spacing-l);
-	line-height: var(--line-l);
-	text-decoration: underline;
-	text-underline-offset: 3px;
-}
-
-.opaline-auth-email-switch:hover:not(:disabled) {
-	color: var(--ink);
-}
-
-.opaline-auth-email-switch:disabled {
-	opacity: 0.55;
-	cursor: default;
-}
-
-.opaline-auth-email-switch > span {
-	position: absolute;
-	top: 50%;
-	left: 50%;
-	width: max(100%, 48px);
-	height: max(100%, 48px);
-	pointer-events: none;
-	transform: translate(-50%, -50%);
-}
-
 .form-input.opaline-auth-code-input {
 	min-height: 56px;
 	border: 0;
@@ -159,37 +95,14 @@ html[data-auth-shell],
 	text-align: center;
 }
 
-@keyframes opaline-auth-stage-enter {
-	from {
-		opacity: 0;
-		transform: translateY(8px);
-	}
-	to {
-		opacity: 1;
-		transform: translateY(0);
-	}
-}
-
 @media (max-width: 899px) {
 	.opaline-auth-main {
 		padding-block: calc(var(--space-xxl) * 5 / 3);
-	}
-
-	.opaline-email-verification-intro p {
-		font-size: var(--size-xxl);
-		line-height: var(--line-xxl);
-		letter-spacing: var(--letter-spacing-xxl);
 	}
 }
 
 @media (max-height: 700px) and (min-width: 900px) {
 	.opaline-auth-main {
 		padding-block: calc(var(--space-xxl) * 4 / 3);
-	}
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.opaline-auth-stage {
-		animation: none;
 	}
 }
