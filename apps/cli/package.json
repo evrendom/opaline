@@ -1,6 +1,6 @@
 {
 	"name": "@opalinehq/cli",
-	"version": "0.17.1",
+	"version": "0.18.0",
 	"type": "module",
 	"description": "Retired: removes the Opaline CLI's upload hooks and saved sign-in. Opaline is now a free Mac app.",
 	"license": "Apache-2.0",
