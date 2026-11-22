@@ -481,8 +481,7 @@ export function RepoDetailHeader({
 		<>
 			<nav
 				aria-label="Repo breadcrumb"
-				// design-escape-ok(type): shipped value; -0.025em title tracking
-				className="flex min-w-0 flex-1 items-center gap-s text-body-xxl font-medium tracking-[-0.025em]"
+				className="flex min-w-0 flex-1 items-center gap-s text-body-xxl font-medium tracking-xs"
 			>
 				<button
 					type="button"

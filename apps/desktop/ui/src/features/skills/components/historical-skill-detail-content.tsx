@@ -208,15 +208,13 @@ function SkillVersionMenu({
 			>
 				<IconStack2
 					aria-hidden="true"
-					// design-escape-ok(colour): shipped value; #5d5d5d, #acaeb2 in dark
-					className="size-4 h-lh shrink-0 text-[#5d5d5d] dark:text-[#acaeb2]"
+					className="size-4 h-lh shrink-0 text-ink-3"
 				/>
 				<span>{label}</span>
 				<IconChevronDown
 					stroke={1.75}
 					aria-hidden="true"
-					// design-escape-ok(colour): shipped value; #5d5d5d, #acaeb2 in dark
-					className="size-4 shrink-0 text-[#5d5d5d] dark:text-[#acaeb2]"
+					className="size-4 shrink-0 text-ink-3"
 				/>
 			</Menu.Trigger>
 			<SessionMenuPopup aria-label="Skill versions">

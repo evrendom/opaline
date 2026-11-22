@@ -288,8 +288,7 @@ function SplitPanes({ bottom, top }: { bottom: ReactNode; top: ReactNode }) {
 					"edge-none",
 					"cursor-row-resize touch-none select-none bg-line-soft outline-none transition-colors",
 					"before:absolute before:inset-x-0 before:top-1/2 before:h-3 before:-translate-y-1/2",
-					// design-escape-ok(opacity): no role renders this; focus/60
-					"hover:bg-focus/60",
+					"hover:bg-focus",
 					"focus-visible:bg-focus",
 					"data-[resizing=true]:bg-focus",
 				)}
@@ -389,8 +388,7 @@ function CallCard({
 						"[direction:rtl]",
 						"-mt-xs pr-m pl-m",
 						"truncate text-left text-body-m",
-						// design-escape-ok(opacity): shipped value; muted-foreground/70
-						"text-ink-3/70",
+						"text-ink-3",
 					)}
 					title={call.path}
 				>
@@ -529,8 +527,7 @@ function CallPayloads({ call }: { call: RepositoryRunCall }) {
 					wrapLines={!shell}
 				/>
 				{cut ? (
-					// design-escape-ok(opacity): shipped value; muted-foreground/70
-					<p className="text-body-m text-ink-3/70">
+					<p className="text-body-m text-ink-3">
 						Cut short here; the rest is in the session's transcript.
 					</p>
 				) : null}
@@ -592,8 +589,7 @@ function CallSection({
 			<h3 className="text-body-m font-medium text-ink-3">{title}</h3>
 			{children}
 			{cut ? (
-				// design-escape-ok(opacity): shipped value; muted-foreground/70
-				<p className="text-body-m text-ink-3/70">
+				<p className="text-body-m text-ink-3">
 					Cut short here; the rest is in the session's transcript.
 				</p>
 			) : null}
@@ -754,10 +750,7 @@ function ReadCommand({ bash, text }: { bash: boolean; text: string }) {
 	const [open, setOpen] = useState(false);
 	const hunks = useMemo(() => wholeText(text), [text]);
 	return (
-		<div
-			// design-escape-ok(opacity): no role renders this; field/50
-			className="flex flex-col gap-xs corner-s bg-field/50"
-		>
+		<div className="flex flex-col gap-xs corner-s bg-hover">
 			<button
 				type="button"
 				aria-expanded={open}

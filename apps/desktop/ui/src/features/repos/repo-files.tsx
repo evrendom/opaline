@@ -125,8 +125,7 @@ export function RepoFiles({ repoKey }: { repoKey: string }) {
 							"flex h-8 shrink-0 items-center gap-s",
 							"corner-s pr-xs pl-m",
 							"text-body-m",
-							// design-escape-ok(opacity): no role renders this; field/50
-							"bg-field/50",
+							"bg-hover",
 						)}
 					>
 						<span className="shrink-0 font-medium">Entire repo</span>
@@ -326,8 +325,7 @@ function RepoFileDetail({
 					"shrink-0 [direction:rtl]",
 					"-mt-xs pl-m",
 					"truncate text-left text-body-m",
-					// design-escape-ok(opacity): shipped value; muted-foreground/70
-					"text-ink-3/70",
+					"text-ink-3",
 				)}
 				title={directory}
 			>
@@ -455,10 +453,7 @@ function TreeSkeleton() {
 					className="flex h-7 shrink-0 items-center gap-m pr-[calc(var(--space-m)+var(--space-xxs))]"
 					style={{ paddingLeft: 8 + depth * 12 }}
 				>
-					<Skeleton
-						// design-escape-ok(radius): shipped value; 4px corner
-						className="size-3.5 shrink-0 rounded-[4px]"
-					/>
+					<Skeleton className="size-3.5 shrink-0 corner-xs" />
 					<Skeleton
 						className="h-2.5 corner-full"
 						style={{ width: `${width}%` }}

@@ -394,8 +394,7 @@ function RunList({
 		<FluidList>
 			{days.map((day) => (
 				<section key={day.label} className="flex flex-col gap-xxs">
-					{/* design-escape-ok(type): shipped value; the 11px label on a 1.5 line */}
-					<h3 className="px-[calc(var(--space-m)+var(--space-xxs))] pt-l pb-xs text-body-s leading-normal font-medium text-ink-3 first:pt-xs">
+					<h3 className="px-[calc(var(--space-m)+var(--space-xxs))] pt-l pb-xs text-body-s font-medium text-ink-3 first:pt-xs">
 						{day.label}
 					</h3>
 					{day.runs.map((run) => (
@@ -492,8 +491,7 @@ function RunRow({
 					className={cn(
 						"shrink-0",
 						"corner-xs px-xs",
-						// design-escape-ok(type): shipped value; 10px on a 16px line
-						"text-body-xs leading-4 font-medium tabular-nums",
+						"text-body-xs font-medium tabular-nums",
 						"bg-field text-ink-3",
 					)}
 				>
@@ -786,8 +784,7 @@ function RunTrace({
 					className={cn(
 						"flex h-6 items-center gap-xs",
 						"corner-xs px-s",
-						// design-escape-ok(type): shipped value; 11px on main's inherited 4/3 line
-						"text-body-s leading-[calc(4/3)]",
+						"text-body-s line-tight",
 						"text-ink-3 transition-colors",
 						"hover:text-ink",
 					)}
@@ -963,10 +960,8 @@ function OpenRunLink({
 			to={sessionPagePath(getShellRoutePath, undefined, run.sessionId, params)}
 			className={
 				compact
-					? // design-escape-ok(type): shipped value; 11px on main's inherited 4/3 line
-						"flex h-6 items-center gap-xs corner-xs px-s text-body-s leading-[calc(4/3)] text-ink-3 transition-colors hover:text-ink"
-					: // design-escape-ok(opacity): shipped value; border/60 as line-strong at 60%
-						"inline-flex h-8 items-center gap-xs corner-s edge-m border-line/60 px-l text-body-m font-medium transition-colors hover:bg-field"
+					? "flex h-6 items-center gap-xs corner-xs px-s text-body-s line-tight text-ink-3 transition-colors hover:text-ink"
+					: "inline-flex h-8 items-center gap-xs corner-s edge-m border-line px-l text-body-m font-medium transition-colors hover:bg-field"
 			}
 		>
 			Open in session
@@ -1049,8 +1044,7 @@ function MiddleSample({ section }: { section: UseSection }) {
 					className={cn(
 						"flex h-8 shrink-0 items-center gap-s",
 						"corner-s px-m",
-						// design-escape-ok(opacity): no role renders this; field/50
-						"bg-field/50",
+						"bg-hover",
 					)}
 				>
 					<Bone className="size-4 shrink-0 corner-full" />
@@ -1092,10 +1086,7 @@ function SkillTraceBody() {
 					</div>
 				</div>
 			</div>
-			<div
-				// design-escape-ok(space): skeleton rows indent past the trace's 36px glyph column and its 9px rule
-				className="flex flex-col gap-xl pl-[calc(2.25rem+9px)]"
-			>
+			<div className="flex flex-col gap-xl pl-[calc(var(--space-xxl)+var(--space-l)+var(--space-m))]">
 				{TRACE_ROWS.map((row) => (
 					<div key={row.id} className="flex h-6 items-center gap-m">
 						<Bone className="size-5 shrink-0 corner-s" />
@@ -1125,8 +1116,7 @@ function McpCallsSample() {
 				className={cn(
 					"flex flex-col",
 					"divide-y corner-m edge-m px-l",
-					// design-escape-ok(opacity): shipped value; border/40 and /60 as line-strong
-					"divide-line/40 border-line/60 bg-canvas",
+					"divide-line-soft border-line bg-canvas",
 				)}
 			>
 				<div className="flex items-center gap-s py-[calc(var(--space-m)+var(--space-xxs))]">
@@ -1163,8 +1153,7 @@ const FILE_LINES = [94, 88, 96, 70, 0, 90, 84, 92, 60, 0, 86, 94, 78].map(
 function FileCardSample() {
 	return (
 		<div className="flex flex-col">
-			{/* design-escape-ok(opacity): shipped value; border/50 as line-strong at 50% */}
-			<div className="flex items-center gap-m edge-b-m border-line/50 px-[calc(var(--space-xl)+var(--space-xs))] py-xl">
+			<div className="flex items-center gap-m edge-b-m border-line-soft px-[calc(var(--space-xl)+var(--space-xs))] py-xl">
 				<Bone className="size-4 shrink-0 corner-full" />
 				<Bone className="h-3.5 w-28 corner-xs" />
 			</div>

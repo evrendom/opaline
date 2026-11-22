@@ -253,12 +253,12 @@
 @supports (corner-shape: squircle) {
 	/* A popover's 24px squircle; its rows and buttons sit concentric at 12px. */
 	.menu-surface.session-date-picker {
-		border-radius: 24px;
+		border-radius: var(--radius-xl);
 	}
 	.session-date-picker .menu-list .menu-row::before,
 	.menu-surface.session-date-picker .menu-list .fluid-menu-hover-fill::before,
 	.session-date-picker-action {
-		border-radius: 12px;
+		border-radius: var(--radius-m);
 		/* biome-ignore lint/correctness/noUnknownProperty: see the @supports note above. */
 		corner-shape: squircle;
 	}

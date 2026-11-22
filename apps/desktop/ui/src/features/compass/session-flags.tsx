@@ -183,10 +183,7 @@ function FlagTag({ kinds }: { kinds: readonly MomentKind[] }) {
 				title={labels.join(", ")}
 				className="size-4 drop-shadow-none dark:drop-shadow-none"
 			>
-				<IconAlertTriangle
-					aria-hidden="true"
-					className="size-2.5 text-error"
-				/>
+				<IconAlertTriangle aria-hidden="true" className="size-2.5 text-error" />
 			</OpalChip>
 			<span className="sr-only">Flagged: {labels.join(", ")}</span>
 		</span>
@@ -258,8 +255,7 @@ export function useTurnFlags(
 }
 
 const FLAG_TRIGGER =
-	// design-escape-ok(opacity): no role renders this; hover/60
-	"inline-flex h-7 w-fit min-w-7 shrink-0 items-center justify-center gap-xs corner-full bg-surface px-m text-body-m font-medium shadow-card transition-colors hover:bg-hover/60 data-popup-open:bg-hover focus-outline";
+	"inline-flex h-7 w-fit min-w-7 shrink-0 items-center justify-center gap-xs corner-full bg-surface px-m text-body-m font-medium shadow-card transition-colors hover:bg-hover data-popup-open:bg-hover focus-outline";
 
 function SessionFlagFilter({
 	byKind,

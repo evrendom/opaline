@@ -27,9 +27,7 @@ function shouldHideModelBadge(model: string) {
 
 // Model badges set their type solid and a hair tight so the cap-trimmed label
 // centres in a fixed-height pill.
-const BADGE_TRACKING =
-	// design-escape-ok(type): the badge's -1% tracking; no text step carries it
-	"tracking-[-0.01em]";
+const BADGE_TRACKING = "tracking-xs";
 const CAP_TRIM_LABEL =
 	"flex min-w-0 items-center line-solid [text-box-edge:cap_alphabetic] [text-box-trim:trim-both]";
 

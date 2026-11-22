@@ -33,8 +33,7 @@ export function SkillCardsGrid({
 		<ScrollColumn className="min-w-0 overscroll-contain">
 			<ul
 				aria-label="Skills"
-				// design-escape-ok(space): shipped value; gap 20px, sm:p 20px
-				className="grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,13.5rem),1fr))] gap-[20px] p-xl sm:p-[20px] lg:p-xxl"
+				className="grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,13.5rem),1fr))] gap-xl p-xl lg:p-xxl"
 			>
 				{skills.map((skill) => (
 					<li key={skill.name} className="min-w-0">
@@ -84,21 +83,13 @@ const SkillCard = memo(function SkillCard({
 			}
 		>
 			{description ? (
-				<p
-					// design-escape-ok(opacity): shipped value; dashboardy-heading/75
-					className="pt-s text-body-l text-pretty text-ink/75"
-				>
-					{description}
-				</p>
+				<p className="pt-s text-body-l text-pretty text-ink-2">{description}</p>
 			) : skill.contentPreview ? (
 				<div className="min-h-0 flex-1 overflow-hidden pt-s">
 					<RichSkillDocument content={skill.contentPreview} variant="preview" />
 				</div>
 			) : (
-				<p
-					// design-escape-ok(type,colour): shipped value; 12px / 20px, dashboardy-subtle #98a2b3 / #77787e
-					className="pt-s text-xs leading-5 text-[#98a2b3] dark:text-[#77787e]"
-				>
+				<p className="pt-s text-body-m text-ink-4">
 					No description was recovered for this skill.
 				</p>
 			)}
@@ -159,10 +150,7 @@ export function OverviewCard({
 						{pills}
 					</div>
 				</div>
-				<div
-					// design-escape-ok(space): shipped value; -mt 20px
-					className="relative -mt-[20px] flex min-w-0 shrink-0 flex-col gap-m px-xl"
-				>
+				<div className="relative -mt-xl flex min-w-0 shrink-0 flex-col gap-m px-xl">
 					<span className="relative grid size-11 place-items-center">
 						<span
 							aria-hidden="true"
@@ -177,8 +165,7 @@ export function OverviewCard({
 						/>
 					</span>
 					<h2
-						// design-escape-ok(type): shipped value; 17px / 24px, -0.015em
-						className="min-w-0 truncate text-[17px] leading-6 font-heavy tracking-[-0.015em] text-ink"
+						className="min-w-0 truncate text-body-xxl font-heavy tracking-xs text-ink"
 						title={name}
 					>
 						{name}
@@ -223,7 +210,7 @@ export function StripPill({
 				"inline-flex items-center gap-xs",
 				"corner-full px-m py-xxs",
 				"text-body-s font-medium tabular-nums",
-				// design-escape-ok(colour): a scrim pill over the card's tinted artwork; reads the same in both modes
+				// design-escape-ok(colour): artwork; a scrim pill over the card's tinted art, the same in both modes
 				"bg-black/30 text-white",
 			)}
 		>

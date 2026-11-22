@@ -28,7 +28,7 @@
 	justify-content: space-between;
 	gap: var(--space-xs);
 	min-height: 44px;
-	padding: 6px 10px;
+	padding: var(--space-s) var(--space-l);
 	border-bottom: 1px solid var(--line-soft);
 }
 .compass-tabs,
@@ -38,6 +38,10 @@
 	gap: var(--space-xxs);
 }
 .compass-tabs .text-button {
+	/* the cost page reverts .text-button's display to its call sites; these tabs
+	   rely on the pattern's row */
+	display: inline-flex;
+	align-items: center;
 	gap: var(--space-s);
 	font-size: var(--size-l);
 	font-weight: var(--weight-body-medium);
@@ -59,7 +63,7 @@
 }
 .compass-list-summary {
 	flex-shrink: 0;
-	padding: 8px 18px 2px;
+	padding: var(--space-m) var(--space-xl) var(--space-xxs);
 	color: var(--ink-3);
 	font-size: var(--size-m);
 	font-variant-numeric: tabular-nums;
@@ -90,7 +94,7 @@
 	gap: var(--space-l);
 	width: 100%;
 	min-width: 0;
-	padding: 10px;
+	padding: var(--space-l);
 	border-radius: var(--radius-m);
 	text-align: left;
 	outline: none;
@@ -108,7 +112,7 @@
 	place-items: center;
 	width: 30px;
 	height: 30px;
-	border-radius: 999px;
+	border-radius: var(--radius-full);
 	background: color-mix(in oklch, var(--glyph-color) 14%, transparent);
 }
 .compass-item-copy {
@@ -129,8 +133,7 @@
 	font-variant-numeric: tabular-nums;
 }
 .compass-row-title {
-	/* design-escape-ok(type): no role renders this; 1.35 (18.9px on the 14px row) */
-	line-height: 1.35;
+	line-height: var(--line-xl);
 }
 .compass-row-sub {
 	color: var(--ink-3);
@@ -170,10 +173,11 @@
 .compass-detail {
 	display: flex;
 	flex-direction: column;
-	gap: 28px;
+	gap: var(--space-xxl);
 	max-width: 880px;
 	margin: 0 auto;
-	padding: 28px 40px 64px;
+	padding: var(--space-xxl) calc(var(--space-xxl) + var(--space-xl))
+		calc(var(--space-xxl) * 2 + var(--space-xl));
 }
 .compass-detail-header {
 	display: flex;
@@ -189,11 +193,9 @@
 	font-size: var(--size-m);
 }
 .compass-detail-title {
-	/* design-escape-ok(type): shipped value; 1.375rem */
-	font-size: 1.375rem;
+	font-size: var(--display-size-xxs);
 	font-weight: var(--weight-body-heavy);
-	/* design-escape-ok(type): shipped value; 1.3 */
-	line-height: 1.3;
+	line-height: var(--display-line-xxs);
 	text-wrap: pretty;
 	overflow-wrap: anywhere;
 	display: -webkit-box;
@@ -203,8 +205,7 @@
 }
 .compass-detail-summary {
 	color: var(--ink-3);
-	/* design-escape-ok(type): no role renders this; 1.5 (21px on the 14px summary) */
-	line-height: 1.5;
+	line-height: var(--line-xl);
 	text-wrap: pretty;
 }
 .compass-detail-actions {
@@ -228,7 +229,7 @@
 	flex-wrap: wrap;
 	gap: var(--space-m) calc(var(--space-xxl) * 4 / 3);
 	padding: var(--space-l) var(--space-xl);
-	border-radius: 12px;
+	border-radius: var(--radius-m);
 	background: var(--hover);
 	font-size: var(--size-l);
 }
@@ -243,7 +244,7 @@
 .compass-detail-section {
 	display: flex;
 	flex-direction: column;
-	gap: 10px;
+	gap: var(--space-m);
 }
 .compass-detail-section > h3 {
 	font-size: var(--size-xl);
@@ -293,7 +294,7 @@
 .compass-timeline-item {
 	display: flex;
 	flex-direction: column;
-	gap: 3px;
+	gap: var(--space-xxs);
 	padding: var(--space-s) var(--space-zero) var(--space-s) var(--space-l);
 	border-left: 2px solid var(--line-soft);
 	scroll-margin: 80px;
@@ -352,8 +353,7 @@
 }
 .compass-timeline-item[data-failed] .compass-timeline-icon,
 .compass-timeline-item[data-failed] .compass-timeline-label {
-	/* design-escape-ok(colour): shipped value; oklch(0.577 0.245 27.325) */
-	color: oklch(0.577 0.245 27.325);
+	color: var(--error);
 }
 .compass-timeline-meta {
 	flex-shrink: 0;
@@ -368,11 +368,10 @@
 	-webkit-box-orient: vertical;
 	-webkit-line-clamp: 3;
 	overflow: hidden;
-	margin-left: 22px;
+	margin-left: calc(var(--space-xl) + var(--space-s));
 	color: var(--ink-3);
 	font-size: var(--size-l);
-	/* design-escape-ok(type): shipped value; 1.45 */
-	line-height: 1.45;
+	line-height: var(--line-l);
 	text-align: left;
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
@@ -384,8 +383,7 @@
 }
 .compass-timeline-item[data-kind="tool_call"] .compass-timeline-text,
 .compass-timeline-item[data-kind="tool_result"] .compass-timeline-text {
-	/* design-escape-ok(type): shipped value; ui-monospace */
-	font-family: ui-monospace, monospace;
+	font-family: var(--font-data);
 	font-size: var(--size-m);
 }
 .compass-timeline-item[data-kind="user_prompt"] .compass-timeline-text {
@@ -465,14 +463,13 @@
 .compass-observation {
 	display: flex;
 	flex-direction: column;
-	gap: 10px;
-	padding: 14px;
-	border-radius: 12px;
+	gap: var(--space-m);
+	padding: var(--space-l);
+	border-radius: var(--radius-m);
 	box-shadow: var(--shadow-card);
 	background: var(--surface);
 	font-size: var(--size-xl);
-	/* design-escape-ok(type): shipped value; 1.45 */
-	line-height: 1.45;
+	line-height: var(--line-xl);
 }
 .compass-observation-lesson {
 	font-weight: var(--weight-body-medium);
@@ -496,7 +493,7 @@
 .compass-chip > i {
 	width: 6px;
 	height: 6px;
-	border-radius: 999px;
+	border-radius: var(--radius-full);
 	background: var(--chip-color);
 }
 .compass-evidence {
@@ -504,8 +501,7 @@
 	flex-direction: column;
 	gap: var(--space-xs);
 	color: var(--ink-3);
-	/* design-escape-ok(type): shipped value; ui-monospace */
-	font-family: ui-monospace, monospace;
+	font-family: var(--font-data);
 	font-size: var(--size-m);
 	overflow-wrap: anywhere;
 }
@@ -526,18 +522,16 @@
 	color: var(--ink-3);
 }
 .compass-error {
-	/* design-escape-ok(colour): shipped value; oklch(0.577 0.245 27.325) */
-	color: oklch(0.577 0.245 27.325);
+	color: var(--error);
 	font-size: var(--size-m);
 }
 .compass-fix {
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-xs);
-	padding: 12px 14px;
-	border-radius: 12px;
-	/* design-escape-ok(colour): no role renders this; green-500 at 10%, success-tint is a different green */
-	background: color-mix(in oklch, oklch(0.723 0.192 149.579) 10%, transparent);
+	padding: var(--space-l);
+	border-radius: var(--radius-m);
+	background: var(--success-tint);
 	font-size: var(--size-l);
 }
 .compass-fix-rate {
@@ -547,7 +541,7 @@
 .compass-note {
 	width: 100%;
 	min-height: 72px;
-	padding: 8px 10px;
+	padding: var(--space-m) var(--space-l);
 	border: 1px solid var(--line);
 	border-radius: var(--radius-s);
 	background: transparent;
@@ -561,14 +555,14 @@
 .compass-weeks {
 	display: flex;
 	align-items: flex-end;
-	gap: 3px;
+	gap: var(--space-xxs);
 	height: 44px;
 }
 .compass-weeks > span {
 	flex: 1;
 	min-width: 3px;
 	max-width: 20px;
-	border-radius: 3px;
+	border-radius: var(--radius-xs);
 	background: color-mix(in oklch, var(--bar-color) 55%, transparent);
 }
 .compass-glyphs {
@@ -594,9 +588,9 @@
 		display: inline-flex;
 		align-items: center;
 		gap: var(--space-xs);
-		margin: 12px 0 0 14px;
+		margin: var(--space-l) 0 0 var(--space-l);
 	}
 	.compass-detail {
-		padding: 16px 20px 48px;
+		padding: var(--space-xl) var(--space-xl) calc(var(--space-xxl) * 2);
 	}
 }

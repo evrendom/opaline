@@ -259,8 +259,7 @@ export function SearchInput({
 	return (
 		<InputGroup variant="toolbar" className={cn("w-56", className)}>
 			<InputGroupAddon>
-				{/* design-escape-ok(colour): shipped value; #B8B8B8, #5B5B5B in dark */}
-				<IconSearch className="size-3.5 dark:text-[#5B5B5B] text-[#B8B8B8]" />
+				<IconSearch className="size-3.5 text-ink-4" />
 			</InputGroupAddon>
 			<InputGroupInput
 				value={value}
@@ -397,8 +396,7 @@ export function PaginationFooter({
 			className={cn(
 				"flex items-center justify-end gap-xs",
 				"edge-t-m px-xxl pt-xl",
-				// design-escape-ok(opacity): shipped value; border/50, /40 in dark, as line-strong
-				"border-line/50 dark:border-line/40",
+				"border-line-soft",
 			)}
 		>
 			<span className="text-body-m text-ink-4 tabular-nums">
@@ -408,12 +406,7 @@ export function PaginationFooter({
 				/>{" "}
 				{total === 1 ? noun[0] : noun[1]}
 			</span>
-			<span
-				// design-escape-ok(opacity): no role renders this; ink-3/20
-				className="text-body-m text-ink-3/20 mx-l"
-			>
-				/
-			</span>
+			<span className="text-body-m text-ink-4 mx-l">/</span>
 			{onPageSizeChange ? (
 				<Select<string, false>
 					value={String(pageSize)}

@@ -314,11 +314,9 @@ export function AnalyticsDateRangePicker({
 					button_next: "session-date-picker-nav-button",
 					button_previous: "session-date-picker-nav-button",
 					caption_label: "session-date-picker-month-label",
-					// design-escape-ok(space): calendar spacing (10px) sits between steps; merging moves the grid
-					month: "flex min-w-0 flex-1 flex-col gap-2.5",
+					month: "flex min-w-0 flex-1 flex-col gap-m",
 					month_caption: "flex h-8 w-full items-center justify-center px-zero",
-					// design-escape-ok(space): calendar month gaps (20px, 15.36px) sit between steps; merging moves the months
-					months: "relative flex flex-col gap-5 md:flex-row md:gap-[0.96rem]",
+					months: "relative flex flex-col gap-xl md:flex-row",
 					// Layout: the arrows at the outer edges of the months.
 					nav: "pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between *:pointer-events-auto",
 					week: "mt-xs flex w-full",

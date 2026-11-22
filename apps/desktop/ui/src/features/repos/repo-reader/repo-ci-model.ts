@@ -145,8 +145,7 @@ export const OUTCOME_TONE: Record<CiRound["outcome"], string> = {
 	flaky: "bg-warning-translucent",
 	running: "bg-accent-line",
 	cancelled: "bg-ink-4",
-	// design-escape-ok(opacity): no role renders this; ink-3/30
-	other: "bg-ink-3/30",
+	other: "bg-ink-4",
 };
 
 export const FIRST_TRY_WORDS: Record<FirstTry, string> = {

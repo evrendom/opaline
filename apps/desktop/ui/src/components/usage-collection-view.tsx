@@ -58,9 +58,7 @@ const USAGE_GRID_CLASS_NAME =
 // Card: a squircle on its soft hairline shadow, no border.
 const USAGE_CARD_CLASS_NAME =
 	"relative flex h-full w-full min-w-0 flex-col overflow-hidden corner-m bg-surface text-left text-ink shadow-card squircle:corner-xl corner-squircle";
-const USAGE_METADATA_ICON_CLASS_NAME =
-	// design-escape-ok(colour): shipped value; #8d8d8d, #8c8c8c in dark
-	"size-3.5 shrink-0 text-[#8d8d8d] dark:text-[#8c8c8c]";
+const USAGE_METADATA_ICON_CLASS_NAME = "size-3.5 shrink-0 text-ink-3";
 
 type SkillAttribution = NonNullable<HistoricalSkillSummary["attribution"]>;
 
@@ -161,8 +159,7 @@ export function UsageCollectionHeader({
 					aria-hidden="true"
 					className={cn(
 						"absolute top-1/2 left-2.5 z-10 size-3.5",
-						// design-escape-ok(colour): shipped value; #b8b8b8, #5b5b5b in dark
-						"pointer-events-none -translate-y-1/2 text-[#b8b8b8] dark:text-[#5b5b5b]",
+						"pointer-events-none -translate-y-1/2 text-ink-4",
 					)}
 				/>
 				<input
