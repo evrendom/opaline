@@ -162,8 +162,7 @@ function CalledServerCard({
 function ListedSkillCard({ skill }: { skill: RepositoryListedSkill }) {
 	return (
 		<div className="flex min-h-0 min-w-0 flex-1 flex-col">
-			{/* design-escape-ok(opacity): shipped value; border/50 as line-strong at 50% */}
-			<header className="flex flex-col gap-m edge-b-m border-line/50 px-[calc(var(--space-xl)+var(--space-xs))] py-xl">
+			<header className="flex flex-col gap-m edge-b-m border-line-soft px-[calc(var(--space-xl)+var(--space-xs))] py-xl">
 				<div className="flex min-w-0 items-center gap-m">
 					<span className="flex shrink-0 opacity-60 grayscale">
 						<SkillMarkGlyph />
@@ -327,8 +326,7 @@ export function RepoSetupView({
 							"flex h-8 shrink-0 items-center gap-s",
 							"corner-s pr-xs pl-m",
 							"text-body-m",
-							// design-escape-ok(opacity): no role renders this; field/50
-							"bg-field/50",
+							"bg-hover",
 						)}
 					>
 						<span className="shrink-0 font-medium">Entire repo</span>
@@ -738,10 +736,7 @@ function RepoSetupRow({
 	const name = (
 		<span
 			title={file.setupFile}
-			className={cn(
-				"truncate text-body-m",
-				isPicked ? "text-ink" : "text-ink",
-			)}
+			className={cn("truncate text-body-m", isPicked ? "text-ink" : "text-ink")}
 		>
 			{setupName(file)}
 		</span>
@@ -825,10 +820,7 @@ function SetupSkeleton() {
 		>
 			<div className="flex h-full min-h-0 gap-xxl">
 				<div className="-mb-m flex min-h-0 w-[320px] shrink-0 flex-col gap-s">
-					<div
-						// design-escape-ok(opacity): no role renders this; field/50
-						className="flex h-8 shrink-0 items-center corner-s bg-field/50 pl-m"
-					>
+					<div className="flex h-8 shrink-0 items-center corner-s bg-hover pl-m">
 						<Bar className="h-2.5 w-20 corner-full" />
 					</div>
 					<div className="flex flex-col gap-xxs">

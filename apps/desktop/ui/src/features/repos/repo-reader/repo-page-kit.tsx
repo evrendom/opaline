@@ -175,8 +175,7 @@ export function PushStrip({
 			{pull.rounds.slice(0, 14).map((round) => (
 				<span
 					key={round.sha}
-					// design-escape-ok(radius): shipped value; 2px corner
-					className={cn("size-2 rounded-[2px]", OUTCOME_TONE[round.outcome])}
+					className={cn("size-2 corner-zero", OUTCOME_TONE[round.outcome])}
 				/>
 			))}
 			{pull.rounds.length > 14 ? (
@@ -255,8 +254,7 @@ export function Bars({
 	highlight,
 	labels,
 	onPick,
-	// design-escape-ok(opacity): no role renders this; ink/70
-	tone = "bg-ink/70",
+	tone = "bg-ink-2",
 	values,
 }: {
 	className?: string;
@@ -287,8 +285,7 @@ export function Bars({
 						title={labels?.[index]}
 						onClick={onPick ? () => onPick(index) : undefined}
 						className={cn(
-							// design-escape-ok(radius): shipped value; 2px corner
-							"min-w-0 flex-1 rounded-[2px] transition-opacity focus-outline",
+							"min-w-0 flex-1 corner-zero transition-opacity focus-outline",
 							onPick ? "hover:opacity-100" : "cursor-default",
 							highlight === undefined ||
 								highlight === null ||

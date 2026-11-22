@@ -428,17 +428,13 @@ export function RepoSignals({ repo }: { repo: RepositorySummary }) {
 			count: repo.signals.userNegative,
 			label: "negative",
 			title: "Negative user signals",
-			color:
-				// design-escape-ok(colour): shipped value; the negative chip's rose
-				"bg-[#ffe4e6] text-[#be123c] dark:bg-[#411b25] dark:text-[#fda4af]",
+			color: "bg-error-tint text-error",
 		},
 		{
 			count: repo.signals.modelApologies,
 			label: "apologies",
 			title: "Model apologies",
-			color:
-				// design-escape-ok(colour): shipped value; the apologies chip's amber
-				"bg-[#fef3c7] text-[#b45309] dark:bg-[#40321b] dark:text-[#fcd34d]",
+			color: "bg-warning-tint text-warning",
 		},
 	].filter((signal) => signal.count > 0);
 	if (signals.length === 0) return null;
@@ -486,16 +482,12 @@ function RepoLastActive({ lastActiveAt }: { lastActiveAt: string }) {
 		>
 			<span aria-hidden="true" className="relative flex size-1.5 shrink-0">
 				{recency === "now" ? (
-					<span
-						// design-escape-ok(colour): shipped value; #22c55e
-						className="absolute inset-0 animate-ping corner-full bg-[#22c55e] opacity-60 motion-reduce:animate-none"
-					/>
+					<span className="absolute inset-0 animate-ping corner-full bg-success opacity-60 motion-reduce:animate-none" />
 				) : null}
 				<span
 					className={cn(
 						"relative size-1.5 corner-full",
-						// design-escape-ok(colour,opacity): shipped value; #22c55e, ink/20, dark ink/25
-						recency === "older" ? "bg-ink/20 dark:bg-ink/25" : "bg-[#22c55e]",
+						recency === "older" ? "bg-ink-4" : "bg-success",
 					)}
 				/>
 			</span>

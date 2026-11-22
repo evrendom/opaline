@@ -51,8 +51,7 @@ export function EmptyState({
 						className={cn(
 							"absolute inset-0",
 							restingChipClassName,
-							// design-escape-ok(colour): the opal shape's ring is artwork
-							"[--opal-ring:rgb(17_24_39/0.08)]",
+							"[--opal-ring:var(--line)]",
 						)}
 					/>
 					<Icon aria-hidden="true" className={cn("relative", iconClassName)} />
@@ -249,8 +248,7 @@ export function StatCard({
 							<CardTitle
 								className={cn(
 									"inline-flex min-w-0 items-center gap-xs overflow-hidden",
-									// design-escape-ok(type): shipped value; -0.025em title tracking
-									"tracking-[-0.025em] whitespace-nowrap tabular-nums",
+									"tracking-xs whitespace-nowrap tabular-nums",
 									"opacity-45",
 								)}
 							>
@@ -280,8 +278,7 @@ export function StatCard({
 					</div>
 				</div>
 				{note && noteBelow && !loading ? (
-					// design-escape-ok(type): shipped value; -0.025em title tracking
-					<CardTitle className="min-w-0 tracking-[-0.025em] text-pretty tabular-nums opacity-45">
+					<CardTitle className="min-w-0 tracking-xs text-pretty tabular-nums opacity-45">
 						{note}
 					</CardTitle>
 				) : null}
@@ -303,11 +300,7 @@ function StatValue({
 }) {
 	if (!tip)
 		return (
-			<CardTitle
-				// design-escape-ok(type): shipped value; -0.025em title tracking
-				className="shrink-0 tracking-[-0.025em] tabular-nums"
-				title={title}
-			>
+			<CardTitle className="shrink-0 tracking-xs tabular-nums" title={title}>
 				{children}
 			</CardTitle>
 		);
@@ -316,8 +309,7 @@ function StatValue({
 			<TooltipTrigger
 				render={
 					<CardTitle
-						// design-escape-ok(type): shipped value; -0.025em title tracking
-						className="relative z-20 shrink-0 cursor-default tracking-[-0.025em] tabular-nums"
+						className="relative z-20 shrink-0 cursor-default tracking-xs tabular-nums"
 						onClick={onSelect}
 					/>
 				}

@@ -24,7 +24,7 @@ describe("ConversationTrace language signals", () => {
 		);
 
 		expect(markup).toContain('data-signal="positive"');
-		expect(markup).toContain("bg-[#dcfce7]");
+		expect(markup).toContain("bg-success-tint");
 	});
 
 	test("highlights model-authored summary prose", () => {

@@ -92,12 +92,10 @@ export function PillTabs<T extends string>({
 							active && !pill && cn("bg-field", pillClassName),
 							active
 								? empty
-									? // design-escape-ok(opacity): no role renders this; ink/45
-										"text-ink/45"
+									? "text-ink-3"
 									: "text-ink"
 								: empty
-									? // design-escape-ok(opacity): no role renders this; ink-3/45
-										"text-ink-3/45 hover:text-ink-3"
+									? "text-ink-4 hover:text-ink-3"
 									: "text-ink-3 hover:text-ink",
 						)}
 					>

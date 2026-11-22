@@ -1,41 +1,16 @@
 .rich-skill-document {
-	/* design-escape-ok(colour): shipped value; rgba(255, 255, 255, 0.7) */
-	--skill-document-code-highlight: rgba(255, 255, 255, 0.7);
 	min-width: 0;
 	color: var(--ink);
 	font-family: var(--font-sans);
-	/* design-escape-ok(type): shipped value; 15px */
-	font-size: 15px;
+	font-size: var(--size-xl);
 	font-weight: var(--weight-body-regular);
-	/* design-escape-ok(type): shipped value; 24px */
-	line-height: 24px;
+	line-height: var(--line-xl);
 	overflow-wrap: anywhere;
-	/* design-escape-ok(colour): shipped value; rgba(242, 241, 238, 0.62) */
-	--skill-document-table-background: rgba(242, 241, 238, 0.62);
-	/* design-escape-ok(colour): shipped value; rgba(15, 23, 42, 0.12) */
-	--skill-document-border: rgba(15, 23, 42, 0.12);
-	/* design-escape-ok(colour): shipped value; rgba(135, 131, 120, 0.15) */
-	--skill-document-inline-code-background: rgba(135, 131, 120, 0.15);
-	/* design-escape-ok(colour): shipped value; rgba(31, 35, 40, 0.08) */
-	--skill-document-code-border: rgba(31, 35, 40, 0.08);
-	/* design-escape-ok(colour): shipped value; #f6f8fa */
-	--skill-document-code-background: #f6f8fa;
-}
-
-.dark .rich-skill-document {
-	/* Hairlines: a 7% edge and a barely-there inner highlight. */
-	/* design-escape-ok(colour): shipped value; rgba(255, 255, 255, 0.03) */
-	--skill-document-code-highlight: rgba(255, 255, 255, 0.03);
-	/* design-escape-ok(colour): shipped value; rgba(255, 255, 255, 0.055) */
-	--skill-document-table-background: rgba(255, 255, 255, 0.055);
-	/* design-escape-ok(colour): shipped value; rgba(255, 255, 255, 0.16) */
-	--skill-document-border: rgba(255, 255, 255, 0.16);
-	/* design-escape-ok(colour): shipped value; rgba(255, 255, 255, 0.09) */
-	--skill-document-inline-code-background: rgba(255, 255, 255, 0.09);
-	/* design-escape-ok(colour): shipped value; rgba(255, 255, 255, 0.07) */
-	--skill-document-code-border: rgba(255, 255, 255, 0.07);
-	/* design-escape-ok(colour): shipped value; oklch(0.205 0 0) */
-	--skill-document-code-background: oklch(0.205 0 0);
+	--skill-document-table-background: var(--hover);
+	--skill-document-border: var(--line);
+	--skill-document-inline-code-background: var(--hover-strong);
+	--skill-document-code-border: var(--line);
+	--skill-document-code-background: var(--inset);
 }
 
 .rich-skill-document > :first-child {
@@ -47,7 +22,7 @@
 }
 
 .rich-skill-document p {
-	min-height: 24px;
+	min-height: var(--line-xl);
 	margin: var(--space-zero) var(--space-zero) var(--space-m);
 	color: var(--ink);
 	font: inherit;
@@ -66,39 +41,30 @@
 .rich-skill-document h1,
 .rich-skill-document h2 {
 	margin: calc(var(--space-xxl) * 4 / 3) var(--space-zero) var(--space-zero);
-	/* design-escape-ok(type): shipped value; 19px */
-	font-size: 19px;
-	font-weight: 700;
+	font-size: var(--display-size-xxs);
+	font-weight: var(--weight-body-heavy);
 	line-height: var(--display-line-xxs);
 }
 
 .rich-skill-document h3 {
 	margin: var(--space-xxl) var(--space-zero) var(--space-s);
-	/* design-escape-ok(type): shipped value; 17px */
-	font-size: 17px;
+	font-size: var(--size-xxl);
 	font-weight: var(--weight-body-heavy);
 	line-height: var(--line-xxl);
 }
 
 .rich-skill-document h4 {
-	margin: 18px 0 0;
-	/* design-escape-ok(type): shipped value; 15px */
-	font-size: 15px;
+	margin: var(--space-xl) 0 0;
+	font-size: var(--size-xl);
 	font-weight: var(--weight-body-heavy);
-	/* design-escape-ok(type): shipped value; 24px */
-	line-height: 24px;
+	line-height: var(--line-xl);
 }
 
 .rich-skill-document blockquote {
-	margin: 10px 0 8px;
-	padding: 4px 14px;
+	margin: var(--space-m) 0 var(--space-m);
+	padding: var(--space-xs) var(--space-l);
 	border-left: 3px solid var(--skill-document-border);
-	/* design-escape-ok(colour): shipped value; #667085 (main's dashboardy-muted) */
-	color: #667085;
-}
-.dark .rich-skill-document blockquote {
-	/* design-escape-ok(colour): shipped value; #a1a2a8 */
-	color: #a1a2a8;
+	color: var(--ink-3);
 }
 
 .rich-skill-document blockquote p {
@@ -108,8 +74,8 @@
 
 .rich-skill-document ul,
 .rich-skill-document ol {
-	margin: 5px 0;
-	padding-left: 28px;
+	margin: var(--space-xs) 0;
+	padding-left: var(--space-xxl);
 	color: var(--ink);
 	font: inherit;
 }
@@ -133,14 +99,11 @@
 
 .rich-skill-document code:not(.rich-skill-document__code) {
 	padding: var(--space-xxs) var(--space-xs);
-	border-radius: 4px;
+	border-radius: var(--radius-xs);
 	background: var(--skill-document-inline-code-background);
-	/* design-escape-ok(colour): shipped value; #c43c4b */
-	color: #c43c4b;
-	/* design-escape-ok(type): shipped value; "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace */
-	font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-	/* design-escape-ok(type): no role renders this; 0.85em, inline code scales with its heading */
-	font-size: 0.85em;
+	color: var(--ink);
+	font-family: var(--font-data);
+	font-size: var(--size-m);
 }
 
 .rich-skill-document__code-block {
@@ -150,18 +113,14 @@
 }
 
 .rich-skill-document__plain-code-block {
-	margin: 12px 0 14px;
-	padding: 14px 16px;
+	margin: var(--space-l) 0 var(--space-l);
+	padding: var(--space-l) var(--space-xl);
 	overflow: auto;
 	border: 0.5px solid var(--skill-document-code-border);
 	border-radius: var(--radius-s);
 	background: var(--skill-document-code-background);
-	box-shadow: inset 0 0 0 1px var(--skill-document-code-highlight);
-	/* design-escape-ok(colour): shipped value; #1f2328 */
-	color: #1f2328;
-	/* design-escape-ok(type): shipped value; "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", Menlo, monos */
-	font-family:
-		"SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+	color: var(--ink);
+	font-family: var(--font-data);
 	font-size: inherit;
 	line-height: inherit;
 	tab-size: 2;
@@ -169,8 +128,8 @@
 
 .rich-skill-document[data-variant="preview"]
 	.rich-skill-document__plain-code-block {
-	margin: 8px 0 10px;
-	padding: 9px 10px;
+	margin: var(--space-m) 0 var(--space-m);
+	padding: var(--space-m) var(--space-m);
 	border-radius: var(--radius-xs);
 }
 
@@ -181,7 +140,7 @@
 
 .rich-skill-document hr {
 	height: 1px;
-	margin: 20px 2px;
+	margin: var(--space-xl) var(--space-xxs);
 	border: 0;
 	background: var(--skill-document-border);
 }
@@ -199,14 +158,13 @@
 	color: var(--ink);
 	font-family: var(--font-sans);
 	font-size: var(--size-xl);
-	/* design-escape-ok(type): shipped value; 21px */
-	line-height: 21px;
+	line-height: var(--line-xl);
 }
 
 .rich-skill-document th,
 .rich-skill-document td {
 	min-width: 92px;
-	padding: 7px 9px;
+	padding: var(--space-s) var(--space-m);
 	border: 1px solid var(--skill-document-border);
 	vertical-align: top;
 }
@@ -219,7 +177,7 @@
 
 .rich-skill-document th p,
 .rich-skill-document td p {
-	min-height: 21px;
+	min-height: var(--line-xl);
 	margin: var(--space-zero);
 	font-family: inherit;
 	font-size: inherit;
@@ -227,8 +185,7 @@
 }
 
 .rich-skill-document a {
-	/* design-escape-ok(colour): shipped value; #2563eb (main's dashboardy-accent) */
-	color: #2563eb;
+	color: var(--accent);
 	text-decoration: underline;
 	text-decoration-color: color-mix(in srgb, currentcolor 34%, transparent);
 	text-underline-offset: 3px;
@@ -283,23 +240,23 @@
 
 .rich-skill-document[data-variant="preview"] ul,
 .rich-skill-document[data-variant="preview"] ol {
-	margin: 3px 0;
-	padding-left: 17px;
+	margin: var(--space-xxs) 0;
+	padding-left: var(--space-xl);
 }
 
 .rich-skill-document[data-variant="preview"]
 	code:not(.rich-skill-document__code) {
-	padding: 1px 3px;
-	border-radius: 3px;
+	padding: 0 var(--space-xxs);
+	border-radius: var(--radius-xs);
 }
 
 .rich-skill-document[data-variant="preview"] hr {
-	margin: 10px 1px;
+	margin: var(--space-m) 0;
 }
 
 .rich-skill-document[data-variant="preview"]
 	.rich-skill-document__table-scroll {
-	margin: 7px 0;
+	margin: var(--space-s) 0;
 }
 
 .rich-skill-document[data-variant="preview"] table {
@@ -310,7 +267,7 @@
 .rich-skill-document[data-variant="preview"] th,
 .rich-skill-document[data-variant="preview"] td {
 	min-width: 58px;
-	padding: 4px 5px;
+	padding: var(--space-xs) var(--space-xs);
 }
 
 .rich-skill-document[data-variant="preview"] > :first-child {
@@ -324,16 +281,10 @@
 @media (min-width: 40rem) {
 	.rich-skill-document[data-variant="preview"] {
 		font-size: var(--size-xl);
-		/* design-escape-ok(type): shipped value; 1.375rem */
-		line-height: 1.375rem;
+		line-height: var(--line-xl);
 	}
 }
 
 .rich-skill-document[data-variant="preview"] :is(pre, code) {
 	color: inherit;
-}
-
-.dark .rich-skill-document a {
-	/* design-escape-ok(colour): shipped value; #93c5fd */
-	color: #93c5fd;
 }

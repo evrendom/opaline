@@ -2,7 +2,7 @@
    share its tokens. */
 .cost-page,
 .cost-range-controls {
-	/* design-escape-ok(colour): the p95 duration series, data paint */
+	/* design-escape-ok(colour): data paint; the p95 duration series */
 	--cost-duration-p95: oklch(0.606 0.219 292.717);
 	--cost-chart-fill-opacity: 0.08;
 }
@@ -27,7 +27,7 @@
 	color: var(--ink-3);
 	line-height: inherit;
 	letter-spacing: inherit;
-	border-radius: 5px;
+	border-radius: var(--radius-xs);
 }
 .cost-page .text-button:hover,
 .cost-page
@@ -61,7 +61,7 @@
 	padding: var(--space-l) var(--cost-page-gutter, 32px) var(--space-xxl);
 	display: flex;
 	flex-direction: column;
-	gap: 20px;
+	gap: var(--space-xl);
 }
 .cost-page-toolbar {
 	display: flex;
@@ -69,7 +69,7 @@
 	flex-shrink: 0;
 	gap: var(--space-m);
 	min-height: 40px;
-	padding: 5px 32px;
+	padding: var(--space-xs) calc(var(--space-xxl) + var(--space-m));
 	background: var(--canvas);
 }
 
@@ -98,7 +98,7 @@
 	.cost-chart-card,
 	.cost-breakdown,
 	.cost-error {
-		border-radius: 24px;
+		border-radius: var(--radius-xl);
 		/* biome-ignore lint/correctness/noUnknownProperty: see the @supports note above. */
 		corner-shape: squircle;
 	}
@@ -156,11 +156,11 @@
 	initial-value: transparent;
 }
 .cost-metric {
-	/* design-escape-ok(colour): a grey derived from the metric's series colour, data paint */
+	/* design-escape-ok(colour): data paint; a grey derived from the metric's series colour */
 	--metric-tint: oklch(from var(--metric-color) l 0 h);
 	position: relative;
-	--metric-pad-x: 20px;
-	padding: 20px var(--metric-pad-x) 0;
+	--metric-pad-x: var(--space-xl);
+	padding: var(--space-xl) var(--metric-pad-x) 0;
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-m);
@@ -223,7 +223,7 @@
 .cost-metric-label {
 	display: flex;
 	align-items: center;
-	gap: 7px;
+	gap: var(--space-s);
 	min-width: 0;
 	font-size: var(--size-xl);
 	line-height: var(--line-xl);
@@ -257,12 +257,10 @@
 	gap: var(--space-s);
 	flex-shrink: 0;
 	font-size: var(--size-xl);
-	/* design-escape-ok(type): shipped value; 1.5 */
-	line-height: 1.5;
+	line-height: var(--line-xl);
 	font-weight: var(--weight-body-medium);
 	font-variant-numeric: tabular-nums;
-	/* design-escape-ok(type): shipped value; -0.025em */
-	letter-spacing: -0.025em;
+	letter-spacing: var(--tracking-xs);
 }
 .cost-metric-value:has(> .cost-metric-chip) {
 	gap: var(--space-xs);
@@ -271,8 +269,7 @@
 	line-height: 1;
 	font-size: var(--size-m);
 	font-weight: 450;
-	/* design-escape-ok(type): shipped value; -0.01em */
-	letter-spacing: -0.01em;
+	letter-spacing: var(--tracking-xs);
 	color: var(--ink-3);
 }
 .cost-metric-qualifier {
@@ -352,7 +349,7 @@
 	gap: var(--space-l);
 	justify-content: space-between;
 	align-items: flex-start;
-	padding: 18px 20px 0;
+	padding: var(--space-xl) var(--space-xl) 0;
 	min-height: 72px;
 }
 .cost-chart-key-copy {
@@ -393,14 +390,14 @@
 }
 .cost-chart-legend {
 	display: flex;
-	gap: 8px 18px;
+	gap: var(--space-m) var(--space-xl);
 	flex-wrap: wrap;
 	min-width: 0;
 }
 .cost-legend-item {
 	display: flex;
 	align-items: center;
-	gap: 7px;
+	gap: var(--space-s);
 	font-size: var(--size-m);
 	color: var(--ink-3);
 }
@@ -438,9 +435,9 @@
 	justify-content: flex-end;
 }
 .cost-duration-legend {
-	padding: 5px 6px;
-	margin: -5px -6px;
-	border-radius: 4px;
+	padding: var(--space-xs) var(--space-s);
+	margin: calc(-1 * var(--space-xs)) calc(-1 * var(--space-s));
+	border-radius: var(--radius-xs);
 }
 .cost-duration-legend:hover {
 	background: var(--hover);
@@ -467,7 +464,7 @@
 	position: relative;
 	/* The marketing demo sets --cost-viewport-height to the height it opens to. */
 	height: clamp(240px, calc(var(--cost-viewport-height, 100vh) * 0.31), 360px);
-	margin: 16px 18px 14px 8px;
+	margin: var(--space-xl) var(--space-xl) var(--space-l) var(--space-m);
 	min-width: 0;
 }
 .cost-chart-tooltip {
@@ -476,18 +473,16 @@
 	padding: var(--space-l);
 	color: var(--ink);
 	background: var(--canvas);
-	/* design-escape-ok(colour): no role renders this; the tooltip's 6px 20px 8% drop */
-	--cost-tooltip-drop: 0 6px 20px rgb(0 0 0 / 8%);
 	box-shadow:
-		var(--cost-tooltip-drop),
+		var(--shadow-float),
 		0 0 0 1px var(--line);
 	display: grid;
-	gap: 7px;
+	gap: var(--space-s);
 	font-size: var(--size-m);
 }
 .cost-chart-tooltip p {
 	color: var(--ink-3);
-	padding-bottom: 3px;
+	padding-bottom: var(--space-xxs);
 }
 .cost-chart-tooltip > div,
 .cost-chart-tooltip span {
@@ -511,7 +506,7 @@
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	gap: 10px;
+	gap: var(--space-m);
 	padding: var(--space-zero) var(--space-xl);
 	text-align: center;
 	pointer-events: none;
@@ -578,12 +573,11 @@
 	gap: var(--space-l);
 	align-items: center;
 	justify-content: space-between;
-	padding: 20px 20px 4px;
+	padding: var(--space-xl) var(--space-xl) var(--space-xs);
 }
 .cost-breakdown-heading h2 {
 	font-size: var(--size-xl);
-	/* design-escape-ok(type): shipped value; 1.5 */
-	line-height: 1.5;
+	line-height: var(--line-xl);
 	font-weight: var(--weight-body-medium);
 	text-wrap: balance;
 }
@@ -597,7 +591,7 @@
 }
 .cost-heading-currency {
 	opacity: 0.6;
-	padding-left: 3px;
+	padding-left: var(--space-xxs);
 }
 .cost-scroll-fade {
 	position: relative;
@@ -637,7 +631,7 @@
 	justify-content: space-between;
 	gap: var(--space-xxl);
 	min-height: 0;
-	padding: 12px 20px;
+	padding: var(--space-l) var(--space-xl);
 	font-size: var(--size-xl);
 	border-radius: var(--radius-zero);
 	border-top: 1px solid var(--line-soft);
@@ -677,10 +671,10 @@
 	width: 100%;
 	min-width: 0;
 	min-height: 34px;
-	padding: 7px 9px;
+	padding: var(--space-s) var(--space-m);
 	font-size: var(--size-l);
 	text-align: left;
-	border-radius: 5px;
+	border-radius: var(--radius-xs);
 	outline: none;
 	font-variant-numeric: tabular-nums;
 }
@@ -710,7 +704,7 @@
 	height: 2px;
 	margin-top: var(--space-s);
 	margin-left: auto;
-	border-radius: 999px;
+	border-radius: var(--radius-full);
 	background: color-mix(in oklch, var(--ink-3) 10%, transparent);
 	overflow: hidden;
 }
@@ -734,10 +728,8 @@
 	text-align: right;
 }
 .cost-member-initial {
-	/* design-escape-ok(type): shipped value; 0.5625rem */
-	font-size: 0.5625rem;
-	/* the avatar fallback's text-sm ratio, as shipped */
-	line-height: calc(1.25 / 0.875);
+	font-size: var(--size-xxs);
+	line-height: var(--line-xxs);
 	background: var(--hover);
 	color: var(--ink-3);
 	font-weight: var(--weight-body-medium);
@@ -757,7 +749,7 @@
 	grid-template-rows: 0.28fr;
 	min-width: 40px;
 	min-height: 10px;
-	border-radius: 999px;
+	border-radius: var(--radius-full);
 	overflow: hidden;
 	background: color-mix(in srgb, var(--ink) 14%, var(--canvas));
 	box-shadow: 0 0 0 1px var(--line);
@@ -776,7 +768,7 @@
 	transition:
 		transform var(--motion-medium-duration) var(--motion-easing),
 		opacity var(--motion-duration) var(--motion-easing);
-	padding: 3px;
+	padding: var(--space-xxs);
 }
 .cost-breakdown:hover .cost-tools,
 .cost-tools:focus-within,
@@ -784,10 +776,8 @@
 	grid-template-columns: 1fr;
 	grid-template-rows: 1fr;
 	background: var(--canvas);
-	/* design-escape-ok(colour): no role renders this; the tools panel's 2px 7px 8% drop */
-	--cost-tools-drop: 0 2px 7px rgb(0 0 0 / 8%);
 	box-shadow:
-		var(--cost-tools-drop),
+		var(--shadow-float),
 		0 0 0 1px var(--line);
 }
 .cost-breakdown:hover .cost-tools-inner,
@@ -801,7 +791,7 @@
 	position: relative;
 	height: 28px;
 	width: 34px;
-	border-radius: 999px;
+	border-radius: var(--radius-full);
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -843,7 +833,7 @@
 	padding: var(--space-xs) var(--space-l) var(--space-l);
 }
 .cost-breakdown-empty {
-	padding: 35px 12px;
+	padding: calc(var(--space-xxl) + var(--space-l)) var(--space-l);
 	text-align: center;
 	color: var(--ink-3);
 	font-size: var(--size-l);
@@ -851,7 +841,7 @@
 .cost-search {
 	width: 100%;
 	min-width: 0;
-	padding: 8px 10px;
+	padding: var(--space-m) var(--space-m);
 	border: 1px solid var(--line);
 	border-radius: var(--radius-xs);
 	background: transparent;
@@ -867,7 +857,7 @@
 	overscroll-behavior: none;
 	display: flex;
 	flex-direction: column;
-	gap: 3px;
+	gap: var(--space-xxs);
 }
 .cost-dialog-footer {
 	display: flex;
@@ -878,7 +868,7 @@
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 20px;
+	gap: var(--space-xl);
 	min-height: 220px;
 	padding: calc(var(--space-xxl) * 4 / 3);
 }
@@ -928,15 +918,14 @@
 	display: block;
 	height: 8px;
 	width: 28px;
-	border-radius: 2px;
+	border-radius: 0;
 }
 .cost-chart-loading-dates [skullet-bar] {
 	width: 48px;
 }
 .cost-metric[data-unavailable="true"] .cost-metric-value {
 	font-size: var(--size-xl);
-	/* design-escape-ok(type): shipped value; 2.0625rem */
-	line-height: 2.0625rem;
+	line-height: var(--display-line-xs);
 	letter-spacing: var(--letter-spacing-xl);
 	color: var(--ink-3);
 }
@@ -1098,12 +1087,11 @@
 }
 @container (max-width: 560px) {
 	.cost-metric {
-		--metric-pad-x: 12px;
+		--metric-pad-x: var(--space-l);
 		padding: var(--space-xl) var(--metric-pad-x) 0;
 	}
 	.cost-metric-value {
-		/* design-escape-ok(type): shipped value; 1.375rem */
-		font-size: 1.375rem;
+		font-size: var(--display-size-xxs);
 	}
 	.cost-metric-label {
 		font-size: var(--size-m);
@@ -1114,7 +1102,7 @@
 }
 @media (max-width: 640px) {
 	.cost-page-content {
-		padding: 20px 14px;
+		padding: var(--space-xl) var(--space-l);
 		gap: var(--space-xl);
 	}
 	.cost-breakdown-row,
@@ -1301,8 +1289,7 @@
 	position: absolute;
 	inset: 0;
 	--ci-run: color-mix(in oklab, var(--ink) 18%, transparent);
-	/* design-escape-ok(colour): no role renders this; red-500, the error role is a different red */
-	--ci-failed: oklch(0.637 0.208 25.331);
+	--ci-failed: var(--error);
 }
 .cost-ci-chart svg {
 	display: block;
@@ -1355,8 +1342,7 @@
 	background: color-mix(in oklab, var(--ink) 35%, transparent);
 }
 .cost-legend-item i[data-ci="failed"] {
-	/* design-escape-ok(colour): shipped value; oklch(0.637 0.208 25.331) */
-	background: oklch(0.637 0.208 25.331);
+	background: var(--error);
 }
 .cost-ci-ring {
 	width: 15px;
@@ -1371,6 +1357,5 @@
 	transition: stroke var(--motion-medium-duration) var(--motion-easing);
 }
 .cost-ci-ring path[data-failed] {
-	/* design-escape-ok(colour): shipped value; oklch(0.637 0.208 25.331) */
-	stroke: oklch(0.637 0.208 25.331);
+	stroke: var(--error);
 }

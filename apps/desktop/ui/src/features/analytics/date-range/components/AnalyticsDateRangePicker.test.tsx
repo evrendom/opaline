@@ -373,9 +373,7 @@ describe("AnalyticsDateRangePicker", () => {
 		expect(calendar).toHaveAttribute("data-fixed-weeks", "true");
 		expect(calendar).toHaveAttribute("data-show-outside-days", "false");
 		expect(calendar).toHaveAttribute("data-week-starts-on", "1");
-		expect(calendar.getAttribute("data-months-class")).toContain(
-			"md:gap-[0.96rem]",
-		);
+		expect(calendar.getAttribute("data-months-class")).toContain("md:flex-row");
 		expect(calendar.getAttribute("data-weekend-class")).toContain(
 			"rdp-day_weekends",
 		);

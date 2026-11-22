@@ -49,8 +49,7 @@ function WorkspaceSetupHeader({
 	return createPortal(
 		<nav
 			aria-label={`${shellRoute.title} breadcrumb`}
-			// design-escape-ok(type): shipped value; -0.025em title tracking
-			className="flex min-w-0 flex-1 items-center gap-s text-body-xxl font-medium tracking-[-0.025em]"
+			className="flex min-w-0 flex-1 items-center gap-s text-body-xxl font-medium tracking-xs"
 		>
 			<button
 				type="button"
@@ -72,11 +71,7 @@ function WorkspaceSetupHeader({
 				stroke={1.5}
 			/>
 			<span aria-current="page" className="flex min-w-0 items-center gap-s">
-				<SkillMark
-					skill={name}
-					// design-escape-ok(type): shipped value; 10px on the title's 1.5 line
-					className="size-4.5 text-body-xs leading-[1.5]"
-				/>
+				<SkillMark skill={name} className="size-4.5 text-body-xs" />
 				<span className="truncate">{name}</span>
 			</span>
 		</nav>,

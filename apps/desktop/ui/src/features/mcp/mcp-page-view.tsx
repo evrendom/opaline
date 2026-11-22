@@ -168,8 +168,7 @@ export function McpCardsGrid({
 		<ScrollColumn className="min-w-0 overscroll-contain">
 			<ul
 				aria-label="MCP servers"
-				// design-escape-ok(space): shipped value; gap 20px, sm:p 20px
-				className="grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,13.5rem),1fr))] gap-[20px] p-xl sm:p-[20px] lg:p-xxl"
+				className="grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,13.5rem),1fr))] gap-xl p-xl lg:p-xxl"
 			>
 				{servers.map((server) => (
 					<li key={server.file.setupFile} className="min-w-0">
@@ -223,26 +222,15 @@ function McpCard({
 							data-card-row=""
 							className="flex min-w-0 items-baseline gap-m"
 						>
-							<span
-								// design-escape-ok(opacity): shipped value; dashboardy-heading/75
-								className="min-w-0 truncate text-ink/75"
-							>
-								{tool.name}
-							</span>
-							<span
-								// design-escape-ok(colour): shipped value; dashboardy-subtle #98a2b3 / #77787e
-								className="ml-auto shrink-0 text-body-m text-[#98a2b3] tabular-nums dark:text-[#77787e]"
-							>
+							<span className="min-w-0 truncate text-ink-2">{tool.name}</span>
+							<span className="ml-auto shrink-0 text-body-m text-ink-4 tabular-nums">
 								{tool.calls.toLocaleString()}
 							</span>
 						</li>
 					))}
 				</ul>
 			) : (
-				<p
-					// design-escape-ok(type,colour): shipped value; 12px / 20px, dashboardy-subtle #98a2b3 / #77787e
-					className="pt-s text-xs leading-5 text-[#98a2b3] dark:text-[#77787e]"
-				>
+				<p className="pt-s text-body-m text-ink-4">
 					Connected in {server.sessions.toLocaleString()}{" "}
 					{server.sessions === 1 ? "session" : "sessions"}, never called.
 				</p>

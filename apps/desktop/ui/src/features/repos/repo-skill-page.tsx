@@ -219,8 +219,7 @@ function SkillHeader({
 	return createPortal(
 		<nav
 			aria-label="Skill breadcrumb"
-			// design-escape-ok(type): shipped value; -0.025em title tracking
-			className="flex min-w-0 flex-1 items-center gap-s text-body-xxl font-medium tracking-[-0.025em]"
+			className="flex min-w-0 flex-1 items-center gap-s text-body-xxl font-medium tracking-xs"
 		>
 			<button
 				type="button"
@@ -258,11 +257,7 @@ function SkillHeader({
 			) : null}
 			<span aria-current="page" className="flex min-w-0 items-center gap-s">
 				{/* The skill's own mark, as on its row in the skills table. */}
-				<SkillMark
-					skill={skillName}
-					// design-escape-ok(type): shipped value; 10px on the title's 1.5 line
-					className="size-4.5 text-body-xs leading-[1.5]"
-				/>
+				<SkillMark skill={skillName} className="size-4.5 text-body-xs" />
 				<span className="truncate">{skillName}</span>
 			</span>
 		</nav>,

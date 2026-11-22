@@ -953,8 +953,7 @@ export function CostChart({
 							<div className="cost-chart-legend">
 								{pending && series.length === 0 ? (
 									<Skeleton
-										// design-escape-ok(radius): a 12px skeleton bar keeps 4px corners, under the xs step
-										className="h-3 rounded-[4px]"
+										className="h-3 corner-xs"
 										style={{ width: metricLabel.length * TICK_CHAR_PX + 14 }}
 									/>
 								) : null}
@@ -1805,8 +1804,7 @@ function Metric({
 					</button>
 				</div>
 				{value === undefined ? (
-					// design-escape-ok(radius): skeleton text bar keeps 4px corners, under the xs step
-					<Skeleton className="cost-metric-skeleton rounded-[4px]" />
+					<Skeleton className="cost-metric-skeleton corner-xs" />
 				) : (
 					<span className="cost-metric-value">
 						{qualifier ? (

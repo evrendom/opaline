@@ -6,13 +6,13 @@
 	gap: var(--space-xxs);
 	margin-left: auto;
 	padding: var(--space-xxs);
-	border-radius: 9px;
+	border-radius: var(--radius-m);
 	background: var(--hover);
 }
 .cost-chart-kind > button {
-	padding: 3px 10px;
+	padding: var(--space-xxs) var(--space-m);
 	white-space: nowrap;
-	border-radius: 7px;
+	border-radius: var(--radius-s);
 	color: var(--ink-3);
 	font-size: var(--size-l);
 	transition:
@@ -58,8 +58,7 @@
 	position: absolute;
 	height: 12px;
 	font-size: var(--size-s);
-	/* design-escape-ok(type): no role renders this; a 12px line in the 12px axis cell */
-	line-height: 12px;
+	line-height: 1;
 	font-weight: 500;
 	color: var(--ink-3);
 	white-space: nowrap;
@@ -195,7 +194,7 @@
 	width: 36%;
 	aspect-ratio: 1;
 	border-radius: var(--radius-full);
-	/* design-escape-ok(colour): the white pip on a cost-heat dot, artwork over data paint */
+	/* design-escape-ok(colour): artwork; the white pip on a cost-heat dot */
 	background: rgb(255 255 255 / 0.45);
 	transform: translate(-50%, -50%);
 }
@@ -226,8 +225,7 @@ button.cost-dot-grid {
 	cursor: default;
 }
 button.cost-dot-grid:focus-visible {
-	outline: 2px solid
-		color-mix(in oklab, var(--ink) 40%, transparent);
+	outline: 2px solid color-mix(in oklab, var(--ink) 40%, transparent);
 	outline-offset: 2px;
 	border-radius: var(--radius-xs);
 }
