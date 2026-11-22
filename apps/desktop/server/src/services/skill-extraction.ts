@@ -1,3 +1,4 @@
+import type { Source } from "@rudel/api-routes";
 import { hashTranscriptContent } from "../lib/transcript-content-hash.js";
 import { extractHistoricalClaudeSkills } from "./historical-claude-skill-parser.js";
 import { extractHistoricalCodexSkills } from "./historical-codex-skill-parser.js";
@@ -13,7 +14,7 @@ export interface SkillExtractionInput {
 	readonly content: string;
 	readonly parserVersion?: number;
 	readonly sessionDate: string;
-	readonly source: "claude_code" | "codex";
+	readonly source: Source;
 	/** Bundled subagent transcripts by agent id (Claude Code Task/Agent runs). */
 	readonly subagents?: Readonly<Record<string, string>>;
 }
@@ -27,7 +28,8 @@ export interface SkillExtractionInput {
 export function extractSessionSkills(
 	input: SkillExtractionInput,
 ): SkillExtractionResult {
-	const agent: SkillAgent = input.source === "claude_code" ? "claude" : "codex";
+	// Gemini sessions are stored in Claude Code's shape.
+	const agent: SkillAgent = input.source === "codex" ? "codex" : "claude";
 	const subagents = input.subagents ?? {};
 	const streams = [
 		input.content,
@@ -38,9 +40,9 @@ export function extractSessionSkills(
 	const uses = new Map<string, ExtractedSkillUse>();
 	for (const stream of streams) {
 		const found =
-			input.source === "claude_code"
-				? extractHistoricalClaudeSkills(stream, input.sessionDate)
-				: extractHistoricalCodexSkills(stream, input.sessionDate);
+			input.source === "codex"
+				? extractHistoricalCodexSkills(stream, input.sessionDate)
+				: extractHistoricalClaudeSkills(stream, input.sessionDate);
 		for (const use of found) {
 			const known = uses.get(use.name);
 			uses.set(

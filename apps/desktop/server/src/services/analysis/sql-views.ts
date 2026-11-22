@@ -134,7 +134,11 @@ const COLUMN_TRAPS: Readonly<Record<string, string>> = {
 		"session_branch needs the upload's branch on a record at the session's own directory: a session whose folder has another branch (a coordinator folder) has none there.",
 };
 
-const AGENT_NAMES = { claude_code: "Claude Code", codex: "Codex" } as const;
+const AGENT_NAMES = {
+	claude_code: "Claude Code",
+	codex: "Codex",
+	gemini: "Gemini",
+} as const;
 
 const runsColumns: readonly SqlViewColumn[] = RUN_INDEX_COLUMNS.filter(
 	(column) =>

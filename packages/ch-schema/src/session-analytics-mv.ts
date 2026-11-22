@@ -1,5 +1,6 @@
 export { CLAUDE_SESSION_ANALYTICS_MV_SQL } from "./mv-sql/claude-session-analytics.js";
 export { CODEX_SESSION_ANALYTICS_MV_SQL } from "./mv-sql/codex-session-analytics.js";
+export { GEMINI_SESSION_ANALYTICS_MV_SQL } from "./mv-sql/gemini-session-analytics.js";
 
 // ClickHouse matches INSERT ... SELECT columns by position, not by name.
 // Keep recovery/backfill writes explicit and in the target table's schema order.

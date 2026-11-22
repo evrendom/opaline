@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SourceSchema } from "./schemas/source.js";
 
 export const SEARCH_MODES = ["hybrid", "meaning", "exact", "regex"] as const;
 /** Record kinds whose text is searched. */
@@ -34,7 +35,7 @@ export const AnalysisSearchInputSchema = z
 				since: z.string().date().optional(),
 				/** Last day searched (UTC), inclusive. Default: today. */
 				until: z.string().date().optional(),
-				source: z.enum(["claude_code", "codex"]).optional(),
+				source: SourceSchema.optional(),
 				kinds: z.array(z.enum(SEARCH_KINDS)).min(1).max(6).optional(),
 				userId: z.string().min(1).max(200).optional(),
 				includeInjected: z.boolean().optional(),

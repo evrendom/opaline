@@ -29,7 +29,7 @@ export async function repositoryFileActivity(
 			native_writes AS (
 				SELECT user_id, session_id, agent_id, call_id FROM ${records}
 				WHERE ${scoped} AND kind = 'file_change' AND file_op = 'write'
-					AND source = 'claude_code' AND subtype = 'native' AND call_id != ''
+					AND source IN ('claude_code', 'gemini') AND subtype = 'native' AND call_id != ''
 			),
 			created AS (
 				SELECT DISTINCT user_id, session_id, agent_id, call_id FROM ${records}

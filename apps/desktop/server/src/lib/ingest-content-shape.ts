@@ -68,7 +68,7 @@ export function getIngestContentShape(
 ): IngestContentShape {
 	const main = getContentComponentShape(input.content, input.source);
 	const subagents =
-		input.source === "claude_code"
+		input.source !== "codex"
 			? Object.fromEntries(
 					(input.subagents ?? []).map((subagent) => [
 						subagent.agentId,
@@ -169,8 +169,7 @@ function countAssistantLines(
 		const end = newline === -1 ? content.length : newline;
 		const line = content.slice(start, end);
 		if (
-			(source === "claude_code" &&
-				hasJsonStringField(line, "type", "assistant")) ||
+			(source !== "codex" && hasJsonStringField(line, "type", "assistant")) ||
 			(source === "codex" &&
 				hasJsonStringField(line, "type", "response_item") &&
 				hasJsonStringField(line, "type", "message") &&

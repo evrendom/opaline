@@ -1,6 +1,6 @@
 type ModelBadgeTone = {
 	chipClassName: string;
-	icon: "claude" | "codex" | null;
+	icon: "claude" | "codex" | "gemini" | null;
 	identityIconClassName: string;
 };
 
@@ -57,6 +57,9 @@ export function formatModelDisplayLabel(model: string) {
 		return version ? `${familyLabel} ${version}` : familyLabel;
 	}
 
+	if (normalizedModel.includes("gemini"))
+		return formatGeminiModelLabel(normalizedModel);
+
 	if (
 		normalizedModel.includes("gpt") ||
 		normalizedModel.includes("chatgpt") ||
@@ -79,8 +82,31 @@ export function formatModelDisplayLabel(model: string) {
 	return formatFallbackModelLabel(model);
 }
 
+/**
+ * "gemini-4-neon" → "Gemini 4 Neon", "gemini-3.1-pro-preview" → "Gemini 3.1 Pro".
+ * Antigravity's thinking-level suffix (`-xhigh`) and the API's `models/`
+ * prefix are not part of the model's name.
+ */
+function formatGeminiModelLabel(normalizedModel: string) {
+	const name = normalizedModel
+		.replace(/^models\//u, "")
+		.replace(/-(?:low|medium|high|xhigh|max)$/u, "")
+		.replace(/-preview(?:-[\w-]+)?$/u, "")
+		.replace(/-customtools$/u, "");
+	return formatFallbackModelLabel(name);
+}
+
 export function getModelBadgeTone(model: string): ModelBadgeTone {
 	const normalizedModel = model.toLowerCase();
+
+	if (normalizedModel.includes("gemini")) {
+		return {
+			chipClassName:
+				"border-black/10 bg-[#FFFFFF] text-[#111111] shadow-none dark:border-white/10 dark:bg-white/8 dark:text-white",
+			icon: "gemini",
+			identityIconClassName: "",
+		};
+	}
 
 	if (
 		normalizedModel.includes("claude") ||
@@ -137,6 +163,9 @@ export function getModelBrandChip(
 	}
 	if (icon === "codex") {
 		return { glyphClassName: "text-foreground", tint: "#10A37F" };
+	}
+	if (icon === "gemini") {
+		return { glyphClassName: "", tint: "#3C7BFF" };
 	}
 	return null;
 }

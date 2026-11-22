@@ -39,13 +39,13 @@ const NARROWED: Partial<
 const NOT_IN_FIXTURES: ReadonlySet<RunIndexFactSource> = new Set([
 	"facts_truncated",
 ]);
-const FIXTURES: Record<TranscriptSource, string> = {
+const FIXTURES: Record<Exclude<TranscriptSource, "gemini">, string> = {
 	claude_code: "claude-2.1.jsonl",
 	codex: "codex-0.156.jsonl",
 };
 
 async function split(
-	source: TranscriptSource,
+	source: Exclude<TranscriptSource, "gemini">,
 ): Promise<TranscriptRecordDraft[]> {
 	const content = await Bun.file(
 		new URL(
@@ -424,7 +424,8 @@ describe("run index columns and the L1 fact catalog", () => {
 					FACT_CATALOG.some(
 						(entry) =>
 							entry.runIndex?.includes(column) &&
-							entry.agents[agent as TranscriptSource].status === "stored",
+							entry.agents[agent as Exclude<TranscriptSource, "gemini">]
+								.status === "stored",
 					),
 				).toBe(true);
 			}

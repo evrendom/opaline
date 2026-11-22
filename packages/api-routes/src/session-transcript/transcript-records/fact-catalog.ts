@@ -48,7 +48,8 @@ import type {
  * Comparability is derived, with explicit semantic conflicts taking priority.
  */
 
-export type FactAgent = TranscriptSource;
+/** A transcript format: Gemini sessions are stored as Claude Code's. */
+export type FactAgent = Exclude<TranscriptSource, "gemini">;
 export const FACT_AGENTS: readonly FactAgent[] = ["claude_code", "codex"];
 export type FactView = "calls" | "runs" | "prompts" | "session";
 export const FACT_VIEWS: readonly FactView[] = [

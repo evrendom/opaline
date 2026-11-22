@@ -101,6 +101,7 @@ export const ingestProcessingTargetReceipt = pgTable(
 			sql`${table.target} IN (
 				'rudel.claude_sessions',
 				'rudel.codex_sessions',
+				'rudel.gemini_sessions',
 				'rudel.session_language_signals',
 				'rudel.skill_receipts',
 				'rudel.skill_uses',

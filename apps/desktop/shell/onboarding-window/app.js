@@ -20,10 +20,14 @@ const COLORS = [
 	"oklch(0.715 0.126 215.221)",
 	"oklch(0.705 0.187 47.604)",
 ];
+// The agents Opaline connects to (its plugin and hooks).
 const AGENTS = [
 	{ key: "claude", label: "Claude Code", short: "Claude", color: "#D97757" },
 	{ key: "codex", label: "Codex", short: "Codex", color: "#10A37F" },
 ];
+// Every agent whose sessions the intro reads; Gemini is read from disk and
+// needs no connecting.
+const SOURCES = [...AGENTS, { key: "gemini", label: "Gemini", short: "Gemini", color: "#3C7BFF" }];
 const money = (value) => `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const METRICS = [
 	{
@@ -188,7 +192,7 @@ function countUp(element) {
 
 function data() {
 	const ok = (part) => (part && !part.error ? part : null);
-	const parts = { claude: ok(state.result?.claude), codex: ok(state.result?.codex) };
+	const parts = Object.fromEntries(SOURCES.map((agent) => [agent.key, ok(state.result?.[agent.key])]));
 	const iso = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 	const days = [];
 	for (let index = 29; index >= 0; index -= 1) {
@@ -200,8 +204,8 @@ function data() {
 	const series = {};
 	const totals = {};
 	for (const metric of METRICS) {
-		const byDate = new Map(days.map((date) => [date, { date, value: 0, claude: 0, codex: 0 }]));
-		for (const agent of AGENTS)
+		const byDate = new Map(days.map((date) => [date, { date, value: 0, ...Object.fromEntries(SOURCES.map((agent) => [agent.key, 0])) }]));
+		for (const agent of SOURCES)
 			for (const [date, value] of parts[agent.key]?.[DAILY[metric.key]] ?? []) {
 				const point = byDate.get(date);
 				if (!point) continue;
@@ -209,11 +213,11 @@ function data() {
 				point.value += Number(value);
 			}
 		series[metric.key] = [...byDate.values()];
-		totals[metric.key] = AGENTS.reduce((sum, agent) => sum + Number(parts[agent.key]?.[TOTAL[metric.key]] ?? 0), 0);
+		totals[metric.key] = SOURCES.reduce((sum, agent) => sum + Number(parts[agent.key]?.[TOTAL[metric.key]] ?? 0), 0);
 	}
-	const error = state.result?.error ?? state.result?.claude?.error ?? state.result?.codex?.error;
+	const error = state.result?.error ?? SOURCES.map((agent) => state.result?.[agent.key]?.error).find(Boolean);
 	return {
-		ok: Boolean(state.result) && (Boolean(parts.claude || parts.codex) || !error),
+		ok: Boolean(state.result) && (SOURCES.some((agent) => parts[agent.key]) || !error),
 		error,
 		series,
 		totals,
@@ -321,7 +325,7 @@ const views = {
 	days: () => {
 		const result = data();
 		if (!result.ok)
-			return `<section class="view center"><h2>We couldn't read your sessions</h2><p class="lede">${escape(result.error ?? `No Claude Code or Codex sessions were found on this ${DEVICE}.`)}</p></section>`;
+			return `<section class="view center"><h2>We couldn't read your sessions</h2><p class="lede">${escape(result.error ?? `No Claude Code, Codex or Gemini sessions were found on this ${DEVICE}.`)}</p></section>`;
 		const metric = METRICS.find((entry) => entry.key === state.metric);
 		return `
 			<section class="view">
@@ -332,7 +336,7 @@ const views = {
 					<div class="chart-key"><span class="chart-title">${metric.label} over time</span>
 					</div>
 					<div class="chart-canvas" data-chart="trend"></div>
-					${table(`${metric.label} per day`, ["Day", ...AGENTS.map((agent) => agent.label)], result.series[metric.key].map((point) => [point.date, ...AGENTS.map((agent) => formatMetric(metric, point[agent.key]))]))}
+					${table(`${metric.label} per day`, ["Day", ...SOURCES.map((agent) => agent.label)], result.series[metric.key].map((point) => [point.date, ...SOURCES.map((agent) => formatMetric(metric, point[agent.key]))]))}
 				</section>
 			</section>`;
 	},
@@ -395,7 +399,7 @@ const boxFeed = {
 const isoDay = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 
 function readSessions() {
-	return AGENTS.flatMap((agent) => {
+	return SOURCES.flatMap((agent) => {
 		const part = state.result?.[agent.key];
 		const sessions = (part?.session_models ?? []).map(([model, start, events, folder, tokens, seconds, prompts, failed]) => ({
 			agent: agent.key,
@@ -479,7 +483,7 @@ function showReading() {
 	} else {
 		view.querySelector("[data-count-kicker]").textContent = "We couldn't read your sessions";
 		view.querySelector("[data-reading-title]").textContent = "We couldn't read your sessions";
-		view.querySelector("[data-reading-note]").textContent = result.error ?? `No Claude Code or Codex sessions were found on this ${DEVICE}.`;
+		view.querySelector("[data-reading-note]").textContent = result.error ?? `No Claude Code, Codex or Gemini sessions were found on this ${DEVICE}.`;
 	}
 	if (result.ok) glass.curve(dailyCurve());
 	glass.finish().then(() => {

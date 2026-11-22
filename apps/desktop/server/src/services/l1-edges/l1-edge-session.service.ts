@@ -1,3 +1,4 @@
+import type { Source } from "@rudel/api-routes";
 import { z } from "zod";
 import {
 	type ClickHouseExecutor,
@@ -151,7 +152,7 @@ export async function buildSessionEdges(input: {
 			{
 				session_id: session.sessionId,
 				user_id: session.userId,
-				source: session.source as "claude_code" | "codex",
+				source: session.source as Source,
 				model: "",
 				repository: remote?.repository ?? "",
 				parentSessionId: null,

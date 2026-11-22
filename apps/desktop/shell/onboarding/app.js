@@ -46,7 +46,8 @@ function countUp(element, target) {
 function totals() {
 	const claude = state.result?.claude && !state.result.claude.error ? state.result.claude : null;
 	const codex = state.result?.codex && !state.result.codex.error ? state.result.codex : null;
-	const parts = [claude, codex].filter(Boolean);
+	const gemini = state.result?.gemini && !state.result.gemini.error ? state.result.gemini : null;
+	const parts = [claude, codex, gemini].filter(Boolean);
 	const sum = (key) => parts.reduce((total, part) => total + Number(part[key] ?? 0), 0);
 	const firstSeen = parts
 		.map((part) => part.first_seen)
@@ -55,6 +56,7 @@ function totals() {
 	const stuck = [
 		...(claude?.stuck_on ?? []).map(([label, count]) => ({ agent: "claude", label, count })),
 		...(codex?.stuck_on ?? []).map(([label, count]) => ({ agent: "codex", label, count })),
+		...(gemini?.stuck_on ?? []).map(([label, count]) => ({ agent: "gemini", label, count })),
 	]
 		.filter((item) => item.label)
 		.sort((a, b) => b.count - a.count)
@@ -67,7 +69,7 @@ function totals() {
 		hours: sum("agent_hours"),
 		firstSeen: firstSeen ? new Date(`${firstSeen.replace(" ", "T")}Z`) : null,
 		stuck,
-		error: state.result?.error ?? claude?.error ?? codex?.error,
+		error: state.result?.error ?? claude?.error ?? codex?.error ?? gemini?.error,
 	};
 }
 
@@ -78,10 +80,10 @@ function readableLabel(label) {
 
 const views = {
 	story: () => `
-		<h1>Opaline shows where your ${icon("claude")}Claude Code and ${icon("codex")}Codex get stuck</h1>
+		<h1>Opaline shows where your ${icon("claude")}Claude Code, ${icon("codex")}Codex and ${icon("gemini")}Gemini get stuck</h1>
 		<p class="lede">It reads the sessions already on this Mac and finds the loops, failures and lost time behind them.</p>
 		<div class="flow" aria-hidden="true">
-			<div class="flow-sources">${icon("claude", "")}${icon("codex", "")}</div>
+			<div class="flow-sources">${icon("claude", "")}${icon("codex", "")}${icon("gemini", "")}</div>
 			<div class="flow-lane">${Array.from({ length: 9 }, (_, index) => `<span style="top:${10 + ((index * 37) % 100)}px;animation-delay:${-index * 0.21}s"></span>`).join("")}</div>
 			<div class="flow-target"><img src="mark.svg" alt="" /></div>
 		</div>
@@ -97,7 +99,7 @@ const views = {
 	numbers: () => {
 		const result = totals();
 		if (!result.ok)
-			return `<h1>We couldn't read your sessions</h1><p class="lede">${escape(result.error ?? "No Claude Code or Codex sessions were found on this Mac.")}</p>`;
+			return `<h1>We couldn't read your sessions</h1><p class="lede">${escape(result.error ?? "No Claude Code, Codex or Gemini sessions were found on this Mac.")}</p>`;
 		const since = result.firstSeen
 			? result.firstSeen.toLocaleDateString("en-US", { month: "short", day: "numeric" })
 			: "last month";
@@ -150,7 +152,7 @@ function render() {
 	for (const element of body.querySelectorAll("[data-count]"))
 		countUp(element, Number(element.dataset.count || 0));
 	if (name === "reading" && state.scan)
-		countUp(body.querySelector("[data-count]"), state.scan.claude + state.scan.codex);
+		countUp(body.querySelector("[data-count]"), state.scan.claude + state.scan.codex + (state.scan.gemini ?? 0));
 	button.classList.toggle("glow", name === "ready");
 	button.disabled = name === "reading";
 	button.textContent = name === "reading" ? "Reading…" : name === "ready" ? "Open Opaline" : "Continue";
@@ -176,7 +178,7 @@ function start() {
 	state.analysis = (async () => {
 		state.scan = await api.scan();
 		const counter = body.querySelector(".reading [data-count]");
-		if (counter) countUp(counter, state.scan.claude + state.scan.codex);
+		if (counter) countUp(counter, state.scan.claude + state.scan.codex + (state.scan.gemini ?? 0));
 		state.result = await api.analyze();
 	})();
 	go(0);

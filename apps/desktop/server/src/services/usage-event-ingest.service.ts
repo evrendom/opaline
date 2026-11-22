@@ -553,7 +553,8 @@ function hasValidUsageEventTokens(event: UsageEvent): boolean {
 }
 
 function parseUsageEventSource(value: string): UsageEventSource {
-	if (value === "claude_code" || value === "codex") return value;
+	if (value === "claude_code" || value === "codex" || value === "gemini")
+		return value;
 	throw new Error(`Unexpected usage event source: ${value}`);
 }
 

@@ -1,4 +1,5 @@
 import { getLogger } from "@logtape/logtape";
+import { RAW_SESSION_TABLES } from "@rudel/api-routes";
 import type { TranscriptSource } from "@rudel/api-routes/transcript-records";
 import {
 	type ClickHouseExecutor,
@@ -297,11 +298,9 @@ function buildCensus(
 	now: number,
 	options: CensusOptions,
 ): { query: string; params: Record<string, number | string> } {
-	const rawTable = getSafeClickHouseTable(
-		source === "claude_code" ? "rudel.claude_sessions" : "rudel.codex_sessions",
-	);
+	const rawTable = getSafeClickHouseTable(RAW_SESSION_TABLES[source]);
 	const sessionBytes =
-		source === "claude_code"
+		source !== "codex"
 			? "length(content) + arraySum(subagents.values.size)"
 			: "length(content)";
 	const organizationFilter =
@@ -367,13 +366,9 @@ export async function readRawRevision(
 	>,
 	signal: AbortSignal,
 ): Promise<RawRow | undefined> {
-	const table = getSafeClickHouseTable(
-		candidate.source === "claude_code"
-			? "rudel.claude_sessions"
-			: "rudel.codex_sessions",
-	);
+	const table = getSafeClickHouseTable(RAW_SESSION_TABLES[candidate.source]);
 	const subagents =
-		candidate.source === "claude_code"
+		candidate.source !== "codex"
 			? "subagents"
 			: "CAST(map(), 'Map(String, String)') AS subagents";
 	const [row] = await executor.query<RawRow>({

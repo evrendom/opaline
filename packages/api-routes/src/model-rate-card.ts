@@ -1,4 +1,4 @@
-export type ModelPricingProvider = "anthropic" | "openai";
+export type ModelPricingProvider = "anthropic" | "openai" | "google";
 
 export type ModelContextBand = "base" | "long";
 
@@ -55,7 +55,7 @@ export type UnpricedModelIdentity = {
 	notes: string;
 };
 
-export const MODEL_RATE_CARD_VERSION = "2026-11-11";
+export const MODEL_RATE_CARD_VERSION = "2026-11-21";
 
 // Standard first-party API rates in USD per million tokens. Keep rows grouped
 // by provider and model family, with the newest effective period first.
@@ -1352,7 +1352,280 @@ export const MODEL_RATE_CARD: readonly ModelRateCardEntry[] = [
 		notes:
 			"Migrated from the legacy catalog; preserves its rounded $0.30 5m write rate, with 1h at the published 2x base multiplier.",
 	},
+	...googleRates(),
 ];
+
+/**
+ * Google Gemini API, paid tier, Standard service. Gemini bills thinking as
+ * output and caches implicitly, so there is no cache write rate. Antigravity
+ * names a model with its thinking level (`gemini-4-neon-xhigh`); the level
+ * does not change the rate.
+ */
+function googleRates(): ModelRateCardEntry[] {
+	const source = "https://ai.google.dev/gemini-api/docs/pricing";
+	const verifiedAt = "2026-11-21";
+	const levels = "(?:-(?:low|medium|high|xhigh|max))?";
+	const rate = (
+		model: string,
+		displayName: string,
+		match: string,
+		effectiveFrom: string,
+		rates: { input: number; cached: number; output: number },
+		extra: Partial<ModelRateCardEntry> & { notes: string },
+	): ModelRateCardEntry => ({
+		provider: "google",
+		model,
+		displayName,
+		match: [match],
+		effectiveFrom,
+		contextBand: "base",
+		inputPerMTok: rates.input,
+		cacheReadPerMTok: rates.cached,
+		cacheWrite5mPerMTok: null,
+		cacheWrite1hPerMTok: null,
+		outputPerMTok: rates.output,
+		source,
+		verifiedAt,
+		...extra,
+	});
+	const gemini4 = (name: string) =>
+		`^(?:models/)?gemini-4-${name}(?:-preview)?${levels}$`;
+	const exact = (id: string) => `^(?:models/)?${id.replaceAll(".", "\\.")}$`;
+	return [
+		// Gemini 4
+		rate(
+			"gemini-4-neon",
+			"Gemini 4 Neon",
+			gemini4("neon"),
+			"2026-11-18",
+			{ input: 3, cached: 0.15, output: 15 },
+			{
+				notes:
+					"Flat across the full 1M context; Batch and Flex 0.5x, Priority 1.8x.",
+			},
+		),
+		rate(
+			"gemini-4-carbon",
+			"Gemini 4 Carbon",
+			gemini4("carbon"),
+			"2026-11-18",
+			{ input: 2, cached: 0.1, output: 10 },
+			{
+				effectiveTo: "2026-11-30",
+				notes: "Introductory rate through 2026-11-30.",
+			},
+		),
+		rate(
+			"gemini-4-carbon",
+			"Gemini 4 Carbon",
+			gemini4("carbon"),
+			"2026-12-01",
+			{ input: 4, cached: 0.2, output: 20 },
+			{
+				notes: "Rate from 2026-12-01, after the introductory price.",
+			},
+		),
+		rate(
+			"gemini-4-hydrogen",
+			"Gemini 4 Hydrogen",
+			gemini4("hydrogen"),
+			"2026-11-18",
+			{ input: 1.5, cached: 0.075, output: 7.5 },
+			{
+				notes: "Flat across the full 1M context.",
+			},
+		),
+		rate(
+			"gemini-4-argon",
+			"Gemini 4 Argon",
+			gemini4("argon"),
+			"2026-09-30",
+			{ input: 2, cached: 0.1, output: 10 },
+			{
+				effectiveTo: "2026-11-30",
+				notes:
+					"Introductory rate through 2026-11-30 (announced 2026-09-30, GA 2026-10-13).",
+			},
+		),
+		rate(
+			"gemini-4-argon",
+			"Gemini 4 Argon",
+			gemini4("argon"),
+			"2026-12-01",
+			{ input: 4, cached: 0.2, output: 20 },
+			{
+				notes: "Rate from 2026-12-01, after the introductory price.",
+			},
+		),
+		// Gemini 3.x
+		rate(
+			"gemini-3.8-flash",
+			"Gemini 3.8 Flash",
+			exact("gemini-3.8-flash"),
+			"2026-09-02",
+			{ input: 0.75, cached: 0.075, output: 3.75 },
+			{
+				effectiveTo: "2026-12-31",
+				notes: "Rate until the 2027-01-01 increase.",
+			},
+		),
+		rate(
+			"gemini-3.8-flash",
+			"Gemini 3.8 Flash",
+			exact("gemini-3.8-flash"),
+			"2027-01-01",
+			{ input: 1.5, cached: 0.15, output: 7.5 },
+			{
+				notes: "Rate from 2027-01-01.",
+			},
+		),
+		rate(
+			"gemini-3.5-flash-lite",
+			"Gemini 3.5 Flash-Lite",
+			exact("gemini-3.5-flash-lite"),
+			"2026-07-21",
+			{ input: 0.3, cached: 0.03, output: 2.5 },
+			{
+				notes: "One rate for text, image, video and audio input.",
+			},
+		),
+		rate(
+			"gemini-3.1-pro-preview",
+			"Gemini 3.1 Pro",
+			"^(?:models/)?gemini-3\\.1-pro-preview(?:-customtools)?$",
+			"2026-02-19",
+			{ input: 2, cached: 0.2, output: 12 },
+			{
+				notes: "Prompts up to 200k tokens.",
+			},
+		),
+		rate(
+			"gemini-3.1-pro-preview",
+			"Gemini 3.1 Pro",
+			"^(?:models/)?gemini-3\\.1-pro-preview(?:-customtools)?$",
+			"2026-02-19",
+			{ input: 4, cached: 0.4, output: 18 },
+			{
+				contextBand: "long",
+				longContextAboveTokens: 200_000,
+				notes: "Prompts over 200k tokens.",
+			},
+		),
+		rate(
+			"gemini-3.1-flash-lite",
+			"Gemini 3.1 Flash-Lite",
+			"^(?:models/)?gemini-3\\.1-flash-lite(?:-preview)?$",
+			"2026-11-21",
+			{ input: 0.25, cached: 0.025, output: 1.5 },
+			{
+				notes:
+					"Text, image and video input; audio input is $0.50. Release date not verified, so earlier usage stays unpriced.",
+			},
+		),
+		rate(
+			"gemini-3-pro-preview",
+			"Gemini 3 Pro",
+			exact("gemini-3-pro-preview"),
+			"2025-11-18",
+			{ input: 2, cached: 0.2, output: 12 },
+			{
+				notes:
+					"Prompts up to 200k tokens; no longer on the pricing page, priced as at launch (the same as 3.1 Pro).",
+			},
+		),
+		rate(
+			"gemini-3-pro-preview",
+			"Gemini 3 Pro",
+			exact("gemini-3-pro-preview"),
+			"2025-11-18",
+			{ input: 4, cached: 0.4, output: 18 },
+			{
+				contextBand: "long",
+				longContextAboveTokens: 200_000,
+				notes: "Prompts over 200k tokens.",
+			},
+		),
+		rate(
+			"gemini-3-flash-preview",
+			"Gemini 3 Flash",
+			exact("gemini-3-flash-preview"),
+			"2025-12-17",
+			{ input: 0.5, cached: 0.05, output: 3 },
+			{
+				notes: "Text, image and video input; audio input is $1.00.",
+			},
+		),
+		// Gemini 2.5. From 2026-12-01 Google serves 2.5 Pro requests with 3.8
+		// Flash and 2.5 Flash requests with 3.5 Flash-Lite, at their rates.
+		rate(
+			"gemini-2.5-pro",
+			"Gemini 2.5 Pro",
+			exact("gemini-2.5-pro"),
+			"2025-06-17",
+			{ input: 1.25, cached: 0.125, output: 10 },
+			{
+				effectiveTo: "2026-11-30",
+				notes: "Prompts up to 200k tokens.",
+			},
+		),
+		rate(
+			"gemini-2.5-pro",
+			"Gemini 2.5 Pro",
+			exact("gemini-2.5-pro"),
+			"2025-06-17",
+			{ input: 2.5, cached: 0.25, output: 15 },
+			{
+				effectiveTo: "2026-11-30",
+				contextBand: "long",
+				longContextAboveTokens: 200_000,
+				notes: "Prompts over 200k tokens.",
+			},
+		),
+		rate(
+			"gemini-2.5-pro",
+			"Gemini 2.5 Pro",
+			exact("gemini-2.5-pro"),
+			"2026-12-01",
+			{ input: 0.75, cached: 0.075, output: 3.75 },
+			{
+				effectiveTo: "2026-12-31",
+				notes:
+					"Routed to Gemini 3.8 Flash and billed at its rate from 2026-12-01.",
+			},
+		),
+		rate(
+			"gemini-2.5-pro",
+			"Gemini 2.5 Pro",
+			exact("gemini-2.5-pro"),
+			"2027-01-01",
+			{ input: 1.5, cached: 0.15, output: 7.5 },
+			{
+				notes: "Routed to Gemini 3.8 Flash and billed at its 2027 rate.",
+			},
+		),
+		rate(
+			"gemini-2.5-flash",
+			"Gemini 2.5 Flash",
+			exact("gemini-2.5-flash"),
+			"2025-06-17",
+			{ input: 0.3, cached: 0.03, output: 2.5 },
+			{
+				notes:
+					"Text, image and video input; audio input is $1.00. Routed to 3.5 Flash-Lite at the same text rate from 2026-12-01.",
+			},
+		),
+		rate(
+			"gemini-2.5-flash-lite",
+			"Gemini 2.5 Flash-Lite",
+			exact("gemini-2.5-flash-lite"),
+			"2025-07-22",
+			{ input: 0.1, cached: 0.01, output: 0.4 },
+			{
+				notes: "Text, image and video input; audio input is $0.30.",
+			},
+		),
+	];
+}
 
 // Known native identities that deliberately have no comparable first-party API
 // rate. Keeping them beside the rate card separates model identity from

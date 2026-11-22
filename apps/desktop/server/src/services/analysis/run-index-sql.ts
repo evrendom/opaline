@@ -238,7 +238,7 @@ const sortedSet = (expression: string) =>
  * (`permissionDecision` decision, source or reasonType); '' when none.
  */
 const permissionField = (field: string) =>
-	`if(source = 'claude_code' AND kind = 'tool_result', arrayElement(${componentStringsSql("facts['permission_decision_components']", `^user[.]permissionDecision[.]${field}$`)}, 1), '')`;
+	`if(source IN ('claude_code', 'gemini') AND kind = 'tool_result', arrayElement(${componentStringsSql("facts['permission_decision_components']", `^user[.]permissionDecision[.]${field}$`)}, 1), '')`;
 
 /** The used_percent of each rate-limit window a Codex token count reports (primary, secondary). */
 const RATE_LIMIT_USED = `if(source = 'codex' AND kind = 'meta' AND subtype = 'token_count',
@@ -248,7 +248,7 @@ const RATE_LIMIT_USED = `if(source = 'codex' AND kind = 'meta' AND subtype = 'to
 	CAST([], 'Array(Float64)'))`;
 
 /** A Claude Code request its quota refused (`quotaLimits.status` rejected). */
-const QUOTA_REJECTED = `source = 'claude_code' AND has(${componentStringsSql("facts['rate_limits_components']", "^assistant[.]quotaLimits[.]status$")}, 'rejected')`;
+const QUOTA_REJECTED = `source IN ('claude_code', 'gemini') AND has(${componentStringsSql("facts['rate_limits_components']", "^assistant[.]quotaLimits[.]status$")}, 'rejected')`;
 
 /** Who accepted a call at a permission prompt or by a rule they saved there. */
 const USER_DECIDED =
@@ -451,7 +451,7 @@ function foundNothingSql(): string {
 					OR (kind = 'tool_result' AND match(substringUTF8(head, 1, 64), '^(No files found|No matches found|[a-z()]+:[0-9]+: no matches found: )'))
 					OR (${toolErrorSql()} AND match(concat(substringUTF8(head, 1, ${FACT_TEXT_CHARS}), '\\n', substringUTF8(tail, -${FACT_TEXT_CHARS})), '${NOT_FOUND_TEXT}')))) AS said_nothing_found,
 				max(kind = 'tool_result' AND subtype != 'running' AND (text_chars = 0
-					OR (source = 'claude_code' AND (startsWith(head, '(Bash completed with no output)') OR match(substringUTF8(head, 1, 32), '^Exit code [0-9]+$')))
+					OR (source IN ('claude_code', 'gemini') AND (startsWith(head, '(Bash completed with no output)') OR match(substringUTF8(head, 1, 32), '^Exit code [0-9]+$')))
 					OR (source = 'codex' AND match(substringUTF8(head, 1, ${FACT_TEXT_CHARS}), '\\nProcess exited with code [0-9]+\\nOriginal token count: 0\\n')))) AS printed_nothing,
 				maxIf(match(substringUTF8(head, 1, ${FACT_TEXT_CHARS}), '${SILENCED_COMMAND.replaceAll("\\", "\\\\")}'), kind = 'tool_call') AS silenced`;
 }
@@ -846,7 +846,7 @@ export function usageEventCtes(
 		claude_single_lineages AS (
 			SELECT DISTINCT session_id, lineage_id FROM ${getSafeClickHouseTable("rudel.usage_events")} FINAL
 			WHERE organization_id = {organizationId:String} AND user_id = {userId:String} AND session_id IN {sessionIds:Array(String)}
-				AND source = 'claude_code' AND record_kind = 'event' AND is_deleted = 0 AND duplicate_observation_count = 0${generation}
+				AND source IN ('claude_code', 'gemini') AND record_kind = 'event' AND is_deleted = 0 AND duplicate_observation_count = 0${generation}
 		),
 		codex_line_streams AS (
 			SELECT session_id, record_idx, any(agent_id) AS stream, uniqExact(agent_id) AS streams
@@ -1269,7 +1269,7 @@ function runRequestsCtes(batch = false): string {
 			),
 			(SELECT groupArray((${PLACED_USAGE_COLUMNS.join(", ")}))
 				FROM (
-					SELECT e.*, if(e.source = 'claude_code' AND l.response = 1, l.record_idx, e.first_observed_line) AS line
+					SELECT e.*, if(e.source IN ('claude_code', 'gemini') AND l.response = 1, l.record_idx, e.first_observed_line) AS line
 					FROM resolved_usage e
 					ASOF LEFT JOIN response_lines l
 						ON e.session_id = l.session_id AND e.stream = l.agent_id AND e.first_observed_line <= l.record_idx
@@ -1304,7 +1304,7 @@ function runRequestsCtes(batch = false): string {
 			),
 			request_marks AS (
 				SELECT *,
-					toUInt8(candidate = 1 AND (source != 'claude_code' OR stream_has_usage = 0 OR event_line = 1 OR candidate_number = 1)) AS request_start,
+					toUInt8(candidate = 1 AND (source NOT IN ('claude_code', 'gemini') OR stream_has_usage = 0 OR event_line = 1 OR candidate_number = 1)) AS request_start,
 					max(if(request_start = 1, toNullable(record_idx), NULL)) OVER (${run} ${order} ROWS UNBOUNDED PRECEDING) AS request
 				FROM request_candidates
 			),
@@ -1512,7 +1512,7 @@ const SESSION_CALLS_MAX_RESULT_BYTES = "268435456";
  * that lists servers needing authentication, still connecting or failed (a
  * delta that only adds tools lists none and says nothing about them).
  */
-const MCP_STATE_RECORD = `source = 'claude_code' AND kind = 'meta' AND subtype = 'attachment:deferred_tools_delta'
+const MCP_STATE_RECORD = `source IN ('claude_code', 'gemini') AND kind = 'meta' AND subtype = 'attachment:deferred_tools_delta'
 	AND match(facts['mcp_server_state_components'], '[.](needsAuthMcpServers|pendingMcpServers|failedMcpServers)')`;
 
 /**

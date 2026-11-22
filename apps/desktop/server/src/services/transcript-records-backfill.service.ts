@@ -1,5 +1,6 @@
 import { Buffer } from "node:buffer";
 import { getLogger } from "@logtape/logtape";
+import { RAW_SESSION_TABLES } from "@rudel/api-routes";
 import {
 	createSplitStats,
 	decodeTranscriptRecordsReceipt,
@@ -409,7 +410,7 @@ async function listSourceCandidates(
 		? "AND cityHash64(raw.session_id) % {shardCount:UInt32} = {shardIndex:UInt32}"
 		: "";
 	const subagentBytes =
-		source === "claude_code"
+		source !== "codex"
 			? "arraySum(arrayMap(value -> length(value), mapValues(raw.subagents)))"
 			: "0";
 	const rows = await executor.query<CandidateRow>({
@@ -511,7 +512,7 @@ async function readRawSessions(
 	const first = pending[0];
 	if (first === undefined) return [];
 	const subagentsColumn =
-		first.source === "claude_code"
+		first.source !== "codex"
 			? "raw.subagents"
 			: "CAST(map(), 'Map(String, String)') AS subagents";
 	return executor.query<RawRow>({
@@ -698,9 +699,7 @@ function identity(candidate: Candidate): string {
 }
 
 function getRawTable(source: TranscriptSource): string {
-	return getSafeClickHouseTable(
-		source === "claude_code" ? "rudel.claude_sessions" : "rudel.codex_sessions",
-	);
+	return getSafeClickHouseTable(RAW_SESSION_TABLES[source]);
 }
 
 function monthBounds(month: string): { monthEnd: string; monthStart: string } {

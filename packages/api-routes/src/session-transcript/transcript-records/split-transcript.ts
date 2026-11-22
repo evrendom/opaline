@@ -489,7 +489,7 @@ function lineRecordUuid(
 	parsed: Record<string, unknown>,
 	source: TranscriptSource,
 ): string {
-	if (source !== "claude_code") return "";
+	if (source === "codex") return "";
 	const uuid = parsed.uuid;
 	return typeof uuid === "string" && uuid.length <= RECORD_UUID_MAX_CHARS
 		? uuid

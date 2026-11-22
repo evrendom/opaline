@@ -19,7 +19,7 @@ const SessionSchema = z.object({
 });
 type SessionRow = z.infer<typeof SessionSchema>;
 
-const SOURCES = new Set(["claude_code", "codex"]);
+const SOURCES = new Set(["claude_code", "codex", "gemini"]);
 const SELECTION_SETTINGS = {
 	max_execution_time: 120,
 	max_rows_to_read: "1000000000",

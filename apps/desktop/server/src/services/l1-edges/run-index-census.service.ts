@@ -1,4 +1,5 @@
 import { getLogger } from "@logtape/logtape";
+import { RAW_SESSION_TABLES } from "@rudel/api-routes";
 import type { TranscriptSource } from "@rudel/api-routes/transcript-records";
 import type postgres from "postgres";
 import {
@@ -71,7 +72,7 @@ export async function requeueStaleRunIndexScopes(options: {
 		return { candidates: 0, queued: 0, hasMore: false };
 	const executor = options.executor ?? getClickhouse();
 	const now = options.deadline.now();
-	const sources = ["claude_code", "codex"] as const;
+	const sources = ["claude_code", "codex", "gemini"] as const;
 	const found = await Promise.all(
 		sources.map((source) =>
 			executor.query<CensusRow>(
@@ -129,9 +130,7 @@ export function buildRunIndexCensusStatement(
 	now: number,
 	organizationId?: string,
 ) {
-	const rawTable = getSafeClickHouseTable(
-		source === "claude_code" ? "rudel.claude_sessions" : "rudel.codex_sessions",
-	);
+	const rawTable = getSafeClickHouseTable(RAW_SESSION_TABLES[source]);
 	const organizationFilter =
 		organizationId === undefined
 			? ""

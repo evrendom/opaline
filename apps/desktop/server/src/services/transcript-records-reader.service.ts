@@ -1340,7 +1340,9 @@ function emptyFacts(sessionId: string): SessionFacts {
 }
 
 function toSource(value: string): TranscriptSource | null {
-	return value === "claude_code" || value === "codex" ? value : null;
+	return value === "claude_code" || value === "codex" || value === "gemini"
+		? value
+		: null;
 }
 
 function toIso(
@@ -1550,7 +1552,7 @@ const recordBlockRow = z.object({
 	file_path: z.string(),
 	is_error: flag,
 	kind: z.string(),
-	source: z.enum(["claude_code", "codex"]),
+	source: z.enum(["claude_code", "codex", "gemini"]),
 	subtype: z.string(),
 	text_chars: count,
 	tool_name: z.string(),

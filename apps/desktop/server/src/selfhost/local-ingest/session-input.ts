@@ -3,11 +3,13 @@ import {
 	claudeCodeAdapter,
 	codexAdapter,
 	decodeProjectPath,
+	geminiAdapter,
 } from "@rudel/agent-adapters";
 import {
 	type IngestSessionInput,
 	LocalIngestSessionInputSchema,
 } from "@rudel/api-routes";
+import { type GeminiSessionRead, readGeminiSession } from "./gemini-session.js";
 import { type GitInfo, getGitInfo, normalizeRemoteUrl } from "./git-info.js";
 import { inferSessionRepository } from "./session-repository.js";
 import { claudeProjectDirectory, claudeSessionId } from "./sources.js";
@@ -37,7 +39,7 @@ export type LocalSessionInput =
 
 export interface LocalSessionInputRequest {
 	readonly sessionPath: string;
-	readonly source: "claude_code" | "codex";
+	readonly source: "claude_code" | "codex" | "gemini";
 	readonly change: TranscriptChange | null;
 	readonly organizationId: string;
 	readonly now: number;
@@ -127,6 +129,15 @@ function skipped(reason: string, session: SessionRead): LocalSessionInput {
 export async function buildLocalSessionInput(
 	input: LocalSessionInputRequest,
 ): Promise<LocalSessionInput> {
+	if (input.source === "gemini") {
+		const session = await readGeminiSession(input.sessionPath);
+		try {
+			return await fromGeminiSession(input, session);
+		} catch (error) {
+			session.discardImages();
+			throw error;
+		}
+	}
 	const session = await readSession(input.sessionPath, input.change);
 	try {
 		return await fromSession(input, session);
@@ -196,6 +207,49 @@ async function fromSession(
 		{
 			source: "claude_code",
 			sessionId,
+			projectPath,
+			gitRemote: repository.gitRemote,
+			packageName: repository.packageName,
+			packageType: repository.packageType,
+			gitBranch: repository.branch,
+			gitSha: repository.sha,
+			content,
+			subagents: subagents.length > 0 ? [...subagents] : undefined,
+			organizationId: input.organizationId,
+			upload_mode: "hook",
+		},
+		input.sessionPath,
+		session,
+	);
+}
+
+async function fromGeminiSession(
+	input: LocalSessionInputRequest,
+	session: GeminiSessionRead,
+): Promise<LocalSessionInput> {
+	const { transcript, content, projectPath } = session;
+	if (!transcript) return skipped("not a Gemini session", session);
+	if (transcript.kind === "subagent")
+		return skipped("a Gemini subagent, imported with its parent", session);
+	if (!geminiAdapter.extractTimestamps(content))
+		return skipped("no timestamped user or assistant messages", session);
+	const subagents = await session.subagents();
+	const gitInfo = projectPath
+		? await cachedGitInfo(projectPath, input.now)
+		: {};
+	const inferred = projectPath
+		? await inferSessionRepository({
+				projectPath,
+				gitRemote: gitInfo.gitRemote,
+				packageName: gitInfo.packageName,
+				streams: [content, ...subagents.map((subagent) => subagent.content)],
+			}).catch(() => null)
+		: null;
+	const repository = inferred ?? gitInfo;
+	return parsed(
+		{
+			source: "gemini",
+			sessionId: transcript.sessionId,
 			projectPath,
 			gitRemote: repository.gitRemote,
 			packageName: repository.packageName,

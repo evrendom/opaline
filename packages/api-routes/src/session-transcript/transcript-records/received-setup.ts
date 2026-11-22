@@ -254,7 +254,7 @@ export function recordCwd(
 	record: Record<string, unknown>,
 	source: TranscriptSource,
 ): string | undefined {
-	if (source === "claude_code") return readString(record.cwd);
+	if (source !== "codex") return readString(record.cwd);
 	const payload = isRecord(record.payload) ? record.payload : undefined;
 	return record.type === "turn_context" || record.type === "session_meta"
 		? fileUrlPath(readString(payload?.cwd))

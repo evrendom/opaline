@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import type { Source } from "@rudel/api-routes";
 import type { RudelSessionImagesRow } from "@rudel/ch-schema/generated";
 import type postgres from "postgres";
 import type { ClickHouseExecutor } from "../../clickhouse.js";
@@ -14,7 +15,7 @@ export interface SessionImageTarget {
 	readonly organizationId: string;
 	readonly userId: string;
 	readonly sessionId: string;
-	readonly source: "claude_code" | "codex";
+	readonly source: Source;
 }
 
 export interface ImageCaptureResult {

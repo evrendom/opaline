@@ -471,6 +471,7 @@ ipcMain.handle("onboarding:icons", (event) =>
 				codex:
 					appIcon("/Applications/Codex.app") ??
 					appIcon("/Applications/ChatGPT.app/Contents/Resources/icon-codex-dark-color.png"),
+				gemini: appIcon("/Applications/Antigravity.app"),
 			}
 		: null,
 );

@@ -17,7 +17,7 @@ export async function getRepositorySettings(
 		queryClickhouse<RepositoryInventory>({
 			query: `SELECT project_path, git_remote, package_name, count() AS session_count
 				FROM rudel.session_analytics FINAL
-				WHERE source IN ('claude_code', 'codex') AND organization_id = {organizationId:String}
+				WHERE source IN ('claude_code', 'codex', 'gemini') AND organization_id = {organizationId:String}
 				GROUP BY project_path, git_remote, package_name LIMIT 10001`,
 			query_params: { organizationId },
 			clickhouse_settings: {

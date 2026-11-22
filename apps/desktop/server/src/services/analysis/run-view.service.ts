@@ -314,7 +314,7 @@ async function resolveRun(
 		!userId ||
 		!sessionId ||
 		agentId === undefined ||
-		(source !== "claude_code" && source !== "codex") ||
+		(source !== "claude_code" && source !== "codex" && source !== "gemini") ||
 		!/^\d{1,10}$/u.test(start ?? "") ||
 		Number(start) > MAX_RECORD
 	)

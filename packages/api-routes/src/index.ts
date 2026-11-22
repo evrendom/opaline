@@ -806,7 +806,16 @@ export const SessionTagSchema = z.enum([
 ]);
 
 export type { Source } from "./schemas/source.js";
-export { SourceSchema } from "./schemas/source.js";
+export {
+	RAW_SESSION_TABLES,
+	type RawSessionTable,
+	SOURCE_LABELS,
+	SourceSchema,
+	type TranscriptFormat,
+	toSource,
+	transcriptFormat,
+	usesClaudeTranscript,
+} from "./schemas/source.js";
 
 import { SourceSchema } from "./schemas/source.js";
 

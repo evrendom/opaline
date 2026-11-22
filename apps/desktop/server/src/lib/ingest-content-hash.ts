@@ -40,7 +40,7 @@ function hashIngestContent(
 	else updateFramedField(hash, input.content);
 	updateNamedField(hash, "filterVersion", String(input.filter_version ?? 0));
 
-	if (input.source === "claude_code") {
+	if (input.source !== "codex") {
 		const subagents = [...(input.subagents ?? [])].sort((left, right) =>
 			left.agentId < right.agentId ? -1 : left.agentId > right.agentId ? 1 : 0,
 		);

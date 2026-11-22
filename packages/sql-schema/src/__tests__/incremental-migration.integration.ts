@@ -19,13 +19,13 @@ const migrationsFolder = join(import.meta.dir, "..", "..", "db", "migrations");
 
 setDefaultTimeout(120_000);
 
-test("applies migrations 0020-0076 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, GitHub webhook delivery 0046, repository evidence index publication 0048, GitHub outcomes 0049, organization feature readiness 0050, CLI version 0051, coordination lease 0052, and L1 edges 0055, and creates the analysis sql result and quota tables (0058) the agent query slots (0059), lets a result be removed with the visibility sync queue (0060), creates the transcript embedding quota and run question tables (0061), lets run question jobs be precomputed (0062), and creates the live session tables with a per-budget rate-limit row (0063), creates the usage digest tables (0064), gives run questions a label (0065), creates the workspace feature switches (0066), creates the moment observation, feedback and fix tables (0067), creates the Compass settings and prompt frustration tables (0068), drops the Free member cap (0069), stages saved outputs with evidence captures (0070), stages images with evidence captures and accepts image objects (0071), creates the analysis check table (0072), lifts the free-plan run limit on self-hosted databases (0073), creates the Postgres analysis log tables (0074), creates the local ingest file table (0075), and creates the local ingest milestone table (0076)", async () => {
+test("applies migrations 0020-0077 to a database already migrated through 0019, main's 0043, repository evidence 0044, GitHub evidence 0045, GitHub webhook delivery 0046, repository evidence index publication 0048, GitHub outcomes 0049, organization feature readiness 0050, CLI version 0051, coordination lease 0052, and L1 edges 0055, and creates the analysis sql result and quota tables (0058) the agent query slots (0059), lets a result be removed with the visibility sync queue (0060), creates the transcript embedding quota and run question tables (0061), lets run question jobs be precomputed (0062), and creates the live session tables with a per-budget rate-limit row (0063), creates the usage digest tables (0064), gives run questions a label (0065), creates the workspace feature switches (0066), creates the moment observation, feedback and fix tables (0067), creates the Compass settings and prompt frustration tables (0068), drops the Free member cap (0069), stages saved outputs with evidence captures (0070), stages images with evidence captures and accepts image objects (0071), creates the analysis check table (0072), lifts the free-plan run limit on self-hosted databases (0073), creates the Postgres analysis log tables (0074), creates the local ingest file table (0075), creates the local ingest milestone table (0076), and lets the source checks accept Gemini (0077)", async () => {
 	const journalValue: unknown = JSON.parse(
 		await readFile(join(migrationsFolder, "meta", "_journal.json"), "utf8"),
 	);
 	const entries = readMigrationEntries(journalValue);
 	const latestMigration = entries.at(-1);
-	expect(latestMigration?.tag).toBe("0076_local_ingest_milestone");
+	expect(latestMigration?.tag).toBe("0077_gemini_source");
 	for (const [index, entry] of entries.entries()) {
 		if (index > 0) {
 			expect(entry.when).toBeGreaterThan(entries[index - 1]?.when ?? 0);
@@ -154,6 +154,16 @@ test("applies migrations 0020-0076 to a database already migrated through 0019, 
 					constraint: "repository_evidence_object_kind_check",
 					status: "validated",
 				},
+				{ constraint: "ingest_job_source_check", status: "validated" },
+				{
+					constraint: "ingest_processing_target_receipt_target_check",
+					status: "validated",
+				},
+				{ constraint: "live_session_source_check", status: "validated" },
+				{
+					constraint: "repository_evidence_capture_source_check",
+					status: "validated",
+				},
 			]);
 			expect(await validateDeferredConstraints(migrationSql)).toEqual([
 				{
@@ -163,6 +173,16 @@ test("applies migrations 0020-0076 to a database already migrated through 0019, 
 				{ constraint: "l1_edge_scope_kind_check", status: "already_valid" },
 				{
 					constraint: "repository_evidence_object_kind_check",
+					status: "already_valid",
+				},
+				{ constraint: "ingest_job_source_check", status: "already_valid" },
+				{
+					constraint: "ingest_processing_target_receipt_target_check",
+					status: "already_valid",
+				},
+				{ constraint: "live_session_source_check", status: "already_valid" },
+				{
+					constraint: "repository_evidence_capture_source_check",
 					status: "already_valid",
 				},
 			]);
@@ -489,7 +509,7 @@ test("applies migrations 0020-0076 to a database already migrated through 0019, 
 				SELECT to_regclass('public.clickhouse_purge_job')::text AS name
 			`;
 			expect(after0052).toEqual({
-				count: 77,
+				count: 78,
 				latestTimestamp: String(latestMigration?.when),
 			});
 			const [trendsSourceTable] = await migrationSql<TableState[]>`
@@ -972,6 +992,16 @@ test("a fresh database gets the 256 MiB ingest_job bound NOT VALID, then validat
 				{ constraint: "l1_edge_scope_kind_check", status: "validated" },
 				{
 					constraint: "repository_evidence_object_kind_check",
+					status: "validated",
+				},
+				{ constraint: "ingest_job_source_check", status: "validated" },
+				{
+					constraint: "ingest_processing_target_receipt_target_check",
+					status: "validated",
+				},
+				{ constraint: "live_session_source_check", status: "validated" },
+				{
+					constraint: "repository_evidence_capture_source_check",
 					status: "validated",
 				},
 			]);

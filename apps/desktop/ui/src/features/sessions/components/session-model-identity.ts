@@ -19,5 +19,6 @@ export function getSessionModelDisplayValue({
 			: "Claude";
 	}
 	if (source === "codex") return "Codex";
+	if (source === "gemini") return "Gemini";
 	return undefined;
 }

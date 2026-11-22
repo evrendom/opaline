@@ -9,9 +9,15 @@ const CODEX_SOL_CONTEXT_TOKENS = 272_000;
 const GPT_4_1_CONTEXT_TOKENS = 1_047_576;
 const OPENAI_CODE_CONTEXT_TOKENS = 400_000;
 const LEGACY_CLAUDE_CONTEXT_TOKENS = 200_000;
+const GEMINI_INPUT_TOKENS = 1_048_576;
 
 const FABLE_MODEL_PATTERN = /^claude-fable-5(?:-[12])?(?:-\d{8})?$/;
 const SOL_MODEL_PATTERN = /^gpt-5\.6(?:-sol)?$/;
+/** Gemini 4 (Neon, Carbon, Hydrogen, Argon): 1M tokens; Antigravity may add a thinking level. */
+const GEMINI_4_MODEL_PATTERN =
+	/^(?:models\/)?gemini-4-(?:neon|carbon|hydrogen|argon)(?:-[a-z]+)?$/;
+/** Gemini 2.5 and 3.x Pro and Flash take 1,048,576 input tokens. */
+const GEMINI_LEGACY_MODEL_PATTERN = /^(?:models\/)?gemini-(?:2\.5|3(?:\.\d)?)-/;
 const GPT_6_MODEL_PATTERN =
 	/^(?:gpt-6-(?:astra|sol|luna)|gpt-6\.1-(?:sol|terra))$/;
 
@@ -37,6 +43,9 @@ export function resolvePulseInputTokenLimit(
 	}
 	if (GPT_6_MODEL_PATTERN.test(model)) {
 		return OPENAI_FRONTIER_CONTEXT_TOKENS;
+	}
+	if (GEMINI_4_MODEL_PATTERN.test(model)) {
+		return ONE_MILLION_TOKENS;
 	}
 	return undefined;
 }
@@ -91,6 +100,12 @@ export function resolveSessionOverviewContextWindow(
 		}
 		if (model.startsWith("claude-")) {
 			return { source: "catalog", tokenLimit: LEGACY_CLAUDE_CONTEXT_TOKENS };
+		}
+		if (GEMINI_4_MODEL_PATTERN.test(model)) {
+			return { source: "catalog", tokenLimit: ONE_MILLION_TOKENS };
+		}
+		if (GEMINI_LEGACY_MODEL_PATTERN.test(model)) {
+			return { source: "catalog", tokenLimit: GEMINI_INPUT_TOKENS };
 		}
 	}
 

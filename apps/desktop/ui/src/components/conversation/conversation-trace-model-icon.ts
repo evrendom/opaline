@@ -2,6 +2,7 @@ import type { ComponentType } from "react";
 import {
 	ClaudeModelIcon,
 	CodexModelIcon,
+	GeminiModelIcon,
 } from "@/features/dashboard/components/DashboardModelBadges";
 import { getModelBadgeTone } from "@/features/dashboard/components/dashboard-model-brand";
 
@@ -18,6 +19,9 @@ export function getModelIconComponent(
 	}
 	if (icon === "codex") {
 		return CodexModelIcon;
+	}
+	if (icon === "gemini") {
+		return GeminiModelIcon;
 	}
 	return null;
 }

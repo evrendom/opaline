@@ -127,6 +127,7 @@ export function SessionModelMark({
 				"rounded-full",
 				tone.icon === "claude" && "text-[#b96949]",
 				tone.icon === "codex" && "text-[#111] dark:text-white",
+				tone.icon === "gemini" && "text-[#3C7BFF]",
 				tone.icon === null && "text-(--session-overview-muted)",
 			)}
 		>

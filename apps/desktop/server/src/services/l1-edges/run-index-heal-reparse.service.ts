@@ -1,3 +1,4 @@
+import { RAW_SESSION_TABLES } from "@rudel/api-routes";
 import type { TranscriptSource } from "@rudel/api-routes/transcript-records";
 import type postgres from "postgres";
 import {
@@ -143,12 +144,12 @@ async function readRawBytes(
 	},
 	signal: AbortSignal,
 ): Promise<number | null> {
-	const claude = target.source === "claude_code";
+	const claude = target.source !== "codex";
 	const [row] = await executor.query<{ content_bytes: number | string }>({
 		abortSignal: signal,
 		clickhouse_settings: PROBE_SETTINGS,
 		query: `SELECT ${claude ? "length(content) + arraySum(subagents.values.size)" : "length(content)"} AS content_bytes
-			FROM ${getSafeClickHouseTable(claude ? "rudel.claude_sessions" : "rudel.codex_sessions")}
+			FROM ${getSafeClickHouseTable(RAW_SESSION_TABLES[target.source])}
 			WHERE organization_id = {organizationId:String}
 				AND session_date = parseDateTime64BestEffort({sessionDate:String}, 3, 'UTC')
 				AND session_id = {sessionId:String} AND user_id = {userId:String}

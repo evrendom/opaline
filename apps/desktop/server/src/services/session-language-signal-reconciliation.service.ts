@@ -136,6 +136,18 @@ const STALE_SESSION_CTES = `
 				revision,
 				ingested_at
 			FROM rudel.codex_sessions
+
+			UNION ALL
+
+			SELECT
+				'gemini' AS source,
+				organization_id,
+				session_date,
+				session_id,
+				user_id,
+				revision,
+				ingested_at
+			FROM rudel.gemini_sessions
 		)
 		GROUP BY source, organization_id, session_id
 	),

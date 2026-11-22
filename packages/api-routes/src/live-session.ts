@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SourceSchema } from "./schemas/source.js";
 
 // Live session protocol: the CLI streams new transcript lines of a running
 // Claude Code session. opalinehq/cli vendors an identical copy of this
@@ -19,7 +20,7 @@ export const LiveSessionAgentIdSchema = z
 	.regex(/^[A-Za-z0-9_-]{1,200}$/)
 	.nullable();
 
-export const LiveSessionSourceSchema = z.enum(["claude_code", "codex"]);
+export const LiveSessionSourceSchema = SourceSchema;
 
 // For Codex, `sessionId` is the thread id and a sub-agent's `agentId` its
 // child thread id.
