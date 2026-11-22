@@ -4,46 +4,37 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-// An invalid button's edge is the full error colour in light and half of it
-// in dark; error-line is a ring-strength tint, so that edge stays a dark: pair.
+// An invalid button takes the error edge inside an error-line ring.
 // Keyboard focus is the system's one mark, `focus-outline`.
 const buttonVariants = cva(
-	// design-escape-ok(opacity): no role renders this; error/50 invalid edge in dark
-	"group/button inline-flex shrink-0 items-center justify-center corner-full bg-clip-padding text-body-xl font-medium whitespace-nowrap transition-all hover:duration-(--motion-duration) focus-outline select-none active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-error aria-invalid:ring-[1.5px] aria-invalid:ring-error-line dark:aria-invalid:border-error/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
+	"group/button inline-flex shrink-0 items-center justify-center corner-full bg-clip-padding text-body-xl font-medium whitespace-nowrap transition-all hover:duration-(--motion-duration) focus-outline select-none active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-error aria-invalid:ring-[1.5px] aria-invalid:ring-error-line [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
 	{
 		variants: {
 			variant: {
-				// The shipped filled button: a flat near-black (near-white in dark)
-				// fill inside a 1px clear edge, no shadow, lightening to 80% on hover.
-				// No role holds these greys (primary is a step lighter), so they stay
-				// as shipped.
+				// The filled button: a flat primary fill inside a 1px clear edge, no
+				// shadow, easing toward the canvas on hover.
 				default:
-					// design-escape-ok(colour,opacity): shipped value; oklch(0.205 0 0) fill on oklch(0.985 0 0) text, oklch(0.922 0 0) on oklch(0.205 0 0) in dark, /80 hover
-					"border border-transparent bg-[oklch(0.205_0_0)] text-[oklch(0.985_0_0)] hover:bg-[oklch(0.205_0_0)]/80 dark:bg-[oklch(0.922_0_0)] dark:text-[oklch(0.205_0_0)] dark:hover:bg-[oklch(0.922_0_0)]/80",
+					"border border-transparent bg-primary text-primary-fg hover:bg-primary-hover",
 				outline:
 					"shadow-card bg-surface hover:bg-hover hover:text-ink aria-expanded:bg-hover aria-expanded:text-ink [&_svg:not([class*='text-'])]:text-ink-3",
 				ghost:
 					"hover:bg-hover hover:text-ink aria-expanded:bg-hover aria-expanded:text-ink [&_svg:not([class*='text-'])]:text-ink-3",
 				// The plain ghost the dialogs, the date picker, the calendar and the
-				// settings tables shipped with: a 1px clear edge, a field fill on hover
-				// (half of it in dark), and icons that follow the text at 16px.
+				// settings tables use: a 1px clear edge, a field fill on hover, and
+				// icons that follow the text at 16px.
 				quiet:
-					// design-escape-ok(opacity): shipped value; muted/50 hover in dark, field at 50%
-					"border border-transparent hover:bg-field hover:text-ink aria-expanded:bg-field aria-expanded:text-ink dark:hover:bg-field/50 [&_svg:not([class*='size-'])]:size-4",
-				// The plain outline those places shipped with: a 1px line-strong edge on
+					"border border-transparent hover:bg-field hover:text-ink aria-expanded:bg-field aria-expanded:text-ink [&_svg:not([class*='size-'])]:size-4",
+				// The plain outline those places use: a 1px line edge on
 				// the canvas (clear in dark), a field fill on hover, 16px icons.
 				bordered:
 					"border border-line bg-canvas hover:bg-field hover:text-ink aria-expanded:bg-field aria-expanded:text-ink dark:bg-transparent dark:hover:bg-hover [&_svg:not([class*='size-'])]:size-4",
-				// The error fill is stronger in dark (10/20% light, 20/30% dark);
-				// error-tint is 11/17%, so the fill keeps its own dark: steps. Like the
-				// filled button it sits flat inside a 1px clear edge, with no shadow.
+				// An error-tint fill, firming to the error-line strength on hover. Like
+				// the filled button it sits flat inside a 1px clear edge, with no shadow.
 				destructive:
-					// design-escape-ok(opacity): no role renders this; error/10–/30 fills
-					"border border-transparent bg-error/10 text-error hover:bg-error/20 dark:bg-error/20 dark:hover:bg-error/30",
+					"border border-transparent bg-error-tint text-error hover:bg-error-line",
 				// Underline stays rendered but transparent at rest, fading its opacity
 				// in on hover — the base `transition-all` animates the decoration color.
-				// design-escape-ok(opacity): no role renders this; ink/20 underline at rest
-				link: "text-ink underline decoration-ink/20 underline-offset-4 hover:decoration-ink",
+				link: "text-ink underline decoration-line underline-offset-4 hover:decoration-ink",
 				// The toolbar pill: a card surface with muted text and 14px icons
 				// (whatever size the icon asks for). Pressed, active (`data-active`,
 				// e.g. filters applied) or open lifts it to foreground text on the
@@ -53,7 +44,7 @@ const buttonVariants = cva(
 			},
 			size: {
 				xs: "h-6 gap-xs corner-full px-[calc(var(--space-xxs)*5)] text-body-m in-data-[slot=button-group]:corner-full has-[>svg:first-child]:pl-m has-[>svg:last-child]:pr-m [&_svg:not([class*='size-'])]:size-[11px]",
-				// The shipped small button is 32px with a 4px gap.
+				// The small button is 32px with a 4px gap.
 				sm: "h-8 gap-xs corner-full px-l in-data-[slot=button-group]:corner-full has-[>svg:first-child]:pl-m has-[>svg:last-child]:pr-m",
 				default:
 					"h-8 gap-s px-l in-data-[slot=button-group]:corner-full has-[>svg:first-child]:pl-l has-[>svg:last-child]:pr-l",
@@ -69,16 +60,15 @@ const buttonVariants = cva(
 			},
 		},
 		compoundVariants: [
-			// The toolbar pill's shipped spacing: a 5.5px gap, and 10px on an
-			// icon's side. A lone icon before a plain label shipped with 10px on
-			// both sides (the label was a text node, so the icon was also the
+			// The toolbar pill's spacing: a 6px gap, and 10px on an
+			// icon's side. A lone icon before a plain label takes 10px on
+			// both sides (the label is a text node, so the icon is also the
 			// last element).
 			{
 				variant: "toolbar",
 				size: "default",
 				className:
-					// design-escape-ok(space): shipped value; 5.5px gap
-					"gap-[5.5px] has-[>svg:first-child]:pl-[calc(var(--space-xxs)*5)] has-[>svg:last-child]:pr-[calc(var(--space-xxs)*5)] has-[>svg+[data-button-text]:last-child]:pr-[calc(var(--space-xxs)*5)]",
+					"gap-s has-[>svg:first-child]:pl-[calc(var(--space-xxs)*5)] has-[>svg:last-child]:pr-[calc(var(--space-xxs)*5)] has-[>svg+[data-button-text]:last-child]:pr-[calc(var(--space-xxs)*5)]",
 			},
 			// The plain buttons' small size kept its 12px sides beside an icon.
 			{

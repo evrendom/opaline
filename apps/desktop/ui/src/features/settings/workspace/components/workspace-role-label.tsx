@@ -16,7 +16,7 @@ export function WorkspaceOwnerBadge() {
 	return (
 		<span
 			className={
-				/* design-escape-ok(colour): shipped value; orange-500/10 on orange-600 text, orange-600/15 on orange-400 in dark */ "inline-flex h-5 items-center gap-xs corner-full bg-orange-500/10 px-m text-body-m font-medium text-orange-600 dark:bg-orange-600/15 dark:text-orange-400"
+				"inline-flex h-5 items-center gap-xs corner-full bg-warning-tint px-m text-body-m font-medium text-warning"
 			}
 		>
 			<IconCrown aria-hidden="true" className="size-3" />

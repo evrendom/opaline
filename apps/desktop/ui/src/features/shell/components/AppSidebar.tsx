@@ -97,8 +97,7 @@ export function SidebarNavTile({
 				title={route.navLabel}
 				className={cn(
 					"flex h-10 w-full items-center justify-center",
-					// design-escape-ok(radius): shipped value; 12px tile corner without squircle support
-					"rounded-[12px] corner-squircle edge-m",
+					"corner-m corner-squircle edge-m",
 					"border-(--opal-ring) bg-(--opal-fill) focus-outline transition-[background-color,border-color] duration-(--motion-duration)",
 					"squircle:corner-xl-inner",
 					active && route.tone ? route.tone.chip : restingChipClassName,

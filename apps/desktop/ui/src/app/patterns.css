@@ -196,24 +196,19 @@
 .menu-surface {
 	--menu-hairline: 1px;
 	--menu-background: var(--surface);
-	/* design-escape-ok(colour): shipped value; #efefef */
-	--menu-border: #efefef;
+	--menu-border: var(--line);
 	--menu-label: var(--ink);
 	--menu-focused-label: var(--ink);
 	--menu-icon: var(--ink-3);
 	--menu-highlight: var(--field);
-	/* design-escape-ok(colour): shipped value; oklch(0.95 0 0) */
-	--menu-selected: oklch(0.95 0 0);
-	/* design-escape-ok(colour): shipped value; #000 */
-	--menu-accent: #000;
+	--menu-selected: var(--hover-strong);
+	--menu-accent: var(--ink);
 	--menu-check: var(--surface);
-	/* design-escape-ok(colour): shipped value; lch(54.1 0 282) */
-	--menu-checkbox-border: lch(54.1 0 282);
+	--menu-checkbox-border: var(--ink-3);
 	font-family: var(--font-body);
 	font-size: var(--size-xl);
 	font-weight: var(--weight-body-regular);
-	/* design-escape-ok(type): shipped value; a 1.5 line */
-	line-height: 1.5;
+	line-height: var(--line-xl);
 	letter-spacing: var(--letter-spacing-xl);
 	color: var(--menu-label);
 	-webkit-font-smoothing: antialiased;
@@ -224,31 +219,6 @@
 	.menu-surface {
 		--menu-hairline: 0.5px;
 	}
-}
-
-/* Preserve the app's dark appearance; the captured reference was light. */
-.dark .menu-popover,
-.dark .menu-surface {
-	/* design-escape-ok(colour): shipped value; #1c1c1d */
-	--menu-background: #1c1c1d;
-	/* design-escape-ok(colour): shipped value; #38383a */
-	--menu-border: #38383a;
-	/* design-escape-ok(colour): shipped value; #e2e3e5 */
-	--menu-label: #e2e3e5;
-	/* design-escape-ok(colour): shipped value; #f4f4f5 */
-	--menu-focused-label: #f4f4f5;
-	/* design-escape-ok(colour): shipped value; #b8b8ba */
-	--menu-icon: #b8b8ba;
-	/* design-escape-ok(colour): shipped value; #2b2b2d */
-	--menu-highlight: #2b2b2d;
-	/* design-escape-ok(colour): shipped value; #333335 */
-	--menu-selected: #333335;
-	/* design-escape-ok(colour): shipped value; #77777b */
-	--menu-checkbox-border: #77777b;
-	/* design-escape-ok(colour): shipped value; #f4f4f5 */
-	--menu-accent: #f4f4f5;
-	/* design-escape-ok(colour): shipped value; #1c1c1d */
-	--menu-check: #1c1c1d;
 }
 
 .menu-popover {
@@ -347,8 +317,7 @@
 	font-size: var(--size-s);
 	letter-spacing: var(--letter-spacing-s);
 	font-weight: var(--weight-body-regular);
-	/* design-escape-ok(type): shipped value; 1.1 line */
-	line-height: 1.1;
+	line-height: 1;
 	text-align: center;
 	color: var(--menu-icon);
 }
@@ -724,8 +693,7 @@
 	flex-direction: column;
 	gap: var(--space-l);
 	font-size: var(--size-xl);
-	/* design-escape-ok(type): shipped value; 1.5 line, inherited by every row */
-	line-height: 1.5;
+	line-height: var(--line-xl);
 }
 
 .settings-group-heading {
@@ -751,8 +719,7 @@
 }
 
 .settings-group-heading h2 {
-	/* design-escape-ok(type): shipped value; 15px heading on the group's 1.5 line */
-	font-size: 0.9375rem;
+	font-size: var(--size-xl);
 	font-weight: var(--weight-body-medium);
 }
 
@@ -771,8 +738,7 @@
 }
 
 .settings-group-rows > * + * {
-	/* design-escape-ok(colour): shipped value; #0000000f, #ffffff14 in dark */
-	border-top: var(--border-m) solid var(--settings-row-line, #0000000f);
+	border-top: var(--border-m) solid var(--line);
 }
 
 .settings-row,
@@ -798,15 +764,7 @@
 }
 
 .settings-list > * + * {
-	/* design-escape-ok(colour): shipped value; #0000000d, #ffffff12 in dark */
-	border-top: var(--border-m) solid var(--settings-list-line, #0000000d);
-}
-
-.dark .settings-group {
-	/* design-escape-ok(colour): shipped value; #ffffff14 */
-	--settings-row-line: #ffffff14;
-	/* design-escape-ok(colour): shipped value; #ffffff12 */
-	--settings-list-line: #ffffff12;
+	border-top: var(--border-m) solid var(--line-soft);
 }
 
 .settings-subsection {
@@ -856,7 +814,7 @@
 	width: 100%;
 }
 
-/* The shipped settings select: a 16px chevron in the meta ink. */
+/* The settings select: a 16px chevron in the meta ink. */
 .settings-group [data-slot="select-trigger"] > svg:last-child {
 	width: var(--space-xl);
 	height: var(--space-xl);
@@ -1024,7 +982,7 @@
 	font-weight: var(--weight-body-medium);
 }
 
-/* The shipped small button here: a 4px gap, 12px sides and 16px icons. */
+/* The small button here: a 4px gap, 12px sides and 16px icons. */
 .settings-group [data-slot="button"][data-size="sm"] {
 	gap: var(--space-xs);
 	padding-inline: var(--space-l);

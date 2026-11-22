@@ -188,10 +188,8 @@
    with light frosted glass over the same opal glow. */
 .dark .cli-welcome-command.instant-v2-button-primary,
 .dark .cli-welcome-command.instant-v2-button-primary:focus-visible {
-	/* design-escape-ok(colour): no role renders this; neutral-200 pill */
-	background: oklch(0.922 0 0);
-	/* design-escape-ok(colour): no role renders this; neutral-900 text */
-	color: oklch(0.205 0 0);
+	background: var(--primary);
+	color: var(--primary-fg);
 }
 .dark .cli-welcome-command .instant-v2-button-glass {
 	background: color-mix(in oklab, var(--ink-2) 40%, transparent);

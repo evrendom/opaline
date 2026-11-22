@@ -12,8 +12,7 @@ function Separator({
 			data-slot="separator"
 			orientation={orientation}
 			className={cn(
-				// design-escape-ok(opacity): no role renders this; line/70 rule
-				"shrink-0 bg-line/70 data-horizontal:h-px data-horizontal:w-full data-vertical:w-px data-vertical:self-stretch",
+				"shrink-0 bg-line data-horizontal:h-px data-horizontal:w-full data-vertical:w-px data-vertical:self-stretch",
 				className,
 			)}
 			{...props}

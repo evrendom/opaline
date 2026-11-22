@@ -17,8 +17,7 @@
 .cli-onboarding-surface h1 {
 	font-size: var(--display-size-s);
 	line-height: var(--display-line-s);
-	/* design-escape-ok(type): no role renders this; -0.035em display tracking */
-	letter-spacing: -0.035em;
+	letter-spacing: var(--display-letter-spacing-s);
 	font-weight: var(--weight-body-heavy);
 	margin: var(--space-zero) var(--space-zero) var(--space-l);
 }
@@ -82,8 +81,7 @@
 .cli-onboarding-email input {
 	min-width: 0;
 	width: 100%;
-	/* design-escape-ok(base): no role renders this; neutral-5 edge */
-	border: var(--border-m) solid var(--neutral-5);
+	border: var(--border-m) solid var(--line);
 	border-radius: var(--radius-s);
 	padding: var(--space-l) var(--space-l);
 	min-height: 44px;
@@ -92,14 +90,9 @@
 
 /* Dark: only the rules the current sign-in and welcome screens still render. */
 .dark .cli-onboarding-auth-options button {
-	/* design-escape-ok(colour): no role renders this; a 15% white edge */
-	border-color: rgb(255 255 255 / 15%);
+	border-color: var(--line);
 	background: var(--surface);
 }
 .dark .cli-onboarding-divider {
 	color: var(--ink-4);
-}
-.dark .cli-onboarding-email input {
-	/* design-escape-ok(colour): no role renders this; a 15% white edge */
-	border-color: rgb(255 255 255 / 15%);
 }

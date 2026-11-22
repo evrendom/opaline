@@ -43,8 +43,7 @@ function FieldLabel({
 		<Label
 			data-slot="field-label"
 			className={cn(
-				// design-escape-ok(type): shipped value; leading-snug, a 1.375 line
-				"group/field-label peer/field-label flex w-fit gap-m leading-snug group-data-[disabled=true]/field:opacity-50 has-[>[data-slot=field]]:corner-xl-inner has-[>[data-slot=field]]:edge-m *:data-[slot=field]:p-xl",
+				"group/field-label peer/field-label flex w-fit gap-m group-data-[disabled=true]/field:opacity-50 has-[>[data-slot=field]]:corner-xl-inner has-[>[data-slot=field]]:edge-m *:data-[slot=field]:p-xl",
 				"has-[>[data-slot=field]]:w-full has-[>[data-slot=field]]:flex-col",
 				className,
 			)}

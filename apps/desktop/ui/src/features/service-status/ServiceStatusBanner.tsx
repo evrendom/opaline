@@ -28,10 +28,7 @@ export function ServiceStatusBanner() {
 	if (status !== "analytics-unavailable") return null;
 
 	return (
-		<output
-			// design-escape-ok(opacity): no role renders this; warning-line/60, dark warning/30 edge and warning-tint/40 fill
-			className="flex items-start gap-m edge-b-m border-warning-line/60 bg-inset px-xl py-m text-body-xl text-warning dark:border-warning/30 dark:bg-warning-tint/40"
-		>
+		<output className="flex items-start gap-m edge-b-m border-warning-line bg-warning-tint px-xl py-m text-body-xl text-warning">
 			<IconAlertTriangle
 				aria-hidden="true"
 				className="mt-xxs size-4 shrink-0"

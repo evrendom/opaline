@@ -300,10 +300,7 @@ function LoadingRows() {
 				<Skeleton className="ml-auto h-3.5 w-6 corner-xs" />
 			</td>
 			<td>
-				<Skeleton
-					// design-escape-ok(radius): shipped value; 5px corner
-					className="ml-auto size-4 rounded-[5px]"
-				/>
+				<Skeleton className="ml-auto size-4 corner-xs" />
 			</td>
 		</tr>
 	));

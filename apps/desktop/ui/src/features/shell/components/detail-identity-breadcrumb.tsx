@@ -23,10 +23,7 @@ export function DetailIdentityBreadcrumb({
 					const current = index === items.length - 1;
 					const className = cn(
 						"max-w-80 truncate",
-						current
-							? // design-escape-ok(base): no role renders this; neutral-10 at 87.5% in light
-								"text-neutral-10/87.5 dark:text-ink"
-							: "text-ink-3",
+						current ? "text-ink" : "text-ink-3",
 						item.mono && "tabular-nums",
 					);
 					return (
@@ -61,8 +58,7 @@ export function DetailIdentityBreadcrumb({
 							{!current ? (
 								<IconChevronRight
 									aria-hidden="true"
-									// design-escape-ok(colour): shipped value; #ededed, #373737 in dark
-									className="size-4 shrink-0 text-[#ededed] dark:text-[#373737]"
+									className="size-4 shrink-0 text-line"
 								/>
 							) : null}
 						</li>

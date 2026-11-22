@@ -26,21 +26,14 @@ function InputGroup({
 				"group/input-group relative flex w-full min-w-0 items-center",
 				"transition-[color,box-shadow] outline-none",
 				variant === "toolbar"
-					? // The hover tint is half the field in light and all of it in
-						// dark; no role holds that step, so it stays a dark: pair.
-						// design-escape-ok(opacity): shipped value; muted/50 toolbar hover, field at 50% (all of it in dark)
-						"h-8 corner-full bg-surface shadow-card hover:bg-field/50 dark:hover:bg-field"
-					: // design-escape-ok(opacity): no role renders this; line/50 edge and line-strong/30 fill in dark
-						"h-9 corner-s corner-squircle shadow-card squircle:corner-l dark:shadow-none dark:edge-s dark:border-line/50 dark:bg-line/30",
+					? "h-8 corner-full bg-surface shadow-card hover:bg-field"
+					: "h-9 corner-s corner-squircle shadow-card squircle:corner-l dark:shadow-none dark:edge-s dark:border-line-soft dark:bg-hover",
 				"in-data-[slot=combobox-content]:focus-within:border-inherit",
 				"has-[[data-slot=input-group-control]:focus-visible]:border-focus has-[[data-slot=input-group-control]:focus-visible]:ring-[1.5px] has-[[data-slot=input-group-control]:focus-visible]:ring-focus-ring",
-				// design-escape-ok(opacity): no role renders this; error/20 invalid ring
-				"has-[[data-slot][aria-invalid=true]]:border-error has-[[data-slot][aria-invalid=true]]:ring-[1.5px] has-[[data-slot][aria-invalid=true]]:ring-error/20",
+				"has-[[data-slot][aria-invalid=true]]:border-error has-[[data-slot][aria-invalid=true]]:ring-[1.5px] has-[[data-slot][aria-invalid=true]]:ring-error-line",
 				"has-[>[data-align=block-end]]:h-auto has-[>[data-align=block-end]]:flex-col",
 				"has-[>[data-align=block-start]]:h-auto has-[>[data-align=block-start]]:flex-col",
 				"has-[>textarea]:h-auto",
-				// design-escape-ok(opacity): no role renders this; error/40 invalid ring in dark
-				"dark:has-[[data-slot][aria-invalid=true]]:ring-error/40",
 				"has-[>[data-align=block-end]]:[&>input]:pt-l",
 				"has-[>[data-align=block-start]]:[&>input]:pb-l",
 				"has-[>[data-align=inline-end]]:[&>input]:pr-s",

@@ -23,8 +23,7 @@
 	--slider-range-minimum: 0%;
 	--slider-range-maximum: 100%;
 	--slider-range-track-background: var(--canvas);
-	/* design-escape-ok(colour): no role renders this; the slider's warm ink washes */
-	--slider-range-progress-overlay: rgb(25 23 21 / 10%);
+	--slider-range-progress-overlay: var(--hover-strong);
 	--slider-range-handle: var(--ink);
 	position: absolute;
 	inset: auto 0 0;
@@ -38,23 +37,21 @@
 			var(--slider-range-card-inset, 0.5rem)
 		)
 	);
-	box-shadow:
-		inset 0 0 0 1px rgb(25 23 21 / 7%), /* design-escape-ok(colour): no role renders this; the slider's warm ink washes */
-		inset 0 1px 0 rgb(255 255 255 / 32%);
+	box-shadow: inset 0 0 0 1px var(--line);
 	user-select: none;
 }
 
 .slider-range-input-strip[data-active="true"] {
 	box-shadow:
-		inset 0 0 0 1px rgb(25 23 21 / 12%), /* design-escape-ok(colour): no role renders this; the slider's warm ink washes */
-		0 1px 3px rgb(25 23 21 / 8%);
+		inset 0 0 0 1px var(--line),
+		var(--shadow-card);
 	filter: brightness(0.98);
 }
 
 .slider-range-input-strip[data-dragging="true"] {
 	box-shadow:
-		inset 0 0 0 1px rgb(25 23 21 / 16%), /* design-escape-ok(colour): no role renders this; the slider's warm ink washes */
-		0 1px 2px rgb(25 23 21 / 10%);
+		inset 0 0 0 1px var(--line),
+		var(--shadow-raised);
 }
 
 .slider-range-input-strip[data-disabled="true"] {
@@ -70,15 +67,6 @@
 	border-radius: inherit;
 	pointer-events: none;
 	transition: background var(--motion-duration) var(--motion-easing);
-}
-
-.slider-range-input-strip[data-active="true"] .slider-range-input-fill {
-	background: color-mix(
-		in srgb,
-		var(--slider-range-progress-overlay) 76%,
-		/* design-escape-ok(colour): no role renders this; the slider's warm ink washes */
-		rgb(25 23 21 / 8%)
-	);
 }
 
 .slider-range-input-hashmarks {
@@ -101,8 +89,7 @@
 }
 
 .slider-range-input-strip[data-active="true"] .slider-range-input-hashmark {
-	/* design-escape-ok(colour): no role renders this; the slider's warm ink washes */
-	background: rgb(25 23 21 / 15%);
+	background: var(--line);
 }
 
 .slider-range-input-handle {
@@ -145,8 +132,7 @@
 	min-width: 0;
 	align-items: center;
 	gap: calc(var(--space-xs) + var(--space-xxs) / 2);
-	/* design-escape-ok(colour): shipped value; #625a54 */
-	color: #625a54;
+	color: var(--ink-2);
 	font-weight: var(--weight-body-medium);
 	font-size: var(--size-l);
 	letter-spacing: var(--letter-spacing-l);
@@ -181,19 +167,6 @@
 
 .slider-range-input-wrapper[data-active="true"] .slider-range-input-label {
 	color: var(--ink);
-}
-
-.dark .slider-range-input-strip {
-	box-shadow:
-		inset 0 0 0 1px rgb(255 255 255 / 9%), /* design-escape-ok(colour): no role renders this; the slider's warm ink washes */
-		inset 0 1px 0 rgb(255 255 255 / 5%);
-}
-
-.dark
-	.slider-range-input-strip[data-active="true"]
-	.slider-range-input-hashmark {
-	/* design-escape-ok(colour): no role renders this; the slider's warm ink washes */
-	background: rgb(255 255 255 / 16%);
 }
 
 @media (prefers-reduced-motion: reduce) {

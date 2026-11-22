@@ -21,15 +21,20 @@
 	); /* a row under the pointer, and any soft tint: marks, stripes */
 	--hover-strong: var(--neutral-10-translucent); /* pressed, open, selected */
 
-	/* -- Ink: three greys and a disabled one; no shades of them */
+	/* -- Ink: four greys, loudest to quietest; no shades of them (an ink with
+	   an opacity snaps to the ink that holds it) */
 	--ink: var(--neutral-10); /* titles, body, values */
 	--ink-2: var(--neutral-8); /* secondary copy */
-	--ink-3: var(--neutral-7); /* meta, labels, icons, placeholders */
-	--ink-4: var(--neutral-6); /* the quietest: disabled text, placeholders, separators */
+	--ink-3: var(--neutral-7); /* meta, labels, icons */
+	--ink-4: var(
+		--neutral-6
+	); /* the quietest: disabled text, placeholders, separators */
 	--ink-inverse: var(--neutral-1);
 
-	/* -- Lines: white space first, a line next, a card last */
-	--line: var(--neutral-10-translucent); /* hairlines, dividers, inputs, rails */
+	/* -- Lines: white space first, a line next, a card last. Two strengths. */
+	--line: var(
+		--neutral-10-translucent
+	); /* hairlines, dividers, inputs, rails */
 	--line-soft: var(--neutral-10-transparent); /* chart grids, quiet dividers */
 
 	/* -- Action: neutral is the primary action; colour means state */
@@ -65,7 +70,7 @@
 	--shadow-raised:
 		0 0 0 0.5px rgb(0 0 0 / 0.08), 0 0.5px 2px -0.5px rgb(0 0 0 / 0.08),
 		0 2px 4px 0 rgb(0 0 0 / 0.05);
-	/* the inner hairline of a recessed shelf or well */
+	/* the inner hairline of a recessed well */
 	--shadow-inset: inset 0 0 0 0.5px rgb(0 0 0 / 0.06);
 	/* something floating free of a surface: a floating button, a tab menu, a
 	   toast, a scrub label. Its edge is a ring at the call site; dark keeps

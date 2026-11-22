@@ -51,7 +51,6 @@ const DISPLAY = [
 const WEIGHTS = [
 	["regular", "font-regular", "toolbar pills, meta"],
 	["medium", "font-medium", "titles, buttons, labels"],
-	["semibold", "font-semibold", "model badge letters"],
 	["heavy", "font-heavy", "404 and invite titles"],
 ] as const;
 const TRACKING = [
@@ -74,7 +73,7 @@ const CORNERS = [
 const SHADOWS = [
 	["card", "cards, panels, controls, chips: anything resting on a ground"],
 	["raised", "a pressed toolbar pill, a picked row"],
-	["inset", "the inner hairline of a well or shelf"],
+	["inset", "the inner hairline of a well"],
 	["float", "menus' tab bar, sheets, flyouts, scrub labels"],
 ] as const;
 const DURATIONS = [
@@ -155,7 +154,7 @@ export function FoundationsGroup() {
 			<Specimen
 				name="Roles"
 				source="app/tokens.css"
-				where="Every screen reads these; success-line is defined but unused, so it is not shown."
+				where="Every screen reads these and nothing else: six grounds, four inks (ink-4 the quietest), two lines, the action roles and three states with a tint and a line each. No shades: an opacity modifier on a role snaps to the role that holds it."
 				className="flex-col gap-l"
 			>
 				<Line label="ground">

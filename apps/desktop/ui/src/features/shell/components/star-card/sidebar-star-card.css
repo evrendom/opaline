@@ -29,22 +29,10 @@
 	text-align: center;
 	background: var(--surface);
 	color: var(--ink);
-	/* main's lifted card shadow: no role holds this stack since the shadow
-	   roles were consolidated */
-	box-shadow:
-		0 0 0 0.5px rgb(0 0 0 / 0.08),
-		0 1px 2px -0.5px rgb(0 0 0 / 0.06),
-		0 6px 12px -4px rgb(0 0 0 / 0.1),
-		0 16px 32px -8px rgb(0 0 0 / 0.16);
+	/* a lifted card */
+	box-shadow: var(--shadow-raised);
 }
 .dark .star-card {
-	box-shadow:
-		inset 0 0.75px 0 0 rgb(255 255 255 / 0.06),
-		inset 0 0 0 0.75px rgb(255 255 255 / 0.05),
-		0 0 0 0.75px rgb(0 0 0 / 0.3),
-		0 4px 8px 0 rgb(0 0 0 / 0.25),
-		0 12px 24px 0 rgb(0 0 0 / 0.35),
-		0 24px 48px -8px rgb(0 0 0 / 0.4);
 	--knob-bg: oklch(0.34 0 0);
 	--knob-shadow:
 		0 1px 3px rgb(0 0 0 / 55%), inset 0 0.5px 0 rgb(255 255 255 / 14%),

@@ -187,10 +187,7 @@ export function SelfHostedAuthForm({
 				className="flex w-full max-w-sm flex-col gap-xl"
 				data-self-hosted-auth="invite-only"
 			>
-				<div
-					// design-escape-ok(opacity): no role renders this; field/35 fill, line/60 ring
-					className="corner-xl bg-field/35 px-l py-m text-body-xl text-ink-3 ring-1 ring-line/60"
-				>
+				<div className="corner-xl bg-inset px-l py-m text-body-xl text-ink-3 ring-1 ring-line">
 					{signUp === "needs-setup"
 						? "No account exists yet. The owner account comes from the server's setup, not from this page."
 						: "Ask a workspace owner or admin for an invite link (Settings, Members, Invite link) and open it here to create your account."}
@@ -250,10 +247,8 @@ export function SelfHostedAuthForm({
 					className={cn(
 						"corner-xl px-l py-m text-body-xl ring-1",
 						feedback.kind === "error"
-							? // design-escape-ok(opacity): no role renders this; error/5 fill, error/15 ring
-								"bg-error/5 text-error ring-error/15"
-							: // design-escape-ok(opacity): no role renders this; field/35 fill, line/60 ring
-								"bg-field/35 text-ink-3 ring-line/60",
+							? "bg-error-tint text-error ring-error-line"
+							: "bg-inset text-ink-3 ring-line",
 					)}
 				>
 					{feedback.message}

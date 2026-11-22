@@ -15,8 +15,6 @@ function Card({
 				"group/card flex flex-col gap-xl overflow-hidden",
 				"corner-m corner-squircle py-xxl",
 				"text-body-xl",
-				// design-escape-ok(type): shipped value; the 20/14 line as a ratio, so smaller text inside keeps it
-				"leading-[calc(20/14)]",
 				"shadow-card bg-surface text-ink",
 				"squircle:corner-xl",
 				"has-[>img:first-child]:pt-zero",
@@ -50,8 +48,6 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
 			data-slot="card-title"
 			className={cn(
 				"font-body text-body-xxl font-medium group-data-[size=sm]/card:text-body-xl",
-				// design-escape-ok(type): shipped value; a small card's 14px title sits on a 1.5 line (21px)
-				"group-data-[size=sm]/card:leading-normal",
 				className,
 			)}
 			{...props}

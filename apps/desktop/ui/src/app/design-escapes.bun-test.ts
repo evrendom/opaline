@@ -200,6 +200,28 @@ describe("design-system escape check", () => {
 		).toEqual(["1 marker", "2 colour", "3 marker", "4 space", "5 marker"]);
 	});
 
+	test("a shipped value is not a reason: the marker is flagged and exempts nothing", () => {
+		const source = [
+			"// design-escape-ok(colour): shipped value; #ededed",
+			'const a = "text-[#ededed]";',
+			"// design-escape-ok(opacity): No role renders this; ink/70",
+			'const b = "text-ink/70";',
+			"// design-escape-ok(colour): data paint; the trace lanes' hues",
+			'const c = "bg-[#22c55e]";',
+			"/* design-escape-ok(colour): artwork; the opal sheen */",
+			'const d = "bg-[oklch(0.95_0.035_262)]";',
+		].join("\n");
+		const scan = scanFile("src/x.tsx", source);
+		expect(scan.escapes.map((e) => `${e.line} ${e.rule}`)).toEqual([
+			"1 marker",
+			"2 colour",
+			"3 marker",
+			"4 opacity",
+		]);
+		expect(scan.escapes[0].token).toContain("is not a reason");
+		expect(scan.markersUsed).toBe(2);
+	});
+
 	test("ratchet: above fails, below asks for an update, updates only lower", () => {
 		const baseline = { type: 3, colour: 2, markers: 1 };
 		expect(

@@ -98,12 +98,11 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
 				"h-13 [&_tr]:h-13",
 				// When sticky, a solid page bg so scrolling rows don't show through.
 				// The row's border-b doesn't travel with a sticky thead under
-				// border-collapse, so draw the bottom rule as an inset shadow on the
-				// cells (same color as the body row borders) and drop the row's own
-				// border so the two don't stack into a thicker line at rest.
+				// border-collapse, so draw the bottom rule as a 1px line-soft bar along
+				// each cell's foot (same color as the body row borders) and drop the
+				// row's own border so the two don't stack into a thicker line at rest.
 				stickyHeader &&
-					// design-escape-ok(shadow): no role renders this; a 1px inset bottom rule, coloured by line-soft
-					"sticky top-0 z-10 bg-canvas [&_tr]:edge-b-none [&_th]:shadow-[inset_0_-1px_0_0] [&_th]:shadow-line-soft",
+					"sticky top-0 z-10 bg-canvas [&_tr]:edge-b-none [&_th]:relative [&_th]:after:absolute [&_th]:after:inset-x-0 [&_th]:after:bottom-0 [&_th]:after:h-px [&_th]:after:bg-line-soft",
 				className,
 			)}
 			{...props}

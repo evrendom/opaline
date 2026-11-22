@@ -1,17 +1,13 @@
 @reference "../../index.css";
 
 :root {
-	/* design-escape-ok(colour): shipped value; the bone's black/7 */
-	--bone: rgb(0 0 0 / 0.07);
-	/* design-escape-ok(colour): no role renders this; the shimmer's white sheen */
-	--bone-shine: rgb(255 255 255 / 0.6);
+	/* a bone is the firm tint; its shimmer a wash of the canvas */
+	--bone: var(--hover-strong);
+	--bone-shine: color-mix(in oklab, var(--canvas) 60%, transparent);
 }
 
 .dark {
-	/* design-escape-ok(colour): shipped value; the bone's white/8 */
-	--bone: rgb(255 255 255 / 0.08);
-	/* design-escape-ok(colour): no role renders this; the shimmer's white sheen */
-	--bone-shine: rgb(255 255 255 / 0.1);
+	--bone-shine: var(--hover);
 }
 
 .bones-fill,

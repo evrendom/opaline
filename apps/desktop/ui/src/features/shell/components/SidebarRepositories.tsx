@@ -56,11 +56,7 @@ export function SidebarRepositories({ reposActive }: { reposActive: boolean }) {
 		!welcome.length && hasMoreRepositories(query.data ?? [], repos.length);
 	return (
 		<SidebarGroup>
-			<SidebarGroupLabel
-				className={
-					/* design-escape-ok(opacity): no role renders this; ink at 50% */ "h-6 text-body-s font-regular text-sidebar-foreground/50"
-				}
-			>
+			<SidebarGroupLabel className={"h-6 text-body-s font-regular text-ink-2"}>
 				Repositories
 			</SidebarGroupLabel>
 			<SidebarGroupContent>

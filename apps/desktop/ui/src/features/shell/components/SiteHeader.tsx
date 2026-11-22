@@ -121,8 +121,7 @@ export function SiteHeader({
 					/>
 					{/* Detail breadcrumb: the section links back to the list,
 					    the session id is the page title. */}
-					{/* design-escape-ok(type): shipped value; -0.025em title tracking */}
-					<h1 className="flex min-w-0 items-center gap-s text-body-xxl font-medium tracking-[-0.025em]">
+					<h1 className="flex min-w-0 items-center gap-s text-body-xxl font-medium tracking-xs">
 						{/* Back link only lifts its text on hover. Its own fluid
 						    root keeps it out of the header's sliding hover fill. */}
 						<Link
@@ -164,10 +163,7 @@ export function SiteHeader({
 								{formatModelDisplayLabel(sessionModel)}
 							</span>
 						) : modelPending ? (
-							<Skeleton
-								// design-escape-ok(radius): shipped value; 4px corner
-								className="h-3.5 w-16 shrink-0 rounded-[4px] corner-squircle squircle:corner-s"
-							/>
+							<Skeleton className="h-3.5 w-16 shrink-0 corner-xs corner-squircle squircle:corner-s" />
 						) : null}
 						<span className={cn("shrink-0", sessionMuted && "text-ink-3")}>
 							Session
@@ -255,10 +251,7 @@ export function SiteHeader({
 						showWorkspaceMenu={showWorkspaceMenu}
 					/>
 					{!isCollectionDetail ? (
-						<h1
-							// design-escape-ok(type): shipped value; -0.025em title tracking
-							className="flex min-w-0 items-center gap-m text-body-xxl font-medium tracking-[-0.025em]"
-						>
+						<h1 className="flex min-w-0 items-center gap-m text-body-xxl font-medium tracking-xs">
 							<ShellNavIcon
 								icon={currentShellRoute.icon}
 								activeIcon={currentShellRoute.activeIcon}

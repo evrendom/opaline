@@ -125,7 +125,7 @@ export const DATA_PAINT: Record<string, { rules: Rule[]; why: string }> = {
 	},
 	"src/features/shell/components/star-card/sidebar-star-card.css": {
 		rules: ["colour", "motion"],
-		why: "the star card's split-flap counter, knob, gold star, shimmer and celebration are artwork; its lifted shadow is main's, which no role holds",
+		why: "the star card's split-flap counter, knob, gold star, shimmer and celebration are artwork",
 	},
 	"src/app/ui/context-utilization-gradients.tsx": {
 		rules: ["colour"],

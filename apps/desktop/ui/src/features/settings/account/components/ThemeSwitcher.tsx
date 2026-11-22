@@ -46,9 +46,7 @@ export function ThemeSwitcher() {
 							<motion.span
 								layoutId={pillId}
 								transition={MORPH}
-								className={
-									/* design-escape-ok(opacity,colour): shipped value; input/50, line-strong at 50% and oklch(1 0 0 / 7.5%) in dark */ "absolute inset-0 corner-full bg-line/50 dark:bg-[oklch(1_0_0/7.5%)] shadow-card"
-								}
+								className={"absolute inset-0 corner-full bg-hover shadow-card"}
 							/>
 						) : null}
 						<Icon aria-hidden="true" className="relative z-10 size-3.5" />

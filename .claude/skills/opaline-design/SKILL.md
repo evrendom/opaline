@@ -9,18 +9,30 @@ Four files, one system. Load them in this order and never restyle past them.
 
 | File | What it is | How you use it |
 |---|---|---|
-| `apps/desktop/ui/src/app/theme.css` | Layer 1, the primitives: fonts, both type scales, space, corners, strokes, shadows, motion, the neutral ramp, the opal palette, success / warning / error and their tint opacities, in light (`:root`) and dark (`.dark`), plus the Tailwind utilities that read them. | Read it to pick a value. A new primitive goes here; screens never read it directly. |
-| `apps/desktop/ui/src/app/tokens.css` | Layer 2, the roles screens are written against: ground, ink, lines, action, state, elevation. `.dark` swaps Layer 1 and the few roles that change character. | Components and patterns read Layer 2 only. A new role goes here first. |
-| `apps/desktop/ui/src/app/ui/` | The primitives: Button (with `toolbar` and `inline`), Input, Select, Card, Dialog, Sheet, Popover, Tooltip, Table, Badge, Avatar, Empty, TouchTarget, Bones. | Reach for a primitive before anything else. A recurring look is a variant here, not feature CSS. |
-| `apps/desktop/ui/src/app/patterns.css` | Opaline's recurring elements as classes, each state as an attribute or class: text button, secondary button, filter chip, toolbar search, form button and field, tab track and pill, surface card, menu, settings group. | Compose from these; add a class, never an inline style. A tab row's sliding pill is `PillTabs pillClassName="tab-pill"` (or `.tab-track` for the track tone); the sign-in forms put `form-button` / `form-input` on Button and Input. |
+| `apps/desktop/ui/src/app/theme.css` | Layer 1, the primitives: fonts, both type scales, weights, tracking, space, corners, strokes, motion, the neutral ramp, the opal palette, success / warning / error and their tint opacities, in light (`:root`) and dark (`.dark`), plus the Tailwind utilities that read them. | Read it to pick a step. Screens never read its colours directly. |
+| `apps/desktop/ui/src/app/tokens.css` | Layer 2, the roles screens are written against: ground, ink, lines, action, state, shadows, motion. `.dark` swaps Layer 1 and the few roles that change character. | Components and patterns read Layer 2 only. |
+| `apps/desktop/ui/src/app/ui/` | The primitives: Button (with `toolbar` and `inline`), Input, Select, Checkbox, Card, Dialog, Sheet, Popover, Tooltip, Table, Badge, Avatar, Empty, TouchTarget, Bones. | Reach for a primitive before anything else. A recurring look is a variant here, not feature CSS. |
+| `apps/desktop/ui/src/app/patterns.css` | Opaline's recurring elements as classes, each state as an attribute or class: text button, secondary button, filter chip, toolbar search, form button and field, tab track and pill, surface card, menu, settings group. | Compose from these; add a class, never an inline style. |
 
-Tailwind reads the same roles as colours: `bg-surface`, `text-ink-3`, `border-line`, `bg-accent-tint`. Feature CSS reads them as variables: `var(--surface)`, `var(--ink-3)`.
+Tailwind reads the roles as colours: `bg-surface`, `text-ink-3`, `border-line`, `bg-accent-tint`. Feature CSS reads them as variables: `var(--surface)`, `var(--ink-3)`.
 
-## Build order
+## The role set
 
-1. Tokens load once from `src/index.css`: `theme.css` (Layer 1), then `tokens.css` (Layer 2), then `patterns.css`. Dark is the `dark` class on `<html>`, set by `ThemeProvider`. Roles flip with the mode, so a component doesn't check it: a `dark:` that swaps one role for another means a role is missing, so add the role. A primitive keeps a `dark:` pair only where the value differs by an opacity step no role holds (Button's primary hover, its destructive fill), with a comment saying so.
-2. A primitive from `src/app/ui`, then a pattern from `patterns.css`. Reuse before you draw.
-3. Type only through the scales: `text-body-{xxs…xxl}` and `text-display-{xxs…xxl}` carry size, line height and tracking together; weight is `font-regular`, `font-medium`, `font-heavy`. Never a font size or a `leading-*` beside a text style.
+This is the whole set. **Don't add roles, steps or shadows.** If nothing fits, use the nearest one.
+
+- **Ground:** `canvas` (the window's content), `surface` (cards, panels, popovers, menus, controls), `inset` (a recessed area: wells, code, rails), `field` (inputs, chips, segmented tracks), `hover` (a row under the pointer, and any soft tint), `hover-strong` (pressed, open, selected, and any firmer tint).
+- **Ink:** `ink` (titles, body, values), `ink-2` (secondary copy), `ink-3` (meta, labels, icons), `ink-4` (the quietest: disabled text, placeholders, separators, faint meta), `ink-inverse`.
+- **Lines:** `line` (hairlines, dividers, inputs, rails), `line-soft` (chart grids, quiet dividers).
+- **Action:** `primary`, `primary-hover`, `primary-fg` (the filled button and a checked checkbox), `focus`, `focus-ring` (the soft ring around a focused field), `accent` (Opaline blue: links, selection, info), `accent-tint`, `accent-line`, `accent-fg` (text on an accent fill, white in both modes).
+- **State:** `success`, `warning`, `error`, each with `-tint` (a fill) and `-line` (an edge or ring).
+- **Shadows:** `shadow-card` (anything resting on a ground: cards, panels, menus, controls, a window), `shadow-raised` (pressed or picked: a pressed toolbar pill, a lifted card), `shadow-inset` (the inner hairline of a well), `shadow-float` (free of any surface: sheets, toasts, flyouts; dark keeps only its ring, drawn at the call site).
+- **Motion:** the theme's `--motion-duration` (150ms) with `--motion-easing`, and `--motion-large-duration` (300ms) with `--motion-large-easing`; the roles `--motion-quick-duration` (100ms), `--motion-medium-duration` (200ms), `--motion-slow-duration` (650ms); the easings `ease-base`, `ease-large`, `ease-strong`, `ease-drawer`, `ease-wave`.
+
+There are no shades: no `text-ink/70`, no `bg-error/10`, no `line/50`. An opacity on a role is snapped to the role that holds it (see below).
+
+## The steps
+
+- **Body type** `text-body-{xxs 8, xs 10, s 11, m 12, l 13, xl 14, xxl 16}` and **display** `text-display-{xxs 20, xs 24, s 30, xxl 88}` carry size, line height and tracking together. Never a font size or a `leading-*` beside a step. A label set solid in a fixed-height chip, bar or cell takes `line-solid` (1); a dense figure row or a 10 / 12 tag takes `line-tight` (1.2). These are the only line utilities.
 
    | Body step | Size / line | Used for |
    |---|---|---|
@@ -32,111 +44,83 @@ Tailwind reads the same roles as colours: `bg-surface`, `text-ink-3`, `border-li
    | `xl` | 14 / 20 | body copy, card and row titles |
    | `xxl` | 16 / 24 | card headings, emphasised values |
 
-   A label set solid to centre in a fixed-height chip, bar or cell takes `line-solid` (line height 1) beside its step; a dense figure row or a 10 / 12 tag takes `line-tight` (1.2). These are the only line utilities; never `leading-*`. Tracking comes with the step; there is no tracking utility.
+- **Weights** `font-regular`, `font-medium`, `font-heavy` (600; Tailwind's `font-bold` and `font-semibold` snap here).
+- **Tracking** `tracking-{xs, s, m, l, xl}`: `xs` tightens a large title (−1.5%), `xl` opens an uppercase label (+2%).
+- **Space** `zero`, `xxs` 2, `xs` 4, `s` 6, `m` 8, `l` 12, `xl` 16, `xxl` 24: `gap-m`, `px-l`, `mt-xs`. Past 24px, a multiple: `gap-[calc(var(--space-xxl)*4/3)]` for 32. Sizes (`w-*`, `h-*`, `size-*`) keep Tailwind's scale.
+- **Corners** `corner-{zero, xs 6, s 8, m 10, l 14, xl 22, full}`, plus `corner-{s,l,xl}-inset` (1px inside a surface), `corner-xl-inner` (18, a space step inside an xl squircle) and `corner-xl-outer` (26, a space step outside one).
+- **Strokes** `edge-{none, s 0.5, m 1, l 2}`; the colour is `border-line` or `border-line-soft`.
 
-   Display: `xxs` 20 / 28, `xs` 24 / 32 (page titles), `s` 30 / 36, up to `xxl` 88 for artwork glyphs. Body tracking is 0 from `xs` to `xl`; `xxs` opens to +2%, and `xxl` and display tighten to −1.5%.
-4. Space only through the steps: `gap-m`, `px-l`, `mt-xs` (`zero` 0, `xxs` 2, `xs` 4, `s` 6, `m` 8, `l` 12, `xl` 16, `xxl` 24). Past 24px, a multiple: `gap-[calc(var(--space-xxl)*4/3)]` for 32.
-5. Icons are Tabler (`@tabler/icons-react`), outline by default: actions, controls, rows and inline glyphs. The `*Filled` variant is for navigation and identity: sidebar and settings nav, reader tabs, and the small category marks in charts, legends and labels, where a solid shape reads at 12–14px. Sizes go by place, and primitives size their own: 14 (`size-3.5`) in buttons, toolbar pills, inputs and as the default; 12 (`size-3`) in badges, dense rows and `icon-xs` buttons (11 in `xs` buttons); 16 (`size-4`) in menu and select items and for emphasis. Don't size an icon inside a primitive.
+## Build order
 
-## The layers
+1. Tokens load once from `src/index.css`: `theme.css`, then `tokens.css`, then `patterns.css`. Dark is the `dark` class on `<html>`, set by `ThemeProvider`. Roles flip with the mode, so a component rarely needs `dark:`.
+2. A primitive from `src/app/ui`, then a pattern from `patterns.css`. Reuse before you draw.
+3. Type, space, corners and motion only through the steps above.
+4. Icons are Tabler (`@tabler/icons-react`), outline by default; the `*Filled` variant is for navigation and identity (sidebar and settings nav, reader tabs, small category marks). Sizes go by place, and primitives size their own: 14 (`size-3.5`) in buttons, toolbar pills, inputs and as the default; 12 (`size-3`) in badges, dense rows and `icon-xs` buttons; 16 (`size-4`) in menu and select items. Don't size an icon inside a primitive.
 
-- **Layer 1** is what `theme.css` defines: ten neutrals (`neutral-1` page to `neutral-10` strongest text), the opal palette (`color-1` Opaline blue, then the rest of the sheen), success / warning / error, each with a `-transparent` and `-translucent` level; body and display type steps; space; corners; strokes; three shadows; motion.
-- **Layer 2** is what screens are written against:
-  - ground: `canvas` (the window's content), `surface` / `card` (cards, panels, menus, controls), `card-soft` (a card on a recessed ground: a tab's active pill, a picked row; a translucent ink wash in dark), `inset` (wells, code, rails), `field` (inputs, chips), `track` (a segmented track and the tone sliding along it), `shelf` (a list's expanded row and its frozen cap: field in light, card in dark), `hover`, `hover-strong`, `wash` (a soft tint on any ground), `mark-fill` (model marks, run tags, placeholder bars; firmer in dark);
-  - ink: `ink`, `ink-2`, `ink-3`, plus `ink-4` and `ink-inverse`; two that change character in dark: `ink-soft` (secondary icons: ink-2, quieting to ink-3 in dark) and `ink-meta` (the activity panels' meta: ink-3, opal-tinted in dark);
-  - lines: `line` (hairlines, dividers, rails), `line-strong` (opaque edges), `line-soft` (chart grids, quiet dividers), `line-faint` (the faint ring around a small avatar or logo);
-  - action: `primary`, `primary-hover`, `primary-fg`, `focus`, `focus-ring` (the soft ring around a focused control: `focus-visible:ring-focus-ring`); `accent`, `accent-tint`, `accent-line`, `accent-fg` (text and icons on an accent fill, white in both modes);
-  - state: `success`, `warning`, `error`, `warning-tint` and `error-tint` (pastel fills), `warning-line` and `error-line` (their edges);
-  - elevation, seven shadows: `card` (cards, panels, menus, popovers, dialogs, tooltips), `control` (every button, inputs, toolbar pills, the checkbox), `raised` (a pressed or active control, a picked row), `chip` (chips, tags, pills, the reader's light cards, a lens over a chart), `inset` (a shelf's inner hairline), `label` (a small label or button floating over content), `float` (something free of any surface: a floating button, a toast, a sheet, a flyout; dark keeps only its ring). Tailwind reads each as `shadow-<role>` (`shadow-card`, `aria-pressed:shadow-raised`), CSS as `var(--shadow-<role>)`. A new place takes one of these seven; a shadow none of them fits is a design decision, not a new one-off role. Tailwind's `shadow-sm…xl` and `shadow-[…]` are not used in screens.
-- Dark is not an inversion. Roles keep their names; Layer 1 swaps the ramp, `surface` steps one up from `canvas`, `line-strong` becomes the translucent `line`, and every shadow trades its soft drop for an inset highlight edge.
-- The role shadows live in `tokens.css`, not the theme: each is a stack of hairline, contact and ambient layers, and dark swaps in inset highlights over black drops. A single theme value couldn't hold that stack, so `theme.css` defines no shadows.
-- Plugin mode (the widget build, `src/widget/plugin.css`) overrides two roles with other roles for the chat host: `primary` is `ink`, and `card` is `canvas`. Every other role keeps its app value.
+## How to pick a role
+
+Every value lands on a role or a step. Read the table top to bottom and take the first row that matches.
+
+| What you have | Take |
+|---|---|
+| `ink` with an opacity, or any near-black text (`#111`, `#292a2f`, `oklch(0.205 0 0)` …) | 80% or more: `ink`; 50 to 79%: `ink-2`; below 50%: `ink-3` |
+| `ink-2` with an opacity | 80% or more: `ink-2`; else `ink-3` |
+| `ink-3` with an opacity, or a mid grey (`#5d5d5d`, `#828387`, `#acaeb2` …) | 70% or more: `ink-3`; below: `ink-4`. A mid grey takes the nearest of `ink-2`, `ink-3`, `ink-4` by lightness, in both modes |
+| A translucent fill (`field/50`, `hover/…`, `ink/5`, `black/5`, `white/10` …) | a soft tint (about 2 to 5% ink): `hover`; a firmer one (6 to 12%), a scrim, a skeleton bone: `hover-strong` |
+| An opaque light fill (`#f4f4f5`, `field/80` …) | `field`, or `inset` if it's lighter than `field` |
+| An edge with an opacity (`line/50`, `border/60` …), or a literal edge | 60% or more: `line`; else `line-soft` |
+| Red, amber, orange or green for a state (invalid, negative, warning, success, an owner's crown) | `error`, `warning`, `success`; a fill takes its `-tint`, an edge or ring its `-line` |
+| Blue for a link, selection or info | `accent`, `accent-tint`, `accent-line` |
+| A filled near-black button or check | `primary` on `primary-fg`, hovering to `primary-hover` |
+| A text size off the scale | the nearest body or display step; on a tie, the smaller (15px is `body-xl`) |
+| `leading-*` or an arbitrary line height | drop it (the step carries its line), or `line-solid` / `line-tight`; in CSS, the step's `var(--line-*)` |
+| Arbitrary tracking | drop it, or the nearest `tracking-*` (an uppercase label: `tracking-xl`) |
+| Font weight 600 or 700 | `font-heavy` |
+| Off-scale space (5, 10, 14, 20 …) | the nearest step; on a tie, the one that keeps the element aligned with its neighbours |
+| `rounded-*` or an off-scale radius | the nearest corner: 2px is `corner-zero`, 4 to 5px `corner-xs`, 12px `corner-m`, 16 to 18px `corner-l`, a 40px squircle `corner-xl-outer` |
+| A literal shadow | `shadow-card` (resting), `shadow-raised` (pressed or lifted), `shadow-inset` (a well), `shadow-float` (free-floating) |
+| A literal duration or easing | the nearest duration role (50–110ms quick, 120–170 base, 180–250 medium, 280–400 large, 500–800 slow) or easing (`ease`/`ease-out` base, `ease-in-out` wave, a strong ease-out strong, a drawer curve drawer); a loop's period (1s or longer) and `linear` stay literal |
+| A direct Layer 1 read (`neutral-N`, `color-N`) | the role that holds it (`neutral-3` is `field`, `neutral-6` is `ink-4` …) |
+| A colour in feature CSS | the same table, written `var(--role)`; a CSS rule that now repeats a pattern or primitive is deleted in favour of it |
+
+A filter or mask that needs a colour takes a role variable too: `drop-shadow(0 0 0.5px var(--line))`.
 
 ## Rules that keep the craft
 
 1. **Neutral is the primary action.** One filled `Button` per view, filled with `primary`. Colour never says “click me”.
-2. **Colour means state.** `accent` marks selection, links and information; success / warning / error mark outcomes. A sentiment chip is `bg-{state}-tint text-{state}`.
-3. **Data paint is data.** Chart series, activity lanes, event dots, cost heat, model tones, syntax colours, a language's brand colour and the opal sheen carry meaning. They stay as authored and never take a theme role: two categories must never share a colour.
-4. **Three inks.** `ink` for what you read, `ink-2` for secondary copy, `ink-3` for meta, labels, icons and placeholders. `ink-4` is disabled text and the faintest hints (an empty value's dash, a separator glyph). No literal grey and no opacity modifier on an ink. The app ships a few inks at a fixed strength, and those are roles too, the **shipped shades**: `ink-90`, `ink-80` (ink at 90 and 80%), `ink-3-60`, `ink-3-50`, `ink-3-40` (ink-3 at those strengths) and `hover-50`. Each renders exactly what `text-ink/90` or `text-ink-3/50` would, and follows the mode with its role. Use one where the design calls for that strength; don't add another `/N` modifier.
-5. **White space first, a line next, a card last.** Separate with space; then a `line`; a `surface-card` only when the group is independently actionable. Edges are hairline shadows (`shadow-card`, `shadow-control`), not borders.
-6. **Squircles on surfaces, pills on controls.** Corners are `xs` 6, `s` 8, `m` 10, `l` 14, `xl` 22. A squircle needs a larger radius to read as round as an arc, so the pair goes together: cards and panels `corner-m squircle:corner-xl corner-squircle`, menus and popovers `corner-s squircle:corner-l corner-squircle`. Toolbar buttons, badges and avatars are `corner-full`; chips are `corner-xs`. A child drawn 1px inside a surface (a hover or focus overlay on a tile) keeps the corners concentric with `corner-s-inset squircle:corner-xl-inset`; one drawn a space step (4px) inside an xl squircle (a row highlight in a card) takes `squircle:corner-xl-inner` (18), and an outline 4px outside one (a drop target around a shelf) `squircle:corner-xl-outer` (26). A skeleton bar too small for `xs` still takes `corner-xs`.
-7. **Data in the data face.** Money, times, counts, percentages and code are Geist Mono (`font-data`) with `tabular-nums`. Everything else, headings and page titles included, is Inter: a page title is `text-display-xs font-medium`.
-8. **Controls have fixed heights.** Toolbar pills 32 (`Button variant="toolbar"`), inputs 36, buttons 24 / 28 / 32 by size, menu rows 32. Toolbar controls hold a choice with `aria-pressed` or `data-active`.
-   Keyboard focus is one mark: `focus-outline` (a 2px accent outline just outside the control) on Button and on anything clickable that isn't a Button; fields keep `focus-visible:border-focus` with `ring-focus-ring`. An icon-only button is `Button size="icon" | "icon-sm" | "icon-xs"` with an `aria-label`, never a raw `<button>` with its own focus style.
-9. **It's a Mac app.** No pointer cursor on controls. The sidebar stays translucent so the window's vibrancy shows through: that translucency (`src/app/app-surface.css`, the shell's chrome) is the one literal colour family kept there, each value behind a per-rule marker; the sidebar primitive's other names (`--sidebar-foreground`, `--sidebar-accent` …) come from `tokens.css`. Small controls get a `TouchTarget`.
-10. **Motion is quiet.** Buttons press to .97, menus share the fluid hover highlight, numbers count with `FlowNumber`, skeletons reveal with `Bones`. Popups zoom in from 95% and out to it (`zoom-in-95` / `zoom-out-95`, in the primitives). Respect reduced motion. Time every transition with a motion role, never a literal; a loop's period (a spinner, a shimmer, a pulse: 1s or longer) is the one literal duration, and `linear` the one literal easing:
-
-   | Role | Value | Used for |
-   |---|---|---|
-   | `--motion-quick-duration` | 100ms | hover tints, a check appearing, flyouts |
-   | `--motion-duration` (theme) | 150ms | small changes, with `--motion-easing` |
-   | `--motion-medium-duration` | 200ms | fades, sheets, a panel's width |
-   | `--motion-large-duration` (theme) | 300ms | large changes, with `--motion-large-easing` |
-   | `--motion-slow-duration` | 650ms | a chart drawing in, a skeleton leaving |
-   | `--motion-easing` (`ease-base`) | cubic-bezier(.2, .8, .2, 1) | the default ease-out for small changes |
-   | `--motion-large-easing` (`ease-large`) | cubic-bezier(.16, 1, .3, 1) | large changes |
-   | `--motion-strong-easing` (`ease-strong`) | cubic-bezier(.23, 1, .32, 1) | presses, things entering |
-   | `--motion-drawer-easing` (`ease-drawer`) | cubic-bezier(.32, .72, 0, 1) | drawers, rails, rings settling |
-   | `--motion-wave-easing` (`ease-wave`) | cubic-bezier(.455, .03, .515, .955) | strips growing, loops |
-
-   The theme holds only its two timings, so the others are Layer 2 roles in `tokens.css` (with literal values, like the role shadows). In Tailwind: `duration-(--motion-medium-duration) ease-strong`.
-
-## Snapping table
-
-How an escape maps onto the system. Nothing may visibly change: take the role or step only when it renders the same in both modes (within about 1px, or a colour difference you can't see; a motion timing may snap, since motion isn't a look at rest). When the nearest role would visibly change something, keep the value and mark it, `design-escape-ok(<rule>): no role renders this; <value>` (see the check), rather than force a snap or invent a role.
-
-| Escape | Becomes |
-|---|---|
-| text `ink/90`, `ink/95` | `ink` |
-| text `ink/70`–`ink/80` | `ink-2` |
-| text `ink/60`, `ink-2/…` | `ink-3` |
-| text `ink-3/40`–`ink-3/70` | `ink-4` |
-| fill `ink/3`–`ink/5`, `ink-3/10` | `wash` (or `hover` when it is a pointer state) |
-| fill `ink/6`–`ink/10`, `ink-3/15`–`ink-3/20` | `hover-strong` |
-| edge `ink/6`–`ink/15`, `ink-3/20`–`ink-3/30` | `line` |
-| edge or fill `ink/20`–`ink/30`, `ink-3/40` | `line-strong` |
-| `line/40`–`line/60` | `line-soft` |
-| `line/70`+, `line-strong/30`–`line-strong/50` | `line` |
-| `hover/50`–`hover/80` | `hover` |
-| `field/35`–`field/60` | `inset`; `field/70`+ is `field` |
-| `focus/40`, `focus/50` | `focus-ring` |
-| `{success,warning,error}/5`–`/15`, `accent/10`–`/20` | `{state}-tint`, `accent-tint` |
-| `{success,warning,error}/20`–`/50` as an edge or bar, `accent/30`+ | `{state}-line`, `accent-line` |
-| `text-{state}/…` | `text-{state}` |
-| `var(--neutral-N)`, `bg-neutral-N`, `color-N` outside data paint | the role that holds it (`neutral-3` is `field`, `neutral-6` is `ink-4` …) |
-| duration 50–110ms | `--motion-quick-duration` (100) |
-| duration 120–170ms | `--motion-duration` (150) |
-| duration 180–250ms | `--motion-medium-duration` (200) |
-| duration 280–400ms | `--motion-large-duration` (300) |
-| duration 500–800ms | `--motion-slow-duration` (650) |
-| `ease`, `ease-out`, `ease-in` (CSS or Tailwind) | `ease-base` / `var(--motion-easing)` |
-| `ease-in-out` | `ease-wave` |
-| `cubic-bezier(.22, 1, .36, 1)` and other strong ease-outs | `ease-strong` |
-| `cubic-bezier(.2, 0, 0, 1)` and other drawer curves | `ease-drawer` |
-| `delay-300` | `delay-(--motion-large-duration)` |
-| `leading-none`, set solid | `line-solid` |
-| 10 / 12, 13 / 16, 9 / 12 | the body step plus `line-tight` |
-| `tracking-[…]` | the step's own tracking; a wider uppercase label keeps its value behind a marker |
-| 18px / 26px squircle | `corner-xl-inner` / `corner-xl-outer` |
-| 4px skeleton corner | `corner-xs` |
-| CSS `font-size` / `line-height` literal | the body step's variables (`var(--size-m)` with `var(--line-m)` …) or the utility class on the element |
-| CSS `font-family` literal | `var(--font-body)`, `var(--font-display)`, `var(--font-data)` |
-| CSS colour literal | a role variable; data paint stays, in a `DATA_PAINT` file or behind a marker |
+2. **Colour means state.** `accent` marks selection, links and information; success / warning / error mark outcomes. A sentiment chip is `bg-{state}-tint text-{state}`; an invalid control is `border-error` with `ring-error-line`.
+3. **Data paint is data.** Chart series, activity lanes, event dots, cost heat, model tones, syntax colours, diff marks, a language's or tool's brand colour and the opal sheen carry meaning. They stay as authored and never take a theme role: two categories must never share a colour.
+4. **Four inks, no shades.** `ink` for what you read, `ink-2` for secondary copy, `ink-3` for meta, labels and icons, `ink-4` for the quietest things: disabled text, placeholders, separators. No literal grey and no opacity on an ink.
+5. **White space first, a line next, a card last.** Separate with space; then a `line`; a card (`shadow-card` on `surface`) only when the group is independently actionable.
+6. **Squircles on surfaces, pills on controls.** Cards and panels `corner-m squircle:corner-xl corner-squircle`, menus and popovers `corner-s squircle:corner-l corner-squircle`. Toolbar buttons, badges and avatars are `corner-full`; chips, checkboxes and skeleton bars are `corner-xs`.
+7. **Data in the data face.** Money, times, counts, percentages and code are Geist Mono (`font-data`) with `tabular-nums`. Everything else is Inter: a page title is `text-display-xs font-medium`.
+8. **Controls have fixed heights.** Toolbar pills 32 (`Button variant="toolbar"`), inputs 36, buttons 24 / 32 / 36 by size, menu rows 32. Toolbar controls hold a choice with `aria-pressed` or `data-active`. Keyboard focus is one mark: `focus-outline` on Button and anything clickable; fields keep `focus-visible:border-focus` with `ring-focus-ring`.
+9. **It's a Mac app.** No pointer cursor on controls. The sidebar stays translucent so the window's vibrancy shows through (`src/app/app-surface.css`). Small controls get a `TouchTarget`.
+10. **Motion is quiet.** Buttons press to .97, menus share the fluid hover highlight, numbers count with `FlowNumber`, skeletons reveal with `Bones`. Popups zoom in from 95%. Respect reduced motion. Time every transition with a motion role, never a literal.
 
 ## Adding a pattern
 
 - Start from the nearest primitive or pattern and keep its height, padding and corners.
-- Feature CSS never reaches into a primitive with `[data-slot=…]`. A recurring look is a variant or prop on the primitive (`InputGroup variant="toolbar"`, `Sidebar rootClassName`) or a pattern (`.form-button`, `.form-input`, `.tab-pill`); a one-off is a `className` at the call site. The two exceptions are themes over every primitive of a kind: `patterns.css`'s settings group, and the plugin host mode in `src/widget/plugin.css`.
-- Name states as attributes (`aria-pressed`, `aria-selected`, `data-active`, `data-popup-open`, `data-inactive`) or classes, so every state renders at rest for review.
-- A new colour is a new role first: in `tokens.css` on a Layer 1 token, and registered as a Tailwind colour. A new shadow is a role in `tokens.css` (light in `:root`, dark in `.dark`), registered in its `@theme inline reference` block and in `ROLE_SHADOWS` in `src/lib/utils.ts` so `cn()` merges it.
-- Backgrounds from the ground roles, text from the inks, edges from the lines or a role shadow. Never a hex, `rgb()` or `oklch()` outside a token definition or data paint.
-- Add it to the system page, `/dev/design-system` in development (`src/app/system/DesignSystemPage.tsx`), with each state at rest; it shows light beside dark, each in its own frame. The page is the spec.
-- Review it in light and dark before merging.
+- Feature CSS never reaches into a primitive with `[data-slot=…]`. A recurring look is a variant or prop on the primitive or a pattern; a one-off is a `className` at the call site. The two exceptions are themes over every primitive of a kind: `patterns.css`'s settings group, and the plugin host mode in `src/widget/plugin.css`.
+- Name states as attributes (`aria-pressed`, `aria-selected`, `data-active`, `data-popup-open`) or classes, so every state renders at rest for review.
+- Backgrounds from the grounds, text from the inks, edges from the lines or a role shadow. Never a hex, `rgb()` or `oklch()` outside a token definition or data paint.
+- Add it to the system page, `/dev/design-system` in development (`src/app/system/DesignSystemPage.tsx`), with each state at rest, light beside dark. The page is the spec.
 
-## The check
+## The check and its markers
 
-`bun run check:design` (from the repo root or `apps/desktop/ui`; `tools/design-escapes.ts`) reads the class strings under `src` and lists every escape: Tailwind's default type (`text-sm`, `text-[13px]`, `leading-*`, `tracking-wide`), spacing (`p-3`, `gap-[10px]`), every `rounded-*`, palette colours (`bg-rose-500`, `text-white`), a hex, `rgb()` or `oklch()` in a class, and Tailwind's or literal shadows. It enforces all of `src/` (`ENFORCED`). It also reads every CSS declaration: colour, font and motion literals, an opacity modifier on a theme colour, and a direct Layer 1 read (`neutral-N`, `color-N`). Data paint passes by a whole-file entry in `DATA_PAINT` (with its reason and the rules it lifts) or a per-rule marker, `design-escape-ok(<rule>[,<rule>…]): <reason>`, in a comment on the line or the line above; it lifts only the named rules. A bare `design-escape-ok:` exempts nothing and is itself flagged, as is a marker with nothing left to exempt. Counts are held by a ratchet in `tools/design-escapes.baseline.json`: every rule sits at 0, and the number of markers is a ceiling that only goes down (after removing markers, `bun run check:design --update-baseline` lowers it; never raise it by hand to make room for a new escape). Most markers read `no role renders this; <value>`: a near-miss kept so the look doesn't change, and the place to start when the system grows a role for it; `--path <prefix>` and `--rule <name>` narrow what it prints. The web tests and CI run it.
+`bun run check:design` (`tools/design-escapes.ts`) reads every class string and CSS declaration under `src` and lists each escape by rule: `type`, `space`, `radius`, `colour`, `shadow`, `opacity`, `motion`, `base` and `marker`. `--path <prefix>` and `--rule <name>` narrow what it prints. The counts are held at 0 by `tools/design-escapes.baseline.json`, with a ceiling on the number of markers that only goes down.
+
+A marker excuses only what a scale can't hold:
+
+- **data paint:** chart series, syntax colours, diff marks, a model's or tool's brand colour, heat gradients;
+- **artwork:** the opal sheen, the star card's split flap, glows;
+- **the platform:** the macOS window glass and vibrancy;
+- **third-party code.**
+
+Write it as `design-escape-ok(<rule>[,<rule>…]): <what it is>; <detail>`, in a comment on the line or the line above, for example `design-escape-ok(colour): data paint; the trace lanes' hues`. It lifts only the named rules. A file that is all data paint goes in `DATA_PAINT` in `tools/design-escapes.ts`, with its reason and the rules it lifts.
+
+The check refuses a marker whose reason starts with `shipped value` or `no role renders this`: a value the app happened to ship is snapped onto the system, not kept. Such a marker is itself a `marker` escape and exempts nothing. So is a bare `design-escape-ok:`, a marker naming an unknown rule, and a marker with nothing left to exempt.
 
 ## Levers
 
-A design change is made once, in `theme.css` (a step, a ramp, a tint opacity) or `tokens.css` (a role), never at a call site. Check it on the system page in both modes.
+A design change is made once, in `theme.css` (a step, a ramp, a tint opacity) or `tokens.css` (a role's value), never at a call site. Check it on the system page in both modes.

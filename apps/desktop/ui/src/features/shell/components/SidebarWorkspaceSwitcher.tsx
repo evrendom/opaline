@@ -32,11 +32,10 @@ import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
 import { cn } from "@/lib/utils";
 
-// --custom-shadow (the account avatar's edge) as drop-shadows, which follow
+// The mark's edge as drop-shadows coloured from the line roles, which follow
 // the Opaline mask where a box-shadow would draw a square.
 const WORKSPACE_MARK_SHADOW_CLASS_NAME =
-	// design-escape-ok(colour): drop-shadows follow the masked mark; no filter-shadow role exists for the avatar edge
-	"[filter:drop-shadow(0_0_0.5px_rgb(0_0_0_/_14%))_drop-shadow(0_0.5px_1px_rgb(0_0_0_/_6%))_drop-shadow(0_1px_2px_rgb(0_0_0_/_4%))] dark:[filter:drop-shadow(0_0_0.75px_rgb(0_0_0_/_20%))_drop-shadow(0_2px_2px_rgb(0_0_0_/_10%))_drop-shadow(0_4px_4px_rgb(0_0_0_/_10%))]";
+	"[filter:drop-shadow(0_0_0.5px_var(--line))_drop-shadow(0_0.5px_1px_var(--line-soft))]";
 
 // The workspace's logo, or a building on a tile like the account avatar's
 // when it has none (or the logo fails to load), cut to the Opaline outline.

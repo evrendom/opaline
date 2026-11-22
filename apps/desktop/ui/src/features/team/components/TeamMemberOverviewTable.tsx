@@ -263,8 +263,7 @@ export function LastActive({
 				aria-hidden="true"
 				className={cn(
 					"size-1.5 shrink-0 corner-full",
-					// design-escape-ok(colour,opacity): shipped value; #22c55e, ink/20, dark ink/25
-					days < 7 ? "bg-[#22c55e]" : "bg-ink/20 dark:bg-ink/25",
+					days < 7 ? "bg-success" : "bg-ink-4",
 				)}
 			/>
 			<time dateTime={lastActiveDate ?? undefined}>{label}</time>
@@ -297,9 +296,7 @@ function TeamMemberRow({
 						<p className="truncate text-body-xl font-medium text-ink">
 							{row.displayName}
 						</p>
-						<p className="truncate text-body-m text-ink-2">
-							{row.role}
-						</p>
+						<p className="truncate text-body-m text-ink-2">{row.role}</p>
 					</div>
 				</div>
 			</td>
@@ -322,12 +319,7 @@ function TeamMemberRow({
 				<span>{formatCompactWholeNumber(row.totalTokens)}</span>
 				<span className={METRIC_UNIT_CLASS_NAME}> tok</span>
 			</td>
-			<td
-				className={cn(
-					METRIC_CELL_CLASS_NAME,
-					"font-medium text-ink",
-				)}
-			>
+			<td className={cn(METRIC_CELL_CLASS_NAME, "font-medium text-ink")}>
 				{formatCompactWholeCurrency(row.cost)}
 			</td>
 			<td className={cn(METRIC_CELL_CLASS_NAME, "pr-zero pl-l")}>
