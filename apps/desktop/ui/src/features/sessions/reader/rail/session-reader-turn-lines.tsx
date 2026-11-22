@@ -158,7 +158,7 @@ export function MemberFactLine({
 										: "Tracked as frustrated: the run before it is flagged"
 								}
 								// design-escape-ok(opacity): shipped value; rose-500/10
-								className={cn(PILL, "bg-rose-mark/10 text-rose-ink")}
+								className={cn(PILL, "bg-error/10 text-error")}
 							>
 								<IconMoodSad aria-hidden="true" />
 								Frustration
@@ -170,7 +170,7 @@ export function MemberFactLine({
 								className={cn(
 									PILL,
 									// design-escape-ok(opacity,colour): shipped value; emerald-500/10, emerald-700 (emerald-400 in dark)
-									"bg-emerald-mark/10 text-emerald-700 dark:text-emerald-400",
+									"bg-success/10 text-emerald-700 dark:text-emerald-400",
 								)}
 							>
 								<IconMoodSmile aria-hidden="true" />
@@ -192,7 +192,7 @@ export function MemberFactLine({
 								className={cn(
 									PILL,
 									// design-escape-ok(opacity,colour): shipped value; amber-500/10, amber-700 (amber-400 in dark)
-									"bg-amber-mark/10 text-amber-700 dark:text-amber-400",
+									"bg-warning/10 text-amber-700 dark:text-amber-400",
 								)}
 							>
 								<IconMessageQuestion aria-hidden="true" />

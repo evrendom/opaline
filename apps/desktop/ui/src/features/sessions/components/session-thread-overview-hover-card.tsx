@@ -105,7 +105,7 @@ function SessionContextUtilizationRing({
 				viewBox="0 0 16 16"
 			>
 				<circle
-					className="stroke-line-strong"
+					className="stroke-line"
 					cx="8"
 					cy="8"
 					r="6.25"

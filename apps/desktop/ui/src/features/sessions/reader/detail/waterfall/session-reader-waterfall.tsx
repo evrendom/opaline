@@ -301,7 +301,7 @@ export function SessionReaderWaterfallView({
 					ref={cursorLabelRef}
 					style={{ display: "none" }}
 					// design-escape-ok(type): deliberate exception, a 10px label floating over the bars
-					className="pointer-events-none absolute top-0 z-10 corner-xs border bg-canvas px-s py-xxs text-[10px] whitespace-nowrap text-ink-3 tabular-nums shadow-label"
+					className="pointer-events-none absolute top-0 z-10 corner-xs border bg-canvas px-s py-xxs text-[10px] whitespace-nowrap text-ink-3 tabular-nums shadow-float"
 				/>
 			</div>
 			<div />
@@ -367,7 +367,7 @@ export function SessionReaderWaterfallView({
 													key={fraction}
 													className="absolute inset-y-0 w-px"
 													style={{
-														borderLeft: "1px dashed var(--line-strong)",
+														borderLeft: "1px dashed var(--line)",
 														left: `${fraction * 100}%`,
 														opacity: 0.5,
 													}}

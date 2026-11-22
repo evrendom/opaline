@@ -484,7 +484,7 @@ export function ReaderMinimap({
 			<div
 				ref={viewRef}
 				// design-escape-ok(opacity): no role renders this; ring-ink/8 hover:ring-ink/15 dark:ring-ink/12 dark:hover:bg-ink/8
-				className="absolute inset-x-0 top-0 corner-s bg-canvas corner-squircle squircle:corner-l ring-1 ring-ink/8 hover:ring-ink/15 dark:bg-wash dark:ring-ink/12 dark:hover:bg-ink/8"
+				className="absolute inset-x-0 top-0 corner-s bg-canvas corner-squircle squircle:corner-l ring-1 ring-ink/8 hover:ring-ink/15 dark:bg-hover dark:ring-ink/12 dark:hover:bg-ink/8"
 			/>
 			<MinimapHeads
 				focus={focus ?? null}

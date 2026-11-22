@@ -28,7 +28,7 @@ export function SessionTurnEpisodeRow({
 	onToggle: (() => void) | undefined;
 }) {
 	return (
-		<tr className="min-w-full edge-b-m border-line-strong bg-[color-mix(in_srgb,var(--hover)_72%,var(--canvas))]">
+		<tr className="min-w-full edge-b-m border-line bg-[color-mix(in_srgb,var(--hover)_72%,var(--canvas))]">
 			<td>
 				<button
 					type="button"

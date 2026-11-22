@@ -114,7 +114,7 @@ function XmlBlock({
 					)}
 				</div>
 				<div className="grid min-w-0 flex-1 gap-xxs">
-					<p className="text-body-l font-heavy text-dashboardy-heading">
+					<p className="text-body-l font-heavy text-ink">
 						{formatTagLabel(tag)}
 					</p>
 					{isOpen ? null : (
@@ -135,7 +135,7 @@ function XmlBlock({
 							<p className="min-w-[6.5rem] shrink-0 text-body-l font-medium text-ink-3">
 								{formatTagLabel(entry.key)}
 							</p>
-							<p className="break-all font-mono text-body-l text-dashboardy-heading">
+							<p className="break-all font-mono text-body-l text-ink">
 								{entry.value}
 							</p>
 						</div>
@@ -190,7 +190,7 @@ function renderTextParts(parts: ReadonlyArray<TextPart>, key: string) {
 						key={partIdx}
 						className="max-w-[65ch]"
 					>
-						<p className="whitespace-pre-wrap break-words text-body-l text-dashboardy-heading text-pretty [overflow-wrap:anywhere]">
+						<p className="whitespace-pre-wrap break-words text-body-l text-ink text-pretty [overflow-wrap:anywhere]">
 							{renderInlineCode(part.content)}
 						</p>
 					</div>
@@ -386,7 +386,7 @@ export function MessageContent({ content, className }: MessageContentProps) {
 								key={blockKey}
 								className="corner-l edge-m border-line bg-[color:color-mix(in_srgb,var(--inset)_82%,white)] px-xl py-xl"
 							>
-								<p className="mb-xs text-body-xl font-heavy text-dashboardy-heading">
+								<p className="mb-xs text-body-xl font-heavy text-ink">
 									Thinking
 								</p>
 								<p className="whitespace-pre-wrap text-body-l text-ink-3 italic text-pretty">
@@ -444,7 +444,7 @@ export function MessageContent({ content, className }: MessageContentProps) {
 								<p
 									className={cn(
 										"text-body-xl font-heavy",
-										block.is_error ? "text-error" : "text-dashboardy-heading",
+										block.is_error ? "text-error" : "text-ink",
 									)}
 								>
 									{block.is_error ? "Tool Error" : "Tool Result"}

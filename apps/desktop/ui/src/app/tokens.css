@@ -12,20 +12,16 @@
 	/* -- Ground */
 	--canvas: var(--neutral-1); /* the window's content */
 	--surface: var(--neutral-1); /* cards, panels, popovers, menus, controls */
-	--card: var(--surface);
 	--inset: var(
 		--neutral-2
 	); /* a recessed area on the canvas: wells, code, rails */
 	--field: var(--neutral-3); /* inputs, chips, segmented tracks */
 	--hover: var(
 		--neutral-10-transparent
-	); /* a row or control under the pointer */
+	); /* a row under the pointer, and any soft tint: marks, stripes */
 	--hover-strong: var(--neutral-10-translucent); /* pressed, open, selected */
-	--wash: var(
-		--neutral-10-transparent
-	); /* a soft tint on any ground: metric cards, stripes */
 
-	/* -- Ink: three greys, no fourth */
+	/* -- Ink: three greys and a disabled one; no shades of them */
 	--ink: var(--neutral-10); /* titles, body, values */
 	--ink-2: var(--neutral-8); /* secondary copy */
 	--ink-3: var(--neutral-7); /* meta, labels, icons, placeholders */
@@ -33,8 +29,7 @@
 	--ink-inverse: var(--neutral-1);
 
 	/* -- Lines: white space first, a line next, a card last */
-	--line: var(--neutral-10-translucent); /* hairlines, dividers, rails */
-	--line-strong: var(--neutral-4); /* opaque edges: inputs, tracks, menus */
+	--line: var(--neutral-10-translucent); /* hairlines, dividers, inputs, rails */
 	--line-soft: var(--neutral-10-transparent); /* chart grids, quiet dividers */
 
 	/* -- Action: neutral is the primary action; colour means state */
@@ -51,6 +46,8 @@
 	--accent-tint: var(--color-1-transparent);
 	--accent-line: var(--color-1-translucent);
 	--accent-fg: #ffffff; /* text and icons on an accent fill, white in both modes */
+	--success-tint: color-mix(in oklab, var(--success) 12%, transparent);
+	--success-line: var(--success-translucent);
 	--warning-tint: var(--warning-transparent);
 	--warning-line: var(--warning-translucent);
 	--error-tint: var(--error-transparent);
@@ -65,22 +62,14 @@
 	--shadow-card:
 		0 0 0 0.5px rgb(0 0 0 / 0.06), 0 0.5px 2px -0.5px rgb(0 0 0 / 0.06),
 		0 1px 4px 0 rgb(0 0 0 / 0.04);
-	--shadow-control:
-		0 0 0 0.5px rgb(0 0 0 / 0.06), 0 0.5px 2px -0.5px rgb(0 0 0 / 0.06),
-		0 2px 4px 0 rgb(0 0 0 / 0.04);
 	--shadow-raised:
 		0 0 0 0.5px rgb(0 0 0 / 0.08), 0 0.5px 2px -0.5px rgb(0 0 0 / 0.08),
 		0 2px 4px 0 rgb(0 0 0 / 0.05);
-	/* chips, tags and pills, and the reader's light cards */
-	--shadow-chip:
-		0 0 0 0.5px rgb(0 0 0 / 0.06), 0 1px 1px -1px rgb(0 0 0 / 0.1),
-		0 1px 2px 0 rgb(0 0 0 / 0.05);
 	/* the inner hairline of a recessed shelf or well */
 	--shadow-inset: inset 0 0 0 0.5px rgb(0 0 0 / 0.06);
-	/* a small label floating over content: a scrub readout, a sticky hint */
-	--shadow-label: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
 	/* something floating free of a surface: a floating button, a tab menu, a
-	   toast. Its edge is a ring at the call site; dark keeps only the ring. */
+	   toast, a scrub label. Its edge is a ring at the call site; dark keeps
+	   only the ring. */
 	--shadow-float:
 		0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 
@@ -117,116 +106,42 @@
 	--background: var(--canvas);
 	--secondary: var(--field);
 	--destructive: var(--error);
-	--input: var(--line-strong);
+	--input: var(--line);
 	--ring: var(--focus);
 	--radius: var(
 		--radius-m
 	); /* shadcn's base radius; its sm…4xl multiples scale from it */
-	--mark-fill: var(
-		--wash
-	); /* model marks, run tags and placeholder bars; firmer in dark */
-	--ink-soft: var(--ink-2); /* secondary icons that quiet to ink-3 in dark */
-	--ink-meta: var(--ink-3); /* the activity panels' meta; opal-tinted in dark */
-
-	/* a card that sits on a recessed ground (a tab track's active pill, a
-	   toolbar flag button, the reader's picked row); dark softens it to a
-	   translucent ink wash instead of the solid surface */
-	--card-soft: var(--card);
-	/* a segmented track and the highlight that slides along it */
-	--track: var(--field);
-	/* the ground of a list's expanded row and its frozen cap: the field in
-	   light, the card in dark */
-	--shelf: var(--field);
-	/* a faint edge ringing a small avatar or logo on any ground */
-	--line-faint: color-mix(in oklab, var(--ink) 5%, transparent);
-
-	/* Shipped shades: a role at the strength the app renders it, defined
-	   exactly as Tailwind's opacity modifier is (`text-ink-3/50` renders the
-	   same as `text-ink-3-50`), so they follow the mode with their role. */
-	--ink-90: color-mix(in oklab, var(--ink) 90%, transparent);
-	--ink-80: color-mix(in oklab, var(--ink) 80%, transparent);
-	--ink-3-60: color-mix(in oklab, var(--ink-3) 60%, transparent);
-	--ink-3-50: color-mix(in oklab, var(--ink-3) 50%, transparent);
-	--ink-3-40: color-mix(in oklab, var(--ink-3) 40%, transparent);
-	--hover-50: color-mix(in oklab, var(--hover) 50%, transparent);
-
-	/* Shipped inks: values the app renders exactly as main does, with no other role holding them. */
-	--dashboardy-heading: #111827;
-	--session-overview-text: #101112;
-	--rose-ink: oklch(58.6% 0.253 17.585);
-	--amber-ink: oklch(66.6% 0.179 58.318);
-	--emerald-ink: oklch(59.6% 0.145 163.225);
-	--rose-mark: oklch(64.5% 0.246 16.439);
-	--amber-mark: oklch(76.9% 0.188 70.08);
-	--emerald-mark: oklch(69.6% 0.17 162.48);
-	--cost-foreground: #292a2f;
-	--cost-muted: #828387;
-	--cost-border: rgb(0 0 0 / 0.07);
-	--cost-hover: rgb(0 0 0 / 0.05);
-	--cost-row-hover: rgb(0 0 0 / 0.015);
-	--session-overview-muted: rgb(0 0 0 / 0.63);
-	--session-overview-subtle: rgb(0 0 0 / 0.5);
-	--cost-blue: oklch(0.623 0.188 259.815); /* both modes */
 }
 
 .dark {
 	--surface: var(--neutral-2);
-	--line-strong: var(--line);
 	--primary: var(--neutral-10);
 	--shadow-card:
 		inset 0 0.75px 0 0 rgb(255 255 255 / 0.03),
 		inset 0 0 0 0.75px rgb(255 255 255 / 0.03), 0 0 0 0.75px rgb(0 0 0 / 0.1),
 		0 2px 2px 0 rgb(0 0 0 / 0.1), 0 4px 4px 0 rgb(0 0 0 / 0.1),
 		0 8px 8px 0 rgb(0 0 0 / 0.1);
-	--shadow-control:
-		inset 0 0.5px 0 0 rgb(255 255 255 / 0.05),
-		inset 0 0 0 0.5px rgb(255 255 255 / 0.045), 0 0 0 0.5px rgb(0 0 0 / 0.14),
-		0 0.5px 2px -0.5px rgb(0 0 0 / 0.14), 0 2px 4px 0 rgb(0 0 0 / 0.08);
 	--shadow-raised:
 		inset 0 0.5px 0 0 rgb(255 255 255 / 0.04),
 		0 0 0 0.5px rgb(255 255 255 / 0.08), 0 0.5px 2px 0 rgb(0 0 0 / 0.25);
-	--shadow-chip: 0 0 0 0.5px rgb(255 255 255 / 0.1);
 	--shadow-inset: inset 0 0 0 0.5px rgb(255 255 255 / 0.06);
 	--shadow-float: 0 0 #0000;
-	--mark-fill: color-mix(in oklab, var(--ink) 8%, transparent);
-	--ink-soft: var(--ink-3);
-	--ink-meta: var(--color-1-translucent);
-
-	--card-soft: color-mix(in oklab, var(--ink-3) 10%, transparent);
-	--track: color-mix(in oklab, var(--field) 50%, transparent);
-	--shelf: var(--card);
-	--line-faint: color-mix(in oklab, var(--ink) 10%, transparent);
-	--dashboardy-heading: #e6e6e9;
-	--session-overview-text: #e6e6e9;
-	--rose-ink: oklch(71.2% 0.194 13.428);
-	--amber-ink: oklch(82.8% 0.189 84.429);
-	--emerald-ink: oklch(76.5% 0.177 163.223);
-	--cost-foreground: #e6e6e9;
-	--cost-muted: #919299;
-	--cost-border: rgb(255 255 255 / 0.09);
-	--cost-hover: rgb(255 255 255 / 0.07);
-	--cost-row-hover: rgb(255 255 255 / 0.03);
-	--session-overview-muted: rgb(255 255 255 / 0.65);
-	--session-overview-subtle: rgb(255 255 255 / 0.5);
 }
 
 /* Layer 2 as Tailwind colours: `bg-surface`, `text-ink-3`, `border-line`. */
 @theme inline {
 	--color-canvas: var(--canvas);
 	--color-surface: var(--surface);
-	--color-card: var(--card);
 	--color-inset: var(--inset);
 	--color-field: var(--field);
 	--color-hover: var(--hover);
 	--color-hover-strong: var(--hover-strong);
-	--color-wash: var(--wash);
 	--color-ink: var(--ink);
 	--color-ink-2: var(--ink-2);
 	--color-ink-3: var(--ink-3);
 	--color-ink-disabled: var(--ink-disabled);
 	--color-ink-inverse: var(--ink-inverse);
 	--color-line: var(--line);
-	--color-line-strong: var(--line-strong);
 	--color-line-soft: var(--line-soft);
 	--color-primary: var(--primary);
 	--color-primary-fg: var(--primary-fg);
@@ -236,52 +151,22 @@
 	--color-accent-tint: var(--accent-tint);
 	--color-accent-line: var(--accent-line);
 	--color-accent-fg: var(--accent-fg);
+	--color-success-tint: var(--success-tint);
+	--color-success-line: var(--success-line);
 	--color-warning-tint: var(--warning-tint);
 	--color-warning-line: var(--warning-line);
 	--color-error-tint: var(--error-tint);
 	--color-error-line: var(--error-line);
-	--color-mark-fill: var(--mark-fill);
-	--color-ink-soft: var(--ink-soft);
-	--color-ink-meta: var(--ink-meta);
-
-	--color-card-soft: var(--card-soft);
-	--color-track: var(--track);
-	--color-shelf: var(--shelf);
-	--color-line-faint: var(--line-faint);
-
-	--color-ink-90: var(--ink-90);
-	--color-ink-80: var(--ink-80);
-	--color-ink-3-60: var(--ink-3-60);
-	--color-ink-3-50: var(--ink-3-50);
-	--color-ink-3-40: var(--ink-3-40);
-	--color-hover-50: var(--hover-50);
-	--color-dashboardy-heading: var(--dashboardy-heading);
-	--color-session-overview-text: var(--session-overview-text);
-	--color-rose-ink: var(--rose-ink);
-	--color-amber-ink: var(--amber-ink);
-	--color-emerald-ink: var(--emerald-ink);
-	--color-rose-mark: var(--rose-mark);
-	--color-amber-mark: var(--amber-mark);
-	--color-emerald-mark: var(--emerald-mark);
-	--color-cost-foreground: var(--cost-foreground);
-	--color-cost-muted: var(--cost-muted);
-	--color-cost-border: var(--cost-border);
-	--color-session-overview-muted: var(--session-overview-muted);
-	--color-session-overview-subtle: var(--session-overview-subtle);
-	--color-cost-blue: var(--cost-blue);
 }
 
-/* Layer 2 elevation as Tailwind shadows: `shadow-card`, `shadow-control`,
-   `aria-pressed:shadow-raised`. Each utility reads the role variable of the
+/* Layer 2 elevation as Tailwind shadows: `shadow-card`, `shadow-raised`,
+   `shadow-inset`, `shadow-float`. Each utility reads the role variable of the
    same name; `reference` keeps Tailwind from writing these names back over
    the roles above. */
 @theme reference {
 	--shadow-card: var(--shadow-card);
-	--shadow-control: var(--shadow-control);
 	--shadow-raised: var(--shadow-raised);
-	--shadow-chip: var(--shadow-chip);
 	--shadow-inset: var(--shadow-inset);
-	--shadow-label: var(--shadow-label);
 	--shadow-float: var(--shadow-float);
 }
 
@@ -341,14 +226,12 @@
 	--sidebar-primary: var(--ink);
 	--sidebar-primary-foreground: var(--neutral-2);
 	--sidebar-accent: var(--field);
-	/* design-escape-ok(colour): shipped value; oklch(0.205 0 0), the picked sidebar row's text */
-	--sidebar-accent-foreground: oklch(0.205 0 0);
-	--sidebar-border: var(--line-strong);
+	--sidebar-accent-foreground: var(--ink);
+	--sidebar-border: var(--line);
 	--sidebar-ring: var(--ink-3);
 }
 
 .dark {
 	--sidebar: oklch(0.145 0 0);
 	--sidebar-primary-foreground: var(--ink);
-	--sidebar-accent-foreground: var(--ink);
 }

@@ -85,9 +85,9 @@ interface CollapsedTraceCountStyle extends CSSProperties {
 
 const COLLAPSED_TRACE_COUNT_STYLE: CollapsedTraceCountStyle = {
 	"--trace-icon-bg":
-		"color-mix(in srgb, var(--conversation-trace-connector-color, var(--line-strong)) 75%, transparent)",
+		"color-mix(in srgb, var(--conversation-trace-connector-color, var(--line)) 75%, transparent)",
 	background:
-		"color-mix(in srgb, var(--conversation-trace-connector-color, var(--line-strong)) 75%, transparent)",
+		"color-mix(in srgb, var(--conversation-trace-connector-color, var(--line)) 75%, transparent)",
 	color: "var(--ink-3, var(--ink-3, var(--ink-3)))",
 	height: 16,
 	mask: 'var(--opaline-trace-mask, url("/opaline-trace-fill.svg")) center / contain no-repeat',
@@ -290,7 +290,7 @@ function ConversationTraceTreeRail({
 				width={railX + 1}
 				style={{
 					stroke:
-						"var(--conversation-trace-connector-color, var(--line-strong))",
+						"var(--conversation-trace-connector-color, var(--line))",
 					strokeWidth: "var(--border-s)",
 				}}
 			>
@@ -339,7 +339,7 @@ function ConversationTraceTreeRail({
 			viewBox={`0 0 ${railX + 1} ${rowHeight}`}
 			width={railX + 1}
 			style={{
-				stroke: "var(--conversation-trace-connector-color, var(--line-strong))",
+				stroke: "var(--conversation-trace-connector-color, var(--line))",
 				strokeWidth: "var(--border-s)",
 			}}
 		>
@@ -397,7 +397,7 @@ function ConversationTraceTreeExpandedBodyRails({
 			strokeLinecap="round"
 			width={width}
 			style={{
-				stroke: "var(--conversation-trace-connector-color, var(--line-strong))",
+				stroke: "var(--conversation-trace-connector-color, var(--line))",
 				strokeWidth: "var(--border-s)",
 			}}
 		>
@@ -484,7 +484,7 @@ function ConversationTraceTreeConnector({
 			viewBox={`0 0 ${connectorWidth} ${rowHeight}`}
 			width={connectorWidth}
 			style={{
-				stroke: "var(--conversation-trace-connector-color, var(--line-strong))",
+				stroke: "var(--conversation-trace-connector-color, var(--line))",
 				strokeWidth: "var(--border-s)",
 			}}
 		>
@@ -586,7 +586,7 @@ function ConversationTraceTreeConnector({
 							x={currentX - TRACE_DOT_RADIUS}
 							y={elbowY - TRACE_DOT_RADIUS}
 							style={{
-								fill: "var(--conversation-trace-junction-color, var(--conversation-trace-connector-color, var(--line-strong)))",
+								fill: "var(--conversation-trace-junction-color, var(--conversation-trace-connector-color, var(--line)))",
 								mask: 'var(--opaline-trace-mask, url("/opaline-trace-fill.svg")) center / contain no-repeat',
 								WebkitMask:
 									'var(--opaline-trace-mask, url("/opaline-trace-fill.svg")) center / contain no-repeat',
@@ -680,7 +680,7 @@ export function ConversationTraceTreeNode({
 			{childRailExitLength > 0 ? (
 				<span
 					aria-hidden="true"
-					className="pointer-events-none absolute bottom-0 z-10 hidden -translate-x-1/2 bg-[color:var(--conversation-trace-connector-color,var(--line-strong))]"
+					className="pointer-events-none absolute bottom-0 z-10 hidden -translate-x-1/2 bg-[color:var(--conversation-trace-connector-color,var(--line))]"
 					data-trace-tree-child-entry-rail
 					data-trace-tree-line
 					data-trace-tree-line-depth={depth + 1}
@@ -694,7 +694,7 @@ export function ConversationTraceTreeNode({
 			{showsDescendantRail ? (
 				<span
 					aria-hidden="true"
-					className="pointer-events-none absolute bottom-0 left-(--conversation-trace-tree-descend-x) -translate-x-1/2 bg-[color:var(--conversation-trace-connector-color,var(--line-strong))]"
+					className="pointer-events-none absolute bottom-0 left-(--conversation-trace-tree-descend-x) -translate-x-1/2 bg-[color:var(--conversation-trace-connector-color,var(--line))]"
 					data-trace-tree-descendant-rail
 					data-trace-tree-line
 					style={{
@@ -778,7 +778,7 @@ export function ConversationTraceTreeItem({
 				{incomingRailExtension > 0 ? (
 					<span
 						aria-hidden="true"
-						className="pointer-events-none absolute hidden -translate-x-1/2 bg-[color:var(--conversation-trace-connector-color,var(--line-strong))]"
+						className="pointer-events-none absolute hidden -translate-x-1/2 bg-[color:var(--conversation-trace-connector-color,var(--line))]"
 						data-trace-tree-entry-rail
 						data-trace-tree-line
 						data-trace-tree-line-depth={depth}
@@ -828,7 +828,7 @@ export function ConversationTraceTreeItem({
 						subtree !== undefined ? (
 							<span
 								aria-hidden="true"
-								className="pointer-events-none absolute inset-y-0 -translate-x-1/2 bg-[color:var(--conversation-trace-connector-color,var(--line-strong))]"
+								className="pointer-events-none absolute inset-y-0 -translate-x-1/2 bg-[color:var(--conversation-trace-connector-color,var(--line))]"
 								data-trace-tree-line
 								style={{
 									left: `${descendantX}px`,
@@ -1078,7 +1078,7 @@ export function AgentTraceRequestDisplay({
 						"h-px min-w-4 flex-1",
 						contextStrip
 							? "bg-(--conversation-trace-call-accent) opacity-40"
-							: "bg-line-strong",
+							: "bg-line",
 					)}
 					data-trace-tree-line
 				/>
@@ -1254,7 +1254,7 @@ export function AgentCollapsedTraceIcons({
 				>
 					{clusterIndex === 0 ? null : (
 						<span
-							className="h-px w-1.5 shrink-0 bg-line-strong"
+							className="h-px w-1.5 shrink-0 bg-line"
 							data-trace-collapsed-flow-connector
 							data-trace-tree-line
 						/>
@@ -1268,7 +1268,7 @@ export function AgentCollapsedTraceIcons({
 							title={label}
 						>
 							<TraceIcon
-								className="border-line-strong text-ink-3"
+								className="border-line text-ink-3"
 								icon={Icon}
 								toolIcon={toolIcon}
 								tone={tone}
@@ -1283,7 +1283,7 @@ export function AgentCollapsedTraceIcons({
 					data-trace-collapsed-flow-count-slot
 				>
 					<span
-						className="h-px w-1.5 shrink-0 bg-line-strong"
+						className="h-px w-1.5 shrink-0 bg-line"
 						data-trace-tree-line
 					/>
 					<span

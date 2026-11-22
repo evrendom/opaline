@@ -45,12 +45,12 @@ export function MarkLegend({
 				"inline-flex min-w-0 shrink-0 items-center gap-xxs",
 				"corner-m p-xxs corner-squircle",
 				"text-body-m font-medium",
-				"bg-wash text-ink-3",
-				"squircle:corner-l dark:bg-wash",
+				"bg-hover text-ink-3",
+				"squircle:corner-l dark:bg-hover",
 				className,
 			)}
 		>
-			<span className="flex h-6 items-center px-m text-ink-3-60">Errors</span>
+			<span className="flex h-6 items-center px-m text-ink-disabled">Errors</span>
 			<ul aria-label="Errors" className="flex min-w-0 items-center gap-xxs">
 				{shown.map((tone) => (
 					<li key={tone} className="flex h-6 items-center gap-s px-m">
@@ -90,7 +90,7 @@ const TEXT: Record<Tone, string> = {
 	later: "text-color-4",
 	// design-escape-ok(base): a category colour from the opal sheen (data paint)
 	minor: "text-color-2",
-	never: "text-rose-mark",
+	never: "text-error",
 };
 
 const ICON_ROOM = 16;

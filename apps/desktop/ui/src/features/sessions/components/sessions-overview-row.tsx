@@ -254,7 +254,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 		// An open row shares the tint of the panel folded out beneath it, and
 		// rounds its top as the block's top edge.
 		expanded &&
-			"corner-t-m bg-field corner-squircle squircle:corner-t-xl dark:bg-card",
+			"corner-t-m bg-field corner-squircle squircle:corner-t-xl dark:bg-surface",
 	);
 	const cellClassName = cn(
 		SESSION_OVERVIEW_CELL_CLASS_NAME,

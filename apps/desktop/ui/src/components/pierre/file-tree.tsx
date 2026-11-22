@@ -144,7 +144,7 @@ function RowIcon({
 	if (folder) {
 		const Folder = expanded ? IconFolderOpenFilled : IconFolderFilled;
 		return (
-			<Folder className="size-3.5 shrink-0 text-ink-3-50 transition-colors group-hover/row:text-ink-3" />
+			<Folder className="size-3.5 shrink-0 text-ink-disabled transition-colors group-hover/row:text-ink-3" />
 		);
 	}
 	const { Icon } = getFileLanguage(name);
@@ -153,7 +153,7 @@ function RowIcon({
 			aria-hidden="true"
 			className={cn(
 				"size-3.5 shrink-0 transition-colors",
-				selected ? "text-ink" : "text-ink-3-50 group-hover/row:text-ink-3",
+				selected ? "text-ink" : "text-ink-disabled group-hover/row:text-ink-3",
 			)}
 		/>
 	);
@@ -324,7 +324,7 @@ export function FileTree({
 											"h-full w-3 shrink-0 bg-[linear-gradient(to_right,transparent_6px,var(--guide)_6px,var(--guide)_7px,transparent_7px)]",
 											key === activeParentKey
 												? "[--guide:color-mix(in_oklab,var(--ink-3)_30%,transparent)]"
-												: "[--guide:color-mix(in_oklab,var(--line-strong)_70%,transparent)]",
+												: "[--guide:color-mix(in_oklab,var(--line)_70%,transparent)]",
 										)}
 									/>
 								))}
@@ -332,7 +332,7 @@ export function FileTree({
 									<IconChevronRight
 										aria-hidden="true"
 										className={cn(
-											"size-3 shrink-0 text-ink-3-60 transition-transform",
+											"size-3 shrink-0 text-ink-disabled transition-transform",
 											row.isExpanded && "rotate-90",
 										)}
 									/>
@@ -353,7 +353,7 @@ export function FileTree({
 									{row.segments.map((segment, part) => (
 										<span key={row.segments.slice(0, part + 1).join("/")}>
 											{part > 0 ? (
-												<span className="text-ink-3-50"> / </span>
+												<span className="text-ink-disabled"> / </span>
 											) : null}
 											{segment}
 										</span>
@@ -379,7 +379,7 @@ export function FileTree({
 										{status === "read" ? (
 											<IconEyeFilled
 												aria-hidden="true"
-												className="size-3 text-ink-3-60"
+												className="size-3 text-ink-disabled"
 											/>
 										) : status ? (
 											STATUS_LETTER[status]

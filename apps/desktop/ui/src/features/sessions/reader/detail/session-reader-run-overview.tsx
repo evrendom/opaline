@@ -141,7 +141,7 @@ function BreakdownStrip({
 							style={{ backgroundColor: part.color }}
 						/>
 						{part.label} {format(part.value)}
-						<span className="text-ink-3-60">{share(part.value)}</span>
+						<span className="text-ink-disabled">{share(part.value)}</span>
 					</span>
 				))}
 			</span>
@@ -281,7 +281,7 @@ function Touched({ marks }: { marks: readonly SessionReaderTurnMark[] }) {
 						<span className="flex items-center gap-s text-body-m text-ink-3">
 							<Icon aria-hidden="true" className={cn("size-3.5", className)} />
 							{label}
-							<span className="text-ink-3-60 tabular-nums">
+							<span className="text-ink-disabled tabular-nums">
 								{mark.items.length}
 							</span>
 						</span>
@@ -294,8 +294,8 @@ function Touched({ marks }: { marks: readonly SessionReaderTurnMark[] }) {
 											className={cn(
 												"inline-flex h-6 max-w-full min-w-0 items-center gap-s",
 												"corner-full pr-l pl-xs",
-												"bg-canvas shadow-control",
-												"dark:bg-card",
+												"bg-canvas shadow-card",
+												"dark:bg-surface",
 											)}
 										>
 											<OpalChip tint={tint} className={cn("size-4", className)}>
@@ -400,7 +400,7 @@ function StepKinds({
 									×{option.count}
 								</span>
 								{option.errorCount > 0 ? (
-									<span className="shrink-0 text-body-s text-rose-ink tabular-nums">
+									<span className="shrink-0 text-body-s text-error tabular-nums">
 										{option.errorCount} failed
 									</span>
 								) : null}

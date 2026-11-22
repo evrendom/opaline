@@ -438,7 +438,7 @@ export function ConversationTraceEventRow({
 				treeBodyClassName="-ml-l"
 				textDisclosure
 				body={
-					<p className="whitespace-pre-wrap font-body text-body-l font-regular text-dashboardy-heading text-pretty">
+					<p className="whitespace-pre-wrap font-body text-body-l font-regular text-ink text-pretty">
 						<SignalText text={event.text} />
 					</p>
 				}

@@ -102,7 +102,7 @@ export {
 
 const speakerLabelClassName =
 	// design-escape-ok(type): no role renders this; 13/18
-	"shrink-0 text-[0.8125rem]/[1.125rem] font-heavy text-dashboardy-heading";
+	"shrink-0 text-[0.8125rem]/[1.125rem] font-heavy text-ink";
 
 function AgentSection({
 	events,
@@ -158,13 +158,13 @@ function AgentSection({
 			return (
 				<div
 					id={anchorId}
-					className="min-w-0 scroll-mt-6 edge-b-m border-line-strong bg-canvas [--conversation-trace-sticky-offset:2.25rem]"
+					className="min-w-0 scroll-mt-6 edge-b-m border-line bg-canvas [--conversation-trace-sticky-offset:2.25rem]"
 				>
 					<div
 						className={cn(
 							"sticky top-0 z-30 flex min-h-9 min-w-0 items-center gap-m",
 							"edge-b-m px-l py-m",
-							"border-line-strong bg-canvas",
+							"border-line bg-canvas",
 						)}
 					>
 						<ModelTraceIcon
@@ -276,7 +276,7 @@ function UserTraceContent({ content }: { content: UserContent }) {
 					) : null}
 				</div>
 				{slashCommandInfo.commandArgs ? (
-					<p className="max-w-[65ch] whitespace-pre-wrap break-words font-mono text-body-l text-dashboardy-heading [overflow-wrap:anywhere]">
+					<p className="max-w-[65ch] whitespace-pre-wrap break-words font-mono text-body-l text-ink [overflow-wrap:anywhere]">
 						{slashCommandInfo.commandArgs}
 					</p>
 				) : null}
@@ -369,7 +369,7 @@ function TraceRow({
 					leading={<TraceIcon icon={TraceFileIcon} tone="grass" />}
 					textDisclosure
 					body={
-						<p className="whitespace-pre-wrap text-body-l text-dashboardy-heading">
+						<p className="whitespace-pre-wrap text-body-l text-ink">
 							<SignalText text={item.text} />
 						</p>
 					}
@@ -400,7 +400,7 @@ function TraceRow({
 					timestamp={timestamp}
 					textDisclosure
 					body={
-						<p className="whitespace-pre-wrap font-mono text-body-l text-dashboardy-heading">
+						<p className="whitespace-pre-wrap font-mono text-body-l text-ink">
 							{item.text}
 						</p>
 					}

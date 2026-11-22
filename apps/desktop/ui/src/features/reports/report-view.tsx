@@ -232,7 +232,7 @@ function ResultTable({ result }: { result: ReportResult }) {
 	return (
 		<div
 			// design-escape-ok(opacity): shipped value; border/60 as line-strong at 60%
-			className="flex flex-col gap-xs corner-s edge-m border-line-strong/60 p-m"
+			className="flex flex-col gap-xs corner-s edge-m border-line/60 p-m"
 		>
 			<p className="text-body-m text-ink-3">
 				{result.title}

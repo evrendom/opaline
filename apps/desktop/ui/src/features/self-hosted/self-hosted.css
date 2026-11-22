@@ -4,9 +4,9 @@
 	gap: var(--space-m);
 	min-width: 0;
 	padding: var(--space-s) var(--space-s) var(--space-s) var(--space-l);
-	border: var(--border-m) solid var(--line-strong);
+	border: var(--border-m) solid var(--line);
 	border-radius: var(--radius-s);
-	background: var(--settings-section-fill, var(--card));
+	background: var(--settings-section-fill, var(--surface));
 }
 .self-hosted-command pre {
 	flex: 1;
@@ -57,7 +57,7 @@
 	padding: var(--space-xl) var(--space-xxl);
 }
 .self-hosted-mcp-agent + .self-hosted-mcp-agent {
-	border-top: var(--border-m) solid var(--line-strong);
+	border-top: var(--border-m) solid var(--line);
 }
 .self-hosted-mcp-agent h3 {
 	margin: var(--space-zero);

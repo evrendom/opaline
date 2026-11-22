@@ -344,7 +344,7 @@ export function SessionsOverviewFiltersMenu({
 								"flex h-11 items-center justify-between gap-m",
 								"edge-b-m px-l",
 								// design-escape-ok(opacity): shipped value; border/60
-								"border-line-strong/60",
+								"border-line/60",
 							)}
 						>
 							<div className="flex min-w-0 items-center gap-s">

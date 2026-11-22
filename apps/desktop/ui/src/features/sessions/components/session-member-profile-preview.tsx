@@ -66,7 +66,7 @@ function SessionMemberAvatar({
 }) {
 	const isTrigger = size === "trigger";
 	const avatarClassName = cn(
-		"shrink-0 corner-full object-cover outline-(length:--border-m) -outline-offset-1 outline-line-faint",
+		"shrink-0 corner-full object-cover outline-(length:--border-m) -outline-offset-1 outline-line-soft",
 		isTrigger ? "size-4.5" : "size-6",
 	);
 
@@ -88,7 +88,7 @@ function SessionMemberAvatar({
 			className={cn(
 				"flex shrink-0 items-center justify-center",
 				"corner-full",
-				"bg-field -outline-offset-1 outline-line-faint",
+				"bg-field -outline-offset-1 outline-line-soft",
 				"outline-(length:--border-m)",
 				isTrigger ? "size-4.5" : "size-6",
 			)}

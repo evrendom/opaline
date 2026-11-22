@@ -225,7 +225,7 @@ function McpCard({
 						>
 							<span
 								// design-escape-ok(opacity): shipped value; dashboardy-heading/75
-								className="min-w-0 truncate text-dashboardy-heading/75"
+								className="min-w-0 truncate text-ink/75"
 							>
 								{tool.name}
 							</span>

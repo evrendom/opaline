@@ -11,7 +11,7 @@ function Checkbox({ className, ...props }: CheckboxPrimitive.Root.Props) {
 				// design-escape-ok(radius): shipped value; 5px corner
 				"rounded-[5px] edge-m border-transparent",
 				// design-escape-ok(opacity): shipped value; input/90 fill, line-strong at 90% in light
-				"bg-line-strong/90 transition-shadow outline-none",
+				"bg-line/90 transition-shadow outline-none",
 				// design-escape-ok(colour): shipped value; oklch(1 0 0 / 15%) input at 90% in dark
 				"dark:bg-[oklch(1_0_0/13.5%)]",
 				"group-has-disabled/field:opacity-50",

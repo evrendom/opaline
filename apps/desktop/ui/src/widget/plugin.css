@@ -5,7 +5,7 @@ html[data-app-mode="plugin"] {
 	   cards sit flush on the canvas instead of a step above it in dark.
 	   Every other role, the accent included, keeps its app value. */
 	--primary: var(--ink);
-	--card: var(--canvas);
+	--surface: var(--canvas);
 	--app-font-sans: var(--font-sans);
 	--app-font-heading: var(--font-display);
 	--font-sans: var(--font-body);
@@ -35,13 +35,13 @@ html[data-app-mode="plugin"] .dashboard-01-preview {
    a hairline in the host's border colour. (A mode theme, like .dark; the
    tooltip's surface and ink are already its own.) */
 html[data-app-mode="plugin"].dark [data-slot="tooltip-content"] {
-	box-shadow: 0 0 0 1px var(--line-strong);
+	box-shadow: 0 0 0 1px var(--line);
 }
 /* The dashboard's cards sit on a soft black shadow, invisible on a dark host:
    a hairline in the host's border colour outlines them instead. */
 html[data-host-styles]
 :is(.cost-metric, .cost-chart-card, .cost-breakdown, .cost-error) {
-	box-shadow: 0 0 0 1px var(--line-strong);
+	box-shadow: 0 0 0 1px var(--line);
 }
 /* With a host theme, Opaline's neutral greys follow it; brand and status
    colours and translucent tints stay. Hosts without one keep the web look. */
@@ -59,12 +59,12 @@ html[data-host-styles] .dashboard-01-preview {
 }
 html[data-host-styles] :is(.menu-popover, .menu-surface) {
 	--menu-background: var(--canvas);
-	--menu-border: var(--line-strong);
+	--menu-border: var(--line);
 	--menu-label: var(--ink);
 	--menu-focused-label: var(--ink);
 	--menu-icon: var(--ink-3);
 	--menu-highlight: var(--hover);
-	--menu-checkbox-border: var(--line-strong);
+	--menu-checkbox-border: var(--line);
 	--menu-accent: var(--ink);
 	--menu-check: var(--canvas);
 	/* A picked preset or interval: a step past the hover tint. */
@@ -86,13 +86,13 @@ html[data-host-styles]
 		[data-slot="tooltip-content"]
 	) {
 	box-shadow:
-		0 0 0 1px var(--line-strong),
+		0 0 0 1px var(--line),
 		0 8px 24px rgb(0 0 0 / 12%); /* design-escape-ok(colour): no role renders this; the host-mode popup drop, black 12% */
 }
 /* Toolbar pills and search fields: the host's surface, border and hover. */
 html[data-host-styles] :is([data-variant="toolbar"], .toolbar-search) {
 	background: var(--canvas);
-	box-shadow: 0 0 0 1px var(--line-strong);
+	box-shadow: 0 0 0 1px var(--line);
 }
 html[data-host-styles]
 	[data-variant="toolbar"]:is(:hover, [aria-expanded="true"]) {
@@ -195,7 +195,7 @@ html.dark .plugin-loading {
 	font: inherit;
 	color: var(--ink);
 	background: var(--field);
-	border: var(--border-m) solid var(--line-strong);
+	border: var(--border-m) solid var(--line);
 	border-radius: var(--radius-s);
 	padding: var(--space-m) var(--space-xl);
 }

@@ -59,7 +59,7 @@ export function PillTabs<T extends string>({
 					className={cn(
 						"absolute top-1/2 left-0 h-8",
 						"corner-s corner-squircle",
-						"pointer-events-none origin-left bg-track will-change-transform",
+						"pointer-events-none origin-left bg-field will-change-transform",
 						"squircle:corner-l",
 						pillClassName,
 					)}
@@ -89,7 +89,7 @@ export function PillTabs<T extends string>({
 							"text-body-xl font-medium",
 							"transition-colors focus-outline",
 							"squircle:corner-l",
-							active && !pill && cn("bg-track", pillClassName),
+							active && !pill && cn("bg-field", pillClassName),
 							active
 								? empty
 									? // design-escape-ok(opacity): no role renders this; ink/45

@@ -17,7 +17,7 @@ function Card({
 				"text-body-xl",
 				// design-escape-ok(type): shipped value; the 20/14 line as a ratio, so smaller text inside keeps it
 				"leading-[calc(20/14)]",
-				"shadow-card bg-card text-ink",
+				"shadow-card bg-surface text-ink",
 				"squircle:corner-xl",
 				"has-[>img:first-child]:pt-zero",
 				"data-[size=sm]:gap-m data-[size=sm]:py-[calc(var(--space-xs)*5)]",

@@ -22,7 +22,7 @@ function MemberSample() {
 	return (
 		<div className="flex gap-l">
 			<Bone className="mt-s size-6 shrink-0 corner-full" />
-			<div className="flex min-w-0 flex-1 flex-col gap-xxl corner-m bg-card px-l py-l text-body-xl shadow-card corner-squircle squircle:corner-xl">
+			<div className="flex min-w-0 flex-1 flex-col gap-xxl corner-m bg-surface px-l py-l text-body-xl shadow-card corner-squircle squircle:corner-xl">
 				{MEMBER_PARAGRAPHS.map((paragraph) => (
 					<p key={paragraph}>{paragraph}</p>
 				))}
@@ -104,13 +104,13 @@ function TraceSample() {
 
 function RunCardSample() {
 	return (
-		<div className="flex flex-col overflow-hidden corner-m bg-card shadow-card corner-squircle squircle:corner-xl">
+		<div className="flex flex-col overflow-hidden corner-m bg-surface shadow-card corner-squircle squircle:corner-xl">
 			<div
 				className={cn(
 					"flex h-[55px] shrink-0 items-center gap-l",
 					"edge-b-m px-l",
 					// design-escape-ok(opacity): shipped value; border/60
-					"border-line-strong/60",
+					"border-line/60",
 				)}
 			>
 				<Bone className="size-6 shrink-0 corner-full" />
@@ -119,7 +119,7 @@ function RunCardSample() {
 				<Bone className="h-3 w-20 corner-xs" />
 			</div>
 			{/* design-escape-ok(opacity): shipped value; border/60 */}
-			<div className="grid grid-cols-4 gap-xl edge-b-m border-line-strong/60 px-l py-l">
+			<div className="grid grid-cols-4 gap-xl edge-b-m border-line/60 px-l py-l">
 				{CARD_FIGURES.map((key) => (
 					<div key={key} className="flex flex-col gap-m">
 						<Bone className="h-3 w-10 corner-xs" />
@@ -215,13 +215,13 @@ const RAIL_ROWS = [
 ].map((width, index) => ({ id: `row-${index}`, width }));
 export function RailSample() {
 	return (
-		<div className="flex h-full min-h-0 flex-col overflow-hidden corner-m bg-card shadow-card corner-squircle squircle:corner-xl">
+		<div className="flex h-full min-h-0 flex-col overflow-hidden corner-m bg-surface shadow-card corner-squircle squircle:corner-xl">
 			<div
 				className={cn(
 					"flex h-[45px] shrink-0 items-center justify-between gap-m",
 					"edge-b-m pr-m pl-xl",
 					// design-escape-ok(opacity): shipped value; border/60
-					"border-line-strong/60",
+					"border-line/60",
 				)}
 			>
 				<Bone className="h-3.5 w-20 corner-xs" />
@@ -308,7 +308,7 @@ export function SummarySample() {
 						"*:shrink-0",
 					)}
 				>
-					<div className="flex min-w-0 flex-col gap-l corner-m bg-card p-m shadow-chip corner-squircle squircle:corner-xl">
+					<div className="flex min-w-0 flex-col gap-l corner-m bg-surface p-m shadow-card corner-squircle squircle:corner-xl">
 						<div className="grid grid-cols-4 gap-xl px-s pt-s pb-zero">
 							{FIGURES.map((key) => (
 								<Bone

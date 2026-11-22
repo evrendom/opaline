@@ -91,7 +91,7 @@ function StepFigure({
 						</span>
 					)}
 				</span>
-				<span className="relative h-1 overflow-hidden corner-full bg-wash">
+				<span className="relative h-1 overflow-hidden corner-full bg-hover">
 					<span
 						className="absolute inset-y-0 left-0 corner-full"
 						style={{ backgroundColor: color, width: `${fill * 100}%` }}

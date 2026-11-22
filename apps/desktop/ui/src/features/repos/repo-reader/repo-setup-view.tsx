@@ -163,7 +163,7 @@ function ListedSkillCard({ skill }: { skill: RepositoryListedSkill }) {
 	return (
 		<div className="flex min-h-0 min-w-0 flex-1 flex-col">
 			{/* design-escape-ok(opacity): shipped value; border/50 as line-strong at 50% */}
-			<header className="flex flex-col gap-m edge-b-m border-line-strong/50 px-[calc(var(--space-xl)+var(--space-xs))] py-xl">
+			<header className="flex flex-col gap-m edge-b-m border-line/50 px-[calc(var(--space-xl)+var(--space-xs))] py-xl">
 				<div className="flex min-w-0 items-center gap-m">
 					<span className="flex shrink-0 opacity-60 grayscale">
 						<SkillMarkGlyph />
@@ -577,7 +577,7 @@ function ToolRows({
 									<span
 										className={cn(
 											"min-w-0 truncate",
-											isPicked ? "text-ink" : "text-ink-80",
+											isPicked ? "text-ink" : "text-ink",
 										)}
 									>
 										{tool.name}
@@ -664,7 +664,7 @@ function VersionRows({
 									<span
 										className={cn(
 											"shrink-0",
-											isShown ? "text-ink" : "text-ink-80",
+											isShown ? "text-ink" : "text-ink",
 										)}
 									>
 										v{numbers.get(version.version)}
@@ -740,7 +740,7 @@ function RepoSetupRow({
 			title={file.setupFile}
 			className={cn(
 				"truncate text-body-m",
-				isPicked ? "text-ink" : "text-ink-90",
+				isPicked ? "text-ink" : "text-ink",
 			)}
 		>
 			{setupName(file)}

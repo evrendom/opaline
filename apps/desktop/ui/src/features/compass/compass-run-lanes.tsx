@@ -142,7 +142,7 @@ function GroupGap() {
 const AgentGlyph = LANE_LOOK.agent.glyph;
 
 const TRACE_WINDOW =
-	"pointer-events-none absolute -top-1.5 -bottom-0.5 -z-5 hidden corner-xs bg-canvas corner-squircle squircle:corner-l shadow-chip will-change-transform dark:bg-hover-strong";
+	"pointer-events-none absolute -top-1.5 -bottom-0.5 -z-5 hidden corner-xs bg-canvas corner-squircle squircle:corner-l shadow-card will-change-transform dark:bg-hover-strong";
 
 export function RunLanes({
 	onlyPickedLane = false,
@@ -412,7 +412,7 @@ export function RunLanes({
 							className={cn(
 								"inline-flex shrink-0 items-center gap-xxs",
 								"text-body-m tabular-nums",
-								"text-rose-mark transition-[opacity,filter] duration-(--motion-medium-duration)",
+								"text-error transition-[opacity,filter] duration-(--motion-medium-duration)",
 								anyPicked &&
 									!pickedLanes.has(lane.id) &&
 									"opacity-35 saturate-[0.15]",
@@ -560,7 +560,7 @@ export function RunLanes({
 			data-clock-from={view.from}
 			data-clock-to={view.to}
 			className={cn(
-				"corner-m bg-card px-m py-m shadow-card corner-squircle squircle:corner-xl",
+				"corner-m bg-surface px-m py-m shadow-card corner-squircle squircle:corner-xl",
 				!launched &&
 					"pointer-events-auto sticky top-(--reader-pane-top,var(--reader-top,1rem))",
 			)}

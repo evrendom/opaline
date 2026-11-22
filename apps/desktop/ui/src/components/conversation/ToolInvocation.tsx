@@ -109,14 +109,14 @@ export function ToolInvocation({
 					{isError ? (
 						<TraceAlertIcon className="size-4 text-error" />
 					) : (
-						<TraceTerminalIcon className="size-4 text-dashboardy-heading" />
+						<TraceTerminalIcon className="size-4 text-ink" />
 					)}
 				</div>
 				<div className="grid min-w-0 flex-1 gap-xs">
 					<p
 						className={cn(
 							"font-mono text-body-xl font-heavy",
-							isError ? "text-error" : "text-dashboardy-heading",
+							isError ? "text-error" : "text-ink",
 						)}
 					>
 						{toolName}

@@ -125,7 +125,7 @@ export function SubagentMessage({
 				<div
 					className={cn(
 						"min-w-0 corner-m px-l py-[calc(var(--space-m)+var(--space-xxs))] shadow-card corner-squircle squircle:corner-xl-inner",
-						!toMain && "bg-card",
+						!toMain && "bg-surface",
 					)}
 					style={toMain ? tintedGround(tint) : undefined}
 				>

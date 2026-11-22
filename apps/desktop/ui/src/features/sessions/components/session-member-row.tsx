@@ -114,7 +114,7 @@ export function SessionMemberRow({
 		const promptRows = (
 			<div
 				id={promptPanelId}
-				className="grid min-w-0 divide-y divide-line-strong"
+				className="grid min-w-0 divide-y divide-line"
 			>
 				{showFullPrompt ? (
 					promptItems.map((item, index) => (
@@ -198,13 +198,13 @@ export function SessionMemberRow({
 		return (
 			<section
 				aria-labelledby={headingId}
-				className="min-w-0 edge-b-m border-line-strong bg-canvas"
+				className="min-w-0 edge-b-m border-line bg-canvas"
 			>
 				<div
 					className={cn(
 						"sticky top-0 z-20 flex min-h-9 min-w-0 items-center gap-m",
 						"edge-b-m px-l py-m",
-						"border-line-strong bg-canvas",
+						"border-line bg-canvas",
 					)}
 				>
 					<UserTraceAvatar
@@ -222,7 +222,7 @@ export function SessionMemberRow({
 						<div className="ml-auto min-w-0">{headerTrailing}</div>
 					) : null}
 				</div>
-				<div className="grid min-w-0 divide-y divide-line-strong">
+				<div className="grid min-w-0 divide-y divide-line">
 					{items.map((item) =>
 						item.kind === "user" ? (
 							<div

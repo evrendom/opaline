@@ -39,7 +39,7 @@ export function ThemeSwitcher() {
 							"relative flex size-7 items-center justify-center",
 							"corner-full",
 							"focus-outline transition-colors",
-							active ? "text-ink" : "text-ink-3-60 hover:text-ink",
+							active ? "text-ink" : "text-ink-disabled hover:text-ink",
 						)}
 					>
 						{active ? (
@@ -47,7 +47,7 @@ export function ThemeSwitcher() {
 								layoutId={pillId}
 								transition={MORPH}
 								className={
-									/* design-escape-ok(opacity,colour): shipped value; input/50, line-strong at 50% and oklch(1 0 0 / 7.5%) in dark */ "absolute inset-0 corner-full bg-line-strong/50 dark:bg-[oklch(1_0_0/7.5%)] shadow-card"
+									/* design-escape-ok(opacity,colour): shipped value; input/50, line-strong at 50% and oklch(1 0 0 / 7.5%) in dark */ "absolute inset-0 corner-full bg-line/50 dark:bg-[oklch(1_0_0/7.5%)] shadow-card"
 								}
 							/>
 						) : null}

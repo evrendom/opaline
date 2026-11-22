@@ -34,7 +34,7 @@ export function SessionChartLoading() {
 	return (
 		<div
 			aria-hidden="true"
-			className="h-[4.07rem] shrink-0 overflow-hidden edge-b-m border-line-strong bg-inset dark:bg-canvas"
+			className="h-[4.07rem] shrink-0 overflow-hidden edge-b-m border-line bg-inset dark:bg-canvas"
 			data-session-chart-loading
 		>
 			{/* The wave draws its baseline at 50 and its guides a quarter, half
@@ -45,7 +45,7 @@ export function SessionChartLoading() {
 				className="h-[2.57rem] w-full"
 				viewBoxHeight={(50 * 80) / 74}
 			/>
-			<div className="flex h-6 items-center justify-between edge-t-s border-line-strong px-l">
+			<div className="flex h-6 items-center justify-between edge-t-s border-line px-l">
 				<Placeholder className="h-2 w-16" />
 				<Placeholder className="h-2 w-16" />
 			</div>
@@ -65,7 +65,7 @@ function TurnTableLoading() {
 					"grid h-11 min-w-[366px] grid-cols-[46px_repeat(4,64px)_minmax(64px,1fr)] items-center",
 					"edge-b-s",
 					"text-body-m font-medium",
-					"border-line-strong text-ink-3",
+					"border-line text-ink-3",
 				)}
 			>
 				<Placeholder className="size-5 justify-self-center corner-full" />
@@ -115,7 +115,7 @@ export function SessionTranscriptLoading() {
 				{[0, 1, 2].map((turn) => (
 					<div
 						key={turn}
-						className="flex flex-col gap-xxl edge-l-m border-line-strong pl-l"
+						className="flex flex-col gap-xxl edge-l-m border-line pl-l"
 					>
 						<div className="flex flex-col gap-l">
 							<div className="flex items-center gap-m">
@@ -185,14 +185,14 @@ export function SessionDetailContentLoadingView({
 				style={style}
 			>
 				<TurnTableLoading />
-				<div aria-hidden="true" className="edge-l-m border-line-strong" />
+				<div aria-hidden="true" className="edge-l-m border-line" />
 				<div className="flex min-h-0 min-w-0 flex-col overflow-hidden">
 					<div
 						aria-hidden="true"
 						className={cn(
 							"flex h-11 shrink-0 items-center gap-m overflow-hidden",
 							"edge-y-s p-m",
-							"border-line-strong",
+							"border-line",
 						)}
 					>
 						{[0, 1, 2, 3, 4].map((key) => (

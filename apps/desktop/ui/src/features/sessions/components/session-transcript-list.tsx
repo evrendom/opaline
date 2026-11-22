@@ -1287,7 +1287,7 @@ function TranscriptRowContent({
 			return (
 				<button
 					type="button"
-					className="min-h-11 w-full edge-y-m border-line-strong px-l text-left text-body-m text-ink-3 focus-outline"
+					className="min-h-11 w-full edge-y-m border-line px-l text-left text-body-m text-ink-3 focus-outline"
 				>
 					Show {row.hidden.events.toLocaleString()} more {row.hidden.kindLabel}
 				</button>
@@ -1365,7 +1365,7 @@ function TranscriptRowContent({
 			);
 		case "window-edge":
 			return (
-				<div className="flex min-h-12 items-center justify-center edge-y-m border-line-strong p-m">
+				<div className="flex min-h-12 items-center justify-center edge-y-m border-line p-m">
 					<Button
 						disabled={row.state === "loading"}
 						onClick={() =>
@@ -1420,7 +1420,7 @@ function TranscriptRowDebugBadge({
 	return (
 		<output
 			ref={outputRef}
-			className="pointer-events-none absolute top-1 right-2 z-50 corner-s edge-m border-line-strong bg-canvas px-m py-xs text-body-s text-ink-3 shadow-label"
+			className="pointer-events-none absolute top-1 right-2 z-50 corner-s edge-m border-line bg-canvas px-m py-xs text-body-s text-ink-3 shadow-float"
 		/>
 	);
 }

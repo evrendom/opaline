@@ -303,10 +303,10 @@ describe("ConversationTrace sticky surfaces", () => {
 			"var(--ink-3, var(--ink-3, var(--ink-3)))",
 		);
 		expect(remainingCount?.style.background).toBe(
-			"color-mix(in srgb, var(--conversation-trace-connector-color, var(--line-strong)) 75%, transparent)",
+			"color-mix(in srgb, var(--conversation-trace-connector-color, var(--line)) 75%, transparent)",
 		);
 		expect(remainingCount?.style.getPropertyValue("--trace-icon-bg")).toBe(
-			"color-mix(in srgb, var(--conversation-trace-connector-color, var(--line-strong)) 75%, transparent)",
+			"color-mix(in srgb, var(--conversation-trace-connector-color, var(--line)) 75%, transparent)",
 		);
 		expect(remainingCount?.style.mask).toContain("opaline-trace-fill.svg");
 	});

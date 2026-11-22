@@ -143,7 +143,7 @@ export function ContextMark({ className }: { className?: string }) {
 	);
 }
 
-export const PILL_SHADOW = "shadow-chip";
+export const PILL_SHADOW = "shadow-card";
 
 export const CONTEXT_WARN = 70;
 export const CONTEXT_FULL = 90;
@@ -228,7 +228,7 @@ export function ContextBar({
 										: warns && share >= CONTEXT_WARN
 											? "bg-warning-tint text-warning"
 											: // design-escape-ok(opacity): no role renders this; dark:bg-ink/8
-												"bg-wash text-ink-3 dark:bg-ink/8",
+												"bg-hover text-ink-3 dark:bg-ink/8",
 								)}
 							>
 								{share}%
@@ -293,7 +293,7 @@ function MeasureToggle({
 }) {
 	return (
 		// design-escape-ok(opacity): no role renders this; dark:bg-ink/6
-		<fieldset className="m-zero flex shrink-0 items-center gap-xxs corner-m edge-none bg-wash p-xxs corner-squircle squircle:corner-xl dark:bg-ink/6">
+		<fieldset className="m-zero flex shrink-0 items-center gap-xxs corner-m edge-none bg-hover p-xxs corner-squircle squircle:corner-xl dark:bg-ink/6">
 			<legend className="sr-only">Measure the map by</legend>
 			{MEASURES.map((each) => {
 				const pressed = each === measure;
@@ -317,7 +317,7 @@ function MeasureToggle({
 							"focus-outline",
 							"disabled:cursor-default disabled:opacity-40 squircle:corner-l",
 							pressed
-								? cn("bg-card font-medium", PILL_SHADOW)
+								? cn("bg-surface font-medium", PILL_SHADOW)
 								: // design-escape-ok(opacity): no role renders this; hover:text-ink/88
 									"text-ink-3 hover:text-ink/88 dark:hover:text-ink",
 						)}

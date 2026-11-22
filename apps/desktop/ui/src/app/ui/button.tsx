@@ -21,7 +21,7 @@ const buttonVariants = cva(
 					// design-escape-ok(colour,opacity): shipped value; oklch(0.205 0 0) fill on oklch(0.985 0 0) text, oklch(0.922 0 0) on oklch(0.205 0 0) in dark, /80 hover
 					"border border-transparent bg-[oklch(0.205_0_0)] text-[oklch(0.985_0_0)] hover:bg-[oklch(0.205_0_0)]/80 dark:bg-[oklch(0.922_0_0)] dark:text-[oklch(0.205_0_0)] dark:hover:bg-[oklch(0.922_0_0)]/80",
 				outline:
-					"shadow-control bg-card hover:bg-hover hover:text-ink aria-expanded:bg-hover aria-expanded:text-ink [&_svg:not([class*='text-'])]:text-ink-3",
+					"shadow-card bg-surface hover:bg-hover hover:text-ink aria-expanded:bg-hover aria-expanded:text-ink [&_svg:not([class*='text-'])]:text-ink-3",
 				ghost:
 					"hover:bg-hover hover:text-ink aria-expanded:bg-hover aria-expanded:text-ink [&_svg:not([class*='text-'])]:text-ink-3",
 				// The plain ghost the dialogs, the date picker, the calendar and the
@@ -33,7 +33,7 @@ const buttonVariants = cva(
 				// The plain outline those places shipped with: a 1px line-strong edge on
 				// the canvas (clear in dark), a field fill on hover, 16px icons.
 				bordered:
-					"border border-line-strong bg-canvas hover:bg-field hover:text-ink aria-expanded:bg-field aria-expanded:text-ink dark:bg-transparent dark:hover:bg-hover [&_svg:not([class*='size-'])]:size-4",
+					"border border-line bg-canvas hover:bg-field hover:text-ink aria-expanded:bg-field aria-expanded:text-ink dark:bg-transparent dark:hover:bg-hover [&_svg:not([class*='size-'])]:size-4",
 				// The error fill is stronger in dark (10/20% light, 20/30% dark);
 				// error-tint is 11/17%, so the fill keeps its own dark: steps. Like the
 				// filled button it sits flat inside a 1px clear edge, with no shadow.
@@ -49,7 +49,7 @@ const buttonVariants = cva(
 				// e.g. filters applied) or open lifts it to foreground text on the
 				// stronger shadow.
 				toolbar:
-					"bg-card font-regular text-ink-3 shadow-control hover:bg-[color-mix(in_oklab,var(--field)_50%,var(--card))] aria-expanded:bg-[color-mix(in_oklab,var(--field)_50%,var(--card))] data-popup-open:bg-[color-mix(in_oklab,var(--field)_50%,var(--card))] aria-pressed:text-ink aria-pressed:shadow-raised data-active:text-ink data-active:shadow-raised [&>svg]:size-3.5",
+					"bg-surface font-regular text-ink-3 shadow-card hover:bg-[color-mix(in_oklab,var(--field)_50%,var(--surface))] aria-expanded:bg-[color-mix(in_oklab,var(--field)_50%,var(--surface))] data-popup-open:bg-[color-mix(in_oklab,var(--field)_50%,var(--surface))] aria-pressed:text-ink aria-pressed:shadow-raised data-active:text-ink data-active:shadow-raised [&>svg]:size-3.5",
 			},
 			size: {
 				xs: "h-6 gap-xs corner-full px-[calc(var(--space-xxs)*5)] text-body-m in-data-[slot=button-group]:corner-full has-[>svg:first-child]:pl-m has-[>svg:last-child]:pr-m [&_svg:not([class*='size-'])]:size-[11px]",

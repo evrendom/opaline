@@ -6,7 +6,7 @@ import { formatNumber, formatShortCount } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export const TOGGLE =
-	"text-ink-3 active:not-aria-[haspopup]:translate-y-0 aria-pressed:bg-card aria-pressed:text-ink aria-pressed:shadow-card dark:aria-pressed:bg-wash";
+	"text-ink-3 active:not-aria-[haspopup]:translate-y-0 aria-pressed:bg-surface aria-pressed:text-ink aria-pressed:shadow-card dark:aria-pressed:bg-hover";
 
 export function ViewToggle<View extends string>({
 	iconsOnly = false,
@@ -82,7 +82,7 @@ export function ViewToggle<View extends string>({
 }
 
 export const CARD =
-	"corner-m bg-card shadow-card corner-squircle squircle:corner-xl";
+	"corner-m bg-surface shadow-card corner-squircle squircle:corner-xl";
 
 export function ScrollColumn({
 	children,
@@ -179,5 +179,5 @@ export function Crumb({
 }
 
 export function CrumbSeparator() {
-	return <span className="shrink-0 text-ink-3-50">›</span>;
+	return <span className="shrink-0 text-ink-disabled">›</span>;
 }

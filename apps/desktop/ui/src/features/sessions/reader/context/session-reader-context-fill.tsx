@@ -137,7 +137,7 @@ function ContextRange({
 						stroke="currentColor"
 						strokeDasharray={`${Math.max(start * 100, 1)} 100`}
 						strokeWidth="2"
-						className="text-ink-3-40"
+						className="text-ink-disabled"
 					/>
 					<circle
 						cx="6"

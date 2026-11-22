@@ -76,7 +76,7 @@ export function SessionPreview({ sessionId }: { sessionId: string }) {
 				<Link
 					to={getShellRoutePath(appRoutes.repoDetail(repoKey, sessionId))}
 					aria-label="Open session"
-					className="inline-flex h-7 shrink-0 items-center justify-center gap-xs corner-m bg-card-soft pr-m pl-[calc(var(--space-m)+var(--space-xxs))] text-body-m font-medium text-ink-3 shadow-card transition-colors corner-squircle outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-focus-ring squircle:corner-l @max-[30rem]/head:w-7 @max-[30rem]/head:px-zero"
+					className="inline-flex h-7 shrink-0 items-center justify-center gap-xs corner-m bg-surface pr-m pl-[calc(var(--space-m)+var(--space-xxs))] text-body-m font-medium text-ink-3 shadow-card transition-colors corner-squircle outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-focus-ring squircle:corner-l @max-[30rem]/head:w-7 @max-[30rem]/head:px-zero"
 				>
 					<span className="@max-[30rem]/head:sr-only">Open session</span>
 					<IconArrowUpRight aria-hidden="true" className="size-3.5 shrink-0" />

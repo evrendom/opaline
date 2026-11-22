@@ -60,7 +60,7 @@ const SESSION_THEME_CLASS_NAME = "";
 
 export function TranscriptMaskFixturePage() {
 	return (
-		<main className="transcript-mask-demo dashboardy-page grid h-dvh min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-canvas font-body text-dashboardy-heading">
+		<main className="transcript-mask-demo dashboardy-page grid h-dvh min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-canvas font-body text-ink">
 			<header className="flex min-h-12 items-center justify-between edge-b-m border-line px-xl">
 				<div>
 					<h1 className="text-body-xl font-heavy">Transcript gap texture</h1>
@@ -93,7 +93,7 @@ function MaskPane({ label }: { label: string }) {
 			className={`dashboardy-page relative h-full min-h-0 overflow-hidden bg-canvas ${SESSION_THEME_CLASS_NAME}`}
 			data-transcript-mask-theme={label.toLowerCase()}
 		>
-			<div className="pointer-events-none absolute top-3 left-4 z-10 corner-xs bg-canvas px-m py-xs text-body-m font-medium text-ink-3 shadow-label">
+			<div className="pointer-events-none absolute top-3 left-4 z-10 corner-xs bg-canvas px-m py-xs text-body-m font-medium text-ink-3 shadow-float">
 				{label}
 			</div>
 			<section
@@ -105,7 +105,7 @@ function MaskPane({ label }: { label: string }) {
 				<div aria-hidden className="h-[200vh]" />
 			</section>
 			<div
-				className="session-transcript-row-surface absolute inset-x-4 top-14 z-20 max-h-[calc(100%-4.5rem)] overflow-hidden corner-s edge-m border-line-strong shadow-label"
+				className="session-transcript-row-surface absolute inset-x-4 top-14 z-20 max-h-[calc(100%-4.5rem)] overflow-hidden corner-s edge-m border-line shadow-float"
 				data-transcript-mask-overlay
 			>
 				<SessionContinuousTurnSkeleton
@@ -116,7 +116,7 @@ function MaskPane({ label }: { label: string }) {
 				<ConversationTrace
 					agentLabel={CONVERSATION_TRACE_FIXTURE_AGENT_LABEL}
 					agentModel={CONVERSATION_TRACE_FIXTURE_MODEL}
-					className="edge-t-m border-line-strong"
+					className="edge-t-m border-line"
 					expandedSpeakerLayout="trace-tree"
 					items={MASK_COLLAPSED_TRACE_ITEMS}
 					userLabel={CONVERSATION_TRACE_FIXTURE_USER_LABEL}

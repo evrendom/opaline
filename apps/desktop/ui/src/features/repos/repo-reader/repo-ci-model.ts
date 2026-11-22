@@ -144,7 +144,7 @@ export const OUTCOME_TONE: Record<CiRound["outcome"], string> = {
 	failed: "bg-error",
 	flaky: "bg-warning-translucent",
 	running: "bg-accent-line",
-	cancelled: "bg-ink-3-40",
+	cancelled: "bg-ink-disabled",
 	// design-escape-ok(opacity): no role renders this; ink-3/30
 	other: "bg-ink-3/30",
 };

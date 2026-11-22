@@ -315,7 +315,7 @@ export function SessionsOverviewTable({
 					className={cn(
 						"edge-t-m px-l py-m",
 						"text-body-xxl font-medium",
-						"border-line-strong text-ink-3",
+						"border-line text-ink-3",
 						"sm:text-body-xl",
 					)}
 				>

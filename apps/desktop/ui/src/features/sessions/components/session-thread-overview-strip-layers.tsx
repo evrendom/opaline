@@ -69,7 +69,7 @@ export function SessionOverviewTimelineFooter({
 	const firstTick = ticks[0];
 	return (
 		<div
-			className="h-6 shrink-0 edge-t-s border-line-strong px-l py-xs"
+			className="h-6 shrink-0 edge-t-s border-line px-l py-xs"
 			data-session-overview-axis-strip
 		>
 			<div className="grid h-4 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-m font-body text-body-xs font-regular text-ink-3 tabular-nums">

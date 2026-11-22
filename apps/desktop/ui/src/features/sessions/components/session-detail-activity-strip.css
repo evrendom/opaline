@@ -51,7 +51,7 @@
 .session-detail-opaline-menu::before {
 	position: absolute;
 	inset: 8px;
-	background: var(--wash);
+	background: var(--hover);
 	border-radius: 6px;
 	box-shadow: inset 0 0 0 1px var(--line-soft);
 	content: "";

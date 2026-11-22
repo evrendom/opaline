@@ -287,7 +287,7 @@ export function RepoDetailPage({
 	};
 	const sessions = <UsageSessionsPane {...sessionsProps} />;
 	return (
-		<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-inset dark:bg-canvas text-dashboardy-heading [--reader-page:var(--canvas)]">
+		<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-inset dark:bg-canvas text-ink [--reader-page:var(--canvas)]">
 			<RepoDetailHeader
 				repoKey={repoKey}
 				name={name}
@@ -467,7 +467,7 @@ export function RepoDetailHeader({
 	const separator = (
 		<IconChevronRight
 			aria-hidden="true"
-			className="size-4 shrink-0 text-ink-3-50"
+			className="size-4 shrink-0 text-ink-disabled"
 			stroke={1.5}
 		/>
 	);

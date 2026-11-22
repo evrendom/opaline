@@ -13,7 +13,7 @@
 	min-width: 0;
 	min-height: 0;
 	overflow: hidden;
-	color: var(--cost-foreground);
+	color: var(--ink);
 	background: var(--canvas);
 	font-size: var(--size-xl);
 }
@@ -24,7 +24,7 @@
 	/* The shipped cost button left display and gap to the call site's utilities. */
 	display: revert-layer;
 	gap: revert-layer;
-	color: var(--cost-muted);
+	color: var(--ink-3);
 	line-height: inherit;
 	letter-spacing: inherit;
 	border-radius: 5px;
@@ -36,7 +36,7 @@
 		[aria-selected="true"],
 		[data-popup-open]
 	) {
-	color: var(--cost-foreground);
+	color: var(--ink);
 }
 .cost-page
 	.text-button:is(
@@ -44,7 +44,7 @@
 		[aria-selected="true"],
 		[data-popup-open]
 	) {
-	background: var(--cost-hover);
+	background: var(--hover);
 }
 
 .cost-page-scroll {
@@ -78,7 +78,7 @@
 	display: flex;
 	align-items: center;
 	gap: var(--space-m);
-	color: var(--cost-foreground);
+	color: var(--ink);
 }
 .cost-range-controls[data-in-header] {
 	margin-left: auto;
@@ -89,7 +89,7 @@
 .cost-breakdown,
 .cost-error {
 	border-radius: var(--radius-m);
-	background: var(--card);
+	background: var(--surface);
 	box-shadow: var(--shadow-card);
 }
 /* biome-ignore lint/correctness/noUnknownProperty: corner-shape is new (Chromium 139+); Biome does not know it yet. */
@@ -227,7 +227,7 @@
 	min-width: 0;
 	font-size: var(--size-xl);
 	line-height: var(--line-xl);
-	color: var(--cost-foreground);
+	color: var(--ink);
 }
 .cost-metric-icon {
 	width: 14px;
@@ -273,13 +273,13 @@
 	font-weight: 450;
 	/* design-escape-ok(type): shipped value; -0.01em */
 	letter-spacing: -0.01em;
-	color: var(--cost-muted);
+	color: var(--ink-3);
 }
 .cost-metric-qualifier {
 	font-size: var(--size-m);
 	font-weight: 470;
 	letter-spacing: var(--letter-spacing-m);
-	color: var(--cost-muted);
+	color: var(--ink-3);
 }
 /* CardSparkline: the accent at half strength, its stroke at half again, over
    a fill fading from 40% to 10% (text-*-400/50 sparklines). */
@@ -339,7 +339,7 @@
 	stroke-opacity: 1;
 }
 .cost-metric-sparkline[data-placeholder] {
-	color: var(--cost-muted);
+	color: var(--ink-3);
 }
 .cost-metric-sparkline[data-placeholder] .cost-metric-trend-line {
 	stroke-opacity: 0.1;
@@ -378,13 +378,13 @@
 .cost-chart-title {
 	font-size: var(--size-xl);
 	font-weight: var(--weight-body-medium);
-	color: var(--cost-foreground);
+	color: var(--ink);
 }
 .cost-chart-coverage {
 	display: flex;
 	align-items: center;
 	gap: var(--space-m);
-	color: var(--cost-muted);
+	color: var(--ink-3);
 	font-size: var(--size-s);
 	font-variant-numeric: tabular-nums;
 }
@@ -402,7 +402,7 @@
 	align-items: center;
 	gap: 7px;
 	font-size: var(--size-m);
-	color: var(--cost-muted);
+	color: var(--ink-3);
 }
 .cost-legend-item i,
 .cost-chart-tooltip i {
@@ -430,7 +430,7 @@
 	align-items: center;
 	gap: var(--space-s);
 	font-size: var(--size-xl);
-	color: var(--cost-muted);
+	color: var(--ink-3);
 	white-space: nowrap;
 }
 .cost-chart-tags > .cost-active-filters {
@@ -443,7 +443,7 @@
 	border-radius: 4px;
 }
 .cost-duration-legend:hover {
-	background: var(--cost-hover);
+	background: var(--hover);
 }
 .cost-duration-legend[aria-pressed="false"] {
 	opacity: 0.45;
@@ -451,7 +451,7 @@
 .cost-duration-legend i {
 	width: 18px;
 	height: 0;
-	border-top: 2px solid var(--cost-foreground);
+	border-top: 2px solid var(--ink);
 	border-radius: var(--radius-zero);
 }
 .cost-duration-legend[data-percentile="p95"] i {
@@ -459,7 +459,7 @@
 	border-top-style: dashed;
 }
 .cost-duration-legend strong {
-	color: var(--cost-foreground);
+	color: var(--ink);
 	font-weight: var(--weight-body-medium);
 	font-variant-numeric: tabular-nums;
 }
@@ -474,19 +474,19 @@
 	min-width: 190px;
 	border-radius: var(--radius-m);
 	padding: var(--space-l);
-	color: var(--cost-foreground);
+	color: var(--ink);
 	background: var(--canvas);
 	/* design-escape-ok(colour): no role renders this; the tooltip's 6px 20px 8% drop */
 	--cost-tooltip-drop: 0 6px 20px rgb(0 0 0 / 8%);
 	box-shadow:
 		var(--cost-tooltip-drop),
-		0 0 0 1px var(--cost-border);
+		0 0 0 1px var(--line);
 	display: grid;
 	gap: 7px;
 	font-size: var(--size-m);
 }
 .cost-chart-tooltip p {
-	color: var(--cost-muted);
+	color: var(--ink-3);
 	padding-bottom: 3px;
 }
 .cost-chart-tooltip > div,
@@ -551,7 +551,7 @@
 }
 .cost-cycle-time {
 	display: block;
-	color: var(--cost-muted);
+	color: var(--ink-3);
 	font-size: var(--size-xs);
 }
 .cost-breakdowns[data-signals="true"]
@@ -588,11 +588,11 @@
 	text-wrap: balance;
 }
 .cost-breakdown-heading > div {
-	color: var(--cost-muted);
+	color: var(--ink-3);
 	font-size: var(--size-s);
 }
 .cost-breakdown-selected {
-	color: var(--cost-blue);
+	color: var(--accent);
 	font-weight: 500;
 }
 .cost-heading-currency {
@@ -621,11 +621,11 @@
 }
 .cost-scroll-fade-edge[data-edge="top"] {
 	top: 0;
-	background: linear-gradient(to bottom, var(--card), transparent);
+	background: linear-gradient(to bottom, var(--surface), transparent);
 }
 .cost-scroll-fade-edge[data-edge="bottom"] {
 	bottom: 0;
-	background: linear-gradient(to top, var(--card), transparent);
+	background: linear-gradient(to top, var(--surface), transparent);
 }
 .cost-scroll-fade-edge[data-edge="top"][data-visible] {
 	opacity: 1;
@@ -652,14 +652,14 @@
    block (Breakdown rows). The fluid hover paints it, gliding between rows;
    a row it doesn't track still fills itself. */
 .cost-breakdown-list .cost-breakdown-row:not([data-fluid-menu-item]):hover {
-	background: var(--cost-row-hover);
+	background: var(--hover);
 }
 /* Above the page's fill rule, in the row's own hover colour. */
 .cost-breakdown .cost-breakdown-list
 	[data-fluid-menu-root]:not(.cost-metrics)
 	> .fluid-menu-hover-layer
 	.fluid-menu-hover-fill {
-	background: var(--cost-row-hover);
+	background: var(--hover);
 }
 .cost-breakdown-list .cost-breakdown-row:hover,
 .cost-breakdown-list .cost-breakdown-row:hover + .cost-breakdown-row {
@@ -692,14 +692,14 @@
 	[data-fluid-menu-root]
 	> .fluid-menu-hover-layer
 	.fluid-menu-hover-fill {
-	background: var(--cost-hover);
+	background: var(--hover);
 }
 .cost-breakdown-row:focus-visible {
 	outline: 2px solid var(--accent);
 	outline-offset: -2px;
 }
 .cost-breakdown-row[aria-pressed="true"] {
-	color: var(--cost-blue);
+	color: var(--accent);
 }
 /* Share bar: 2px by 56px under the value, filled from the right in
    the row's series colour. */
@@ -711,7 +711,7 @@
 	margin-top: var(--space-s);
 	margin-left: auto;
 	border-radius: 999px;
-	background: color-mix(in oklch, var(--cost-muted) 10%, transparent);
+	background: color-mix(in oklch, var(--ink-3) 10%, transparent);
 	overflow: hidden;
 }
 .cost-row-meter > span {
@@ -738,8 +738,8 @@
 	font-size: 0.5625rem;
 	/* the avatar fallback's text-sm ratio, as shipped */
 	line-height: calc(1.25 / 0.875);
-	background: var(--wash);
-	color: var(--cost-muted);
+	background: var(--hover);
+	color: var(--ink-3);
 	font-weight: var(--weight-body-medium);
 }
 .cost-unknown-model {
@@ -759,8 +759,8 @@
 	min-height: 10px;
 	border-radius: 999px;
 	overflow: hidden;
-	background: color-mix(in srgb, var(--cost-foreground) 14%, var(--canvas));
-	box-shadow: 0 0 0 1px var(--cost-border);
+	background: color-mix(in srgb, var(--ink) 14%, var(--canvas));
+	box-shadow: 0 0 0 1px var(--line);
 	transition:
 		grid-template-columns var(--motion-medium-duration) var(--motion-easing),
 		grid-template-rows var(--motion-medium-duration) var(--motion-easing);
@@ -788,7 +788,7 @@
 	--cost-tools-drop: 0 2px 7px rgb(0 0 0 / 8%);
 	box-shadow:
 		var(--cost-tools-drop),
-		0 0 0 1px var(--cost-border);
+		0 0 0 1px var(--line);
 }
 .cost-breakdown:hover .cost-tools-inner,
 .cost-tools:focus-within .cost-tools-inner,
@@ -809,10 +809,10 @@
 }
 .cost-tool-button[aria-pressed="true"],
 .cost-tool-button[data-popup-open] {
-	background: var(--cost-hover);
+	background: var(--hover);
 }
 .cost-tool-button[aria-pressed="true"] {
-	color: var(--cost-blue);
+	color: var(--accent);
 }
 .cost-tool-button:disabled {
 	opacity: 0.4;
@@ -845,14 +845,14 @@
 .cost-breakdown-empty {
 	padding: 35px 12px;
 	text-align: center;
-	color: var(--cost-muted);
+	color: var(--ink-3);
 	font-size: var(--size-l);
 }
 .cost-search {
 	width: 100%;
 	min-width: 0;
 	padding: 8px 10px;
-	border: 1px solid var(--cost-border);
+	border: 1px solid var(--line);
 	border-radius: var(--radius-xs);
 	background: transparent;
 	font-size: var(--size-xl);
@@ -895,7 +895,7 @@
 	font-weight: var(--weight-body-medium);
 }
 .cost-error p {
-	color: var(--cost-muted);
+	color: var(--ink-3);
 	padding-top: var(--space-s);
 }
 /* Sized like the stat card value it stands in for, so the label keeps its
@@ -938,7 +938,7 @@
 	/* design-escape-ok(type): shipped value; 2.0625rem */
 	line-height: 2.0625rem;
 	letter-spacing: var(--letter-spacing-xl);
-	color: var(--cost-muted);
+	color: var(--ink-3);
 }
 /* The chart loads as itself (chart-flow.ts): Recharts draws the heartbeat
    behind a window sweeping across it, the way ChartLoadingWave flows. The
@@ -1020,7 +1020,7 @@
 	height: 100%;
 }
 .cost-chart-loading-guides path {
-	stroke: color-mix(in srgb, var(--cost-foreground) 6%, transparent);
+	stroke: color-mix(in srgb, var(--ink) 6%, transparent);
 }
 .cost-chart-skeleton[data-leaving] {
 	pointer-events: none;
@@ -1171,7 +1171,7 @@
 }
 .dark .cost-tools,
 .dark .cost-chart-tooltip {
-	box-shadow: 0 0 0 1px var(--cost-border);
+	box-shadow: 0 0 0 1px var(--line);
 }
 
 .dark .cost-page,
@@ -1227,13 +1227,13 @@
 }
 
 .cost-breakdown[data-dimension="durations"] .cost-breakdown-row:last-of-type {
-	border-top: 1px solid var(--cost-border);
+	border-top: 1px solid var(--line);
 	margin-top: var(--space-m);
 }
 
 /* Plugin app: rows that name people load only when asked for. */
 .cost-breakdown-load {
-	color: var(--cost-blue);
+	color: var(--accent);
 	font: inherit;
 	text-decoration: underline;
 	text-underline-offset: 2px;
@@ -1300,7 +1300,7 @@
 .cost-ci-chart {
 	position: absolute;
 	inset: 0;
-	--ci-run: color-mix(in oklab, var(--cost-foreground) 18%, transparent);
+	--ci-run: color-mix(in oklab, var(--ink) 18%, transparent);
 	/* design-escape-ok(colour): no role renders this; red-500, the error role is a different red */
 	--ci-failed: oklch(0.637 0.208 25.331);
 }
@@ -1309,15 +1309,15 @@
 	overflow: visible;
 }
 .cost-ci-grid {
-	stroke: var(--cost-border);
+	stroke: var(--line);
 	stroke-dasharray: 3 4;
 }
 .cost-ci-tick {
-	fill: var(--cost-muted);
+	fill: var(--ink-3);
 	font-size: var(--size-s);
 }
 .cost-ci-tick[data-merged] {
-	fill: color-mix(in oklab, var(--ci-merged) 75%, var(--cost-muted));
+	fill: color-mix(in oklab, var(--ci-merged) 75%, var(--ink-3));
 }
 .cost-ci-day rect {
 	fill: var(--ci-run);
@@ -1347,12 +1347,12 @@
 	fill: transparent;
 }
 .cost-ci-marker {
-	stroke: var(--cost-muted);
+	stroke: var(--ink-3);
 	stroke-dasharray: 3 3;
 	pointer-events: none;
 }
 .cost-legend-item i[data-ci="runs"] {
-	background: color-mix(in oklab, var(--cost-foreground) 35%, transparent);
+	background: color-mix(in oklab, var(--ink) 35%, transparent);
 }
 .cost-legend-item i[data-ci="failed"] {
 	/* design-escape-ok(colour): shipped value; oklch(0.637 0.208 25.331) */
@@ -1366,7 +1366,7 @@
 }
 .cost-ci-ring path {
 	fill: none;
-	stroke: color-mix(in oklab, var(--cost-foreground) 18%, transparent);
+	stroke: color-mix(in oklab, var(--ink) 18%, transparent);
 	stroke-width: 2.6;
 	transition: stroke var(--motion-medium-duration) var(--motion-easing);
 }

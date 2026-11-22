@@ -258,8 +258,8 @@ export function RailTagsPicker({
 					className={cn(
 						"relative inline-flex size-7 shrink-0 items-center justify-center",
 						"corner-full",
-						"bg-card text-ink-3 shadow-card transition-colors",
-						"hover:bg-hover data-popup-open:bg-hover dark:bg-wash",
+						"bg-surface text-ink-3 shadow-card transition-colors",
+						"hover:bg-hover data-popup-open:bg-hover dark:bg-hover",
 					)}
 				>
 					<IconAdjustmentsHorizontal aria-hidden="true" className="size-3.5" />

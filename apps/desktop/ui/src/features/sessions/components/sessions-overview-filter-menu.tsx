@@ -39,7 +39,7 @@ export function SessionOverviewFilterOptionsPanel({
 		<>
 			{canSearch ? (
 				// design-escape-ok(opacity): shipped value; border/60
-				<div className="relative edge-b-m border-line-strong/60 p-m">
+				<div className="relative edge-b-m border-line/60 p-m">
 					<label className="sr-only" htmlFor={`${controlId}-search`}>
 						{`Search ${label.toLocaleLowerCase()}`}
 					</label>
@@ -134,7 +134,7 @@ export function SessionOverviewFilterOptionsPanel({
 			</div>
 			{variant === "default" ? (
 				// design-escape-ok(opacity): shipped value; border/60
-				<div className="edge-t-m border-line-strong/60 px-l py-m text-body-m tabular-nums text-ink-3">
+				<div className="edge-t-m border-line/60 px-l py-m text-body-m tabular-nums text-ink-3">
 					{selectedOptionCount.toLocaleString()} of{" "}
 					{options.length.toLocaleString()} selected
 				</div>

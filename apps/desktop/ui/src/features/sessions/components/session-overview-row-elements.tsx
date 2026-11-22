@@ -11,7 +11,7 @@ export const SESSION_OVERVIEW_ROW_CLASS_NAME =
 
 export const SESSION_OVERVIEW_MODEL_LABEL_CLASS_NAME =
 	// design-escape-ok(type): shipped value; 16/20 below sm, weight 450
-	"text-base/5 font-[450] tracking-m text-session-overview-text sm:text-body-l";
+	"text-base/5 font-[450] tracking-m text-ink sm:text-body-l";
 
 export const SESSION_OVERVIEW_CELL_CLASS_NAME =
 	"flex min-w-0 items-center px-l";

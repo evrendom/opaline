@@ -2,7 +2,7 @@
 	/* design-escape-ok(colour): shipped value; rgba(255, 255, 255, 0.7) */
 	--skill-document-code-highlight: rgba(255, 255, 255, 0.7);
 	min-width: 0;
-	color: var(--dashboardy-heading);
+	color: var(--ink);
 	font-family: var(--font-sans);
 	/* design-escape-ok(type): shipped value; 15px */
 	font-size: 15px;
@@ -49,7 +49,7 @@
 .rich-skill-document p {
 	min-height: 24px;
 	margin: var(--space-zero) var(--space-zero) var(--space-m);
-	color: var(--dashboardy-heading);
+	color: var(--ink);
 	font: inherit;
 }
 
@@ -58,7 +58,7 @@
 .rich-skill-document h3,
 .rich-skill-document h4 {
 	position: relative;
-	color: var(--dashboardy-heading);
+	color: var(--ink);
 	font-family: var(--font-sans);
 	letter-spacing: var(--tracking-m);
 }
@@ -110,7 +110,7 @@
 .rich-skill-document ol {
 	margin: 5px 0;
 	padding-left: 28px;
-	color: var(--dashboardy-heading);
+	color: var(--ink);
 	font: inherit;
 }
 
@@ -196,7 +196,7 @@
 	width: 100%;
 	border-collapse: collapse;
 	table-layout: fixed;
-	color: var(--dashboardy-heading);
+	color: var(--ink);
 	font-family: var(--font-sans);
 	font-size: var(--size-xl);
 	/* design-escape-ok(type): shipped value; 21px */
@@ -241,7 +241,7 @@
 .rich-skill-document[data-variant="preview"] {
 	font-size: var(--size-xxl);
 	line-height: var(--line-xxl);
-	color: var(--session-overview-muted);
+	color: var(--ink-2);
 	--skill-document-inline-code-background: var(--session-overview-hover);
 	--skill-document-code-background: var(--session-overview-hover);
 }
@@ -258,7 +258,7 @@
 	font-size: inherit;
 	font-weight: var(--weight-body-medium);
 	line-height: inherit;
-	color: var(--session-overview-text);
+	color: var(--ink);
 }
 
 .rich-skill-document[data-variant="preview"] h3 {

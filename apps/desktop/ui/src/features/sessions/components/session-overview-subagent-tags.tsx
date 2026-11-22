@@ -22,7 +22,7 @@ type SessionSubagentData = Pick<
 
 const SUBAGENT_TAG_CLASS_NAME = cn(
 	SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME,
-	"shrink-0 whitespace-nowrap bg-mark-fill text-ink-soft",
+	"shrink-0 whitespace-nowrap bg-hover text-ink-2",
 );
 
 const SUBAGENT_ROW_TITLES: Record<

@@ -352,14 +352,14 @@ const RepoRow = memo(function RepoRow({
 					<div className="flex min-w-0 flex-1 flex-col gap-xxs">
 						<div className="flex min-w-0 items-center gap-m">
 							<p
-								className="min-w-0 truncate text-body-xl font-medium text-session-overview-text"
+								className="min-w-0 truncate text-body-xl font-medium text-ink"
 								title={identity.repoLabel}
 							>
 								{identity.repoLabel}
 							</p>
 							<RepoSignals repo={repo} />
 						</div>
-						<div className="flex min-w-0 items-center gap-s text-body-m text-session-overview-muted">
+						<div className="flex min-w-0 items-center gap-s text-body-m text-ink-2">
 							<OverviewMembers
 								avatarMap={avatarMap}
 								topUserIds={repo.topUsers.map((user) => user.userId)}
@@ -389,7 +389,7 @@ const RepoRow = memo(function RepoRow({
 				<div
 					className={cn(
 						OVERVIEW_METRIC_CELL_CLASS_NAME,
-						"font-medium text-session-overview-text",
+						"font-medium text-ink",
 					)}
 					title={
 						repo.estimatedCost === null

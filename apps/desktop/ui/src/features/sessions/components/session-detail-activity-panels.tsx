@@ -34,12 +34,12 @@ export function SessionDetailActivityPanel({
 											{occurrence.detail}
 										</p>
 										{occurrence.supportingDetail ? (
-											<p className="mt-xxs text-body-m tracking-s text-ink-meta tabular-nums">
+											<p className="mt-xxs text-body-m tracking-s text-ink-3 tabular-nums">
 												{occurrence.supportingDetail}
 											</p>
 										) : null}
 									</div>
-									<div className="flex min-w-0 items-center gap-s text-ink-meta">
+									<div className="flex min-w-0 items-center gap-s text-ink-3">
 										<p className="truncate text-body-l tracking-s tabular-nums">
 											{occurrence.turnLabel}
 											{occurrence.time ? ` · ${occurrence.time}` : ""}
@@ -54,22 +54,22 @@ export function SessionDetailActivityPanel({
 						))}
 					</ul>
 					{group.omittedCount > 0 ? (
-						<p className="edge-t-m border-line px-xl py-m text-body-m text-ink-meta tabular-nums">
+						<p className="edge-t-m border-line px-xl py-m text-body-m text-ink-3 tabular-nums">
 							+{group.omittedCount.toLocaleString()} more not shown
 						</p>
 					) : null}
 					{isLoading ? (
-						<p className="edge-t-m border-line px-xl py-m text-body-m text-ink-meta">
+						<p className="edge-t-m border-line px-xl py-m text-body-m text-ink-3">
 							Loading more signal occurrences…
 						</p>
 					) : null}
 				</div>
 			) : isLoading ? (
-				<p className="px-xl py-l text-body-xxl text-ink-meta sm:text-body-l">
+				<p className="px-xl py-l text-body-xxl text-ink-3 sm:text-body-l">
 					Loading signal occurrences…
 				</p>
 			) : (
-				<p className="px-xl py-l text-body-xxl text-ink-meta sm:text-body-l">
+				<p className="px-xl py-l text-body-xxl text-ink-3 sm:text-body-l">
 					{group.emptyLabel}
 				</p>
 			)}
@@ -113,11 +113,11 @@ export function SessionDetailActivityOccurrencePanel({
 					{occurrence.detail}
 				</p>
 				{occurrence.supportingDetail ? (
-					<p className="mt-xs text-body-m tracking-s text-ink-meta tabular-nums">
+					<p className="mt-xs text-body-m tracking-s text-ink-3 tabular-nums">
 						{occurrence.supportingDetail}
 					</p>
 				) : null}
-				<p className="mt-m text-body-m tracking-s text-ink-meta tabular-nums">
+				<p className="mt-m text-body-m tracking-s text-ink-3 tabular-nums">
 					{occurrence.turnLabel}
 					{occurrence.time ? ` · ${occurrence.time}` : ""}
 				</p>

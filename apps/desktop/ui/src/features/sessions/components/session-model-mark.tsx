@@ -28,7 +28,7 @@ export function SessionModelLoadingMark() {
 			// design-escape-ok(colour): shipped value; #111 (white in dark)
 			className={cn(MODEL_MARK_CLASS_NAME, "text-[#111] dark:text-white")}
 		>
-			<span className={cn(MODEL_BACKGROUND_CLASS_NAME, "bg-mark-fill")}>
+			<span className={cn(MODEL_BACKGROUND_CLASS_NAME, "bg-hover")}>
 				<SessionModelProgressRing progress="loading" />
 			</span>
 			<span className={MODEL_ICON_SHELL_CLASS_NAME}>
@@ -135,7 +135,7 @@ export function SessionModelMark({
 					MODEL_BACKGROUND_CLASS_NAME,
 					// design-escape-ok(colour,opacity): shipped value; #cc7d5e/10
 					tone.icon === "claude" && "bg-[#cc7d5e]/10",
-					tone.icon !== "claude" && "bg-mark-fill",
+					tone.icon !== "claude" && "bg-hover",
 					progress && tone.identityIconClassName,
 				)}
 				data-session-model-background

@@ -48,7 +48,7 @@ export function PayloadSection({
 						className={cn("size-3 transition-transform", open && "rotate-90")}
 					/>
 					{label}
-					<span className="text-ink-3-60 tabular-nums">
+					<span className="text-ink-disabled tabular-nums">
 						{hint ?? sizeHint(value)}
 					</span>
 				</button>

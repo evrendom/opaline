@@ -68,7 +68,7 @@
 	border: 0;
 	border-radius: var(--radius-xs);
 	background: var(--canvas);
-	box-shadow: var(--shadow-control);
+	box-shadow: var(--shadow-card);
 	font-size: var(--size-xl);
 	line-height: var(--line-xl);
 	letter-spacing: var(--letter-spacing-xl);
@@ -99,8 +99,8 @@
 		calc(var(--space-xxl) * 4 / 3);
 	border: 0;
 	border-radius: var(--radius-full);
-	background: var(--card);
-	box-shadow: var(--shadow-control);
+	background: var(--surface);
+	box-shadow: var(--shadow-card);
 	color: var(--ink);
 	font-size: var(--size-xl);
 	line-height: var(--line-xl);
@@ -130,7 +130,7 @@
 	border-color: transparent;
 	padding: var(--space-l) var(--space-xl);
 	background: var(--surface);
-	box-shadow: var(--shadow-control);
+	box-shadow: var(--shadow-card);
 }
 .form-button[data-variant="outline"]:hover:not(:disabled) {
 	background: var(--hover);
@@ -157,13 +157,13 @@
 
 /* Tab pill: the highlight that slides along a tab row or a segmented control
    (PillTabs' `pillClassName`). On a track it takes the track's tone
-   (`.tab-track`, the same as `bg-track`); lifted off the page it is a soft
+   (`.tab-track`, the same as `bg-field`); lifted off the page it is a soft
    card on the card shadow (`.tab-pill`). Both modes come from the roles. */
 .tab-track {
-	background: var(--track);
+	background: var(--field);
 }
 .tab-pill {
-	background: var(--card-soft);
+	background: var(--surface);
 	box-shadow: var(--shadow-card);
 }
 
@@ -174,7 +174,7 @@
    first, a line next, a card last. */
 .surface-card {
 	border-radius: var(--radius-m);
-	background: var(--card);
+	background: var(--surface);
 	box-shadow: var(--shadow-card);
 }
 /* biome-ignore lint/correctness/noUnknownProperty: corner-shape is new (Chromium 139+); Biome does not know it yet. */
@@ -1038,7 +1038,7 @@
 .settings-group [data-slot="button"][data-variant="outline"] {
 	border: 0;
 	background: var(--canvas);
-	box-shadow: var(--shadow-control);
+	box-shadow: var(--shadow-card);
 }
 
 .settings-group [data-slot="button"][data-variant="outline"]:hover {

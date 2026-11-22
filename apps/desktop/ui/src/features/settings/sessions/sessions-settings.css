@@ -46,9 +46,9 @@
 	gap: var(--space-l);
 	padding: var(--space-m) calc(var(--space-xxs) * 5) var(--space-m)
 		calc(var(--space-xxs) * 7);
-	border: var(--border-m) solid var(--line-strong);
+	border: var(--border-m) solid var(--line);
 	border-radius: var(--radius-s);
-	background: var(--card);
+	background: var(--surface);
 }
 .sessions-settings-command code {
 	min-width: 0;
@@ -82,7 +82,7 @@
 	align-items: center;
 	gap: var(--space-m);
 	padding: calc(var(--space-xxs) * 3.5) calc(var(--space-xxs) * 5);
-	border: var(--border-m) solid var(--line-strong);
+	border: var(--border-m) solid var(--line);
 	border-radius: var(--radius-xs);
 	color: var(--ink-3);
 }
@@ -126,7 +126,7 @@
 .sessions-settings-table th,
 .sessions-settings-table td {
 	padding: var(--space-l) var(--space-m);
-	border-bottom: var(--border-m) solid var(--line-strong);
+	border-bottom: var(--border-m) solid var(--line);
 }
 .sessions-settings-table :is(th, td):first-child {
 	padding-left: var(--space-zero);

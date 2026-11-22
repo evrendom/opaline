@@ -251,7 +251,7 @@ export function SessionDetailLayout({
 				</section>
 				<HorizontalResizeHandle
 					ariaLabel="Resize turn table panel"
-					className="edge-t-s edge-l-m border-line-strong after:absolute after:inset-x-0 after:top-[calc(2.75rem-0.5px)] after:h-[0.5px] after:bg-line-strong after:content-['']"
+					className="edge-t-s edge-l-m border-line after:absolute after:inset-x-0 after:top-[calc(2.75rem-0.5px)] after:h-[0.5px] after:bg-line after:content-['']"
 					defaultValue={DEFAULT_SESSION_TURN_TABLE_PANE_WIDTH_PX}
 					maximum={turnTablePaneMaximum}
 					minimum={MINIMUM_SESSION_TURN_TABLE_PANE_WIDTH_PX}

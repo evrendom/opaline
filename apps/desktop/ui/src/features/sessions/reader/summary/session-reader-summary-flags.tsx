@@ -247,7 +247,7 @@ export function SummaryFlags({
 		return null;
 	return (
 		// design-escape-ok(opacity): shipped value; border/60
-		<ul className="flex flex-col divide-y divide-line-strong/60">
+		<ul className="flex flex-col divide-y divide-line/60">
 			{before ? (
 				<Row
 					chip={<FlagChip kind="user_frustrated" />}

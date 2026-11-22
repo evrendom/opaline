@@ -147,7 +147,7 @@ function DropdownMenuSeparator({
 		<MenuPrimitive.Separator
 			data-slot="dropdown-menu-separator"
 			// design-escape-ok(opacity): shipped value; border/60 menu rule, line-strong at 60%
-			className={cn("-mx-xs my-xs h-px bg-line-strong/60", className)}
+			className={cn("-mx-xs my-xs h-px bg-line/60", className)}
 			{...props}
 		/>
 	);

@@ -15,7 +15,7 @@ const TEXT: Record<Tone, string> = {
 	// design-escape-ok(base): a category colour from the opal sheen (data paint)
 	later: "text-color-4",
 	minor: "",
-	never: "text-rose-ink",
+	never: "text-error",
 };
 
 const nameOf = (label: string, files: boolean) =>
@@ -202,7 +202,7 @@ export function ContextZoom({
 								"group/thing absolute flex flex-col items-start gap-xxs overflow-hidden",
 								"corner-s edge-m p-s corner-squircle",
 								"text-body-m",
-								"bg-card transition-opacity",
+								"bg-surface transition-opacity",
 								"squircle:corner-l",
 								"border-current/20",
 								mark && !picked.has(item.label) && markGlow(mark),

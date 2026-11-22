@@ -99,7 +99,7 @@ export const RAIL_SHELF =
 	// design-escape-ok(opacity): no role renders this; field/60, dark field/15
 	"-mr-[calc(var(--space-xl)+var(--space-xs))] flex min-h-0 shrink-0 flex-col gap-xs corner-m bg-field/60 pr-[calc(var(--space-xl)+var(--space-xs))] shadow-inset corner-squircle squircle:corner-xl dark:bg-field/15";
 
-export const PICKED_ROW = "bg-card-soft shadow-raised";
+export const PICKED_ROW = "bg-surface shadow-raised";
 
 const COLUMN = cn(RAIL_SHELF, "w-[120px]");
 

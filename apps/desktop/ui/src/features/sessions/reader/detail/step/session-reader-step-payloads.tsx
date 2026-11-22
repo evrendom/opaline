@@ -97,15 +97,15 @@ export function HighlightedCode({
 						className={cn(
 							"flex px-l",
 							// design-escape-ok(opacity): shipped value; emerald-500/10
-							kind === "addition" && "bg-emerald-mark/10",
+							kind === "addition" && "bg-success/10",
 							// design-escape-ok(opacity): shipped value; rose-500/10
-							kind === "deletion" && "bg-rose-mark/10",
+							kind === "deletion" && "bg-error/10",
 						)}
 					>
 						{startLine !== undefined || lineNumbers ? (
 							<span
 								aria-hidden="true"
-								className="mr-l shrink-0 text-right text-ink-3-50 tabular-nums select-none"
+								className="mr-l shrink-0 text-right text-ink-disabled tabular-nums select-none"
 								style={{ width: `${gutter}ch` }}
 							>
 								{lineNumber ?? "⋯"}
@@ -116,7 +116,7 @@ export function HighlightedCode({
 								aria-hidden="true"
 								className={cn(
 									"mr-m shrink-0 select-none",
-									kind === "addition" ? "text-emerald-ink" : "text-rose-ink",
+									kind === "addition" ? "text-success" : "text-error",
 								)}
 							>
 								{kind === "addition" ? "+" : "−"}

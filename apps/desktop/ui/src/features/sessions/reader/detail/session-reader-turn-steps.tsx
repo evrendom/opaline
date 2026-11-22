@@ -113,7 +113,7 @@ export function RunSummaryBar({
 								</span>
 							) : null}
 							{setting ? (
-								<span className="shrink-0 text-ink-3-60">{setting}</span>
+								<span className="shrink-0 text-ink-disabled">{setting}</span>
 							) : null}
 							{mode?.planMode ? <ConversationTracePlanTag /> : null}
 						</span>
@@ -122,12 +122,12 @@ export function RunSummaryBar({
 						expanded ? (
 							<IconArrowsDiagonalMinimize2
 								aria-hidden="true"
-								className="size-4 shrink-0 text-ink-3-60 transition-colors group-hover/run:text-ink"
+								className="size-4 shrink-0 text-ink-disabled transition-colors group-hover/run:text-ink"
 							/>
 						) : (
 							<IconArrowsDiagonal
 								aria-hidden="true"
-								className="size-4 shrink-0 text-ink-3-60 transition-colors group-hover/run:text-ink"
+								className="size-4 shrink-0 text-ink-disabled transition-colors group-hover/run:text-ink"
 							/>
 						)
 					) : null}
@@ -171,7 +171,7 @@ function StepStrip({
 	return (
 		<span
 			aria-hidden="true"
-			className="relative h-2 w-full shrink-0 overflow-hidden corner-xs bg-wash"
+			className="relative h-2 w-full shrink-0 overflow-hidden corner-xs bg-hover"
 		>
 			{steps.map((step) => {
 				const { offset, width } = barGeometry(
@@ -325,8 +325,8 @@ function RunStepTags({
 						"inline-flex h-5 items-center gap-xs",
 						"corner-full pr-m pl-xxs",
 						"tabular-nums",
-						"bg-canvas text-ink-80 shadow-control",
-						"dark:bg-card",
+						"bg-canvas text-ink shadow-card",
+						"dark:bg-surface",
 					)}
 				>
 					<OpalChip
@@ -420,7 +420,7 @@ function RunAlertTags({
 				>
 					<OpalChip
 						tint="var(--color-rose-500)"
-						className="size-4 text-rose-ink"
+						className="size-4 text-error"
 					>
 						<IconAlertTriangle aria-hidden="true" className="size-2.5" />
 					</OpalChip>
@@ -435,7 +435,7 @@ function RunAlertTags({
 				>
 					<OpalChip
 						tint="var(--color-amber-500)"
-						className="size-4 text-amber-ink"
+						className="size-4 text-warning"
 					>
 						<IconAlertTriangle aria-hidden="true" className="size-2.5" />
 					</OpalChip>
@@ -461,8 +461,8 @@ function RunTag({
 				"inline-flex h-5 items-center",
 				"corner-full px-m",
 				"tabular-nums",
-				"bg-canvas text-ink-80 shadow-control",
-				"dark:bg-card",
+				"bg-canvas text-ink shadow-card",
+				"dark:bg-surface",
 				className,
 			)}
 		>

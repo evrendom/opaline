@@ -25,11 +25,11 @@ import {
 import { pullRequestUrl } from "./session-reader-run-ci";
 
 const TONE: Record<CiLinePart["tone"], string> = {
-	failed: "text-rose-ink",
-	flaky: "text-amber-ink",
+	failed: "text-error",
+	flaky: "text-warning",
 	muted: "text-ink-3",
-	passed: "text-emerald-ink",
-	running: "text-amber-ink",
+	passed: "text-success",
+	running: "text-warning",
 };
 
 export type CiPullRow = {
@@ -167,7 +167,7 @@ function CiLine({
 			{parts.map((part, index) => (
 				<span key={part.text} className="inline-flex items-baseline gap-s">
 					{index > 0 ? (
-						<span aria-hidden="true" className="text-ink-3-50">
+						<span aria-hidden="true" className="text-ink-disabled">
 							·
 						</span>
 					) : null}
@@ -234,7 +234,7 @@ export function PullLine({
 					title={pull?.title ?? undefined}
 					className={cn(
 						"min-w-0 flex-1 truncate text-body-m",
-						isPicked ? "text-ink" : "text-ink-90",
+						isPicked ? "text-ink" : "text-ink",
 					)}
 				>
 					{pullTitle(row.entry)}
@@ -288,7 +288,7 @@ export function CiPullCard({
 	return (
 		<div className="flex min-h-0 min-w-0 flex-1 flex-col">
 			{/* design-escape-ok(opacity): shipped value; border/50 */}
-			<header className="flex flex-col gap-s edge-b-m border-line-strong/50 px-xxl py-xl">
+			<header className="flex flex-col gap-s edge-b-m border-line/50 px-xxl py-xl">
 				<div className="flex min-w-0 items-center gap-m">
 					<PullGlyph
 						aria-hidden="true"

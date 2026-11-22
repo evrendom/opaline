@@ -112,7 +112,7 @@ export function getTraceCallGroupStyle(
 	return {
 		"--conversation-trace-call-accent": accent,
 		"--conversation-trace-connector-color":
-			treatment === "connector" ? accent : "var(--line-strong)",
+			treatment === "connector" ? accent : "var(--line)",
 		"--conversation-trace-connector-width":
 			treatment === "connector" ? 2.25 : 1,
 		"--conversation-trace-row-surface":

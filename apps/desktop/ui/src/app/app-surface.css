@@ -35,7 +35,7 @@
 :where(html).dark[data-app-shell] body,
 .dark .dashboard-01-preview {
 	/* Dark layering: a solid shell (the --sidebar colour) under the content
-	   window (--background), with cards (--card) one step above that. */
+	   window (--background), with cards (--surface) one step above that. */
 	/* design-escape-ok(colour): artwork, the opal nav icon's active fill (white 10%) */
 	--dashboard-01-rail-active: rgb(255 255 255 / 0.1);
 	/* design-escape-ok(colour): no role renders this; the dark shell oklch(0.145 0 0) */

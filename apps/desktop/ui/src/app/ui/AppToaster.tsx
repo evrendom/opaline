@@ -27,7 +27,7 @@ export function AppToaster(props: ToasterProps) {
 				{
 					"--normal-bg": "var(--surface)",
 					"--normal-text": "var(--ink)",
-					"--normal-border": "var(--line-strong)",
+					"--normal-border": "var(--line)",
 					"--border-radius": "var(--radius)",
 				} as CSSProperties
 			}

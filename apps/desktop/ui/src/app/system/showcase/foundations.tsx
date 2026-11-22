@@ -6,36 +6,9 @@ import { Group, Specimen, State } from "./kit";
  * .tsx, var(--…) in its .css). A role or step no screen uses is not here.
  */
 
-const GROUND = [
-	"canvas",
-	"surface",
-	"card",
-	"card-soft",
-	"inset",
-	"field",
-	"track",
-	"shelf",
-	"hover",
-	"hover-strong",
-	"hover-50",
-	"wash",
-	"mark-fill",
-];
-const INK = [
-	"ink",
-	"ink-2",
-	"ink-3",
-	"ink-disabled",
-	"ink-90",
-	"ink-80",
-	"ink-3-60",
-	"ink-3-50",
-	"ink-3-40",
-	"ink-inverse",
-	"ink-soft",
-	"ink-meta",
-];
-const LINES = ["line", "line-strong", "line-soft", "line-faint"];
+const GROUND = ["canvas", "surface", "inset", "field", "hover", "hover-strong"];
+const INK = ["ink", "ink-2", "ink-3", "ink-disabled", "ink-inverse"];
+const LINES = ["line", "line-soft"];
 const ACTION = [
 	"primary",
 	"primary-hover",
@@ -47,9 +20,10 @@ const ACTION = [
 	"accent-line",
 	"accent-fg",
 ];
-// success-line is defined but no screen reads it.
 const STATE = [
 	"success",
+	"success-tint",
+	"success-line",
 	"warning",
 	"warning-tint",
 	"warning-line",
@@ -98,16 +72,10 @@ const CORNERS = [
 	["full", "corner-full"],
 ] as const;
 const SHADOWS = [
-	["card", "cards, panels, menus, popovers, dialogs, tooltips"],
-	[
-		"control",
-		"buttons (filled, outline, toolbar, destructive), inputs, checkbox",
-	],
+	["card", "cards, panels, controls, chips: anything resting on a ground"],
 	["raised", "a pressed toolbar pill, a picked row"],
-	["chip", "reader chips, context tiles, the compass lens"],
-	["inset", "summary figure cards"],
-	["label", "the sidebar rail label, the jump-to-latest button"],
-	["float", "turn table view tabs, sheets, the activity flyout"],
+	["inset", "the inner hairline of a well or shelf"],
+	["float", "menus' tab bar, sheets, flyouts, scrub labels"],
 ] as const;
 const DURATIONS = [
 	["quick 100ms", "--motion-quick-duration", "menu rows, hover tints"],
@@ -285,22 +253,22 @@ export function FoundationsGroup() {
 					</State>
 				))}
 				<State label="squircle: card, panel" className="items-center">
-					<div className="size-16 bg-card shadow-card corner-m squircle:corner-xl corner-squircle" />
+					<div className="size-16 bg-surface shadow-card corner-m squircle:corner-xl corner-squircle" />
 				</State>
 				<State label="xl-inset (1px)" className="items-center">
-					<div className="relative size-16 bg-card shadow-card corner-s squircle:corner-xl corner-squircle">
+					<div className="relative size-16 bg-surface shadow-card corner-s squircle:corner-xl corner-squircle">
 						<div className="absolute inset-px bg-hover-strong corner-s-inset squircle:corner-xl-inset corner-squircle" />
 					</div>
 				</State>
 				<State label="xl-inner" className="items-center">
-					<div className="relative size-16 bg-card shadow-card corner-m squircle:corner-xl corner-squircle">
+					<div className="relative size-16 bg-surface shadow-card corner-m squircle:corner-xl corner-squircle">
 						<div className="absolute inset-xs bg-hover-strong corner-s squircle:corner-xl-inner corner-squircle" />
 					</div>
 				</State>
 				<State label="xl-outer" className="items-center">
 					<div className="relative p-xs">
 						<div className="absolute inset-0 edge-s border-dashed border-accent-line corner-l squircle:corner-xl-outer corner-squircle" />
-						<div className="size-14 bg-shelf corner-m squircle:corner-xl corner-squircle" />
+						<div className="size-14 bg-field corner-m squircle:corner-xl corner-squircle" />
 					</div>
 				</State>
 			</Specimen>
@@ -314,7 +282,7 @@ export function FoundationsGroup() {
 				{SHADOWS.map(([name, use]) => (
 					<div key={name} className="flex flex-col gap-s">
 						<div
-							className="h-10 w-full corner-s bg-card"
+							className="h-10 w-full corner-s bg-surface"
 							style={{ boxShadow: `var(--shadow-${name})` }}
 						/>
 						<span className="text-body-s text-ink">{name}</span>

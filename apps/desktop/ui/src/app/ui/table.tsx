@@ -151,8 +151,8 @@ function TableRow({
 			onClick={onClick}
 			onKeyDown={handleKeyDown}
 			className={cn(
-				"[&_th:last-child]:edge-none edge-b-m border-line-soft data-[state=selected]:bg-field has-aria-expanded:bg-hover-50",
-				"data-interactive:hover:bg-hover data-interactive:outline-none data-interactive:focus-visible:bg-hover-50",
+				"[&_th:last-child]:edge-none edge-b-m border-line-soft data-[state=selected]:bg-field has-aria-expanded:bg-hover",
+				"data-interactive:hover:bg-hover data-interactive:outline-none data-interactive:focus-visible:bg-hover",
 				// Hide the hovered row's bottom border and the previous row's (which
 				// draws the hovered row's top edge) so the highlight reads as one
 				// seamless block instead of a stripe with lines through it. An

@@ -158,7 +158,7 @@ function SessionRecordNavigation({
 				"flex h-8 min-w-0 shrink-0 items-center",
 				"corner-full",
 				"text-body-xl",
-				"bg-card shadow-control",
+				"bg-surface shadow-card",
 			)}
 		>
 			<p
@@ -175,7 +175,7 @@ function SessionRecordNavigation({
 			</p>
 			<span
 				aria-hidden="true"
-				className="mx-xs h-4 w-px shrink-0 bg-line-strong"
+				className="mx-xs h-4 w-px shrink-0 bg-line"
 			/>
 			<SessionHeaderNavigationButton
 				disabled={!navigation.hasPreviousSession}
@@ -211,12 +211,12 @@ function SessionMetric({
 					<div className={cn(sessionMetricItemClassName, "cursor-help")}>
 						<Icon
 							aria-hidden="true"
-							className="size-4 h-lh shrink-0 text-dashboardy-heading"
+							className="size-4 h-lh shrink-0 text-ink"
 						/>
 						<div className="min-w-0 flex-1">
 							<div
 								className={cn(
-									"whitespace-nowrap text-body-xxl font-heavy text-dashboardy-heading tabular-nums sm:text-body-l",
+									"whitespace-nowrap text-body-xxl font-heavy text-ink tabular-nums sm:text-body-l",
 									mono && "font-mono",
 								)}
 							>

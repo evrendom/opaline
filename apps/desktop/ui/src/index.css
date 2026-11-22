@@ -52,7 +52,7 @@
 	* {
 		scrollbar-width: thin;
 		scrollbar-color: var(--line) transparent;
-		border-color: var(--line-strong);
+		border-color: var(--line);
 	}
 	body {
 		background: var(--canvas);

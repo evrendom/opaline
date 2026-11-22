@@ -32,23 +32,23 @@ const OUTCOME = {
 		label: "Cancelled",
 	},
 	failed: {
-		className: "text-rose-mark",
+		className: "text-error",
 		icon: IconCircleX,
 		label: "Failed",
 	},
 	other: { className: "", icon: IconCircleDashed, label: "Ended" },
 	passed: {
-		className: "text-emerald-mark",
+		className: "text-success",
 		icon: IconCircleCheck,
 		label: "Passed",
 	},
 	flaky: {
-		className: "text-amber-mark",
+		className: "text-warning",
 		icon: IconRepeat,
 		label: "Flaky",
 	},
 	running: {
-		className: "text-amber-mark",
+		className: "text-warning",
 		icon: IconCircleDashed,
 		label: "Running",
 	},
@@ -60,11 +60,11 @@ const OUTCOME = {
 const duration = (ms: number) => formatReaderDuration(ms / 1000);
 
 const DOT: Record<CiRoundOutcome, string> = {
-	cancelled: "edge-m border-ink-3-50",
-	failed: "bg-rose-mark",
-	other: "bg-ink-3-40",
-	passed: "bg-emerald-mark",
-	flaky: "bg-amber-mark",
+	cancelled: "edge-m border-ink-disabled",
+	failed: "bg-error",
+	other: "bg-ink-disabled",
+	passed: "bg-success",
+	flaky: "bg-warning",
 	running: "animate-pulse bg-warning-translucent",
 };
 
@@ -195,7 +195,7 @@ export function CiPushDetail({
 					<span
 						className={cn(
 							"min-w-0 truncate",
-							round.outcome === "failed" ? "text-rose-ink" : "text-ink-3",
+							round.outcome === "failed" ? "text-error" : "text-ink-3",
 						)}
 					>
 						{look.label}
@@ -262,12 +262,12 @@ function PushRun({ run }: { run: SummaryCiRun }) {
 								target="_blank"
 								rel="noreferrer"
 								title={`Open ${job.name}'s log on GitHub`}
-								className="truncate text-rose-ink underline-offset-2 hover:underline"
+								className="truncate text-error underline-offset-2 hover:underline"
 							>
 								{job.name}
 							</a>
 						) : (
-							<span key={job.jobId} className="truncate text-rose-ink">
+							<span key={job.jobId} className="truncate text-error">
 								{job.name}
 							</span>
 						);
@@ -293,10 +293,10 @@ function PushRun({ run }: { run: SummaryCiRun }) {
 }
 
 const END_DOT = {
-	closed: "bg-rose-mark",
+	closed: "bg-error",
 	// design-escape-ok(colour): shipped value; violet-500 data paint
 	merged: "bg-violet-500",
-	open: "edge-m border-ink-3-50",
+	open: "edge-m border-ink-disabled",
 };
 
 function LineNode({
@@ -348,7 +348,7 @@ export function CiRounds({
 	const ending = pullEndWords(rounds, pull);
 	return (
 		<section className="flex flex-col gap-xs">
-			<h3 className="px-l text-body-m font-medium text-ink-80">Pushes</h3>
+			<h3 className="px-l text-body-m font-medium text-ink">Pushes</h3>
 			<ol className="flex flex-col">
 				{rounds.map((round, index) => {
 					const picked = isRoundPicked(round, pickedRun);
@@ -391,8 +391,8 @@ export function CiRounds({
 												className={cn(
 													"min-w-0 truncate",
 													round.outcome === "failed"
-														? "text-rose-ink"
-														: "text-amber-ink",
+														? "text-error"
+														: "text-warning",
 												)}
 											>
 												{pushOutcomeWords(round)}

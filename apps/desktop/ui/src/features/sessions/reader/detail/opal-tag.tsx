@@ -126,7 +126,7 @@ export function OpalTag({
 			onPointerEnter={onHover ? () => onHover(true) : undefined}
 			onPointerLeave={onHover ? () => onHover(false) : undefined}
 			className={cn(
-				"group/tag relative inline-flex h-5 items-center pr-s pl-xxs text-ink-80 tabular-nums",
+				"group/tag relative inline-flex h-5 items-center pr-s pl-xxs text-ink tabular-nums",
 				className,
 			)}
 		>
@@ -141,7 +141,7 @@ export function OpalTag({
 					ref={pathRef}
 					strokeWidth={0.5}
 					// design-escape-ok(opacity): no role renders this; stroke-ink/10
-					className="fill-card stroke-ink/10"
+					className="fill-surface stroke-ink/10"
 				/>
 			</svg>
 			<span className="relative inline-flex items-center gap-xs">

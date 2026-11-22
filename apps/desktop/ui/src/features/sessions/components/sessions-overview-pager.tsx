@@ -36,18 +36,18 @@ export function SessionsOverviewPager({
 	const canNext = hasNext && !(isFetching && first + pageSize >= known);
 	return (
 		<div className="flex items-center justify-end gap-xs px-xxl py-xl">
-			<span className="text-body-m text-ink-3-50 tabular-nums">
+			<span className="text-body-m text-ink-disabled tabular-nums">
 				{formatNumber(known)}
 				{more ? "+" : ""} {known === 1 && !more ? "session" : "sessions"}
 			</span>
-			<span className="mx-l text-body-m text-line-strong">/</span>
+			<span className="mx-l text-body-m text-line">/</span>
 			<Select<string, false>
 				value={String(pageSize)}
 				onValueChange={(value) => value && onPageSize(Number(value))}
 			>
 				<SelectTrigger
 					title="Sessions per page"
-					className="h-auto data-[size=default]:h-auto gap-s corner-s squircle:corner-s edge-none bg-transparent p-zero text-body-m text-ink-3-50 tabular-nums shadow-none transition-[color,box-shadow] hover:text-ink dark:edge-none dark:bg-transparent dark:shadow-none dark:hover:bg-transparent"
+					className="h-auto data-[size=default]:h-auto gap-s corner-s squircle:corner-s edge-none bg-transparent p-zero text-body-m text-ink-disabled tabular-nums shadow-none transition-[color,box-shadow] hover:text-ink dark:edge-none dark:bg-transparent dark:shadow-none dark:hover:bg-transparent"
 				>
 					{shown === 0 ? "0" : `${first + 1} to ${first + shown}`}
 				</SelectTrigger>

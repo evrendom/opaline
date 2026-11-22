@@ -67,7 +67,7 @@ export function ToolCard({
 				prose
 					? null
 					: // design-escape-ok(opacity,colour): shipped value; border/60, bg-muted/40, dark:bg-white/[0.02]
-						"edge-m border-line-strong/60 bg-field/40 corner-squircle dark:bg-white/[0.02]",
+						"edge-m border-line/60 bg-field/40 corner-squircle dark:bg-white/[0.02]",
 				!prose &&
 					(fit
 						? "corner-l squircle:corner-xl"
@@ -195,7 +195,7 @@ export function ToolCard({
 					) : null}
 				</AnimatePresence>
 				{text ? null : (
-					<p className="px-l pb-xs text-body-m text-ink-3-60">No output</p>
+					<p className="px-l pb-xs text-body-m text-ink-disabled">No output</p>
 				)}
 			</div>
 		</section>

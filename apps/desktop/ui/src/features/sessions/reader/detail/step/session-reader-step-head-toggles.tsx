@@ -5,7 +5,7 @@ import {
 } from "@tabler/icons-react";
 
 const TOGGLE =
-	"inline-flex shrink-0 items-center justify-center corner-xs p-xs text-ink-3-60 transition-colors focus-outline hover:text-ink aria-pressed:text-ink";
+	"inline-flex shrink-0 items-center justify-center corner-xs p-xs text-ink-disabled transition-colors focus-outline hover:text-ink aria-pressed:text-ink";
 
 export function StepHeadToggles({
 	expanded,

@@ -208,7 +208,7 @@ export const TurnTrace = memo(function TurnTrace({
 						className={cn(
 							"flex flex-col overflow-hidden",
 							"corner-m corner-squircle",
-							"bg-card shadow-card",
+							"bg-surface shadow-card",
 							"squircle:corner-xl",
 							step &&
 								"h-[calc(100cqh-var(--reader-pane-top,var(--reader-top,1rem))-var(--frozen-subagents,0px)-0.5rem)]",
@@ -216,13 +216,13 @@ export const TurnTrace = memo(function TurnTrace({
 					>
 						{headNode ? (
 							// design-escape-ok(opacity): shipped value; border/60
-							<div className="shrink-0 edge-b-m border-line-strong/60 px-l py-[calc(var(--space-m)+var(--space-xxs))]">
+							<div className="shrink-0 edge-b-m border-line/60 px-l py-[calc(var(--space-m)+var(--space-xxs))]">
 								{headNode}
 							</div>
 						) : null}
 						{headNode && step ? (
 							// design-escape-ok(opacity): shipped value; border/60
-							<div className="shrink-0 edge-b-m border-line-strong/60 px-l py-m">
+							<div className="shrink-0 edge-b-m border-line/60 px-l py-m">
 								<StepBreakdowns
 									model={model}
 									step={step}
@@ -237,7 +237,7 @@ export const TurnTrace = memo(function TurnTrace({
 									"grid shrink-0 gap-xl",
 									"edge-b-m px-l py-m",
 									// design-escape-ok(opacity): shipped value; border/60
-									"border-line-strong/60",
+									"border-line/60",
 									"empty:hidden",
 									agent ? "grid-cols-2" : "grid-cols-4",
 								)}
@@ -277,7 +277,7 @@ export const TurnTrace = memo(function TurnTrace({
 							ref={setRunningSlot}
 							className={cn(
 								// design-escape-ok(opacity): shipped value; border/60
-								"shrink-0 edge-t-m border-line-strong/60 px-l py-m empty:hidden",
+								"shrink-0 edge-t-m border-line/60 px-l py-m empty:hidden",
 								(!subagentsAtStep || expanded) && "hidden",
 							)}
 						/>
@@ -285,13 +285,13 @@ export const TurnTrace = memo(function TurnTrace({
 							ref={setSubagentSlot}
 							className={cn(
 								// design-escape-ok(opacity): shipped value; border/60
-								"shrink-0 edge-t-m border-line-strong/60 px-m py-m empty:hidden",
+								"shrink-0 edge-t-m border-line/60 px-m py-m empty:hidden",
 								step && "hidden",
 							)}
 						/>
 						{step ? (
 							// design-escape-ok(opacity): shipped value; border/60
-							<div className="flex min-h-0 flex-1 flex-col edge-t-m border-line-strong/60">
+							<div className="flex min-h-0 flex-1 flex-col edge-t-m border-line/60">
 								<SessionReaderStepDetail
 									bare
 									expanded={expanded}

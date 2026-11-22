@@ -208,7 +208,7 @@ export function SetupProse({
 						);
 					case "rule":
 						// design-escape-ok(opacity): shipped value; border/60
-						return <hr key={key} className="border-line-strong/60" />;
+						return <hr key={key} className="border-line/60" />;
 					default:
 						return null;
 				}

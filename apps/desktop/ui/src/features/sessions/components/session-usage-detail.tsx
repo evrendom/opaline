@@ -140,7 +140,7 @@ export function SessionUsageDetail({
 							</button>
 							<IconChevronRight
 								aria-hidden="true"
-								className="size-4 shrink-0 text-ink-3-50"
+								className="size-4 shrink-0 text-ink-disabled"
 								stroke={1.5}
 							/>
 							<span aria-current="page" className="truncate">
@@ -172,7 +172,7 @@ export function SessionUsageDetail({
 					<HorizontalResizeHandle
 						ariaLabel={`Resize ${kind.toLowerCase()} usage panel`}
 						direction={1}
-						className="hidden edge-l-m border-line-strong md:block"
+						className="hidden edge-l-m border-line md:block"
 						defaultValue={DEFAULT_USAGE_WIDTH}
 						maximum={maximum}
 						minimum={minimum}
@@ -187,7 +187,7 @@ export function SessionUsageDetail({
 					/>
 					<section
 						aria-label={`${kind} content`}
-						className="flex min-h-0 min-w-0 flex-col overflow-hidden edge-t-m border-line-strong md:edge-t-none"
+						className="flex min-h-0 min-w-0 flex-col overflow-hidden edge-t-m border-line md:edge-t-none"
 					>
 						<h1 className="sr-only">{name}</h1>
 						{children}
@@ -527,7 +527,7 @@ export function UsageSessionDetail({
 			value={navigationHost ?? sessionHeaderPortal}
 		>
 			{backBar ? (
-				<div className="flex h-12 shrink-0 items-center gap-m edge-b-m border-line-strong px-l">
+				<div className="flex h-12 shrink-0 items-center gap-m edge-b-m border-line px-l">
 					<Button
 						aria-label={backLabel}
 						title={backLabel}

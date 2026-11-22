@@ -14,9 +14,9 @@ export function formatWhen(iso: string | null): string {
 }
 
 const VERDICT_PARTS = [
-	["failed", "failed", "text-rose-ink"],
-	["running", "running", "text-amber-ink"],
-	["passed", "passed", "text-emerald-ink"],
+	["failed", "failed", "text-error"],
+	["running", "running", "text-warning"],
+	["passed", "passed", "text-success"],
 	["cancelled", "cancelled", "text-ink-3"],
 	["other", "other", "text-ink-3"],
 ] as const;

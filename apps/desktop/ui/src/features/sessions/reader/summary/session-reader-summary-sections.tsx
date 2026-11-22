@@ -282,7 +282,7 @@ export function SummaryActivityLine({
 						<span
 							className={cn(
 								"text-ink tabular-nums",
-								label === "errors" && "text-rose-ink",
+								label === "errors" && "text-error",
 							)}
 						>
 							{formatCompactNumber(value)}
@@ -310,7 +310,7 @@ export function SkillRow({
 }) {
 	return (
 		<Row>
-			<Glyph icon={IconSparkles} className="text-amber-mark" />
+			<Glyph icon={IconSparkles} className="text-warning" />
 			<ConversationSkillLink
 				name={skill.name}
 				className="min-w-0 flex-1 truncate hover:underline"

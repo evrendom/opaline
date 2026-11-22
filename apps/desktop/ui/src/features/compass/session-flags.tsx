@@ -185,7 +185,7 @@ function FlagTag({ kinds }: { kinds: readonly MomentKind[] }) {
 			>
 				<IconAlertTriangle
 					aria-hidden="true"
-					className="size-2.5 text-rose-mark"
+					className="size-2.5 text-error"
 				/>
 			</OpalChip>
 			<span className="sr-only">Flagged: {labels.join(", ")}</span>
@@ -259,7 +259,7 @@ export function useTurnFlags(
 
 const FLAG_TRIGGER =
 	// design-escape-ok(opacity): no role renders this; hover/60
-	"inline-flex h-7 w-fit min-w-7 shrink-0 items-center justify-center gap-xs corner-full bg-card-soft px-m text-body-m font-medium shadow-card transition-colors hover:bg-hover/60 data-popup-open:bg-hover focus-outline";
+	"inline-flex h-7 w-fit min-w-7 shrink-0 items-center justify-center gap-xs corner-full bg-surface px-m text-body-m font-medium shadow-card transition-colors hover:bg-hover/60 data-popup-open:bg-hover focus-outline";
 
 function SessionFlagFilter({
 	byKind,
@@ -293,7 +293,7 @@ function SessionFlagFilter({
 				aria-label="Loading flags"
 				className={cn(
 					FLAG_TRIGGER,
-					"cursor-default text-ink-3 opacity-40 hover:bg-card-soft",
+					"cursor-default text-ink-3 opacity-40 hover:bg-surface",
 					className,
 				)}
 			>

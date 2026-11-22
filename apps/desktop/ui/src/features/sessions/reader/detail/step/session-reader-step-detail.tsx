@@ -149,7 +149,7 @@ export function SessionReaderStepDetail({
 			)}
 		>
 			{top ? (
-				<div className="shrink-0 corner-m bg-card px-m pt-m pb-s shadow-card corner-squircle squircle:corner-xl">
+				<div className="shrink-0 corner-m bg-surface px-m pt-m pb-s shadow-card corner-squircle squircle:corner-xl">
 					{top}
 				</div>
 			) : null}
@@ -158,7 +158,7 @@ export function SessionReaderStepDetail({
 				className={cn(
 					"flex flex-col overflow-hidden",
 					!bare &&
-						"corner-m bg-card shadow-card corner-squircle squircle:corner-xl",
+						"corner-m bg-surface shadow-card corner-squircle squircle:corner-xl",
 					fit
 						? "min-h-0 flex-1"
 						: top
@@ -213,7 +213,7 @@ export function SessionReaderStepDetail({
 						{isTool && step?.kind !== "agent" && step?.isError ? (
 							<IconAlertTriangleFilled
 								aria-label="Failed"
-								className="size-3.5 shrink-0 text-rose-mark"
+								className="size-3.5 shrink-0 text-error"
 							/>
 						) : null}
 					</div>
@@ -228,8 +228,8 @@ export function SessionReaderStepDetail({
 								"inline-flex items-center gap-xs",
 								"corner-full py-xs pr-m pl-l",
 								"text-body-m font-medium",
-								"bg-card shadow-card transition-colors",
-								"hover:bg-hover dark:bg-wash",
+								"bg-surface shadow-card transition-colors",
+								"hover:bg-hover dark:bg-hover",
 							)}
 						>
 							Open details

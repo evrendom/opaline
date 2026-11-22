@@ -113,7 +113,7 @@
 	width: 18px;
 	height: 2px;
 	border-radius: var(--radius-xs);
-	background: var(--line-strong);
+	background: var(--line);
 }
 .cli-welcome-progress li[data-complete="true"] {
 	background: var(--ink);
@@ -214,7 +214,7 @@
 .cli-welcome-form .cli-onboarding-auth-options button {
 	border-color: transparent;
 	background: var(--surface);
-	box-shadow: var(--shadow-control);
+	box-shadow: var(--shadow-card);
 }
 .cli-welcome-form .cli-onboarding-auth-options button:hover:not(:disabled) {
 	background: var(--hover);

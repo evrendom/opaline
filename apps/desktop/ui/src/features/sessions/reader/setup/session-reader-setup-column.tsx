@@ -140,7 +140,7 @@ export function SetupColumn({
 						className={cn(
 							"flex flex-col gap-xxs",
 							// design-escape-ok(opacity): shipped value; border/50
-							uses && "mt-l edge-t-m border-line-strong/50 pt-m",
+							uses && "mt-l edge-t-m border-line/50 pt-m",
 							calls && "hidden",
 						)}
 					>
@@ -161,7 +161,7 @@ export function SetupColumn({
 					</FluidList>
 					{receivedBy ? (
 						// design-escape-ok(opacity): shipped value; border/50
-						<div className="mt-l edge-t-m border-line-strong/50 pt-xs">
+						<div className="mt-l edge-t-m border-line/50 pt-xs">
 							{receivedBy}
 						</div>
 					) : null}
@@ -292,7 +292,7 @@ function SetupUseGroup({
 				<div key={tool ?? ""} className="flex flex-col gap-xxs">
 					{tool ? (
 						<div className="flex items-center gap-m py-xs pr-l pl-[calc(var(--space-xxl)*1.5)]">
-							<span className="min-w-0 flex-1 truncate text-body-m text-ink-90">
+							<span className="min-w-0 flex-1 truncate text-body-m text-ink">
 								{tool}
 							</span>
 							{countOf(uses.length)}
@@ -423,7 +423,7 @@ export function SetupMark({ file }: { file: SessionSetupFile }) {
 				skullet-block=""
 				className="inline-flex shrink-0 corner-xs corner-squircle squircle:corner-m"
 			>
-				<Icon aria-hidden="true" className="size-4 text-ink-3-60" />
+				<Icon aria-hidden="true" className="size-4 text-ink-disabled" />
 			</span>
 		);
 	}
@@ -471,7 +471,7 @@ function SetupFileRow({
 					title={file.setupFile}
 					className={cn(
 						"truncate text-body-m",
-						isPicked ? "text-ink" : "text-ink-90",
+						isPicked ? "text-ink" : "text-ink",
 					)}
 				>
 					{setupName(file)}

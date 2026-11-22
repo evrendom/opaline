@@ -132,7 +132,7 @@ export function RailHighlightProvider({
 	const lead = onClear ? (
 		<span
 			title={name}
-			className="group/tag inline-flex h-8 min-w-0 items-center gap-xs corner-full bg-card pr-l pl-s text-body-m font-medium text-ink shadow-control"
+			className="group/tag inline-flex h-8 min-w-0 items-center gap-xs corner-full bg-surface pr-l pl-s text-body-m font-medium text-ink shadow-card"
 		>
 			<button
 				type="button"

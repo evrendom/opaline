@@ -175,7 +175,7 @@ export function SkillPage({
 				) : pick?.kind === "skill" ? (
 					<SkillFileCard key={pick.name} name={pick.name} />
 				) : null}
-				<div className="flex min-h-0 flex-1 flex-col overflow-hidden corner-m bg-card-soft shadow-card corner-squircle squircle:corner-xl">
+				<div className="flex min-h-0 flex-1 flex-col overflow-hidden corner-m bg-surface shadow-card corner-squircle squircle:corner-xl">
 					<HistoricalSkillDetailContent
 						key={skillName}
 						detail={skill.data}
@@ -212,7 +212,7 @@ function SkillHeader({
 	const separator = (
 		<IconChevronRight
 			aria-hidden="true"
-			className="size-4 shrink-0 text-ink-3-50"
+			className="size-4 shrink-0 text-ink-disabled"
 			stroke={1.5}
 		/>
 	);
@@ -279,7 +279,7 @@ function SkillFileCard({ name }: { name: string }) {
 	return (
 		<section
 			aria-label={`${name} skill file`}
-			className="flex min-h-0 flex-1 flex-col overflow-hidden corner-m bg-card-soft shadow-card corner-squircle squircle:corner-xl"
+			className="flex min-h-0 flex-1 flex-col overflow-hidden corner-m bg-surface shadow-card corner-squircle squircle:corner-xl"
 		>
 			<HistoricalSkillDetailContent
 				detail={skill.data}

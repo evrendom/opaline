@@ -165,7 +165,7 @@ function UsageBreakdown({
 										maximum={maximum}
 										color={
 											row.muted
-												? "var(--cost-muted)"
+												? "var(--ink-3)"
 												: (SERIES_COLORS[index % (SERIES_COLORS.length - 1)] ??
 													SERIES_COLORS[0])
 										}

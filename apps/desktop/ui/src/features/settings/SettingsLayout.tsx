@@ -103,7 +103,7 @@ export function SettingsSectionTab({
 							duration: 0.2,
 							ease: [0.32, 0.72, 0, 1],
 						}}
-						className="absolute inset-0 z-0 corner-s bg-card-soft shadow-card corner-squircle squircle:corner-l"
+						className="absolute inset-0 z-0 corner-s bg-surface shadow-card corner-squircle squircle:corner-l"
 					/>
 				) : null}
 				<span className="relative z-10 flex items-center gap-s">

@@ -38,7 +38,7 @@
 	gap: var(--space-l);
 }
 .cli-onboarding-auth-options button {
-	border: var(--border-m) solid var(--line-strong);
+	border: var(--border-m) solid var(--line);
 	background: var(--canvas);
 	padding: var(--space-l) var(--space-xl);
 }
@@ -94,7 +94,7 @@
 .dark .cli-onboarding-auth-options button {
 	/* design-escape-ok(colour): no role renders this; a 15% white edge */
 	border-color: rgb(255 255 255 / 15%);
-	background: var(--card);
+	background: var(--surface);
 }
 .dark .cli-onboarding-divider {
 	color: var(--ink-disabled);

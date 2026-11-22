@@ -148,7 +148,7 @@ export function SessionsOverviewPendingRow({
 						>
 							{repositoryName}
 						</p>
-						<span className="inline-block h-1.5 w-12 shrink-0 corner-xs bg-mark-fill" />
+						<span className="inline-block h-1.5 w-12 shrink-0 corner-xs bg-hover" />
 					</div>
 					<SessionOverviewSubagentCountTag
 						session={{
@@ -232,7 +232,7 @@ export function SessionsOverviewPendingRow({
 						className={cn(
 							"flex size-5 shrink-0 items-center justify-center",
 							"corner-full",
-							"bg-wash text-ink-disabled",
+							"bg-hover text-ink-disabled",
 							"dark:bg-hover-strong dark:text-ink-disabled",
 						)}
 					>

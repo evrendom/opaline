@@ -173,7 +173,7 @@ export function SessionThreadOverviewStripView({
 	return (
 		<section
 			aria-label="Session activity map (input context)"
-			className="@container h-[4.07rem] shrink-0 border-b border-line-strong bg-canvas"
+			className="@container h-[4.07rem] shrink-0 border-b border-line bg-canvas"
 		>
 			<div className="relative flex h-[4.07rem] min-w-0 flex-col overflow-visible bg-canvas">
 				{zoomSelectionIsDraft ? null : (

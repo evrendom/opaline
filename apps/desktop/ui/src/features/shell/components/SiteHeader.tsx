@@ -146,7 +146,7 @@ export function SiteHeader({
 						</Link>
 						<IconChevronRight
 							aria-hidden="true"
-							className={"size-4 shrink-0 text-ink-3-50"}
+							className={"size-4 shrink-0 text-ink-disabled"}
 							stroke={1.5}
 						/>
 						{modelChip ? (

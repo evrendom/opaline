@@ -86,7 +86,7 @@ const SkillCard = memo(function SkillCard({
 			{description ? (
 				<p
 					// design-escape-ok(opacity): shipped value; dashboardy-heading/75
-					className="pt-s text-body-l text-pretty text-dashboardy-heading/75"
+					className="pt-s text-body-l text-pretty text-ink/75"
 				>
 					{description}
 				</p>
@@ -145,7 +145,7 @@ export function OverviewCard({
 					skullet-block=""
 					className="relative h-20 shrink-0 overflow-hidden"
 					style={{
-						background: `radial-gradient(120% 140% at 0% 0%, color-mix(in oklab, ${tint} 70%, white 12%) 0%, transparent 60%), linear-gradient(135deg, color-mix(in oklab, ${tint} 62%, var(--card)), color-mix(in oklab, ${tint} 26%, var(--card)))`,
+						background: `radial-gradient(120% 140% at 0% 0%, color-mix(in oklab, ${tint} 70%, white 12%) 0%, transparent 60%), linear-gradient(135deg, color-mix(in oklab, ${tint} 62%, var(--surface)), color-mix(in oklab, ${tint} 26%, var(--surface)))`,
 					}}
 				>
 					<span
@@ -169,7 +169,7 @@ export function OverviewCard({
 							skullet-ignore=""
 							className="absolute inset-0"
 						>
-							<OpalineShape className="absolute inset-0 [--opal-fill:var(--card)] [--opal-ring:transparent]" />
+							<OpalineShape className="absolute inset-0 [--opal-fill:var(--surface)] [--opal-ring:transparent]" />
 						</span>
 						<SkillMark
 							skill={name}
@@ -178,7 +178,7 @@ export function OverviewCard({
 					</span>
 					<h2
 						// design-escape-ok(type): shipped value; 17px / 24px, -0.015em
-						className="min-w-0 truncate text-[17px] leading-6 font-heavy tracking-[-0.015em] text-dashboardy-heading"
+						className="min-w-0 truncate text-[17px] leading-6 font-heavy tracking-[-0.015em] text-ink"
 						title={name}
 					>
 						{name}

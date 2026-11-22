@@ -258,7 +258,7 @@ function StageText({
 	span: Span;
 }) {
 	return open ? (
-		<span className="text-body-l text-ink-80">
+		<span className="text-body-l text-ink">
 			{keyed(gluePunctuation(capitalized(sentence)), (part) =>
 				segmentText(part.segment),
 			).map(({ item, key }) => (
@@ -379,7 +379,7 @@ function Spaces({ count }: { count: number }) {
 	return (
 		<span
 			title={`${count} space${count === 1 ? "" : "s"}`}
-			className="text-ink-3-50 select-none"
+			className="text-ink-disabled select-none"
 		>
 			{"·".repeat(count)}
 		</span>
@@ -405,7 +405,7 @@ function WordsButton({
 			className={cn(
 				"inline-flex size-5 shrink-0 items-center justify-center",
 				"ml-auto corner-xs focus-outline",
-				"text-ink-3-60 transition-colors",
+				"text-ink-disabled transition-colors",
 				"hover:bg-hover hover:text-ink",
 				open && "bg-field text-ink",
 			)}
@@ -506,7 +506,7 @@ export function CommandLines({
 					"flex flex-col",
 					"divide-y corner-m edge-m px-m py-xxs",
 					// design-escape-ok(opacity): shipped value; border/60
-					"divide-line-soft border-line-strong/60 bg-canvas",
+					"divide-line-soft border-line/60 bg-canvas",
 					"dark:bg-canvas/25",
 				)}
 			>

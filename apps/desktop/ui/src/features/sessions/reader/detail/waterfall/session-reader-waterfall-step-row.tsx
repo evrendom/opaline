@@ -47,7 +47,7 @@ const DASHED =
 function SubagentRoleMark({ role }: { role: SubagentRole }) {
 	const { Icon, className, label } = {
 		finish: {
-			className: "text-emerald-mark",
+			className: "text-success",
 			Icon: IconCircleCheckFilled,
 			label: "Finished",
 		},
@@ -114,7 +114,7 @@ export const StepRowView = memo(function StepRowView({
 	const subagentTint = useSubagentTint(step);
 	const subagentRole = useSubagentRole(step);
 	const bar = step.isError
-		? { className: "bg-rose-mark" }
+		? { className: "bg-error" }
 		: { style: { backgroundColor: subagentTint ?? stepTint(step) } };
 	const timed = isToolStep(step) || step.kind === "ci" || durationMs > 0;
 	const running = subagent ? null : solidSpan(step, startMs, total);

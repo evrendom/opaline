@@ -337,7 +337,7 @@ export function ScrollFade({
 	children,
 	className,
 	containerClassName,
-	fromClassName = "from-card",
+	fromClassName = "from-surface",
 }: {
 	children: React.ReactNode;
 	/** Classes for the scroll viewport (e.g. `max-h-72`, padding). */

@@ -260,7 +260,7 @@ export function SessionDetailView({
 
 	return (
 		<ConversationSkillLinkContext.Provider value={getSkillHref}>
-			<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-canvas text-dashboardy-heading">
+			<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-canvas text-ink">
 				<SessionDetailHeader
 					avatarMap={avatarMap}
 					headerRef={setHeaderElement}
@@ -289,7 +289,7 @@ export function SessionDetailView({
 					>
 						{relationshipsQuery.data.parent ? (
 							<Link
-								className="font-medium text-dashboardy-heading hover:underline"
+								className="font-medium text-ink hover:underline"
 								to={getShellRoutePath(
 									appRoutes.sessionDetail(
 										relationshipsQuery.data.parent.sessionId,
@@ -302,7 +302,7 @@ export function SessionDetailView({
 						{relationshipsQuery.data.children.map((child, index) => (
 							<Link
 								key={child.sessionId}
-								className="font-medium text-dashboardy-heading hover:underline"
+								className="font-medium text-ink hover:underline"
 								to={getShellRoutePath(appRoutes.sessionDetail(child.sessionId))}
 							>
 								{child.agentPath?.split("/").at(-1) || `Subagent ${index + 1}`}
@@ -350,7 +350,7 @@ export function SessionDetailView({
 							{hasShapeWarning ? (
 								<output
 									// design-escape-ok(opacity): no role renders this; border-warning/30, bg-warning/10
-									className="edge-b-m border-warning/30 bg-warning/10 px-xl py-m text-body-xl text-dashboardy-heading"
+									className="edge-b-m border-warning/30 bg-warning/10 px-xl py-m text-body-xl text-ink"
 								>
 									Some session fields were unavailable. Safe overview values are
 									shown.

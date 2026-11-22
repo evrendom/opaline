@@ -27,14 +27,14 @@ function SessionUserIdentity({
 								alt=""
 								width={16}
 								height={16}
-								className="size-4 shrink-0 corner-full object-cover outline-(length:--border-m) -outline-offset-1 outline-line-faint"
+								className="size-4 shrink-0 corner-full object-cover outline-(length:--border-m) -outline-offset-1 outline-line-soft"
 							/>
 						) : (
-							<span className="flex size-4 shrink-0 items-center justify-center corner-full bg-field outline-(length:--border-m) -outline-offset-1 outline-line-faint">
+							<span className="flex size-4 shrink-0 items-center justify-center corner-full bg-field outline-(length:--border-m) -outline-offset-1 outline-line-soft">
 								<IconUser className="size-3 shrink-0" />
 							</span>
 						)}
-						<div className="shrink-0 font-mono text-body-xxl font-heavy text-dashboardy-heading tabular-nums sm:text-body-l">
+						<div className="shrink-0 font-mono text-body-xxl font-heavy text-ink tabular-nums sm:text-body-l">
 							{safeMessageCount}
 						</div>
 					</div>

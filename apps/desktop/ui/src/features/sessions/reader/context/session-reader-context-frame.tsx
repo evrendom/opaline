@@ -17,7 +17,7 @@ export function ContextMapFrame({
 				"flex min-w-0 flex-col",
 				!preview &&
 					// design-escape-ok(radius): shipped value; a 20px squircle
-					"p-m corner-m corner-squircle squircle:rounded-[20px] bg-card shadow-chip",
+					"p-m corner-m corner-squircle squircle:rounded-[20px] bg-surface shadow-card",
 				className,
 			)}
 		>

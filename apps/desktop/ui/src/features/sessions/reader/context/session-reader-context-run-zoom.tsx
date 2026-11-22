@@ -80,7 +80,7 @@ export function RunZoom({
 					return (
 						<div
 							key={run.key}
-							className="absolute overflow-hidden corner-s edge-m border-current/20 bg-card corner-squircle squircle:corner-l"
+							className="absolute overflow-hidden corner-s edge-m border-current/20 bg-surface corner-squircle squircle:corner-l"
 							style={{
 								height: h,
 								left: cell.left + GAP / 2,

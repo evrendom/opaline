@@ -32,7 +32,7 @@ export type SubagentSummary =
 
 export function FactDot() {
 	return (
-		<span aria-hidden="true" className="text-ink-3-50">
+		<span aria-hidden="true" className="text-ink-disabled">
 			·
 		</span>
 	);
@@ -143,7 +143,7 @@ export function SubagentStrip({
 								: "Foreground"}
 						</span>
 						{launch.isError ? (
-							<span className="inline-flex items-center gap-xxs text-rose-mark">
+							<span className="inline-flex items-center gap-xxs text-error">
 								<IconAlertTriangle aria-hidden="true" className="size-3" />
 								Failed
 							</span>
@@ -209,7 +209,7 @@ export function ReaderStrip({
 				"flex flex-col gap-m",
 				"corner-m px-l py-l corner-squircle",
 				"text-body-m",
-				"bg-card shadow-card",
+				"bg-surface shadow-card",
 				"squircle:corner-xl",
 				className,
 			)}
@@ -246,7 +246,7 @@ export function ReaderStrip({
 					{failed ? (
 						<>
 							<FactDot />
-							<span className="inline-flex items-center gap-xxs text-rose-mark">
+							<span className="inline-flex items-center gap-xxs text-error">
 								<IconAlertTriangle aria-hidden="true" className="size-3" />
 								{failed}
 							</span>

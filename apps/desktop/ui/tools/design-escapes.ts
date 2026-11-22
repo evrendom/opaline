@@ -45,7 +45,11 @@
  *            Screens read Layer 2 roles. ROLE_FILES (role definitions) are
  *            exempt from it.
  *   marker   A legacy `design-escape-ok: …` (exempts nothing now), a marker
- *            naming an unknown rule, or a stale marker (none of its rules has
+ *            naming an unknown rule, a marker whose reason is "shipped value"
+ *            or "no role renders this" (exempts nothing: a value the app
+ *            happened to ship gets snapped to a role or step; markers are for
+ *            data paint, artwork, the platform and third-party code), or a
+ *            stale marker (none of its rules has
  *            an escape on its line or the next).
  *
  * What it reads, under src (skipping site/, dev/, test dirs, fixtures, tests,
@@ -587,9 +591,21 @@ export function scanCssDeclarations(
 	return out;
 }
 
-const MARKER = /design-escape-ok(\(([^)]*)\))?\s*:/g;
+const MARKER = /design-escape-ok(\(([^)]*)\))?\s*:\s*([^\n]*)/g;
 
-type Marker = { line: number; rules: string[]; legacy: boolean };
+/**
+ * A marker excuses what a scale can't hold: data paint, artwork, the platform
+ * (macOS window glass) or third-party code. A value the app happened to ship
+ * is not a reason: snap it to the nearest role or step instead.
+ */
+const NOT_A_REASON = /^(shipped value|no role renders this)/i;
+
+type Marker = {
+	line: number;
+	rules: string[];
+	legacy: boolean;
+	reason: string;
+};
 
 function markersOf(lines: string[]): Marker[] {
 	const out: Marker[] = [];
@@ -598,6 +614,7 @@ function markersOf(lines: string[]): Marker[] {
 			out.push({
 				line: i + 1,
 				legacy: m[1] === undefined,
+				reason: (m[3] ?? "").trim(),
 				rules: (m[2] ?? "")
 					.split(",")
 					.map((r) => r.trim())
@@ -650,6 +667,15 @@ export function scanFile(file: string, source: string): Scan {
 				line: m.line,
 				rule: "marker",
 				token: `design-escape-ok(${m.rules.join(",")}): unknown rule ${unknown.join(",") || "(none)"}`,
+			});
+			continue;
+		}
+		if (NOT_A_REASON.test(m.reason)) {
+			out.push({
+				file,
+				line: m.line,
+				rule: "marker",
+				token: `design-escape-ok(${m.rules.join(",")}): "${m.reason.slice(0, 40)}" is not a reason; snap the value to a role or step`,
 			});
 			continue;
 		}

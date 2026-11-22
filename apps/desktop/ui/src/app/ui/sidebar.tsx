@@ -276,7 +276,7 @@ function Sidebar({
 						// The inset sidebar sits in the window chrome: no fill of its
 						// own, so the window's vibrancy shows through.
 						"flex size-full min-w-0 flex-col overflow-hidden bg-sidebar group-data-[variant=inset]:bg-transparent group-data-[variant=sidebar]:edge-r-m",
-						"group-data-[variant=floating]:corner-m group-data-[variant=floating]:shadow-label group-data-[variant=floating]:ring-1 group-data-[variant=floating]:ring-sidebar-border",
+						"group-data-[variant=floating]:corner-m group-data-[variant=floating]:shadow-float group-data-[variant=floating]:ring-1 group-data-[variant=floating]:ring-sidebar-border",
 					)}
 				>
 					{children}

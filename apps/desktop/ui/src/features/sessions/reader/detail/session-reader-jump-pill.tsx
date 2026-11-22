@@ -100,7 +100,7 @@ export function JumpPill({
 				"flex h-8 items-center gap-s",
 				"corner-full pr-[calc(var(--space-m)+var(--space-xxs))] pl-s",
 				"bg-canvas text-ink-3 shadow-card transition-[opacity,translate,color] duration-(--motion-medium-duration) ease-base",
-				"focus-outline hover:text-ink dark:bg-card",
+				"focus-outline hover:text-ink dark:bg-surface",
 				where
 					? "pointer-events-auto translate-y-0 opacity-100"
 					: cn(

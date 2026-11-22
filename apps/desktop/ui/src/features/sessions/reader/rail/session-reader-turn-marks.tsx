@@ -26,7 +26,7 @@ export const TURN_MARKS: Record<
 	{ className: string; Icon: Icon; label: string; tint: string }
 > = {
 	"file-added": {
-		className: "text-emerald-ink",
+		className: "text-success",
 		Icon: IconFilePlus,
 		label: "Added",
 		tint: "var(--color-emerald-500)",
@@ -38,13 +38,13 @@ export const TURN_MARKS: Record<
 		tint: "var(--color-blue-500)",
 	},
 	"file-removed": {
-		className: "text-rose-ink",
+		className: "text-error",
 		Icon: IconFileMinus,
 		label: "Removed",
 		tint: "var(--color-rose-500)",
 	},
 	skill: {
-		className: "text-amber-ink",
+		className: "text-warning",
 		Icon: IconBolt,
 		label: "Skill",
 		tint: "var(--color-amber-500)",
@@ -98,19 +98,19 @@ function MarkStack({ marks }: { marks: readonly StackMark[] }) {
 
 const SIGNAL_MARKS: Record<SessionReaderTurnSignal, Omit<StackMark, "key">> = {
 	apology: {
-		className: "text-amber-ink",
+		className: "text-warning",
 		Icon: IconAlertTriangle,
 		tint: "var(--color-amber-500)",
 		title: "Apology",
 	},
 	positive: {
-		className: "text-emerald-ink",
+		className: "text-success",
 		Icon: IconThumbUp,
 		tint: "var(--color-emerald-500)",
 		title: "Positive signal",
 	},
 	trouble: {
-		className: "text-rose-ink",
+		className: "text-error",
 		Icon: IconAlertTriangle,
 		tint: "var(--color-rose-500)",
 		title: "Error or negative signal",
@@ -171,8 +171,8 @@ export function RunTouchTags({
 					"inline-flex h-5 items-center gap-xs",
 					"corner-full pr-m pl-xxs",
 					"tabular-nums",
-					"bg-canvas text-ink-80 shadow-control",
-					"dark:bg-card",
+					"bg-canvas text-ink shadow-card",
+					"dark:bg-surface",
 				)}
 			>
 				<OpalChip tint={tint} className={cn("size-4", className)}>

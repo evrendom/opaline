@@ -57,7 +57,7 @@ const USAGE_GRID_CLASS_NAME =
 	"grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,13.5rem),1fr))] gap-xl px-xl pt-xs pb-xxl sm:px-[calc(var(--space-xxl)*4/3)]";
 // Card: a squircle on its soft hairline shadow, no border.
 const USAGE_CARD_CLASS_NAME =
-	"relative flex h-full w-full min-w-0 flex-col overflow-hidden corner-m bg-card text-left text-session-overview-text shadow-card squircle:corner-xl corner-squircle";
+	"relative flex h-full w-full min-w-0 flex-col overflow-hidden corner-m bg-surface text-left text-ink shadow-card squircle:corner-xl corner-squircle";
 const USAGE_METADATA_ICON_CLASS_NAME =
 	// design-escape-ok(colour): shipped value; #8d8d8d, #8c8c8c in dark
 	"size-3.5 shrink-0 text-[#8d8d8d] dark:text-[#8c8c8c]";
@@ -147,7 +147,7 @@ export function UsageCollectionHeader({
 				inline &&
 					// The detail page's side pane: a 48px strip on 24px gutters, level
 					// with the sessions toolbar beside it.
-					"h-12 w-full flex-none edge-b-m border-line-strong px-xxl",
+					"h-12 w-full flex-none edge-b-m border-line px-xxl",
 			)}
 		>
 			{inline ? (
@@ -301,7 +301,7 @@ function UsageCardGrid({
 						hover.setActiveIndex(null);
 				}}
 			>
-				<FluidHoverHighlight hover={hover} className="z-10 corner-m bg-wash" />
+				<FluidHoverHighlight hover={hover} className="z-10 corner-m bg-hover" />
 				{/* biome-ignore lint/a11y/useSemanticElements: An explicit role preserves this list in Safari with list-style none. */}
 				<ul
 					// biome-ignore lint/a11y/noRedundantRoles: Preserve list semantics in Safari with list-style none.
@@ -412,7 +412,7 @@ function UsageSummary({
 	);
 
 	return (
-		<dl className="grid min-w-0 gap-s text-body-m text-session-overview-muted">
+		<dl className="grid min-w-0 gap-s text-body-m text-ink-2">
 			<div className="flex min-w-0 items-center">
 				<dt className="sr-only">Sessions</dt>
 				<dd className="flex min-w-0 items-center gap-m">
@@ -441,14 +441,14 @@ function UsageSummary({
 							<UsageUserAvatar avatarUrl={undefined} title={undefined} />
 						)}
 						{hiddenUserCount > 0 ? (
-							<AvatarGroupCount className="bg-hover font-body text-body-m text-session-overview-muted ring-canvas tabular-nums">
+							<AvatarGroupCount className="bg-hover font-body text-body-m text-ink-2 ring-canvas tabular-nums">
 								+{hiddenUserCount.toLocaleString()}
 								<span className="sr-only"> more users</span>
 							</AvatarGroupCount>
 						) : null}
 					</AvatarGroup>
 					<span
-						className="font-body font-regular text-session-overview-text tabular-nums"
+						className="font-body font-regular text-ink tabular-nums"
 						title={formatCompactSessionCount(sessionCount)}
 					>
 						{sessionCount.toLocaleString()}
@@ -477,7 +477,7 @@ function UsageSummary({
 									"shrink-0 px-s",
 								)}
 							>
-								<span className="font-body font-regular text-session-overview-muted tabular-nums">
+								<span className="font-body font-regular text-ink-2 tabular-nums">
 									+{hiddenRepoCount.toLocaleString()}
 									<span className="sr-only"> more repositories</span>
 								</span>
@@ -537,7 +537,7 @@ function RepositoryChip({
 					"shrink-0",
 					"edge-l-m pl-s",
 					"font-body tabular-nums",
-					"border-line text-session-overview-subtle",
+					"border-line text-ink-3",
 				)}
 			>
 				{sessionCount.toLocaleString()}

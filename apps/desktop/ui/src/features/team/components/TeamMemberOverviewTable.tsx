@@ -216,8 +216,8 @@ function ModelComposition({
 // metrics in fixed tracks with their units inline, so they line up without
 // column headers (kept for screen readers).
 const METRIC_CELL_CLASS_NAME =
-	"h-16 px-l py-zero text-right align-middle text-body-m tabular-nums whitespace-nowrap text-session-overview-muted";
-const METRIC_UNIT_CLASS_NAME = "text-session-overview-subtle";
+	"h-16 px-l py-zero text-right align-middle text-body-m tabular-nums whitespace-nowrap text-ink-2";
+const METRIC_UNIT_CLASS_NAME = "text-ink-3";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** When a teammate was last active, by day (the roster keeps dates, not
@@ -294,10 +294,10 @@ function TeamMemberRow({
 						</AvatarFallback>
 					</Avatar>
 					<div className="min-w-0">
-						<p className="truncate text-body-xl font-medium text-session-overview-text">
+						<p className="truncate text-body-xl font-medium text-ink">
 							{row.displayName}
 						</p>
-						<p className="truncate text-body-m text-session-overview-muted">
+						<p className="truncate text-body-m text-ink-2">
 							{row.role}
 						</p>
 					</div>
@@ -325,7 +325,7 @@ function TeamMemberRow({
 			<td
 				className={cn(
 					METRIC_CELL_CLASS_NAME,
-					"font-medium text-session-overview-text",
+					"font-medium text-ink",
 				)}
 			>
 				{formatCompactWholeCurrency(row.cost)}

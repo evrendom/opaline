@@ -15,19 +15,19 @@
 .cost-breakdown-tabs > button {
 	padding: 5px 12px;
 	border-radius: var(--radius-s);
-	color: var(--cost-muted);
+	color: var(--ink-3);
 	font-size: var(--size-xl);
 	transition:
 		background-color var(--motion-duration) var(--motion-easing),
 		color var(--motion-duration) var(--motion-easing);
 }
 .cost-breakdown-tabs > button:hover {
-	color: var(--cost-foreground);
-	background: var(--cost-hover);
+	color: var(--ink);
+	background: var(--hover);
 }
 .cost-breakdown-tabs > button[aria-selected="true"] {
-	color: var(--cost-foreground);
-	background: var(--cost-hover);
+	color: var(--ink);
+	background: var(--hover);
 	font-weight: 500;
 }
 
@@ -103,7 +103,7 @@
 	max-width: calc(1600px - 2 * var(--cost-page-gutter, 32px));
 	width: calc(100% - 2 * var(--cost-page-gutter, 32px));
 	border-radius: 24px;
-	background: var(--card);
+	background: var(--surface);
 	box-shadow: var(--shadow-card);
 	overflow: hidden;
 }
@@ -128,7 +128,7 @@
 	box-shadow: none;
 }
 .cost-page[data-variant="one-card"] .cost-metric {
-	background: var(--wash);
+	background: var(--hover);
 }
 .cost-page[data-variant="one-card"] .cost-breakdowns-container {
 	padding: 20px;
@@ -153,7 +153,7 @@
 	max-width: calc(1600px - 2 * var(--cost-page-gutter, 32px));
 	width: calc(100% - 2 * var(--cost-page-gutter, 32px));
 	border-radius: 24px;
-	background: var(--card);
+	background: var(--surface);
 	box-shadow: var(--shadow-card);
 	overflow: hidden;
 }
@@ -171,7 +171,7 @@
 .cost-page[data-variant="rail-card"] .cost-metric {
 	--metric-pad-x: 14px;
 	padding: var(--space-l) var(--metric-pad-x) 0;
-	background: var(--wash);
+	background: var(--hover);
 	box-shadow: none;
 }
 .cost-page[data-variant="rail-card"] .cost-breakdowns-container {
@@ -187,7 +187,7 @@
 	gap: var(--space-s);
 }
 .cost-page[data-variant="rail-card"] .cost-breakdown {
-	background: var(--wash);
+	background: var(--hover);
 	box-shadow: none;
 	overflow: hidden;
 }
@@ -213,7 +213,7 @@
 	margin: var(--space-zero);
 	padding: var(--space-zero) var(--space-m) var(--space-zero) var(--space-zero);
 	font-size: var(--size-m);
-	color: var(--cost-muted);
+	color: var(--ink-3);
 }
 .cost-page[data-variant="rail-card"] .cost-breakdown-heading > div,
 .cost-page[data-variant="rail-card"] .cost-row-meter,
@@ -265,7 +265,7 @@
 	max-width: calc(1600px - 2 * var(--cost-page-gutter, 32px));
 	width: calc(100% - 2 * var(--cost-page-gutter, 32px));
 	border-radius: 24px;
-	background: var(--card);
+	background: var(--surface);
 	box-shadow: var(--shadow-card);
 	overflow: hidden;
 }
@@ -279,7 +279,7 @@
 	min-width: 0;
 	margin: var(--space-l) var(--space-l) var(--space-zero);
 	border-radius: 16px;
-	background: var(--wash);
+	background: var(--hover);
 	box-shadow: none;
 }
 .cost-page:is([data-variant="dot-rail"], [data-variant="rail-chat"])
@@ -360,12 +360,12 @@
 	.cost-metric {
 	--metric-pad-x: 14px;
 	padding: var(--space-l) var(--metric-pad-x) 0;
-	background: var(--wash);
+	background: var(--hover);
 	box-shadow: none;
 }
 .cost-page:is([data-variant="dot-rail"], [data-variant="rail-chat"])
 	.cost-metric[data-primary="true"] {
-	background: var(--card);
+	background: var(--surface);
 	box-shadow:
 		var(--shadow-card),
 		0 1.5px 2px color-mix(in oklch, var(--metric-color) 25%, transparent);
@@ -390,7 +390,7 @@
 }
 .cost-page:is([data-variant="dot-rail"], [data-variant="rail-chat"])
 	.cost-breakdown {
-	background: var(--wash);
+	background: var(--hover);
 	box-shadow: none;
 }
 .cost-page:is([data-variant="dot-rail"], [data-variant="rail-chat"])
@@ -449,7 +449,7 @@
 	margin: var(--space-zero);
 	padding: var(--space-zero);
 	font-size: var(--size-m);
-	color: var(--cost-muted);
+	color: var(--ink-3);
 }
 .cost-page[data-variant="chat"] .cost-scroll-fade {
 	flex: 1 1 0;
@@ -624,9 +624,9 @@
 		width: 22px;
 		height: 22px;
 		border-radius: 999px;
-		background: var(--card);
-		color: var(--cost-muted);
-		box-shadow: var(--shadow-control);
+		background: var(--surface);
+		color: var(--ink-3);
+		box-shadow: var(--shadow-card);
 		opacity: 0;
 		transition: opacity var(--motion-duration) var(--motion-easing);
 	}
@@ -645,7 +645,7 @@
 		box-sizing: border-box;
 		padding: var(--sheet-card) 14px var(--space-l);
 		border-radius: 24px;
-		background: var(--card);
+		background: var(--surface);
 		box-shadow: var(--shadow-card);
 		animation: cost-metric-sheet-in var(--motion-medium-duration)
 			var(--motion-easing);
@@ -673,7 +673,7 @@
 .cost-metric-deep h3 {
 	font-size: var(--size-m);
 	font-weight: var(--weight-body-medium);
-	color: var(--cost-muted);
+	color: var(--ink-3);
 }
 .cost-metric-deep ul {
 	display: grid;
@@ -690,7 +690,7 @@
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	color: var(--cost-foreground);
+	color: var(--ink);
 }
 .cost-metric-deep-bar {
 	position: relative;
@@ -698,7 +698,7 @@
 	align-items: center;
 	height: 18px;
 	border-radius: var(--radius-xs);
-	background: var(--wash);
+	background: var(--hover);
 	overflow: hidden;
 }
 .cost-metric-deep-bar::before {
@@ -718,6 +718,6 @@
 	font-size: var(--size-s);
 	font-weight: var(--weight-body-medium);
 	font-variant-numeric: tabular-nums;
-	color: var(--cost-foreground);
+	color: var(--ink);
 	white-space: nowrap;
 }

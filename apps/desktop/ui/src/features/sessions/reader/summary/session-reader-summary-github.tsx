@@ -42,7 +42,7 @@ export function pullRequestLook(pull: SessionPullRequest): {
 		};
 	if (pull.state === "closed")
 		return {
-			className: "text-rose-mark",
+			className: "text-error",
 			icon: IconGitPullRequestClosed,
 			label: "Closed",
 		};
@@ -50,7 +50,7 @@ export function pullRequestLook(pull: SessionPullRequest): {
 		return { className: "", icon: IconGitPullRequestDraft, label: "Draft" };
 	if (pull.state === "open")
 		return {
-			className: "text-emerald-mark",
+			className: "text-success",
 			icon: IconGitPullRequest,
 			label: "Open",
 		};
@@ -111,11 +111,11 @@ export function ciLook(conclusion: string | null): {
 	icon: Icon;
 } {
 	if (conclusion === null)
-		return { className: "text-amber-mark", icon: IconCircleDashed };
+		return { className: "text-warning", icon: IconCircleDashed };
 	if (conclusion === "success")
-		return { className: "text-emerald-mark", icon: IconCircleCheck };
+		return { className: "text-success", icon: IconCircleCheck };
 	if (conclusion === "failure" || conclusion === "timed_out")
-		return { className: "text-rose-mark", icon: IconCircleX };
+		return { className: "text-error", icon: IconCircleX };
 	return { className: "", icon: IconCircleDashed };
 }
 

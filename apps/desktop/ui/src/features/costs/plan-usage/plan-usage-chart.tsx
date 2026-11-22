@@ -66,7 +66,7 @@ const SEGMENT_RADIUS_PX = 2;
 // Axis labels sit Recharts' 6px tick size plus their tick margin from the plot.
 const VALUE_TICK_OFFSET_PX = 6 + 10;
 const DATE_TICK_OFFSET_PX = 6 + 14;
-const TICK_STYLE = { fill: "var(--cost-muted)", fontSize: 11 };
+const TICK_STYLE = { fill: "var(--ink-3)", fontSize: 11 };
 const DAY_MS = 86_400_000;
 
 const resetTickFormat = new Intl.DateTimeFormat("en-US", {
@@ -836,7 +836,7 @@ function UsagePreview({
 						x2={1000}
 						y1={(1 - tick / 100) * 1000}
 						y2={(1 - tick / 100) * 1000}
-						stroke="var(--cost-border)"
+						stroke="var(--line)"
 						strokeDasharray="3 4"
 						vectorEffect="non-scaling-stroke"
 					/>
@@ -888,7 +888,7 @@ function UsagePreview({
 								className="plan-usage-preview-reset"
 								size={RESET_ICON_PX}
 								stroke={1.75}
-								color="var(--cost-muted)"
+								color="var(--ink-3)"
 								style={{ top: -(RESET_ICON_PX + RESET_ICON_GAP_PX) }}
 							/>
 						) : null}
@@ -1066,7 +1066,7 @@ function SplitBar({
 					y={snap(y) - RESET_ICON_PX - RESET_ICON_GAP_PX}
 					size={RESET_ICON_PX}
 					stroke={1.75}
-					color="var(--cost-muted)"
+					color="var(--ink-3)"
 					title={reset}
 					aria-label={reset}
 				/>

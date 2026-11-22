@@ -470,7 +470,7 @@ function RunRow({
 			<span
 				className={cn(
 					"min-w-0 flex-1 truncate text-body-m tabular-nums",
-					isPicked ? "text-ink" : "text-ink-90",
+					isPicked ? "text-ink" : "text-ink",
 				)}
 			>
 				{run.agentId
@@ -966,7 +966,7 @@ function OpenRunLink({
 					? // design-escape-ok(type): shipped value; 11px on main's inherited 4/3 line
 						"flex h-6 items-center gap-xs corner-xs px-s text-body-s leading-[calc(4/3)] text-ink-3 transition-colors hover:text-ink"
 					: // design-escape-ok(opacity): shipped value; border/60 as line-strong at 60%
-						"inline-flex h-8 items-center gap-xs corner-s edge-m border-line-strong/60 px-l text-body-m font-medium transition-colors hover:bg-field"
+						"inline-flex h-8 items-center gap-xs corner-s edge-m border-line/60 px-l text-body-m font-medium transition-colors hover:bg-field"
 			}
 		>
 			Open in session
@@ -1085,7 +1085,7 @@ function SkillTraceBody() {
 				</div>
 				<div className="flex gap-l">
 					<Bone className="mt-s size-6 shrink-0 corner-full" />
-					<div className="flex min-w-0 flex-1 flex-col gap-m corner-m bg-card px-l py-l shadow-card corner-squircle squircle:corner-xl-inner">
+					<div className="flex min-w-0 flex-1 flex-col gap-m corner-m bg-surface px-l py-l shadow-card corner-squircle squircle:corner-xl-inner">
 						<Bone className="h-3 w-full corner-xs" />
 						<Bone className="h-3 w-10/12 corner-xs" />
 						<Bone className="h-3 w-1/2 corner-xs" />
@@ -1126,7 +1126,7 @@ function McpCallsSample() {
 					"flex flex-col",
 					"divide-y corner-m edge-m px-l",
 					// design-escape-ok(opacity): shipped value; border/40 and /60 as line-strong
-					"divide-line-strong/40 border-line-strong/60 bg-canvas",
+					"divide-line/40 border-line/60 bg-canvas",
 				)}
 			>
 				<div className="flex items-center gap-s py-[calc(var(--space-m)+var(--space-xxs))]">
@@ -1164,7 +1164,7 @@ function FileCardSample() {
 	return (
 		<div className="flex flex-col">
 			{/* design-escape-ok(opacity): shipped value; border/50 as line-strong at 50% */}
-			<div className="flex items-center gap-m edge-b-m border-line-strong/50 px-[calc(var(--space-xl)+var(--space-xs))] py-xl">
+			<div className="flex items-center gap-m edge-b-m border-line/50 px-[calc(var(--space-xl)+var(--space-xs))] py-xl">
 				<Bone className="size-4 shrink-0 corner-full" />
 				<Bone className="h-3.5 w-28 corner-xs" />
 			</div>

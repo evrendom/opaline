@@ -60,7 +60,7 @@ export function HistoricalSkillDetailContent({
 					"flex shrink-0 items-center gap-l",
 					variant === "card"
 						? "px-xxl pt-[calc(var(--space-xl)+var(--space-xs))] pb-xs"
-						: "h-12 edge-b-m border-line-strong px-xxl",
+						: "h-12 edge-b-m border-line px-xxl",
 				)}
 				data-slot="skill-version-toolbar"
 			>
@@ -99,7 +99,7 @@ export function HistoricalSkillDetailContent({
 							size="xs"
 							variant="quiet"
 							aria-pressed={raw}
-							className="text-ink-3-60 hover:text-ink"
+							className="text-ink-disabled hover:text-ink"
 							onClick={() => setRaw((value) => !value)}
 						>
 							{raw ? "Rendered" : "Raw"}
@@ -143,7 +143,7 @@ export function HistoricalSkillDetailContent({
 								<>
 									{allowedTools.length > 0 ? (
 										<div className="mb-xxl flex flex-wrap items-center gap-m">
-											<span className="text-body-l font-medium text-session-overview-muted">
+											<span className="text-body-l font-medium text-ink-2">
 												Allowed tools
 											</span>
 											<ul
@@ -178,7 +178,7 @@ export function HistoricalSkillDetailContent({
 									/>
 								</>
 							) : (
-								<div className="py-[calc(var(--space-xxl)*5/3)] text-center text-body-xl text-session-overview-muted">
+								<div className="py-[calc(var(--space-xxl)*5/3)] text-center text-body-xl text-ink-2">
 									No complete content was recovered
 								</div>
 							)

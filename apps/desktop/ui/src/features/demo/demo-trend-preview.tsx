@@ -69,7 +69,7 @@ const plotY = (fraction: number) =>
 	`calc(${PLOT_TOP}px + ${fraction} * (100% - ${PLOT_TOP + PLOT_BOTTOM}px))`;
 const labelStyle = {
 	position: "absolute",
-	color: "var(--cost-muted)",
+	color: "var(--ink-3)",
 	fontSize: LABEL_FONT_SIZE,
 	lineHeight: 1,
 	whiteSpace: "nowrap",

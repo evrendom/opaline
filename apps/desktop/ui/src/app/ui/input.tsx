@@ -9,7 +9,7 @@ const PLAIN_INPUT_CLASS_NAME = cn(
 	"corner-full edge-m border-transparent px-l py-xs",
 	"text-body-xxl md:text-body-xl",
 	// design-escape-ok(opacity,colour): shipped value; input/50, line-strong at 50% and oklch(1 0 0 / 7.5%) in dark
-	"bg-line-strong/50 dark:bg-[oklch(1_0_0/7.5%)]",
+	"bg-line/50 dark:bg-[oklch(1_0_0/7.5%)]",
 	"transition-[color,box-shadow,background-color] outline-none",
 	"file:inline-flex file:h-7 file:edge-none file:bg-transparent file:text-body-xl file:font-medium file:text-ink",
 	"placeholder:text-ink-3",
@@ -49,13 +49,13 @@ function Input({
 				// design-escape-ok(opacity): no role renders this; line/70 dark edge on hover
 				"hover:dark:border-line/70",
 				"file:inline-flex file:h-7 file:edge-none file:bg-transparent file:text-body-xl file:font-medium file:text-ink",
-				"placeholder:text-ink-3-50",
+				"placeholder:text-ink-disabled",
 				"disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
 				// design-escape-ok(opacity): no role renders this; error/20 invalid ring
 				"aria-invalid:border-error aria-invalid:ring-[1.5px] aria-invalid:ring-error/20",
 				"md:text-body-xl",
 				// design-escape-ok(opacity): no role renders this; line-strong/30 dark fill, error/40–/50 invalid marks
-				"dark:bg-line-strong/30 dark:aria-invalid:border-error/50 dark:aria-invalid:ring-error/40",
+				"dark:bg-line/30 dark:aria-invalid:border-error/50 dark:aria-invalid:ring-error/40",
 				className,
 			)}
 			{...props}

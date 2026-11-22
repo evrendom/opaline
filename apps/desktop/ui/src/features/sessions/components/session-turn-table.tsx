@@ -233,7 +233,7 @@ function SessionTurnTableViewedRowsButton({
 					? `Scroll ${direction === "above" ? "up" : "down"} to visible transcript rows`
 					: "Scroll to visible transcript rows"
 			}
-			className="group absolute left-2 z-30 flex size-6 items-center justify-center corner-full bg-surface opacity-100 shadow-label focus-outline data-[direction=above]:top-16 data-[direction=below]:bottom-11 data-[direction=none]:pointer-events-none data-[direction=none]:opacity-0"
+			className="group absolute left-2 z-30 flex size-6 items-center justify-center corner-full bg-surface opacity-100 shadow-float focus-outline data-[direction=above]:top-16 data-[direction=below]:bottom-11 data-[direction=none]:pointer-events-none data-[direction=none]:opacity-0"
 			data-direction={direction ?? "none"}
 			disabled={direction === undefined}
 			onClick={scrollToViewedRows}
@@ -424,7 +424,7 @@ export function SessionTurnTable({
 					aria-label="Session turn ledger"
 					className="block w-min min-w-full bg-(--session-turn-table-surface)"
 				>
-					<thead className="sticky top-0 z-10 block min-w-full edge-b-s border-line-strong bg-(--session-turn-table-surface)">
+					<thead className="sticky top-0 z-10 block min-w-full edge-b-s border-line bg-(--session-turn-table-surface)">
 						<tr
 							className="grid h-(--session-turn-table-header-height) min-w-full bg-(--session-turn-table-surface) [grid-template-columns:var(--session-turn-grid-template)]"
 							style={getSessionTurnGridStyle(modelGridTemplate)}
@@ -509,7 +509,7 @@ export function SessionTurnTable({
 			) : null}
 			<div
 				aria-hidden="true"
-				className="pointer-events-none absolute inset-x-0 top-0 z-20 h-(--session-turn-table-header-height) edge-t-s border-line-strong"
+				className="pointer-events-none absolute inset-x-0 top-0 z-20 h-(--session-turn-table-header-height) edge-t-s border-line"
 			/>
 			<SessionTurnTableViewedRowsButton
 				scrollElementRef={scrollElementRef}
