@@ -6,7 +6,15 @@ import { Group, Specimen, State } from "./kit";
  * .tsx, var(--…) in its .css). A role or step no screen uses is not here.
  */
 
-const GROUND = ["canvas", "surface", "inset", "field", "hover", "hover-strong"];
+const GROUND = [
+	"canvas",
+	"surface",
+	"inset",
+	"field",
+	"hover",
+	"hover-strong",
+	"scrim",
+];
 const INK = ["ink", "ink-2", "ink-3", "ink-4", "ink-inverse"];
 const LINES = ["line", "line-soft"];
 const ACTION = [

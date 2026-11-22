@@ -20,6 +20,7 @@
 		--neutral-10-transparent
 	); /* a row under the pointer, and any soft tint: marks, stripes */
 	--hover-strong: var(--neutral-10-translucent); /* pressed, open, selected */
+	--scrim: rgb(0 0 0 / 0.25); /* behind a dialog or sheet: always darkens */
 
 	/* -- Ink: four greys, loudest to quietest; no shades of them (an ink with
 	   an opacity snaps to the ink that holds it) */
@@ -141,6 +142,7 @@
 	--color-field: var(--field);
 	--color-hover: var(--hover);
 	--color-hover-strong: var(--hover-strong);
+	--color-scrim: var(--scrim);
 	--color-ink: var(--ink);
 	--color-ink-2: var(--ink-2);
 	--color-ink-3: var(--ink-3);

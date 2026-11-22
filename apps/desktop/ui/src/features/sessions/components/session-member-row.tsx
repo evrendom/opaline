@@ -112,10 +112,7 @@ export function SessionMemberRow({
 		) : null;
 		const promptItems = items.filter((item) => item.kind === "user");
 		const promptRows = (
-			<div
-				id={promptPanelId}
-				className="grid min-w-0 divide-y divide-line"
-			>
+			<div id={promptPanelId} className="grid min-w-0 divide-y divide-line">
 				{showFullPrompt ? (
 					promptItems.map((item, index) => (
 						<div key={item.id} className={userPromptRowClassName}>

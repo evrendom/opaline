@@ -20,7 +20,7 @@ Tailwind reads the roles as colours: `bg-surface`, `text-ink-3`, `border-line`, 
 
 This is the whole set. **Don't add roles, steps or shadows.** If nothing fits, use the nearest one.
 
-- **Ground:** `canvas` (the window's content), `surface` (cards, panels, popovers, menus, controls), `inset` (a recessed area: wells, code, rails), `field` (inputs, chips, segmented tracks), `hover` (a row under the pointer, and any soft tint), `hover-strong` (pressed, open, selected, and any firmer tint).
+- **Ground:** `canvas` (the window's content), `surface` (cards, panels, popovers, menus, controls), `inset` (a recessed area: wells, code, rails), `field` (inputs, chips, segmented tracks), `hover` (a row under the pointer, and any soft tint), `hover-strong` (pressed, open, selected, and any firmer tint), `scrim` (behind a dialog or sheet; it darkens in both modes).
 - **Ink:** `ink` (titles, body, values), `ink-2` (secondary copy), `ink-3` (meta, labels, icons), `ink-4` (the quietest: disabled text, placeholders, separators, faint meta), `ink-inverse`.
 - **Lines:** `line` (hairlines, dividers, inputs, rails), `line-soft` (chart grids, quiet dividers).
 - **Action:** `primary`, `primary-hover`, `primary-fg` (the filled button and a checked checkbox), `focus`, `focus-ring` (the soft ring around a focused field), `accent` (Opaline blue: links, selection, info), `accent-tint`, `accent-line`, `accent-fg` (text on an accent fill, white in both modes).
@@ -66,7 +66,7 @@ Every value lands on a role or a step. Read the table top to bottom and take the
 | `ink` with an opacity, or any near-black text (`#111`, `#292a2f`, `oklch(0.205 0 0)` …) | 80% or more: `ink`; 50 to 79%: `ink-2`; below 50%: `ink-3` |
 | `ink-2` with an opacity | 80% or more: `ink-2`; else `ink-3` |
 | `ink-3` with an opacity, or a mid grey (`#5d5d5d`, `#828387`, `#acaeb2` …) | 70% or more: `ink-3`; below: `ink-4`. A mid grey takes the nearest of `ink-2`, `ink-3`, `ink-4` by lightness, in both modes |
-| A translucent fill (`field/50`, `hover/…`, `ink/5`, `black/5`, `white/10` …) | a soft tint (about 2 to 5% ink): `hover`; a firmer one (6 to 12%), a scrim, a skeleton bone: `hover-strong` |
+| A translucent fill (`field/50`, `hover/…`, `ink/5`, `black/5`, `white/10` …) | a soft tint (about 2 to 5% ink): `hover`; a firmer one (6 to 12%), a skeleton bone: `hover-strong`; a modal backdrop: `scrim` |
 | An opaque light fill (`#f4f4f5`, `field/80` …) | `field`, or `inset` if it's lighter than `field` |
 | An edge with an opacity (`line/50`, `border/60` …), or a literal edge | 60% or more: `line`; else `line-soft` |
 | Red, amber, orange or green for a state (invalid, negative, warning, success, an owner's crown) | `error`, `warning`, `success`; a fill takes its `-tint`, an edge or ring its `-line` |

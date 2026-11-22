@@ -129,10 +129,7 @@ function MemberAvatar({ avatarUrl }: { avatarUrl: string | undefined }) {
 				<AvatarImage alt="" src={avatarUrl} decoding="async" loading="lazy" />
 			) : null}
 			<AvatarFallback className="bg-hover">
-				<IconUser
-					aria-hidden="true"
-					className="size-2.5 shrink-0 text-ink-2"
-				/>
+				<IconUser aria-hidden="true" className="size-2.5 shrink-0 text-ink-2" />
 			</AvatarFallback>
 		</Avatar>
 	);

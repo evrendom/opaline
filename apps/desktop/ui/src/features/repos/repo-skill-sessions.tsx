@@ -271,9 +271,7 @@ export function RepoSkillSessions({
 				</div>
 			)}
 			{rows.length > 0 && searching ? (
-				<p className="px-xxl py-l text-body-m text-ink-3">
-					Finding more runs…
-				</p>
+				<p className="px-xxl py-l text-body-m text-ink-3">Finding more runs…</p>
 			) : null}
 		</div>
 	);
