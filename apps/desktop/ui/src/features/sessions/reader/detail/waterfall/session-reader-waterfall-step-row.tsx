@@ -137,8 +137,7 @@ export const StepRowView = memo(function StepRowView({
 					data-mark=""
 					data-width={width}
 					className={cn(
-						// design-escape-ok(radius): shipped value; 2px bar corners
-						"absolute top-1/2 min-w-0.5 -translate-y-1/2 rounded-[2px]",
+						"absolute top-1/2 min-w-0.5 -translate-y-1/2 corner-zero",
 						bar.className,
 						runsOn && !subagent ? `h-0.5 ${DASHED}` : "h-2",
 						running && !runsOn && "opacity-35",
@@ -219,8 +218,7 @@ export const StepRowView = memo(function StepRowView({
 							<span
 								role="img"
 								aria-label="Error"
-								// design-escape-ok(colour): deliberate exception, rose to match the waterfall's rose-500 error bar (data paint); the error role is a visibly different red
-								className="inline-flex size-5 shrink-0 items-center justify-center corner-full bg-rose-500/10 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400"
+								className="inline-flex size-5 shrink-0 items-center justify-center corner-full bg-error-tint text-error"
 							>
 								<IconAlertTriangle aria-hidden="true" className="size-3" />
 							</span>

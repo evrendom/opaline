@@ -83,8 +83,7 @@ export function FoldRow({
 	);
 	const bar = (
 		<ProgressBar
-			// design-escape-ok(opacity): no role renders this; bg-ink-3/25
-			baseClassName="bg-ink-3/25"
+			baseClassName="bg-hover-strong"
 			color="var(--ink-3)"
 			fillClassName="bg-ink-4"
 			left={offset}

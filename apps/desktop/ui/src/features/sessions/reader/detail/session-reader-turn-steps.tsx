@@ -331,7 +331,7 @@ function RunStepTags({
 				>
 					<OpalChip
 						tint="var(--color-indigo-500)"
-						// design-escape-ok(base): a category colour from the opal sheen (data paint)
+						// design-escape-ok(base): data paint; a category colour from the opal sheen
 						className="size-4 text-color-3"
 					>
 						<IconGhost

@@ -111,8 +111,7 @@ export function RunZoom({
 									"absolute right-1.5 bottom-1.5 z-20 inline-flex h-6 items-center gap-xxs",
 									"corner-s pr-xs pl-m",
 									"text-body-m font-medium",
-									// design-escape-ok(opacity): no role renders this; bg-field/70
-									"bg-field/70 text-ink-3 transition-colors focus-outline",
+									"bg-field text-ink-3 transition-colors focus-outline",
 									"hover:bg-hover hover:text-ink",
 								)}
 							>

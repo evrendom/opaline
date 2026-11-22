@@ -77,8 +77,7 @@ export function SummaryFigures({
 								/>
 							</div>
 							{flags ? (
-								// design-escape-ok(opacity): no role renders this; bg-field/60
-								<div className="relative -mt-xxl corner-b-m bg-field/60 px-xl pt-[calc(var(--space-xxl)*4/3)] pb-l shadow-inset corner-squircle squircle:corner-b-xl dark:bg-inset">
+								<div className="relative -mt-xxl corner-b-m bg-hover px-xl pt-[calc(var(--space-xxl)*4/3)] pb-l shadow-inset corner-squircle squircle:corner-b-xl dark:bg-inset">
 									{flags(groupOf(stat))}
 								</div>
 							) : null}

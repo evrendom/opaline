@@ -271,10 +271,8 @@ export function SessionReaderWaterfallView({
 				<div key={String(open)} className="relative h-5">
 					<ProgressBar
 						ref={progress.barRef}
-						// design-escape-ok(colour): shipped value; main's primary at 50%, oklch(0.205) (oklch(0.922) in dark)
-						baseClassName="bg-[oklch(0.205_0_0/0.5)] opacity-35 dark:bg-[oklch(0.922_0_0/0.5)]"
-						// design-escape-ok(colour): shipped value; main's primary at 50%, oklch(0.205) (oklch(0.922) in dark)
-						fillClassName="bg-[oklch(0.205_0_0/0.5)] dark:bg-[oklch(0.922_0_0/0.5)]"
+						baseClassName="bg-ink-2 opacity-35"
+						fillClassName="bg-ink-2"
 						left={0}
 						width={(runMs / total) * 100}
 					/>
@@ -300,8 +298,7 @@ export function SessionReaderWaterfallView({
 				<span
 					ref={cursorLabelRef}
 					style={{ display: "none" }}
-					// design-escape-ok(type): deliberate exception, a 10px label floating over the bars
-					className="pointer-events-none absolute top-0 z-10 corner-xs border bg-canvas px-s py-xxs text-[10px] whitespace-nowrap text-ink-3 tabular-nums shadow-float"
+					className="pointer-events-none absolute top-0 z-10 corner-xs border bg-canvas px-s py-xxs text-body-xs whitespace-nowrap text-ink-3 tabular-nums shadow-float"
 				/>
 			</div>
 			<div />
@@ -347,8 +344,7 @@ export function SessionReaderWaterfallView({
 										<div
 											ref={cursorRef}
 											style={{ display: "none" }}
-											// design-escape-ok(opacity): no role renders this; bg-ink/25
-											className="absolute inset-y-0 w-px bg-ink/25"
+											className="absolute inset-y-0 w-px bg-ink-3"
 										/>
 									</div>
 
@@ -374,8 +370,7 @@ export function SessionReaderWaterfallView({
 												/>
 											))}
 											{bare ? (
-												// design-escape-ok(type,opacity): deliberate exception, 9/12 ruler ticks; muted-foreground/70 as shipped
-												<div className="absolute inset-x-0 top-0 flex justify-between px-xs text-[9px] leading-3 text-ink-3/70 tabular-nums">
+												<div className="absolute inset-x-0 top-0 flex justify-between px-xs text-body-xxs text-ink-3 tabular-nums">
 													<span>0s</span>
 													<span>{formatWholeDuration(total)}</span>
 												</div>

@@ -12,7 +12,7 @@ const GAP = 4;
 const MIN_CELL = 40;
 
 const TEXT: Record<Tone, string> = {
-	// design-escape-ok(base): a category colour from the opal sheen (data paint)
+	// design-escape-ok(base): data paint; a category colour from the opal sheen
 	later: "text-color-4",
 	minor: "",
 	never: "text-error",
@@ -208,7 +208,7 @@ export function ContextZoom({
 								mark && !picked.has(item.label) && markGlow(mark),
 								picked.size > 0 && !picked.has(item.label) && "opacity-40",
 								picked.has(item.label) &&
-									// design-escape-ok(shadow): the picked tile's glow is tinted from its category
+									// design-escape-ok(shadow): artwork; the picked tile's glow is tinted from its category
 									"shadow-[0_2px_10px_-2px_color-mix(in_oklab,var(--tint)_55%,transparent)] ring-2 ring-[color-mix(in_oklab,var(--tint)_55%,transparent)]",
 							)}
 							style={{
@@ -266,8 +266,7 @@ export function ContextZoom({
 										"absolute right-1.5 bottom-1.5 inline-flex h-6 items-center gap-xxs",
 										"corner-s pr-xs pl-m",
 										"text-body-m font-medium",
-										// design-escape-ok(opacity): no role renders this; bg-field/70
-										"bg-field/70 text-ink-3 transition-colors focus-outline",
+										"bg-field text-ink-3 transition-colors focus-outline",
 										"hover:bg-hover hover:text-ink",
 									)}
 								>

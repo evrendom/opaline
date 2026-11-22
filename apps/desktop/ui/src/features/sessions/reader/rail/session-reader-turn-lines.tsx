@@ -100,8 +100,7 @@ function PromptTokens({
 				.join("\n")}
 		>
 			~{formatCompactNumber(estimate.tokens)} tokens
-			{/* design-escape-ok(opacity): shipped value; muted-foreground/70 */}
-			{share ? <span className="text-ink-3/70"> · {share}</span> : null}
+			{share ? <span className="text-ink-3"> · {share}</span> : null}
 		</span>
 	);
 }
@@ -157,8 +156,7 @@ export function MemberFactLine({
 										? quotes(negative)
 										: "Tracked as frustrated: the run before it is flagged"
 								}
-								// design-escape-ok(opacity): shipped value; rose-500/10
-								className={cn(PILL, "bg-error/10 text-error")}
+								className={cn(PILL, "bg-error-tint text-error")}
 							>
 								<IconMoodSad aria-hidden="true" />
 								Frustration
@@ -167,11 +165,7 @@ export function MemberFactLine({
 						{positive.length > 0 ? (
 							<span
 								title={quotes(positive)}
-								className={cn(
-									PILL,
-									// design-escape-ok(opacity,colour): shipped value; emerald-500/10, emerald-700 (emerald-400 in dark)
-									"bg-success/10 text-emerald-700 dark:text-emerald-400",
-								)}
+								className={cn(PILL, "bg-success-tint text-success")}
 							>
 								<IconMoodSmile aria-hidden="true" />
 								Positive
@@ -189,11 +183,7 @@ export function MemberFactLine({
 							<span
 								key={question.id}
 								title={runQuestionTagTitle(question)}
-								className={cn(
-									PILL,
-									// design-escape-ok(opacity,colour): shipped value; amber-500/10, amber-700 (amber-400 in dark)
-									"bg-warning/10 text-amber-700 dark:text-amber-400",
-								)}
+								className={cn(PILL, "bg-warning-tint text-warning")}
 							>
 								<IconMessageQuestion aria-hidden="true" />
 								{runQuestionTagLabel(question)}

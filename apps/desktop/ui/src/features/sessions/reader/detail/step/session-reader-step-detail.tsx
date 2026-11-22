@@ -194,8 +194,7 @@ export function SessionReaderStepDetail({
 						{skillHref && step?.toolEvent?.skillContent ? (
 							<Link
 								to={skillHref}
-								// design-escape-ok(opacity): no role renders this; decoration-ink/20
-								className="truncate underline decoration-ink/20 underline-offset-4 transition-colors hover:decoration-ink"
+								className="truncate underline decoration-line underline-offset-4 transition-colors hover:decoration-ink"
 							>
 								{step?.name}
 							</Link>
@@ -314,8 +313,7 @@ export function SessionReaderStepDetail({
 								</div>
 							) : null}
 							{step?.isError && step.result && step.kind !== "ci" && !carded ? (
-								// design-escape-ok(opacity): no role renders this; bg-error/20
-								<div className="mx-xxl flex flex-col gap-xs corner-m bg-error/20 px-l py-l text-body-xl text-error corner-squircle">
+								<div className="mx-xxl flex flex-col gap-xs corner-m bg-error-tint px-l py-l text-body-xl text-error corner-squircle">
 									<span className="flex items-center gap-s font-medium">
 										<IconAlertTriangleFilled className="size-3.5 shrink-0" />
 										Error

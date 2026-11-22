@@ -139,8 +139,7 @@ export function SetupColumn({
 					<FluidList
 						className={cn(
 							"flex flex-col gap-xxs",
-							// design-escape-ok(opacity): shipped value; border/50
-							uses && "mt-l edge-t-m border-line/50 pt-m",
+							uses && "mt-l edge-t-m border-line-soft pt-m",
 							calls && "hidden",
 						)}
 					>
@@ -160,8 +159,7 @@ export function SetupColumn({
 						))}
 					</FluidList>
 					{receivedBy ? (
-						// design-escape-ok(opacity): shipped value; border/50
-						<div className="mt-l edge-t-m border-line/50 pt-xs">
+						<div className="mt-l edge-t-m border-line-soft pt-xs">
 							{receivedBy}
 						</div>
 					) : null}
@@ -397,8 +395,7 @@ function SetupUseRow({
 			<span
 				className={cn(
 					"min-w-0 flex-1 truncate text-body-m",
-					// design-escape-ok(opacity): no role renders this; text-ink/70
-					isPicked ? "text-ink" : "text-ink/70",
+					isPicked ? "text-ink" : "text-ink-2",
 				)}
 			>
 				{about}

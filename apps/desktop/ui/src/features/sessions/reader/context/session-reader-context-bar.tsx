@@ -87,8 +87,7 @@ export function tileLook(
 	if (kind === "free")
 		return {
 			className:
-				// design-escape-ok(opacity,colour): shipped value; ink/14 edge (ink/16 in dark), a black/45 label (white/45 in dark)
-				"border-dashed border-ink/14 text-[rgba(0,0,0,0.45)] dark:text-[rgba(255,255,255,0.45)] bg-[repeating-linear-gradient(135deg,transparent_0_6px,color-mix(in_srgb,var(--ink)_3.5%,transparent)_6px_7px)] dark:border-ink/16 dark:bg-[repeating-linear-gradient(135deg,transparent_0_6px,color-mix(in_srgb,var(--ink)_5%,transparent)_6px_7px)]",
+				"border-dashed border-line text-ink-3 bg-[repeating-linear-gradient(135deg,transparent_0_6px,color-mix(in_srgb,var(--ink)_3.5%,transparent)_6px_7px)] dark:bg-[repeating-linear-gradient(135deg,transparent_0_6px,color-mix(in_srgb,var(--ink)_5%,transparent)_6px_7px)]",
 		};
 	if (strong)
 		return {
@@ -227,8 +226,7 @@ export function ContextBar({
 										? "bg-error-tint text-error"
 										: warns && share >= CONTEXT_WARN
 											? "bg-warning-tint text-warning"
-											: // design-escape-ok(opacity): no role renders this; dark:bg-ink/8
-												"bg-hover text-ink-3 dark:bg-ink/8",
+											: "bg-hover text-ink-3 dark:bg-hover-strong",
 								)}
 							>
 								{share}%
@@ -292,8 +290,7 @@ function MeasureToggle({
 	onMeasure: (measure: ContextMeasure) => void;
 }) {
 	return (
-		// design-escape-ok(opacity): no role renders this; dark:bg-ink/6
-		<fieldset className="m-zero flex shrink-0 items-center gap-xxs corner-m edge-none bg-hover p-xxs corner-squircle squircle:corner-xl dark:bg-ink/6">
+		<fieldset className="m-zero flex shrink-0 items-center gap-xxs corner-m edge-none bg-hover p-xxs corner-squircle squircle:corner-xl dark:bg-hover-strong">
 			<legend className="sr-only">Measure the map by</legend>
 			{MEASURES.map((each) => {
 				const pressed = each === measure;
@@ -318,8 +315,7 @@ function MeasureToggle({
 							"disabled:cursor-default disabled:opacity-40 squircle:corner-l",
 							pressed
 								? cn("bg-surface font-medium", PILL_SHADOW)
-								: // design-escape-ok(opacity): no role renders this; hover:text-ink/88
-									"text-ink-3 hover:text-ink/88 dark:hover:text-ink",
+								: "text-ink-3 hover:text-ink dark:hover:text-ink",
 						)}
 					>
 						{MEASURE_LOOK[each].label}

@@ -156,8 +156,7 @@ function PickCrumb({
 	useShellCrumbFollows(host !== null && (agent !== null || run !== null));
 	if (!host || (!agent && !run)) return null;
 	return createPortal(
-		// design-escape-ok(type): shipped value; -0.025em title tracking
-		<div className="-order-1 mr-auto -ml-xxs flex shrink-0 items-center gap-s text-body-xxl font-medium tracking-[-0.025em] tabular-nums">
+		<div className="-order-1 mr-auto -ml-xxs flex shrink-0 items-center gap-s text-body-xxl font-medium tracking-xs tabular-nums">
 			<IconChevronRight
 				aria-hidden="true"
 				className="size-4 shrink-0 text-ink-4"

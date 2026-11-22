@@ -295,8 +295,7 @@ function Thing({
 				"squircle:corner-xs",
 				lit
 					? litLook
-					: // design-escape-ok(opacity): no role renders this; dark:hover:bg-ink/6
-						"edge-m border-current/25 hover:bg-hover dark:hover:bg-ink/6",
+					: "edge-m border-current/25 hover:bg-hover dark:hover:bg-hover-strong",
 			)}
 			style={style}
 		>

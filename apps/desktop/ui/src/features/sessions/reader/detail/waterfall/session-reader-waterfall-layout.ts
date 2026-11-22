@@ -5,9 +5,9 @@ export const FROZEN_ROW_REM = 2.625;
 export const INDENT =
 	"pl-[calc(var(--depth)*var(--space-m)+var(--space-xs))] @lg:pl-[calc(var(--depth)*var(--space-l)+var(--space-xs))]";
 
+// The border step puts the rail on its parent's hairline.
 export const MESSAGE_INDENT =
-	// design-escape-ok(space): 1px puts the rail on its parent's hairline
-	"ml-[calc(var(--depth)*8px+1px)] @lg:ml-[calc(var(--depth)*12px+1px)]";
+	"ml-[calc(var(--depth)*var(--space-m)+var(--border-m))] @lg:ml-[calc(var(--depth)*var(--space-l)+var(--border-m))]";
 
 export const GRID =
 	"grid grid-cols-[9.5rem_minmax(0,1fr)_3.25rem] @lg:grid-cols-[15rem_minmax(0,1fr)_6.5rem]";
@@ -23,10 +23,7 @@ export const ROW =
 	"min-h-10 w-full items-center corner-s py-xs text-left text-body-xl focus-outline";
 
 export function rowState(selected: boolean): string {
-	return selected
-		? "bg-hover dark:bg-hover"
-		: // design-escape-ok(opacity): shipped value; field/80 (field/50 in dark)
-			"hover:bg-field/80 dark:hover:bg-field/50";
+	return selected ? "bg-hover dark:bg-hover" : "hover:bg-hover";
 }
 
 export function barGeometry(

@@ -17,7 +17,7 @@ const MARK: Record<Tone, string> = {
 };
 
 const MARKED =
-	// design-escape-ok(shadow): a marked tile glows in its mark's colour
+	// design-escape-ok(shadow): artwork; a marked tile glows in its mark's colour
 	"border-[color-mix(in_oklab,var(--mark)_45%,transparent)] shadow-[0_0_4px_color-mix(in_oklab,var(--mark)_60%,transparent),0_0_14px_color-mix(in_oklab,var(--mark)_45%,transparent)]";
 
 export const markGlow = (tone: Tone) => `${MARK[tone]} ${MARKED}`;
@@ -57,8 +57,7 @@ export function MarkLegend({
 						<span
 							aria-hidden="true"
 							className={cn(
-								// design-escape-ok(radius): shipped value; 3px swatch corners
-								"size-2.5 shrink-0 rounded-[3px] edge-m corner-squircle",
+								"size-2.5 shrink-0 corner-xs edge-m corner-squircle",
 								markGlow(tone),
 							)}
 						/>
@@ -86,9 +85,9 @@ export function markOf(
 }
 
 const TEXT: Record<Tone, string> = {
-	// design-escape-ok(base): a category colour from the opal sheen (data paint)
+	// design-escape-ok(base): data paint; a category colour from the opal sheen
 	later: "text-color-4",
-	// design-escape-ok(base): a category colour from the opal sheen (data paint)
+	// design-escape-ok(base): data paint; a category colour from the opal sheen
 	minor: "text-color-2",
 	never: "text-error",
 };

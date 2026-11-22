@@ -35,7 +35,7 @@ export function pullRequestLook(pull: SessionPullRequest): {
 } {
 	if (pull.mergedAt)
 		return {
-			// design-escape-ok(colour): shipped value; violet-500 data paint
+			// design-escape-ok(colour): data paint; GitHub's merged purple
 			className: "text-violet-500",
 			icon: IconGitMerge,
 			label: "Merged",

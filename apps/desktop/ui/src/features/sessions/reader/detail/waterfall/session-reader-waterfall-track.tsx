@@ -24,14 +24,12 @@ export function RowTotals({
 	return (
 		<div className="flex flex-col items-end pr-xs text-right">
 			{durationMs !== null ? (
-				// design-escape-ok(type,opacity): deliberate exception, waterfall figures inherit the row's line; no step
-				<span className="text-[11px] font-medium text-ink tabular-nums">
+				<span className="text-body-s font-medium text-ink tabular-nums">
 					{formatSpanDuration(durationMs)}
 				</span>
 			) : null}
 			{cost !== null || tokens > 0 ? (
-				// design-escape-ok(type): deliberate exception, waterfall figures inherit the row's line; no step
-				<span className="hidden text-[10px] whitespace-nowrap text-ink-3 tabular-nums @lg:inline">
+				<span className="hidden text-body-xs whitespace-nowrap text-ink-3 tabular-nums @lg:inline">
 					{cost !== null ? formatReaderCost(cost) : null}
 					{cost !== null && tokens > 0 ? " · " : null}
 					{tokens > 0 ? formatCompactNumber(tokens) : null}
@@ -55,8 +53,7 @@ export function TimeRuler({ total }: { total: number }) {
 					className={cn(
 						// One line: a label at the track's end has no width left to
 						// lay out in, so "4m 10s" would otherwise stack its words.
-						// design-escape-ok(type,opacity): deliberate exception, ruler labels at 10px inherit the ruler's line
-						"absolute top-0 text-[10px] whitespace-nowrap text-ink-4 tabular-nums",
+						"absolute top-0 text-body-xs whitespace-nowrap text-ink-4 tabular-nums",
 						fraction === 1 && "-translate-x-full",
 						// The inner labels collide on a short track, so only the two
 						// ends show there.
@@ -108,8 +105,7 @@ export function ProgressBar({
 			data-mark=""
 			data-progress-host=""
 			data-width={width}
-			// design-escape-ok(radius): shipped value; 2px bar corners
-			className="group/host absolute top-1/2 h-2 min-w-0.5 -translate-y-1/2 overflow-hidden rounded-[2px] *:absolute *:inset-y-0 *:duration-(--motion-large-duration) *:ease-out"
+			className="group/host absolute top-1/2 h-2 min-w-0.5 -translate-y-1/2 overflow-hidden corner-zero *:absolute *:inset-y-0 *:duration-(--motion-large-duration) *:ease-out"
 			style={{ left: `${left}%`, width: `${width}%` }}
 		>
 			<div
@@ -140,8 +136,7 @@ export function ProgressBar({
 
 export function RanOnChip({ ms }: { ms: number }) {
 	return (
-		// design-escape-ok(type): deliberate exception, a 10/16 label on the bar
-		<span className="absolute top-1/2 right-0 -translate-y-1/2 corner-xs bg-canvas px-xs text-[10px] leading-4 text-ink-3 tabular-nums">
+		<span className="absolute top-1/2 right-0 -translate-y-1/2 corner-xs bg-canvas px-xs text-body-xs text-ink-3 tabular-nums">
 			+{formatRanOn(ms)}
 		</span>
 	);
@@ -158,8 +153,7 @@ export function RunningBar({
 		<div
 			aria-hidden="true"
 			className={cn(
-				// design-escape-ok(radius): shipped value; 2px bar corners
-				"pointer-events-none absolute top-1/2 h-2 min-w-0.5 -translate-y-1/2 rounded-[2px]",
+				"pointer-events-none absolute top-1/2 h-2 min-w-0.5 -translate-y-1/2 corner-zero",
 				bar.className,
 			)}
 			style={{ ...bar.style, left: `${span.offset}%`, width: `${span.width}%` }}
