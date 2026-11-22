@@ -3,9 +3,9 @@
 	--trace-debug-fill-rgb: 255 64 64;
 	--trace-debug-outline-rgb: 255 64 64;
 	--trace-debug-outline-alpha: 70%;
-	/* design-escape-ok(colour): no role renders this; one rainbow hue per depth */
+	/* design-escape-ok(colour): data paint; the ?debug=colors overlay, one hue per depth */
 	--trace-debug-div-fill: rgb(var(--trace-debug-fill-rgb) / 8%);
-	/* design-escape-ok(colour): no role renders this; one rainbow hue per depth */
+	/* design-escape-ok(colour): data paint; the ?debug=colors overlay, one hue per depth */
 	--trace-debug-div-outline: rgb(
 		var(--trace-debug-outline-rgb) /
 		var(--trace-debug-outline-alpha)

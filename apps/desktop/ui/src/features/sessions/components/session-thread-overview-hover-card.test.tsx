@@ -122,8 +122,8 @@ describe("SessionThreadOverviewHoverCard", () => {
 		expect(markup).toContain("top-0");
 		expect(markup).toContain("h-14");
 		expect(markup).toContain("corner-s");
-		expect(markup).toContain("shadow-md");
-		expect(markup).toContain("ring-ink/10");
+		expect(markup).toContain("shadow-float");
+		expect(markup).toContain("ring-line");
 		expect(markup).toContain(
 			'data-session-overview-hover-card-placement="right"',
 		);

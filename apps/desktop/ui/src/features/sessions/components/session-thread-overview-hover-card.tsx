@@ -29,8 +29,7 @@ import {
 import type { SessionOverviewZoomWindow } from "./session-thread-overview-zoom";
 
 const SESSION_OVERVIEW_HOVER_CARD_SURFACE_CLASSES =
-	// design-escape-ok(opacity,shadow): no role renders this; ring-ink/10, shadow-md
-	"absolute top-0 z-50 w-80 max-w-[calc(100%-1.5rem)] corner-s bg-canvas font-body text-body-m text-ink shadow-md ring-1 ring-ink/10";
+	"absolute top-0 z-50 w-80 max-w-[calc(100%-1.5rem)] corner-s bg-canvas font-body text-body-m text-ink shadow-float ring-1 ring-line";
 
 interface SessionContextUtilizationRingStyle extends CSSProperties {
 	"--session-context-ring-color-dark": string;
@@ -185,7 +184,7 @@ function SessionOverviewActivityTag({
 }) {
 	return (
 		<div
-			className="flex h-4 shrink-0 items-center gap-xxs corner-m bg-[color-mix(in_srgb,var(--ink)_6%,transparent)] pr-xs pl-xxs"
+			className="flex h-4 shrink-0 items-center gap-xxs corner-m bg-hover-strong pr-xs pl-xxs"
 			data-session-overview-activity-tag={kind}
 			title={title}
 		>

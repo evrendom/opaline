@@ -75,9 +75,7 @@ export function ToolInvocation({
 		<div
 			className={cn(
 				"overflow-hidden corner-l edge-m",
-				isError
-					? "border-line bg-error-tint"
-					: "border-line bg-[color:color-mix(in_srgb,var(--inset)_82%,white)]",
+				isError ? "border-line bg-error-tint" : "border-line bg-inset",
 				className,
 			)}
 		>

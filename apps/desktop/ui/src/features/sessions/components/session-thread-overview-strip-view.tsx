@@ -218,7 +218,7 @@ export function SessionThreadOverviewStripView({
 							{resolvedConfig.showCrosshair && readout ? (
 								<path
 									d={`M ${getChartX(readout.xRatio, resolvedConfig)} 2 V ${resolvedConfig.eventY + 5}`}
-									className="stroke-[color-mix(in_srgb,var(--ink)_28%,transparent)]"
+									className="stroke-ink-4"
 									vectorEffect="non-scaling-stroke"
 								/>
 							) : null}

@@ -1109,6 +1109,11 @@ function flashTranscriptAnchors(elements: readonly HTMLElement[]) {
 	if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
 		return;
 	}
+	// The motion role's curve; WAAPI can't read a var(), so resolve it here.
+	const easing =
+		getComputedStyle(document.documentElement)
+			.getPropertyValue("--motion-easing")
+			.trim() || "linear";
 	for (const element of elements) {
 		element.animate(
 			[
@@ -1118,8 +1123,7 @@ function flashTranscriptAnchors(elements: readonly HTMLElement[]) {
 				},
 				{ backgroundColor: "transparent" },
 			],
-			// design-escape-ok(motion): no role renders this; ease-out
-			{ duration: 300, easing: "ease-out" },
+			{ duration: 300, easing },
 		);
 	}
 }

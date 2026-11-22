@@ -16,18 +16,14 @@ const MODEL_MARK_CLASS_NAME =
 const MODEL_BACKGROUND_CLASS_NAME =
 	"absolute inset-0 [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]";
 const MODEL_ICON_SHELL_CLASS_NAME =
-	// design-escape-ok(shadow): the model icon's hairline edge is artwork
+	// design-escape-ok(shadow): artwork; the model icon's hairline edge
 	"session-turn-table-model-icon-shell relative flex size-5 shrink-0 drop-shadow-[0_0_0.75px_rgb(0_0_0_/_14%)]";
 const MODEL_ICON_CLASS_NAME =
-	"session-turn-table-model-icon size-5 corner-zero edge-none bg-canvas shadow-none dark:bg-[color-mix(in_oklab,#fff_14%,var(--canvas))] [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]";
+	"session-turn-table-model-icon size-5 corner-zero edge-none bg-canvas shadow-none dark:bg-field [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]";
 
 export function SessionModelLoadingMark() {
 	return (
-		<span
-			aria-hidden="true"
-			// design-escape-ok(colour): shipped value; #111 (white in dark)
-			className={cn(MODEL_MARK_CLASS_NAME, "text-[#111] dark:text-white")}
-		>
+		<span aria-hidden="true" className={cn(MODEL_MARK_CLASS_NAME, "text-ink")}>
 			<span className={cn(MODEL_BACKGROUND_CLASS_NAME, "bg-hover")}>
 				<SessionModelProgressRing progress="loading" />
 			</span>
@@ -122,10 +118,9 @@ export function SessionModelMark({
 			className={cn(
 				MODEL_MARK_CLASS_NAME,
 				"corner-full",
-				// design-escape-ok(colour): shipped value; #b96949
+				// design-escape-ok(colour): data paint; Claude's brand orange on its model mark
 				tone.icon === "claude" && "text-[#b96949]",
-				// design-escape-ok(colour): shipped value; #111 (white in dark)
-				tone.icon === "codex" && "text-[#111] dark:text-white",
+				tone.icon === "codex" && "text-ink",
 				tone.icon === null && "text-ink-3",
 			)}
 		>
@@ -133,7 +128,7 @@ export function SessionModelMark({
 				{...iconAccessibility}
 				className={cn(
 					MODEL_BACKGROUND_CLASS_NAME,
-					// design-escape-ok(colour,opacity): shipped value; #cc7d5e/10
+					// design-escape-ok(colour): data paint; Claude's brand orange, tinted behind its model mark
 					tone.icon === "claude" && "bg-[#cc7d5e]/10",
 					tone.icon !== "claude" && "bg-hover",
 					progress && tone.identityIconClassName,

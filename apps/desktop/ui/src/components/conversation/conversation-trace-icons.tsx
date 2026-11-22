@@ -173,7 +173,7 @@ export function UserTraceAvatar({
 	return (
 		<span
 			className={cn(
-				// design-escape-ok(shadow): the model icon's hairline edge is artwork
+				// design-escape-ok(shadow): artwork; the model icon's hairline edge
 				"relative flex size-5 shrink-0 drop-shadow-[0_0_0.75px_rgb(0_0_0_/_14%)]",
 				className,
 			)}

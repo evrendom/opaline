@@ -343,8 +343,7 @@ export function SessionsOverviewFiltersMenu({
 							className={cn(
 								"flex h-11 items-center justify-between gap-m",
 								"edge-b-m px-l",
-								// design-escape-ok(opacity): shipped value; border/60
-								"border-line/60",
+								"border-line",
 							)}
 						>
 							<div className="flex min-w-0 items-center gap-s">

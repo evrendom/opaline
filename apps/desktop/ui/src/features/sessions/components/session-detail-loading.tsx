@@ -22,10 +22,7 @@ const LOADING_ROWS = Array.from({ length: 16 }, (_, index) => index);
 function Placeholder({ className }: { className?: string }) {
 	return (
 		<Skeleton
-			className={cn(
-				"h-3 animate-none corner-xs bg-[color-mix(in_srgb,var(--ink)_6%,transparent)] dark:bg-hover-strong",
-				className,
-			)}
+			className={cn("h-3 animate-none corner-xs bg-hover-strong", className)}
 		/>
 	);
 }
@@ -89,7 +86,7 @@ function TurnTableLoading() {
 					) : (
 						TABLE_COLUMNS.slice(1).map((label) => (
 							<div key={label} className="flex min-w-0 items-center gap-s px-s">
-								<div className="size-3.5 shrink-0 corner-full edge-l border-[color-mix(in_srgb,var(--ink)_8%,transparent)]" />
+								<div className="size-3.5 shrink-0 corner-full edge-l border-line" />
 								<Placeholder className="h-2.5 w-6" />
 							</div>
 						))

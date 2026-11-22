@@ -121,8 +121,7 @@ export function SessionUsageDetail({
 						// on hover, outside the header's fluid fill); the name is the title.
 						<nav
 							aria-label={`${kind} breadcrumb`}
-							// design-escape-ok(type): shipped value; -0.025em title tracking
-							className="flex min-w-0 flex-1 items-center gap-s text-body-xxl font-medium tracking-[-0.025em]"
+							className="flex min-w-0 flex-1 items-center gap-s text-body-xxl font-medium"
 						>
 							<button
 								type="button"
