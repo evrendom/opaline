@@ -96,10 +96,8 @@ export function HighlightedCode({
 						key={`${id}#${repeat}`}
 						className={cn(
 							"flex px-l",
-							// design-escape-ok(opacity): shipped value; emerald-500/10
-							kind === "addition" && "bg-success/10",
-							// design-escape-ok(opacity): shipped value; rose-500/10
-							kind === "deletion" && "bg-error/10",
+							kind === "addition" && "bg-success-tint",
+							kind === "deletion" && "bg-error-tint",
 						)}
 					>
 						{startLine !== undefined || lineNumbers ? (
@@ -212,8 +210,7 @@ function FieldValue({ value }: { value: unknown }) {
 	if (typeof value === "string") {
 		const long = value.length > 80 || value.includes("\n");
 		return long ? (
-			// design-escape-ok(type): shipped value; 13px on a relaxed 1.625 line
-			<p className="corner-s bg-field px-l py-m text-body-l leading-[1.625] whitespace-pre-wrap [overflow-wrap:anywhere]">
+			<p className="corner-s bg-field px-l py-m text-body-l whitespace-pre-wrap [overflow-wrap:anywhere]">
 				{value}
 			</p>
 		) : (

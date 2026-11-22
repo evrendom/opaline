@@ -64,10 +64,7 @@ export function ToolCard({
 		<section
 			className={cn(
 				"flex min-h-0 flex-col overflow-hidden",
-				prose
-					? null
-					: // design-escape-ok(opacity,colour): shipped value; border/60, bg-muted/40, dark:bg-white/[0.02]
-						"edge-m border-line/60 bg-field/40 corner-squircle dark:bg-white/[0.02]",
+				prose ? null : "edge-m border-line bg-hover corner-squircle",
 				!prose &&
 					(fit
 						? "corner-l squircle:corner-xl"
@@ -106,8 +103,7 @@ export function ToolCard({
 						Result
 						<span
 							title={size.title}
-							// design-escape-ok(opacity): shipped value; muted-foreground/70
-							className="font-regular text-ink-3/70 tabular-nums"
+							className="font-regular text-ink-3 tabular-nums"
 						>
 							{size.label}
 						</span>
@@ -134,8 +130,7 @@ export function ToolCard({
 									)}
 								>
 									{prose ? (
-										// design-escape-ok(type): shipped value; 13px on a relaxed 1.625 line
-										<p className="pr-[calc(var(--space-xxl)*4/3)] text-body-l leading-[1.625] whitespace-pre-wrap [overflow-wrap:anywhere]">
+										<p className="pr-[calc(var(--space-xxl)*4/3)] text-body-l whitespace-pre-wrap [overflow-wrap:anywhere]">
 											{text}
 										</p>
 									) : text.length <= LAYOUT_CHARS ? (
@@ -165,8 +160,7 @@ export function ToolCard({
 										className={cn(
 											"absolute top-0 right-1 flex items-center gap-xxs",
 											"corner-s",
-											// design-escape-ok(opacity): no role renders this; bg-canvas/80
-											"bg-canvas/80 opacity-0 backdrop-blur-sm transition-opacity",
+											"bg-canvas opacity-0 backdrop-blur-sm transition-opacity",
 											"group-hover/output:opacity-100 focus-within:opacity-100 has-[[aria-pressed=true]]:opacity-100",
 										)}
 									>

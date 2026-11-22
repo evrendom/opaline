@@ -30,8 +30,7 @@ export function RunLegend({
 	});
 	if (run.flags.length === 0 && calls.length === 0) return null;
 	return (
-		// design-escape-ok(opacity): no role renders this; bg-surface/95
-		<ul className="pointer-events-auto absolute bottom-2 left-2 z-30 flex max-w-[60%] flex-col gap-xs corner-m bg-surface/95 px-l py-m text-body-m shadow-card backdrop-blur-sm corner-squircle squircle:corner-xl">
+		<ul className="pointer-events-auto absolute bottom-2 left-2 z-30 flex max-w-[60%] flex-col gap-xs corner-m bg-surface px-l py-m text-body-m shadow-card backdrop-blur-sm corner-squircle squircle:corner-xl">
 			{run.flags.map((kind) => (
 				<li key={kind} className="flex min-w-0 items-center gap-m">
 					<FlagChip kind={kind} />

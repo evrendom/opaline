@@ -55,8 +55,7 @@ export function ContextFill({
 					fill="none"
 					stroke="currentColor"
 					strokeWidth="2"
-					// design-escape-ok(opacity): no role renders this; text-ink-3/20
-					className="text-ink-3/20"
+					className="text-ink-4"
 				/>
 				<circle
 					cx="6"
@@ -68,8 +67,7 @@ export function ContextFill({
 					strokeDasharray={`${Math.max(share * 100, 1)} 100`}
 					strokeLinecap="round"
 					strokeWidth="2"
-					// design-escape-ok(opacity): shipped value; muted-foreground/70
-					className={share > 0.8 ? "text-warning" : "text-ink-3/70"}
+					className={share > 0.8 ? "text-warning" : "text-ink-3"}
 				/>
 			</svg>
 			<span>
@@ -125,8 +123,7 @@ function ContextRange({
 						fill="none"
 						stroke="currentColor"
 						strokeWidth="2"
-						// design-escape-ok(opacity): no role renders this; text-ink-3/20
-						className="text-ink-3/20"
+						className="text-ink-4"
 					/>
 					<circle
 						cx="6"
@@ -154,11 +151,7 @@ function ContextRange({
 				</svg>
 				<span className="inline-flex items-center gap-xs">
 					<span className="text-ink-3">{percentOf(first.share)}</span>
-					<IconArrowRight
-						aria-hidden="true"
-						// design-escape-ok(opacity): shipped value; muted-foreground/70
-						className="size-3 text-ink-3/70"
-					/>
+					<IconArrowRight aria-hidden="true" className="size-3 text-ink-3" />
 					<span>{percentOf(last.share)}</span>
 					<span className="text-ink-3">context window</span>
 				</span>

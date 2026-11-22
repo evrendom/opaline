@@ -49,12 +49,9 @@ export function SentMessage({
 				</button>
 				<div
 					className={cn(
-						// design-escape-ok(space): shipped value; 10px block padding
-						"min-w-0 corner-m px-l py-[10px] shadow-card corner-squircle squircle:corner-xl-inner",
-						// design-escape-ok(colour): shipped value; black/2.5% (white/4% in dark)
-						!tint && "bg-black/[0.025] dark:bg-white/[0.04]",
-						// design-escape-ok(opacity): no role renders this; ring-(--sent-tint)/40
-						selected && "ring-[1.5px] ring-(--sent-tint)/40",
+						"min-w-0 corner-m px-l py-m shadow-card corner-squircle squircle:corner-xl-inner",
+						!tint && "bg-hover",
+						selected && "ring-[1.5px] ring-accent-line",
 					)}
 					style={
 						{

@@ -128,8 +128,7 @@ function Counts({ rows }: { rows: { count: string; name: string }[] }) {
 					return (
 						<tr
 							key={`${row.name}:${row.count}`}
-							// design-escape-ok(opacity): shipped value; border/60
-							className={cn(total && "edge-t-m border-line/60")}
+							className={cn(total && "edge-t-m border-line")}
 						>
 							<td className="pr-l text-right tabular-nums">{row.count}</td>
 							<td>
@@ -176,8 +175,7 @@ function Table({
 		<div className="overflow-x-auto px-l">
 			<table className="w-full border-collapse font-mono text-body-m">
 				<thead>
-					{/* design-escape-ok(opacity): shipped value; border/60 */}
-					<tr className="edge-b-m border-line/60 text-ink-3">
+					<tr className="edge-b-m border-line text-ink-3">
 						{header.map((cell, column) => (
 							<th
 								key={columns[column]}
@@ -199,8 +197,7 @@ function Table({
 						return (
 							<tr
 								key={`${id}#${repeat}`}
-								// design-escape-ok(opacity): shipped value; border/30
-								className="edge-b-m border-line/30 last:edge-b-none"
+								className="edge-b-m border-line-soft last:edge-b-none"
 							>
 								{columns.map((columnKey, column) => (
 									<td
@@ -308,8 +305,7 @@ export function ShellOutput({
 						key={`${part.text}#${repeat}`}
 						className={cn(
 							"flex flex-col gap-xs",
-							// design-escape-ok(opacity): shipped value; border/60
-							index > 0 && "mt-m edge-t-m border-line/60 pt-m",
+							index > 0 && "mt-m edge-t-m border-line pt-m",
 						)}
 					>
 						{several && label ? (

@@ -3,9 +3,9 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 const KIND_COLOR = {
-	// design-escape-ok(colour): shipped value; syntax paint, oklch(0.56 0.16 55) numbers and oklch(0.5 0.2 292.717) literals
+	// design-escape-ok(colour): data paint; JSON syntax colours, numbers
 	number: "text-[oklch(0.56_0.16_55)] dark:text-[oklch(0.8_0.14_55)]",
-	// design-escape-ok(colour): shipped value; syntax paint, oklch(0.5 0.2 292.717) literals (0.74 0.16 in dark)
+	// design-escape-ok(colour): data paint; JSON syntax colours, literals
 	literal: "text-[oklch(0.5_0.2_292.717)] dark:text-[oklch(0.74_0.16_292.717)]",
 } as const;
 

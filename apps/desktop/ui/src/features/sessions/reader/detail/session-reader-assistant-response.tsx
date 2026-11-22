@@ -103,8 +103,7 @@ export const AssistantResponse = memo(function AssistantResponse({
 		<div className="group/bubble flex items-start justify-between gap-m px-xs">
 			<div
 				data-selectable=""
-				// design-escape-ok(type,radius,space): shipped value; prose 14/22.75 with 13px code, 4px code corners, 20px list indent
-				className="min-w-0 flex-1 text-sm leading-relaxed [overflow-wrap:anywhere] [&_a]:underline [&_code]:rounded [&_code]:bg-field [&_code]:px-xs [&_code]:font-mono [&_code]:text-[0.8125rem] [&_h1]:mt-l [&_h1]:font-heavy [&_h2]:mt-l [&_h2]:font-heavy [&_h3]:mt-l [&_h3]:font-heavy [&_li]:my-xxs [&_ol]:my-s [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-s [&_pre]:my-m [&_pre]:overflow-x-auto [&_pre]:corner-s [&_pre]:bg-field [&_pre]:p-l [&_pre_code]:bg-transparent [&_pre_code]:p-zero [&_table]:my-m [&_td]:edge-m [&_td]:px-m [&_td]:py-xs [&_th]:edge-m [&_th]:px-m [&_th]:py-xs [&_ul]:my-s [&_ul]:list-disc [&_ul]:pl-5 [&>*:first-child]:mt-zero [&>*:last-child]:mb-zero"
+				className="min-w-0 flex-1 text-body-xl [overflow-wrap:anywhere] [&_a]:underline [&_code]:corner-xs [&_code]:bg-field [&_code]:px-xs [&_code]:font-mono [&_code]:text-body-l [&_h1]:mt-l [&_h1]:font-heavy [&_h2]:mt-l [&_h2]:font-heavy [&_h3]:mt-l [&_h3]:font-heavy [&_li]:my-xxs [&_ol]:my-s [&_ol]:list-decimal [&_ol]:pl-xl [&_p]:my-s [&_pre]:my-m [&_pre]:overflow-x-auto [&_pre]:corner-s [&_pre]:bg-field [&_pre]:p-l [&_pre_code]:bg-transparent [&_pre_code]:p-zero [&_table]:my-m [&_td]:edge-m [&_td]:px-m [&_td]:py-xs [&_th]:edge-m [&_th]:px-m [&_th]:py-xs [&_ul]:my-s [&_ul]:list-disc [&_ul]:pl-xl [&>*:first-child]:mt-zero [&>*:last-child]:mb-zero"
 			>
 				<Markdown components={SIGNAL_MARKDOWN} remarkPlugins={REMARK_PLUGINS}>
 					{text}

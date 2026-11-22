@@ -179,10 +179,8 @@ export function Row({ children }: { children: ReactNode }) {
 			className={cn(
 				"flex min-h-8 min-w-0 items-center gap-[calc(var(--space-m)+var(--space-xxs))]",
 				"corner-s px-m py-xs",
-				// design-escape-ok(type): shipped value; 13px on the card's 14/20 ratio (18.57)
-				"text-[13px]/[calc(20/14)]",
-				// design-escape-ok(opacity): shipped value; field/60
-				"hover:bg-field/60",
+				"text-body-l",
+				"hover:bg-hover",
 			)}
 		>
 			{children}
@@ -229,8 +227,7 @@ export function PlaceLink({
 			onClick={() => onOpen(first.turnId, first.agent)}
 			className={cn(
 				"shrink-0",
-				// design-escape-ok(radius): shipped value; 4px
-				"rounded-[4px] px-xs",
+				"corner-xs px-xs",
 				"text-body-m font-medium tabular-nums",
 				"text-ink-3 focus-outline",
 				"hover:bg-field hover:text-ink",
@@ -462,23 +459,9 @@ export function SummarySubagents({
 }
 
 export function Empty({ children }: { children: ReactNode }) {
-	return (
-		<p
-			// design-escape-ok(type): shipped value; 13px on the card's 14/20 ratio (18.57)
-			className="text-[13px]/[calc(20/14)] text-ink-3"
-		>
-			{children}
-		</p>
-	);
+	return <p className="text-body-l text-ink-3">{children}</p>;
 }
 
 export function Pending() {
-	return (
-		<p
-			// design-escape-ok(type): shipped value; 13px on the card's 14/20 ratio (18.57)
-			className="text-[13px]/[calc(20/14)] text-ink-3"
-		>
-			Loading…
-		</p>
-	);
+	return <p className="text-body-l text-ink-3">Loading…</p>;
 }

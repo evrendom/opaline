@@ -296,7 +296,7 @@ export function ReaderMinimap({
 					/>
 				))}
 				<path
-					// design-escape-ok(colour): shipped value; violet-500/30 data paint (violet-400/30 in dark)
+					// design-escape-ok(colour): data paint; the main thread's lane, its rail at rest
 					className="fill-none stroke-violet-500/30 dark:stroke-violet-400/30"
 					d={`${line.rail} ${line.branches}`}
 					strokeLinecap="round"
@@ -320,7 +320,7 @@ export function ReaderMinimap({
 						clipPath={`url(#${litId})`}
 					>
 						<path
-							// design-escape-ok(colour): shipped value; violet-500 data paint (violet-400 in dark)
+							// design-escape-ok(colour): data paint; the main thread's lane, its lit rail
 							className="fill-none stroke-violet-500 dark:stroke-violet-400"
 							d={`${line.rail} ${line.branches}`}
 							strokeLinecap="round"
@@ -399,9 +399,8 @@ export function ReaderMinimap({
 							node.kind === "subagent"
 								? "fill-canvas"
 								: node.alert
-									? // design-escape-ok(colour): shipped value; rose-500 alert dot (rose-400 in dark)
-										"fill-rose-500 stroke-rose-500 dark:fill-rose-400 dark:stroke-rose-400"
-									: // design-escape-ok(colour): shipped value; violet-500/60 data paint (violet-400/60 in dark)
+									? "fill-error stroke-error"
+									: // design-escape-ok(colour): data paint; the main thread's lane, its turn dots
 										"fill-canvas stroke-violet-500/60 dark:stroke-violet-400/60"
 						}
 						style={
@@ -483,8 +482,7 @@ export function ReaderMinimap({
 			</svg>
 			<div
 				ref={viewRef}
-				// design-escape-ok(opacity): no role renders this; ring-ink/8 hover:ring-ink/15 dark:ring-ink/12 dark:hover:bg-ink/8
-				className="absolute inset-x-0 top-0 corner-s bg-canvas corner-squircle squircle:corner-l ring-1 ring-ink/8 hover:ring-ink/15 dark:bg-hover dark:ring-ink/12 dark:hover:bg-ink/8"
+				className="absolute inset-x-0 top-0 corner-s bg-canvas corner-squircle squircle:corner-l ring-1 ring-line hover:ring-line dark:bg-hover dark:hover:bg-hover-strong"
 			/>
 			<MinimapHeads
 				focus={focus ?? null}

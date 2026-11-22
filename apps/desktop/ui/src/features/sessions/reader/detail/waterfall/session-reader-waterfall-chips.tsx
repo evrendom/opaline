@@ -69,9 +69,9 @@ function ciTone(ci: SessionReaderStep["ci"]): {
 		conclusion === "startup_failure"
 	)
 		return {
-			bar: "bg-rose-500",
-			text: "text-rose-600 dark:text-rose-400",
-			tint: "var(--color-rose-500)",
+			bar: "bg-error",
+			text: "text-error",
+			tint: "var(--error)",
 		};
 	return {
 		bar: "bg-neutral-400 dark:bg-neutral-500",
@@ -344,7 +344,7 @@ export function stepBar(
 		return {
 			className: step.notification?.agent ? "bg-pink-500" : "bg-blue-400",
 		};
-	if (step.isError) return { className: "bg-rose-500" };
+	if (step.isError) return { className: "bg-error" };
 	if (step.kind === "agent") {
 		return { style: { backgroundColor: agentColor(step.name) } };
 	}

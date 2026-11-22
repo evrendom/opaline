@@ -45,8 +45,7 @@ export function McpCall({ event }: { event: ToolEvent }) {
 	const named = mcpTool(event.toolName);
 	const input = Object.entries(getRawToolInput(event.input));
 	return (
-		// design-escape-ok(opacity,colour): shipped value; border/60, dark:bg-black/25
-		<div className="flex flex-col divide-y divide-line-soft corner-m edge-m border-line/60 bg-canvas px-l dark:bg-black/25">
+		<div className="flex flex-col divide-y divide-line-soft corner-m edge-m border-line bg-canvas px-l">
 			{named ? (
 				<p className="flex min-w-0 items-baseline gap-s py-m">
 					<span className="shrink-0 corner-xs bg-field px-xs text-body-xs font-medium text-ink-3 [line-height:var(--line-m)]">

@@ -287,8 +287,7 @@ function ReadRuler({
 			title={title}
 			className="flex w-10 shrink-0 flex-col items-end gap-xxs"
 		>
-			{/* design-escape-ok(opacity): shipped value; muted-foreground/70 */}
-			<span className="text-body-xs line-solid text-ink-3/70 tabular-nums">
+			<span className="text-body-xs line-solid text-ink-3 tabular-nums">
 				{count === null
 					? "all lines"
 					: `${count.toLocaleString()} ${count === 1 ? "line" : "lines"}`}
@@ -299,8 +298,7 @@ function ReadRuler({
 					return (
 						<span
 							key={`${range.from}-${range.to}`}
-							// design-escape-ok(opacity): no role renders this; bg-ink-3/55
-							className="absolute inset-y-0 min-w-0.5 corner-full bg-ink-3/55"
+							className="absolute inset-y-0 min-w-0.5 corner-full bg-ink-4"
 							style={{
 								left: share(range.from - 1),
 								width: share(to - range.from + 1),
@@ -320,8 +318,7 @@ function RepoRow({ root }: { root: string }) {
 				"flex h-6 items-center gap-s",
 				"px-m pt-xs",
 				"text-body-s font-medium",
-				// design-escape-ok(opacity): shipped value; muted-foreground/70
-				"text-ink-3/70",
+				"text-ink-3",
 			)}
 		>
 			<IconFolderOpenFilled
@@ -362,8 +359,7 @@ function FolderRow({
 				"flex min-h-6 items-start gap-s",
 				"pt-s pr-m pb-xxs",
 				"text-body-s",
-				// design-escape-ok(opacity): shipped value; muted-foreground/70
-				"text-ink-3/70",
+				"text-ink-3",
 				inRepo ? "pl-xxl" : "pl-m",
 			)}
 		>
@@ -437,11 +433,8 @@ function StepRow({
 					aria-hidden="true"
 					className={cn(
 						"size-3 shrink-0",
-						step.kind === "check" &&
-							!step.failed &&
-							// design-escape-ok(colour): deliberate exception, dark lifts a passed check to green-400 for contrast; dark's success is emerald-500, a visibly different green
-							"text-success dark:text-green-400",
-						// design-escape-ok(base): a category colour from the opal sheen (data paint)
+						step.kind === "check" && !step.failed && "text-success",
+						// design-escape-ok(base): data paint; a category colour from the opal sheen
 						step.kind === "edit" && "text-color-3",
 						!failedCheck &&
 							step.kind !== "check" &&
@@ -481,11 +474,11 @@ function StepRow({
 				) : null}
 				{edit ? (
 					<span className="shrink-0 text-body-s tabular-nums">
-						{/* design-escape-ok(colour): diff paint: added lines */}
+						{/* design-escape-ok(colour): data paint; diff marks, added lines */}
 						<span className="text-success dark:text-green-400">
 							+{edit.added}
 						</span>{" "}
-						{/* design-escape-ok(colour): diff paint: removed lines */}
+						{/* design-escape-ok(colour): data paint; diff marks, removed lines */}
 						<span className="text-error dark:text-red-400">
 							−{edit.removed}
 						</span>

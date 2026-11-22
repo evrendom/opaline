@@ -25,8 +25,7 @@ export function PickStrip({
 				"flex h-8 shrink-0 items-center gap-s",
 				"corner-s pr-xs",
 				"text-body-m",
-				// design-escape-ok(opacity): no role renders this; bg-field/50
-				"bg-field/50",
+				"bg-hover",
 				untitled && !run && !agent ? "w-max min-w-full pl-xs" : "pl-m",
 			)}
 		>
@@ -41,10 +40,7 @@ export function PickStrip({
 				<span className="shrink-0 font-medium">Entire session</span>
 			)}
 			{summary ? (
-				<span
-					// design-escape-ok(type): shipped value; 11px on the strip's 12/16 ratio
-					className="min-w-0 truncate text-[11px]/[calc(16/12)] text-ink-3"
-				>
+				<span className="min-w-0 truncate text-body-s text-ink-3">
 					{summary}
 				</span>
 			) : null}

@@ -156,8 +156,7 @@ export function Crumb({
 				"inline-flex min-w-0 items-center gap-xs",
 				"corner-s py-xxs pr-xxs pl-m",
 				"text-body-xl font-medium",
-				// design-escape-ok(opacity): no role renders this; bg-field/70
-				"bg-field/70",
+				"bg-field",
 			)}
 			title={title}
 		>

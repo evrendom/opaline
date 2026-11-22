@@ -49,8 +49,7 @@ export function MemberBubble({
 					</AvatarFallback>
 				</Avatar>
 			)}
-			{/* design-escape-ok(space): shipped value; 10px block padding */}
-			<div className="min-w-0 flex-1 corner-m bg-surface px-l py-[10px] shadow-card corner-squircle squircle:corner-xl-inner">
+			<div className="min-w-0 flex-1 corner-m bg-surface px-l py-m shadow-card corner-squircle squircle:corner-xl-inner">
 				{folded ? (
 					<TwoLines className="text-body-xl">{message}</TwoLines>
 				) : (

@@ -334,10 +334,9 @@ export function ContextTiles({
 							its && !markedInside && !focused && markGlow(its.tone),
 							focused &&
 								(tile.part
-									? // design-escape-ok(shadow): the focused tile's glow is tinted from its category
+									? // design-escape-ok(shadow): artwork; the focused tile's glow is tinted from its category
 										"bg-[color-mix(in_oklab,var(--tint)_34%,transparent)] shadow-[0_2px_10px_-2px_color-mix(in_oklab,var(--tint)_45%,transparent)] dark:bg-[color-mix(in_oklab,var(--tint)_40%,transparent)] dark:shadow-[0_2px_12px_-2px_color-mix(in_oklab,var(--tint)_55%,transparent)]"
-									: // design-escape-ok(shadow,opacity): the focused untinted tile's lift pairs with the tinted tiles' glow
-										"bg-hover shadow-[0_2px_10px_-2px_rgba(0,0,0,0.2)] dark:bg-ink/6 dark:shadow-[0_2px_12px_-2px_rgba(0,0,0,0.6)]"),
+									: "bg-hover-strong shadow-raised"),
 						)}
 						style={{
 							...look.style,

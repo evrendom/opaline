@@ -111,8 +111,7 @@ function Inline({ text }: { text: string }) {
 				return (
 					<code
 						key={key}
-						// design-escape-ok(type,radius): shipped value; code at 0.85em of its prose, 4px corners
-						className="rounded-[4px] bg-field px-xs py-[calc(var(--space-xxs)/2)] font-mono text-[0.85em]"
+						className="corner-xs bg-field px-xs py-[calc(var(--space-xxs)/2)] font-mono text-body-s"
 					>
 						{part.slice(1, -1)}
 					</code>
@@ -137,8 +136,7 @@ export function SetupProse({
 		<div
 			data-selectable=""
 			className={cn(
-				// design-escape-ok(type): shipped value; 13/21.125 prose
-				"flex flex-col gap-[calc(var(--space-m)+var(--space-xxs))] text-[13px] leading-relaxed [overflow-wrap:anywhere]",
+				"flex flex-col gap-[calc(var(--space-m)+var(--space-xxs))] text-body-l [overflow-wrap:anywhere]",
 				className,
 			)}
 		>
@@ -151,8 +149,7 @@ export function SetupProse({
 								key={key}
 								className={cn(
 									"font-heavy text-balance",
-									// design-escape-ok(type): shipped value; 13px on the prose's line
-									block.level <= 2 ? "mt-xs text-body-xl" : "text-[13px]",
+									block.level <= 2 ? "mt-xs text-body-xl" : "text-body-l",
 								)}
 							>
 								<Inline text={block.text} />
@@ -176,8 +173,7 @@ export function SetupProse({
 							<List
 								key={key}
 								className={cn(
-									// design-escape-ok(opacity): shipped value; muted-foreground/70
-									"space-y-xxs pl-[calc(var(--space-xl)+var(--space-xs))] marker:text-ink-3/70",
+									"space-y-xxs pl-[calc(var(--space-xl)+var(--space-xs))] marker:text-ink-3",
 									block.ordered ? "list-decimal" : "list-disc",
 								)}
 							>
@@ -194,8 +190,7 @@ export function SetupProse({
 						return (
 							<pre
 								key={key}
-								// design-escape-ok(type): shipped value; 11/20
-								className="overflow-x-auto corner-s bg-field px-l py-m font-mono text-[11px]/5"
+								className="overflow-x-auto corner-s bg-field px-l py-m font-mono text-body-s"
 							>
 								{block.lines.join("\n")}
 							</pre>
@@ -207,8 +202,7 @@ export function SetupProse({
 							</div>
 						);
 					case "rule":
-						// design-escape-ok(opacity): shipped value; border/60
-						return <hr key={key} className="border-line/60" />;
+						return <hr key={key} className="border-line" />;
 					default:
 						return null;
 				}

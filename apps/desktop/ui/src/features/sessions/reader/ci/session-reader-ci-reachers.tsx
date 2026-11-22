@@ -14,8 +14,7 @@ import {
 function TurnTag({ index, turnId }: { index: number; turnId: string }) {
 	return (
 		<span className="flex shrink-0 items-baseline gap-s tabular-nums">
-			{/* design-escape-ok(opacity): shipped value; muted-foreground/70 */}
-			<span className="w-5 text-ink-3/70">{index + 1}</span>
+			<span className="w-5 text-ink-3">{index + 1}</span>
 			<span className="font-mono text-ink-3">{shortRunId(turnId)}</span>
 		</span>
 	);
@@ -29,8 +28,7 @@ function HowWords({ link }: { link: CiReachLink }) {
 			title={words.full}
 			className={cn(
 				"shrink-0 text-body-s whitespace-nowrap",
-				// design-escape-ok(opacity): no role renders this; text-ink/70
-				exact ? "text-ink/70" : "text-ink-3 italic",
+				exact ? "text-ink-2" : "text-ink-3 italic",
 			)}
 		>
 			<span className={cn(exact && "font-medium")}>
@@ -85,8 +83,7 @@ export function ReachedBy({
 								<span
 									className={cn(
 										"min-w-0 flex-1 truncate",
-										// design-escape-ok(opacity): no role renders this; text-ink/85
-										main ? "text-ink/85" : "text-ink-3",
+										main ? "text-ink" : "text-ink-3",
 									)}
 								>
 									{first.prompt ?? "No prompt"}

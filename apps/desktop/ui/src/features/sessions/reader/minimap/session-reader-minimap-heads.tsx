@@ -74,8 +74,7 @@ export function MinimapHeads({
 					{member.imageUrl ? (
 						<AvatarImage src={member.imageUrl} alt="" />
 					) : null}
-					{/* design-escape-ok(type): shipped value; 6.4px initials */}
-					<AvatarFallback className="text-[0.4rem]">
+					<AvatarFallback className="text-body-xxs">
 						{member.label.charAt(0).toUpperCase()}
 					</AvatarFallback>
 				</Avatar>

@@ -159,8 +159,7 @@ export function CiRoundDots({
 								"size-2 corner-full transition-transform group-hover/dot:scale-125",
 								DOT[round.outcome],
 								picked &&
-									// design-escape-ok(opacity): no role renders this; ring-ink/70
-									"scale-125 ring-2 ring-ink/70 ring-offset-1 ring-offset-canvas",
+									"scale-125 ring-2 ring-ink-2 ring-offset-1 ring-offset-canvas",
 							)}
 						/>
 					</button>
@@ -183,8 +182,7 @@ export function CiPushDetail({
 }) {
 	const look = OUTCOME[round.outcome];
 	return (
-		// design-escape-ok(opacity): no role renders this; bg-field/40
-		<section className="flex flex-col gap-m corner-m bg-field/40 py-l">
+		<section className="flex flex-col gap-m corner-m bg-hover py-l">
 			<div className="flex min-w-0 flex-col gap-xs px-l">
 				<div className="flex min-w-0 items-center gap-m text-body-xl">
 					<Glyph icon={look.icon} className={cn("size-4", look.className)} />
@@ -294,7 +292,7 @@ function PushRun({ run }: { run: SummaryCiRun }) {
 
 const END_DOT = {
 	closed: "bg-error",
-	// design-escape-ok(colour): shipped value; violet-500 data paint
+	// design-escape-ok(colour): data paint; GitHub's merged purple
 	merged: "bg-violet-500",
 	open: "edge-m border-ink-4",
 };
@@ -368,8 +366,7 @@ export function CiRounds({
 									"corner-m px-l py-s",
 									"text-left",
 									"transition-colors",
-									// design-escape-ok(opacity): no role renders this; hover:bg-hover/40
-									picked ? "bg-field ring-1 ring-line" : "hover:bg-hover/40",
+									picked ? "bg-field ring-1 ring-line" : "hover:bg-hover",
 								)}
 							>
 								<LineNode
@@ -406,8 +403,7 @@ export function CiRounds({
 										<span className="h-1.5 min-w-0 flex-1">
 											{round.ciMs !== null ? (
 												<span
-													// design-escape-ok(opacity): no role renders this; bg-ink-3/35
-													className="block h-full min-w-[2px] corner-full bg-ink-3/35"
+													className="block h-full min-w-[2px] corner-full bg-ink-4"
 													style={{
 														width: `${(round.ciMs / longest) * 100}%`,
 													}}

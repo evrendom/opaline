@@ -126,8 +126,7 @@ export function SeenFile({
 				<div className="flex flex-col gap-m pt-m pb-xl">
 					<DiffView hunks={hunks} language={languageForPath(path)} />
 					{seen.cut ? (
-						// design-escape-ok(opacity): shipped value; muted-foreground/70
-						<p className="text-body-m text-ink-3/70">
+						<p className="text-body-m text-ink-3">
 							Cut at {SESSION_RUN_SEEN_LIMIT.toLocaleString()} characters; the
 							rest is in the transcript.
 						</p>

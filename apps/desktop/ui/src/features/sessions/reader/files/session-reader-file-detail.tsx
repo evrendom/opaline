@@ -81,14 +81,14 @@ export function LineCounts({
 	return (
 		<>
 			<FlowNumber
-				// design-escape-ok(colour): diff paint: added lines
+				// design-escape-ok(colour): data paint; diff marks, added lines
 				className="text-success dark:text-green-400"
 				value={added}
 				format={PLAIN_NUMBER}
 				prefix="+"
 			/>{" "}
 			<FlowNumber
-				// design-escape-ok(colour): diff paint: removed lines
+				// design-escape-ok(colour): data paint; diff marks, removed lines
 				className="text-error dark:text-red-400"
 				value={removed}
 				format={PLAIN_NUMBER}
@@ -174,8 +174,7 @@ export function FileDetail({
 				/>
 			</ReaderPaneHeader>
 			<span
-				// design-escape-ok(opacity): shipped value; muted-foreground/70
-				className="-mt-xs truncate pl-m text-left text-body-m text-ink-3/70 [direction:rtl]"
+				className="-mt-xs truncate pl-m text-left text-body-m text-ink-3 [direction:rtl]"
 				title={directory}
 			>
 				{`‎${directory}‎`}

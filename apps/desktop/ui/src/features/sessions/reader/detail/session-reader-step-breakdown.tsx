@@ -81,12 +81,10 @@ function StepFigure({
 		>
 			<div className="flex min-w-0 flex-col gap-xs">
 				<span className="truncate text-body-m text-ink-3">{title}</span>
-				{/* design-escape-ok(type): deliberate exception, 13/16 keeps the figure row dense; body-l's 20px line grows it */}
-				<span className="flex min-w-0 items-baseline gap-s text-[13px]/4 tabular-nums">
+				<span className="flex min-w-0 items-baseline gap-s text-body-l line-tight tabular-nums">
 					<span className="truncate text-ink">{value ?? "—"}</span>
 					{share === null ? null : (
-						// design-escape-ok(opacity): shipped value; muted-foreground/70
-						<span className="shrink-0 text-body-s text-ink-3/70">
+						<span className="shrink-0 text-body-s text-ink-3">
 							{formatShare(fill)}
 						</span>
 					)}

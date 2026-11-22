@@ -102,11 +102,9 @@ function SetupRow({
 				className={cn(
 					"flex min-h-8 min-w-0 flex-1 items-center gap-[calc(var(--space-m)+var(--space-xxs))]",
 					"corner-s px-m py-xs",
-					// design-escape-ok(type): shipped value; 13px on the card's 14/20 ratio (18.57)
-					"text-left text-[13px]/[calc(20/14)]",
+					"text-left text-body-l",
 					"focus-outline",
-					// design-escape-ok(opacity): shipped value; field/60
-					"hover:bg-field/60",
+					"hover:bg-hover",
 				)}
 			>
 				<SetupMark file={file} />
