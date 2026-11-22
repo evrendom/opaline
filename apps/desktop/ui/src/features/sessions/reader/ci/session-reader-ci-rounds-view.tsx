@@ -60,9 +60,9 @@ const OUTCOME = {
 const duration = (ms: number) => formatReaderDuration(ms / 1000);
 
 const DOT: Record<CiRoundOutcome, string> = {
-	cancelled: "edge-m border-ink-disabled",
+	cancelled: "edge-m border-ink-4",
 	failed: "bg-error",
-	other: "bg-ink-disabled",
+	other: "bg-ink-4",
 	passed: "bg-success",
 	flaky: "bg-warning",
 	running: "animate-pulse bg-warning-translucent",
@@ -296,7 +296,7 @@ const END_DOT = {
 	closed: "bg-error",
 	// design-escape-ok(colour): shipped value; violet-500 data paint
 	merged: "bg-violet-500",
-	open: "edge-m border-ink-disabled",
+	open: "edge-m border-ink-4",
 };
 
 function LineNode({

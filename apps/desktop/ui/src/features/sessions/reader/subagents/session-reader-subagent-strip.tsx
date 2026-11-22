@@ -32,7 +32,7 @@ export type SubagentSummary =
 
 export function FactDot() {
 	return (
-		<span aria-hidden="true" className="text-ink-disabled">
+		<span aria-hidden="true" className="text-ink-4">
 			·
 		</span>
 	);

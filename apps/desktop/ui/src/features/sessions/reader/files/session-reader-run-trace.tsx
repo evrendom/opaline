@@ -326,7 +326,7 @@ function RepoRow({ root }: { root: string }) {
 		>
 			<IconFolderOpenFilled
 				aria-hidden="true"
-				className="size-3 shrink-0 text-ink-disabled"
+				className="size-3 shrink-0 text-ink-4"
 			/>
 			<span className="min-w-0 truncate">{root.split("/").at(-1)}</span>
 		</li>
@@ -369,10 +369,10 @@ function FolderRow({
 		>
 			<IconFolderOpenFilled
 				aria-hidden="true"
-				className="mt-xxs size-3 shrink-0 text-ink-disabled"
+				className="mt-xxs size-3 shrink-0 text-ink-4"
 			/>
 			<span className="min-w-0 [overflow-wrap:anywhere]">
-				{same ? <span className="text-ink-disabled">{`${same} / `}</span> : null}
+				{same ? <span className="text-ink-4">{`${same} / `}</span> : null}
 				{fresh}
 			</span>
 		</li>
@@ -454,7 +454,7 @@ function StepRow({
 						aria-hidden="true"
 						className={cn(
 							"size-3.5 shrink-0 transition-colors",
-							selected ? "text-ink" : "text-ink-disabled",
+							selected ? "text-ink" : "text-ink-4",
 						)}
 					/>
 				) : null}

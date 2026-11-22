@@ -113,7 +113,7 @@ export function RunSummaryBar({
 								</span>
 							) : null}
 							{setting ? (
-								<span className="shrink-0 text-ink-disabled">{setting}</span>
+								<span className="shrink-0 text-ink-4">{setting}</span>
 							) : null}
 							{mode?.planMode ? <ConversationTracePlanTag /> : null}
 						</span>
@@ -122,12 +122,12 @@ export function RunSummaryBar({
 						expanded ? (
 							<IconArrowsDiagonalMinimize2
 								aria-hidden="true"
-								className="size-4 shrink-0 text-ink-disabled transition-colors group-hover/run:text-ink"
+								className="size-4 shrink-0 text-ink-4 transition-colors group-hover/run:text-ink"
 							/>
 						) : (
 							<IconArrowsDiagonal
 								aria-hidden="true"
-								className="size-4 shrink-0 text-ink-disabled transition-colors group-hover/run:text-ink"
+								className="size-4 shrink-0 text-ink-4 transition-colors group-hover/run:text-ink"
 							/>
 						)
 					) : null}

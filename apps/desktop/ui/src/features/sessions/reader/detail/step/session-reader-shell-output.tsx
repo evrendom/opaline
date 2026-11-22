@@ -211,7 +211,7 @@ function Table({
 											wrap ? "[overflow-wrap:anywhere]" : "whitespace-nowrap",
 										)}
 									>
-										{row[column] || <span className="text-ink-disabled">—</span>}
+										{row[column] || <span className="text-ink-4">—</span>}
 									</td>
 								))}
 							</tr>

@@ -105,7 +105,7 @@ export function HighlightedCode({
 						{startLine !== undefined || lineNumbers ? (
 							<span
 								aria-hidden="true"
-								className="mr-l shrink-0 text-right text-ink-disabled tabular-nums select-none"
+								className="mr-l shrink-0 text-right text-ink-4 tabular-nums select-none"
 								style={{ width: `${gutter}ch` }}
 							>
 								{lineNumber ?? "⋯"}

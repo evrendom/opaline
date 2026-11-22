@@ -58,7 +58,7 @@ function ciTone(ci: SessionReaderStep["ci"]): {
 				: ci.run.conclusion;
 	if (conclusion === undefined)
 		return {
-			bar: "bg-ink-disabled",
+			bar: "bg-ink-4",
 			text: "text-ink-3",
 			tint: "var(--ink-3)",
 		};

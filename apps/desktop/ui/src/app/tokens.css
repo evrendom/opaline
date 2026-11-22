@@ -25,7 +25,7 @@
 	--ink: var(--neutral-10); /* titles, body, values */
 	--ink-2: var(--neutral-8); /* secondary copy */
 	--ink-3: var(--neutral-7); /* meta, labels, icons, placeholders */
-	--ink-disabled: var(--neutral-6);
+	--ink-4: var(--neutral-6); /* the quietest: disabled text, placeholders, separators */
 	--ink-inverse: var(--neutral-1);
 
 	/* -- Lines: white space first, a line next, a card last */
@@ -139,7 +139,7 @@
 	--color-ink: var(--ink);
 	--color-ink-2: var(--ink-2);
 	--color-ink-3: var(--ink-3);
-	--color-ink-disabled: var(--ink-disabled);
+	--color-ink-4: var(--ink-4);
 	--color-ink-inverse: var(--ink-inverse);
 	--color-line: var(--line);
 	--color-line-soft: var(--line-soft);

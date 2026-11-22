@@ -275,7 +275,7 @@ export function SearchInput({
 						size="icon-xs"
 						aria-label="Clear search"
 						onClick={() => onChange("")}
-						className="corner-full text-ink-disabled hover:text-ink"
+						className="corner-full text-ink-4 hover:text-ink"
 					>
 						<IconX className="size-3.5" />
 					</InputGroupButton>
@@ -308,7 +308,7 @@ export function ToggleChip({
 				// (outline would pin the icon to neutral, hence the svg override).
 				"font-regular transition-[color,box-shadow] active:scale-100",
 				!active &&
-					"text-ink-disabled hover:text-ink-disabled bg-surface hover:bg-hover aria-expanded:bg-hover dark:hover:bg-hover dark:aria-expanded:bg-hover [&_svg:not([class*='text-'])]:text-ink-disabled dark:[&_svg:not([class*='text-'])]:text-ink-disabled",
+					"text-ink-4 hover:text-ink-4 bg-surface hover:bg-hover aria-expanded:bg-hover dark:hover:bg-hover dark:aria-expanded:bg-hover [&_svg:not([class*='text-'])]:text-ink-4 dark:[&_svg:not([class*='text-'])]:text-ink-4",
 			)}
 		>
 			{children}
@@ -401,7 +401,7 @@ export function PaginationFooter({
 				"border-line/50 dark:border-line/40",
 			)}
 		>
-			<span className="text-body-m text-ink-disabled tabular-nums">
+			<span className="text-body-m text-ink-4 tabular-nums">
 				<FlowNumber
 					value={count}
 					format={count >= 1000 ? COMPACT_COUNT : undefined}
@@ -427,7 +427,7 @@ export function PaginationFooter({
 							"h-auto gap-s",
 							"corner-s edge-none p-zero",
 							"text-body-m tabular-nums",
-							"bg-transparent text-ink-disabled shadow-none transition-[color,box-shadow]",
+							"bg-transparent text-ink-4 shadow-none transition-[color,box-shadow]",
 							"data-[size=default]:h-auto",
 							"squircle:corner-s",
 							"hover:text-ink",
@@ -450,7 +450,7 @@ export function PaginationFooter({
 					</SelectContent>
 				</Select>
 			) : (
-				<span className="text-body-m text-ink-disabled tabular-nums">{range}</span>
+				<span className="text-body-m text-ink-4 tabular-nums">{range}</span>
 			)}
 			<div className="ml-s flex items-center gap-xs">
 				<Button

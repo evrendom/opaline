@@ -29,7 +29,7 @@ function summary(value: object): string {
 function Primitive({ value }: { value: unknown }) {
 	if (typeof value === "string")
 		return value === "" ? (
-			<span className="text-ink-disabled">""</span>
+			<span className="text-ink-4">""</span>
 		) : (
 			<span className="whitespace-pre-wrap text-ink [overflow-wrap:anywhere]">
 				{value}
@@ -54,14 +54,14 @@ function Entry({
 	const nested = isNested(value) && entriesOf(value).length > 0;
 	const [open, setOpen] = useState(depth < OPEN_LEVELS);
 	const key = (
-		<span className={cn("text-ink-3", index && "text-ink-disabled")}>{name}</span>
+		<span className={cn("text-ink-3", index && "text-ink-4")}>{name}</span>
 	);
 	if (!nested)
 		return (
 			<>
 				{key}
 				{isNested(value) ? (
-					<span className="text-ink-disabled">
+					<span className="text-ink-4">
 						{Array.isArray(value) ? "[]" : "{}"}
 					</span>
 				) : (
@@ -80,13 +80,13 @@ function Entry({
 				<IconChevronRight
 					aria-hidden="true"
 					className={cn(
-						"size-3.5 shrink-0 text-ink-disabled transition-transform",
+						"size-3.5 shrink-0 text-ink-4 transition-transform",
 						open && "rotate-90",
 					)}
 				/>
 				{key}
 			</button>
-			<span className="text-ink-disabled">{open ? null : summary(value)}</span>
+			<span className="text-ink-4">{open ? null : summary(value)}</span>
 			{open ? (
 				<div className="col-span-2 pl-xl">
 					<Entries depth={depth + 1} value={value} />

@@ -43,7 +43,7 @@ Tailwind reads the same roles as colours: `bg-surface`, `text-ink-3`, `border-li
 - **Layer 1** is what `theme.css` defines: ten neutrals (`neutral-1` page to `neutral-10` strongest text), the opal palette (`color-1` Opaline blue, then the rest of the sheen), success / warning / error, each with a `-transparent` and `-translucent` level; body and display type steps; space; corners; strokes; three shadows; motion.
 - **Layer 2** is what screens are written against:
   - ground: `canvas` (the window's content), `surface` / `card` (cards, panels, menus, controls), `card-soft` (a card on a recessed ground: a tab's active pill, a picked row; a translucent ink wash in dark), `inset` (wells, code, rails), `field` (inputs, chips), `track` (a segmented track and the tone sliding along it), `shelf` (a list's expanded row and its frozen cap: field in light, card in dark), `hover`, `hover-strong`, `wash` (a soft tint on any ground), `mark-fill` (model marks, run tags, placeholder bars; firmer in dark);
-  - ink: `ink`, `ink-2`, `ink-3`, plus `ink-disabled` and `ink-inverse`; two that change character in dark: `ink-soft` (secondary icons: ink-2, quieting to ink-3 in dark) and `ink-meta` (the activity panels' meta: ink-3, opal-tinted in dark);
+  - ink: `ink`, `ink-2`, `ink-3`, plus `ink-4` and `ink-inverse`; two that change character in dark: `ink-soft` (secondary icons: ink-2, quieting to ink-3 in dark) and `ink-meta` (the activity panels' meta: ink-3, opal-tinted in dark);
   - lines: `line` (hairlines, dividers, rails), `line-strong` (opaque edges), `line-soft` (chart grids, quiet dividers), `line-faint` (the faint ring around a small avatar or logo);
   - action: `primary`, `primary-hover`, `primary-fg`, `focus`, `focus-ring` (the soft ring around a focused control: `focus-visible:ring-focus-ring`); `accent`, `accent-tint`, `accent-line`, `accent-fg` (text and icons on an accent fill, white in both modes);
   - state: `success`, `warning`, `error`, `warning-tint` and `error-tint` (pastel fills), `warning-line` and `error-line` (their edges);
@@ -57,7 +57,7 @@ Tailwind reads the same roles as colours: `bg-surface`, `text-ink-3`, `border-li
 1. **Neutral is the primary action.** One filled `Button` per view, filled with `primary`. Colour never says “click me”.
 2. **Colour means state.** `accent` marks selection, links and information; success / warning / error mark outcomes. A sentiment chip is `bg-{state}-tint text-{state}`.
 3. **Data paint is data.** Chart series, activity lanes, event dots, cost heat, model tones, syntax colours, a language's brand colour and the opal sheen carry meaning. They stay as authored and never take a theme role: two categories must never share a colour.
-4. **Three inks.** `ink` for what you read, `ink-2` for secondary copy, `ink-3` for meta, labels, icons and placeholders. `ink-disabled` is disabled text and the faintest hints (an empty value's dash, a separator glyph). No literal grey and no opacity modifier on an ink. The app ships a few inks at a fixed strength, and those are roles too, the **shipped shades**: `ink-90`, `ink-80` (ink at 90 and 80%), `ink-3-60`, `ink-3-50`, `ink-3-40` (ink-3 at those strengths) and `hover-50`. Each renders exactly what `text-ink/90` or `text-ink-3/50` would, and follows the mode with its role. Use one where the design calls for that strength; don't add another `/N` modifier.
+4. **Three inks.** `ink` for what you read, `ink-2` for secondary copy, `ink-3` for meta, labels, icons and placeholders. `ink-4` is disabled text and the faintest hints (an empty value's dash, a separator glyph). No literal grey and no opacity modifier on an ink. The app ships a few inks at a fixed strength, and those are roles too, the **shipped shades**: `ink-90`, `ink-80` (ink at 90 and 80%), `ink-3-60`, `ink-3-50`, `ink-3-40` (ink-3 at those strengths) and `hover-50`. Each renders exactly what `text-ink/90` or `text-ink-3/50` would, and follows the mode with its role. Use one where the design calls for that strength; don't add another `/N` modifier.
 5. **White space first, a line next, a card last.** Separate with space; then a `line`; a `surface-card` only when the group is independently actionable. Edges are hairline shadows (`shadow-card`, `shadow-control`), not borders.
 6. **Squircles on surfaces, pills on controls.** Corners are `xs` 6, `s` 8, `m` 10, `l` 14, `xl` 22. A squircle needs a larger radius to read as round as an arc, so the pair goes together: cards and panels `corner-m squircle:corner-xl corner-squircle`, menus and popovers `corner-s squircle:corner-l corner-squircle`. Toolbar buttons, badges and avatars are `corner-full`; chips are `corner-xs`. A child drawn 1px inside a surface (a hover or focus overlay on a tile) keeps the corners concentric with `corner-s-inset squircle:corner-xl-inset`; one drawn a space step (4px) inside an xl squircle (a row highlight in a card) takes `squircle:corner-xl-inner` (18), and an outline 4px outside one (a drop target around a shelf) `squircle:corner-xl-outer` (26). A skeleton bar too small for `xs` still takes `corner-xs`.
 7. **Data in the data face.** Money, times, counts, percentages and code are Geist Mono (`font-data`) with `tabular-nums`. Everything else, headings and page titles included, is Inter: a page title is `text-display-xs font-medium`.
@@ -90,7 +90,7 @@ How an escape maps onto the system. Nothing may visibly change: take the role or
 | text `ink/90`, `ink/95` | `ink` |
 | text `ink/70`–`ink/80` | `ink-2` |
 | text `ink/60`, `ink-2/…` | `ink-3` |
-| text `ink-3/40`–`ink-3/70` | `ink-disabled` |
+| text `ink-3/40`–`ink-3/70` | `ink-4` |
 | fill `ink/3`–`ink/5`, `ink-3/10` | `wash` (or `hover` when it is a pointer state) |
 | fill `ink/6`–`ink/10`, `ink-3/15`–`ink-3/20` | `hover-strong` |
 | edge `ink/6`–`ink/15`, `ink-3/20`–`ink-3/30` | `line` |
@@ -103,7 +103,7 @@ How an escape maps onto the system. Nothing may visibly change: take the role or
 | `{success,warning,error}/5`–`/15`, `accent/10`–`/20` | `{state}-tint`, `accent-tint` |
 | `{success,warning,error}/20`–`/50` as an edge or bar, `accent/30`+ | `{state}-line`, `accent-line` |
 | `text-{state}/…` | `text-{state}` |
-| `var(--neutral-N)`, `bg-neutral-N`, `color-N` outside data paint | the role that holds it (`neutral-3` is `field`, `neutral-6` is `ink-disabled` …) |
+| `var(--neutral-N)`, `bg-neutral-N`, `color-N` outside data paint | the role that holds it (`neutral-3` is `field`, `neutral-6` is `ink-4` …) |
 | duration 50–110ms | `--motion-quick-duration` (100) |
 | duration 120–170ms | `--motion-duration` (150) |
 | duration 180–250ms | `--motion-medium-duration` (200) |

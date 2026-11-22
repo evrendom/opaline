@@ -50,7 +50,7 @@ export function MarkLegend({
 				className,
 			)}
 		>
-			<span className="flex h-6 items-center px-m text-ink-disabled">Errors</span>
+			<span className="flex h-6 items-center px-m text-ink-4">Errors</span>
 			<ul aria-label="Errors" className="flex min-w-0 items-center gap-xxs">
 				{shown.map((tone) => (
 					<li key={tone} className="flex h-6 items-center gap-s px-m">

@@ -141,7 +141,7 @@ function BreakdownStrip({
 							style={{ backgroundColor: part.color }}
 						/>
 						{part.label} {format(part.value)}
-						<span className="text-ink-disabled">{share(part.value)}</span>
+						<span className="text-ink-4">{share(part.value)}</span>
 					</span>
 				))}
 			</span>
@@ -281,7 +281,7 @@ function Touched({ marks }: { marks: readonly SessionReaderTurnMark[] }) {
 						<span className="flex items-center gap-s text-body-m text-ink-3">
 							<Icon aria-hidden="true" className={cn("size-3.5", className)} />
 							{label}
-							<span className="text-ink-disabled tabular-nums">
+							<span className="text-ink-4 tabular-nums">
 								{mark.items.length}
 							</span>
 						</span>

@@ -144,7 +144,7 @@ function RowIcon({
 	if (folder) {
 		const Folder = expanded ? IconFolderOpenFilled : IconFolderFilled;
 		return (
-			<Folder className="size-3.5 shrink-0 text-ink-disabled transition-colors group-hover/row:text-ink-3" />
+			<Folder className="size-3.5 shrink-0 text-ink-4 transition-colors group-hover/row:text-ink-3" />
 		);
 	}
 	const { Icon } = getFileLanguage(name);
@@ -153,7 +153,7 @@ function RowIcon({
 			aria-hidden="true"
 			className={cn(
 				"size-3.5 shrink-0 transition-colors",
-				selected ? "text-ink" : "text-ink-disabled group-hover/row:text-ink-3",
+				selected ? "text-ink" : "text-ink-4 group-hover/row:text-ink-3",
 			)}
 		/>
 	);
@@ -332,7 +332,7 @@ export function FileTree({
 									<IconChevronRight
 										aria-hidden="true"
 										className={cn(
-											"size-3 shrink-0 text-ink-disabled transition-transform",
+											"size-3 shrink-0 text-ink-4 transition-transform",
 											row.isExpanded && "rotate-90",
 										)}
 									/>
@@ -353,7 +353,7 @@ export function FileTree({
 									{row.segments.map((segment, part) => (
 										<span key={row.segments.slice(0, part + 1).join("/")}>
 											{part > 0 ? (
-												<span className="text-ink-disabled"> / </span>
+												<span className="text-ink-4"> / </span>
 											) : null}
 											{segment}
 										</span>
@@ -379,7 +379,7 @@ export function FileTree({
 										{status === "read" ? (
 											<IconEyeFilled
 												aria-hidden="true"
-												className="size-3 text-ink-disabled"
+												className="size-3 text-ink-4"
 											/>
 										) : status ? (
 											STATUS_LETTER[status]

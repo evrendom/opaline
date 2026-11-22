@@ -282,7 +282,7 @@ function renderRow(
 					{line.newNumber}
 				</span>
 				<span skullet-ignore="" className="w-2 shrink-0" />
-				<span className={cn("whitespace-pre", !isLit && "text-ink-disabled")}>
+				<span className={cn("whitespace-pre", !isLit && "text-ink-4")}>
 					{isLit ? lineContent(line.text, tokens, line.marks, "") : line.text}
 				</span>
 			</div>
@@ -303,7 +303,7 @@ function renderRow(
 			)}
 		>
 			<span
-				className="shrink-0 text-right text-ink-disabled tabular-nums select-none"
+				className="shrink-0 text-right text-ink-4 tabular-nums select-none"
 				style={numberStyle}
 			>
 				{line.kind === "removed" ? line.oldNumber : line.newNumber}

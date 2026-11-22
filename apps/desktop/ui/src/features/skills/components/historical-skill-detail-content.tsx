@@ -99,7 +99,7 @@ export function HistoricalSkillDetailContent({
 							size="xs"
 							variant="quiet"
 							aria-pressed={raw}
-							className="text-ink-disabled hover:text-ink"
+							className="text-ink-4 hover:text-ink"
 							onClick={() => setRaw((value) => !value)}
 						>
 							{raw ? "Rendered" : "Raw"}

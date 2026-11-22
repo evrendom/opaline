@@ -379,7 +379,7 @@ function Spaces({ count }: { count: number }) {
 	return (
 		<span
 			title={`${count} space${count === 1 ? "" : "s"}`}
-			className="text-ink-disabled select-none"
+			className="text-ink-4 select-none"
 		>
 			{"·".repeat(count)}
 		</span>
@@ -405,7 +405,7 @@ function WordsButton({
 			className={cn(
 				"inline-flex size-5 shrink-0 items-center justify-center",
 				"ml-auto corner-xs focus-outline",
-				"text-ink-disabled transition-colors",
+				"text-ink-4 transition-colors",
 				"hover:bg-hover hover:text-ink",
 				open && "bg-field text-ink",
 			)}

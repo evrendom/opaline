@@ -195,7 +195,7 @@ export function ToolCard({
 					) : null}
 				</AnimatePresence>
 				{text ? null : (
-					<p className="px-l pb-xs text-body-m text-ink-disabled">No output</p>
+					<p className="px-l pb-xs text-body-m text-ink-4">No output</p>
 				)}
 			</div>
 		</section>

@@ -39,7 +39,7 @@ export function ThemeSwitcher() {
 							"relative flex size-7 items-center justify-center",
 							"corner-full",
 							"focus-outline transition-colors",
-							active ? "text-ink" : "text-ink-disabled hover:text-ink",
+							active ? "text-ink" : "text-ink-4 hover:text-ink",
 						)}
 					>
 						{active ? (

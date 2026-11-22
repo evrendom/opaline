@@ -179,5 +179,5 @@ export function Crumb({
 }
 
 export function CrumbSeparator() {
-	return <span className="shrink-0 text-ink-disabled">›</span>;
+	return <span className="shrink-0 text-ink-4">›</span>;
 }

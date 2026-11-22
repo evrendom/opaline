@@ -160,7 +160,7 @@ function PickCrumb({
 		<div className="-order-1 mr-auto -ml-xxs flex shrink-0 items-center gap-s text-body-xxl font-medium tracking-[-0.025em] tabular-nums">
 			<IconChevronRight
 				aria-hidden="true"
-				className="size-4 shrink-0 text-ink-disabled"
+				className="size-4 shrink-0 text-ink-4"
 				stroke={1.5}
 			/>
 			{agent ? (

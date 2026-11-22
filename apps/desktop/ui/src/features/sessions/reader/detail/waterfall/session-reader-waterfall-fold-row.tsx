@@ -86,7 +86,7 @@ export function FoldRow({
 			// design-escape-ok(opacity): no role renders this; bg-ink-3/25
 			baseClassName="bg-ink-3/25"
 			color="var(--ink-3)"
-			fillClassName="bg-ink-disabled"
+			fillClassName="bg-ink-4"
 			left={offset}
 			width={width}
 		>

@@ -97,7 +97,7 @@
 	background: var(--surface);
 }
 .dark .cli-onboarding-divider {
-	color: var(--ink-disabled);
+	color: var(--ink-4);
 }
 .dark .cli-onboarding-email input {
 	/* design-escape-ok(colour): no role renders this; a 15% white edge */

@@ -7,7 +7,7 @@ import { Group, Specimen, State } from "./kit";
  */
 
 const GROUND = ["canvas", "surface", "inset", "field", "hover", "hover-strong"];
-const INK = ["ink", "ink-2", "ink-3", "ink-disabled", "ink-inverse"];
+const INK = ["ink", "ink-2", "ink-3", "ink-4", "ink-inverse"];
 const LINES = ["line", "line-soft"];
 const ACTION = [
 	"primary",

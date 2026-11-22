@@ -114,7 +114,7 @@ export function CopyButton({
 				"copy-button inline-flex shrink-0 items-center justify-center",
 				// design-escape-ok(radius): shipped value; 4px corner
 				"rounded-[4px] p-xs",
-				"text-ink-disabled transition-colors focus-outline",
+				"text-ink-4 transition-colors focus-outline",
 				"hover:text-ink",
 				className,
 			)}

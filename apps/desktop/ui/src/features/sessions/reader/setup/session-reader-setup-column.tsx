@@ -423,7 +423,7 @@ export function SetupMark({ file }: { file: SessionSetupFile }) {
 				skullet-block=""
 				className="inline-flex shrink-0 corner-xs corner-squircle squircle:corner-m"
 			>
-				<Icon aria-hidden="true" className="size-4 text-ink-disabled" />
+				<Icon aria-hidden="true" className="size-4 text-ink-4" />
 			</span>
 		);
 	}

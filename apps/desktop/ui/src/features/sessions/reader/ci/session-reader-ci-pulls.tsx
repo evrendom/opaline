@@ -167,7 +167,7 @@ function CiLine({
 			{parts.map((part, index) => (
 				<span key={part.text} className="inline-flex items-baseline gap-s">
 					{index > 0 ? (
-						<span aria-hidden="true" className="text-ink-disabled">
+						<span aria-hidden="true" className="text-ink-4">
 							·
 						</span>
 					) : null}
