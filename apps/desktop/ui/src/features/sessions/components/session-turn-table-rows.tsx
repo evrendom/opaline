@@ -9,8 +9,7 @@ export function SessionTurnCompactionRow({
 }) {
 	return (
 		<tr
-			// design-escape-ok(opacity,colour): no role renders this; border-warning-line/70, dark:border-warning/15, dark:bg-warning/10, dark:text-amber-300
-			className="flex h-7 min-w-full items-center edge-y-m border-warning-line/70 bg-inset px-l text-body-m font-medium text-warning dark:border-warning/15 dark:bg-warning/10 dark:text-amber-300"
+			className="flex h-7 min-w-full items-center edge-y-m border-warning-line bg-warning-tint px-l text-body-m font-medium text-warning"
 			title={new Date(compaction.timestamp).toLocaleString()}
 		>
 			<td>Compaction</td>
@@ -28,7 +27,7 @@ export function SessionTurnEpisodeRow({
 	onToggle: (() => void) | undefined;
 }) {
 	return (
-		<tr className="min-w-full edge-b-m border-line bg-[color-mix(in_srgb,var(--hover)_72%,var(--canvas))]">
+		<tr className="min-w-full edge-b-m border-line bg-inset">
 			<td>
 				<button
 					type="button"

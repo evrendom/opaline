@@ -62,8 +62,7 @@ export function SessionUploadFailureDetail({
 						)}
 					</p>
 				</div>
-				{/* design-escape-ok(opacity): no role renders this; divide-ink/6, dark:divide-ink/8 */}
-				<dl className="min-w-0 divide-y divide-ink/6 dark:divide-ink/8">
+				<dl className="min-w-0 divide-y divide-line">
 					{fields.map(([label, value]) => (
 						<div
 							key={label}

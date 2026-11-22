@@ -38,8 +38,7 @@ export function SessionOverviewFilterOptionsPanel({
 	return (
 		<>
 			{canSearch ? (
-				// design-escape-ok(opacity): shipped value; border/60
-				<div className="relative edge-b-m border-line/60 p-m">
+				<div className="relative edge-b-m border-line p-m">
 					<label className="sr-only" htmlFor={`${controlId}-search`}>
 						{`Search ${label.toLocaleLowerCase()}`}
 					</label>
@@ -51,8 +50,7 @@ export function SessionOverviewFilterOptionsPanel({
 						id={`${controlId}-search`}
 						type="text"
 						name={`${controlId}-search`}
-						// design-escape-ok(opacity): no role renders this; bg-field/60
-						className="h-8 corner-m bg-field/60 pr-m pl-[calc(var(--space-xxl)*1.5)] text-body-xl"
+						className="h-8 corner-m bg-hover pr-m pl-[calc(var(--space-xxl)*1.5)] text-body-xl"
 						placeholder={`Search ${label.toLocaleLowerCase()}`}
 						value={searchQuery}
 						onChange={(event) => setSearchQuery(event.target.value)}
@@ -133,8 +131,7 @@ export function SessionOverviewFilterOptionsPanel({
 				)}
 			</div>
 			{variant === "default" ? (
-				// design-escape-ok(opacity): shipped value; border/60
-				<div className="edge-t-m border-line/60 px-l py-m text-body-m tabular-nums text-ink-3">
+				<div className="edge-t-m border-line px-l py-m text-body-m tabular-nums text-ink-3">
 					{selectedOptionCount.toLocaleString()} of{" "}
 					{options.length.toLocaleString()} selected
 				</div>

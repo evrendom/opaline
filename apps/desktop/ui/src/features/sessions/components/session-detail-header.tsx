@@ -99,8 +99,7 @@ function SessionIdentityBreadcrumb({
 							{index < 3 ? (
 								<IconChevronRight
 									aria-hidden="true"
-									// design-escape-ok(opacity): no role renders this; text-ink/6, dark:text-ink/8
-									className="size-4 shrink-0 text-ink/6 dark:text-ink/8"
+									className="size-4 shrink-0 text-hover-strong"
 								/>
 							) : null}
 						</li>
@@ -173,10 +172,7 @@ function SessionRecordNavigation({
 			>
 				{positionLabel}
 			</p>
-			<span
-				aria-hidden="true"
-				className="mx-xs h-4 w-px shrink-0 bg-line"
-			/>
+			<span aria-hidden="true" className="mx-xs h-4 w-px shrink-0 bg-line" />
 			<SessionHeaderNavigationButton
 				disabled={!navigation.hasPreviousSession}
 				icon={<PreviousIcon aria-hidden="true" className="size-3.5" />}

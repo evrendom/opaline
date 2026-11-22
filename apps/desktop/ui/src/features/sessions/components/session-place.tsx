@@ -29,8 +29,7 @@ export function SessionPlaceLabel({
 	if (!showPlace)
 		return (
 			<p
-				// design-escape-ok(colour): shipped value; #0000009b (#ffffffaf in dark)
-				className="min-w-0 truncate text-left font-body text-body-m font-regular tracking-m text-[#0000009b] dark:text-[#ffffffaf]"
+				className="min-w-0 truncate text-left font-body text-body-m font-regular tracking-m text-ink-2"
 				data-session-overview-repository-label
 				title={repositoryLabel}
 			>
@@ -40,17 +39,13 @@ export function SessionPlaceLabel({
 	const place = getSessionPlace(session);
 	return (
 		<p
-			// design-escape-ok(colour): shipped value; #0000009b (#ffffffaf in dark)
-			className="flex min-w-0 items-center gap-s text-left font-body text-body-m font-regular tracking-m text-[#0000009b] dark:text-[#ffffffaf]"
+			className="flex min-w-0 items-center gap-s text-left font-body text-body-m font-regular tracking-m text-ink-2"
 			data-session-overview-place
 			title={place.title}
 		>
 			<span className="min-w-0 truncate">{place.label}</span>
 			{place.remote ? null : (
-				<span
-					// design-escape-ok(colour,type): shipped value; amber-500/12, amber-700 (amber-300 in dark), 10/16
-					className="shrink-0 corner-full bg-amber-500/12 px-s text-[0.625rem]/4 text-amber-700 dark:text-amber-300"
-				>
+				<span className="shrink-0 corner-full bg-warning-tint px-s text-body-xs text-warning">
 					no remote
 				</span>
 			)}

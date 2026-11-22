@@ -151,8 +151,7 @@ export function SessionTurnTableSpeakerVisibilityControls({
 				</DropdownMenuTrigger>
 				<DropdownMenuContent
 					align="start"
-					// design-escape-ok(opacity): no role renders this; ring-ink/10
-					className="w-auto min-w-40 corner-m bg-canvas p-xs text-ink shadow-float ring-1 ring-ink/10 dark:bg-surface dark:text-ink"
+					className="w-auto min-w-40 corner-m bg-canvas p-xs text-ink shadow-float ring-1 ring-line dark:bg-surface dark:text-ink"
 					sideOffset={4}
 				>
 					{SESSION_TURN_TABLE_SPEAKERS.map((speaker) => {

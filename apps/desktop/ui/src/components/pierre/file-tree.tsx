@@ -61,13 +61,12 @@ function RowTags({
 					}}
 					className={cn(
 						"inline-flex items-center gap-xxs focus-outline",
-						// design-escape-ok(radius,type): shipped value; 4px corners, 10/16
-						"rounded-[4px] px-xs font-mono text-[10px]/4 font-regular tabular-nums",
+						"corner-xs px-xs font-mono text-body-xs font-regular tabular-nums",
 						"transition-colors",
 						tag.color
 							? ""
 							: tag.changed
-								? // design-escape-ok(base,opacity): a changed file's run tag in its opal colour
+								? // design-escape-ok(base,opacity): data paint; a changed file's run tag in its opal colour
 									"bg-opal-2-tint text-color-3 hover:bg-opal-2/20"
 								: "bg-field text-ink-3 hover:text-ink",
 					)}
@@ -94,8 +93,7 @@ function RowTags({
 			))}
 			{rest > 0 ? (
 				<span
-					// design-escape-ok(opacity): shipped value; muted-foreground/70
-					className="text-body-xs font-regular text-ink-3/70 tabular-nums"
+					className="text-body-xs font-regular text-ink-3 tabular-nums"
 					title={tags
 						.slice(ROW_TAGS)
 						.map((tag) => tag.label)
@@ -123,9 +121,9 @@ const STATUS_TITLE: Record<FileTreeStatus, string> = {
 };
 
 const STATUS_LOOK: Record<FileTreeStatus, string> = {
-	// design-escape-ok(base): file status marks in the opal palette
+	// design-escape-ok(base): data paint; file status marks in the opal palette
 	added: "text-color-1",
-	deleted: "text-color-5", // design-escape-ok(base): file status marks
+	deleted: "text-color-5", // design-escape-ok(base): data paint; file status marks
 	modified: "text-color-2",
 	read: "",
 };
@@ -261,8 +259,7 @@ export function FileTree({
 		<div className="flex flex-col">
 			{model.rootLabel ? (
 				<div
-					// design-escape-ok(opacity): shipped value; muted-foreground/70
-					className="truncate px-[calc(var(--space-m)+var(--space-xxs))] pb-xs text-body-m text-ink-3/70 [direction:rtl] text-left"
+					className="truncate px-[calc(var(--space-m)+var(--space-xxs))] pb-xs text-body-m text-ink-3 [direction:rtl] text-left"
 					title={model.rootLabel}
 				>
 					{`‎${model.rootLabel}‎`}
@@ -305,8 +302,7 @@ export function FileTree({
 								className={cn(
 									"group/row flex h-7 items-center gap-s",
 									"corner-s pr-[calc(var(--space-m)+var(--space-xxs))] pl-xs corner-squircle",
-									// design-escape-ok(type): shipped value; 13px on the card's 14/20 ratio (18.57)
-									"text-[13px]/[calc(20/14)]",
+									"text-body-l",
 									"outline-none select-none",
 									"squircle:corner-l",
 									row.item?.dimmed && !isSelected && "opacity-40",
@@ -323,8 +319,8 @@ export function FileTree({
 										className={cn(
 											"h-full w-3 shrink-0 bg-[linear-gradient(to_right,transparent_6px,var(--guide)_6px,var(--guide)_7px,transparent_7px)]",
 											key === activeParentKey
-												? "[--guide:color-mix(in_oklab,var(--ink-3)_30%,transparent)]"
-												: "[--guide:color-mix(in_oklab,var(--line)_70%,transparent)]",
+												? "[--guide:var(--ink-4)]"
+												: "[--guide:var(--line)]",
 										)}
 									/>
 								))}
@@ -363,8 +359,7 @@ export function FileTree({
 									<RowTags onPick={onPickTag} tags={row.item.tags} />
 								) : null}
 								{row.item?.badge ? (
-									// design-escape-ok(opacity): shipped value; muted-foreground/70
-									<span className="shrink-0 text-body-m font-regular text-ink-3/70 tabular-nums">
+									<span className="shrink-0 text-body-m font-regular text-ink-3 tabular-nums">
 										{row.item.badge}
 									</span>
 								) : null}
@@ -384,7 +379,7 @@ export function FileTree({
 										) : status ? (
 											STATUS_LETTER[status]
 										) : row.containsChange ? (
-											// design-escape-ok(base): a changed folder's mark in the modified opal
+											// design-escape-ok(base): data paint; a changed folder's mark in the modified opal
 											<span className="size-1.5 corner-full bg-color-2/60" />
 										) : null}
 									</span>

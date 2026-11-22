@@ -294,7 +294,7 @@ describe("ConversationTrace sticky surfaces", () => {
 		expect(remainingCount).toHaveAttribute("data-trace-icon");
 		expect(remainingCount).toHaveClass(
 			"text-body-xxs",
-			"tracking-[-0.08em]",
+			"tracking-xs",
 			"[text-indent:-1.5px]",
 		);
 		expect(remainingCount?.style.width).toBe("16px");

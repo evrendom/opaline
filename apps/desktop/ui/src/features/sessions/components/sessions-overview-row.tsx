@@ -113,8 +113,7 @@ type SessionsOverviewRowProps = {
 
 const MAX_SESSION_OVERVIEW_SKILL_TAGS = 7;
 const SESSION_OVERVIEW_TOOLTIP_CLASS_NAME =
-	// design-escape-ok(shadow,colour,opacity): shipped value; the row tooltip's 40% drop, black/10 edge, #202124 ink (#f3f4f6 on #202124 in dark)
-	"whitespace-nowrap corner-s edge-m border-black/10 bg-canvas px-[calc(var(--space-m)+var(--space-xxs))] py-s text-body-m font-medium text-[#202124] shadow-[0_8px_20px_-10px_rgba(0,0,0,0.4),0_2px_6px_rgba(0,0,0,0.1)] tabular-nums dark:border-white/10 dark:bg-[#202124] dark:text-[#f3f4f6]";
+	"whitespace-nowrap corner-s edge-m border-line bg-surface px-[calc(var(--space-m)+var(--space-xxs))] py-s text-body-m font-medium text-ink shadow-float tabular-nums";
 // CSS selects both tags and the matching count, including before demo hydration.
 // Column widths grow continuously; only the number of skill tags changes in tiers.
 const SESSION_OVERVIEW_SKILL_OVERFLOW_TIERS = [
@@ -319,8 +318,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 							<span
 								key={limit}
 								className={cn(
-									// design-escape-ok(colour): shipped value; black/50 (white/50 in dark)
-									"shrink-0 whitespace-nowrap text-body-xs font-regular text-black/50 dark:text-white/50",
+									"shrink-0 whitespace-nowrap text-body-xs font-regular text-ink-2",
 									className,
 								)}
 								data-session-overview-skill-overflow-tag
@@ -414,12 +412,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 						data-session-overview-model-label
 					>
 						{session.subagent_of ? (
-							<span
-								// design-escape-ok(colour): shipped value; black/63 (white/65 in dark)
-								className="text-black/63 dark:text-white/65"
-							>
-								Subagent{" "}
-							</span>
+							<span className="text-ink-2">Subagent </span>
 						) : null}
 						{formatModelDisplayLabel(displayModel)}
 						{failure ? (
@@ -432,8 +425,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 					<SessionPlaceLabel session={session} showPlace={showPlace} />
 					{branchLabel ? (
 						<p
-							// design-escape-ok(colour): shipped value; #00000044 (#ffffff55 in dark)
-							className="min-w-0 truncate text-left font-body text-body-m font-regular tracking-m text-[#00000044] tabular-nums dark:text-[#ffffff55]"
+							className="min-w-0 truncate text-left font-body text-body-m font-regular tracking-m text-ink-4 tabular-nums"
 							data-session-overview-branch-label
 							dir="rtl"
 							title={branchLabel}

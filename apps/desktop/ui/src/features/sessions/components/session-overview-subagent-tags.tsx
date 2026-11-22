@@ -64,8 +64,7 @@ export function SessionOverviewSubagentCountTag({
 			className={cn(
 				SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME,
 				SESSION_OVERVIEW_ICON_TAG_CLASS_NAME,
-				// design-escape-ok(colour): shipped value; the pink chip
-				"shrink-0 bg-[#fce7f3] text-[#be185d] dark:bg-[#4a1d36] dark:text-[#f472b6]",
+				"shrink-0 bg-field text-ink-2",
 			)}
 			data-session-overview-subagent-count={count}
 			title={`${count} ${count === 1 ? "subagent" : "subagents"}`}

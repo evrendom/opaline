@@ -348,10 +348,7 @@ export function SessionDetailView({
 					viewModel ? (
 						<div className="flex h-full min-h-0 flex-col">
 							{hasShapeWarning ? (
-								<output
-									// design-escape-ok(opacity): no role renders this; border-warning/30, bg-warning/10
-									className="edge-b-m border-warning/30 bg-warning/10 px-xl py-m text-body-xl text-ink"
-								>
+								<output className="edge-b-m border-warning-line bg-warning-tint px-xl py-m text-body-xl text-ink">
 									Some session fields were unavailable. Safe overview values are
 									shown.
 								</output>

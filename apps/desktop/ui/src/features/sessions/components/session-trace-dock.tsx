@@ -6,12 +6,10 @@ import type { SessionNavigation } from "@/features/sessions/session-navigation";
 import { cn } from "@/lib/utils";
 
 const sessionTraceDockPressClassName =
-	// design-escape-ok(motion): no role renders this; ease-out
-	"scale-100 transition-transform duration-(--motion-duration) ease-out active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100";
+	"scale-100 transition-transform duration-(--motion-duration) ease-base active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100";
 
 const sessionTraceDockButtonClassName = cn(
-	// design-escape-ok(opacity): no role renders this; dark:hover:bg-ink/6
-	"group relative flex size-9 shrink-0 items-center justify-center corner-zero text-ink focus-outline hover:bg-hover disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:active:scale-100 dark:hover:bg-ink/6",
+	"group relative flex size-9 shrink-0 items-center justify-center corner-zero text-ink focus-outline hover:bg-hover disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:active:scale-100 dark:hover:bg-hover-strong",
 	sessionTraceDockPressClassName,
 );
 
@@ -78,16 +76,14 @@ export function SessionTraceDock({
 					"corner-zero pl-m pr-l",
 					"text-body-xxl font-medium",
 					"text-ink focus-outline",
-					// design-escape-ok(opacity): no role renders this; dark:hover:bg-ink/6
-					"hover:bg-hover dark:hover:bg-ink/6 sm:text-body-xl",
+					"hover:bg-hover dark:hover:bg-hover-strong sm:text-body-xl",
 					sessionTraceDockPressClassName,
 				)}
 				onClick={onReturn}
 			>
 				<IconArrowLeft
 					aria-hidden="true"
-					// design-escape-ok(motion): no role renders this; ease-out
-					className="size-4 shrink-0 transition-transform duration-(--motion-medium-duration) ease-out group-hover:-translate-x-px group-active:translate-x-0 motion-reduce:transition-none"
+					className="size-4 shrink-0 transition-transform duration-(--motion-medium-duration) ease-base group-hover:-translate-x-px group-active:translate-x-0 motion-reduce:transition-none"
 				/>
 				<span>Back</span>
 				<TouchTarget className="size-12" />
@@ -98,8 +94,7 @@ export function SessionTraceDock({
 				icon={
 					<IconArrowUp
 						aria-hidden="true"
-						// design-escape-ok(motion): no role renders this; ease-out
-						className="size-4 shrink-0 transition-transform duration-(--motion-medium-duration) ease-out group-hover:-translate-y-px group-active:translate-y-0 group-disabled:translate-y-0 motion-reduce:transition-none"
+						className="size-4 shrink-0 transition-transform duration-(--motion-medium-duration) ease-base group-hover:-translate-y-px group-active:translate-y-0 group-disabled:translate-y-0 motion-reduce:transition-none"
 					/>
 				}
 				label="Previous session"
@@ -123,8 +118,7 @@ export function SessionTraceDock({
 				icon={
 					<IconArrowDown
 						aria-hidden="true"
-						// design-escape-ok(motion): no role renders this; ease-out
-						className="size-4 shrink-0 transition-transform duration-(--motion-medium-duration) ease-out group-hover:translate-y-px group-active:translate-y-0 group-disabled:translate-y-0 motion-reduce:transition-none"
+						className="size-4 shrink-0 transition-transform duration-(--motion-medium-duration) ease-base group-hover:translate-y-px group-active:translate-y-0 group-disabled:translate-y-0 motion-reduce:transition-none"
 					/>
 				}
 				label="Next session"

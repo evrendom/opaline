@@ -103,7 +103,7 @@ function XmlBlock({
 					"flex w-full items-start gap-l focus-outline",
 					"edge-b-m px-xl py-l",
 					"text-left",
-					"border-line bg-[color:color-mix(in_srgb,var(--inset)_82%,white)]",
+					"border-line bg-inset",
 				)}
 			>
 				<div className="mt-xxs shrink-0 text-ink-3">
@@ -384,7 +384,7 @@ export function MessageContent({ content, className }: MessageContentProps) {
 						return (
 							<div
 								key={blockKey}
-								className="corner-l edge-m border-line bg-[color:color-mix(in_srgb,var(--inset)_82%,white)] px-xl py-xl"
+								className="corner-l edge-m border-line bg-inset px-xl py-xl"
 							>
 								<p className="mb-xs text-body-xl font-heavy text-ink">
 									Thinking
@@ -438,7 +438,7 @@ export function MessageContent({ content, className }: MessageContentProps) {
 									"grid gap-l corner-l edge-m p-xl",
 									block.is_error
 										? "border-line bg-error-tint"
-										: "border-line bg-[color:color-mix(in_srgb,var(--inset)_82%,white)]",
+										: "border-line bg-inset",
 								)}
 							>
 								<p

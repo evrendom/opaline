@@ -95,8 +95,7 @@ export function SessionDetailActivityOccurrencePanel({
 			<div className="flex h-9 items-center edge-b-m border-line px-xs">
 				<Button
 					aria-label={`Back to ${group.label}`}
-					// design-escape-ok(opacity): no role renders this; dark:hover:bg-ink/6
-					className="size-7 corner-s text-ink-2 dark:hover:bg-ink/6"
+					className="size-7 corner-s text-ink-2 dark:hover:bg-hover-strong"
 					onClick={onBack}
 					size="icon-sm"
 					type="button"

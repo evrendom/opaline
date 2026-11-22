@@ -143,8 +143,7 @@ const CONVERSATION_TRACE_TREE_COMPACT_ROW_HEIGHT = 32;
 const TRACE_EVENT_ICON_RAIL_OFFSET = 14;
 const COLLAPSED_TRACE_ICON_LIMIT = 25;
 const traceCollapsiblePanelClassName =
-	// design-escape-ok(motion): no role renders this; cubic-bezier(0.2,0,0,1)
-	"h-(--collapsible-panel-height) min-w-0 overflow-clip transition-[height,opacity] duration-(--motion-medium-duration) ease-[cubic-bezier(0.2,0,0,1)] data-ending-style:h-0 data-ending-style:opacity-0 data-starting-style:h-0 data-starting-style:opacity-0 motion-reduce:transition-none";
+	"h-(--collapsible-panel-height) min-w-0 overflow-clip transition-[height,opacity] duration-(--motion-medium-duration) ease-drawer data-ending-style:h-0 data-ending-style:opacity-0 data-starting-style:h-0 data-starting-style:opacity-0 motion-reduce:transition-none";
 type ConversationTraceTreeConnectorShape = "branch" | "through";
 
 function SplitRailEventIconSegments({
@@ -289,8 +288,7 @@ function ConversationTraceTreeRail({
 				viewBox={`0 0 ${railX + 1} ${rowHeight}`}
 				width={railX + 1}
 				style={{
-					stroke:
-						"var(--conversation-trace-connector-color, var(--line))",
+					stroke: "var(--conversation-trace-connector-color, var(--line))",
 					strokeWidth: "var(--border-s)",
 				}}
 			>
@@ -1282,13 +1280,9 @@ export function AgentCollapsedTraceIcons({
 					className="flex shrink-0 items-center"
 					data-trace-collapsed-flow-count-slot
 				>
+					<span className="h-px w-1.5 shrink-0 bg-line" data-trace-tree-line />
 					<span
-						className="h-px w-1.5 shrink-0 bg-line"
-						data-trace-tree-line
-					/>
-					<span
-						// design-escape-ok(type): digits packed into a 16px glyph
-						className="flex shrink-0 items-center justify-center font-body text-body-xxs line-solid font-medium tracking-[-0.08em] tabular-nums [text-indent:-1.5px]"
+						className="flex shrink-0 items-center justify-center font-body text-body-xxs line-solid font-medium tracking-xs tabular-nums [text-indent:-1.5px]"
 						data-trace-collapsed-flow-count
 						data-trace-icon
 						data-trace-icon-tone="neutral"

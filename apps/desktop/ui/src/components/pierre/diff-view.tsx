@@ -185,16 +185,14 @@ const LINE_LOOK: Record<
 	{ mark: string; row: string; sign: string; signColor: string }
 > = {
 	added: {
-		// design-escape-ok(radius): diff word highlights hug the glyphs
-		mark: "rounded-[3px] bg-green-500/20 box-decoration-clone",
+		mark: "corner-xs bg-green-500/20 box-decoration-clone",
 		row: "bg-green-500/10",
 		sign: "+",
 		signColor: "text-green-600 dark:text-green-400",
 	},
 	context: { mark: "", row: "", sign: " ", signColor: "" },
 	removed: {
-		// design-escape-ok(radius): diff word highlights hug the glyphs
-		mark: "rounded-[3px] bg-red-500/20 box-decoration-clone",
+		mark: "corner-xs bg-red-500/20 box-decoration-clone",
 		row: "bg-red-500/10",
 		sign: "−",
 		signColor: "text-red-600 dark:text-red-400",
@@ -240,8 +238,7 @@ function renderRow(
 		return (
 			<div
 				key={`separator-${hunk.oldStart}-${hunk.newStart}`}
-				// design-escape-ok(opacity): shipped value; muted-foreground/70
-				className="flex gap-m px-s py-xs text-ink-3/70 italic"
+				className="flex gap-m px-s py-xs text-ink-3 italic"
 			>
 				<span skullet-ignore="" className="shrink-0" style={numberStyle} />
 				<span skullet-ignore="" className="w-2 shrink-0" />
@@ -263,8 +260,7 @@ function renderRow(
 				key={`${line.oldNumber ?? ""}:${line.newNumber ?? ""}`}
 				className={cn(
 					"flex min-h-[1.2em] gap-m px-s",
-					// design-escape-ok(opacity): no role renders this; bg-ink/[0.07]
-					isLit && "bg-ink/[0.07]",
+					isLit && "bg-hover-strong",
 					isLit && !litAt(row.line - 1) && "corner-t-s",
 					isLit && !litAt(row.line + 1) && "corner-b-s",
 				)}
@@ -272,10 +268,7 @@ function renderRow(
 				<span
 					className={cn(
 						"shrink-0 text-right tabular-nums select-none",
-						isLit
-							? "text-ink-3"
-							: // design-escape-ok(opacity): no role renders this; text-ink-3/30
-								"text-ink-3/30",
+						isLit ? "text-ink-3" : "text-ink-4",
 					)}
 					style={numberStyle}
 				>
@@ -310,11 +303,7 @@ function renderRow(
 			</span>
 			<span
 				skullet-ignore=""
-				className={cn(
-					// design-escape-ok(opacity): shipped value; muted-foreground/70
-					"w-2 shrink-0 text-ink-3/70 select-none",
-					look.signColor,
-				)}
+				className={cn("w-2 shrink-0 text-ink-3 select-none", look.signColor)}
 			>
 				{look.sign}
 			</span>

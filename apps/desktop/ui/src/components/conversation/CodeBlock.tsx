@@ -103,7 +103,7 @@ function getCodeLineKind(
 function getCodeHeaderIcon(filename: string, language: string) {
 	if (/\.(?:cts|mts|ts|tsx)$/i.test(filename)) {
 		return {
-			// design-escape-ok(colour): TypeScript's brand colour
+			// design-escape-ok(colour): data paint; TypeScript's brand colour
 			className: "text-[#3178c6]",
 			context: "typescript",
 			Icon: TraceTypeScriptIcon,

@@ -1,45 +1,41 @@
 /* biome-ignore-all lint/complexity/noImportantStyles: the temporary ?debug=colors palette must override every layer it diagnoses */
-/* Code cards sit on the surface role; comments and gutter numbers are the
- * faintest ink. The syntax and diff-mark hues are data paint (a token's kind,
+/* Code cards sit on the surface role; comments are ink-3 and gutter numbers
+ * the faintest ink, ink-4. The syntax and diff-mark hues are data paint (a token's kind,
  * an added or removed line), authored in Display P3, which every WebKit and
  * Chromium the Mac app runs in supports. */
 .trace-code-block,
 .trace-inline-code {
 	--trace-code-surface: var(--surface);
 	--trace-code-sticky-surface: var(--canvas);
-	/* design-escape-ok(colour): no role renders this; black at 44.7% */
-	--trace-code-comment: color(display-p3 0 0 0 / 0.447);
-	/* design-escape-ok(colour): no role renders this; black at 26.7% */
-	--trace-code-line-number: color(display-p3 0 0 0 / 0.267);
-	/* design-escape-ok(colour): syntax colour (data paint) */
+	--trace-code-comment: var(--ink-3);
+	--trace-code-line-number: var(--ink-4);
+	/* design-escape-ok(colour): data paint; a syntax colour */
 	--trace-code-keyword: color(display-p3 0.843 0.298 0.507);
-	/* design-escape-ok(colour): syntax colour (data paint) */
+	/* design-escape-ok(colour): data paint; a syntax colour */
 	--trace-code-function: color(display-p3 0.587 0.29 0.667);
-	/* design-escape-ok(colour): syntax colour (data paint) */
+	/* design-escape-ok(colour): data paint; a syntax colour */
 	--trace-code-type: color(display-p3 0.276 0.384 0.837);
-	/* design-escape-ok(colour): syntax colour (data paint) */
+	/* design-escape-ok(colour): data paint; a syntax colour */
 	--trace-code-property: color(display-p3 1 0.77 0.26);
-	/* design-escape-ok(colour): syntax colour (data paint) */
+	/* design-escape-ok(colour): data paint; a syntax colour */
 	--trace-code-string: color(display-p3 0.543 0.263 0.619);
 	--trace-code-deletion-surface: color-mix(
 		in oklab,
 		var(--error) 3%,
 		transparent
 	);
-	/* design-escape-ok(colour): diff mark (data paint) */
+	/* design-escape-ok(colour): data paint; a diff mark */
 	--trace-code-deletion-marker: color(display-p3 0.755 0.259 0.152);
 	--trace-code-addition-surface: color-mix(
 		in oklab,
 		var(--success) 4%,
 		transparent
 	);
-	/* design-escape-ok(colour): diff mark (data paint) */
+	/* design-escape-ok(colour): data paint; a diff mark */
 	--trace-code-addition-marker: color(display-p3 0.19 0.5 0.32);
 
 	background-color: var(--trace-code-surface);
-	box-shadow:
-		0 1px 1px -1px #0000001a, /* design-escape-ok(colour): no role renders this; the card's two-layer drop */
-		0 1px 2px 0 #0000000d;
+	box-shadow: var(--shadow-card);
 }
 
 /* Split borders preserve the filename-row treatment while the complete card
@@ -115,13 +111,9 @@
 
 .dark .trace-code-block,
 .dark .trace-inline-code {
-	/* design-escape-ok(colour): no role renders this; white at 39.1% */
-	--trace-code-comment: color(display-p3 1 1 1 / 0.391);
-	/* design-escape-ok(colour): no role renders this; white at 33.2% */
-	--trace-code-line-number: color(display-p3 1 1 1 / 0.332);
-	/* design-escape-ok(colour): syntax colour (data paint) */
+	/* design-escape-ok(colour): data paint; a syntax colour */
 	--trace-code-function: color(display-p3 0.86 0.602 0.933);
-	/* design-escape-ok(colour): syntax colour (data paint) */
+	/* design-escape-ok(colour): data paint; a syntax colour */
 	--trace-code-type: color(display-p3 0.63 0.69 1);
 	--trace-code-string: var(--trace-code-function);
 	--trace-code-deletion-surface: color-mix(
@@ -129,14 +121,14 @@
 		var(--error) 5%,
 		transparent
 	);
-	/* design-escape-ok(colour): diff mark (data paint) */
+	/* design-escape-ok(colour): data paint; a diff mark */
 	--trace-code-deletion-marker: color(display-p3 1 0.585 0.455);
 	--trace-code-addition-surface: color-mix(
 		in oklab,
 		var(--success) 4%,
 		transparent
 	);
-	/* design-escape-ok(colour): diff mark (data paint) */
+	/* design-escape-ok(colour): data paint; a diff mark */
 	--trace-code-addition-marker: color(display-p3 0.434 0.828 0.573);
 
 	box-shadow: none;
@@ -177,7 +169,7 @@
 
 [data-debug-sticky-colors] .trace-code-block [data-trace-code-block-header] {
 	background: var(--error-translucent) !important;
-	/* design-escape-ok(colour): no role renders this; debug cyan */
+	/* design-escape-ok(colour): data paint; the ?debug=colors legend's cyan */
 	box-shadow: 0 -2px 0 2px rgba(0, 200, 255, 0.9) !important;
 	outline: var(--border-m) solid var(--error) !important;
 	outline-offset: -1px;
@@ -202,7 +194,7 @@
 [data-debug-sticky-colors]
 	.trace-code-block
 	[data-trace-code-block-header]::before {
-	/* design-escape-ok(base): no role renders this; debug magenta */
+	/* design-escape-ok(base): data paint; the ?debug=colors legend's magenta */
 	background: var(--color-2-translucent) !important;
 }
 
@@ -226,7 +218,7 @@
 }
 
 [data-debug-sticky-colors] [data-trace-tree-row-body] {
-	/* design-escape-ok(base): no role renders this; debug blue */
+	/* design-escape-ok(base): data paint; the ?debug=colors legend's blue */
 	background-color: var(--color-3-translucent) !important;
 }
 
@@ -236,7 +228,7 @@
 
 [data-debug-sticky-colors] [data-trace-tool-details],
 [data-debug-sticky-colors] [data-trace-shell-command-details] {
-	/* design-escape-ok(base): no role renders this; debug pink */
+	/* design-escape-ok(base): data paint; the ?debug=colors legend's pink */
 	background-color: var(--color-5-translucent) !important;
 }
 

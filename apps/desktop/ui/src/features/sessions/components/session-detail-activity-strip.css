@@ -59,8 +59,7 @@
 }
 
 .dark .session-detail-opaline-menu::before {
-	/* design-escape-ok(colour): no role renders this; white at 8% */
-	box-shadow: inset 0 0 0 1px rgb(255 255 255 / 8%);
+	box-shadow: inset 0 0 0 1px var(--line);
 }
 
 .session-detail-opaline-menu[data-state="open"] {

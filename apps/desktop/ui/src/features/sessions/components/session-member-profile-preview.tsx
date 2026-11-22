@@ -45,8 +45,7 @@ function MemberActivitySparkline({ values }: { values: readonly number[] }) {
 			viewBox={`0 0 ${SPARKLINE_WIDTH} ${SPARKLINE_HEIGHT}`}
 		>
 			<polyline
-				// design-escape-ok(colour): shipped value; #266df0
-				className="fill-none stroke-[#266df0]"
+				className="fill-none stroke-accent"
 				points={buildSparklinePoints(values)}
 				strokeLinecap="round"
 				strokeLinejoin="round"
@@ -148,8 +147,7 @@ export function SessionMemberProfilePreview({
 					sideOffset={2}
 				>
 					<PreviewCard.Popup
-						// design-escape-ok(opacity): no role renders this; ring-ink/10, dark:ring-ink/15
-						className="w-52 origin-(--transform-origin) corner-m bg-surface p-[calc(var(--space-m)+var(--space-xxs))] text-ink ring-1 ring-ink/10 outline-none transition-[opacity,transform] duration-(--motion-quick-duration) data-ending-style:scale-98 data-ending-style:opacity-0 data-starting-style:scale-98 data-starting-style:opacity-0 dark:ring-ink/15"
+						className="w-52 origin-(--transform-origin) corner-m bg-surface p-[calc(var(--space-m)+var(--space-xxs))] text-ink ring-1 ring-line outline-none transition-[opacity,transform] duration-(--motion-quick-duration) data-ending-style:scale-98 data-ending-style:opacity-0 data-starting-style:scale-98 data-starting-style:opacity-0"
 						data-slot="session-member-profile-preview"
 					>
 						<div className="flex min-w-0 items-center gap-m">

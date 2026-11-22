@@ -145,8 +145,7 @@ function SkeletonTraceRowContent({
 			<Skeleton
 				className={cn(
 					"size-4 shrink-0 corner-xs bg-field",
-					// design-escape-ok(opacity): no role renders this; bg-error/20
-					row.kind === "error" && "bg-error/20",
+					row.kind === "error" && "bg-error-tint",
 				)}
 			/>
 			<Skeleton

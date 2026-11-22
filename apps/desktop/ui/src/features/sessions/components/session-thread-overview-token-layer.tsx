@@ -166,7 +166,7 @@ export function SessionThreadOverviewTokenLayer({
 			{gridYs.map((y) => (
 				<path
 					key={y}
-					className="stroke-[color-mix(in_srgb,var(--ink)_6%,transparent)]"
+					className="stroke-line-soft"
 					d={`M ${plotLeft} ${y} H ${plotRight}`}
 					strokeWidth="1"
 					vectorEffect="non-scaling-stroke"
