@@ -1,5 +1,5 @@
 import type { SessionAnalytics } from "@rudel/api-routes";
-import { Badge } from "@/app/ui/badge";
+import { Tag } from "@/app/ui/tag";
 import { getRepositoryLabel } from "./sessions-overview-table-utils";
 
 export function getSessionPlace(session: SessionAnalytics) {
@@ -45,7 +45,7 @@ export function SessionPlaceLabel({
 			title={place.title}
 		>
 			<span className="min-w-0 truncate">{place.label}</span>
-			{place.remote ? null : <Badge variant="warning">no remote</Badge>}
+			{place.remote ? null : <Tag tone="warning">no remote</Tag>}
 		</p>
 	);
 }
