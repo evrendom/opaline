@@ -68,7 +68,7 @@ function DropdownMenuItem({
 	...props
 }: MenuPrimitive.Item.Props & {
 	inset?: boolean;
-	variant?: "default" | "destructive";
+	variant?: "default" | "danger";
 }) {
 	return (
 		<MenuPrimitive.Item
@@ -81,13 +81,13 @@ function DropdownMenuItem({
 				"text-body-xl",
 				"outline-hidden select-none",
 				"focus:bg-hover focus:text-sidebar-accent-foreground",
-				"not-data-[variant=destructive]:focus:**:text-sidebar-accent-foreground",
+				"not-data-[variant=danger]:focus:**:text-sidebar-accent-foreground",
 				"data-inset:pl-[calc(var(--space-xxl)*4/3)]",
-				"data-[variant=destructive]:text-error data-[variant=destructive]:focus:bg-error-tint data-[variant=destructive]:focus:text-error",
+				"data-[variant=danger]:text-error data-[variant=danger]:focus:bg-error-tint data-[variant=danger]:focus:text-error",
 				"data-disabled:pointer-events-none data-disabled:opacity-50",
 				"[&_svg]:pointer-events-none [&_svg]:shrink-0",
 				"[&_svg:not([class*='size-'])]:size-4",
-				"data-[variant=destructive]:*:[svg]:text-error",
+				"data-[variant=danger]:*:[svg]:text-error",
 				className,
 			)}
 			{...props}

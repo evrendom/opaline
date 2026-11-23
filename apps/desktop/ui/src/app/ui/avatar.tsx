@@ -5,10 +5,10 @@ import { cn } from "@/lib/utils";
 
 function Avatar({
 	className,
-	size = "default",
+	size = "md",
 	...props
 }: AvatarPrimitive.Root.Props & {
-	size?: "default" | "sm";
+	size?: "md" | "sm";
 }) {
 	return (
 		<AvatarPrimitive.Root

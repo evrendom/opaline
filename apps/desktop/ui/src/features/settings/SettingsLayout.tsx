@@ -184,7 +184,7 @@ export function SettingsLayout() {
 					>
 						<SelectTrigger
 							aria-label="Settings section"
-							className="w-full corner-s bg-transparent text-body-xxl data-[size=default]:h-12"
+							className="w-full corner-s bg-transparent text-body-xxl data-[size=md]:h-12"
 						>
 							<SelectValue>{settingsRouteMap[activeRouteId].label}</SelectValue>
 						</SelectTrigger>

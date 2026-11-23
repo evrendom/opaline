@@ -4,9 +4,9 @@ import { cn } from "@/lib/utils";
 
 function Card({
 	className,
-	size = "default",
+	size = "md",
 	...props
-}: React.ComponentProps<"div"> & { size?: "default" | "sm" }) {
+}: React.ComponentProps<"div"> & { size?: "md" | "sm" }) {
 	return (
 		<div
 			data-slot="card"

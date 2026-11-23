@@ -47,7 +47,7 @@ export function SessionsOverviewPager({
 			>
 				<SelectTrigger
 					title="Sessions per page"
-					className="h-auto data-[size=default]:h-auto gap-s corner-s squircle:corner-s edge-none bg-transparent p-zero text-body-m text-ink-4 tabular-nums shadow-none transition-[color,box-shadow] hover:text-ink dark:edge-none dark:bg-transparent dark:shadow-none dark:hover:bg-transparent"
+					className="h-auto data-[size=md]:h-auto gap-s corner-s squircle:corner-s edge-none bg-transparent p-zero text-body-m text-ink-4 tabular-nums shadow-none transition-[color,box-shadow] hover:text-ink dark:edge-none dark:bg-transparent dark:shadow-none dark:hover:bg-transparent"
 				>
 					{shown === 0 ? "0" : `${first + 1} to ${first + shown}`}
 				</SelectTrigger>

@@ -23,6 +23,9 @@
 		--neutral-10-transparent
 	); /* a row under the pointer, and any soft tint: marks, stripes */
 	--hover-strong: var(--neutral-10-translucent); /* pressed, open, selected */
+	/* the ground of a text field or select: clear on the card shadow in light,
+	   a soft tint inside a hairline in dark */
+	--control: transparent;
 	--scrim: rgb(0 0 0 / 0.25); /* behind a dialog or sheet: always darkens */
 
 	/* -- Ink: four greys, loudest to quietest; no shades of them (an ink with
@@ -34,6 +37,10 @@
 		--neutral-6
 	); /* the quietest: disabled text, placeholders, separators */
 	--ink-inverse: var(--neutral-1);
+	/* the window chrome's quiet icons and labels (the window bar's arrows, the
+	   sidebar's section label): one mid-grey that reads on the light and the
+	   dark chrome alike */
+	--ink-chrome: var(--neutral-6);
 
 	/* -- Lines: white space first, a line next, a card last. Two strengths. */
 	--line: var(
@@ -74,6 +81,8 @@
 	--shadow-raised:
 		0 0 0 0.5px rgb(0 0 0 / 0.08), 0 0.5px 2px -0.5px rgb(0 0 0 / 0.08),
 		0 2px 4px 0 rgb(0 0 0 / 0.05);
+	/* a text field or select at rest */
+	--shadow-control: var(--shadow-card);
 	/* the inner hairline of a recessed well */
 	--shadow-inset: inset 0 0 0 0.5px rgb(0 0 0 / 0.06);
 	/* something floating free of a surface: a floating button, a tab menu, a
@@ -124,6 +133,8 @@
 
 .dark {
 	--canvas: var(--neutral-1);
+	--control: var(--hover);
+	--ink-chrome: var(--neutral-7);
 	--chrome: oklch(0.145 0 0); /* darker than the window it holds */
 	--surface: var(--neutral-2);
 	--primary: var(--neutral-10);
@@ -136,6 +147,7 @@
 		inset 0 0.5px 0 0 rgb(255 255 255 / 0.04),
 		0 0 0 0.5px rgb(255 255 255 / 0.08), 0 0.5px 2px 0 rgb(0 0 0 / 0.25);
 	--shadow-inset: inset 0 0 0 0.5px rgb(255 255 255 / 0.06);
+	--shadow-control: inset 0 0 0 0.5px var(--line-soft);
 	--shadow-float: 0 0 #0000;
 }
 
@@ -147,12 +159,14 @@
 	--color-field: var(--field);
 	--color-hover: var(--hover);
 	--color-hover-strong: var(--hover-strong);
+	--color-control: var(--control);
 	--color-scrim: var(--scrim);
 	--color-ink: var(--ink);
 	--color-ink-2: var(--ink-2);
 	--color-ink-3: var(--ink-3);
 	--color-ink-4: var(--ink-4);
 	--color-ink-inverse: var(--ink-inverse);
+	--color-ink-chrome: var(--ink-chrome);
 	--color-line: var(--line);
 	--color-line-soft: var(--line-soft);
 	--color-primary: var(--primary);
@@ -172,12 +186,13 @@
 }
 
 /* Layer 2 elevation as Tailwind shadows: `shadow-card`, `shadow-raised`,
-   `shadow-inset`, `shadow-float`. Each utility reads the role variable of the
+   `shadow-control`, `shadow-inset`, `shadow-float`. Each utility reads the role variable of the
    same name; `reference` keeps Tailwind from writing these names back over
    the roles above. */
 @theme reference {
 	--shadow-card: var(--shadow-card);
 	--shadow-raised: var(--shadow-raised);
+	--shadow-control: var(--shadow-control);
 	--shadow-inset: var(--shadow-inset);
 	--shadow-float: var(--shadow-float);
 }

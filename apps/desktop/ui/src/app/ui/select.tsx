@@ -64,11 +64,11 @@ function SelectValue({ className, ...props }: SelectPrimitive.Value.Props) {
 
 function SelectTrigger({
 	className,
-	size = "default",
+	size = "md",
 	children,
 	...props
 }: SelectPrimitive.Trigger.Props & {
-	size?: "sm" | "default";
+	size?: "sm" | "md";
 }) {
 	return (
 		<SelectPrimitive.Trigger
@@ -79,16 +79,14 @@ function SelectTrigger({
 				"flex w-fit items-center justify-between gap-s",
 				"corner-s corner-squircle py-m pr-l pl-l",
 				"text-body-xl whitespace-nowrap",
-				"shadow-card bg-transparent transition-all outline-none",
+				"bg-control shadow-control transition-all outline-none",
 				"squircle:corner-xl",
-				"dark:shadow-none dark:edge-s dark:border-line-soft",
 				"disabled:cursor-not-allowed disabled:opacity-50",
 				"aria-invalid:border-error aria-invalid:ring-[1.5px] aria-invalid:ring-error-line",
 				"data-placeholder:text-ink-4",
-				"data-[size=default]:h-9",
+				"data-[size=md]:h-9",
 				"data-[size=sm]:h-8",
 				"*:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-s",
-				"dark:bg-hover dark:hover:bg-hover-strong",
 				"[&_svg]:pointer-events-none [&_svg]:shrink-0",
 				"[&_svg:not([class*='size-'])]:size-4",
 				className,

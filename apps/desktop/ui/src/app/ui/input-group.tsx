@@ -27,7 +27,7 @@ function InputGroup({
 				"transition-[color,box-shadow] outline-none",
 				variant === "toolbar"
 					? "h-8 corner-full bg-surface shadow-card hover:bg-field"
-					: "h-9 corner-s corner-squircle shadow-card squircle:corner-l dark:shadow-none dark:edge-s dark:border-line-soft dark:bg-hover",
+					: "h-9 corner-s corner-squircle bg-control shadow-control squircle:corner-l",
 				"in-data-[slot=combobox-content]:focus-within:border-inherit",
 				"has-[[data-slot=input-group-control]:focus-visible]:border-focus has-[[data-slot=input-group-control]:focus-visible]:ring-[1.5px] has-[[data-slot=input-group-control]:focus-visible]:ring-focus-ring",
 				"has-[[data-slot][aria-invalid=true]]:border-error has-[[data-slot][aria-invalid=true]]:ring-[1.5px] has-[[data-slot][aria-invalid=true]]:ring-error-line",
@@ -93,14 +93,14 @@ const inputGroupButtonVariants = cva(
 	{
 		variants: {
 			size: {
-				xs: "h-6 gap-xs corner-xs px-s [&>svg:not([class*='size-'])]:size-3.5",
-				sm: "",
-				"icon-xs": "size-6 corner-xs p-zero has-[>svg]:p-zero",
-				"icon-sm": "size-8 p-zero has-[>svg]:p-zero",
+				sm: "h-6 gap-xs corner-xs px-s [&>svg:not([class*='size-'])]:size-3.5",
+				md: "",
+				"icon-sm": "size-6 corner-xs p-zero has-[>svg]:p-zero",
+				icon: "size-8 p-zero has-[>svg]:p-zero",
 			},
 		},
 		defaultVariants: {
-			size: "xs",
+			size: "sm",
 		},
 	},
 );
@@ -109,7 +109,7 @@ function InputGroupButton({
 	className,
 	type = "button",
 	variant = "secondary",
-	size = "xs",
+	size = "sm",
 	...props
 }: Omit<React.ComponentProps<typeof Button>, "size" | "type"> &
 	VariantProps<typeof inputGroupButtonVariants> & {
@@ -136,8 +136,7 @@ function InputGroupInput({
 			className={cn(
 				"flex-1",
 				"corner-zero edge-none",
-				"bg-transparent shadow-none ring-0",
-				"dark:border-none aria-invalid:ring-0 dark:bg-transparent",
+				"bg-transparent shadow-none ring-0 aria-invalid:ring-0",
 				className,
 			)}
 			{...props}

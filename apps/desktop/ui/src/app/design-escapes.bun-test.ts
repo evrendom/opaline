@@ -39,7 +39,6 @@ describe("design-system escape check", () => {
 			"text-display-xs",
 			"gap-m",
 			"px-xl",
-			"gap-[calc(var(--space-xxl)*4/3)]",
 			"corner-m",
 			"squircle:corner-xl",
 			"corner-xl-inner",
@@ -55,6 +54,42 @@ describe("design-system escape check", () => {
 			"line-tight",
 		])
 			expect(classifyClass(ok)).toBeUndefined();
+	});
+
+	test("space: a calc() of steps is off the scale; xxxl is on it", () => {
+		expect(classifyClass("gap-[calc(var(--space-xxl)*4/3)]")).toBe("space");
+		expect(classifyClass("px-[calc(var(--space-xxs)*5)]")).toBe("space");
+		expect(classifyClass("p-xxxl")).toBeUndefined();
+	});
+
+	test("dark: a per-mode class is a missing role", () => {
+		expect(rules("src/x.tsx", 'const a = "bg-surface dark:bg-hover";')).toEqual(
+			["1 dark dark:bg-hover"],
+		);
+	});
+
+	test("element: raw form and button elements outside src/app/ui/", () => {
+		const source = 'const a = <button type="button" />;\nconst b = <input />;';
+		expect(rules("src/features/x.tsx", source)).toEqual([
+			"1 element <button>",
+			"2 element <input>",
+		]);
+		expect(rules("src/app/ui/x.tsx", source)).toEqual([]);
+	});
+
+	test("restyle: className places a primitive, never restyles it", () => {
+		expect(
+			rules(
+				"src/features/x.tsx",
+				'const a = <Button variant="primary" className="ml-m w-full bg-canvas">Go</Button>;',
+			),
+		).toEqual(["1 restyle <Button> bg-canvas"]);
+		expect(
+			rules(
+				"src/features/x.tsx",
+				'const a = <Pressable className="bg-canvas p-m" />;',
+			),
+		).toEqual([]);
 	});
 
 	test("opacity: a theme colour with a modifier", () => {

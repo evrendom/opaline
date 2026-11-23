@@ -6,7 +6,7 @@ import type { ConfigExtension } from "tailwind-merge";
 export const systemClasses: ConfigExtension<string, string> = {
 	extend: {
 		theme: {
-			spacing: ["zero", "xxs", "xs", "s", "m", "l", "xl", "xxl"],
+			spacing: ["zero", "xxs", "xs", "s", "m", "l", "xl", "xxl", "xxxl"],
 			text: [
 				"body-xxs",
 				"body-xs",

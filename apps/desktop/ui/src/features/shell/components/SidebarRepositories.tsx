@@ -57,7 +57,7 @@ export function SidebarRepositories({ reposActive }: { reposActive: boolean }) {
 	return (
 		<SidebarGroup>
 			<SidebarGroupLabel
-				className={"h-6 text-body-s font-regular text-ink-3 dark:text-ink-4"}
+				className={"h-6 text-body-s font-regular text-ink-chrome"}
 			>
 				Repositories
 			</SidebarGroupLabel>

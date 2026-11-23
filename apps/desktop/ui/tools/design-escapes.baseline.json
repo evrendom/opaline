@@ -1,12 +1,15 @@
 {
 	"type": 0,
-	"space": 0,
+	"space": 214,
 	"radius": 0,
 	"colour": 0,
 	"shadow": 0,
 	"opacity": 0,
 	"motion": 0,
 	"base": 0,
+	"dark": 163,
+	"element": 209,
+	"restyle": 302,
 	"marker": 0,
 	"markers": 95
 }

@@ -16,6 +16,21 @@ const PLAIN_INPUT_CLASS_NAME = cn(
 	"aria-invalid:border-error aria-invalid:ring-[1.5px] aria-invalid:ring-error-line",
 );
 
+// The field every single- and multi-line text control shares: a squircle on
+// the control ground and shadow (the roles flip it for dark), placeholder in
+// ink-4.
+export const FIELD_CLASS_NAME = cn(
+	"corner-s corner-squircle px-[calc(var(--space-m)+var(--space-xxs))] py-xs",
+	"text-body-xxl",
+	"bg-control shadow-control transition-[color,box-shadow] outline-none",
+	"squircle:corner-xl-inner",
+	"file:inline-flex file:h-7 file:edge-none file:bg-transparent file:text-body-xl file:font-medium file:text-ink",
+	"placeholder:text-ink-4",
+	"disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
+	"aria-invalid:border-error aria-invalid:ring-[1.5px] aria-invalid:ring-error-line",
+	"md:text-body-xl",
+);
+
 function Input({
 	className,
 	type,
@@ -36,23 +51,7 @@ function Input({
 		<InputPrimitive
 			type={type}
 			data-slot="input"
-			className={cn(
-				"h-9 w-full min-w-0",
-				"corner-s corner-squircle px-[calc(var(--space-m)+var(--space-xxs))] py-xs",
-				"text-body-xxl",
-				"shadow-card bg-transparent transition-[color,box-shadow] outline-none",
-				"squircle:corner-xl-inner",
-				// Dark trades the card shadow for a soft hairline that firms on hover.
-				"dark:shadow-none dark:edge-s dark:border-line-soft",
-				"hover:dark:border-line",
-				"file:inline-flex file:h-7 file:edge-none file:bg-transparent file:text-body-xl file:font-medium file:text-ink",
-				"placeholder:text-ink-4",
-				"disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
-				"aria-invalid:border-error aria-invalid:ring-[1.5px] aria-invalid:ring-error-line",
-				"md:text-body-xl",
-				"dark:bg-hover",
-				className,
-			)}
+			className={cn("h-9 w-full min-w-0", FIELD_CLASS_NAME, className)}
 			{...props}
 		/>
 	);

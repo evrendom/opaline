@@ -4,7 +4,7 @@ import { systemClasses } from "./tailwind-merge-config";
 
 // The Layer 2 role shadows registered in src/app/tokens.css, so `shadow-card`
 // reads as a shadow (not a shadow colour) and overrides `shadow-none`.
-const ROLE_SHADOWS = ["card", "raised", "inset", "float"];
+const ROLE_SHADOWS = ["card", "raised", "control", "inset", "float"];
 
 // tailwind-merge with the system's classes, so text styles, weights,
 // `corner-*` and `edge-*` override each other the way their CSS does, plus

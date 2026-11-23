@@ -10,7 +10,7 @@ function Empty({ className, ...props }: React.ComponentProps<"div">) {
 				"flex w-full min-w-0 flex-1 flex-col items-center justify-center gap-xl",
 				"corner-l corner-squircle border-dashed edge-m p-[calc(var(--space-xxl)*2)] py-[calc(var(--space-xxl)*8/3)]",
 				"text-center text-balance",
-				"squircle:corner-xl-outer dark:border-line-soft",
+				"squircle:corner-xl-outer",
 				className,
 			)}
 			{...props}

@@ -271,7 +271,7 @@ export function SearchInput({
 			{value && (
 				<InputGroupAddon align="inline-end">
 					<InputGroupButton
-						size="icon-xs"
+						size="icon-sm"
 						aria-label="Clear search"
 						onClick={() => onChange("")}
 						className="corner-full text-ink-4 hover:text-ink"
@@ -421,7 +421,7 @@ export function PaginationFooter({
 							"corner-s edge-none p-zero",
 							"text-body-m tabular-nums",
 							"bg-transparent text-ink-4 shadow-none transition-[color,box-shadow]",
-							"data-[size=default]:h-auto",
+							"data-[size=md]:h-auto",
 							"squircle:corner-s",
 							"hover:text-ink",
 							"dark:edge-none dark:bg-transparent dark:shadow-none dark:hover:bg-transparent",

@@ -44,6 +44,16 @@
  *            [var(--neutral-N)]; in CSS var(--neutral-N…) / var(--color-N…).
  *            Screens read Layer 2 roles. ROLE_FILES (role definitions) are
  *            exempt from it.
+ *   dark     A `dark:` class in a component. Theming lives in the roles, which
+ *            flip with the mode; a per-mode swap means a role is missing.
+ *            Data paint and artwork that differ per mode take a marker.
+ *   element  A raw <button>, <input>, <select> or <textarea> outside
+ *            src/app/ui/: screens build from the primitives (Button, Input,
+ *            Select, Textarea, Pressable for a clickable row or tile).
+ *   restyle  A visual class passed to a primitive through className. A
+ *            primitive owns its look; className places it (margin, width,
+ *            height, flex/grid placement, position, display) and nothing
+ *            else. Pressable is exempt: it has no look of its own.
  *   marker   A legacy `design-escape-ok: …` (exempts nothing now), a marker
  *            naming an unknown rule, a marker whose reason is "shipped value"
  *            or "no role renders this" (exempts nothing: a value the app
@@ -90,6 +100,9 @@ export const RULES = [
 	"opacity",
 	"motion",
 	"base",
+	"dark",
+	"element",
+	"restyle",
 	"marker",
 ] as const;
 export type Rule = (typeof RULES)[number];
@@ -216,7 +229,7 @@ const SKIP_PATH = new Set([
 
 const SPACE_PREFIX =
 	/^(p|px|py|pt|pr|pb|pl|ps|pe|m|mx|my|mt|mr|mb|ml|ms|me|gap|gap-x|gap-y|space-x|space-y)-(.+)$/;
-const SPACE_STEP = /^(zero|xxs|xs|s|m|l|xl|xxl|auto|reverse)$/;
+const SPACE_STEP = /^(zero|xxs|xs|s|m|l|xl|xxl|xxxl|auto|reverse)$/;
 const LENGTH_LITERAL = /\d(px|rem|em)\b|^-?\d+(\.\d+)?$/;
 const COLOUR_PREFIXES = [
 	"bg",
@@ -378,6 +391,8 @@ export function classifyClass(word: string): Rule | undefined {
 		if (value === "px" || /^\d+(\.\d+)?$/.test(value)) return "space";
 		const inner = /^\[(.+)\]$/.exec(value)?.[1];
 		if (inner && LENGTH_LITERAL.test(inner)) return "space";
+		// a calc() of steps (p-[calc(var(--space-xs)*5)]) is an off-scale value
+		if (inner?.startsWith("calc(")) return "space";
 		return undefined;
 	}
 
@@ -396,6 +411,156 @@ export function classifyClass(word: string): Rule | undefined {
 		if (value && /^(?:var\(|--|color:)/.test(value)) return "opacity";
 	}
 	return undefined;
+}
+
+/** True when a class applies only in dark mode (`dark:` in its variants). */
+export function isDarkClass(word: string): boolean {
+	const u = utilityOf(word);
+	const variants = word.slice(0, word.length - u.length);
+	return /(?:^|:)dark:/.test(variants);
+}
+
+/** The primitives of src/app/ui/ whose look className must not change.
+ * Not here: the behavioural triggers (they style what they wrap), Skeleton
+ * (a bone takes the shape it stands in for) and Pressable (no look). */
+const PRIMITIVES = [
+	"Avatar",
+	"AvatarFallback",
+	"AvatarGroup",
+	"AvatarGroupCount",
+	"AvatarImage",
+	"Badge",
+	"Button",
+	"Calendar",
+	"Card",
+	"CardContent",
+	"CardDescription",
+	"CardHeader",
+	"CardTitle",
+	"Checkbox",
+	"Dialog",
+	"DialogContent",
+	"DialogDescription",
+	"DialogFooter",
+	"DialogHeader",
+	"DialogTitle",
+	"DropdownMenu",
+	"DropdownMenuCheckboxItem",
+	"DropdownMenuContent",
+	"DropdownMenuItem",
+	"DropdownMenuSeparator",
+	"Empty",
+	"EmptyContent",
+	"EmptyDescription",
+	"EmptyHeader",
+	"EmptyMedia",
+	"EmptyTitle",
+	"Field",
+	"FieldLabel",
+	"Input",
+	"InputGroup",
+	"InputGroupAddon",
+	"InputGroupButton",
+	"InputGroupInput",
+	"Label",
+	"Popover",
+	"PopoverContent",
+	"PopoverTitle",
+	"Select",
+	"SelectContent",
+	"SelectItem",
+	"SelectTrigger",
+	"SelectValue",
+	"Separator",
+	"Sheet",
+	"SheetContent",
+	"SheetDescription",
+	"SheetHeader",
+	"SheetTitle",
+	"Sidebar",
+	"SidebarContent",
+	"SidebarFooter",
+	"SidebarGroup",
+	"SidebarGroupContent",
+	"SidebarGroupLabel",
+	"SidebarHeader",
+	"SidebarInset",
+	"SidebarMenu",
+	"SidebarMenuButton",
+	"SidebarMenuItem",
+	"Table",
+	"TableBody",
+	"TableCell",
+	"TableHead",
+	"TableHeader",
+	"TableRow",
+	"Textarea",
+	"Tooltip",
+	"TooltipContent",
+];
+const PRIMITIVE_TAG = new RegExp(`<(${PRIMITIVES.join("|")})(?![\\w.])`, "g");
+
+/** Classes that place a primitive without restyling it. */
+const LAYOUT_CLASS =
+	/^(?:-?m[xytrblse]?-.+|(?:w|h|size|min-w|max-w|min-h|max-h)-.+|flex-(?:1|none|auto|initial)|grow(?:-0)?|shrink(?:-0)?|basis-.+|(?:self|justify-self|place-self|order)-.+|(?:col|row)-(?:span|start|end)-.+|(?:absolute|relative|fixed|sticky|static)|(?:inset|inset-x|inset-y|top|right|bottom|left|start|end|z)-.+|(?:hidden|block|inline-block|inline-flex|flex|grid|contents)|(?:group|peer)(?:\/.+)?|@container(?:\/.+)?|sr-only)$/;
+
+/** Escapes a primitive's className carries: every non-layout class. */
+function restylesIn(file: string, source: string): Omit<Escape, "file">[] {
+	if (file.startsWith("src/app/ui/") || !file.endsWith(".tsx")) return [];
+	const out: Omit<Escape, "file">[] = [];
+	for (const tag of source.matchAll(PRIMITIVE_TAG)) {
+		const start = tag.index ?? 0;
+		// the opening tag runs to the first ">" outside braces and quotes
+		let depth = 0;
+		let quote: string | null = null;
+		let end = start;
+		for (let i = start + 1; i < source.length; i++) {
+			const c = source[i];
+			if (quote) {
+				if (c === quote) quote = null;
+				continue;
+			}
+			if (c === '"' || c === "'" || c === "`") quote = c;
+			else if (c === "{") depth++;
+			else if (c === "}") depth--;
+			else if (c === ">" && depth === 0) {
+				end = i;
+				break;
+			}
+		}
+		const open = source.slice(start, end);
+		const at = open.search(/\bclassName=/);
+		if (at === -1) continue;
+		const rest = open.slice(at + "className=".length);
+		const value = rest.startsWith('"')
+			? rest.slice(0, rest.indexOf('"', 1) + 1)
+			: rest;
+		const line = source.slice(0, start + at).split("\n").length;
+		for (const [, text] of stringPieces(value))
+			for (const word of wordsOf(text)) {
+				const u = utilityOf(word).replace(/^!|^-(?=m)/, "");
+				const keep = u.startsWith("-") ? u : u;
+				if (!LAYOUT_CLASS.test(keep))
+					out.push({ line, rule: "restyle", token: `<${tag[1]}> ${word}` });
+			}
+	}
+	return out;
+}
+
+/** Raw form and button elements outside the primitives. */
+function elementsIn(file: string, source: string): Omit<Escape, "file">[] {
+	if (file.startsWith("src/app/ui/") || !file.endsWith(".tsx")) return [];
+	const out: Omit<Escape, "file">[] = [];
+	const code = source
+		.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, " "))
+		.replace(/\/\/[^\n]*/g, "");
+	for (const m of code.matchAll(/<(button|input|select|textarea)\b/g))
+		out.push({
+			line: code.slice(0, m.index).split("\n").length,
+			rule: "element",
+			token: `<${m[1]}>`,
+		});
+	return out;
 }
 
 /** Class-like words in a piece of text: split on whitespace. */
@@ -641,7 +806,13 @@ export function scanFile(file: string, source: string): Scan {
 		for (const word of wordsOf(text)) {
 			const rule = classifyClass(word);
 			if (rule) raw.push({ file, line, rule, token: word });
+			if (!file.endsWith(".css") && isDarkClass(word))
+				raw.push({ file, line, rule: "dark", token: word });
 		}
+	if (!file.endsWith(".css")) {
+		for (const e of restylesIn(file, source)) raw.push({ file, ...e });
+		for (const e of elementsIn(file, source)) raw.push({ file, ...e });
+	}
 	if (file.endsWith(".css"))
 		for (const e of scanCssDeclarations(file, source)) raw.push({ file, ...e });
 

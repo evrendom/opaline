@@ -81,6 +81,7 @@
   --padding-l: var(--space-l);
   --padding-xl: var(--space-xl);
   --padding-xxl: var(--space-xxl);
+  --padding-xxxl: var(--space-xxxl);
   --margin-zero: var(--space-zero);
   --margin-xxs: var(--space-xxs);
   --margin-xs: var(--space-xs);
@@ -89,6 +90,7 @@
   --margin-l: var(--space-l);
   --margin-xl: var(--space-xl);
   --margin-xxl: var(--space-xxl);
+  --margin-xxxl: var(--space-xxxl);
   --gap-zero: var(--space-zero);
   --gap-xxs: var(--space-xxs);
   --gap-xs: var(--space-xs);
@@ -97,6 +99,7 @@
   --gap-l: var(--space-l);
   --gap-xl: var(--space-xl);
   --gap-xxl: var(--space-xxl);
+  --gap-xxxl: var(--space-xxxl);
   --space-zero: var(--space-zero);
   --space-xxs: var(--space-xxs);
   --space-xs: var(--space-xs);
@@ -105,6 +108,7 @@
   --space-l: var(--space-l);
   --space-xl: var(--space-xl);
   --space-xxl: var(--space-xxl);
+  --space-xxxl: var(--space-xxxl);
 
   /* Corners and edges */
   --corner-zero: var(--radius-zero);
@@ -365,6 +369,7 @@
   --space-l: 12px;
   --space-xl: 16px;
   --space-xxl: 24px;
+  --space-xxxl: 32px;
 
   /* Corners and edges */
   --radius-zero: 0px;
