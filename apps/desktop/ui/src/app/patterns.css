@@ -521,6 +521,15 @@
 	border-radius: 6px;
 	background: var(--menu-highlight);
 }
+/* Over a Button (a popover footer's Cancel, Clear, Apply) the fill is the
+   button's own shape: full size, its pill corner. */
+.menu-surface .fluid-menu-hover-layer[data-button]
+	.fluid-menu-hover-fill::before {
+	inset: 0;
+	border-radius: inherit;
+	/* biome-ignore lint/correctness/noUnknownProperty: corner-shape is new (Chromium 139+); Biome does not know it yet. */
+	corner-shape: round;
+}
 .menu-row[data-fluid-menu-item]::before {
 	background: transparent;
 }

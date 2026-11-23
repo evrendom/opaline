@@ -33,6 +33,7 @@ export function FluidMenuHover({
 	const [appearance, setAppearance] = useState({
 		radius: "6px",
 		destructive: false,
+		button: false,
 	});
 
 	useLayoutEffect(() => {
@@ -49,6 +50,9 @@ export function FluidMenuHover({
 				setAppearance({
 					radius: getComputedStyle(item).borderRadius,
 					destructive: item.dataset.variant === "destructive",
+					// a Button (a pill in a popover's footer) takes the fill at its
+					// own size and corner, not a menu row's inset 6px one
+					button: item.dataset.slot === "button",
 				});
 			}
 		};
@@ -196,6 +200,7 @@ export function FluidMenuHover({
 				className="fluid-menu-hover-layer"
 				data-over={over || undefined}
 				data-destructive={appearance.destructive || undefined}
+				data-button={appearance.button || undefined}
 				style={{ borderRadius: appearance.radius }}
 			>
 				<FluidHoverHighlight
