@@ -292,14 +292,15 @@
   --neutral-10: #0a0a0a;
   --neutral-10-translucent: #0a0a0a14;
   --neutral-10-transparent: #0a0a0a0a;
-  --success: #16a34a;
-  --success-translucent: #16a34a66;
+  --success: #009966;
+  --success-translucent: #00996666;
   --warning: #e17100;
   --warning-translucent: #e171003d;
   --warning-transparent: #e1710024;
-  --error: #e7000b;
-  --error-translucent: #e7000b36;
-  --error-transparent: #e7000b1c;
+  /* rose, as main drew every error mark: rose-600 in light, rose-500 in dark */
+  --error: #ec003f;
+  --error-translucent: #ec003f36;
+  --error-transparent: #ec003f1c;
 
   /* Fonts */
   --font-body: "Inter Variable", sans-serif;
@@ -416,8 +417,8 @@
   --warning: #fe9a00;
   --warning-translucent: #fe9a0066;
   --warning-transparent: #fe9a002b;
-  --error: #ff6467;
-  --error-translucent: #ff646766;
-  --error-transparent: #ff64672b;
+  --error: #ff2056;
+  --error-translucent: #ff205666;
+  --error-transparent: #ff20562b;
 
 }
