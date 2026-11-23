@@ -62,7 +62,7 @@ function RowTags({
 					}}
 					className={cn(
 						"inline-flex items-center gap-xxs",
-						"corner-xs px-xs font-mono text-body-xs font-regular tabular-nums",
+						"corner-xs px-xs font-data text-body-xs font-regular tabular-nums",
 						"transition-colors",
 						tag.color
 							? ""

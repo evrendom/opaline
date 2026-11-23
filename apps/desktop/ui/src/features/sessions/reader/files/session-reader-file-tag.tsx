@@ -124,7 +124,7 @@ export function FileTag({
 				<OpalChip tint={color} className="size-4">
 					<Icon aria-hidden="true" className="size-2.5" style={{ color }} />
 				</OpalChip>
-				<span className="truncate font-mono text-body-m">{name}</span>
+				<span className="truncate font-data text-body-m">{name}</span>
 			</span>
 		</SessionFileLink>
 	);

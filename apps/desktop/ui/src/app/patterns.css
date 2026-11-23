@@ -40,21 +40,6 @@
 	cursor: default;
 }
 
-/* Secondary button: a bordered square-cornered action beside a form or a
-   detail pane. One line edge, hover tint. */
-.secondary-button {
-	min-height: 32px;
-	padding: var(--space-s) var(--space-l);
-	border: var(--border-m) solid var(--line);
-	border-radius: var(--radius-xs);
-	font-size: var(--size-l);
-	line-height: var(--line-l);
-	letter-spacing: var(--letter-spacing-l);
-}
-.secondary-button:hover {
-	background: var(--hover);
-}
-
 /* Filter chip: an applied filter. Its dimension in ink-3, its value in ink;
    inactive chips fade until focused. */
 .filter-chip {
@@ -84,7 +69,6 @@
 }
 
 .text-button:focus-visible,
-.secondary-button:focus-visible,
 .filter-chip:focus-visible {
 	outline: 2px solid var(--accent);
 	outline-offset: -1px;
@@ -112,35 +96,13 @@
 	opacity: 1;
 }
 
-/* Tab pill: the highlight that slides along a tab row or a segmented control
-   (PillTabs' `pillClassName`). On a track it takes the track's tone
-   (`.tab-track`, the same as `bg-field`); lifted off the page it is a soft
-   card on the card shadow (`.tab-pill`). Both modes come from the roles. */
-.tab-track {
-	background: var(--field);
-}
 .tab-pill {
 	background: var(--surface);
 	box-shadow: var(--shadow-card);
 }
 
-/* ---- Part B · Opaline patterns ---- */
-
-/* Surface card: the app's card. Surface, card shadow, squircle corners where
-   the browser draws them. Independently actionable things only: white space
-   first, a line next, a card last. */
-.surface-card {
-	border-radius: var(--radius-m);
-	background: var(--surface);
-	box-shadow: var(--shadow-card);
-}
 /* biome-ignore lint/correctness/noUnknownProperty: corner-shape is new (Chromium 139+); Biome does not know it yet. */
 @supports (corner-shape: squircle) {
-	.surface-card {
-		border-radius: var(--radius-xl);
-		/* biome-ignore lint/correctness/noUnknownProperty: see the @supports note above. */
-		corner-shape: squircle;
-	}
 }
 
 /* Menu: dropdowns, popovers and pickers across sessions, costs, Compass and
@@ -226,7 +188,6 @@
 	padding: var(--space-zero);
 	list-style: none;
 }
-.menu-search,
 .menu-heading {
 	display: flex;
 	flex: none;
@@ -236,47 +197,7 @@
 	padding: var(--space-zero) var(--space-l);
 	border-bottom: var(--menu-hairline) solid var(--menu-border);
 }
-.menu-search input {
-	appearance: none;
-	width: 0;
-	min-width: 0;
-	height: 36px;
-	flex: 1;
-	border: 0;
-	border-radius: var(--radius-zero);
-	padding: var(--space-m) var(--space-zero) var(--space-m);
-	background: transparent;
-	color: var(--menu-label);
-	font-family: var(--font-body);
-	font-size: var(--size-xl);
-	font-weight: var(--weight-body-regular);
-	line-height: normal;
-	letter-spacing: var(--letter-spacing-xl);
-	box-shadow: none;
-	outline: none;
-}
-.menu-search input::placeholder {
-	color: var(--menu-icon);
-	opacity: 1;
-}
-.menu-search input::-webkit-search-cancel-button {
-	display: none;
-}
-.menu-search kbd {
-	flex: none;
-	min-width: 18px;
-	padding: var(--space-xxs);
-	margin-top: calc(var(--space-xxs) / -2);
-	border: var(--menu-hairline) solid var(--menu-border);
-	border-radius: 4px;
-	font-family: var(--font-body);
-	font-size: var(--size-s);
-	letter-spacing: var(--letter-spacing-s);
-	font-weight: var(--weight-body-regular);
-	line-height: 1;
-	text-align: center;
-	color: var(--menu-icon);
-}
+
 .menu-row {
 	position: relative;
 	isolation: isolate;
@@ -722,17 +643,8 @@
 	border-top: var(--border-m) solid var(--line-soft);
 }
 
-.settings-subsection {
-	padding-top: var(--space-xl);
-}
-
 .settings-list .settings-row {
 	min-height: 0;
-}
-
-.settings-subsection > h3 {
-	color: var(--ink-3);
-	font-weight: var(--weight-body-medium);
 }
 
 .settings-row-copy {
@@ -756,8 +668,7 @@
    itself around its bare input. */
 .settings-group [data-slot="input"],
 .settings-url-field,
-.settings-group [data-slot="select-trigger"],
-.settings-link-value [data-slot="input"] {
+.settings-group [data-slot="select-trigger"] {
 	height: 48px;
 	border: 0;
 	border-radius: var(--radius-s);
@@ -872,40 +783,13 @@
 	flex-shrink: 0;
 }
 
-.settings-link-surface {
-	display: flex;
-	min-width: 0;
-	flex-direction: column;
-	gap: var(--space-l);
-	padding: var(--space-l) var(--space-zero);
-}
-
-.settings-link-value,
-.settings-link-actions {
-	display: flex;
-	min-width: 0;
-	align-items: center;
-	gap: var(--space-m);
-}
-
-.settings-link-actions {
-	flex-wrap: wrap;
-	justify-content: flex-end;
-}
-
-.settings-link-value [data-slot="input"] {
-	min-width: 0;
-	flex: 1;
-}
-
 .settings-row-control [data-slot="skeleton"] {
 	width: 100%;
 	height: 48px;
 	border-radius: var(--radius-xs);
 }
 
-.settings-actions [data-slot="skeleton"],
-.settings-link-actions [data-slot="skeleton"] {
+.settings-actions [data-slot="skeleton"] {
 	width: 136px;
 	height: 48px;
 	border-radius: var(--radius-xs);
@@ -998,14 +882,12 @@
 	.settings-field [data-slot="input"],
 	.settings-url-field,
 	.settings-field [data-slot="select-trigger"],
-	.settings-link-value [data-slot="input"],
 	.settings-row-control [data-slot="skeleton"] {
 		height: 36px;
 	}
 
 	.settings-row-control [data-slot="select-trigger"],
 	.settings-actions [data-slot="skeleton"],
-	.settings-link-actions [data-slot="skeleton"],
 	.settings-group [data-slot="button"] {
 		height: 32px;
 	}
@@ -1023,10 +905,8 @@
 
 	.settings-group [data-slot="button"],
 	.settings-group [data-slot="select-trigger"],
-	.settings-link-value [data-slot="input"],
 	.settings-row-control [data-slot="skeleton"],
 	.settings-actions [data-slot="skeleton"],
-	.settings-link-actions [data-slot="skeleton"],
 	.settings-row-control > [data-slot="input"],
 	.settings-url-field {
 		min-height: 48px;

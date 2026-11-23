@@ -23,7 +23,7 @@ This file is the instructions for every coding agent: Codex reads `AGENTS.md`, a
 
 ## Web UI
 
-- The Mac app's UI is built on the Opaline design system: read `apps/desktop/ui/FRONTEND.md` and use the `opaline-design` skill before building UI. `apps/desktop/ui/src/app/ui` is its only primitive library; composites go in `src/components`.
+- The Mac app's UI is built on the Opaline design system: read `apps/desktop/ui/design/README.md` (then the topic files it lists) and use the `opaline-design` skill before building UI; `apps/desktop/ui/FRONTEND.md` covers where code goes. `apps/desktop/ui/src/app/ui` is its only primitive library; composites go in `src/components`. `bun run check:design` enforces the system.
 - Menus, selects and popover lists get the fluid hover by building them from the components that carry it: `apps/desktop/ui/src/app/ui` (dropdown-menu, select, popover) and `SessionMenuPopup` for the session-style menus. Do not hand-roll a Base UI popup.
 
 ## Tests

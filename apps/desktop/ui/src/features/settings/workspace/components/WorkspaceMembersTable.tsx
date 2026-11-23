@@ -249,7 +249,7 @@ export function WorkspaceMembersTable({
 					<DialogFooter>
 						<Button
 							type="button"
-							variant="primary"
+							variant="secondary"
 							size="lg"
 							onClick={() => setRemoving(null)}
 						>

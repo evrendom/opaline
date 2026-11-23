@@ -68,7 +68,7 @@
 		cursor: pointer;
 	}
 	html {
-		@apply font-sans;
+		@apply font-body;
 	}
 	/* NumberFlow pads its digits by twice this inside its shadow root; cancel it so the line box matches plain text. */
 	number-flow-react {

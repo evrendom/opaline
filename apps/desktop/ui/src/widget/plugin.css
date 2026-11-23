@@ -21,7 +21,7 @@ html[data-app-mode="plugin"] body {
 html[data-app-mode="plugin"] .font-sans {
 	font-family: var(--font-sans);
 }
-html[data-app-mode="plugin"] .font-mono {
+html[data-app-mode="plugin"] .font-data {
 	font-family: var(--font-data);
 }
 html[data-app-mode="plugin"] .dashboard-01-preview {
@@ -146,9 +146,9 @@ html[data-host-styles] body * {
 	/* biome-ignore lint/complexity/noImportantStyles: web rules pin families with long selectors */
 	font-family: var(--font-sans) !important;
 }
-html[data-host-styles] :is(code, pre, kbd, samp, .font-mono, .dashboardy-mono),
+html[data-host-styles] :is(code, pre, kbd, samp, .font-data, .dashboardy-mono),
 html[data-host-styles]
-	:is(code, pre, kbd, samp, .font-mono, .dashboardy-mono)
+	:is(code, pre, kbd, samp, .font-data, .dashboardy-mono)
 	* {
 	/* biome-ignore lint/complexity/noImportantStyles: must beat the sans rule above */
 	font-family: var(--font-data) !important;

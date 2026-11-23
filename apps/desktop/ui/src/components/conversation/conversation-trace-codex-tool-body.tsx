@@ -134,7 +134,7 @@ function ActivityTargets({ activity }: { activity: TranscriptToolActivity }) {
 						<span className="text-ink-3">{action.verb}</span>
 						{[...new Set(action.targets)].map((target) => (
 							<code
-								className="break-words whitespace-pre-wrap font-mono text-body-m"
+								className="break-words whitespace-pre-wrap font-data text-body-m"
 								key={target}
 							>
 								{target}
@@ -201,7 +201,7 @@ function PatchBody({ translation }: { translation: CodexToolTranslation }) {
 					key={`${file.operation}:${file.path}:${file.movePath ?? ""}`}
 				>
 					{file.movePath ? (
-						<p className="font-mono text-body-m text-ink-3">
+						<p className="font-data text-body-m text-ink-3">
 							Moved to {file.movePath}
 						</p>
 					) : null}
@@ -233,7 +233,7 @@ function PlanBody({ translation }: { translation: CodexToolTranslation }) {
 						data-plan-status={item.status}
 						key={`${item.status}:${item.step}`}
 					>
-						<span className="font-mono text-body-s text-ink-3">
+						<span className="font-data text-body-s text-ink-3">
 							{item.status.replaceAll("_", " ")}
 						</span>
 						<span>{item.step}</span>

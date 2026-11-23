@@ -73,7 +73,7 @@ export function HeredocBodies({ command }: { command: string }) {
 		<div className="flex flex-col gap-m">
 			{heredocs.map((heredoc) => (
 				<div key={heredoc.key} className="flex flex-col gap-xs">
-					<span className="truncate px-xs font-mono text-body-s text-ink-3">
+					<span className="truncate px-xs font-data text-body-s text-ink-3">
 						{heredoc.lead || "heredoc"}
 					</span>
 					<HighlightedCode

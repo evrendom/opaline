@@ -105,7 +105,7 @@ function DeleteWorkspaceDialogBody({
 			<DialogFooter>
 				<Button
 					type="button"
-					variant="primary"
+					variant="secondary"
 					size="lg"
 					onClick={() => onOpenChange(false)}
 					disabled={isDeleting}

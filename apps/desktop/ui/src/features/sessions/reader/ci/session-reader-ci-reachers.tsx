@@ -16,7 +16,7 @@ function TurnTag({ index, turnId }: { index: number; turnId: string }) {
 	return (
 		<span className="flex shrink-0 items-baseline gap-s tabular-nums">
 			<span className="w-5 text-ink-4">{index + 1}</span>
-			<span className="font-mono text-ink-3">{shortRunId(turnId)}</span>
+			<span className="font-data text-ink-3">{shortRunId(turnId)}</span>
 		</span>
 	);
 }

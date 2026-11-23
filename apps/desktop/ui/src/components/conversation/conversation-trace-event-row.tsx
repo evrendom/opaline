@@ -400,7 +400,7 @@ function MessagePreviewText({ text }: { text: string }) {
 					<SignalText text={part.content} />
 				</strong>
 			) : (
-				<span className="font-mono">{part.content}</span>
+				<span className="font-data">{part.content}</span>
 			)}
 		</span>
 	));
@@ -562,7 +562,7 @@ export function ConversationTraceEventRow({
 						value={shellCommand}
 					>
 						<code
-							className="min-w-0 truncate whitespace-pre font-mono font-regular tracking-m [font-variant-ligatures:none]"
+							className="min-w-0 truncate whitespace-pre font-data font-regular tracking-m [font-variant-ligatures:none]"
 							data-trace-preview
 							data-trace-shell-command-preview
 						>
@@ -713,7 +713,7 @@ export function ConversationTraceEventRow({
 				<p
 					className={cn(
 						conversationTracePreviewClassName,
-						"font-mono text-body-m",
+						"font-data text-body-m",
 					)}
 					data-trace-preview
 				>

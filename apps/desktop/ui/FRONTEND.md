@@ -1,106 +1,65 @@
-# Opaline design system
+# Frontend: the Mac app UI
 
-How UI is built in the Mac app (`apps/desktop/ui`): the Opaline design system's tokens, primitives and composites, and the rules for using them. Every rule is a hard rule. If a pattern doesn't fit, raise it before working around it.
+How code is organised in the Mac app (`apps/desktop/ui`). **Every visual
+rule lives in the design docs: read [`design/README.md`](design/README.md)
+before building any screen.** This file covers where code goes, theming and
+data.
 
 ## Layout
 
 ```
-apps/desktop/ui/src/
-  app/ui/            # Opaline primitives. One file per primitive.
-  app/providers/     # ThemeProvider, AppProviders
-  components/        # app composites built from primitives (data table, conversation trace, …)
-  features/<area>/   # screens and their feature-only parts
-  index.css          # Tailwind entry: imports the files below in order
-  app/theme.css      # Layer 1: the primitives (ramps, palette, type, space, corners, motion) and their utilities
-  app/tokens.css     # Layer 2: the roles screens read
-  app/patterns.css   # Opaline patterns: controls app/ui doesn't cover, and recurring patterns, each state as a class
-  app/preset-extensions.css  # squircle corner utilities and the opal-1…5 names mapped onto the palette
+apps/desktop/ui/
+  design/            # the design system docs: start at README.md
+  src/
+    app/ui/          # the primitives. One file per primitive.
+    app/providers/   # ThemeProvider, AppProviders
+    app/system/      # the dev showcase, /dev/design-system
+    components/      # composites built from primitives (data table, conversation trace, …)
+    features/<area>/ # screens and their feature-only parts
+    index.css        # Tailwind entry: imports the files below in order
+    app/theme.css    # Layer 1: primitives and steps
+    app/tokens.css   # Layer 2: the roles screens read
+    app/patterns.css # recurring structures as classes (menus, settings rows)
+  tools/design-escapes.ts  # the design check (bun run check:design)
 ```
 
-The `opaline-design` skill (`.claude/skills/opaline-design/SKILL.md`) holds the rules for using these files.
-
-- **Always** put a reusable primitive in `src/app/ui/` and import it as `@/app/ui/<name>`. This is the only primitive library: `components.json` points shadcn's `ui` alias here.
-- **Always** put composites (primitives arranged for a recurring job, like `DataTable`, `StatCard`, `EmptyState`, `RetryButton`) in `src/components/`, and feature-only parts in `src/features/<area>/`.
-- **Never** create a second copy of a primitive (a `button.tsx` in a feature or in `components/`). Extend the one in `app/ui`: pass `className` for a one-off, and add a variant there when a look is reused.
-- **Only** keep what the app uses. Add a primitive, part, variant or size when a screen needs it, not in case one might; delete one when its last user goes.
-
-## Primitives — `@/app/ui`
-
-Opaline's primitives are shadcn-derived and built on Base UI, with the Mac app's changes:
-
-- No `cursor-pointer`. The app uses the default arrow on controls, like a native Mac app (`index.css` resets `a[href]` too).
-- Menus, popovers and selects mount `FluidMenuHover`, the sliding hover highlight.
-- `Button` carries `skullet-block`, so a skeleton pass draws it as a block.
-
-| Need | Use |
-| --- | --- |
-| Action | `Button` (`default`, `outline`, `ghost`, `destructive`, `link`, `toolbar`; sizes `xs`, `sm`, `default`, `icon`, `icon-xs`, `icon-sm`, `inline`) |
-| Toolbar control (filter, sort, date range, version picker) | `Button variant="toolbar"`; mark it `aria-pressed` or `data-active` when it holds a choice. On a Base UI trigger: `render={<Button variant="toolbar" />}` |
-| An action inside a sentence ("Couldn't load. Try again") | `<Button variant="link" size="inline">` |
-| Retry after a failed load | `RetryButton` (`components/retry-button.tsx`) |
-| A link styled as a button | `<a className={buttonVariants()}>`, or `<Button render={<Link to="…" />}>` for in-app routes |
-| Text field | `Input`; with an icon, prefix, suffix or button use `InputGroup` + `InputGroupInput` + `InputGroupAddon`; a toolbar's search pill is `InputGroup variant="toolbar"`; the sign-in forms' tall controls add `form-button` / `form-input` |
-| Choice | `Select` (item labels are collected for `SelectValue` automatically), `Checkbox`, `DropdownMenu` |
-| Tab row or segmented control | `PillTabs` (`features/repos/pill-tabs.tsx`); its sliding pill sits on the track tone, or lifts off the page with `pillClassName="tab-pill"` (patterns `.tab-track` / `.tab-pill`) |
-| Label / form row | `Label`, `Field` |
-| Surface | `Card` (`size="sm"` for dense), `Dialog`, `Sheet`, `Popover`, `Tooltip` |
-| Data | `Table` (pass `align` per column), `Badge` (`secondary`, `outline`) |
-| Person | `Avatar` (`default`, `sm`), `AvatarGroup` |
-| Number that animates | `FlowNumber` (`flow-number.tsx`) |
-| Loading | `Bones` / `Bone` / `Reveal` (`bones.tsx`) for page skeletons, `Skeleton` for a single bar, `ChartLoadingWave` for charts |
-| Nothing to show | `EmptyState` (`components/dashboard/page-parts.tsx`) in a section, `PageEmptyState` for a whole page's empty, error or not-found state; both are built on `Empty` |
-| A small control on a touch screen | `TouchTarget` inside it grows the hit area to 48px |
-| Notifications | `toast` from `sonner`; `AppToaster` is mounted once in `AppShellLayout` |
-
-- **Always** compose with Base UI's `render` prop (`<TooltipTrigger render={<button … />} />`). **Never** use `asChild` or import `radix-ui` (lint rejects it).
-- **Never** style a raw `<button>`, `<input>`, `<select>` or `<textarea>` to look like a control, with classes or a feature CSS class. Use the primitive, or add a variant to it. A raw `<button>` is fine for an unstyled clickable surface: a list row, a chart mark, a tree node.
-- **Never** restyle a primitive from feature CSS (`.my-page [data-slot="button"] { … }`). If a look recurs, it is a variant.
-
-## Tokens and styling — Tailwind v4
-
-Two layers, with the rules in the `opaline-design` skill. Layer 1 is `src/app/theme.css`: the primitives. Layer 2 is `src/app/tokens.css`: the roles screens are written against. The system page (`/dev/design-system` in development) shows every component the app uses, in light and dark.
-
-- **Always** colour with the Layer 2 roles, and only these: ground `canvas`, `surface`, `inset`, `field`, `hover`, `hover-strong`, `scrim` (behind a dialog or sheet); ink `ink`, `ink-2`, `ink-3`, `ink-4` (the quietest: disabled text, placeholders, separators), `ink-inverse`; lines `line`, `line-soft`; action `primary`, `primary-hover`, `primary-fg`, `focus`, `focus-ring`, `accent`, `accent-tint`, `accent-line`, `accent-fg`; state `success`, `warning`, `error`, each with `-tint` and `-line`. Feature CSS reads them as `var(--surface)`. **Never** add a role, a step or a shadow: if nothing fits, use the nearest one. **Never** read Layer 1 (`neutral-1`…`neutral-10`, `color-1`…`color-5`, their `-translucent`/`-transparent` levels) in a screen or primitive. The shadcn names in `tokens.css` (`--background`, `--secondary`, …) exist for third-party code only.
-- **Never** put an opacity on a role (`text-ink/70`, `bg-error/10`, `border-line/50`). There are no shades: snap to the role that holds it, using the table in the `opaline-design` skill ("How to pick a role"). In short: ink at 80%+ is `ink`, 50 to 79% `ink-2`, below that `ink-3`; `ink-3` below 70% is `ink-4`; a soft tint is `hover`, a firmer one `hover-strong`; an edge at 60%+ is `line`, else `line-soft`; a state fill is its `-tint`, its edge its `-line`.
-- **Never** switch roles with `dark:`. Roles flip with the mode; a `dark:` swap is a sign the element wants a different role in both modes.
-- **Always** set text with a text style: `text-body-{xxs…xxl}` or `text-display-{xxs, xs, s, xxl}`, which carry size, line height and tracking. Faces are `font-body`, `font-display`, `font-data`; weights `font-regular`, `font-medium`, `font-heavy`; tracking `tracking-{xs…xl}`; line `line-solid` or `line-tight`. Don't add `leading-*` or a size beside a text style; an off-scale size takes the nearest step.
-- **Always** space with the steps: `p-m`, `gap-l`, `mt-xs` (`zero`, `xxs`…`xxl`). Past XXL, use a multiple such as `gap-[calc(var(--space-xxl)*4/3)]`. Sizes (`w-*`, `h-*`, `size-*`) keep Tailwind's scale.
-- **Always** round with `corner-{zero,xs…xl,full}` (never `rounded-*`) and stroke with `edge-{none,s,m,l}` (colour stays `border-*`). Keep the squircle pair on surfaces: `corner-m squircle:corner-xl corner-squircle` on cards, `corner-s squircle:corner-l corner-squircle` on menus and popovers.
-- **Always** lift and separate with the four role shadows: `shadow-card` (resting), `shadow-raised` (pressed or lifted), `shadow-inset` (a well), `shadow-float` (free-floating); in CSS, `var(--shadow-card)`. Each carries its dark form. Tailwind's `shadow-sm…xl` and literal `shadow-[…]` stay out of screens.
-- **Never** hard-code a hex, `rgb()` or `oklch()` colour, or an arbitrary text size or spacing value, in `className`, `style` or feature CSS. Data paint (charts, lanes, syntax, diff, brand colours, heat) and artwork (the opal sheen, the star card, glows) are the exception.
-- **Always** time motion with the roles: the theme's `--motion-duration` (150ms) / `--motion-easing` and `--motion-large-duration` (300ms) / `--motion-large-easing`, and `--motion-quick-duration` (100ms), `--motion-medium-duration` (200ms), `--motion-slow-duration` (650ms), `ease-strong`, `ease-drawer`, `ease-wave`. A literal timing snaps to the nearest one; only a loop's period (1s or longer) and `linear` stay literal.
-- **Always** keep `bun run check:design` clean (`tools/design-escapes.ts`; `--path <prefix>` narrows it to one area). It lists every escape from the scales and roles across `src`; the web tests (`src/app/design-escapes.bun-test.ts`) and CI run it. Only data paint, artwork, the platform (the macOS window glass and vibrancy) and third-party code may keep a value: a whole file goes in `DATA_PAINT` with its reason, a single line takes `design-escape-ok(<rule>): <what it is>; <detail>` (for example `design-escape-ok(colour): data paint; the trace lanes' hues`). A marker whose reason starts with `shipped value` or `no role renders this` is refused: it exempts nothing and is itself flagged.
-- **Always** merge classes with `cn()` from `@/lib/utils`: it knows the system's classes and the role shadows. Every component takes `className` and merges it on its root element.
-- **Never** bake outer margins into a component. The call site spaces it.
-- **Never** add a CSS file for something a utility or a primitive already covers. Feature CSS is for what Tailwind can't express (keyframes, `::part`, shadow-root styles, complex `:has()` chains), and reads the roles.
+- **Always** put a reusable primitive in `src/app/ui/` and import it as
+  `@/app/ui/<name>`. It's the only primitive library: `components.json`
+  points shadcn's `ui` alias here.
+- **Always** put composites (primitives arranged for a recurring job, like
+  `DataTable`, `StatCard` and `RetryButton`) in `src/components/`, and
+  feature-only parts in `src/features/<area>/`.
+- **Never** create a second copy of a primitive, such as a `button.tsx` in a
+  feature. A look that three or more screens need becomes a variant in
+  `app/ui`. A look only one screen needs uses the nearest existing variant.
+- **Only** keep what the app uses. Delete a primitive, variant, size or
+  pattern when its last user goes: a dead option is still a choice an agent
+  can pick.
 
 ## Theme
 
-- **Always** read and set the theme through `useTheme()` from `@/app/providers/ThemeProvider` (`system` | `light` | `dark`). **Never** toggle `document.documentElement.classList` yourself.
+- **Always** read and set the theme through `useTheme()` from
+  `@/app/providers/ThemeProvider` (`system` | `light` | `dark`). **Never**
+  toggle `document.documentElement.classList` yourself.
 - **Always** check every screen in light and dark.
-- **Always** add a new primitive variant, pattern or role to the system page, `/dev/design-system` (development only, `src/app/system/DesignSystemPage.tsx`): every role, step, primitive and pattern in each state at rest, light beside dark. The page is the spec.
-
-## Icons — `@tabler/icons-react`
-
-- **Always** import icons from `@tabler/icons-react`. **Never** add another icon library (lint rejects `lucide-react`).
-- **Always** use the outline icon for actions, controls, rows and inline glyphs. Use the `*Filled` variant for navigation and identity: sidebar and settings nav, reader tabs, and small category marks in charts, legends and labels.
-- **Always** size icons by place, with Tailwind: `size-3.5` (14) in buttons, toolbar pills, inputs and by default; `size-3` (12) in badges and dense rows; `size-4` (16) in menu and select items and for emphasis. Primitives size their own icons, so don't size an icon inside a `Button`, `Badge`, menu or select item.
-- **Never** put a margin on an icon inside a `Button` or `Badge`; they space children with `gap-*`.
+- **Always** add a new role, step, variant or pattern to `/dev/design-system`
+  (`src/app/system/`), with each state at rest and light beside dark, and to
+  the matching file in `design/`.
 
 ## Data
 
-- **Always** call the API through the oRPC TanStack Query utils in `@/lib/orpc`. **Never** `fetch` the API from a component.
+- **Always** call the API through the oRPC TanStack Query utils in
+  `@/lib/orpc`. **Never** `fetch` the API from a component.
 - **Never** mirror server data into `useState`; read it from the query.
 - **Always** format dates with `date-fns`.
 
-## Known debt (do not copy)
+## Known debt
 
-These predate the rules above. Move them onto the roles and primitives when you touch them; don't extend them.
-
-- Tailwind's default scales still compile next to the system's: `text-sm`, `p-3`, `rounded-lg`, `shadow-md`, `bg-rose-500` build silently. `bun run check:design` lists what remains outside its enforced scope (the sessions reader, the dashboard and the other product features); `index.css` keeps `--radius-sm…4xl`, which keeps `rounded-md…4xl` alive.
-- Some `dark:` variants still swap one role for another; fold each into the one role that reads right in both modes.
-- Feature CSS islands with hand-written surfaces, controls and literal values: costs (`costs/cost-dashboard*.css`), the dashboard (`dashboard/dashboard-theme.css`, 22 control-like classes), Compass (`compass/compass.css`), `app/app-surface.css` (the `--dashboard-01-*` chrome names), `session-constellation-tree.css` (type literals) and `product-window-chrome.css`.
-- Duplicate controls: search fields outside `InputGroup` (`.toolbar-search`, `.cost-search`, `.sessions-settings-search`, which renders as a bordered rectangle, not a pill); `.compass-chip` repeats `.filter-chip`; `.cli-onboarding-primary` is a second primary button (`cli-onboarding.css`, re-overridden in `welcome.css`), with `.cli-onboarding-text-button` beside it.
-- `dashboard-theme.css` is mostly dead: 119 of its 121 `.dashboardy-*` classes (a flight-board template's cards, meters, tables and sticky nav) are referenced nowhere in `src`. Raw `<button>`s styled as controls in places.
-- `--dashboard-01-metric-button-focus-ring` is read for focus outlines (`expandable-trace-row.tsx`, `skill-cards.tsx`, `ThemeSwitcher.tsx`, `SettingsLayout.tsx`, `reports-settings.css`) but defined nowhere, so those outlines fall back to the text colour.
-- Space: a few spots still write an off-scale step as a multiple (`calc(var(--space-xs) * 5)` for 20, `calc(var(--space-xxs) * 7)` for 14); snap them to the nearest step when you touch them.
+- `patterns.css`'s settings group reaches into `Input`, `Select`, `Button` and
+  `Avatar` through `[data-slot=…]` selectors (48px fields and pills): 15
+  `restyle` escapes, held by the baseline. The fix is a size on the
+  primitives that settings asks for.
+- Six files are over 1,000 lines (`cost-chart.tsx`,
+  `session-transcript-list.tsx`, `conversation-trace-tree.tsx`,
+  `session-detail-fast-response-pane.tsx`, `workspace-use-view.tsx` and
+  `plan-usage-chart.tsx`). Split them by section when you work in them.

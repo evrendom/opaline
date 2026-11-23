@@ -275,7 +275,7 @@ function UserTraceContent({ content }: { content: UserContent }) {
 					) : null}
 				</div>
 				{slashCommandInfo.commandArgs ? (
-					<p className="max-w-[65ch] whitespace-pre-wrap break-words font-mono text-body-l text-ink [overflow-wrap:anywhere]">
+					<p className="max-w-[65ch] whitespace-pre-wrap break-words font-data text-body-l text-ink [overflow-wrap:anywhere]">
 						{slashCommandInfo.commandArgs}
 					</p>
 				) : null}
@@ -399,7 +399,7 @@ function TraceRow({
 					timestamp={timestamp}
 					textDisclosure
 					body={
-						<p className="whitespace-pre-wrap font-mono text-body-l text-ink">
+						<p className="whitespace-pre-wrap font-data text-body-l text-ink">
 							{item.text}
 						</p>
 					}

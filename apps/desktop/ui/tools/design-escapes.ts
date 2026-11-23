@@ -10,6 +10,8 @@
  *            with a literal value (allowed: var(…), a calc(…) of vars and
  *            unitless numbers, inherit, normal, initial, unset, 0, 1, 100%,
  *            1em), and a font-family that doesn't start with var( or inherit.
+ *            Classes: font-mono, font-sans and font-serif (use font-body or
+ *            font-data).
  *   space    Numeric or off-scale padding, margin, gap and space-x/y classes
  *            (p-3, -ml-1.5, gap-[10px]); Tailwind's scale stays for w-*, h-*.
  *   radius   Every rounded-* class (use corner-{zero,xs…xl,full}).
@@ -53,7 +55,9 @@
  *   restyle  A visual class passed to a primitive through className. A
  *            primitive owns its look; className places it (margin, width,
  *            height, flex/grid placement, position, display) and nothing
- *            else. Pressable is exempt: it has no look of its own.
+ *            else. Pressable is exempt: it has no look of its own. In CSS
+ *            outside src/app/ui/, a selector that reaches a primitive by its
+ *            data-slot ([data-slot="input"]) is the same escape.
  *   marker   A legacy `design-escape-ok: …` (exempts nothing now), a marker
  *            naming an unknown rule, a marker whose reason is "shipped value"
  *            or "no role renders this" (exempts nothing: a value the app
@@ -128,6 +132,10 @@ export const ENFORCED: string[] = ["src/"];
  * and stay as authored. Only the rules listed for a file are lifted.
  */
 export const DATA_PAINT: Record<string, { rules: Rule[]; why: string }> = {
+	"src/widget/plugin.css": {
+		rules: ["restyle"],
+		why: "third-party: the plugin widget restyles the app's primitives to match the host page it is embedded in",
+	},
 	"src/features/sessions/reader/detail/session-reader-run-overview.tsx": {
 		rules: ["colour"],
 		why: "legend swatches repeat the activity lanes' colours",
@@ -381,6 +389,8 @@ export function classifyClass(word: string): Rule | undefined {
 	)
 		return "type";
 	if (/^leading-.+$/.test(u)) return "type";
+	// the data face is font-data (Geist Mono with its weights), never font-mono
+	if (/^font-(?:mono|sans|serif)$/.test(u)) return "type";
 	if (
 		/^tracking-(?:tighter|tight|normal|wide|wider|widest|\[.+\]|\(.+\))$/.test(
 			u,
@@ -556,6 +566,33 @@ function restylesIn(file: string, source: string): Omit<Escape, "file">[] {
 				if (!LAYOUT_CLASS.test(keep))
 					out.push({ line, rule: "restyle", token: `<${tag[1]}> ${word}` });
 			}
+	}
+	return out;
+}
+
+/** The data-slot names of the primitives a stylesheet must not reach into. */
+const PRIMITIVE_SLOT =
+	/\[data-slot=["']?(button|input|textarea|select-trigger|checkbox|card|badge|avatar|dialog-content|sheet-content|popover-content|tooltip-content|dropdown-menu-content|dropdown-menu-item|input-group|empty)["']?\]/;
+
+/** CSS outside src/app/ui/ that restyles a primitive by its data-slot. */
+function cssRestylesIn(file: string, source: string): Omit<Escape, "file">[] {
+	if (file.startsWith("src/app/ui/") || !file.endsWith(".css")) return [];
+	const out: Omit<Escape, "file">[] = [];
+	const css = stripCssComments(source);
+	let start = 0;
+	for (let i = 0; i < css.length; i++) {
+		const c = css[i];
+		if (c === "{") {
+			const selector = css.slice(start, i);
+			const hit = PRIMITIVE_SLOT.exec(selector);
+			if (hit && !selector.trim().startsWith("@"))
+				out.push({
+					line: css.slice(0, i).split("\n").length,
+					rule: "restyle",
+					token: `[data-slot=${hit[1]}] in a selector`,
+				});
+			start = i + 1;
+		} else if (c === "}" || c === ";") start = i + 1;
 	}
 	return out;
 }
@@ -822,6 +859,7 @@ export function scanFile(file: string, source: string): Scan {
 			if (!file.endsWith(".css") && isDarkClass(word))
 				raw.push({ file, line, rule: "dark", token: word });
 		}
+	for (const e of cssRestylesIn(file, source)) raw.push({ file, ...e });
 	if (!file.endsWith(".css")) {
 		for (const e of restylesIn(file, source)) raw.push({ file, ...e });
 		for (const e of elementsIn(file, source)) raw.push({ file, ...e });

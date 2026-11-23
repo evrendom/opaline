@@ -324,7 +324,7 @@ export function CiPullCard({
 						</span>
 					)}
 					{pull?.headRef ? (
-						<span className="truncate font-mono text-body-s">
+						<span className="truncate font-data text-body-s">
 							{pull.headRef}
 						</span>
 					) : null}

@@ -60,6 +60,8 @@ describe("design-system escape check", () => {
 		expect(classifyClass("gap-[calc(var(--space-xxl)*4/3)]")).toBe("space");
 		expect(classifyClass("px-[calc(var(--space-xxs)*5)]")).toBe("space");
 		expect(classifyClass("p-xxxl")).toBeUndefined();
+		expect(classifyClass("font-mono")).toBe("type");
+		expect(classifyClass("font-data")).toBeUndefined();
 		expect(
 			classifyClass("pl-[calc(var(--depth)*var(--space-m)+var(--space-xs))]"),
 		).toBeUndefined();

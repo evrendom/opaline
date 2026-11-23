@@ -77,7 +77,7 @@ export function HighlightedCode({
 			className={cn(
 				"overflow-hidden [overflow-wrap:anywhere]",
 				"corner-s py-m",
-				"font-mono text-body-m whitespace-pre-wrap [line-height:var(--line-l)]",
+				"font-data text-body-m whitespace-pre-wrap [line-height:var(--line-l)]",
 				"bg-field",
 				className,
 			)}
@@ -164,7 +164,7 @@ function FilePath({ path }: { path: string }) {
 	const slash = path.lastIndexOf("/");
 	return (
 		<SessionFileLink path={path} className="corner-xs hover:underline">
-			<span className="font-mono text-body-m [overflow-wrap:anywhere]">
+			<span className="font-data text-body-m [overflow-wrap:anywhere]">
 				<span className="text-ink-3">{path.slice(0, slash + 1)}</span>
 				<span className="font-medium">{path.slice(slash + 1)}</span>
 			</span>
@@ -218,7 +218,7 @@ function FieldValue({ value }: { value: unknown }) {
 		);
 	}
 	if (typeof value === "number" || typeof value === "boolean") {
-		return <span className="font-mono text-body-m">{String(value)}</span>;
+		return <span className="font-data text-body-m">{String(value)}</span>;
 	}
 	return (
 		<HighlightedCode

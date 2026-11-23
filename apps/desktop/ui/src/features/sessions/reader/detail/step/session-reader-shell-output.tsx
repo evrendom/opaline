@@ -121,7 +121,7 @@ const PATH = /[./]/u;
 
 function Counts({ rows }: { rows: { count: string; name: string }[] }) {
 	return (
-		<table className="mx-l border-collapse font-mono text-body-m">
+		<table className="mx-l border-collapse font-data text-body-m">
 			<tbody>
 				{rows.map((row) => {
 					const total = row.name === "total";
@@ -173,7 +173,7 @@ function Table({
 	const seen = new Map<string, number>();
 	return (
 		<div className="overflow-x-auto px-l">
-			<table className="w-full border-collapse font-mono text-body-m">
+			<table className="w-full border-collapse font-data text-body-m">
 				<thead>
 					<tr className="edge-b-m border-line text-ink-3">
 						{header.map((cell, column) => (

@@ -209,7 +209,7 @@ function SessionMetric({
 							<div
 								className={cn(
 									"whitespace-nowrap text-body-xxl font-heavy text-ink tabular-nums sm:text-body-l",
-									mono && "font-mono",
+									mono && "font-data",
 								)}
 							>
 								<span className="sr-only">{label}: </span>

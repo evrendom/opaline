@@ -142,7 +142,7 @@ export function SubagentTag({
 			title={title}
 		>
 			<SubagentChip selected={selected} subagentId={subagentId} />
-			<span className="font-mono" style={tint ? { color: tint } : undefined}>
+			<span className="font-data" style={tint ? { color: tint } : undefined}>
 				{shortSubagentId(subagentId)}
 			</span>
 		</span>

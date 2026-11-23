@@ -114,7 +114,7 @@ export function ToolInvocation({
 				<div className="grid min-w-0 flex-1 gap-xs">
 					<p
 						className={cn(
-							"font-mono text-body-xl font-heavy",
+							"font-data text-body-xl font-heavy",
 							isError ? "text-error" : "text-ink",
 						)}
 					>

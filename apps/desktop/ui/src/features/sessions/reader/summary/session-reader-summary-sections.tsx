@@ -289,7 +289,7 @@ export function SummaryActivityLine({
 					</span>
 				))}
 			{activity.slashCommands.map((command) => (
-				<span key={command} className="font-mono">
+				<span key={command} className="font-data">
 					{command}
 				</span>
 			))}
@@ -409,7 +409,7 @@ export function SummarySubagents({
 				const label = (
 					<>
 						<SubagentChip selected={false} subagentId={subagent.subagentId} />
-						<span className="font-mono text-body-m">
+						<span className="font-data text-body-m">
 							{shortSubagentId(subagent.subagentId)}
 						</span>
 						<span className="min-w-0 flex-1 truncate text-ink-3">

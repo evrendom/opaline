@@ -111,7 +111,7 @@ function Inline({ text }: { text: string }) {
 				return (
 					<code
 						key={key}
-						className="corner-xs bg-field px-xs py-xxs font-mono text-body-s"
+						className="corner-xs bg-field px-xs py-xxs font-data text-body-s"
 					>
 						{part.slice(1, -1)}
 					</code>
@@ -190,14 +190,14 @@ export function SetupProse({
 						return (
 							<pre
 								key={key}
-								className="overflow-x-auto corner-s bg-field px-l py-m font-mono text-body-s"
+								className="overflow-x-auto corner-s bg-field px-l py-m font-data text-body-s"
 							>
 								{block.lines.join("\n")}
 							</pre>
 						);
 					case "tag":
 						return (
-							<div key={key} className="font-mono text-body-s text-ink-3">
+							<div key={key} className="font-data text-body-s text-ink-3">
 								{block.text}
 							</div>
 						);

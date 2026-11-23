@@ -143,7 +143,7 @@ export function MemberFactLine({
 					/>
 				) : null,
 				turn.slashCommands.length > 0 ? (
-					<span key="commands" className="font-mono">
+					<span key="commands" className="font-data">
 						{turn.slashCommands.join(" ")}
 					</span>
 				) : null,

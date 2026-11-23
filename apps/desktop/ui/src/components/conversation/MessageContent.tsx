@@ -136,7 +136,7 @@ function XmlBlock({
 							<p className="min-w-[6.5rem] shrink-0 text-body-l font-medium text-ink-3">
 								{formatTagLabel(entry.key)}
 							</p>
-							<p className="break-all font-mono text-body-l text-ink">
+							<p className="break-all font-data text-body-l text-ink">
 								{entry.value}
 							</p>
 						</div>

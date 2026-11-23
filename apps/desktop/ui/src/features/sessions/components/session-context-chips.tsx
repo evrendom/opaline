@@ -151,7 +151,7 @@ export function SessionWhere({
 	if (safeGitSha)
 		parts.push([
 			"commit",
-			<span key="commit" className="font-mono" title={safeGitSha}>
+			<span key="commit" className="font-data" title={safeGitSha}>
 				{safeGitSha.slice(0, 8)}
 			</span>,
 		]);

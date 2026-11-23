@@ -38,7 +38,7 @@ function ArgumentValue({ name, value }: { name: string; value: unknown }) {
 	}
 	if (value !== null && typeof value === "object")
 		return <JsonTree value={value} />;
-	return <span className="font-mono text-body-m">{String(value)}</span>;
+	return <span className="font-data text-body-m">{String(value)}</span>;
 }
 
 export function McpCall({ event }: { event: ToolEvent }) {
@@ -51,7 +51,7 @@ export function McpCall({ event }: { event: ToolEvent }) {
 					<span className="shrink-0 corner-xs bg-field px-xs text-body-xs font-medium text-ink-3 [line-height:var(--line-m)]">
 						{named.server}
 					</span>
-					<span className="min-w-0 truncate font-mono text-body-m">
+					<span className="min-w-0 truncate font-data text-body-m">
 						{named.tool}
 					</span>
 				</p>

@@ -381,7 +381,7 @@ export function CiRounds({
 										<span className="shrink-0 font-medium">
 											Push {index + 1}
 										</span>
-										<span className="shrink-0 font-mono text-body-s text-ink-3">
+										<span className="shrink-0 font-data text-body-s text-ink-3">
 											{round.sha.slice(0, 7)}
 										</span>
 										{failed ? (

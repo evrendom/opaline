@@ -146,7 +146,7 @@ function ciFields(
 		{
 			label: "Commit",
 			value: (
-				<span className="font-mono text-body-m">
+				<span className="font-data text-body-m">
 					{run.headBranch || "—"}
 					{run.headSha ? ` @ ${run.headSha.slice(0, 7)}` : ""}
 				</span>

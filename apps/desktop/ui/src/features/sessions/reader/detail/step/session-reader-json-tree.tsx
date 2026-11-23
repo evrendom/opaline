@@ -113,7 +113,7 @@ function Entries({ depth, value }: { depth: number; value: object }) {
 
 export function JsonTree({ value }: { value: object }) {
 	return (
-		<div className="font-mono text-body-m">
+		<div className="font-data text-body-m">
 			<Entries depth={0} value={value} />
 		</div>
 	);

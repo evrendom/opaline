@@ -34,7 +34,7 @@ function SessionUserIdentity({
 								<IconUser className="size-3 shrink-0" />
 							</span>
 						)}
-						<div className="shrink-0 font-mono text-body-xxl font-heavy text-ink tabular-nums sm:text-body-l">
+						<div className="shrink-0 font-data text-body-xxl font-heavy text-ink tabular-nums sm:text-body-l">
 							{safeMessageCount}
 						</div>
 					</div>

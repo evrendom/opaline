@@ -198,7 +198,7 @@ export function WorkspaceIdentityCard({
 					) : null}
 					<Button
 						type="button"
-						variant="primary"
+						variant="secondary"
 						size="md"
 						onClick={cancelEditing}
 						disabled={isSavingName}

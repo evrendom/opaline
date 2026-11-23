@@ -118,7 +118,7 @@ describe("Claude rendered transcript golden", () => {
 		expect(markup).not.toContain(">Wrote<");
 		expect(markup).not.toContain(">Read<");
 		expect(createHash("sha256").update(markup).digest("hex")).toBe(
-			"34c61d7d772576a44d06f7b458120c7fc60c2ff27ec4414eee6de8985f16fd30",
+			"c41db6d9f5acf90b9f7fca1510c30a6cf2d36e7edad9dd7c1cbf5c8f3c024300",
 		);
 	});
 });
