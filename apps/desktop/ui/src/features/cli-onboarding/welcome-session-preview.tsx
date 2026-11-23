@@ -39,8 +39,10 @@ export function WelcomeSessionPreview({
 				name: repository.name,
 				sessionCount: repository.sessionCount,
 				sources: repository.sources.filter(
-					(source): source is "claude_code" | "codex" =>
-						source === "claude_code" || source === "codex",
+					(source): source is "claude_code" | "codex" | "gemini" =>
+						source === "claude_code" ||
+						source === "codex" ||
+						source === "gemini",
 				),
 			}));
 	const previewCount = Math.min(
@@ -175,13 +177,13 @@ function interleavePendingRows(
 		id: string;
 		name: string;
 		sessionCount: number;
-		sources: ("claude_code" | "codex")[];
+		sources: ("claude_code" | "codex" | "gemini")[];
 	}[],
 ) {
 	const rows: {
 		key: string;
 		repositoryName: string;
-		source: "claude_code" | "codex" | undefined;
+		source: "claude_code" | "codex" | "gemini" | undefined;
 	}[] = [];
 	for (let index = 0; rows.length < MAX_PREVIEW_SESSIONS; index += 1) {
 		const remaining = repositories.filter(

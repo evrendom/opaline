@@ -246,7 +246,7 @@ export function callFactRows(
 				);
 		const timeoutUnknown =
 			unrecorded.includes("timed_out_calls") ||
-			(context.session.source === "claude_code" &&
+			(context.session.source !== "codex" &&
 				named.agent_id !== "" &&
 				context.parserVersion < TIMEOUT_LIMIT_SINCE_PARSER_VERSION);
 		const rows = named.command_rows.map(([, from, text, head]) => ({

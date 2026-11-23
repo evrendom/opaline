@@ -252,8 +252,9 @@ describe("usage-event analytics query contract", () => {
 	});
 
 	test("picks each event's context band at its model's own threshold", () => {
-		const expected =
-			"multiIf(match(lowerUTF8(trimBoth(if(e.model_status = 'unresolved', e.raw_model, e.resolved_model))), '^claude-haiku-5-5(?:-\\\\d{8})?$'), 100000, 272000)";
+		const model =
+			"lowerUTF8(trimBoth(if(e.model_status = 'unresolved', e.raw_model, e.resolved_model)))";
+		const expected = `multiIf(match(${model}, '^claude-haiku-5-5(?:-\\\\d{8})?$'), 100000, match(${model}, '^(?:models/)?gemini-3\\\\.1-pro-preview(?:-customtools)?$'), 200000, match(${model}, '^(?:models/)?gemini-3-pro-preview$'), 200000, match(${model}, '^(?:models/)?gemini-2\\\\.5-pro$'), 200000, 272000)`;
 
 		for (const sql of [
 			buildPricedUsageEventsCte("1"),

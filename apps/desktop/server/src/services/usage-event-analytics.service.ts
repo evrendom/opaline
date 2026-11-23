@@ -258,7 +258,7 @@ function buildEventGroupCostSql(): string {
 			g.is_priceable = 1
 				AND r.model != ''
 				AND lowerUTF8(trimBoth(g.model_provider)) IN ('', r.provider)
-				AND r.provider = if(g.source = 'codex', 'openai', 'anthropic'),
+				AND r.provider = multiIf(g.source = 'codex', 'openai', g.source = 'gemini', 'google', 'anthropic'),
 			round((${components.join(" + ")}) * (${modifierMultiplier}), 12),
 			CAST(NULL, 'Nullable(Float64)')
 		)

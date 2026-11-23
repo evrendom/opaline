@@ -956,3 +956,42 @@ test("older history comes in batches, newest first, and waits while the disk is 
 	expect(ingest.calls.map((call) => call.sessionPath)).toEqual(paths);
 	await service.stop();
 });
+
+test("a new Gemini translation imports every Gemini session again once; Claude Code sessions are left alone", async () => {
+	const claude = await session("a", 5);
+	const geminiRoots: LocalIngestRoots = {
+		...roots,
+		geminiTmp: join(home, ".gemini", "tmp"),
+	};
+	const chats = join(home, ".gemini", "tmp", "repo", "chats");
+	await mkdir(chats, { recursive: true });
+	const gemini = join(chats, "session-2026-11-21T10-00-8d1f6a6e.jsonl");
+	await writeFile(gemini, line("gemini"));
+	const store = memoryStore();
+	const milestones = memoryMilestoneStore();
+	const first = ingestor();
+	const service = create(store, first, { roots: geminiRoots, milestones });
+	await service.start();
+	await settle(service);
+	await service.stop();
+	expect(first.calls.map((call) => call.sessionPath).sort()).toEqual(
+		[claude, gemini].sort(),
+	);
+	// Nothing new to translate: a restart imports nothing.
+	const second = ingestor();
+	const restarted = create(store, second, { roots: geminiRoots, milestones });
+	await restarted.start();
+	await settle(restarted);
+	await restarted.stop();
+	expect(second.calls).toHaveLength(0);
+	// An install from before this translation has no milestone yet.
+	const third = ingestor();
+	const upgraded = create(store, third, {
+		roots: geminiRoots,
+		milestones: memoryMilestoneStore(),
+	});
+	await upgraded.start();
+	await settle(upgraded);
+	await upgraded.stop();
+	expect(third.calls.map((call) => call.sessionPath)).toEqual([gemini]);
+});

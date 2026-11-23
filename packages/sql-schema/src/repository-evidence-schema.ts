@@ -234,7 +234,7 @@ export const repositoryEvidenceCapture = pgTable(
 		),
 		check(
 			"repository_evidence_capture_source_check",
-			sql`${table.source} IN ('claude_code', 'codex')`,
+			sql`${table.source} IN ('claude_code', 'codex', 'gemini')`,
 		),
 		check(
 			"repository_evidence_capture_lifecycle_check",

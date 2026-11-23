@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { Source } from "@rudel/api-routes";
 
 export const LOCK_SESSION_REVISION_HEAD_SQL = `
 	SELECT revision_head::text AS "revisionHead"
@@ -158,7 +159,7 @@ export async function allocateSessionRevision(
 }
 
 export function buildSessionRevisionOperationId(
-	source: "claude_code" | "codex",
+	source: Source,
 	durableOperationId: string | undefined,
 	clientOperationId: string | undefined,
 ): string {

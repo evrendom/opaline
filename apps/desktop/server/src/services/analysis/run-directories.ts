@@ -264,7 +264,7 @@ function directoryEvidenceSql(replay: ForkReplayRules, batch = false): string {
 		? `SELECT 'session_branch' AS evidence, session_id, '' AS agent_id, min(record_idx) AS first_record, '' AS cd_target,
 			any(${RECORDED_CWD}) AS recorded_cwd, '' AS command, '' AS output
 		FROM ${records()}
-		WHERE ${pinnedRecords()} AND source = 'claude_code'
+		WHERE ${pinnedRecords()} AND source IN ('claude_code', 'gemini')
 			AND kind IN ('user_prompt', 'tool_call')
 			AND (session_id, ${RECORDED_CWD}, ${componentValue("git_branch_components")}) IN (
 				SELECT b.1, b.2, b.3 FROM (SELECT arrayJoin(arrayZip({sessionIds:Array(String)}, {projectPaths:Array(String)}, {gitBranches:Array(String)})) AS b)
@@ -273,7 +273,7 @@ function directoryEvidenceSql(replay: ForkReplayRules, batch = false): string {
 		: `SELECT 'session_branch' AS evidence, '' AS agent_id, min(record_idx) AS first_record, '' AS cd_target,
 			{projectPath:String} AS recorded_cwd, '' AS command, '' AS output
 		FROM ${records()}
-		WHERE ${pinnedRecords()} AND source = 'claude_code' AND {gitBranch:String} != ''
+		WHERE ${pinnedRecords()} AND source IN ('claude_code', 'gemini') AND {gitBranch:String} != ''
 			AND kind IN ('user_prompt', 'tool_call')
 			AND ${RECORDED_CWD} = {projectPath:String}
 			AND ${componentValue("git_branch_components")} = {gitBranch:String}

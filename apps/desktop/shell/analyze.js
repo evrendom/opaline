@@ -7,8 +7,13 @@ const path = require("node:path");
 const home = os.homedir();
 const claudeRoot = path.join(home, ".claude", "projects");
 const codexRoot = path.join(home, ".codex");
+const geminiRoot = path.join(process.env.GEMINI_CLI_HOME || home, ".gemini");
+const t3Providers = path.join(home, ".t3", "userdata", "providers", "antigravity");
 const TEMPLATES = Object.fromEntries(
-	["claude.sql", "codex.sql"].map((name) => [name, fs.readFileSync(path.join(__dirname, "analysis", name), "utf8")]),
+	["claude.sql", "codex.sql", "gemini.sql", "gemini-cli.sql", "antigravity.sql", "antigravity-conversations.sql"].map((name) => [
+		name,
+		fs.readFileSync(path.join(__dirname, "analysis", name), "utf8"),
+	]),
 );
 
 function findClickhouse() {
@@ -41,7 +46,18 @@ function scanSessions() {
 	try {
 		codex = codexFolders().flatMap((folder) => listFiles(path.join(codexRoot, folder), /\.jsonl(\.zst)?$/)).length;
 	} catch {}
-	return { claude, codex, folders: claudeFolders.length, ms: Date.now() - started };
+	const sources = geminiSources();
+	const gemini =
+		sources.cli.reduce((count, chats) => count + listFiles(chats, /^session-.*\.jsonl?$/).length, 0) +
+		sources.brains.reduce(
+			(count, brain) =>
+				count +
+				listFiles(brain, /.*/).filter((conversation) =>
+					fs.existsSync(path.join(brain, conversation, ".system_generated", "logs", "transcript.jsonl")),
+				).length,
+			0,
+		);
+	return { claude, codex, gemini, folders: claudeFolders.length, ms: Date.now() - started };
 }
 
 // Two threads keep the parse of a few GB of transcripts near 1 GB of memory
@@ -49,8 +65,51 @@ function scanSessions() {
 // cores to the intro animation and the server starting beside it.
 const ANALYSIS_THREADS = 2;
 
+/**
+ * Where Gemini sessions are: Gemini CLI's project chats, and Antigravity's
+ * brain folders (its own, and each T3 Code workspace's), with the
+ * conversation database beside each brain.
+ */
+function geminiSources() {
+	const cli = listFiles(path.join(geminiRoot, "tmp"), /.*/)
+		.map((folder) => path.join(geminiRoot, "tmp", folder, "chats"))
+		.filter((chats) => fs.existsSync(chats));
+	const brains = [
+		path.join(geminiRoot, "antigravity-cli", "brain"),
+		path.join(geminiRoot, "antigravity", "brain"),
+		...listFiles(t3Providers, /.*/).map((id) => path.join(t3Providers, id, "antigravity-acp", "brain")),
+	].filter((brain) => fs.existsSync(brain));
+	const databases = brains
+		.map((brain) => path.join(path.dirname(brain), "conversation_summaries.db"))
+		.filter((database) => fs.existsSync(database));
+	return { cli, brains, databases };
+}
+
+/** gemini.sql with one INSERT per folder and database that holds sessions. */
+function geminiQuery() {
+	const { cli, brains, databases } = geminiSources();
+	const fill = (template, key, value) => TEMPLATES[template].replace(key, value.replaceAll("'", "\\'"));
+	const inserts = [
+		...cli
+			.filter((chats) => listFiles(chats, /^session-.*\.jsonl$/).length > 0)
+			.map((chats) => fill("gemini-cli.sql", "{GLOB}", `${chats}/session-*.jsonl`)),
+		...brains
+			.filter((brain) =>
+				listFiles(brain, /.*/).some((conversation) =>
+					fs.existsSync(path.join(brain, conversation, ".system_generated", "logs", "transcript_full.jsonl")),
+				),
+			)
+			.map((brain) => fill("antigravity.sql", "{GLOB}", `${brain}/*/.system_generated/logs/transcript_full.jsonl`)),
+		...databases.map((database) => fill("antigravity-conversations.sql", "{DB}", database)),
+	];
+	return TEMPLATES["gemini.sql"].replace("{SOURCES}", inserts.join("\n\n"));
+}
+
 function runQuery(binary, template, glob) {
-	const sql = TEMPLATES[template].replace("{GLOB}", glob);
+	return runSql(binary, template, TEMPLATES[template].replace("{GLOB}", glob));
+}
+
+function runSql(binary, template, sql) {
 	const file = path.join(os.tmpdir(), `opaline-${process.pid}-${template}`);
 	fs.writeFileSync(file, sql);
 	return new Promise((resolve) => {
@@ -117,7 +176,9 @@ async function analyzeSessions() {
 	const found = scanSessions();
 	const hasClaude = found.claude > 0;
 	const hasCodex = found.codex > 0;
-	if (!hasClaude && !hasCodex) return { claude: null, codex: null, ms: Date.now() - started };
+	const hasGemini = found.gemini > 0;
+	if (!hasClaude && !hasCodex && !hasGemini)
+		return { claude: null, codex: null, gemini: null, ms: Date.now() - started };
 	const binary = findClickhouse();
 	if (!binary) return { error: `ClickHouse is not available on this ${process.platform === "darwin" ? "Mac" : "PC"}.` };
 	// One after the other, so the two parses never hold memory at the same time.
@@ -125,7 +186,8 @@ async function analyzeSessions() {
 	const codex = hasCodex
 		? await runQuery(binary, "codex.sql", `${codexRoot}/{${codexFolders().join(",")}}/*.{jsonl,jsonl.zst}`)
 		: null;
-	return { claude: priced(claude), codex: priced(codex), ms: Date.now() - started };
+	const gemini = hasGemini ? await runSql(binary, "gemini.sql", geminiQuery()) : null;
+	return { claude: priced(claude), codex: priced(codex), gemini: priced(gemini), ms: Date.now() - started };
 }
 
 /** Where the transcripts are, for asking about the folders their sessions ran in. */
@@ -136,7 +198,7 @@ function sessionSources() {
 			listFiles(path.join(codexRoot, folder), /\.jsonl$/).map((name) => path.join(codexRoot, folder, name)),
 		);
 	} catch {}
-	return { claudeRoot, codexFiles };
+	return { claudeRoot, codexFiles, geminiRoot };
 }
 
-module.exports = { analyzeSessions, scanSessions, sessionSources };
+module.exports = { analyzeSessions, geminiQuery, scanSessions, sessionSources };

@@ -52,7 +52,7 @@ export const liveSession = pgTable(
 		}),
 		check(
 			"live_session_source_check",
-			sql`${table.source} IN ('claude_code', 'codex')`,
+			sql`${table.source} IN ('claude_code', 'codex', 'gemini')`,
 		),
 		index("live_session_activity_idx").on(
 			table.organizationId,

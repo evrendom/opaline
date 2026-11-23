@@ -1,4 +1,5 @@
 import { getLogger } from "@logtape/logtape";
+import type { Source } from "@rudel/api-routes";
 import type postgres from "postgres";
 import { sqlClient } from "../db.js";
 import type { IngestContentShape } from "../lib/ingest-content-shape.js";
@@ -57,7 +58,7 @@ export interface SessionAgentMetadata {
 	readonly nativeSubagentPath?: string;
 	readonly rawIngestedAt?: string;
 	readonly rawSessionDate?: string;
-	readonly source: "claude_code" | "codex";
+	readonly source: Source;
 }
 
 export class SessionAgentMetadataConflictError extends Error {

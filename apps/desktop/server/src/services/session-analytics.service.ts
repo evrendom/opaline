@@ -323,7 +323,7 @@ async function getSessionAnalyticsBaseRows(
 		query_params.organizationId = orgId;
 		filters.push(
 			useSkillReceipts
-				? `sa.subagent_kind != 'agent' AND (sa.user_id, sa.source, sa.session_id) IN (
+				? `sa.subagent_kind != 'agent' AND (sa.user_id, if(sa.source = 'gemini', 'claude_code', sa.source), sa.session_id) IN (
 				SELECT user_id, if(agent = 'claude', 'claude_code', 'codex'), session_id
 				FROM active_skill_uses
 			)`

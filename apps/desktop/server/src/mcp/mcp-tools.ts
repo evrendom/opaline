@@ -1262,7 +1262,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 				text: "Required. What to find: a description of what happened, a literal string such as a flag, file name or error, or an RE2 regex (mode regex, up to 800 characters).",
 				mode: "hybrid (default) merges meaning and exact matches, meaning finds similar text, exact finds the string itself (case-insensitive), regex matches an RE2 pattern (case-sensitive unless it starts with (?i)).",
 				filters:
-					"Optional: since and until (YYYY-MM-DD, UTC, inclusive; default the last 30 days, at most 180 apart), source (claude_code or codex), kinds (user_prompt, assistant_text, reasoning, tool_call, tool_result, file_change), userId (one member).",
+					"Optional: since and until (YYYY-MM-DD, UTC, inclusive; default the last 30 days, at most 180 apart), source (claude_code, codex or gemini), kinds (user_prompt, assistant_text, reasoning, tool_call, tool_result, file_change), userId (one member).",
 				workspace: WORKSPACE_DESCRIPTION,
 			}),
 			run: async (client, { workspace: _workspace, ...args }, context) => {

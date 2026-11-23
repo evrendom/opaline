@@ -93,7 +93,7 @@ export const l1EdgeScope = pgTable(
 			.where(sql`${table.requestCount} > ${table.builtRequestCount}`),
 		check(
 			"l1_edge_scope_kind_check",
-			sql`(${table.scopeKind} IN ('session', 'run_index') AND ${table.userId} IS NOT NULL AND ${table.sessionId} IS NOT NULL AND ${table.source} IN ('claude_code', 'codex')) OR (${table.scopeKind} = 'repository' AND ${table.repositoryId} IS NOT NULL AND ${table.userId} IS NULL)`,
+			sql`(${table.scopeKind} IN ('session', 'run_index') AND ${table.userId} IS NOT NULL AND ${table.sessionId} IS NOT NULL AND ${table.source} IN ('claude_code', 'codex', 'gemini')) OR (${table.scopeKind} = 'repository' AND ${table.repositoryId} IS NOT NULL AND ${table.userId} IS NULL)`,
 		),
 	],
 );

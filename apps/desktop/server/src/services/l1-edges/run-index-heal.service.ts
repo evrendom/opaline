@@ -284,7 +284,7 @@ function staleSources(organizationFilter: string): string {
 				${newestGenerations({
 					columns: `any(source) AS session_source,
 					argMax(session_date, (revision, parser_version)) AS last_session_date`,
-					and: `AND source IN ('claude_code', 'codex') ${organizationFilter}`,
+					and: `AND source IN ('claude_code', 'codex', 'gemini') ${organizationFilter}`,
 				})}
 			),
 			indexed AS (

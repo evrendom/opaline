@@ -194,7 +194,7 @@ const CandidateRowSchema = z.object({
 	organization_id: z.string(),
 	user_id: z.string(),
 	session_id: z.string(),
-	source: z.enum(["claude_code", "codex"]),
+	source: z.enum(["claude_code", "codex", "gemini"]),
 	session_date: z.string(),
 	reason: z.enum(["missing", "generation", "pending"]),
 });
@@ -262,7 +262,7 @@ export function buildTranscriptSearchBackfillStatement(input: {
 			FROM records
 			LEFT JOIN indexed ON records.organization_id = indexed.organization_id
 				AND records.user_id = indexed.user_id AND records.session_id = indexed.session_id
-			WHERE records.session_source IN ('claude_code', 'codex')
+			WHERE records.session_source IN ('claude_code', 'codex', 'gemini')
 				AND (indexed.present = 0
 					OR tuple(indexed.committed.1, indexed.committed.2) != records.generation
 					OR indexed.committed.3 > 0)

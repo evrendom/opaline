@@ -1,3 +1,4 @@
+import { transcriptFormat } from "../../schemas/source.js";
 import {
 	CENSUS_CONVENTIONS,
 	censusPathParts,
@@ -118,9 +119,10 @@ function factsForKind(
 
 export function withV9Facts(
 	record: Record<string, unknown>,
-	agent: TranscriptSource,
+	source: TranscriptSource,
 	items: readonly LineItem[],
 ): LineItem[] {
+	const agent = transcriptFormat(source);
 	const selected = factsForKind(agent, censusRecordKind(record, agent));
 	if (selected.length === 0) return [...items];
 	const baseItems: readonly LineItem[] =

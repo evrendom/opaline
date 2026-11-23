@@ -3,6 +3,7 @@ import type {
 	AnalysisCost,
 	AnalysisHost,
 	AnalysisScope,
+	Source,
 } from "@rudel/api-routes";
 
 /**
@@ -132,7 +133,7 @@ export interface QuerySummary
 export interface StoredSessionLink {
 	analysisId: string;
 	sessionId: string;
-	source: "claude_code" | "codex";
+	source: Source;
 	/** The member who uploaded the chat; it is their session. */
 	ownerId: string;
 	/** The latest upload of the session for this analysis. */

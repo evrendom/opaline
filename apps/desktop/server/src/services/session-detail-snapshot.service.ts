@@ -85,6 +85,30 @@ function rawSessionUnionSql(pinRevision = false) {
     PREWHERE organization_id = {orgId:String}
       AND user_id = {ownerId:String}
       AND session_id = {sessionId:String}
+      ${pinRevision ? "AND revision = {revision:UInt64} AND source = {source:String}" : ""}
+
+    UNION ALL
+
+    SELECT
+      'gemini' AS source,
+      organization_id,
+      user_id,
+      session_id,
+      content,
+      subagents,
+      revision,
+      ingested_at,
+      session_date,
+      last_interaction_date,
+      project_path,
+      git_remote,
+      package_name,
+      git_branch,
+      git_sha
+    FROM rudel.gemini_sessions
+    PREWHERE organization_id = {orgId:String}
+      AND user_id = {ownerId:String}
+      AND session_id = {sessionId:String}
       ${pinRevision ? "AND revision = {revision:UInt64} AND source = {source:String}" : ""}`;
 }
 

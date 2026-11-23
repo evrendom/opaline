@@ -47,7 +47,7 @@ const MAX_REPOSITORIES = 200;
 const SCOPE_READ_BATCH = 1_000;
 /** Leave this much of the deadline for the response; stop queueing without it. */
 const MIN_REMAINING_MS = 2_000;
-const SOURCES = new Set(["claude_code", "codex"]);
+const SOURCES = new Set(["claude_code", "codex", "gemini"]);
 const CENSUS_SETTINGS = {
 	max_execution_time: 30,
 	max_rows_to_read: "100000000",

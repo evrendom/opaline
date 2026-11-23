@@ -52,7 +52,7 @@ export function findScope(
 const SessionSchema = z.object({
 	session_id: z.string(),
 	user_id: z.string(),
-	source: z.enum(["claude_code", "codex"]),
+	source: z.enum(["claude_code", "codex", "gemini"]),
 	model: z.string(),
 	repository: z.string(),
 });

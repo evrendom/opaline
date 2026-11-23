@@ -140,7 +140,9 @@ export function ModelTraceIcon({
 			? "claude"
 			: modelBrand === "codex"
 				? "openai"
-				: "violet";
+				: modelBrand === "gemini"
+					? "blue"
+					: "violet";
 
 	return (
 		<TraceDisclosureFrame

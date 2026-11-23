@@ -1,3 +1,4 @@
+import { toSource } from "@rudel/api-routes";
 import { encodedSessionDetailBodies } from "./session-detail-body-store.js";
 import {
 	deriveSessionDetail,
@@ -46,7 +47,7 @@ async function respond(
 				request.load.ownerId,
 				{
 					revision: request.load.revision,
-					source: request.load.source === "codex" ? "codex" : "claude_code",
+					source: toSource(request.load.source),
 				},
 			);
 			if (!read) {

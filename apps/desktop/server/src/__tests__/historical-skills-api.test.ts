@@ -45,7 +45,7 @@ describe("historical skills API guardrails", () => {
 		expect(serviceSource).toContain("FROM active_skill_uses AS su");
 		expect(serviceSource).toContain("LEFT JOIN (");
 		expect(serviceSource).toContain("su.agent = 'claude'");
-		expect(serviceSource).toContain("sa.source = 'claude_code'");
+		expect(serviceSource).toContain("sa.source IN ('claude_code', 'gemini')");
 		expect(serviceSource).toContain("su.agent = 'codex'");
 		expect(serviceSource).toContain("sa.source = 'codex'");
 		expect(serviceSource).toContain("coalesce(sa.project_path, '')");

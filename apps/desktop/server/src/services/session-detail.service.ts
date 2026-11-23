@@ -5,7 +5,7 @@ import type {
 	SessionDetailOverview,
 	SessionDetailWindowRequest,
 } from "@rudel/api-routes";
-import { isLiveSessionDetailRevision } from "@rudel/api-routes";
+import { isLiveSessionDetailRevision, toSource } from "@rudel/api-routes";
 import { readPositiveSafeIntegerEnv } from "../lib/env.js";
 import { isSelfHosted } from "../lib/self-hosted.js";
 import { timedIngestPhase } from "./ingest-phase-timings.js";
@@ -192,7 +192,7 @@ async function liveSessionDatabase() {
 }
 
 async function loadRawSnapshot(key: SessionDetailDerivationCacheKey) {
-	const source = key.source === "codex" ? "codex" : "claude_code";
+	const source = toSource(key.source);
 	if (!isLiveSessionDetailRevision(key.revision)) {
 		return getSessionDetailRawSnapshot(
 			key.organizationId,

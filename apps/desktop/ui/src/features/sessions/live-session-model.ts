@@ -115,7 +115,11 @@ export function mergeLiveSessionTail(
 }
 
 export function formatLiveSessionSource(source: LiveSessionSource): string {
-	return source === "codex" ? "Codex" : "Claude Code";
+	return source === "codex"
+		? "Codex"
+		: source === "gemini"
+			? "Gemini"
+			: "Claude Code";
 }
 
 /** "now", "12s ago", "3m ago", "2h ago". */

@@ -36,7 +36,7 @@ import { RUN_INDEX_TABLE } from "./l1-edge-tables.js";
  *   would only freeze again.
  */
 
-const SOURCES = new Set(["claude_code", "codex"]);
+const SOURCES = new Set(["claude_code", "codex", "gemini"]);
 /** Scope ids read from the queue per statement. */
 const SCOPE_READ_BATCH = 1_000;
 const SELECTION_SETTINGS = {

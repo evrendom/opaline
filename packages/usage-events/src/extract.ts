@@ -139,9 +139,9 @@ export function extractUsageEventsAtVersions(
 	const versionedInput: VersionedUsageExtractionInput = { ...input, versions };
 	const diagnostics = new Map<string, MutableDiagnostic>();
 	const events =
-		input.source === "claude_code"
-			? extractClaudeEvents(versionedInput, diagnostics)
-			: extractCodexEvents(versionedInput, diagnostics);
+		input.source === "codex"
+			? extractCodexEvents(versionedInput, diagnostics)
+			: extractClaudeEvents(versionedInput, diagnostics);
 	const finalizedDiagnostics = finalizeDiagnostics(diagnostics);
 
 	if (finalizedDiagnostics.some((diagnostic) => diagnostic.fatal)) {
@@ -642,6 +642,7 @@ function mergeClaudeCandidateGroup(
 		group,
 		occurredAt,
 		qualityFlags,
+		input.source,
 	);
 	const serviceTier = resolveClaudeServiceTier(
 		preferredMetadata,
@@ -770,7 +771,7 @@ function buildClaudeSubInferenceEvent(
 				subInference.model,
 				response.occurredAt,
 				qualityFlags,
-				"claude_code",
+				response.source,
 			)
 		: { rawModel: "", resolvedModel: "", status: "missing" as const };
 	if (!subInference.model) qualityFlags.add("missing_model");
@@ -845,6 +846,7 @@ function resolveClaudeModel(
 	all: readonly ClaudeCandidate[],
 	occurredAt: string | null,
 	qualityFlags: Set<string>,
+	source: UsageEventSource,
 ): {
 	rawModel: string;
 	resolvedModel: string;
@@ -863,7 +865,7 @@ function resolveClaudeModel(
 	}
 	const rawModel = realModels[0];
 	if (rawModel) {
-		return resolveUsageModel(rawModel, occurredAt, qualityFlags, "claude_code");
+		return resolveUsageModel(rawModel, occurredAt, qualityFlags, source);
 	}
 	if (all.some((candidate) => candidate.modelWasSynthetic)) {
 		qualityFlags.add("synthetic_model");
@@ -2039,7 +2041,7 @@ function resolveUsageModel(
 		qualityFlags.add("unresolved_model");
 		return { rawModel, resolvedModel: "", status: "unresolved" };
 	}
-	const expectedProvider = source === "claude_code" ? "anthropic" : "openai";
+	const expectedProvider = EXPECTED_MODEL_PROVIDER[source];
 	if (identity.provider !== expectedProvider) {
 		qualityFlags.add("provider_model_mismatch");
 	}
@@ -2067,10 +2069,17 @@ function uniqueModelsCaseInsensitive(values: readonly string[]): string[] {
 	return [...models.values()];
 }
 
+const EXPECTED_MODEL_PROVIDER: Readonly<Record<UsageEventSource, string>> = {
+	claude_code: "anthropic",
+	codex: "openai",
+	gemini: "google",
+};
+
 const ALLOWED_SERVICE_TIERS: Readonly<
 	Record<UsageEventSource, ReadonlySet<string>>
 > = {
 	claude_code: new Set(["batch", "priority", "standard"]),
+	gemini: new Set(["batch", "flex", "priority", "standard"]),
 	codex: new Set([
 		"auto",
 		"default",

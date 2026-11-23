@@ -785,7 +785,9 @@ async function completeCollection(input: {
 			input.evidence.pullRequests.length > 0 &&
 			input.sessionId &&
 			sessionUserId &&
-			(sessionSource === "claude_code" || sessionSource === "codex")
+			(sessionSource === "claude_code" ||
+				sessionSource === "codex" ||
+				sessionSource === "gemini")
 		)
 			await enqueueL1EdgeScope(
 				transaction,

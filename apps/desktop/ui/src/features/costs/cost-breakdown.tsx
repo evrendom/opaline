@@ -28,6 +28,7 @@ import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import {
 	ClaudeModelIcon,
 	CodexModelIcon,
+	GeminiModelIcon,
 } from "@/features/dashboard/components/DashboardModelBadges";
 import { getModelBadgeTone } from "@/features/dashboard/components/dashboard-model-brand";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
@@ -450,6 +451,8 @@ function EntryIcon({
 		return <ClaudeModelIcon className="size-3.5 shrink-0" />;
 	if (tone.icon === "codex")
 		return <CodexModelIcon className="size-3.5 shrink-0" />;
+	if (tone.icon === "gemini")
+		return <GeminiModelIcon className="size-3.5 shrink-0" />;
 	return (
 		<span className="cost-unknown-model" aria-hidden="true">
 			?

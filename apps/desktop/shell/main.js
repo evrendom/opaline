@@ -413,6 +413,12 @@ function createOnboarding() {
 	onboardingWindow.loadFile(path.join(__dirname, "onboarding", "index.html"));
 }
 
+// Gemini's mark on an app-icon tile, for Gemini sessions on Macs without the
+// Antigravity app.
+const GEMINI_ICON = `data:image/svg+xml,${encodeURIComponent(
+	'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><defs><linearGradient id="g" x1="70" y1="186" x2="186" y2="70" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#1C7DFF"/><stop offset="0.52" stop-color="#1C69FF"/><stop offset="1" stop-color="#B07CF7"/></linearGradient></defs><rect x="24" y="24" width="208" height="208" rx="47" fill="#fff"/><path fill="url(#g)" transform="translate(78 78) scale(4.1667)" d="M12 24A14.3 14.3 0 0 0 0 12 14.3 14.3 0 0 0 12 0a14.3 14.3 0 0 0 12 12 14.3 14.3 0 0 0-12 12Z"/></svg>',
+)}`;
+
 function appIcon(bundle) {
 	if (!isMac) return null;
 	if (bundle.endsWith(".png"))
@@ -471,6 +477,8 @@ ipcMain.handle("onboarding:icons", (event) =>
 				codex:
 					appIcon("/Applications/Codex.app") ??
 					appIcon("/Applications/ChatGPT.app/Contents/Resources/icon-codex-dark-color.png"),
+				gemini: appIcon("/Applications/Antigravity.app") ?? GEMINI_ICON,
+				antigravity: appIcon("/Applications/Antigravity.app") ?? "antigravity.svg",
 			}
 		: null,
 );

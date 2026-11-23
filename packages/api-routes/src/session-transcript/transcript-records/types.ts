@@ -402,7 +402,11 @@ export const TRANSCRIPT_RECORDS_SESSION_TEXT_BUDGET_CHARS = 32 * 1024 * 1024;
 /** Lines larger than this are indexed by byte range and excerpts, never parsed. */
 export const TRANSCRIPT_RECORD_MAX_PARSE_LINE_BYTES = 16 * 1024 * 1024;
 
-export type TranscriptSource = "claude_code" | "codex";
+/**
+ * A session's source. Gemini sessions are stored in Claude Code's transcript
+ * shape, so they are parsed as Claude Code (anything but "codex" is).
+ */
+export type TranscriptSource = "claude_code" | "codex" | "gemini";
 
 export type TranscriptRecordKind =
 	/** A human prompt or a parent's task (subtype `delegation`) in a subagent. */

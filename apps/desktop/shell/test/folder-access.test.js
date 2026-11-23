@@ -5,6 +5,7 @@ const path = require("node:path");
 const {
 	askForSessionFolders,
 	codexCwd,
+	geminiProjectRoots,
 	guardedFolders,
 } = require("../folder-access");
 
@@ -142,5 +143,38 @@ describe("asking", () => {
 				platform: "linux",
 			}),
 		).toEqual([]);
+	});
+});
+
+describe("Gemini", () => {
+	let root;
+	beforeEach(() => {
+		root = fs.mkdtempSync(path.join(os.tmpdir(), "opaline-gemini-folders-"));
+	});
+	afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+
+	test("the folders Gemini CLI ran in come from projects.json and each .project_root", async () => {
+		fs.mkdirSync(path.join(root, "tmp", "site"), { recursive: true });
+		fs.writeFileSync(
+			path.join(root, "tmp", "site", ".project_root"),
+			"/Users/ada/Desktop/site\n",
+		);
+		fs.writeFileSync(
+			path.join(root, "projects.json"),
+			JSON.stringify({
+				projects: { "/Users/ada/Documents/app": "app", "/": "root" },
+			}),
+		);
+		const roots = await geminiProjectRoots(root);
+		expect(roots.sort()).toEqual([
+			"/Users/ada/Desktop/site",
+			"/Users/ada/Documents/app",
+		]);
+		expect(
+			await guardedFolders(
+				{ claudeFolders: [], codexPaths: [], geminiPaths: roots },
+				{ home, list: none },
+			),
+		).toEqual(["/Users/ada/Desktop", "/Users/ada/Documents"]);
 	});
 });

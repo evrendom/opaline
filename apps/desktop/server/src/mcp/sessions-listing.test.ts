@@ -9,7 +9,7 @@ interface Listed {
 }
 
 const PUBLISHED_TOOLS_SHA256 =
-	"713e34b25b485bd883399f89fca351d67d373f8204d3dcd76943435349b1d646";
+	"c97f6a8b8d7064cb74c7d1998e7cb84d169a5386f66fd04fe64f58b8df33192e";
 
 const SESSIONS_REMINDER =
 	"use groupBy=session instead of calling find once per session";

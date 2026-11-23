@@ -8,7 +8,7 @@
 
 # Opaline
 
-**Pull back the curtain on your Claude Code and Codex sessions.**
+**Pull back the curtain on your Claude Code, Codex and Gemini sessions.**
 
 Local-first desktop app for macOS and Linux. See what filled your context window, where agents got stuck, what they cost, and let them retro their own setup.
 
@@ -32,7 +32,7 @@ Local-first desktop app for macOS and Linux. See what filled your context window
 - **macOS:** [Apple Silicon (`.dmg`)](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-macOS-arm64.dmg) · [Intel (`.dmg`)](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-macOS-x64.dmg) (open and drag to Applications)
 - **Linux x64:** [AppImage](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-Linux-x86_64.AppImage) (`chmod +x` and run) · [`.deb`](https://github.com/evrendom/opaline/releases/download/desktop-latest/Opaline-Linux-amd64.deb) (`sudo apt install ./Opaline-Linux-amd64.deb`)
 
-Launch Opaline and it starts its bundled local stack automatically, imports existing Claude Code and Codex sessions, and updates via GitHub Releases. No account, no Docker, and nothing leaves your machine. *(Downloads are ~310-530 MB because Electron, Postgres, and ClickHouse are bundled in.)*
+Launch Opaline and it starts its bundled local stack automatically, imports existing Claude Code, Codex and Gemini (Gemini CLI and Antigravity) sessions, and updates via GitHub Releases. No account, no Docker, and nothing leaves your machine. *(Downloads are ~310-530 MB because Electron, Postgres, and ClickHouse are bundled in.)*
 
 <p align="center">
   <picture>

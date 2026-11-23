@@ -83,7 +83,7 @@ export const FIND_INPUT_DESCRIPTIONS: Record<string, string> = {
 	latest: "Only the newest N sessions in the date range, 1-200.",
 	repository:
 		"Only sessions in this repository (a name from the repository column). Not for source=weekly.",
-	agent: "Only sessions from claude_code or codex. Default: both.",
+	agent: "Only sessions from claude_code, codex or gemini. Default: all.",
 	model:
 		"Only runs that used this model id; cost then counts only that model. Not for source=calls: find those runs first and pass them.",
 	sessionId: "Only this session and the subagents it started.",

@@ -24,7 +24,7 @@ export const FINAL_MESSAGE_CHARS = 2_000;
 
 /** Records that carry the system prompt a stream received. */
 const SYSTEM_PROMPT_SQL = `kind = 'meta' AND facts['instruction_text_components'] != ''
-	AND ((source = 'claude_code' AND subtype = 'attachment:prompt_snapshot') OR (source = 'codex' AND subtype = 'session_meta'))`;
+	AND ((source IN ('claude_code', 'gemini') AND subtype = 'attachment:prompt_snapshot') OR (source = 'codex' AND subtype = 'session_meta'))`;
 
 export const RunMessagesRowSchema = z.object({
 	agent_id: z.string(),

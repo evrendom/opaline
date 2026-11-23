@@ -390,7 +390,8 @@ export function isRunIndexColumnRecordable(
 	agentId = "",
 ): boolean {
 	const columnGate: RunIndexColumnGate = RUN_INDEX_FACT_COLUMNS[column];
-	const agent = source as TranscriptSource;
+	// Gemini sessions are stored, and parsed, as Claude Code transcripts.
+	const agent: TranscriptSource = source === "codex" ? "codex" : "claude_code";
 	const since = columnGate.sinceBy?.[agent] ?? columnGate.since;
 	return (
 		parserVersion >=
