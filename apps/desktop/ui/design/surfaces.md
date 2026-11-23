@@ -32,6 +32,8 @@ padding, settings groups). Never build a card by hand from
 ```
 
 Lay out a card's children on a child element, never on `CardContent` itself.
+A list of rows inside a card is a child `ul` with `settings-group-rows`: it
+draws the hairline between rows. Each row is `flex items-center gap-l py-l`.
 
 ## Dialog
 
@@ -57,7 +59,11 @@ placement, which is allowed); the surface, padding and shadow are its own.
 `src/app/ui/dropdown-menu.tsx`: `DropdownMenu`, `DropdownMenuTrigger`,
 `DropdownMenuContent`, `DropdownMenuItem`, `DropdownMenuCheckboxItem` and
 `DropdownMenuSeparator`. An item's variant is `default` or `danger`, and
-`danger` is for destructive items only, placed last after a separator.
+`danger` is for destructive items only, placed last after a separator. A
+delete that can't be undone opens a Dialog to confirm (a `danger` button and
+a `secondary` Cancel); one that can be undone just happens, with a toast. Set
+a width on `DropdownMenuContent` (`className="w-40"`) when the trigger is an
+icon: by default the menu is as wide as its trigger.
 
 ## Tooltip
 
@@ -78,7 +84,8 @@ else exists.
 ```
 Which tone?
  ├── Did it fail, or is it invalid or destructive? → variant="error"
- ├── Does it need attention, or was it interrupted? → variant="warning"
+ ├── Does it need attention, or was it interrupted by a fault? → variant="warning"
+ ├── Is it paused, off or a draft on purpose? → neutral (no colour: nothing's wrong)
  ├── Is it done, passed or healthy? → variant="success"
  ├── Is it a secondary label on a card (Private, Draft)? → variant="outline"
  └── Default, including in progress (add a spinner icon) → leave variant off (neutral)

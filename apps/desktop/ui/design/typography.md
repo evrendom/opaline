@@ -27,7 +27,9 @@ reads: `text-body-xxs` is only for initials and dense tags.
 
 ```
 What size is this text?
- ├── Is it a page or dialog title? → text-body-xxl (shell header) or text-display-xs (a settings page)
+ ├── Is it a page title? → nothing on the page: the shell header draws it
+ │   (text-body-xxl). Give the page an `<h1 className="sr-only">` instead.
+ ├── Is it a dialog title? → DialogTitle sets it
  ├── Is it the main reading text of a screen or dialog? → text-body-xl
  ├── Is it a row in a list, or a card title? → text-body-l
  ├── Is it a chip, menu item or secondary row? → text-body-m

@@ -29,6 +29,10 @@ How much space?
 Width and height (`w-*`, `h-*`, `size-*`) use Tailwind's scale. They're
 layout, not space.
 
+A page of rows, forms or prose reads in a centred column,
+`mx-auto w-full max-w-3xl px-xxl py-xxxl`, as ReportPage does, with its
+sections `gap-xxl` apart. A page of charts or tables fills the width.
+
 ## Corners
 
 `corner-zero`, `corner-xs` (6), `corner-s` (8), `corner-m` (10), `corner-l`

@@ -58,7 +58,9 @@ its content from 80px. Use it for notes, descriptions and messages.
 carries its own visible label as its children. The group takes `value` and
 `onValueChange` (or `defaultValue`) and an `aria-label` or
 `aria-labelledby`. `orientation` is `vertical` (the default) or
-`horizontal` (two or three short options on one line). Never build a choice
+`horizontal` (two or three short options on one line). Its visible label is
+a `FieldLabel` with an `id`, and the group points at it with
+`aria-labelledby`. Never build a choice
 from a row of Pressables or toggled Buttons: that's a RadioGroup.
 
 ```tsx
@@ -100,7 +102,9 @@ button inside it.
 `Field` (orientations `vertical`, the default, `horizontal` and
 `responsive`) stacks a `FieldLabel` with its control. Use `Label` for a
 checkbox's label. Every control has a label, either visible or as an
-`aria-label`: a placeholder is not a label.
+`aria-label`: a placeholder is not a label. Mark an optional field with
+"Optional" after its label, in `font-regular text-ink-3`; never mark the
+required ones.
 
 ## Validation
 
