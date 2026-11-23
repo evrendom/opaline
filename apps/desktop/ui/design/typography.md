@@ -30,6 +30,9 @@ What size is this text?
  ├── Is it a page title? → nothing on the page: the shell header draws it
  │   (text-body-xxl). Give the page an `<h1 className="sr-only">` instead.
  ├── Is it a dialog title? → DialogTitle sets it
+ ├── Is it a card's title? → CardTitle sets it
+ ├── Is it a section heading on the page (above a card or a group)? →
+ │   <h2 className="text-body-xl font-medium">
  ├── Is it the main reading text of a screen or dialog? → text-body-xl
  ├── Is it a row in a list, or a card title? → text-body-l
  ├── Is it a chip, menu item or secondary row? → text-body-m

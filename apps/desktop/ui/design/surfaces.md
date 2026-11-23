@@ -16,8 +16,9 @@ Where does this content live?
 ## Card
 
 `src/app/ui/card.tsx`: `Card`, `CardHeader`, `CardTitle`, `CardDescription`
-and `CardContent`. Sizes are `md` (24px padding, the default) and `sm` (12px
-padding, settings groups). Never build a card by hand from
+and `CardContent`. Sizes are `md` (24px padding, the default: prose,
+explanations) and `sm` (12px padding: a card that holds a List, figures or
+form rows). Never build a card by hand from
 `bg-surface … shadow-card` on a `div`: that's a Card.
 
 ```tsx
@@ -34,14 +35,24 @@ padding, settings groups). Never build a card by hand from
 ```
 
 Lay out a card's children on a child element, never on `CardContent` itself.
-Rows inside a card are a `List`; figures are a `StatGroup`.
+Rows inside a card are a `List`; figures are a `StatGroup`. A form in a card
+ends with its actions right-aligned after the last row (`flex justify-end
+gap-m` on a child); Save stays disabled until something changes, and a
+successful save confirms with a toast (`toast.success("Saved")` from
+`sonner`).
+
+The settings pages have their own group (`WorkspaceSettingsGroup` and the
+`settings-*` classes in `patterns.css`). Use it on a settings page only;
+anywhere else, a group of settings is a Card of `List` rows.
 
 ## List
 
 `src/app/ui/list.tsx`: `List` and `ListItem`. Rows of things with a hairline
 between them: rules, members, runs. A `ListItem` is a 12px-padded flex row
-with a 12px gap; lay out what's inside it (a name over its meta, a Badge, a
-menu at the end with `ml-auto`) on its children.
+with a 12px gap; its className may only place it, so lay out what's inside
+(a name over its meta, a Badge, a label-left/control-right setting) on its
+children, and put a row menu at the end with `ml-auto`. A row's icon
+button is `size="icon"`.
 
 ```tsx
 // Correct
@@ -104,7 +115,10 @@ placement, which is allowed); the surface, padding and shadow are its own.
 delete that can't be undone opens a Dialog to confirm (a `danger` button and
 a `secondary` Cancel); one that can be undone just happens, with a toast. Set
 a width on `DropdownMenuContent` (`className="w-40"`) when the trigger is an
-icon: by default the menu is as wide as its trigger.
+icon: by default the menu is as wide as its trigger. The trigger is a Button
+through `render`: `<DropdownMenuTrigger render={<Button size="icon"
+aria-label="Run actions" />}>`. An item that navigates renders a Link:
+`<DropdownMenuItem render={<Link to={href} />}>Open</DropdownMenuItem>`.
 
 ## Tooltip
 
@@ -144,7 +158,8 @@ Which tone?
 ## Tag
 
 `src/app/ui/tag.tsx`. A small, square-cornered label on a thing in a row: the
-tool, file, model or subagent a step touched, a count, "Plan", "MCP".
+tool, file or subagent a step touched, a count of something it holds, "Plan",
+"MCP". A row's model, tokens and time are meta text, not tags.
 
 ```
 Badge or Tag?

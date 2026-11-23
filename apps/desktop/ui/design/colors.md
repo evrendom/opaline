@@ -36,8 +36,8 @@ What background do I use?
 | Role | Use for |
 |---|---|
 | `ink` | titles, body text, values, numbers |
-| `ink-2` | secondary copy: a description under a title, a subtitle |
-| `ink-3` | meta, labels, icons, column headers, timestamps |
+| `ink-2` | secondary prose in a reading flow: a lead paragraph, a quoted reply |
+| `ink-3` | a description under a title (CardDescription sets it), meta, labels, icons, column headers, timestamps |
 | `ink-4` | the quietest: disabled text, placeholders, separators, ticks, faint meta |
 | `ink-inverse` | text on a `primary` fill |
 | `ink-chrome` | the window chrome's quiet icons and labels (the shell only) |
@@ -45,8 +45,9 @@ What background do I use?
 ```
 What text colour do I use?
  ├── Is it disabled, a placeholder, a separator (· /) or an axis tick? → ink-4
- ├── Is it meta: a label, timestamp, count, icon or column header? → ink-3
- ├── Is it a description or subtitle under something in ink? → ink-2
+ ├── Is it a description under a title, or meta: a label, timestamp, count,
+ │   icon or column header? → ink-3
+ ├── Is it secondary prose in a reading flow (a lead, a quote)? → ink-2
  └── Default → ink (leave it unset: text inherits ink)
 ```
 

@@ -16,7 +16,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
 import { Badge } from "@/app/ui/badge";
 import { Button } from "@/app/ui/button";
 import { Checkbox } from "@/app/ui/checkbox";
-import { Field, FieldLabel } from "@/app/ui/field";
+import { Field, FieldLabel, FieldLegend, FieldSet } from "@/app/ui/field";
 import { Input } from "@/app/ui/input";
 import { Label } from "@/app/ui/label";
 import { List, ListItem } from "@/app/ui/list";
@@ -352,14 +352,17 @@ function Fields() {
 				source="app/ui/radio-group.tsx"
 				where="Pick one of two to five options that should all stay in view."
 			>
-				<State label="vertical">
-					<RadioGroup defaultValue="weekly" aria-label="Digest">
-						<RadioGroupItem value="daily">Daily</RadioGroupItem>
-						<RadioGroupItem value="weekly">Weekly</RadioGroupItem>
-						<RadioGroupItem value="never" disabled>
-							Never
-						</RadioGroupItem>
-					</RadioGroup>
+				<State label="vertical, in a FieldSet">
+					<FieldSet>
+						<FieldLegend>Digest</FieldLegend>
+						<RadioGroup defaultValue="weekly">
+							<RadioGroupItem value="daily">Daily</RadioGroupItem>
+							<RadioGroupItem value="weekly">Weekly</RadioGroupItem>
+							<RadioGroupItem value="never" disabled>
+								Never
+							</RadioGroupItem>
+						</RadioGroup>
+					</FieldSet>
 				</State>
 				<State label="horizontal">
 					<RadioGroup

@@ -57,19 +57,20 @@ its content from 80px. Use it for notes, descriptions and messages.
 
 `src/app/ui/radio-group.tsx`: `RadioGroup` and `RadioGroupItem`. Each item
 carries its own visible label as its children. The group takes `value` and
-`onValueChange` (or `defaultValue`) and an `aria-label` or
-`aria-labelledby`. `orientation` is `vertical` (the default) or
+`onValueChange` (or `defaultValue`). `orientation` is `vertical` (the default) or
 `horizontal` (two or three short options on one line). Its visible label is
-a `FieldLabel` with an `id`, and the group points at it with
-`aria-labelledby`. Never build a choice
+a `FieldLegend` in a `FieldSet` around it. Never build a choice
 from a row of Pressables or toggled Buttons: that's a RadioGroup.
 
 ```tsx
 // Correct
-<RadioGroup value={range} onValueChange={setRange} orientation="horizontal" aria-label="Range">
-  <RadioGroupItem value="7d">7 days</RadioGroupItem>
-  <RadioGroupItem value="30d">30 days</RadioGroupItem>
-</RadioGroup>
+<FieldSet>
+  <FieldLegend>Range</FieldLegend>
+  <RadioGroup value={range} onValueChange={setRange} orientation="horizontal">
+    <RadioGroupItem value="7d">7 days</RadioGroupItem>
+    <RadioGroupItem value="30d">30 days</RadioGroupItem>
+  </RadioGroup>
+</FieldSet>
 
 // Incorrect: a hand-built segmented choice
 <div className="flex">{options.map((o) => <Button aria-pressed={o === range} …>{o}</Button>)}</div>
@@ -123,8 +124,7 @@ button inside it.
 label outside a `Field` (the sign-in form); a checkbox or radio option takes
 its text as children instead. Every control has a label, either visible or as an
 `aria-label`: a placeholder is not a label. A group of checkboxes sits in a
-`<fieldset>` with `aria-labelledby` pointing at its `FieldLabel`'s `id`, the
-same as a RadioGroup. Mark an optional field with
+`FieldSet` under a `FieldLegend`, the same as a RadioGroup. Mark an optional field with
 "Optional" after its label, in `font-regular text-ink-3`; never mark the
 required ones.
 

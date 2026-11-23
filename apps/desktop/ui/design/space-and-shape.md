@@ -30,8 +30,8 @@ Width and height (`w-*`, `h-*`, `size-*`) use Tailwind's scale. They're
 layout, not space.
 
 A page of rows, forms or prose reads in a centred column,
-`mx-auto w-full max-w-3xl px-xxl py-xxxl`, as ReportPage does, with its
-sections `gap-xxl` apart. A page of charts or tables fills the width.
+`mx-auto w-full max-w-3xl px-xxl py-xxxl`, with its sections `gap-xxl`
+apart. A page of charts or tables fills the width.
 
 ## Corners
 

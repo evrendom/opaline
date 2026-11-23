@@ -488,6 +488,8 @@ const PRIMITIVES = [
 	"EmptyTitle",
 	"Field",
 	"FieldLabel",
+	"FieldLegend",
+	"FieldSet",
 	"Input",
 	"InputGroup",
 	"InputGroupAddon",

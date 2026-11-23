@@ -52,4 +52,27 @@ function FieldLabel({
 	);
 }
 
-export { Field, FieldLabel };
+// A group of options under one label: a RadioGroup, or several Checkboxes.
+// The legend names the group for assistive tech, so the options need no
+// aria-labelledby. Lay the options out on a child (a RadioGroup does it).
+function FieldSet({ className, ...props }: React.ComponentProps<"fieldset">) {
+	return (
+		<fieldset
+			data-slot="field-set"
+			className={cn("flex min-w-0 flex-col gap-l", className)}
+			{...props}
+		/>
+	);
+}
+
+function FieldLegend({ className, ...props }: React.ComponentProps<"legend">) {
+	return (
+		<legend
+			data-slot="field-legend"
+			className={cn("mb-l p-zero text-body-xl font-medium", className)}
+			{...props}
+		/>
+	);
+}
+
+export { Field, FieldLabel, FieldLegend, FieldSet };
