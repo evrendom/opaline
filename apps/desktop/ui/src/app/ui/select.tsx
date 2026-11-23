@@ -87,12 +87,13 @@ function SelectTrigger({
 				"data-placeholder:text-ink-4",
 				"data-[size=md]:h-9",
 				// sm: the dense one, inside a line or a table row (a pager's page
-				// size, a role cell): Button sm's 24px pill on the muted field
-				// fill, no control shadow, 12px text.
+				// size, a role cell): a 24px pill in muted 12px text with no fill
+				// or control shadow at rest; hover or open takes the field fill,
+				// as a secondary Button does.
 				"data-[size=sm]:h-6 data-[size=sm]:gap-xs data-[size=sm]:py-zero data-[size=sm]:pr-s data-[size=sm]:pl-m",
 				"data-[size=sm]:corner-full data-[size=sm]:corner-round data-[size=sm]:squircle:corner-full",
-				"data-[size=sm]:bg-field data-[size=sm]:text-body-m data-[size=sm]:shadow-none",
-				"data-[size=sm]:hover:bg-hover-strong",
+				"data-[size=sm]:bg-transparent data-[size=sm]:text-body-m data-[size=sm]:text-ink-3 data-[size=sm]:shadow-none",
+				"data-[size=sm]:hover:bg-field data-[size=sm]:hover:text-ink data-[size=sm]:data-popup-open:bg-field data-[size=sm]:data-popup-open:text-ink",
 				"*:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-s",
 				"[&_svg]:pointer-events-none [&_svg]:shrink-0",
 				"[&_svg:not([class*='size-'])]:size-4",
