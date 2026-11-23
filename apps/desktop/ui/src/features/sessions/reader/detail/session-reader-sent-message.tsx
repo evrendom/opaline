@@ -1,6 +1,7 @@
 import { getRawToolInput } from "@rudel/api-routes";
 import { IconArrowRight } from "@tabler/icons-react";
 import type { CSSProperties } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { textOf, tintedGround } from "@/features/compass/subagent-exchanges";
 import { cn } from "@/lib/utils";
 import type { SessionReaderStep } from "../model/session-reader-model";
@@ -27,32 +28,36 @@ export function SentMessage({
 	tint: string | null;
 }) {
 	return (
-		<div className="flex w-full max-w-[33rem] gap-3 py-1.5">
-			<span className="mt-1.5 flex h-fit shrink-0">
+		<div className="flex w-full max-w-[33rem] gap-l py-s">
+			<span className="mt-s flex h-fit shrink-0">
 				<ModelAvatar flat loading={false} model={model} />
 			</span>
-			<div className="flex min-w-0 flex-1 flex-col gap-1.5">
-				<button
+			<div className="flex min-w-0 flex-1 flex-col gap-s">
+				<Pressable
 					type="button"
 					onClick={onSelect}
 					className={cn(
-						"inline-flex w-fit items-center gap-1 rounded text-xs font-medium text-muted-foreground outline-none hover:text-foreground",
-						selected && "text-foreground",
+						"inline-flex w-fit items-center gap-xs",
+						"corner-xs",
+						"text-body-m font-medium",
+						"text-ink-3",
+						"hover:text-ink",
+						selected && "text-ink",
 					)}
 				>
 					To subagent
 					<IconArrowRight aria-hidden="true" className="size-3" />
-				</button>
+				</Pressable>
 				<div
 					className={cn(
-						"min-w-0 rounded-lg px-3 py-2.5 shadow-(--custom-shadow) corner-squircle squircle:rounded-2xl",
-						!tint && "bg-black/[0.025] dark:bg-white/[0.04]",
-						selected && "ring-[1.5px] ring-(--sent-tint)/40",
+						"min-w-0 corner-m px-l py-m shadow-card corner-squircle squircle:corner-xl-inner",
+						!tint && "bg-hover",
+						selected && "ring-[1.5px] ring-accent-line",
 					)}
 					style={
 						{
 							...(tint ? tintedGround(tint) : {}),
-							"--sent-tint": tint ?? "var(--foreground)",
+							"--sent-tint": tint ?? "var(--ink)",
 						} as CSSProperties
 					}
 				>

@@ -1,4 +1,6 @@
 import type { CSSProperties, KeyboardEvent, PointerEvent } from "react";
+import { Button } from "@/app/ui/button";
+import { Pressable } from "@/app/ui/pressable";
 import type { SessionThreadOverviewChartRow } from "./session-thread-overview-chart";
 import type { SessionThreadOverviewStripConfig } from "./session-thread-overview-config";
 import { getChartX, getTurnLabel } from "./session-thread-overview-strip-utils";
@@ -45,7 +47,7 @@ export function SessionOverviewViewportPane({
 			aria-valuemin={0}
 			aria-valuenow={selectedIndex}
 			aria-valuetext={valueText}
-			className="absolute inset-y-0.5 left-(--session-overview-viewport-left) z-20 w-(--session-overview-viewport-width) cursor-crosshair touch-none bg-orange-500/10 outline-none dark:bg-orange-400/10"
+			className="absolute inset-y-0.5 left-(--session-overview-viewport-left) z-20 w-(--session-overview-viewport-width) cursor-crosshair touch-none bg-warning-tint outline-none"
 			data-session-overview-viewport-band
 			data-session-overview-viewport-pane
 			style={style}
@@ -68,24 +70,24 @@ export function SessionOverviewTimelineFooter({
 	const firstTick = ticks[0];
 	return (
 		<div
-			className="h-6 shrink-0 border-t-[0.5px] border-(--session-overview-border) px-3 py-1"
+			className="h-6 shrink-0 edge-t-s border-line px-l py-xs"
 			data-session-overview-axis-strip
 		>
-			<div className="grid h-4 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 font-sans text-[0.625rem] leading-4 font-normal text-(--session-overview-subtle) tabular-nums">
+			<div className="grid h-4 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-m font-body text-body-xs font-regular text-ink-3 tabular-nums">
 				{firstTick ? (
 					<span className="truncate whitespace-nowrap">
 						{formatTimelineMoment(firstTick.timestamp)}
 					</span>
 				) : null}
 				{onResetZoom ? (
-					<button
+					<Button
 						type="button"
+						size="sm"
 						aria-label="Reset timeline zoom"
-						className="h-5 rounded px-1.5 text-[0.625rem] font-medium text-(--session-overview-text) outline-none hover:bg-(--session-overview-hover)"
 						onClick={onResetZoom}
 					>
 						Reset zoom
-					</button>
+					</Button>
 				) : (
 					<span />
 				)}
@@ -129,7 +131,7 @@ export function SessionOverviewTurnHitTargets({
 					return null;
 				}
 				return (
-					<button
+					<Pressable
 						key={option.key}
 						type="button"
 						aria-describedby={
@@ -137,7 +139,7 @@ export function SessionOverviewTurnHitTargets({
 						}
 						aria-label={`Select ${getTurnLabel(option)}`}
 						aria-pressed={row.index === selectedIndex}
-						className="absolute inset-y-0 w-5 -translate-x-1/2 cursor-crosshair rounded-sm outline-none"
+						className="absolute inset-y-0 w-5 -translate-x-1/2 cursor-crosshair corner-xs"
 						data-session-overview-turn-hit-target
 						style={{
 							left: `${(getChartX(row.xRatio, config) / config.chartWidth) * 100}%`,

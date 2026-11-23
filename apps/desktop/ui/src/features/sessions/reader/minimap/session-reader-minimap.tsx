@@ -243,7 +243,7 @@ export function ReaderMinimap({
 			ref={mapRef}
 			aria-hidden="true"
 			className={cn(
-				"relative isolate min-h-0 flex-1 touch-none select-none transition-opacity duration-300",
+				"relative isolate min-h-0 flex-1 touch-none select-none transition-opacity duration-(--motion-large-duration)",
 				focus && "overflow-y-clip",
 				drawn.parts.length === 0 && "opacity-0",
 			)}
@@ -290,13 +290,14 @@ export function ReaderMinimap({
 					<path
 						// biome-ignore lint/suspicious/noArrayIndexKey: lanes are their order
 						key={index}
-						className="stroke-zinc-950/6 dark:stroke-white/6"
+						className="stroke-line"
 						d={`M${share * drawn.width} 0V${drawn.height}`}
 						strokeWidth={1}
 					/>
 				))}
 				<path
-					className="fill-none stroke-violet-500/30 dark:stroke-violet-400/30"
+					// design-escape-ok(colour): data paint; the main thread's lane, its rail at rest
+					className="fill-none stroke-violet-500/30"
 					d={`${line.rail} ${line.branches}`}
 					strokeLinecap="round"
 					strokeWidth={1.5}
@@ -315,11 +316,12 @@ export function ReaderMinimap({
 				))}
 				{focus && sessionRef.current ? null : (
 					<g
-						className="[filter:drop-shadow(0_0_3px_var(--color-violet-500))] dark:[filter:drop-shadow(0_0_4px_var(--color-violet-400))]"
+						className="[filter:drop-shadow(0_0_3px_var(--color-violet-500))]"
 						clipPath={`url(#${litId})`}
 					>
 						<path
-							className="fill-none stroke-violet-500 dark:stroke-violet-400"
+							// design-escape-ok(colour): data paint; the main thread's lane, its lit rail
+							className="fill-none stroke-violet-500"
 							d={`${line.rail} ${line.branches}`}
 							strokeLinecap="round"
 							strokeWidth={1.75}
@@ -384,7 +386,7 @@ export function ReaderMinimap({
 				))}
 				{line.errors ? (
 					<path
-						className="fill-none stroke-rose-500 dark:stroke-rose-400"
+						className="fill-none stroke-error"
 						d={line.errors}
 						strokeLinecap="round"
 						strokeWidth={2.75}
@@ -395,10 +397,11 @@ export function ReaderMinimap({
 						key={node.key}
 						className={
 							node.kind === "subagent"
-								? "fill-background"
+								? "fill-canvas"
 								: node.alert
-									? "fill-rose-500 stroke-rose-500 dark:fill-rose-400 dark:stroke-rose-400"
-									: "fill-background stroke-violet-500/60 dark:stroke-violet-400/60"
+									? "fill-error stroke-error"
+									: // design-escape-ok(colour): data paint; the main thread's lane, its turn dots
+										"fill-canvas stroke-violet-500/60"
 						}
 						style={
 							node.kind === "subagent"
@@ -430,7 +433,7 @@ export function ReaderMinimap({
 							return (
 								<circle
 									key={`lit:${node.key}`}
-									className={node.alert ? undefined : "fill-background"}
+									className={node.alert ? undefined : "fill-canvas"}
 									style={{
 										fill: node.alert ? color : undefined,
 										filter: `drop-shadow(0 0 3px ${color})`,
@@ -479,7 +482,7 @@ export function ReaderMinimap({
 			</svg>
 			<div
 				ref={viewRef}
-				className="absolute inset-x-0 top-0 rounded-md bg-white corner-squircle squircle:rounded-xl ring-1 ring-zinc-950/8 hover:ring-zinc-950/15 dark:bg-white/5 dark:ring-white/12 dark:hover:bg-white/8"
+				className="absolute inset-x-0 top-0 corner-s bg-hover corner-squircle squircle:corner-l ring-1 ring-line hover:bg-hover-strong"
 			/>
 			<MinimapHeads
 				focus={focus ?? null}

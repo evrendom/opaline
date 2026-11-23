@@ -13,7 +13,6 @@ import {
 } from "react";
 import { SessionMenuPopup } from "@/features/sessions/components/session-menu-popup";
 import { cn } from "@/lib/utils";
-import "../../components/session-menu.css";
 import {
 	OpalChip,
 	Tip,
@@ -120,10 +119,7 @@ export function TagChip({
 			solid={solid}
 			tint={tag.tint}
 			title={title}
-			className={cn(
-				small && "size-4",
-				flat && "drop-shadow-none dark:drop-shadow-none",
-			)}
+			className={cn(small && "size-4", flat && "drop-shadow-none")}
 		>
 			<Glyph
 				aria-hidden="true"
@@ -147,13 +143,11 @@ export function RailTags({
 	});
 	if (shown.length === 0) return null;
 	return (
-		<span className="flex shrink-0 items-center gap-1.5">
+		<span className="flex shrink-0 items-center gap-s">
 			{shown.map(({ count, tag }) => (
-				<span key={tag.key} className="flex items-center gap-0.5">
+				<span key={tag.key} className="flex items-center gap-xxs">
 					<TagChip small tag={tag} title={`${tag.label}: ${count}`} />
-					<span className="text-[10px] text-muted-foreground tabular-nums">
-						{count}
-					</span>
+					<span className="text-body-xs text-ink-3 tabular-nums">{count}</span>
 				</span>
 			))}
 		</span>
@@ -225,7 +219,7 @@ function FigureToggle({
 	value: string;
 }) {
 	return (
-		<div className="flex justify-center px-2 py-1">
+		<div className="flex justify-center px-m py-xs">
 			<ViewToggle
 				label="Beside each turn"
 				onPick={onPick}
@@ -258,7 +252,12 @@ export function RailTagsPicker({
 			<Tip label="Beside each turn" side="bottom">
 				<Menu.Trigger
 					aria-label="Beside each turn"
-					className="relative inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-card text-muted-foreground shadow-(--custom-shadow) transition-colors hover:bg-muted/60 data-popup-open:bg-muted dark:bg-muted-foreground/10"
+					className={cn(
+						"relative inline-flex size-7 shrink-0 items-center justify-center",
+						"corner-full",
+						"bg-surface text-ink-3 shadow-card transition-colors",
+						"hover:bg-hover data-popup-open:bg-hover",
+					)}
 				>
 					<IconAdjustmentsHorizontal aria-hidden="true" className="size-3.5" />
 				</Menu.Trigger>

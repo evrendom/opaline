@@ -17,7 +17,7 @@ import {
 	IconSettingsFilled,
 } from "@tabler/icons-react";
 import { appRoutes, getCanonicalAppPath } from "@/app/routes";
-import { IconPlugFilled } from "@/components/ui/icon-plug-filled";
+import { IconPlugFilled } from "@/app/ui/icon-plug-filled";
 import { CLI_SETUP_PATH } from "@/features/cli-onboarding/cli-authorization";
 import type { ShellNavTone } from "@/features/shell/components/shell-nav-icon";
 

@@ -1,5 +1,7 @@
 import { IconArrowUpRight } from "@tabler/icons-react";
 import { useState } from "react";
+import { Button } from "@/app/ui/button";
+import { Pressable } from "@/app/ui/pressable";
 import { cn } from "@/lib/utils";
 import { getFileLanguage } from "../files/session-reader-file-tag";
 import { squarify } from "../summary/session-reader-breakdown";
@@ -12,9 +14,10 @@ const GAP = 4;
 const MIN_CELL = 40;
 
 const TEXT: Record<Tone, string> = {
-	later: "text-opal-4",
+	// design-escape-ok(base): data paint; a category colour from the opal sheen
+	later: "text-color-4",
 	minor: "",
-	never: "text-rose-600",
+	never: "text-error",
 };
 
 const nameOf = (label: string, files: boolean) =>
@@ -166,7 +169,9 @@ export function ContextZoom({
 			<div
 				ref={measure}
 				className={cn(
-					"relative min-h-0 flex-1 rounded-md border p-0 corner-squircle squircle:rounded-xl",
+					"relative min-h-0 flex-1",
+					"corner-s edge-m p-zero corner-squircle",
+					"squircle:corner-l",
 					boxLook.className,
 				)}
 				style={boxLook.style}
@@ -196,11 +201,16 @@ export function ContextZoom({
 							key={cell.part.label}
 							title={item.label}
 							className={cn(
-								"group/thing absolute flex flex-col items-start gap-0.5 overflow-hidden rounded-md border bg-card p-1.5 text-[12px] leading-4 transition-opacity corner-squircle squircle:rounded-xl",
+								"group/thing absolute flex flex-col items-start gap-xxs overflow-hidden",
+								"corner-s edge-m p-s corner-squircle",
+								"text-body-m",
+								"bg-surface transition-opacity",
+								"squircle:corner-l",
 								"border-current/20",
 								mark && !picked.has(item.label) && markGlow(mark),
 								picked.size > 0 && !picked.has(item.label) && "opacity-40",
 								picked.has(item.label) &&
+									// design-escape-ok(shadow): artwork; the picked tile's glow is tinted from its category
 									"shadow-[0_2px_10px_-2px_color-mix(in_oklab,var(--tint)_55%,transparent)] ring-2 ring-[color-mix(in_oklab,var(--tint)_55%,transparent)]",
 							)}
 							style={{
@@ -210,7 +220,7 @@ export function ContextZoom({
 								width: w,
 							}}
 						>
-							<button
+							<Pressable
 								type="button"
 								data-context-pick=""
 								aria-pressed={picked.has(item.label)}
@@ -222,16 +232,16 @@ export function ContextZoom({
 								onClick={(event) =>
 									item.more ? open.go() : onPick(item.label, event.shiftKey)
 								}
-								className="absolute inset-0 rounded-[calc(var(--radius-md)-1px)] corner-squircle outline-none transition-colors hover:bg-black/[0.03] squircle:rounded-[calc(var(--radius-xl)-1px)] dark:hover:bg-white/[0.04]"
+								className="absolute inset-0 corner-s-inset corner-squircle transition-colors hover:bg-hover squircle:corner-l-inset"
 							/>
 							<span
 								className={cn(
-									"pointer-events-none relative flex min-w-0 max-w-full items-center gap-1.5",
+									"pointer-events-none relative flex min-w-0 max-w-full items-center gap-s",
 									!showName && "m-auto",
 								)}
 							>
 								{item.more ? (
-									<span className="font-medium text-muted-foreground tabular-nums">
+									<span className="font-medium text-ink-3 tabular-nums">
 										+{item.more}
 									</span>
 								) : w >= 16 && h >= 16 ? (
@@ -249,16 +259,17 @@ export function ContextZoom({
 								) : null}
 							</span>
 							{!item.more && w >= 90 && h >= 56 ? (
-								<button
+								<Button
+									size="sm"
 									type="button"
 									data-context-pick=""
 									onClick={open.go}
 									aria-label={`Open ${nameOf(item.label, files)} in ${open.words}`}
-									className="absolute right-1.5 bottom-1.5 inline-flex h-6 items-center gap-0.5 rounded-md bg-muted/70 pr-1 pl-2 text-[12px] font-medium text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground"
+									className="absolute right-1.5 bottom-1.5"
 								>
 									{open.words}
 									<IconArrowUpRight aria-hidden="true" className="size-3" />
-								</button>
+								</Button>
 							) : null}
 						</div>
 					);

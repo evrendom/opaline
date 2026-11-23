@@ -9,7 +9,8 @@ import { useMemo, useState } from "react";
 import { Reveal } from "@/app/ui/bones";
 import { Button } from "@/app/ui/button";
 import { SearchInput } from "@/components/dashboard/data-table";
-import { UsageStateMessage } from "@/components/usage-collection-view";
+import { PageEmptyState } from "@/components/dashboard/page-parts";
+import { RetryButton } from "@/components/retry-button";
 import {
 	type McpServer,
 	mcpServers,
@@ -83,7 +84,7 @@ export function McpPageView({
 				aria-label="MCP servers"
 				className="flex min-h-0 min-w-0 flex-1 flex-col"
 			>
-				<div className="flex h-12 shrink-0 items-center gap-2 px-6">
+				<div className="flex h-12 shrink-0 items-center gap-m px-xxl">
 					<SearchInput
 						value={search}
 						onChange={setSearch}
@@ -103,40 +104,35 @@ export function McpPageView({
 					/>
 				</div>
 				{!isPending && isError ? (
-					<UsageStateMessage
-						icon={<IconPlug aria-hidden="true" />}
+					<PageEmptyState
+						icon={IconPlug}
 						title="MCP servers couldn’t be loaded"
 						description="Your sessions are still available. Try loading this view again."
 						action={
-							<Button
-								type="button"
-								size="sm"
-								variant="outline"
-								onClick={() => {
+							<RetryButton
+								onRetry={() => {
 									void setup.refetch();
 									void tools.refetch();
 								}}
-							>
-								Try again
-							</Button>
+							/>
 						}
 					/>
 				) : !isPending && (servers?.length ?? 0) === 0 ? (
-					<UsageStateMessage
-						icon={<IconPlug aria-hidden="true" />}
+					<PageEmptyState
+						icon={IconPlug}
 						title="No MCP servers yet"
 						description="MCP servers appear here once a session connects one or calls its tools."
 					/>
 				) : !isPending && visible.length === 0 ? (
-					<UsageStateMessage
-						icon={<IconZoomCancel aria-hidden="true" />}
+					<PageEmptyState
+						icon={IconZoomCancel}
 						title="No matching MCP servers"
 						description="Try a different name or clear the search."
 						action={
 							<Button
 								type="button"
-								size="sm"
-								variant="outline"
+								size="md"
+								variant="primary"
 								onClick={() => setSearch("")}
 							>
 								Clear search
@@ -160,7 +156,7 @@ export function McpPageView({
 	);
 }
 
-function McpCardsGrid({
+export function McpCardsGrid({
 	servers,
 	onSelect,
 }: {
@@ -171,7 +167,7 @@ function McpCardsGrid({
 		<ScrollColumn className="min-w-0 overscroll-contain">
 			<ul
 				aria-label="MCP servers"
-				className="grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,13.5rem),1fr))] gap-5 p-4 sm:p-5 lg:p-6"
+				className="grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,13.5rem),1fr))] gap-xl p-xl lg:p-xxl"
 			>
 				{servers.map((server) => (
 					<li key={server.file.setupFile} className="min-w-0">
@@ -218,24 +214,22 @@ function McpCard({
 			}
 		>
 			{server.tools.length > 0 ? (
-				<ul className="flex w-full min-w-0 flex-col gap-1 pt-1.5 text-[13px] leading-5">
+				<ul className="flex w-full min-w-0 flex-col gap-xs pt-s text-body-l">
 					{server.tools.slice(0, SHOWN_TOOLS).map((tool) => (
 						<li
 							key={tool.name}
 							data-card-row=""
-							className="flex min-w-0 items-baseline gap-2"
+							className="flex min-w-0 items-baseline gap-m"
 						>
-							<span className="min-w-0 truncate text-[color:var(--dashboardy-heading)]/75">
-								{tool.name}
-							</span>
-							<span className="ml-auto shrink-0 text-xs text-[color:var(--dashboardy-subtle)] tabular-nums">
+							<span className="min-w-0 truncate text-ink-2">{tool.name}</span>
+							<span className="ml-auto shrink-0 text-body-m text-ink-4 tabular-nums">
 								{tool.calls.toLocaleString()}
 							</span>
 						</li>
 					))}
 				</ul>
 			) : (
-				<p className="pt-1.5 text-xs leading-5 text-[color:var(--dashboardy-subtle)]">
+				<p className="pt-s text-body-m text-ink-4">
 					Connected in {server.sessions.toLocaleString()}{" "}
 					{server.sessions === 1 ? "session" : "sessions"}, never called.
 				</p>

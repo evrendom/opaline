@@ -50,7 +50,7 @@ export function SummaryFigures({
 		<div className="@container">
 			<div
 				className={cn(
-					"grid grid-cols-2 items-start gap-4",
+					"grid grid-cols-2 items-start gap-xl",
 					ordered.length === 3 ? "@2xl:grid-cols-3" : "@2xl:grid-cols-4",
 				)}
 			>
@@ -77,7 +77,7 @@ export function SummaryFigures({
 								/>
 							</div>
 							{flags ? (
-								<div className="relative -mt-5 rounded-b-lg bg-muted/60 px-4 pt-8 pb-3 shadow-[inset_0_0_0_0.5px_rgb(0_0_0/0.06)] corner-squircle squircle:rounded-b-3xl dark:bg-muted/30 dark:shadow-[inset_0_0_0_0.5px_rgb(255_255_255/0.06)]">
+								<div className="relative -mt-xxl corner-b-m bg-inset px-xl pt-xxxl pb-l shadow-inset corner-squircle squircle:corner-b-xl">
 									{flags(groupOf(stat))}
 								</div>
 							) : null}

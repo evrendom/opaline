@@ -76,6 +76,7 @@ import {
 	useTranscriptStickyHeaderWrappers,
 } from "./use-transcript-sticky-header-wrappers";
 import "./session-transcript-mask.css";
+import { Pressable } from "@/app/ui/pressable";
 
 const TRANSCRIPT_OVERSCAN = 8;
 const TRANSCRIPT_EDGE_LOAD_DISTANCE = 10;
@@ -1149,7 +1150,7 @@ const TranscriptVirtualRow = memo(function TranscriptVirtualRow({
 					{...elementTimingAttributes}
 					key={contentVersion}
 					aria-hidden
-					className="pointer-events-none absolute top-0 left-0 size-px overflow-hidden text-[1px] leading-none opacity-[0.01]"
+					className="pointer-events-none absolute top-0 left-0 size-px overflow-hidden text-body-xxs line-solid opacity-[0.01]"
 				>
 					{contentVersion}
 				</span>
@@ -1285,12 +1286,12 @@ function TranscriptRowContent({
 		}
 		case "section-overflow":
 			return (
-				<button
+				<Pressable
 					type="button"
-					className="min-h-11 w-full border-y border-(--session-overview-border) px-3 text-left text-xs text-(--session-overview-muted)"
+					className="min-h-11 w-full edge-y-m border-line px-l text-body-m text-ink-3"
 				>
 					Show {row.hidden.events.toLocaleString()} more {row.hidden.kindLabel}
-				</button>
+				</Pressable>
 			);
 		case "turn-fold":
 			return (
@@ -1344,13 +1345,14 @@ function TranscriptRowContent({
 			);
 		case "turn-error":
 			return (
-				<div className="flex min-h-48 flex-col items-center justify-center gap-3 p-6 text-sm text-(--session-overview-muted)">
+				<div className="flex min-h-48 flex-col items-center justify-center gap-l p-xxl text-body-xl text-ink-3">
 					<p>This turn could not be loaded.</p>
 					<Button
+						className="h-8 [&_svg:not([class*='size-'])]:size-4"
 						onClick={() => onRetryTurn?.(row.turnId)}
-						size="sm"
+						size="md"
 						type="button"
-						variant="outline"
+						variant="primary"
 					>
 						Retry turn
 					</Button>
@@ -1358,21 +1360,21 @@ function TranscriptRowContent({
 			);
 		case "no-response":
 			return (
-				<p className="py-10 text-center text-sm text-(--session-overview-muted)">
+				<p className="py-xxxl text-center text-body-xl text-ink-3">
 					No response recorded
 				</p>
 			);
 		case "window-edge":
 			return (
-				<div className="flex min-h-12 items-center justify-center border-y border-(--session-overview-border) p-2">
+				<div className="flex min-h-12 items-center justify-center edge-y-m border-line p-m">
 					<Button
 						disabled={row.state === "loading"}
 						onClick={() =>
 							startTransition(() => onLoadDirection?.(row.direction))
 						}
-						size="sm"
+						size="md"
 						type="button"
-						variant="outline"
+						variant="primary"
 					>
 						{row.state === "loading"
 							? "Loading…"
@@ -1419,7 +1421,7 @@ function TranscriptRowDebugBadge({
 	return (
 		<output
 			ref={outputRef}
-			className="pointer-events-none absolute top-1 right-2 z-50 rounded-md border border-(--session-overview-border) bg-(--session-overview-surface) px-2 py-1 text-[0.6875rem] text-(--session-overview-muted) shadow-sm"
+			className="pointer-events-none absolute top-1 right-2 z-50 corner-s edge-m border-line bg-canvas px-m py-xs text-body-s text-ink-3 shadow-float"
 		/>
 	);
 }

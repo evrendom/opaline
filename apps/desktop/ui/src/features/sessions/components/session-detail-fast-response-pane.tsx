@@ -261,7 +261,7 @@ export function SessionDetailFastResponsePane({
 			<section
 				ref={responseScrollRef}
 				aria-label="Conversation thread"
-				className={`session-constellation-tree session-constellation-tree-v2 session-transcript-mask h-full min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain bg-(--session-overview-surface) [overflow-anchor:none] [scrollbar-gutter:stable] ${bottomPaddingClassName}`}
+				className={`session-constellation-tree session-constellation-tree-v2 session-transcript-mask h-full min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain bg-canvas [overflow-anchor:none] [scrollbar-gutter:stable] ${bottomPaddingClassName}`}
 				data-conversation-trace-scroll-container
 				data-session-constellation-version="v2"
 				data-session-trace-presentation="constellation-tree-branch-dots-no-horizontal"
@@ -1109,16 +1109,21 @@ function flashTranscriptAnchors(elements: readonly HTMLElement[]) {
 	if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
 		return;
 	}
+	// The motion role's curve; WAAPI can't read a var(), so resolve it here.
+	const easing =
+		getComputedStyle(document.documentElement)
+			.getPropertyValue("--motion-easing")
+			.trim() || "linear";
 	for (const element of elements) {
 		element.animate(
 			[
 				{
 					backgroundColor:
-						"color-mix(in oklab, var(--session-overview-accent) 16%, transparent)",
+						"color-mix(in oklab, var(--accent) 16%, transparent)",
 				},
 				{ backgroundColor: "transparent" },
 			],
-			{ duration: 300, easing: "ease-out" },
+			{ duration: 300, easing },
 		);
 	}
 }
@@ -1293,7 +1298,7 @@ function SessionDetailInlineSubagentBranch({
 
 	return (
 		<div
-			className="min-w-0 pl-9"
+			className="min-w-0 pl-xxxl"
 			data-session-subagent-branch={branch.subagentId}
 		>
 			<TraceExpansionNamespaceProvider namespace={branch.subagentId}>
@@ -1324,10 +1329,16 @@ function PaneMessage({
 	onAction?: () => void;
 }) {
 	return (
-		<div className="flex min-h-48 flex-col items-center justify-center gap-3 p-6 text-center text-sm text-(--session-overview-muted)">
+		<div className="flex min-h-48 flex-col items-center justify-center gap-l p-xxl text-center text-body-xl text-ink-3">
 			<p>{message}</p>
 			{actionLabel && onAction ? (
-				<Button onClick={onAction} size="sm" type="button" variant="outline">
+				<Button
+					className="h-8 [&_svg:not([class*='size-'])]:size-4"
+					onClick={onAction}
+					size="md"
+					type="button"
+					variant="primary"
+				>
 					{actionLabel}
 				</Button>
 			) : null}

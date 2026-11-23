@@ -8,6 +8,7 @@ import {
 	useMemo,
 	useState,
 } from "react";
+import { Button } from "@/app/ui/button";
 import {
 	DotFocusContext,
 	DotFocusDaysContext,
@@ -128,29 +129,32 @@ export function RailHighlightProvider({
 	const name = filter?.name ?? repoTabLabel(tab);
 	const TabIcon = repoTabIcon(onClear && tab === "summary" ? "sessions" : tab);
 	const swap =
-		"[grid-area:1/1] size-3.5 transition-[opacity,scale] duration-150 ease-out motion-reduce:transition-none";
+		"[grid-area:1/1] size-3.5 transition-[opacity,scale] duration-(--motion-duration) ease-base motion-reduce:transition-none";
 	const lead = onClear ? (
 		<span
 			title={name}
-			className="group/tag inline-flex h-8 min-w-0 items-center gap-1 rounded-full bg-card pr-3 pl-1.5 text-xs font-medium text-foreground shadow-(--custom-outline-shadow)"
+			className="group/tag inline-flex h-8 min-w-0 items-center gap-xs corner-full bg-surface pr-l pl-xs text-body-m font-medium text-ink shadow-card"
 		>
-			<button
-				type="button"
+			<Button
+				variant="secondary"
+				size="icon-sm"
 				aria-label={`Stop filtering by ${name}`}
 				onClick={onClear}
-				className="grid size-5 shrink-0 place-items-center rounded-full outline-none"
+				className="shrink-0"
 			>
-				{TabIcon ? (
-					<TabIcon
+				<span aria-hidden="true" className="grid place-items-center">
+					{TabIcon ? (
+						<TabIcon
+							aria-hidden="true"
+							className={`${swap} group-hover/tag:scale-50 group-hover/tag:opacity-0 group-has-focus-visible/tag:scale-50 group-has-focus-visible/tag:opacity-0`}
+						/>
+					) : null}
+					<IconX
 						aria-hidden="true"
-						className={`${swap} group-hover/tag:scale-50 group-hover/tag:opacity-0 group-has-focus-visible/tag:scale-50 group-has-focus-visible/tag:opacity-0`}
+						className={`${swap} scale-50 text-ink-3 opacity-0 group-hover/tag:scale-100 group-hover/tag:opacity-100 group-has-focus-visible/tag:scale-100 group-has-focus-visible/tag:opacity-100 hover:text-ink`}
 					/>
-				) : null}
-				<IconX
-					aria-hidden="true"
-					className={`${swap} scale-50 text-muted-foreground opacity-0 group-hover/tag:scale-100 group-hover/tag:opacity-100 group-has-focus-visible/tag:scale-100 group-has-focus-visible/tag:opacity-100 hover:text-foreground`}
-				/>
-			</button>
+				</span>
+			</Button>
 			<span className="min-w-0 truncate">{name}</span>
 		</span>
 	) : null;

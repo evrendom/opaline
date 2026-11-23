@@ -17,6 +17,7 @@ const MARK: Record<Tone, string> = {
 };
 
 const MARKED =
+	// design-escape-ok(shadow): artwork; a marked tile glows in its mark's colour
 	"border-[color-mix(in_oklab,var(--mark)_45%,transparent)] shadow-[0_0_4px_color-mix(in_oklab,var(--mark)_60%,transparent),0_0_14px_color-mix(in_oklab,var(--mark)_45%,transparent)]";
 
 export const markGlow = (tone: Tone) => `${MARK[tone]} ${MARKED}`;
@@ -41,20 +42,22 @@ export function MarkLegend({
 	return (
 		<div
 			className={cn(
-				"inline-flex min-w-0 shrink-0 items-center gap-0.5 rounded-lg bg-black/[0.04] p-0.5 text-xs font-medium text-muted-foreground corner-squircle squircle:rounded-[14px] dark:bg-white/[0.06]",
+				"inline-flex min-w-0 shrink-0 items-center gap-xxs",
+				"corner-m p-xxs corner-squircle",
+				"text-body-m font-medium",
+				"bg-hover text-ink-3",
+				"squircle:corner-l",
 				className,
 			)}
 		>
-			<span className="flex h-6 items-center px-2 text-muted-foreground/60">
-				Errors
-			</span>
-			<ul aria-label="Errors" className="flex min-w-0 items-center gap-0.5">
+			<span className="flex h-6 items-center px-m text-ink-4">Errors</span>
+			<ul aria-label="Errors" className="flex min-w-0 items-center gap-xxs">
 				{shown.map((tone) => (
-					<li key={tone} className="flex h-6 items-center gap-1.5 px-2">
+					<li key={tone} className="flex h-6 items-center gap-s px-m">
 						<span
 							aria-hidden="true"
 							className={cn(
-								"size-2.5 shrink-0 rounded-[3px] border corner-squircle",
+								"size-2.5 shrink-0 corner-xs edge-m corner-squircle",
 								markGlow(tone),
 							)}
 						/>
@@ -82,9 +85,11 @@ export function markOf(
 }
 
 const TEXT: Record<Tone, string> = {
-	later: "text-opal-4",
-	minor: "text-opal-3",
-	never: "text-rose-500",
+	// design-escape-ok(base): data paint; a category colour from the opal sheen
+	later: "text-color-4",
+	// design-escape-ok(base): data paint; a category colour from the opal sheen
+	minor: "text-color-2",
+	never: "text-error",
 };
 
 const ICON_ROOM = 16;
@@ -173,7 +178,7 @@ export function ContextSubTiles({
 					>
 						<span
 							className={cn(
-								"absolute inset-0 rounded-[3px] border corner-squircle squircle:rounded-[6px]",
+								"absolute inset-0 corner-xs edge-m corner-squircle squircle:corner-xs",
 								mark ? markGlow(mark) : "border-current opacity-20",
 							)}
 						/>

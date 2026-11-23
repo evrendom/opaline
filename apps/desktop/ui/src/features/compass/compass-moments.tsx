@@ -21,11 +21,12 @@ import {
 	type ReactNode,
 	useState,
 } from "react";
-import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
+import { Button } from "@/app/ui/button";
+import { FlowNumber } from "@/app/ui/flow-number";
+import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
+import { Pressable } from "@/app/ui/pressable";
 import { SessionMenuPopup } from "@/features/sessions/components/session-menu-popup";
 import { formatReaderCost } from "@/features/sessions/reader/model/session-reader-model";
-import "@/features/sessions/components/session-menu.css";
-import { FlowNumber } from "@/app/ui/flow-number";
 import {
 	ShellNavIcon,
 	type ShellNavTone,
@@ -100,7 +101,7 @@ export function RunRow({
 	const lead = run.flags[0] ? MOMENT_KINDS_APPEARANCE[run.flags[0].kind] : null;
 	const LeadGlyph = lead?.icon;
 	return (
-		<button
+		<Pressable
 			type="button"
 			className={`compass-item${notFriction ? " compass-row-muted" : ""}`}
 			aria-current={selected || undefined}
@@ -125,7 +126,7 @@ export function RunRow({
 				</span>
 			</span>
 			<span className="compass-item-side">
-				<span className="inline-flex items-center gap-1">
+				<span className="inline-flex items-center gap-xs">
 					{observation && !notFriction ? (
 						<IconSparkles aria-label="Observed" className="size-3.5" />
 					) : null}
@@ -133,7 +134,7 @@ export function RunRow({
 				</span>
 				<span>{shortDate(run.startedAt)}</span>
 			</span>
-		</button>
+		</Pressable>
 	);
 }
 
@@ -150,7 +151,7 @@ export function KindsMenu({
 	return (
 		<Menu.Root>
 			<Menu.Trigger
-				className="cost-text-button inline-flex items-center gap-0.5"
+				className="text-button inline-flex items-center gap-xxs"
 				aria-label={
 					kinds.length > 0
 						? `Filter runs by flag, ${kinds.length} active`
@@ -176,7 +177,8 @@ export function KindsMenu({
 }
 
 const FLAG_TONE: ShellNavTone = {
-	chip: "[--opal-fill:color-mix(in_oklch,var(--flag-tint)_14%,var(--session-menu-background))] [--opal-ring:color-mix(in_oklch,var(--flag-tint)_20%,transparent)] drop-shadow-[0_1.5px_2px_color-mix(in_oklch,var(--flag-tint)_25%,transparent)]",
+	// design-escape-ok(shadow): artwork; the flag chip's fill, ring and glow take its flag colour
+	chip: "[--opal-fill:color-mix(in_oklch,var(--flag-tint)_14%,var(--menu-background))] [--opal-ring:color-mix(in_oklch,var(--flag-tint)_20%,transparent)] drop-shadow-[0_1.5px_2px_color-mix(in_oklch,var(--flag-tint)_25%,transparent)]",
 	glyph: "text-(--flag-tint)",
 };
 
@@ -203,7 +205,7 @@ function FlagKindRow({
 		<Menu.CheckboxItem
 			checked={checked}
 			onCheckedChange={onCheckedChange}
-			className="session-menu-row"
+			className="menu-row"
 			data-join-next={(checked && joins.next) || undefined}
 			data-join-previous={(checked && joins.previous) || undefined}
 			style={{ "--flag-tint": tint } as CSSProperties}
@@ -215,7 +217,7 @@ function FlagKindRow({
 				tone={FLAG_TONE}
 			/>
 			<span className="flex-1">{children}</span>
-			<span className="tabular-nums text-(--session-menu-icon)">{count}</span>
+			<span className="tabular-nums text-(--menu-icon)">{count}</span>
 		</Menu.CheckboxItem>
 	);
 }
@@ -246,11 +248,7 @@ export function FlagKindsPopup({
 	});
 	const offset = any ? 1 : 0;
 	return (
-		<SessionMenuPopup
-			align={align}
-			aria-label="Flags"
-			className="session-menu-picks"
-		>
+		<SessionMenuPopup align={align} aria-label="Flags" className="menu-picks">
 			{any ? (
 				<FlagKindRow
 					checked={all}
@@ -385,7 +383,7 @@ export function ObservationCard({
 	const group = layerGroup(observation.layer);
 	return (
 		<article className="compass-observation" aria-label="Observation">
-			<div className="flex flex-wrap items-center gap-2">
+			<div className="flex flex-wrap items-center gap-m">
 				<span
 					className="compass-chip"
 					style={{ "--chip-color": group.color } as CSSProperties}
@@ -412,26 +410,26 @@ export function ObservationCard({
 			<div className="compass-feedback" data-fluid-menu-root="">
 				<FluidMenuHover items="button" />
 				<span>Did this help?</span>
-				<button
+				<Button
 					type="button"
-					className="cost-text-button"
+					size="sm"
 					aria-pressed={feedback.mine === true}
 					aria-label="Useful"
 					onClick={() => vote(true)}
 				>
 					<IconThumbUp aria-hidden="true" className="size-3.5" />
 					{feedback.useful}
-				</button>
-				<button
+				</Button>
+				<Button
 					type="button"
-					className="cost-text-button"
+					size="sm"
 					aria-pressed={feedback.mine === false}
 					aria-label="Not useful"
 					onClick={() => vote(false)}
 				>
 					<IconThumbDown aria-hidden="true" className="size-3.5" />
 					{feedback.notUseful}
-				</button>
+				</Button>
 			</div>
 		</article>
 	);

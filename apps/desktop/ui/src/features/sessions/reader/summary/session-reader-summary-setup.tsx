@@ -1,4 +1,5 @@
 import type { SessionSetupFile } from "@rudel/api-routes";
+import { Pressable } from "@/app/ui/pressable";
 import { cn } from "@/lib/utils";
 import { useSessionPlaces } from "../session-places";
 import { SetupMark } from "../setup/session-reader-setup-column";
@@ -95,12 +96,15 @@ function SetupRow({
 }) {
 	return (
 		<li className="flex min-w-0">
-			<button
+			<Pressable
 				type="button"
 				title={`Read ${setupName(file)} in Setup`}
 				onClick={() => onOpen(file.setupFile)}
 				className={cn(
-					"flex min-h-8 min-w-0 flex-1 items-center gap-2.5 rounded-md px-2 py-1 text-left text-[13px] outline-none hover:bg-accent/60",
+					"flex min-h-8 min-w-0 flex-1 items-center gap-m",
+					"corner-s px-m py-xs",
+					"text-left text-body-l",
+					"hover:bg-hover",
 				)}
 			>
 				<SetupMark file={file} />
@@ -113,7 +117,7 @@ function SetupRow({
 					{file.versions > 1 ? `${file.versions} versions · ` : ""}
 					{file.runs} {file.runs === 1 ? "run" : "runs"}
 				</Meta>
-			</button>
+			</Pressable>
 		</li>
 	);
 }

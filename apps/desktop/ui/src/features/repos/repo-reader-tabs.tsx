@@ -15,7 +15,7 @@ import {
 	IconSparklesFilled,
 } from "@tabler/icons-react";
 import { useMemo } from "react";
-import { IconPlugFilled } from "@/components/ui/icon-plug-filled";
+import { IconPlugFilled } from "@/app/ui/icon-plug-filled";
 import { PillTabs } from "./pill-tabs";
 
 export type RepoReaderTab =
@@ -119,9 +119,9 @@ export function RepoReaderTabs({
 	);
 	return (
 		<PillTabs
-			className="mr-2 h-8 bg-transparent"
+			className="mr-m h-8 bg-transparent"
 			label="Repo view"
-			pillClassName="bg-card shadow-(--custom-shadow) dark:bg-muted-foreground/10"
+			pillClassName="tab-pill"
 			onChange={onChange}
 			tabs={tabs}
 			value={value}

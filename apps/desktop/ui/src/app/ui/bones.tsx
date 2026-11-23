@@ -5,7 +5,7 @@ import {
 	useLayoutEffect,
 	useRef,
 } from "react";
-import { smart } from "skullet";
+import { forgetShapes, smart } from "skullet";
 import { Skeleton, SkulletProvider } from "skullet/react";
 import {
 	introRequested,
@@ -26,6 +26,24 @@ const THEME = {
 };
 
 const INTRO_REVEAL = { ...smart, hold: 0 };
+
+// skullet saves each skeleton's shapes in localStorage and redraws them on
+// later visits, so a sample changed in code would never reach a returning
+// user. A new build forgets the saved shapes once; each skeleton re-measures
+// on its next draw.
+const BUILD_KEY = "opaline:bones-build";
+function forgetShapesFromOlderBuilds() {
+	const build = import.meta.env.VITE_BUILD_ID;
+	if (!build || typeof window === "undefined") return;
+	try {
+		if (window.localStorage.getItem(BUILD_KEY) === build) return;
+		forgetShapes();
+		window.localStorage.setItem(BUILD_KEY, build);
+	} catch {
+		// storage blocked: nothing was saved either
+	}
+}
+forgetShapesFromOlderBuilds();
 
 export function BonesProvider({ children }: { children: ReactNode }) {
 	const holding = useIntroHold();

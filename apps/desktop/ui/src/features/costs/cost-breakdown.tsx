@@ -16,6 +16,7 @@ import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { useIntroHold, useIntroSettled } from "@/app/first-open";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
 import { Reveal } from "@/app/ui/bones";
+import { Button } from "@/app/ui/button";
 import {
 	Dialog,
 	DialogContent,
@@ -23,8 +24,11 @@ import {
 	DialogTitle,
 } from "@/app/ui/dialog";
 import { FlowNumber } from "@/app/ui/flow-number";
+import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
+import { Input } from "@/app/ui/input";
+import { Pressable } from "@/app/ui/pressable";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
-import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
+import { TouchTarget } from "@/app/ui/touch-target";
 import {
 	ClaudeModelIcon,
 	CodexModelIcon,
@@ -129,13 +133,16 @@ export function CostBreakdown({
 				>
 					{!pending && onLoadDeferred ? (
 						<p className="cost-breakdown-empty">
-							<button
-								type="button"
-								className="cost-breakdown-load"
-								onClick={onLoadDeferred}
-							>
-								Show {label.toLowerCase()}
-							</button>
+							<span className="cost-breakdown-load">
+								<Button
+									type="button"
+									variant="link"
+									size="inline"
+									onClick={onLoadDeferred}
+								>
+									Show {label.toLowerCase()}
+								</Button>
+							</span>
 						</p>
 					) : empty ? (
 						<BreakdownEmpty
@@ -204,7 +211,7 @@ export function CostBreakdown({
 				</ScrollFade>
 				<div className="cost-tools" data-open={split}>
 					<div className="cost-tools-inner" data-fluid-menu-root="">
-						<FluidMenuHover items=".cost-tool-button" />
+						<FluidMenuHover items="button" />
 						<ToolButton
 							label={`View all ${label.toLowerCase()}`}
 							icon={IconArrowsDiagonal}
@@ -233,21 +240,20 @@ export function CostBreakdown({
 				</div>
 			</section>
 			<Dialog open={expanded} onOpenChange={setExpanded}>
-				<DialogContent className="cost-breakdown-dialog gap-4 sm:max-w-xl">
+				<DialogContent className="sm:max-w-xl">
 					<DialogTitle>{label}</DialogTitle>
 					<DialogDescription>
 						Select {label.toLowerCase()} to filter{" "}
 						{metric === "cost" ? "costs" : METRIC_LABELS[metric].toLowerCase()}.
 						Selections combine with your other filters.
 					</DialogDescription>
-					<input
+					<Input
 						type="search"
 						name={`search-${dimension}`}
 						aria-label={`Search ${label.toLowerCase()}`}
 						placeholder={`Search ${label.toLowerCase()}…`}
 						value={search}
 						onChange={(event) => setSearch(event.target.value)}
-						className="cost-search"
 					/>
 					<div
 						className="cost-expanded-list"
@@ -282,19 +288,14 @@ export function CostBreakdown({
 					</div>
 					<div className="cost-dialog-footer" data-fluid-menu-root="">
 						<FluidMenuHover items="button" />
-						<button
+						<Button
 							type="button"
-							className="cost-text-button"
 							onClick={onClear}
 							disabled={selected.length === 0}
 						>
 							Clear selection
-						</button>
-						<button
-							type="button"
-							className="cost-secondary-button"
-							onClick={() => setExpanded(false)}
-						>
+						</Button>
+						<Button type="button" onClick={() => setExpanded(false)}>
 							Done
 							{selected.length ? (
 								<>
@@ -303,7 +304,7 @@ export function CostBreakdown({
 									{" selected"}
 								</>
 							) : null}
-						</button>
+						</Button>
 					</div>
 				</DialogContent>
 			</Dialog>
@@ -365,7 +366,7 @@ function BreakdownRow({
 }) {
 	const label = costLabel(dimension, entry.label);
 	return (
-		<button
+		<Pressable
 			type="button"
 			className="cost-breakdown-row"
 			aria-pressed={selected}
@@ -401,7 +402,7 @@ function BreakdownRow({
 					</small>
 				) : null}
 			</span>
-		</button>
+		</Pressable>
 	);
 }
 
@@ -425,14 +426,14 @@ function EntryIcon({
 				alt=""
 				width={16}
 				height={16}
-				className="size-4 shrink-0 rounded-full object-cover ring-1 ring-black/5 dark:ring-white/10"
+				className="size-4 shrink-0 corner-full object-cover ring-1 ring-line-soft"
 			/>
 		);
 	if (dimension === "members")
 		return (
-			<Avatar className="size-4 shrink-0 rounded-full ring-1 ring-black/5 dark:ring-white/10">
+			<Avatar size="sm" className="size-4 shrink-0">
 				<AvatarImage src={image ?? undefined} alt="" />
-				<AvatarFallback className="cost-member-initial">
+				<AvatarFallback>
 					{entry.label
 						.split(/\s+/u)
 						.slice(0, 2)
@@ -475,22 +476,22 @@ function ToolButton({
 }) {
 	return (
 		<Tooltip>
-			<TooltipTrigger asChild>
-				<button
-					type="button"
-					className="cost-tool-button"
-					aria-label={label}
-					aria-pressed={pressed}
-					onClick={onClick}
-					disabled={disabled}
-				>
-					<Glyph size={16} />
-					<span
-						className="absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden"
-						aria-hidden="true"
-					/>
-				</button>
-			</TooltipTrigger>
+			<TooltipTrigger
+				render={
+					<Button
+						type="button"
+						size="icon"
+						className="relative"
+						aria-label={label}
+						aria-pressed={pressed}
+						onClick={onClick}
+						disabled={disabled}
+					>
+						<Glyph size={16} />
+						<TouchTarget />
+					</Button>
+				}
+			/>
 			<TooltipContent>{label}</TooltipContent>
 		</Tooltip>
 	);

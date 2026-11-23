@@ -1,20 +1,21 @@
-.reports-settings-list .workspace-settings-row-control {
+.reports-settings-list .settings-row-control {
 	width: auto;
 }
 
 .reports-settings-link {
 	display: block;
-	border-radius: 8px;
+	border-radius: var(--radius-s);
 	outline: none;
 }
 
 .reports-settings-link:focus-visible {
-	outline: 2px solid var(--dashboard-01-metric-button-focus-ring);
-	outline-offset: 2px;
+	/* the focus-outline mark */
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
 }
 
 .reports-settings-title {
-	font-weight: 500;
+	font-weight: var(--weight-body-medium);
 	overflow-wrap: anywhere;
 	text-wrap: pretty;
 }
@@ -24,7 +25,6 @@
 	text-underline-offset: 3px;
 }
 
-.reports-settings-list .workspace-settings-badge,
-.reports-settings-list .workspace-settings-status {
+.reports-settings-list .settings-status {
 	white-space: nowrap;
 }

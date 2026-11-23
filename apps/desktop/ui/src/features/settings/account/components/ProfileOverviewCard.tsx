@@ -54,8 +54,8 @@ export function ProfileOverviewCard({
 				>
 					<Button
 						type="button"
-						variant="outline"
-						size="sm"
+						variant="primary"
+						size="md"
 						onClick={onSignOut}
 						disabled={isSigningOut}
 					>

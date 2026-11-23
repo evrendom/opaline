@@ -14,8 +14,8 @@ import {
 } from "react";
 import { appRoutes } from "@/app/routes";
 import { Reveal } from "@/app/ui/bones";
-import { Button } from "@/app/ui/button";
 import { ConversationSkillLinkContext } from "@/components/conversation/conversation-skill-link";
+import { RetryButton } from "@/components/retry-button";
 import type { SessionNavigation } from "@/features/sessions/session-navigation";
 import { useSessionSummaryLinks } from "@/features/sessions/use-session-summary-links";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
@@ -73,11 +73,11 @@ const TAB_BAND_LEFT: Record<SessionReaderTab, string> = {
 };
 
 const TAB_BAND_FROM: Record<SessionReaderTab, string> = {
-	ci: "left-[calc(2rem+var(--reader-rail)+0.5rem)] pl-4",
-	detail: "left-[calc(2rem+var(--reader-rail)+0.5rem)] pl-4",
-	files: "left-[calc(2rem+var(--reader-rail)+0.5rem)] pl-4",
-	setup: "left-[calc(2rem+var(--reader-rail)+0.5rem)] pl-4",
-	summary: "left-[calc(2rem+var(--reader-rail)+0.5rem)] pl-4",
+	ci: "left-[calc(2rem+var(--reader-rail)+0.5rem)] pl-xl",
+	detail: "left-[calc(2rem+var(--reader-rail)+0.5rem)] pl-xl",
+	files: "left-[calc(2rem+var(--reader-rail)+0.5rem)] pl-xl",
+	setup: "left-[calc(2rem+var(--reader-rail)+0.5rem)] pl-xl",
+	summary: "left-[calc(2rem+var(--reader-rail)+0.5rem)] pl-xl",
 };
 
 const LIVE_REREAD_DELAY_MS = 1_000;
@@ -215,7 +215,7 @@ export const SessionReaderView = memo(function SessionReaderView({
 	const inRepo = useContext(SessionInRepo);
 	const contextFields =
 		viewModel && !inRepo ? (
-			<span className="flex items-center gap-1.5 text-sm">
+			<span className="flex items-center gap-s text-body-xl">
 				<SessionWhere viewModel={viewModel} />
 			</span>
 		) : null;
@@ -224,7 +224,7 @@ export const SessionReaderView = memo(function SessionReaderView({
 		<SessionPlacesContext.Provider value={places}>
 			<SubagentsCountedProvider>
 				<ConversationSkillLinkContext.Provider value={getSkillHref}>
-					<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-[var(--dashboard-01-content-background,#fcfcfc)] text-(--dashboardy-heading) [--reader-page:var(--dashboard-01-content-background,#fcfcfc)]">
+					<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-canvas text-ink [--reader-page:var(--canvas)]">
 						<SessionDetailHeader
 							avatarMap={avatarMap}
 							headerRef={() => undefined}
@@ -243,13 +243,18 @@ export const SessionReaderView = memo(function SessionReaderView({
 							<div
 								aria-hidden="true"
 								className={cn(
-									"pointer-events-none absolute top-(--stage-top) right-0 bottom-0 -z-10 -ml-6 rounded-tl-lg bg-(--dashboard-01-stage-background) corner-squircle squircle:rounded-tl-3xl",
+									"absolute top-(--stage-top) right-0 bottom-0 -z-10",
+									"-ml-xxl corner-tl-m corner-squircle",
+									"pointer-events-none bg-(--dashboard-01-stage-background)",
+									"squircle:corner-tl-xl",
 									TAB_BAND_LEFT[tab],
 								)}
 							/>
 							<div
 								className={cn(
-									"absolute top-0 right-0 z-50 flex h-(--stage-top) justify-start bg-(--reader-page) pt-4 pr-8",
+									"absolute top-0 right-0 z-50 flex h-(--stage-top) justify-start",
+									"pt-xl pr-xxxl",
+									"bg-(--reader-page)",
 									TAB_BAND_FROM[tab],
 								)}
 							>
@@ -265,23 +270,25 @@ export const SessionReaderView = memo(function SessionReaderView({
 								</div>
 							</div>
 							{!initialQuery.isLoading && errorState && !waitingForLiveLines ? (
-								<div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
-									<p className="text-lg font-semibold">{errorState.title}</p>
+								<div
+									className={cn(
+										"flex h-full flex-col items-center justify-center gap-m",
+										"px-xxl",
+										"text-center",
+									)}
+								>
+									<p className="text-body-xxl font-heavy">{errorState.title}</p>
 									{errorState.description ? (
-										<p className="text-sm text-muted-foreground">
+										<p className="text-body-xl text-ink-3">
 											{errorState.description}
 										</p>
 									) : null}
 									{canRetrySessionDetailError(initialQuery.error) ? (
-										<Button
-											className="mt-3"
-											disabled={initialQuery.isFetching}
-											onClick={() => void refetch()}
-											size="sm"
-											variant="outline"
-										>
-											{initialQuery.isFetching ? "Trying again…" : "Try again"}
-										</Button>
+										<RetryButton
+											onRetry={() => void refetch()}
+											retrying={initialQuery.isFetching}
+											className="mt-l"
+										/>
 									) : null}
 								</div>
 							) : null}

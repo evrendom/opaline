@@ -8,6 +8,11 @@ import {
 } from "@/app/routes";
 import { Button } from "@/app/ui/button";
 import { Input } from "@/app/ui/input";
+import {
+	InputGroup,
+	InputGroupAddon,
+	InputGroupInput,
+} from "@/app/ui/input-group";
 import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import { workspaceUrlPrefix } from "@/features/self-hosted/surfaces";
 import {
@@ -134,10 +139,12 @@ export function WorkspaceIdentityCard({
 				/>
 			</WorkspaceSettingsRow>
 			<WorkspaceSettingsRow label="Workspace URL" controlId="workspace-slug">
-				<div className="workspace-settings-url-control">
-					<div className="workspace-settings-url-field">
-						<span aria-hidden="true">{workspaceUrlPrefix(selfHost)}</span>
-						<Input
+				<div className="settings-url-control">
+					<InputGroup>
+						<InputGroupAddon>
+							<span aria-hidden="true">{workspaceUrlPrefix(selfHost)}</span>
+						</InputGroupAddon>
+						<InputGroupInput
 							id="workspace-slug"
 							name="workspace-slug"
 							value={isEditingName ? editedSlug : organization.slug}
@@ -177,40 +184,38 @@ export function WorkspaceIdentityCard({
 								isEditingName ? "workspace-slug-status" : undefined
 							}
 						/>
-					</div>
+					</InputGroup>
 					{isEditingName ? (
-						<output
-							id="workspace-slug-status"
-							className="workspace-settings-status"
-						>
+						<output id="workspace-slug-status" className="settings-status">
 							{slugAvailability.message}
 						</output>
 					) : null}
 				</div>
 			</WorkspaceSettingsRow>
 			{isEditingName ? (
-				<div className="workspace-settings-actions">
+				<div className="settings-actions">
 					{renameError ? (
 						<p
 							id="workspace-name-error"
 							role="alert"
-							className="workspace-settings-error"
+							className="settings-error"
 						>
 							{renameError}
 						</p>
 					) : null}
 					<Button
 						type="button"
-						variant="outline"
-						size="sm"
+						variant="secondary"
+						size="md"
 						onClick={cancelEditing}
 						disabled={isSavingName}
 					>
 						Cancel
 					</Button>
 					<Button
+						variant="primary"
 						type="button"
-						size="sm"
+						size="md"
 						onClick={() => void saveName()}
 						disabled={
 							isSavingName || editedName.trim().length === 0 || invalidSlug

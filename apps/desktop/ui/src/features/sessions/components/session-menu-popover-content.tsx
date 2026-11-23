@@ -1,5 +1,4 @@
 import { Popover } from "@base-ui/react/popover";
-import "./session-menu.css";
 
 type SessionMenuPopoverContentProps = Popover.Popup.Props &
 	Pick<Popover.Positioner.Props, "align" | "sideOffset">;

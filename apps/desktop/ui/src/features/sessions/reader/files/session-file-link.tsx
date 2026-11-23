@@ -20,7 +20,7 @@ export function SessionFileLink({
 			to={places.hrefs.file({ file })}
 			title={`Open ${file} in Files`}
 			onClick={(event) => event.stopPropagation()}
-			className={cn("rounded-full outline-none hover:opacity-80", className)}
+			className={cn("corner-full outline-none hover:opacity-80", className)}
 		>
 			{children}
 		</Link>

@@ -10,7 +10,6 @@ import {
 	type UseHint,
 	writeUseHint,
 } from "../reader/detail/reader-use-hint";
-import { SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME } from "./session-overview-row-elements";
 
 export type SessionMcpServerUse = { server: string; at: number };
 
@@ -59,9 +58,11 @@ function ToolTag({
 	return (
 		<span
 			className={cn(
-				SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME,
-				"h-[1.1875rem] max-w-44 gap-1 rounded-[9.5px] py-[2.5px] pr-1.5 pl-[2.5px] text-(--session-overview-text) bg-card shadow-(--custom-shadow) [corner-shape:superellipse(1.25)] dark:bg-muted-foreground/10",
-				onOpen && "cursor-pointer hover:bg-(--session-overview-hover)",
+				"flex min-w-0 shrink items-center text-body-xs font-regular tabular-nums",
+				"h-[1.1875rem] max-w-44 gap-xs [corner-shape:superellipse(1.25)]",
+				"corner-m py-xxs pr-s pl-xxs",
+				"text-ink bg-field shadow-card",
+				onOpen && "cursor-pointer hover:bg-hover-strong",
 			)}
 			data-session-overview-tool-tag={kind}
 			{...(onOpen
@@ -86,10 +87,7 @@ function ToolTag({
 				{first}
 			</span>
 			{rest.length > 0 ? (
-				<span
-					className="shrink-0 text-[0.5rem] text-(--session-overview-muted)"
-					aria-hidden="true"
-				>
+				<span className="shrink-0 text-body-xxs text-ink-2" aria-hidden="true">
 					+{rest.length}
 				</span>
 			) : null}
@@ -100,7 +98,7 @@ function ToolTag({
 	);
 }
 
-function Tag(props: ToolTagProps & { linked: boolean }) {
+function ToolChip(props: ToolTagProps & { linked: boolean }) {
 	const { linked, ...tag } = props;
 	if (props.names.length === 0) return null;
 	return linked && tag.href ? (
@@ -123,7 +121,7 @@ export function SessionOverviewToolTags({
 	const firstServer = mcpServers?.[0];
 	return (
 		<>
-			<Tag
+			<ToolChip
 				linked={linked}
 				kind="skill"
 				names={skills}
@@ -133,7 +131,7 @@ export function SessionOverviewToolTags({
 						: undefined
 				}
 			/>
-			<Tag
+			<ToolChip
 				linked={linked}
 				kind="mcp"
 				names={(mcpServers ?? []).map((use) => mcpServerLabel(use.server))}

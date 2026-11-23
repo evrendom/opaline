@@ -9,6 +9,7 @@ import {
 } from "react";
 import { Link } from "react-router-dom";
 import { FlowNumber } from "@/app/ui/flow-number";
+import { Pressable } from "@/app/ui/pressable";
 import { ConversationSkillLink } from "@/components/conversation/conversation-skill-link";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { FileTree } from "@/components/pierre/file-tree";
@@ -72,13 +73,13 @@ export function ShortList<T>({
 	return (
 		<>
 			{maxHeight ? (
-				<div className={cn("-mx-2 flex min-h-0 flex-col", maxHeight)}>
+				<div className={cn("-mx-m flex min-h-0 flex-col", maxHeight)}>
 					<ScrollColumn>
 						<ul className="flex flex-col">{shown.map(render)}</ul>
 					</ScrollColumn>
 				</div>
 			) : (
-				<ul className="-mx-2 flex flex-col">{shown.map(render)}</ul>
+				<ul className="-mx-m flex flex-col">{shown.map(render)}</ul>
 			)}
 			{items.length > LIST_LIMIT ? (
 				<ShowAll onClick={onShowAll ?? (() => setOpen(!open))}>
@@ -97,13 +98,13 @@ export function ShowAll({
 	onClick: () => void;
 }) {
 	return (
-		<button
+		<Pressable
 			type="button"
 			onClick={onClick}
-			className="w-fit text-xs text-muted-foreground tabular-nums hover:text-foreground"
+			className="w-fit text-body-m text-ink-3 tabular-nums hover:text-ink"
 		>
 			{children}
-		</button>
+		</Pressable>
 	);
 }
 
@@ -155,7 +156,7 @@ function FitRows({
 		<>
 			<div
 				ref={area}
-				className="relative -mx-2 flex-1"
+				className="relative -mx-m flex-1"
 				style={{ minHeight: `max(${fit.least}px, ${floor})` }}
 			>
 				<div
@@ -175,7 +176,14 @@ function FitRows({
 
 export function Row({ children }: { children: ReactNode }) {
 	return (
-		<li className="flex min-h-8 min-w-0 items-center gap-2.5 rounded-md px-2 py-1 text-[13px] hover:bg-accent/60">
+		<li
+			className={cn(
+				"flex min-h-8 min-w-0 items-center gap-m",
+				"corner-s px-m py-xs",
+				"text-body-l",
+				"hover:bg-hover",
+			)}
+		>
 			{children}
 		</li>
 	);
@@ -183,7 +191,7 @@ export function Row({ children }: { children: ReactNode }) {
 
 export function Meta({ children }: { children: ReactNode }) {
 	return (
-		<span className="shrink-0 text-xs whitespace-nowrap text-muted-foreground tabular-nums">
+		<span className="shrink-0 text-body-m whitespace-nowrap text-ink-3 tabular-nums">
 			{children}
 		</span>
 	);
@@ -199,7 +207,7 @@ export function Glyph({
 	return (
 		<Icon
 			aria-hidden="true"
-			className={cn("size-4 shrink-0 text-muted-foreground", className)}
+			className={cn("size-4 shrink-0 text-ink-3", className)}
 		/>
 	);
 }
@@ -214,16 +222,22 @@ export function PlaceLink({
 	const first = places[0];
 	if (!first) return null;
 	return (
-		<button
+		<Pressable
 			type="button"
 			title={`Open turn ${shortRunId(first.turnId)} in the detail`}
 			onClick={() => onOpen(first.turnId, first.agent)}
-			className="shrink-0 rounded px-1 text-xs font-medium text-muted-foreground tabular-nums hover:bg-muted hover:text-foreground"
+			className={cn(
+				"shrink-0",
+				"corner-xs px-xs",
+				"text-body-m font-medium tabular-nums",
+				"text-ink-3",
+				"hover:bg-field hover:text-ink",
+			)}
 		>
 			{shortRunId(first.turnId)}
 			{first.agent ? ` · ${shortSubagentId(first.agent)}` : ""}
 			{places.length > 1 ? ` +${places.length - 1}` : ""}
-		</button>
+		</Pressable>
 	);
 }
 
@@ -258,15 +272,15 @@ export function SummaryActivityLine({
 		[activity.errors, "errors"],
 	];
 	return (
-		<p className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+		<p className="flex flex-wrap gap-x-xl gap-y-xs text-body-m text-ink-3">
 			{parts
 				.filter(([value]) => value > 0)
 				.map(([value, label]) => (
 					<span key={label} className="whitespace-nowrap">
 						<span
 							className={cn(
-								"text-foreground tabular-nums",
-								label === "errors" && "text-rose-600 dark:text-rose-400",
+								"text-ink tabular-nums",
+								label === "errors" && "text-error",
 							)}
 						>
 							{formatCompactNumber(value)}
@@ -275,7 +289,7 @@ export function SummaryActivityLine({
 					</span>
 				))}
 			{activity.slashCommands.map((command) => (
-				<span key={command} className="font-mono">
+				<span key={command} className="font-data">
 					{command}
 				</span>
 			))}
@@ -294,7 +308,7 @@ export function SkillRow({
 }) {
 	return (
 		<Row>
-			<Glyph icon={IconSparkles} className="text-amber-500" />
+			<Glyph icon={IconSparkles} className="text-warning" />
 			<ConversationSkillLink
 				name={skill.name}
 				className="min-w-0 flex-1 truncate hover:underline"
@@ -326,9 +340,9 @@ export function SummaryFiles({
 	const items = useMemo(() => getSummaryTreeItems(shown), [shown]);
 	if (files.length === 0)
 		return (
-			<div className="relative mt-2 min-h-26 flex-1">
+			<div className="relative mt-m min-h-26 flex-1">
 				<EmptyState
-					className="absolute inset-0 gap-2 p-4 py-0"
+					className="absolute inset-0 gap-m p-xl py-zero"
 					icon={IconFileCode}
 				/>
 			</div>
@@ -357,13 +371,12 @@ export function SummaryChangesStrip({ changes }: { changes: SummaryChanges }) {
 		{ count: changes.deleted, label: "deleted" },
 	].filter((each) => each.count > 0);
 	return (
-		<span className="flex min-w-0 items-baseline gap-3 text-sm text-muted-foreground tabular-nums">
+		<span className="flex min-w-0 items-baseline gap-l text-body-xl text-ink-3 tabular-nums">
 			<span className="min-w-0 truncate">
 				{counts.map((each, index) => (
 					<span key={each.label}>
 						{index > 0 ? " · " : null}
-						<FlowNumber className="text-foreground" value={each.count} />{" "}
-						{each.label}
+						<FlowNumber className="text-ink" value={each.count} /> {each.label}
 					</span>
 				))}
 			</span>
@@ -396,10 +409,10 @@ export function SummarySubagents({
 				const label = (
 					<>
 						<SubagentChip selected={false} subagentId={subagent.subagentId} />
-						<span className="font-mono text-xs">
+						<span className="font-data text-body-m">
 							{shortSubagentId(subagent.subagentId)}
 						</span>
-						<span className="min-w-0 flex-1 truncate text-muted-foreground">
+						<span className="min-w-0 flex-1 truncate text-ink-3">
 							{subagent.model ? formatModelDisplayLabel(subagent.model) : ""}
 						</span>
 					</>
@@ -410,21 +423,21 @@ export function SummarySubagents({
 							<Link
 								to={places.hrefs.subagent(subagent.subagentId)}
 								title="Read its thread"
-								className="flex min-w-0 flex-1 items-center gap-2.5 hover:underline"
+								className="flex min-w-0 flex-1 items-center gap-m hover:underline"
 							>
 								{label}
 							</Link>
 						) : turnId ? (
-							<button
+							<Pressable
 								type="button"
 								title="Open it in focus in the detail"
 								onClick={() => onOpen(turnId, subagent.subagentId)}
-								className="flex min-w-0 flex-1 items-center gap-2.5 text-left hover:underline"
+								className="flex min-w-0 flex-1 items-center gap-m text-left hover:underline"
 							>
 								{label}
-							</button>
+							</Pressable>
 						) : (
-							<span className="flex min-w-0 flex-1 items-center gap-2.5">
+							<span className="flex min-w-0 flex-1 items-center gap-m">
 								{label}
 							</span>
 						)}
@@ -447,9 +460,9 @@ export function SummarySubagents({
 }
 
 export function Empty({ children }: { children: ReactNode }) {
-	return <p className="text-[13px] text-muted-foreground">{children}</p>;
+	return <p className="text-body-l text-ink-3">{children}</p>;
 }
 
 export function Pending() {
-	return <p className="text-[13px] text-muted-foreground">Loading…</p>;
+	return <p className="text-body-l text-ink-3">Loading…</p>;
 }

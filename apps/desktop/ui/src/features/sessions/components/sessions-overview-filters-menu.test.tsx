@@ -152,11 +152,11 @@ describe("SessionsOverviewFiltersMenu linear variant", () => {
 			name: "Configure Tokens filter",
 		});
 		expect(tokensRow).toHaveAttribute("title", "In 1K–50K · Out 500–5K");
-		expect(tokensRow.querySelector(".session-menu-active-dot")).not.toBeNull();
+		expect(tokensRow.querySelector(".menu-active-dot")).not.toBeNull();
 		expect(
 			screen
 				.getByRole("button", { name: "Configure Model filter" })
-				.querySelector(".session-menu-active-dot"),
+				.querySelector(".menu-active-dot"),
 		).toBeNull();
 	});
 

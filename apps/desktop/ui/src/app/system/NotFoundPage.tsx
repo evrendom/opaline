@@ -7,15 +7,13 @@ import { useOptionalOrganization } from "@/features/workspace/organization/useOr
 export function NotFoundPage() {
 	const workspace = useOptionalOrganization()?.state.activeOrg;
 	return (
-		<div className="flex min-h-screen items-center justify-center px-6 py-12">
-			<div className="flex max-w-md flex-col items-center gap-4 text-center">
-				<div className="text-sm font-medium uppercase tracking-[0.18em] text-muted-foreground">
+		<div className="flex min-h-screen items-center justify-center px-xxl py-xxxl">
+			<div className="flex max-w-md flex-col items-center gap-xl text-center">
+				<div className="text-body-xl font-medium uppercase tracking-xl text-ink-3">
 					404
 				</div>
-				<h1 className="text-3xl font-semibold tracking-tight text-foreground">
-					Page not found
-				</h1>
-				<p className="text-sm leading-6 text-muted-foreground">
+				<h1 className="text-display-s font-heavy text-ink">Page not found</h1>
+				<p className="text-body-xl text-ink-3">
 					The page you’re looking for does not exist or is no longer available.
 				</p>
 				<Link
@@ -24,7 +22,7 @@ export function NotFoundPage() {
 							? getWorkspaceAppPath(workspace.slug, appRoutes.dashboard())
 							: appRoutes.dashboard()
 					}
-					className={buttonVariants()}
+					className={buttonVariants({ className: "h-9" })}
 				>
 					Go to dashboard
 				</Link>

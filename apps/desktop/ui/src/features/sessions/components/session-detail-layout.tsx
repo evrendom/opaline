@@ -12,8 +12,8 @@ import {
 	HorizontalResizeHandle,
 	useElementWidth,
 	useStoredPaneSize,
-} from "@/components/ui/horizontal-resize-handle";
-import { clampPaneSize } from "@/components/ui/horizontal-resize-utils";
+} from "@/app/ui/horizontal-resize-handle";
+import { clampPaneSize } from "@/app/ui/horizontal-resize-utils";
 import { formatRoundedDuration } from "@/lib/format";
 import {
 	createSessionContinuousTurnViewportStore,
@@ -232,7 +232,7 @@ export function SessionDetailLayout({
 				<section
 					ref={turnTableSectionRef}
 					aria-label="Turn table"
-					className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-(--session-turn-table-surface) [--session-turn-table-surface:var(--session-overview-surface)]"
+					className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-(--session-turn-table-surface) [--session-turn-table-surface:var(--canvas)]"
 				>
 					<SessionTurnTablePane
 						model={viewModel.displayModel}
@@ -251,7 +251,7 @@ export function SessionDetailLayout({
 				</section>
 				<HorizontalResizeHandle
 					ariaLabel="Resize turn table panel"
-					className="border-t-[0.5px] border-l border-(--session-overview-border) after:absolute after:inset-x-0 after:top-[calc(2.75rem-0.5px)] after:h-[0.5px] after:bg-(--session-overview-border) after:content-['']"
+					className="edge-t-s edge-l-m border-line after:absolute after:inset-x-0 after:top-[calc(2.75rem-0.5px)] after:h-[0.5px] after:bg-line after:content-['']"
 					defaultValue={DEFAULT_SESSION_TURN_TABLE_PANE_WIDTH_PX}
 					maximum={turnTablePaneMaximum}
 					minimum={MINIMUM_SESSION_TURN_TABLE_PANE_WIDTH_PX}
@@ -268,7 +268,7 @@ export function SessionDetailLayout({
 						className="pointer-events-none absolute inset-y-0 left-0 z-50 w-0"
 					>
 						<div
-							className="absolute -top-px right-0 bottom-0 w-px opacity-0 transition-opacity duration-200 [background:none] [box-shadow:-6px_0px_16px_4px_rgba(0,0,0,0.12)] [clip-path:inset(0_0_0_-38px)] [transition-timing-function:ease] data-[visible=true]:opacity-100"
+							className="absolute -top-px right-0 bottom-0 w-px opacity-0 transition-opacity duration-(--motion-medium-duration) [background:none] shadow-float [clip-path:inset(0_0_0_-38px)] ease-base data-[visible=true]:opacity-100"
 							data-slot="session-detail-response-pane-edge-shadow"
 							data-visible={isResponsePaneEdgeShadowVisible ? "true" : "false"}
 						/>

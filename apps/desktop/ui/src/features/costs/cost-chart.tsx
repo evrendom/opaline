@@ -40,24 +40,26 @@ import {
 import {
 	Area,
 	CartesianGrid,
+	Tooltip as ChartTooltip,
 	ComposedChart,
 	Line,
 	ResponsiveContainer,
-	Tooltip,
 	XAxis,
 	type XAxisTickContentProps,
 	YAxis,
 } from "recharts";
 import { introRequested } from "@/app/first-open";
+import { Button } from "@/app/ui/button";
+import { ChartLoadingWave } from "@/app/ui/chart-loading-wave";
 import { FlowFigure, FlowNumber } from "@/app/ui/flow-number";
+import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
+import { Pressable } from "@/app/ui/pressable";
 import { Skeleton } from "@/app/ui/skeleton";
 import {
 	Tooltip as InfoTooltip,
 	TooltipContent,
 	TooltipTrigger,
 } from "@/app/ui/tooltip";
-import { ChartLoadingWave } from "@/components/ui/chart-loading-wave";
-import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { useOptionalDateRange } from "@/features/analytics/date-range/DateRangeProvider";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { DemoTrendPreview } from "@/features/demo/demo-trend-preview";
@@ -945,7 +947,7 @@ export function CostChart({
 					style={usage?.selected ? { display: "none" } : undefined}
 				>
 					<div className="cost-chart-key" data-fluid-menu-root="">
-						<FluidMenuHover items=".cost-text-button" />
+						<FluidMenuHover items=".text-button" />
 						<div className="cost-chart-key-copy">
 							<h2 className="cost-chart-title">
 								{ciChart ? "PRs & CI" : metricLabel} over time
@@ -953,7 +955,7 @@ export function CostChart({
 							<div className="cost-chart-legend">
 								{pending && series.length === 0 ? (
 									<Skeleton
-										className="h-3 rounded-[4px]"
+										className="h-3 corner-xs"
 										style={{ width: metricLabel.length * TICK_CHAR_PX + 14 }}
 									/>
 								) : null}
@@ -987,7 +989,7 @@ export function CostChart({
 								{sampled ? null : metric === "agentRuns" ||
 									metric === "ciRuns" ? (
 									<>
-										<button
+										<Pressable
 											type="button"
 											className="cost-legend-item cost-duration-legend"
 											data-percentile="median"
@@ -1009,8 +1011,8 @@ export function CostChart({
 													)}
 												/>
 											</strong>
-										</button>
-										<button
+										</Pressable>
+										<Pressable
 											type="button"
 											className="cost-legend-item cost-duration-legend"
 											data-percentile="p95"
@@ -1030,10 +1032,10 @@ export function CostChart({
 													figure={runDurationFigure(durationStats?.p95Seconds)}
 												/>
 											</strong>
-										</button>
+										</Pressable>
 									</>
 								) : metric === "mergedPullRequests" && !ciChart ? (
-									<button
+									<Pressable
 										type="button"
 										className="cost-legend-item cost-duration-legend"
 										data-percentile="p95"
@@ -1059,7 +1061,7 @@ export function CostChart({
 												/>
 											)}
 										</strong>
-									</button>
+									</Pressable>
 								) : null}
 							</div>
 							{history && !sampled && !ciChart ? (
@@ -1114,26 +1116,28 @@ export function CostChart({
 							{sampled && data !== null ? null : coverage &&
 								data?.incomplete ? (
 								<output className="cost-chart-coverage">
-									<button
+									<Button
 										type="button"
-										className="cost-text-button cost-coverage-refresh"
+										size="sm"
+										className="shrink-0"
 										onClick={onRefresh}
 										disabled={refreshing}
 									>
 										{refreshing ? "Refreshing…" : "Refresh"}
-									</button>
+									</Button>
 								</output>
 							) : unavailable ? (
 								<output className="cost-chart-coverage">
 									<span>{unavailableLabel}</span>
-									<button
+									<Button
 										type="button"
-										className="cost-text-button cost-coverage-refresh"
+										size="sm"
+										className="shrink-0"
 										onClick={onRefresh}
 										disabled={refreshing}
 									>
 										{refreshing ? "Refreshing…" : "Refresh"}
-									</button>
+									</Button>
 								</output>
 							) : null}
 						</div>
@@ -1143,16 +1147,16 @@ export function CostChart({
 								{splitBy !== "none" ? (
 									<span className="cost-chart-split">
 										Split by
-										<button
+										<Pressable
 											type="button"
-											className="cost-filter-chip"
+											className="filter-chip"
 											onClick={onResetSplit}
 											title={`Split by ${COST_LABELS[splitBy]}`}
 											aria-label={`Stop splitting by ${COST_LABELS[splitBy].toLowerCase()}`}
 										>
 											<span className="truncate">{COST_LABELS[splitBy]}</span>
 											<IconX size={12} className="shrink-0" />
-										</button>
+										</Pressable>
 									</span>
 								) : null}
 								{filters}
@@ -1167,7 +1171,7 @@ export function CostChart({
 								aria-label="Pull requests or CI runs"
 							>
 								{(["mergedPullRequests", "ciRuns"] as const).map((value) => (
-									<button
+									<Pressable
 										key={value}
 										type="button"
 										aria-pressed={selectedMetric === value}
@@ -1177,21 +1181,21 @@ export function CostChart({
 										}
 									>
 										{METRIC_LABELS[value]}
-									</button>
+									</Pressable>
 								))}
 							</fieldset>
 						) : null}
 						{dots === "switch" ? (
 							<fieldset className="cost-chart-kind" aria-label="Chart style">
 								{(["line", "dots"] as const).map((value) => (
-									<button
+									<Pressable
 										key={value}
 										type="button"
 										aria-pressed={kind === value}
 										onClick={() => setKind(value)}
 									>
 										{value === "line" ? "Line" : "Dots"}
-									</button>
+									</Pressable>
 								))}
 							</fieldset>
 						) : null}
@@ -1294,7 +1298,7 @@ export function CostChart({
 											<CartesianGrid
 												yAxisId="count"
 												vertical={false}
-												stroke="var(--cost-border)"
+												stroke="var(--line)"
 												strokeDasharray="3 4"
 											/>
 										)}
@@ -1348,7 +1352,7 @@ export function CostChart({
 											tick={
 												heartbeat
 													? false
-													: { fill: "var(--cost-muted)", fontSize: 11 }
+													: { fill: "var(--ink-3)", fontSize: 11 }
 											}
 										/>
 										{metric === "agentRuns" || metric === "ciRuns" ? (
@@ -1367,7 +1371,7 @@ export function CostChart({
 												width={68}
 												tick={
 													phase === "idle" && durationStats?.sampleCount
-														? { fill: "var(--cost-muted)", fontSize: 11 }
+														? { fill: "var(--ink-3)", fontSize: 11 }
 														: false
 												}
 											/>
@@ -1391,12 +1395,12 @@ export function CostChart({
 												width={56}
 												tick={
 													phase === "idle"
-														? { fill: "var(--cost-muted)", fontSize: 11 }
+														? { fill: "var(--ink-3)", fontSize: 11 }
 														: false
 												}
 											/>
 										) : null}
-										<Tooltip
+										<ChartTooltip
 											active={phase === "idle" ? undefined : false}
 											// Follows the pointer across, but holds one height near the
 											// top of the plot instead of tracking the pointer's height.
@@ -1404,7 +1408,7 @@ export function CostChart({
 											// Appear in place rather than slide in from the last spot.
 											isAnimationActive={false}
 											cursor={{
-												stroke: "var(--cost-muted)",
+												stroke: "var(--ink-3)",
 												strokeDasharray: "3 4",
 											}}
 											content={({ active, payload, label }) => {
@@ -1493,7 +1497,7 @@ export function CostChart({
 													}
 													activeDot={{
 														r: 4,
-														stroke: "var(--cost-surface)",
+														stroke: "var(--canvas)",
 														strokeWidth: 2,
 													}}
 													isAnimationActive={false}
@@ -1509,16 +1513,16 @@ export function CostChart({
 													dataKey="medianSeconds"
 													name="Median duration"
 													type="linear"
-													stroke="var(--cost-foreground)"
+													stroke="var(--ink)"
 													strokeWidth={2}
 													dot={{
 														r: 2,
 														strokeWidth: 0,
-														fill: "var(--cost-foreground)",
+														fill: "var(--ink)",
 													}}
 													activeDot={{
 														r: 4,
-														stroke: "var(--cost-surface)",
+														stroke: "var(--canvas)",
 														strokeWidth: 2,
 													}}
 													connectNulls={false}
@@ -1540,7 +1544,7 @@ export function CostChart({
 													}}
 													activeDot={{
 														r: 4,
-														stroke: "var(--cost-surface)",
+														stroke: "var(--canvas)",
 														strokeWidth: 2,
 													}}
 													connectNulls={false}
@@ -1564,7 +1568,7 @@ export function CostChart({
 												}}
 												activeDot={{
 													r: 4,
-													stroke: "var(--cost-surface)",
+													stroke: "var(--canvas)",
 													strokeWidth: 2,
 												}}
 												connectNulls={false}
@@ -1636,7 +1640,7 @@ export function GitHubHistoryNotes({
 			{history.ciUnavailablePullRequests > 0 ||
 			(metric === "ciRuns" && history.ciFrom && startDate < history.ciFrom) ? (
 				<InfoTooltip>
-					<TooltipTrigger className="cost-text-button">
+					<TooltipTrigger className="text-button">
 						CI history{" "}
 						{history.ciFrom
 							? `from ${historyDate(history.ciFrom)}`
@@ -1788,7 +1792,7 @@ function Metric({
 			<div className="cost-metric-header">
 				<div className="cost-metric-label">
 					<MetricIcon className="cost-metric-icon" aria-hidden="true" />
-					<button
+					<Pressable
 						type="button"
 						className="cost-metric-select"
 						aria-pressed={primary}
@@ -1799,10 +1803,10 @@ function Metric({
 						onFocus={onIntent}
 					>
 						{label}
-					</button>
+					</Pressable>
 				</div>
 				{value === undefined ? (
-					<Skeleton className="cost-metric-skeleton rounded-[4px]" />
+					<Skeleton className="cost-metric-skeleton corner-xs" />
 				) : (
 					<span className="cost-metric-value">
 						{qualifier ? (

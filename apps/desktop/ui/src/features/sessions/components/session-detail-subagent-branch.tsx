@@ -71,7 +71,7 @@ export function SessionDetailSubagentBranch({
 
 	return (
 		<div
-			className="min-w-0 pl-9"
+			className="min-w-0 pl-xxxl"
 			data-session-subagent-branch={subagent.subagentId}
 		>
 			<TraceExpansionNamespaceProvider namespace={subagent.subagentId}>
@@ -111,23 +111,23 @@ function SubagentBranchStatus({
 	onRetry: () => void;
 }) {
 	if (!hasTranscript) {
-		return (
-			<p className="text-xs text-(--session-overview-subtle)">No transcript</p>
-		);
+		return <p className="text-body-m text-ink-3">No transcript</p>;
 	}
 	if (isError) {
 		return (
-			<Button onClick={onRetry} size="sm" type="button" variant="ghost">
+			<Button
+				className="h-8 [&_svg:not([class*='size-'])]:size-4"
+				onClick={onRetry}
+				size="md"
+				type="button"
+				variant="secondary"
+			>
 				Retry
 			</Button>
 		);
 	}
 	if (isPending) {
-		return (
-			<output className="text-xs text-(--session-overview-subtle)">
-				Loading…
-			</output>
-		);
+		return <output className="text-body-m text-ink-3">Loading…</output>;
 	}
 	return null;
 }

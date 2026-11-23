@@ -1,42 +1,16 @@
-html[data-auth-shell] {
-	--auth-surface: #fff;
-	--auth-text: #171717;
-	--auth-muted: #737373;
-	--auth-control: #fff;
-	--auth-control-hover: #f9f9f9;
-	--auth-input-border: rgb(23 23 23 / 15%);
-	--auth-control-shadow:
-		inset 0 0 0 0.5px rgb(0 0 0 / 0%), 0 0 0 0.5px rgb(0 0 0 / 6%),
-		0 1px 1px -1px rgb(0 0 0 / 10%), 0 1px 2px rgb(0 0 0 / 5%);
-	--auth-code-shadow:
-		inset 0 0 0 1px rgb(23 23 23 / 15%), 0 1px 2px rgb(0 0 0 / 4%);
-}
-
-/* Dark: the app's window surface, with controls one step up like cards. */
-html.dark[data-auth-shell] {
-	--auth-surface: var(--background);
-	--auth-text: var(--foreground);
-	--auth-muted: var(--muted-foreground);
-	--auth-control: var(--card);
-	--auth-control-hover: oklch(0.235 0 0);
-	--auth-input-border: rgb(255 255 255 / 15%);
-	--auth-control-shadow: var(--custom-outline-shadow);
-	--auth-code-shadow: inset 0 0 0 1px rgb(255 255 255 / 15%);
-}
-
 html[data-auth-shell],
 :where(html)[data-auth-shell] body {
 	min-height: 100%;
-	background: var(--auth-surface);
+	background: var(--canvas);
 	overscroll-behavior: none;
 }
 
 .opaline-auth-shell {
 	display: flex;
 	min-height: 100svh;
-	background: var(--auth-surface);
-	color: var(--auth-text);
-	font-family: "Inter Variable", Inter, system-ui, sans-serif;
+	background: var(--canvas);
+	color: var(--ink);
+	font-family: var(--font-body);
 }
 
 .opaline-auth-main {
@@ -45,7 +19,7 @@ html[data-auth-shell],
 	min-height: 100svh;
 	align-items: center;
 	justify-content: center;
-	padding: 48px 24px;
+	padding: var(--space-xxxl) var(--space-xxl);
 }
 
 .opaline-auth-content {
@@ -54,7 +28,7 @@ html[data-auth-shell],
 }
 
 .opaline-auth-intro {
-	margin-bottom: 32px;
+	margin-bottom: var(--space-xxxl);
 	text-align: center;
 }
 
@@ -66,93 +40,40 @@ html[data-auth-shell],
 }
 
 .opaline-auth-intro h1 {
-	margin: 0 0 12px;
-	font-size: 20px;
-	font-weight: 600;
-	letter-spacing: -0.025em;
-	line-height: 1.35;
+	margin: var(--space-zero) var(--space-zero) var(--space-l);
+	font-size: var(--display-size-xxs);
+	font-weight: var(--weight-body-heavy);
+	letter-spacing: var(--display-letter-spacing-xxs);
+	line-height: var(--display-line-xxs);
 	text-wrap: balance;
 }
 
 .opaline-auth-intro p {
-	margin: 0;
-	color: var(--auth-muted);
-	font-size: 14px;
-	line-height: 1.6;
+	margin: var(--space-zero);
+	color: var(--ink-3);
+	font-size: var(--size-xl);
+	letter-spacing: var(--letter-spacing-xl);
+	line-height: var(--line-xl);
 	text-wrap: pretty;
 }
 
 .opaline-auth-intro .opaline-auth-eyebrow {
-	margin-bottom: 8px;
-	font-size: 11px;
-	font-weight: 600;
-	letter-spacing: 0.14em;
-	line-height: 1.4;
+	margin-bottom: var(--space-m);
+	font-size: var(--size-s);
+	font-weight: var(--weight-body-heavy);
+	letter-spacing: var(--tracking-xl);
+	line-height: var(--line-s);
 	text-transform: uppercase;
-}
-
-.opaline-auth-content [data-slot="button"] {
-	min-height: 42px;
-	border-radius: 8px;
-	font: inherit;
-	transition:
-		background-color 140ms ease,
-		border-color 140ms ease,
-		color 140ms ease;
-}
-
-.opaline-auth-content [data-slot="button"][data-variant="outline"] {
-	border-color: transparent;
-	padding: 10px 14px;
-	background: var(--auth-control);
-	box-shadow: var(--auth-control-shadow);
-}
-
-.opaline-auth-content
-	[data-slot="button"][data-variant="outline"]:hover:not(:disabled) {
-	background: var(--auth-control-hover);
-}
-
-.opaline-auth-content [data-slot="input"] {
-	min-height: 44px;
-	border: 1px solid var(--auth-input-border);
-	border-radius: 8px;
-	background: var(--auth-control);
-}
-
-.opaline-auth-content [data-slot="input"].opaline-auth-code-input {
-	min-height: 56px;
-	border: 0;
-	padding-inline: 18px;
-	background: var(--auth-control);
-	box-shadow: var(--auth-code-shadow);
-	color: var(--auth-text);
-	font-size: 18px;
-	font-variant-numeric: tabular-nums;
-	font-weight: 500;
-	letter-spacing: 0.22em;
-	text-align: center;
 }
 
 @media (max-width: 899px) {
 	.opaline-auth-main {
-		padding-block: 40px;
-	}
-
-	.opaline-auth-content [data-slot="button"],
-	.opaline-auth-content [data-slot="input"] {
-		font-size: 16px;
+		padding-block: var(--space-xxxl);
 	}
 }
 
 @media (max-height: 700px) and (min-width: 900px) {
 	.opaline-auth-main {
-		padding-block: 32px;
-	}
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.opaline-auth-content [data-slot="button"] {
-		transition: none;
+		padding-block: var(--space-xxxl);
 	}
 }

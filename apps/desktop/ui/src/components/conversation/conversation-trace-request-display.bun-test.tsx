@@ -31,11 +31,11 @@ describe("AgentTraceRequestDisplay", () => {
 		expect(markup.match(/data-trace-request-separator/g)).toHaveLength(3);
 		expect(markup.match(/data-trace-request-metadata="true"/g)).toHaveLength(3);
 		expect(markup).toContain("tabular-nums");
-		expect(markup).toContain("gap-1.5");
-		expect(markup).not.toContain("rounded-full");
+		expect(markup).toContain("gap-s");
+		expect(markup).not.toContain("corner-full");
 		expect(markup).not.toContain("font-medium");
-		expect(markup).not.toContain("tracking-[-0.01em]");
-		expect(markup).not.toContain("px-2");
-		expect(markup).not.toContain("py-0.5");
+		expect(markup).not.toContain("tracking-s");
+		expect(markup).not.toContain("px-m");
+		expect(markup).not.toContain("py-xxs");
 	});
 });

@@ -26,7 +26,7 @@ export function GitHubSettingsPage() {
 		<SettingsPageReveal routeId="workspace" loading={loading}>
 			{() =>
 				organizationId ? (
-					<div className="workspace-settings-page">
+					<div className="settings-page">
 						<WorkspaceGitHubConnection organizationId={organizationId} />
 					</div>
 				) : null

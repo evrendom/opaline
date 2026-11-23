@@ -192,7 +192,7 @@ export function SessionsPage() {
 			{/* An open session takes the whole page; its breadcrumb
 			    in the shell header leads back to the list. */}
 			<div
-				className="dashboardy-page @container/session-workspace flex min-h-0 min-w-0 flex-1 overflow-hidden bg-[color:var(--dashboardy-surface-opaque)]"
+				className="dashboardy-page @container/session-workspace flex min-h-0 min-w-0 flex-1 overflow-hidden bg-canvas"
 				data-slot="session-workspace"
 			>
 				{activeSessionDetail ? (

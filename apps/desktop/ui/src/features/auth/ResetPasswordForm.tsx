@@ -74,58 +74,64 @@ export function ResetPasswordForm({
 	return (
 		<Card className="w-full max-w-sm">
 			<CardHeader>
-				<CardTitle className="text-2xl">Reset password</CardTitle>
+				<CardTitle>Reset password</CardTitle>
 				<CardDescription>Enter your new password</CardDescription>
 			</CardHeader>
-			<CardContent className="flex flex-col gap-4">
-				<form onSubmit={handleSubmit} className="flex flex-col gap-4">
-					<div className="flex flex-col gap-2">
-						<Label htmlFor="new-password">New password</Label>
-						<Input
-							id="new-password"
-							name="newPassword"
-							type="password"
-							autoComplete="new-password"
-							value={password}
-							onChange={(e) => {
-								setPassword(e.target.value);
-								if (feedback?.kind === "error") {
-									setFeedback(null);
-								}
-							}}
-							required
-							minLength={8}
-							disabled={!token || loading}
-						/>
-					</div>
-					{feedback ? (
-						<div
-							role={feedback.kind === "error" ? "alert" : "status"}
-							aria-live="polite"
-							className={cn(
-								"rounded-3xl px-3 py-2 text-sm leading-5 ring-1",
-								feedback.kind === "error"
-									? "bg-destructive/5 text-destructive ring-destructive/15"
-									: "bg-muted/35 text-muted-foreground ring-border/60",
-							)}
-						>
-							{feedback.message}
+			<CardContent>
+				<div className="flex flex-col gap-xl">
+					<form onSubmit={handleSubmit} className="flex flex-col gap-xl">
+						<div className="flex flex-col gap-m">
+							<Label htmlFor="new-password">New password</Label>
+							<Input
+								id="new-password"
+								name="newPassword"
+								type="password"
+								autoComplete="new-password"
+								value={password}
+								onChange={(e) => {
+									setPassword(e.target.value);
+									if (feedback?.kind === "error") {
+										setFeedback(null);
+									}
+								}}
+								required
+								minLength={8}
+								disabled={!token || loading}
+							/>
 						</div>
-					) : null}
-					<Button type="submit" disabled={loading || !token}>
-						{loading ? "Resetting password..." : "Reset password"}
-					</Button>
-				</form>
+						{feedback ? (
+							<div
+								role={feedback.kind === "error" ? "alert" : "status"}
+								aria-live="polite"
+								className={cn(
+									"corner-xl px-l py-m text-body-xl ring-1",
+									feedback.kind === "error"
+										? "bg-error-tint text-error ring-error-line"
+										: "bg-inset text-ink-3 ring-line-soft",
+								)}
+							>
+								{feedback.message}
+							</div>
+						) : null}
+						<Button
+							variant="primary"
+							type="submit"
+							disabled={loading || !token}
+						>
+							{loading ? "Resetting password..." : "Reset password"}
+						</Button>
+					</form>
 
-				<Button
-					type="button"
-					variant="ghost"
-					size="sm"
-					onClick={onBackToLogin}
-					className="self-start text-muted-foreground"
-				>
-					Back to sign in
-				</Button>
+					<Button
+						type="button"
+						variant="secondary"
+						size="md"
+						onClick={onBackToLogin}
+						className="self-start"
+					>
+						Back to sign in
+					</Button>
+				</div>
 			</CardContent>
 		</Card>
 	);

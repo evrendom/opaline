@@ -1,9 +1,11 @@
-import { IconFolder, IconSearch } from "@tabler/icons-react";
+import { IconFolder } from "@tabler/icons-react";
 import { useCallback, useEffect, useState } from "react";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
 import { Button } from "@/app/ui/button";
 import { Checkbox } from "@/app/ui/checkbox";
+import { Pressable } from "@/app/ui/pressable";
 import { Skeleton } from "@/app/ui/skeleton";
+import { RepositorySearchField } from "@/features/settings/components/repository-search-field";
 import type {
 	DesktopApplyEvent,
 	DesktopRepository,
@@ -169,23 +171,19 @@ export function DesktopRepositoryPicker({
 
 	return (
 		<div className="desktop-repository-picker">
-			<label className="sessions-settings-search">
-				<IconSearch size={16} aria-hidden="true" />
-				<input
-					type="search"
-					name="local-repository-search"
-					aria-label="Find a repository on this Mac"
-					placeholder="Find a repository…"
-					value={search}
-					onChange={(event) => setSearch(event.target.value)}
-				/>
-			</label>
+			<RepositorySearchField
+				className="mb-m"
+				name="local-repository-search"
+				label="Find a repository on this Mac"
+				value={search}
+				onChange={setSearch}
+			/>
 			{loadError ? (
 				<div className="sessions-settings-empty" role="alert">
 					{loadError}{" "}
-					<button type="button" onClick={load}>
+					<Button variant="link" size="inline" onClick={load}>
 						Try again
-					</button>
+					</Button>
 				</div>
 			) : (
 				<div className="sessions-settings-table-wrap">
@@ -223,6 +221,7 @@ export function DesktopRepositoryPicker({
 									<td>{repo.uploadedCount?.toLocaleString() ?? "–"}</td>
 									<td>
 										<Checkbox
+											className="ml-auto"
 											aria-label={`Upload sessions from ${repo.name}`}
 											checked={isOn(repo.key, repo.enabled)}
 											disabled={working}
@@ -247,8 +246,7 @@ export function DesktopRepositoryPicker({
 				</p>
 			)}
 			{list && !loadError && !query && hiddenCount > 0 && (
-				<button
-					type="button"
+				<Pressable
 					className="desktop-repository-more"
 					aria-expanded={showAll}
 					onClick={() => setShowAll((value) => !value)}
@@ -256,7 +254,7 @@ export function DesktopRepositoryPicker({
 					{showAll
 						? "Show fewer"
 						: `Show ${hiddenCount.toLocaleString()} more (temporary folders and folders without sessions)`}
-				</button>
+				</Pressable>
 			)}
 
 			<div className="desktop-repository-footer">
@@ -274,8 +272,9 @@ export function DesktopRepositoryPicker({
 						: status.text}
 				</p>
 				<Button
+					variant="primary"
 					type="button"
-					size="sm"
+					size="md"
 					disabled={!canSubmit}
 					onClick={() => void submit()}
 				>
@@ -291,18 +290,18 @@ function LoadingRows() {
 		<tr key={width} data-loading-row="">
 			<td>
 				<div className="sessions-settings-repo">
-					<Skeleton className="size-4 shrink-0 rounded-sm" />
-					<Skeleton className="h-3.5 rounded-sm" style={{ width }} />
+					<Skeleton className="size-4 shrink-0 corner-xs" />
+					<Skeleton className="h-3.5 corner-xs" style={{ width }} />
 				</div>
 			</td>
 			<td>
-				<Skeleton className="ml-auto h-3.5 w-6 rounded-sm" />
+				<Skeleton className="ml-auto h-3.5 w-6 corner-xs" />
 			</td>
 			<td>
-				<Skeleton className="ml-auto h-3.5 w-6 rounded-sm" />
+				<Skeleton className="ml-auto h-3.5 w-6 corner-xs" />
 			</td>
 			<td>
-				<Skeleton className="ml-auto size-4 rounded-[5px]" />
+				<Skeleton className="ml-auto size-4 corner-xs" />
 			</td>
 		</tr>
 	));

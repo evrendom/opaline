@@ -14,6 +14,7 @@ import { MemoryRouter } from "react-router-dom";
 import { AppRouter } from "@/app/AppRouter";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
 import { ThemeProvider } from "@/app/providers/ThemeProvider";
+import { Button } from "@/app/ui/button";
 import { DateRangeProvider } from "@/features/analytics/date-range/DateRangeProvider";
 import { planUsageQueryKey } from "@/features/costs/plan-usage/use-plan-usage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
@@ -36,6 +37,59 @@ export function createDemoQueryClient() {
 	});
 }
 
+/** The answers the demo renders before its backend connects: the seed's
+ *  dashboard, stat card trends, repositories, navigation and last upload. */
+export function demoSeedQueries(seed: DemoSeed): Array<[QueryKey, unknown]> {
+	const answers = [seed.dashboard, ...seed.previews];
+	const seededMetrics = Object.fromEntries(
+		answers
+			.filter(({ input }) => input.splitBy === "none")
+			.map(({ input, data }) => {
+				const metric = input.requestedMetric ?? "cost";
+				return [metric, data.metrics[metric]];
+			}),
+	);
+	const seeded: Array<[QueryKey, unknown]> = [
+		...(seed.queries ?? []),
+		...answers.map(({ input, data }): [QueryKey, unknown] => [
+			[
+				"org",
+				seed.organization.id,
+				...orpc.analytics.overview.costs.queryOptions({ input }).queryKey,
+			],
+			input.splitBy === "none"
+				? { ...data, metrics: { ...data.metrics, ...seededMetrics } }
+				: data,
+		]),
+		[
+			[
+				"org",
+				seed.organization.id,
+				...orpc.analytics.repositories.list.queryOptions({}).queryKey,
+			],
+			seed.repositories,
+		],
+		[
+			[
+				"org",
+				seed.organization.id,
+				...orpc.analytics.repositories.navigation.queryOptions({}).queryKey,
+			],
+			seed.navigation,
+		],
+		[
+			[
+				"org",
+				seed.organization.id,
+				...orpc.analytics.sessions.lastUpload.queryOptions().queryKey,
+			],
+			seed.lastUpload,
+		],
+		[planUsageQueryKey(DEMO_RANGE), seed.planUsage],
+	];
+	return seeded;
+}
+
 export function DemoRoot({
 	seed,
 	client: givenClient,
@@ -53,53 +107,7 @@ export function DemoRoot({
 		// Render the actual dashboard and its stat card trends before activation.
 		// The stat cards read every session metric from one answer, so each
 		// seeded answer carries every seeded metric.
-		const answers = [seed.dashboard, ...seed.previews];
-		const seededMetrics = Object.fromEntries(
-			answers
-				.filter(({ input }) => input.splitBy === "none")
-				.map(({ input, data }) => {
-					const metric = input.requestedMetric ?? "cost";
-					return [metric, data.metrics[metric]];
-				}),
-		);
-		const seeded: Array<[QueryKey, unknown]> = [
-			...(seed.queries ?? []),
-			...answers.map(({ input, data }): [QueryKey, unknown] => [
-				[
-					"org",
-					seed.organization.id,
-					...orpc.analytics.overview.costs.queryOptions({ input }).queryKey,
-				],
-				input.splitBy === "none"
-					? { ...data, metrics: { ...data.metrics, ...seededMetrics } }
-					: data,
-			]),
-			[
-				[
-					"org",
-					seed.organization.id,
-					...orpc.analytics.repositories.list.queryOptions({}).queryKey,
-				],
-				seed.repositories,
-			],
-			[
-				[
-					"org",
-					seed.organization.id,
-					...orpc.analytics.repositories.navigation.queryOptions({}).queryKey,
-				],
-				seed.navigation,
-			],
-			[
-				[
-					"org",
-					seed.organization.id,
-					...orpc.analytics.sessions.lastUpload.queryOptions().queryKey,
-				],
-				seed.lastUpload,
-			],
-			[planUsageQueryKey(DEMO_RANGE), seed.planUsage],
-		];
+		const seeded = demoSeedQueries(seed);
 		for (const [queryKey, data] of seeded)
 			client.setQueryData(queryKey, data, { updatedAt: 0 });
 		return { client, seeded };
@@ -179,12 +187,12 @@ export function DemoRoot({
 			{active && connection === "error" ? (
 				<div
 					role="alert"
-					className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-popover p-4 text-popover-foreground shadow-lg dark:shadow-(--custom-shadow)"
+					className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 corner-m bg-surface p-xl text-ink edge-m border-line shadow-float"
 				>
 					The demo data could not load.{" "}
-					<button type="button" onClick={() => void connect()}>
+					<Button variant="link" size="inline" onClick={() => void connect()}>
 						Try again
-					</button>
+					</Button>
 				</div>
 			) : null}
 		</DemoRuntimeContext.Provider>

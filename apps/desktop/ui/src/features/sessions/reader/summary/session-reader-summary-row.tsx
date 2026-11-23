@@ -16,7 +16,7 @@ export function ErrorChip({ quiet = false }: { quiet?: boolean }) {
 }
 
 export const ROW_GRID =
-	"grid min-w-0 grid-cols-[minmax(0,13rem)_minmax(0,1fr)] items-start gap-4 py-2.5 text-[13px] first:pt-0 last:pb-0";
+	"grid min-w-0 grid-cols-[minmax(0,13rem)_minmax(0,1fr)] items-start gap-xl py-l text-body-l first:pt-zero last:pb-zero";
 
 export function Row({
 	children,
@@ -31,17 +31,17 @@ export function Row({
 }) {
 	return (
 		<li className={ROW_GRID}>
-			<span className="flex h-6 min-w-0 items-center gap-2.5">
+			<span className="flex h-6 min-w-0 items-center gap-l">
 				<span className="flex shrink-0">{chip}</span>
 				<span className="truncate font-medium">{label}</span>
 			</span>
-			<span className="flex min-w-0 flex-col gap-1.5">
+			<span className="flex min-w-0 flex-col gap-s">
 				{reasons.length > 0 ? (
-					<span className="flex min-h-6 min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
+					<span className="flex min-h-6 min-w-0 flex-wrap items-center gap-x-l gap-y-s">
 						{reasons.map((reason, index) => (
 							<span
 								key={typeof reason === "string" ? reason : index}
-								className="text-xs text-muted-foreground tabular-nums"
+								className="text-body-m text-ink-3 tabular-nums"
 							>
 								{reason}
 							</span>

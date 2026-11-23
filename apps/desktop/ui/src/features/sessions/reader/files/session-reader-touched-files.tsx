@@ -81,7 +81,7 @@ export function TouchedFiles({
 		else onPickFile(path);
 	};
 	return (
-		<div className="-mb-2 flex min-h-0 w-[280px] shrink-0 flex-col gap-1.5 pt-(--panes-top)">
+		<div className="-mb-m flex min-h-0 w-[280px] shrink-0 flex-col gap-s pt-(--panes-top)">
 			<PickStrip agent={agent} model={model} run={run}>
 				<ViewToggle
 					label="How to list the files"
@@ -90,8 +90,8 @@ export function TouchedFiles({
 					value={order}
 				/>
 			</PickStrip>
-			<div ref={column.ref} className="-mx-1 flex min-h-0 flex-1 flex-col">
-				<ScrollColumn className="px-1 pb-8">
+			<div ref={column.ref} className="-mx-xs flex min-h-0 flex-1 flex-col">
+				<ScrollColumn className="px-xs pb-xxxl">
 					{order === "timeline" ? (
 						<RunTrace
 							agent={agent}
@@ -107,7 +107,7 @@ export function TouchedFiles({
 					) : items.length > 0 ? (
 						<FileTree items={items} onSelect={pickInTree} selected={file} />
 					) : (
-						<p className="py-1 pl-2 text-[11px] text-muted-foreground">
+						<p className="py-xs pl-m text-body-s text-ink-3">
 							No files read or edited.
 						</p>
 					)}
@@ -162,7 +162,7 @@ export function SessionFiles({
 	);
 	const changed = files.filter((each) => each.changes.length > 0).length;
 	return (
-		<div className="-mb-2 flex min-h-0 w-[280px] shrink-0 flex-col gap-1.5 pt-(--panes-top)">
+		<div className="-mb-m flex min-h-0 w-[280px] shrink-0 flex-col gap-s pt-(--panes-top)">
 			<PickStrip agent={null} model={model} run={null} untitled>
 				<ViewToggle
 					iconsOnly
@@ -182,8 +182,8 @@ export function SessionFiles({
 					value={kept}
 				/>
 			</PickStrip>
-			<div ref={column.ref} className="-mx-1 flex min-h-0 flex-1 flex-col">
-				<ScrollColumn className="px-1 pb-8">
+			<div ref={column.ref} className="-mx-xs flex min-h-0 flex-1 flex-col">
+				<ScrollColumn className="px-xs pb-xxxl">
 					{order === "timeline" ? (
 						<RunTrace
 							edits={edits}

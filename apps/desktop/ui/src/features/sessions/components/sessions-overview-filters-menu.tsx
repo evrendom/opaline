@@ -1,17 +1,16 @@
-import {
-	IconAdjustmentsHorizontal,
-	IconArrowLeft,
-	IconChevronRight,
-} from "@tabler/icons-react";
+import { IconArrowLeft, IconChevronRight } from "@tabler/icons-react";
 import { useRef, useState } from "react";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
-import { FlowNumber } from "@/app/ui/flow-number";
+import { Button } from "@/app/ui/button";
 import {
 	Popover,
 	PopoverContent,
 	PopoverTitle,
 	PopoverTrigger,
 } from "@/app/ui/popover";
+import { Pressable } from "@/app/ui/pressable";
+import { TouchTarget } from "@/app/ui/touch-target";
+import { FilterTriggerLabel } from "@/components/filter-trigger-label";
 import { SessionOverviewFilterOptionsPanel } from "@/features/sessions/components/sessions-overview-filter-menu";
 import {
 	formatSessionOverviewRangeValue,
@@ -38,7 +37,6 @@ import type {
 } from "@/features/sessions/components/sessions-overview-table-utils";
 import { SESSION_OVERVIEW_TOOLBAR_FILTERS } from "@/features/sessions/components/sessions-overview-toolbar-filters";
 import { useSessionOverviewFilterWheelContainment } from "@/features/sessions/components/use-session-overview-filter-wheel-containment";
-import { PLAIN_NUMBER } from "@/lib/figure";
 import { cn } from "@/lib/utils";
 import { SessionMenuPopoverContent } from "./session-menu-popover-content";
 
@@ -173,29 +171,15 @@ export function SessionsOverviewFiltersMenu({
 				aria-busy={isLoading || undefined}
 				aria-label={triggerLabel}
 				title={triggerLabel}
-				className="toolbar-button"
-				data-icon-only={iconOnly || undefined}
 				data-active={activeFilterCount > 0 || undefined}
+				render={<Button variant="primary" size={iconOnly ? "icon" : "md"} />}
 			>
-				<IconAdjustmentsHorizontal
-					aria-hidden="true"
-					className={cn(
-						"size-4 h-lh shrink-0",
-						activeFilterCount > 0
-							? "text-(--session-overview-accent)"
-							: "text-[#5d5d5d] dark:text-[#acaeb2]",
-					)}
+				<FilterTriggerLabel
+					activeCount={activeFilterCount}
+					iconOnly={iconOnly}
 				/>
-				{iconOnly ? null : <span>Filter</span>}
-				{activeFilterCount > 0 && !iconOnly ? (
-					<span className="min-w-4 rounded-full bg-(--session-overview-accent) px-1 text-center text-[10px] leading-4 font-semibold tabular-nums text-white">
-						<FlowNumber value={activeFilterCount} format={PLAIN_NUMBER} />
-					</span>
-				) : null}
-				<span
-					aria-hidden="true"
-					className="pointer-fine:hidden absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2"
-				/>
+
+				<TouchTarget />
 			</PopoverTrigger>
 			{variant === "linear" && iconOnly && activeFilterCount > 0 ? (
 				<LinearActiveFiltersButton
@@ -233,7 +217,7 @@ export function SessionsOverviewFiltersMenu({
 						return;
 					const menu = linearMenuRef.current;
 					if (!menu) return;
-					const flyout = event.target.closest(".session-menu-flyout");
+					const flyout = event.target.closest(".menu-flyout");
 					if (event.key === "ArrowLeft" && flyout) {
 						event.preventDefault();
 						linearFlyoutAnchor?.focus();
@@ -244,7 +228,7 @@ export function SessionsOverviewFiltersMenu({
 						event.preventDefault();
 						menu
 							.querySelector<HTMLElement>(
-								".session-menu-flyout input, .session-menu-flyout [role=slider]",
+								".menu-flyout input, .menu-flyout [role=slider]",
 							)
 							?.focus();
 						return;
@@ -254,9 +238,7 @@ export function SessionsOverviewFiltersMenu({
 						if (event.target.closest('[role="slider"]')) return;
 						const items = Array.from(
 							(flyout ?? menu).querySelectorAll<HTMLElement>(
-								flyout
-									? 'input[type="checkbox"]'
-									: ".session-menu-list > ul button",
+								flyout ? 'input[type="checkbox"]' : ".menu-list > ul button",
 							),
 						);
 						if (items.length === 0) return;
@@ -276,11 +258,11 @@ export function SessionsOverviewFiltersMenu({
 					}
 				}}
 				className={cn(
-					"gap-0",
+					"gap-zero",
 					variant === "linear"
-						? "session-menu-popover"
+						? "menu-popover"
 						: cn(
-								"w-80 rounded-xl p-0",
+								"w-80 corner-l p-zero",
 								selectedFilter !== undefined &&
 									selectedFilter.kind !== "options"
 									? "overflow-visible"
@@ -292,10 +274,7 @@ export function SessionsOverviewFiltersMenu({
 					<PopoverTitle className="sr-only">Session filters</PopoverTitle>
 				) : null}
 				{variant === "linear" ? (
-					<div
-						ref={setLinearMenuElement}
-						className="session-menu-surface session-menu-parent"
-					>
+					<div ref={setLinearMenuElement} className="menu-surface menu-parent">
 						<LinearFilterList
 							activeFilterKey={selectedFilterKey}
 							filters={SESSION_OVERVIEW_TOOLBAR_FILTERS}
@@ -328,16 +307,15 @@ export function SessionsOverviewFiltersMenu({
 							}}
 						/>
 						{activeFilterCount > 0 ? (
-							<div className="session-menu-footer">
-								<div aria-hidden="true" className="session-menu-separator" />
-								<button
-									type="button"
+							<div className="menu-footer">
+								<div aria-hidden="true" className="menu-separator" />
+								<Pressable
 									aria-label="Clear all filters"
-									className="session-menu-row"
+									className="menu-row"
 									onClick={onClearAll}
 								>
 									Clear all
-								</button>
+								</Pressable>
 							</div>
 						) : null}
 						{selectedFilter ? (
@@ -359,34 +337,45 @@ export function SessionsOverviewFiltersMenu({
 					</div>
 				) : (
 					<>
-						<div className="flex h-11 items-center justify-between gap-2 border-b border-border/60 px-2.5">
-							<div className="flex min-w-0 items-center gap-1.5">
+						<div
+							className={cn(
+								"flex h-11 items-center justify-between gap-m",
+								"edge-b-m px-l",
+								"border-line",
+							)}
+						>
+							<div className="flex min-w-0 items-center gap-s">
 								{selectedFilter ? (
-									<button
+									<Button
 										type="button"
+										variant="secondary"
+										size="icon-sm"
 										aria-label="Back to all filters"
-										className="relative flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring/40"
+										className="relative"
 										onClick={() => setSelectedFilterKey(null)}
 									>
-										<IconArrowLeft aria-hidden="true" className="size-4" />
-										<span
+										<IconArrowLeft
 											aria-hidden="true"
-											className="pointer-fine:hidden absolute top-1/2 left-1/2 size-12 -translate-1/2"
+											className="size-4 text-current"
 										/>
-									</button>
+										<TouchTarget className="size-12" />
+									</Button>
 								) : null}
-								<PopoverTitle className="truncate text-sm font-semibold">
-									{selectedFilter ? selectedFilter.label : "Filters"}
+								<PopoverTitle className="min-w-0">
+									<span className="block truncate">
+										{selectedFilter ? selectedFilter.label : "Filters"}
+									</span>
 								</PopoverTitle>
 							</div>
-							<button
+							<Button
 								type="button"
+								size="sm"
 								aria-label={
 									selectedFilter
 										? `Clear ${selectedFilter.label} filter`
 										: "Clear all filters"
 								}
-								className="shrink-0 rounded-md px-1.5 py-1 text-xs font-medium text-primary outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-40"
+								className="shrink-0"
 								disabled={
 									selectedFilter
 										? !isToolbarFilterActive(
@@ -413,7 +402,7 @@ export function SessionsOverviewFiltersMenu({
 								}}
 							>
 								{selectedFilter ? "Clear" : "Clear all"}
-							</button>
+							</Button>
 						</div>
 
 						{selectedFilter ? (
@@ -451,7 +440,7 @@ export function SessionsOverviewFiltersMenu({
 								/>
 							)
 						) : (
-							<div className="max-h-96 overflow-y-auto p-1.5">
+							<div className="max-h-96 overflow-y-auto p-s">
 								{SESSION_OVERVIEW_TOOLBAR_FILTERS.map((filter) => {
 									const isActive = isToolbarFilterActive(
 										filter,
@@ -460,11 +449,10 @@ export function SessionsOverviewFiltersMenu({
 									);
 
 									return (
-										<button
+										<Pressable
 											key={filter.key}
-											type="button"
 											aria-label={`Configure ${filter.label} filter`}
-											className="flex min-h-9 w-full items-center gap-3 rounded-lg px-2.5 py-1.5 text-left text-sm font-medium outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring/40"
+											className="flex min-h-9 w-full items-center gap-l corner-m px-l py-s text-body-xl font-medium hover:bg-hover hover:text-ink"
 											onClick={() => setSelectedFilterKey(filter.key)}
 										>
 											<span className="min-w-0 flex-1 truncate">
@@ -472,7 +460,7 @@ export function SessionsOverviewFiltersMenu({
 											</span>
 											<span
 												className={cn(
-													"max-w-32 truncate text-xs font-normal tabular-nums text-muted-foreground",
+													"max-w-32 truncate text-body-m font-regular tabular-nums text-ink-3",
 													isActive && "text-primary",
 												)}
 											>
@@ -485,9 +473,9 @@ export function SessionsOverviewFiltersMenu({
 											</span>
 											<IconChevronRight
 												aria-hidden="true"
-												className="size-4 shrink-0 text-muted-foreground"
+												className="size-4 shrink-0 text-ink-3"
 											/>
-										</button>
+										</Pressable>
 									);
 								})}
 							</div>

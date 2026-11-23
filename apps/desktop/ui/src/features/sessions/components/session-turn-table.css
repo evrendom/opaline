@@ -3,8 +3,8 @@
 	--session-turn-table-header-height: 2.75rem;
 	--session-turn-table-scrollbar-thumb-hover: color-mix(
 		in srgb,
-		var(--scrollbar-thumb) 70%,
-		var(--session-overview-muted) 30%
+		var(--line) 70%,
+		var(--ink-3) 30%
 	);
 
 	scrollbar-color: auto;
@@ -29,8 +29,8 @@
 	}
 
 	.session-turn-table-scroll::-webkit-scrollbar-thumb {
-		border-radius: 999px;
-		background: var(--scrollbar-thumb);
+		border-radius: var(--radius-full);
+		background: var(--line);
 	}
 
 	.session-turn-table-scroll::-webkit-scrollbar-thumb:hover {
@@ -45,7 +45,7 @@
 /* Firefox cannot inset scrollbar tracks, so its thin bar spans the header. */
 @supports (-moz-appearance: none) {
 	.session-turn-table-scroll {
-		scrollbar-color: var(--scrollbar-thumb) transparent;
+		scrollbar-color: var(--line) transparent;
 		scrollbar-width: thin;
 	}
 
@@ -68,11 +68,11 @@
 	width: 6px;
 	touch-action: none;
 	user-select: none;
-	border-radius: 999px;
-	background: var(--scrollbar-thumb);
+	border-radius: var(--radius-full);
+	background: var(--line);
 	opacity: 0;
 	pointer-events: none;
-	transition: opacity 200ms ease;
+	transition: opacity var(--motion-medium-duration) var(--motion-easing);
 }
 
 .session-turn-table-scrollbar[data-overflow="true"][data-visible="true"]

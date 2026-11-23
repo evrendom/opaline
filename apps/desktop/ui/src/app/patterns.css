@@ -1,0 +1,814 @@
+/* ============================================================
+   Opaline · patterns.css
+   Part A: the controls the primitives in src/app/ui don't cover, as classes
+   for markup and feature CSS (text button, secondary button, filter chip,
+   toolbar search).
+   Part B: Opaline's recurring patterns (surface card, menu, settings group).
+   Every rule reads Layer 2 (tokens.css) only. States are attributes or
+   classes, so each one renders at rest for review.
+   ============================================================ */
+
+/* ---- Part A · controls the primitives don't cover ---- */
+
+/* Text button: a quiet action inside a toolbar or a row. Ink-3 at rest, ink on
+   hover; pressed, selected or open sits on the hover tint. */
+.text-button {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-xs);
+	padding: var(--space-xs) var(--space-s);
+	border-radius: var(--radius-xs);
+	color: var(--ink-3);
+	font-size: var(--size-m);
+	line-height: var(--line-m);
+	letter-spacing: var(--letter-spacing-m);
+	white-space: nowrap;
+}
+.text-button:hover {
+	color: var(--ink);
+}
+.text-button:is(
+		[aria-pressed="true"],
+		[aria-selected="true"],
+		[data-popup-open]
+	) {
+	color: var(--ink);
+	background: var(--hover);
+}
+.text-button:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+/* Filter chip: an applied filter. Its dimension in ink-3, its value in ink;
+   inactive chips fade until focused. */
+.filter-chip {
+	display: flex;
+	align-items: center;
+	gap: var(--space-s);
+	min-width: 0;
+	max-width: min(340px, 100%);
+	height: 28px;
+	padding: var(--space-xs) var(--space-m) var(--space-xs) var(--space-s);
+	border: 0;
+	border-radius: var(--radius-xs);
+	background: var(--canvas);
+	box-shadow: var(--shadow-card);
+	font-size: var(--size-xl);
+	line-height: var(--line-xl);
+	letter-spacing: var(--letter-spacing-xl);
+	font-weight: var(--weight-body-medium);
+}
+.filter-chip[data-inactive="true"] {
+	opacity: 0.6;
+}
+.filter-chip-dimension {
+	flex-shrink: 0;
+	white-space: nowrap;
+	color: var(--ink-3);
+}
+
+.text-button:focus-visible,
+.filter-chip:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: -1px;
+}
+
+/* Toolbar search: the toolbar button's 32px pill and control shadow, with
+   room for a leading 14px magnifier. */
+.toolbar-search {
+	width: 100%;
+	height: 32px;
+	padding: var(--space-zero) var(--space-l) var(--space-zero) var(--space-xxxl);
+	border: 0;
+	border-radius: var(--radius-full);
+	background: var(--surface);
+	box-shadow: var(--shadow-card);
+	color: var(--ink);
+	font-size: var(--size-xl);
+	line-height: var(--line-xl);
+	letter-spacing: var(--letter-spacing-xl);
+	outline: none;
+	transition: box-shadow var(--motion-duration) var(--motion-easing);
+}
+.toolbar-search::placeholder {
+	color: var(--ink-3);
+	opacity: 1;
+}
+
+.tab-pill {
+	background: var(--surface);
+	box-shadow: var(--shadow-card);
+}
+
+/* Menu: dropdowns, popovers and pickers across sessions, costs, Compass and
+   the date range. Rows, checks, search, flyouts and their states. */
+/* Menu surface (dropdown-menu / popover): a borderless
+   popover on its soft hairline shadow, squircle corners, a 4px list inset and
+   compact 14px rows. Opaline keeps its pebble checks, black accent and fluid
+   hover. These tokens are scoped to session menus. */
+.menu-popover,
+.menu-surface {
+	--menu-hairline: 1px;
+	--menu-background: var(--surface);
+	--menu-border: var(--line);
+	--menu-label: var(--ink);
+	--menu-focused-label: var(--ink);
+	--menu-icon: var(--ink-3);
+	--menu-highlight: var(--field);
+	--menu-selected: var(--hover-strong);
+	--menu-accent: var(--ink);
+	--menu-check: var(--surface);
+	--menu-checkbox-border: var(--ink-3);
+	font-family: var(--font-body);
+	font-size: var(--size-xl);
+	font-weight: var(--weight-body-regular);
+	line-height: var(--line-xl);
+	letter-spacing: var(--letter-spacing-xl);
+	color: var(--menu-label);
+	-webkit-font-smoothing: antialiased;
+}
+
+@media (min-resolution: 2dppx) {
+	.menu-popover,
+	.menu-surface {
+		--menu-hairline: 0.5px;
+	}
+}
+
+.menu-popover {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	width: calc(206px + 2 * var(--menu-hairline));
+	max-height: var(--available-height, calc(100dvh - 16px));
+	padding: var(--space-zero);
+	margin: var(--space-zero);
+	outline: none;
+	transform-origin: var(--transform-origin);
+}
+
+.menu-surface {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	border: 0;
+	border-radius: var(--radius-s);
+	background: var(--menu-background);
+	box-shadow: var(--shadow-card);
+	outline: none;
+}
+/* Squircle corners where supported: a dropdown's 16px (rounded-2xl). */
+/* biome-ignore lint/correctness/noUnknownProperty: corner-shape is new (Chromium 139+); Biome does not know it yet. */
+@supports (corner-shape: squircle) {
+	.menu-surface {
+		border-radius: 16px;
+		/* biome-ignore lint/correctness/noUnknownProperty: see the @supports note above. */
+		corner-shape: squircle;
+	}
+}
+
+.menu-parent {
+	width: calc(206px + 2 * var(--menu-hairline));
+}
+.menu-list {
+	min-height: 0;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	scrollbar-width: thin;
+	padding: var(--space-xs) var(--space-zero);
+}
+.menu-list > ul {
+	margin: var(--space-zero);
+	padding: var(--space-zero);
+	list-style: none;
+}
+.menu-heading {
+	display: flex;
+	flex: none;
+	align-items: center;
+	gap: var(--space-xl);
+	height: calc(36px + var(--menu-hairline));
+	padding: var(--space-zero) var(--space-l);
+	border-bottom: var(--menu-hairline) solid var(--menu-border);
+}
+
+.menu-row {
+	position: relative;
+	isolation: isolate;
+	display: flex;
+	align-items: center;
+	gap: var(--space-m);
+	width: 100%;
+	height: 32px;
+	min-height: 32px;
+	flex-shrink: 0;
+	padding: var(--space-zero) var(--space-xl) var(--space-zero) var(--space-l);
+	border: 0;
+	border-radius: var(--radius-zero);
+	background: transparent;
+	color: var(--menu-label);
+	font-family: var(--font-body);
+	font-size: var(--size-xl);
+	font-weight: var(--weight-body-regular);
+	line-height: normal;
+	letter-spacing: var(--letter-spacing-xl);
+	text-align: left;
+	white-space: nowrap;
+	outline: none;
+	user-select: none;
+	transition: color var(--motion-quick-duration) var(--motion-wave-easing);
+}
+.menu-row::before {
+	content: "";
+	position: absolute;
+	inset: 0 4px;
+	z-index: -1;
+	border-radius: var(--radius-xs);
+	pointer-events: none;
+}
+.menu-row:is(
+		:hover,
+		:focus-visible,
+		:focus-within,
+		[data-highlighted],
+		[data-previewed="true"]
+	) {
+	color: var(--menu-focused-label);
+}
+.menu-row:is(
+		:hover,
+		:focus-visible,
+		:focus-within,
+		[data-highlighted],
+		[data-previewed="true"]
+	)::before {
+	background: var(--menu-highlight);
+}
+/* A filter that's been changed reads like the toolbar's active Filter button:
+   its icon and label take the accent, with a dot before the chevron. */
+.menu-row[data-active="true"] {
+	color: var(--menu-focused-label);
+}
+.menu-row[data-active="true"] > .menu-icon:first-child {
+	color: var(--menu-accent);
+}
+.menu-active-dot {
+	flex: none;
+	width: 6px;
+	height: 6px;
+	border-radius: 9999px;
+	background: var(--menu-accent);
+}
+.menu-row:disabled {
+	color: var(--menu-icon);
+	pointer-events: none;
+}
+.menu-icon {
+	color: var(--menu-icon);
+	flex: none;
+}
+.menu-surface svg {
+	opacity: 1;
+}
+.menu-separator {
+	position: relative;
+	height: 9px;
+	flex: none;
+}
+.menu-separator::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 50%;
+	border-top: var(--menu-hairline) solid var(--menu-border);
+}
+.menu-footer {
+	flex: none;
+	padding-bottom: var(--space-s);
+}
+.menu-empty {
+	padding: var(--space-xxl) var(--space-l);
+	color: var(--menu-icon);
+	text-align: center;
+}
+.menu-check-slot {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 14px;
+	flex: none;
+	margin-right: calc(var(--space-xxs) * -1);
+}
+.menu-checkbox {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 14px;
+	height: 14px;
+	background: var(--menu-checkbox-border);
+	color: var(--menu-check);
+	-webkit-mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
+	mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
+	transition: background-color var(--motion-quick-duration);
+}
+.menu-checkbox::before {
+	content: "";
+	position: absolute;
+	inset: 1px;
+	background: var(--menu-background);
+	-webkit-mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
+	mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
+	transition: opacity var(--motion-quick-duration);
+}
+.menu-checkbox > svg {
+	position: relative;
+}
+.menu-checkbox[data-checked="true"] {
+	background: var(--menu-accent);
+}
+.menu-checkbox[data-checked="true"]::before {
+	opacity: 0;
+}
+.menu-row:not(:hover, :focus-within) .menu-checkbox[data-checked="false"] {
+	visibility: hidden;
+}
+.menu-flyout {
+	position: absolute;
+	z-index: 10;
+	width: max-content;
+	min-width: 175px;
+	max-width: min(340px, calc(100vw - 24px));
+	max-height: min(374px, calc(100dvh - 24px));
+	box-shadow: var(--shadow-card);
+	transform-origin: var(--menu-flyout-origin, 0 43px);
+}
+.menu-flyout[data-kind="options"] {
+	overflow: hidden;
+}
+.menu-flyout:not([data-kind="options"]) {
+	width: calc(216px + 2 * var(--menu-hairline));
+}
+.menu-flyout .menu-list {
+	max-height: 338px;
+}
+.menu-sort {
+	width: calc(206px + 2 * var(--menu-hairline));
+	max-height: var(--available-height);
+	overflow-y: auto;
+	padding: var(--space-xs) var(--space-zero);
+	transform-origin: var(--transform-origin);
+}
+.menu-sort .menu-row {
+	padding-left: var(--space-xxxl);
+}
+.menu-sort-check {
+	position: absolute;
+	left: 12px;
+	display: flex;
+	align-items: center;
+	color: var(--menu-icon);
+}
+
+/* Sampled from the reference's rendered opacity/scale curve; no layout animation. */
+.menu-popover[data-open],
+.menu-sort[data-open],
+.session-date-picker[data-open] {
+	animation: menu-enter var(--motion-medium-duration) linear both;
+}
+/* Category changes keep the flyout's icons and text on fixed pixel positions. */
+.menu-flyout {
+	animation: menu-flyout-enter var(--motion-quick-duration) var(--motion-easing)
+		both;
+}
+@keyframes menu-flyout-enter {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+.menu-popover[data-closed],
+.menu-sort[data-closed],
+.session-date-picker[data-closed] {
+	animation: menu-exit var(--motion-duration) linear both;
+}
+@keyframes menu-enter {
+	0% {
+		transform: scale(0.98);
+		opacity: 0;
+	}
+	7.65% {
+		transform: scale(0.982753);
+		opacity: 0.275293;
+	}
+	15.3% {
+		transform: scale(0.984423);
+		opacity: 0.442248;
+	}
+	22.6% {
+		transform: scale(0.9849);
+		opacity: 0.489984;
+	}
+	30.7% {
+		transform: scale(0.987402);
+		opacity: 0.740174;
+	}
+	38.1% {
+		transform: scale(0.990805);
+		opacity: 1;
+	}
+	46% {
+		transform: scale(0.993343);
+		opacity: 1;
+	}
+	53.7% {
+		transform: scale(0.995014);
+		opacity: 1;
+	}
+	61.4% {
+		transform: scale(0.996334);
+		opacity: 1;
+	}
+	68.7% {
+		transform: scale(0.997306);
+		opacity: 1;
+	}
+	76.2% {
+		transform: scale(0.997984);
+		opacity: 1;
+	}
+	84.4% {
+		transform: scale(0.998518);
+		opacity: 1;
+	}
+	92.1% {
+		transform: scale(0.998931);
+		opacity: 1;
+	}
+	100% {
+		transform: scale(1);
+		opacity: 1;
+	}
+}
+@keyframes menu-exit {
+	0% {
+		transform: scale(1);
+		opacity: 1;
+	}
+	10% {
+		transform: scale(0.98);
+		opacity: 0.900299;
+	}
+	20% {
+		transform: scale(0.98);
+		opacity: 0.56046;
+	}
+	30% {
+		transform: scale(0.98);
+		opacity: 0.363471;
+	}
+	40% {
+		transform: scale(0.98);
+		opacity: 0.191692;
+	}
+	50% {
+		transform: scale(0.98);
+		opacity: 0.103101;
+	}
+	60% {
+		transform: scale(0.98);
+		opacity: 0.0506555;
+	}
+	70% {
+		transform: scale(0.98);
+		opacity: 0.0256828;
+	}
+	80% {
+		transform: scale(0.98);
+		opacity: 0.0129563;
+	}
+	100% {
+		transform: scale(0.98);
+		opacity: 0;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.menu-popover[data-open],
+	.menu-popover[data-closed],
+	.menu-sort[data-open],
+	.menu-sort[data-closed],
+	.session-date-picker[data-open],
+	.session-date-picker[data-closed],
+	.menu-flyout {
+		animation: none;
+	}
+}
+
+/* Keep Opaline's spring-driven hover, with the reference's inset silhouette. */
+.menu-surface .fluid-menu-hover-fill {
+	background: transparent;
+}
+.menu-surface .fluid-menu-hover-fill::before {
+	content: "";
+	position: absolute;
+	inset: 0 4px;
+	border-radius: 6px;
+	background: var(--menu-highlight);
+}
+/* Over a Button (a popover footer's Cancel, Clear, Apply) the fill is the
+   button's own shape: full size, its pill corner. */
+.menu-surface .fluid-menu-hover-layer[data-button]
+	.fluid-menu-hover-fill::before {
+	inset: 0;
+	border-radius: inherit;
+	/* biome-ignore lint/correctness/noUnknownProperty: corner-shape is new (Chromium 139+); Biome does not know it yet. */
+	corner-shape: round;
+}
+.menu-row[data-fluid-menu-item]::before {
+	background: transparent;
+}
+.menu-picks .menu-row {
+	padding-left: var(--space-l);
+}
+.menu-picks .menu-row::before {
+	background: var(--hover);
+	opacity: 0;
+	transition: opacity var(--motion-quick-duration) var(--motion-wave-easing);
+	will-change: opacity;
+}
+.menu-picks .menu-row[data-checked]::before {
+	opacity: 1;
+}
+.menu-picks .menu-row[data-join-next]::before {
+	border-bottom-left-radius: var(--radius-zero);
+	border-bottom-right-radius: var(--radius-zero);
+}
+.menu-picks .menu-row[data-join-previous]::before {
+	border-top-left-radius: var(--radius-zero);
+	border-top-right-radius: var(--radius-zero);
+}
+.menu-list:not([data-fluid-hover-active-index])
+	.menu-row[data-previewed="true"]::before {
+	background: var(--hover);
+}
+
+/* Settings: groups of rows, fields and actions, used by every settings page. */
+.settings-page {
+	container: settings / inline-size;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-xxxl);
+	width: 100%;
+	min-width: 0;
+	padding-bottom: var(--space-xxxl);
+}
+
+.settings-group {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: var(--space-l);
+	font-size: var(--size-xl);
+	line-height: var(--line-xl);
+}
+
+.settings-group-heading {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-xl);
+	padding-inline: var(--space-xl);
+}
+
+.settings-group-title {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: var(--space-xs);
+}
+
+.settings-group-action {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	gap: var(--space-m);
+}
+
+.settings-group-heading h2 {
+	font-size: var(--size-xl);
+	font-weight: var(--weight-body-medium);
+}
+
+.settings-group[data-tone="danger"] .settings-group-heading h2 {
+	color: var(--error);
+}
+
+.settings-group-heading p,
+.settings-row-description {
+	color: var(--ink-3);
+}
+
+.settings-group-rows {
+	min-width: 0;
+}
+
+.settings-group-rows > * + * {
+	border-top: var(--border-m) solid var(--line);
+}
+
+.settings-row,
+.settings-actions {
+	padding: var(--space-l) var(--space-zero);
+}
+
+.settings-row-copy > :first-child {
+	font-weight: var(--weight-body-medium);
+}
+
+.settings-row-description {
+	font-size: var(--size-l);
+}
+
+.settings-row {
+	display: flex;
+	min-height: 60px;
+	min-width: 0;
+	flex-direction: column;
+	align-items: stretch;
+	gap: var(--space-l);
+}
+
+.settings-list > * + * {
+	border-top: var(--border-m) solid var(--line-soft);
+}
+
+.settings-list .settings-row {
+	min-height: 0;
+}
+
+.settings-row-copy {
+	display: flex;
+	min-width: 0;
+	flex: 1;
+	flex-direction: column;
+	gap: var(--space-xs);
+}
+
+.settings-row-control {
+	display: flex;
+	min-width: 0;
+	align-items: center;
+	justify-content: flex-start;
+	gap: var(--space-m);
+}
+
+.settings-member-identity {
+	display: flex;
+	min-width: 0;
+	align-items: center;
+	gap: var(--space-l);
+}
+
+.settings-member-text {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: var(--space-xxs);
+}
+
+.settings-member-activity {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	column-gap: var(--space-l);
+	color: var(--ink-3);
+	font-size: var(--size-l);
+	font-weight: var(--weight-body-regular);
+	font-variant-numeric: tabular-nums;
+}
+
+.settings-member-copy {
+	display: flex;
+	min-width: 0;
+	align-items: baseline;
+	gap: var(--space-m);
+}
+
+.settings-member-copy > :first-child {
+	font-weight: var(--weight-body-medium);
+}
+
+.settings-member-copy > :last-child {
+	font-size: var(--size-m);
+	font-weight: var(--weight-body-regular);
+}
+
+.settings-role {
+	display: flex;
+	width: 120px;
+	flex-shrink: 0;
+	align-items: center;
+}
+
+.settings-icon-slot {
+	width: 32px;
+	flex-shrink: 0;
+}
+
+.settings-member-copy > * {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.settings-member-copy > :last-child,
+.settings-status,
+.settings-empty {
+	color: var(--ink-3);
+}
+
+.settings-empty {
+	padding: var(--space-xl) var(--space-zero);
+}
+
+.settings-row-control [data-slot="skeleton"] {
+	width: 100%;
+	height: 36px;
+	border-radius: var(--radius-xs);
+}
+
+.settings-actions [data-slot="skeleton"] {
+	width: 136px;
+	height: 32px;
+	border-radius: var(--radius-xs);
+}
+
+.settings-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: flex-end;
+	gap: var(--space-m);
+}
+
+.settings-fields {
+	display: flex;
+	min-width: 0;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: var(--space-xl);
+	padding: var(--space-l) var(--space-zero);
+}
+
+.settings-field {
+	display: flex;
+	min-width: 0;
+	flex: 1 1 200px;
+	flex-direction: column;
+	gap: var(--space-m);
+}
+
+.settings-field[data-size="compact"] {
+	flex: 0 0 184px;
+}
+
+.settings-field > :is(label, div):first-child {
+	font-weight: var(--weight-body-medium);
+}
+
+.settings-error {
+	width: 100%;
+	color: var(--error);
+}
+
+@container settings (min-width: 480px) {
+	.settings-group {
+		font-size: var(--size-xl);
+	}
+
+	.settings-row {
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.settings-row-control {
+		width: 256px;
+		flex-shrink: 0;
+		justify-content: flex-end;
+	}
+}
+
+.settings-url-control {
+	display: flex;
+	width: 100%;
+	min-width: 0;
+	flex-direction: column;
+	gap: var(--space-m);
+}

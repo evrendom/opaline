@@ -1,16 +1,18 @@
 .github-connection-state {
-	color: var(--muted-foreground);
+	color: var(--ink-3);
 }
 
 .github-token-fix {
 	display: grid;
-	gap: 8px;
-	padding: 14px 0;
+	gap: var(--space-m);
+	padding: var(--space-xl) var(--space-zero);
 }
 
 .github-token-fix p {
-	margin: 0;
-	color: var(--muted-foreground);
-	font-size: 0.8125rem;
+	margin: var(--space-zero);
+	color: var(--ink-3);
+	font-size: var(--size-l);
+	line-height: var(--line-l);
+	letter-spacing: var(--letter-spacing-l);
 	text-wrap: pretty;
 }

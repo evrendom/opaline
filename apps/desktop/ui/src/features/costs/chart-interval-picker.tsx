@@ -1,6 +1,6 @@
 import { IconCheck } from "@tabler/icons-react";
 import { useId } from "react";
-import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
+import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
 import { CHART_INTERVALS, type ChartInterval } from "./chart-interval";
 
 export function ChartIntervalPicker({
@@ -14,14 +14,15 @@ export function ChartIntervalPicker({
 	return (
 		<fieldset className="cost-chart-interval">
 			<legend className="sr-only">Chart interval</legend>
-			<div data-fluid-menu-root="" className="session-menu-list">
+			<div data-fluid-menu-root="" className="menu-list">
 				<FluidMenuHover />
 				{CHART_INTERVALS.map((option) => (
 					<label
 						key={option.value}
 						htmlFor={`${id}-${option.value}`}
-						className="session-menu-row"
+						className="menu-row"
 					>
+						{/* design-escape-ok(element): native; the visually hidden radio the menu row's label drives, no radio primitive */}
 						<input
 							id={`${id}-${option.value}`}
 							name={`${id}-interval`}
@@ -33,7 +34,7 @@ export function ChartIntervalPicker({
 						/>
 						<IconCheck
 							aria-hidden="true"
-							className="session-menu-icon size-3.5 shrink-0"
+							className="menu-icon size-3.5 shrink-0"
 						/>
 						{option.label}
 					</label>

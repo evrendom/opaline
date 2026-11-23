@@ -1,369 +1,45 @@
-@theme inline {
-	--color-dashboard-01-tone-blue: var(--dashboard-01-tone-blue);
-	--color-dashboard-01-tone-teal: var(--dashboard-01-tone-teal);
-	--color-dashboard-01-tone-orange: var(--dashboard-01-tone-orange);
-	--color-dashboard-01-tone-lime: var(--dashboard-01-tone-lime);
-	--color-dashboard-01-tone-violet: var(--dashboard-01-tone-violet);
-	--color-dashboard-01-tone-rose: var(--dashboard-01-tone-rose);
-	--color-dashboard-01-tone-slate: var(--dashboard-01-tone-slate);
-}
-
+/* The app shell's chrome. The sidebar and the window frame are translucent so
+   macOS vibrancy shows through: that translucency is the one literal colour
+   family kept here, each behind a per-rule marker. Everything else reads the
+   roles; the sidebar primitive's other names come from tokens.css. */
 .dashboard-01-theme,
 :where(html)[data-app-shell] body,
 .dashboard-01-preview {
-	--dashboard-01-font-sans: var(--font-sans);
-	--dashboard-01-font-heading: var(--app-font-heading);
-	--dashboard-01-font-roster-display: var(--app-font-heading);
-	--dashboard-01-font-roster-mono: "Geist Mono", ui-monospace, monospace;
-	--dashboard-01-content-background: #fcfcfc;
-	--dashboard-01-stage-background: var(--dashboard-01-content-background);
-	--dashboard-01-rail-icon: #a4a7a7;
-	--dashboard-01-rail-icon-active: #121517;
-	--dashboard-01-rail-hover: rgba(0, 0, 0, 0.02);
+	--dashboard-01-stage-background: var(--canvas);
+	--dashboard-01-header-height: 2.75rem;
+	/* design-escape-ok(colour): artwork, the opal nav icon's active fill (white 72%) */
 	--dashboard-01-rail-active: rgba(255, 255, 255, 0.72);
-	--dashboard-01-avatar-background: #e6e7e8;
-	--dashboard-01-avatar-foreground: #6b6f72;
-	--dashboard-01-tone-blue: #2f5fe5;
-	--dashboard-01-tone-teal: #25b5aa;
-	--dashboard-01-tone-orange: #ef9a14;
-	--dashboard-01-tone-lime: #8abf4a;
-	--dashboard-01-tone-violet: #8c7cf3;
-	--dashboard-01-tone-rose: #f08ba7;
-	--dashboard-01-tone-slate: #94a3b8;
-	--dashboard-01-metric-button-border: rgba(217, 217, 217, 0.5);
-	--dashboard-01-metric-button-surface: linear-gradient(
-		180deg,
-		rgba(0, 0, 0, 0) 0%,
-		rgba(0, 0, 0, 0.03) 100%
-	);
-	--dashboard-01-metric-button-surface-selected: linear-gradient(
-		180deg,
-		rgba(255, 255, 255, 1) 0%,
-		rgba(249, 249, 249, 1) 100%
-	);
-	--dashboard-01-metric-button-shadow-selected:
-		0 1px 3.1px rgba(0, 0, 0, 0.18),
-		0 12px 24px -18px
-		var(--dashboard-01-metric-button-shadow-color, rgba(15, 23, 42, 0.18)),
-		inset 0 10px 5.5px rgba(255, 255, 255, 0.9);
-	--dashboard-01-insights-surface: rgba(255, 255, 255, 0.95);
-	--dashboard-01-insights-subsurface: rgba(244, 246, 248, 0.9);
-	--dashboard-01-insights-border: rgba(218, 223, 228, 0.78);
-	--dashboard-01-insights-track: rgba(255, 255, 255, 0.98);
-	--dashboard-01-insights-chip-surface: rgba(255, 255, 255, 0.9);
-	--dashboard-01-insights-chip-border: rgba(214, 219, 224, 0.9);
-	--dashboard-01-insights-chip-foreground: #16181c;
-	--dashboard-01-insights-meta: #6b7280;
-	--dashboard-01-insights-shadow:
-		0 1px 3px rgba(15, 23, 42, 0.08), 0 18px 40px -28px rgba(15, 23, 42, 0.18);
-	--team-lineup-metric-picker-foreground: #303032;
-	--team-lineup-role-chart-main-l: 0.628;
-	--team-lineup-role-chart-main-c: 0.201;
-	--team-lineup-role-series-strong-l: 0.612;
-	--team-lineup-role-series-strong-c: 0.21;
-	--team-lineup-role-series-soft-l: 0.833;
-	--team-lineup-role-series-soft-c: 0.083;
-	--team-lineup-role-series-mid-l: 0.72;
-	--team-lineup-role-series-mid-c: 0.145;
-	--team-lineup-role-card-surface-l: 0.968;
-	--team-lineup-role-card-surface-c: 0.018;
-	--team-lineup-role-card-border-l: 0.812;
-	--team-lineup-role-card-border-c: 0.062;
-	--team-lineup-role-card-shadow-l: 0.628;
-	--team-lineup-role-card-shadow-c: 0.201;
-	--team-lineup-hue-output: 273.8;
-	--team-lineup-hue-quality: 250;
-	--team-lineup-hue-efficiency: 145;
-	--team-lineup-hue-speed: 28;
-	--team-lineup-hue-craft: 72;
-	--team-lineup-hue-consistency: 205;
-	--team-lineup-output-chart-main: oklch(
-		var(--team-lineup-role-chart-main-l) var(--team-lineup-role-chart-main-c)
-			var(--team-lineup-hue-output)
-	);
-	--team-lineup-output-series-strong: oklch(
-		var(--team-lineup-role-series-strong-l)
-			var(--team-lineup-role-series-strong-c) var(--team-lineup-hue-output)
-	);
-	--team-lineup-output-series-soft: oklch(
-		var(--team-lineup-role-series-soft-l) var(--team-lineup-role-series-soft-c)
-			var(--team-lineup-hue-output)
-	);
-	--team-lineup-output-series-mid: oklch(
-		var(--team-lineup-role-series-mid-l) var(--team-lineup-role-series-mid-c)
-			var(--team-lineup-hue-output)
-	);
-	--team-lineup-output-card-surface: oklch(
-		var(--team-lineup-role-card-surface-l)
-			var(--team-lineup-role-card-surface-c) var(--team-lineup-hue-output) /
-		0.42
-	);
-	--team-lineup-output-card-border: oklch(
-		var(--team-lineup-role-card-border-l) var(--team-lineup-role-card-border-c)
-			var(--team-lineup-hue-output) /
-		0.46
-	);
-	--team-lineup-output-card-shadow: oklch(
-		var(--team-lineup-role-card-shadow-l) var(--team-lineup-role-card-shadow-c)
-			var(--team-lineup-hue-output) /
-		0.18
-	);
-	--team-lineup-quality-chart-main: oklch(
-		var(--team-lineup-role-chart-main-l) var(--team-lineup-role-chart-main-c)
-			var(--team-lineup-hue-quality)
-	);
-	--team-lineup-quality-series-strong: oklch(
-		var(--team-lineup-role-series-strong-l)
-			var(--team-lineup-role-series-strong-c) var(--team-lineup-hue-quality)
-	);
-	--team-lineup-quality-series-soft: oklch(
-		var(--team-lineup-role-series-soft-l) var(--team-lineup-role-series-soft-c)
-			var(--team-lineup-hue-quality)
-	);
-	--team-lineup-quality-series-mid: oklch(
-		var(--team-lineup-role-series-mid-l) var(--team-lineup-role-series-mid-c)
-			var(--team-lineup-hue-quality)
-	);
-	--team-lineup-quality-card-surface: oklch(
-		var(--team-lineup-role-card-surface-l)
-			var(--team-lineup-role-card-surface-c) var(--team-lineup-hue-quality) /
-		0.42
-	);
-	--team-lineup-quality-card-border: oklch(
-		var(--team-lineup-role-card-border-l) var(--team-lineup-role-card-border-c)
-			var(--team-lineup-hue-quality) /
-		0.46
-	);
-	--team-lineup-quality-card-shadow: oklch(
-		var(--team-lineup-role-card-shadow-l) var(--team-lineup-role-card-shadow-c)
-			var(--team-lineup-hue-quality) /
-		0.18
-	);
-	--team-lineup-efficiency-chart-main: oklch(
-		var(--team-lineup-role-chart-main-l) var(--team-lineup-role-chart-main-c)
-			var(--team-lineup-hue-efficiency)
-	);
-	--team-lineup-efficiency-series-strong: oklch(
-		var(--team-lineup-role-series-strong-l)
-			var(--team-lineup-role-series-strong-c) var(--team-lineup-hue-efficiency)
-	);
-	--team-lineup-efficiency-series-soft: oklch(
-		var(--team-lineup-role-series-soft-l) var(--team-lineup-role-series-soft-c)
-			var(--team-lineup-hue-efficiency)
-	);
-	--team-lineup-efficiency-series-mid: oklch(
-		var(--team-lineup-role-series-mid-l) var(--team-lineup-role-series-mid-c)
-			var(--team-lineup-hue-efficiency)
-	);
-	--team-lineup-efficiency-card-surface: oklch(
-		var(--team-lineup-role-card-surface-l)
-			var(--team-lineup-role-card-surface-c) var(--team-lineup-hue-efficiency) /
-		0.42
-	);
-	--team-lineup-efficiency-card-border: oklch(
-		var(--team-lineup-role-card-border-l) var(--team-lineup-role-card-border-c)
-			var(--team-lineup-hue-efficiency) /
-		0.46
-	);
-	--team-lineup-efficiency-card-shadow: oklch(
-		var(--team-lineup-role-card-shadow-l) var(--team-lineup-role-card-shadow-c)
-			var(--team-lineup-hue-efficiency) /
-		0.18
-	);
-	--team-lineup-speed-chart-main: oklch(
-		var(--team-lineup-role-chart-main-l) var(--team-lineup-role-chart-main-c)
-			var(--team-lineup-hue-speed)
-	);
-	--team-lineup-speed-series-strong: oklch(
-		var(--team-lineup-role-series-strong-l)
-			var(--team-lineup-role-series-strong-c) var(--team-lineup-hue-speed)
-	);
-	--team-lineup-speed-series-soft: oklch(
-		var(--team-lineup-role-series-soft-l) var(--team-lineup-role-series-soft-c)
-			var(--team-lineup-hue-speed)
-	);
-	--team-lineup-speed-series-mid: oklch(
-		var(--team-lineup-role-series-mid-l) var(--team-lineup-role-series-mid-c)
-			var(--team-lineup-hue-speed)
-	);
-	--team-lineup-speed-card-surface: oklch(
-		var(--team-lineup-role-card-surface-l)
-			var(--team-lineup-role-card-surface-c) var(--team-lineup-hue-speed) /
-		0.42
-	);
-	--team-lineup-speed-card-border: oklch(
-		var(--team-lineup-role-card-border-l) var(--team-lineup-role-card-border-c)
-			var(--team-lineup-hue-speed) /
-		0.46
-	);
-	--team-lineup-speed-card-shadow: oklch(
-		var(--team-lineup-role-card-shadow-l) var(--team-lineup-role-card-shadow-c)
-			var(--team-lineup-hue-speed) /
-		0.18
-	);
-	--team-lineup-craft-chart-main: oklch(
-		var(--team-lineup-role-chart-main-l) var(--team-lineup-role-chart-main-c)
-			var(--team-lineup-hue-craft)
-	);
-	--team-lineup-craft-series-strong: oklch(
-		var(--team-lineup-role-series-strong-l)
-			var(--team-lineup-role-series-strong-c) var(--team-lineup-hue-craft)
-	);
-	--team-lineup-craft-series-soft: oklch(
-		var(--team-lineup-role-series-soft-l) var(--team-lineup-role-series-soft-c)
-			var(--team-lineup-hue-craft)
-	);
-	--team-lineup-craft-series-mid: oklch(
-		var(--team-lineup-role-series-mid-l) var(--team-lineup-role-series-mid-c)
-			var(--team-lineup-hue-craft)
-	);
-	--team-lineup-craft-card-surface: oklch(
-		var(--team-lineup-role-card-surface-l)
-			var(--team-lineup-role-card-surface-c) var(--team-lineup-hue-craft) /
-		0.42
-	);
-	--team-lineup-craft-card-border: oklch(
-		var(--team-lineup-role-card-border-l) var(--team-lineup-role-card-border-c)
-			var(--team-lineup-hue-craft) /
-		0.46
-	);
-	--team-lineup-craft-card-shadow: oklch(
-		var(--team-lineup-role-card-shadow-l) var(--team-lineup-role-card-shadow-c)
-			var(--team-lineup-hue-craft) /
-		0.18
-	);
-	--team-lineup-consistency-chart-main: oklch(
-		var(--team-lineup-role-chart-main-l) var(--team-lineup-role-chart-main-c)
-			var(--team-lineup-hue-consistency)
-	);
-	--team-lineup-consistency-series-strong: oklch(
-		var(--team-lineup-role-series-strong-l)
-			var(--team-lineup-role-series-strong-c) var(--team-lineup-hue-consistency)
-	);
-	--team-lineup-consistency-series-soft: oklch(
-		var(--team-lineup-role-series-soft-l) var(--team-lineup-role-series-soft-c)
-			var(--team-lineup-hue-consistency)
-	);
-	--team-lineup-consistency-series-mid: oklch(
-		var(--team-lineup-role-series-mid-l) var(--team-lineup-role-series-mid-c)
-			var(--team-lineup-hue-consistency)
-	);
-	--team-lineup-consistency-card-surface: oklch(
-		var(--team-lineup-role-card-surface-l)
-			var(--team-lineup-role-card-surface-c) var(--team-lineup-hue-consistency) /
-		0.42
-	);
-	--team-lineup-consistency-card-border: oklch(
-		var(--team-lineup-role-card-border-l) var(--team-lineup-role-card-border-c)
-			var(--team-lineup-hue-consistency) /
-		0.46
-	);
-	--team-lineup-consistency-card-shadow: oklch(
-		var(--team-lineup-role-card-shadow-l) var(--team-lineup-role-card-shadow-c)
-			var(--team-lineup-hue-consistency) /
-		0.18
-	);
-	--team-lineup-card-grain-opacity: 0.17;
-	--team-lineup-card-grain-size: 110px;
-	--team-lineup-card-grain-contrast: 100%;
-	--dashboard-01-chrome-turbulence-opacity: 0.18;
 	--dashboard-01-chrome-noise-large-size: 130px;
 	--dashboard-01-chrome-noise-small-size: 136px;
 	--dashboard-01-chrome-turbulence-contrast: 190%;
 	--dashboard-01-chrome-turbulence-darkness: 0.8;
-	--dashboard-01-chrome-highlight-opacity: 0.15;
-	--dashboard-01-chrome-backdrop-fill: var(--dashboard-01-content-background);
+	--dashboard-01-chrome-backdrop-fill: var(--canvas);
+	/* design-escape-ok(colour): macOS vibrancy, a translucent sidebar the desktop shows through */
 	--dashboard-01-chrome-surface: rgba(235, 235, 235, 0.72);
 	--dashboard-01-chrome-noise-texture:
 		url("/shell/team-lineup-stats-panel-noise.svg"),
 		url("/shell/team-lineup-stats-panel-noise.svg");
-	--dashboard-01-header-height: 2.75rem;
-	--dashboard-01-window-inset: 0.25rem;
-	--dashboard-01-window-radius: 0.5rem;
-	--dashboard-01-window-shadow:
-		0 1px 2px rgb(17 24 39 / 0.08), 0 16px 40px -28px rgb(17 24 39 / 0.32),
-		0 0 0 1px rgb(17 24 39 / 0.04);
 	--sidebar: var(--dashboard-01-chrome-surface);
-	--sidebar-foreground: oklch(0.145 0 0);
-	--sidebar-primary: oklch(0.205 0 0);
-	--sidebar-primary-foreground: oklch(0.985 0 0);
-	--sidebar-accent: oklch(0.97 0 0);
-	--sidebar-accent-foreground: oklch(0.205 0 0);
-	--sidebar-border: oklch(0.922 0 0);
-	--sidebar-ring: oklch(0.708 0 0);
-	font-family: var(--dashboard-01-font-sans);
+	font-family: var(--font-sans);
 }
 
 .dashboard-01-preview {
 	position: relative;
 	isolation: isolate;
 	background: transparent;
-	color: var(--foreground);
+	color: var(--ink);
 	min-height: 100dvh;
 }
 
 .dark .dashboard-01-theme,
 :where(html).dark[data-app-shell] body,
 .dark .dashboard-01-preview {
-	--dashboard-01-content-background: var(--background);
-	--dashboard-01-stage-background: var(--dashboard-01-content-background);
-	--dashboard-01-rail-icon: oklch(0.708 0 0);
-	--dashboard-01-rail-icon-active: oklch(0.985 0 0);
-	--dashboard-01-rail-hover: rgb(255 255 255 / 0.04);
+	/* Dark layering: a solid shell on the canvas under the content window,
+	   with cards (--surface) one step above that. */
+	/* design-escape-ok(colour): artwork, the opal nav icon's active fill (white 10%) */
 	--dashboard-01-rail-active: rgb(255 255 255 / 0.1);
-	--dashboard-01-avatar-background: oklch(0.269 0 0);
-	--dashboard-01-avatar-foreground: oklch(0.708 0 0);
-	--dashboard-01-tone-blue: #6d8fff;
-	--dashboard-01-tone-teal: #4fd3c9;
-	--dashboard-01-tone-orange: #f6b34d;
-	--dashboard-01-tone-lime: #a0d35c;
-	--dashboard-01-tone-violet: #a99afc;
-	--dashboard-01-tone-rose: #f4a8bd;
-	--dashboard-01-tone-slate: #a5b4c5;
-	--dashboard-01-metric-button-border: rgba(255, 255, 255, 0.12);
-	--dashboard-01-metric-button-surface: linear-gradient(
-		180deg,
-		rgba(255, 255, 255, 0.04) 0%,
-		rgba(255, 255, 255, 0.01) 100%
-	);
-	--dashboard-01-metric-button-surface-selected: linear-gradient(
-		180deg,
-		rgba(255, 255, 255, 0.16) 0%,
-		rgba(255, 255, 255, 0.08) 100%
-	);
-	--dashboard-01-metric-button-shadow-selected:
-		0 1px 3.1px rgba(0, 0, 0, 0.3),
-		0 12px 24px -18px
-		var(--dashboard-01-metric-button-shadow-color, rgba(15, 23, 42, 0.28)),
-		inset 0 10px 5.5px rgba(255, 255, 255, 0.08);
-	--dashboard-01-insights-surface: rgba(37, 39, 42, 0.95);
-	--dashboard-01-insights-subsurface: rgba(55, 58, 62, 0.78);
-	--dashboard-01-insights-border: rgba(255, 255, 255, 0.12);
-	--dashboard-01-insights-track: rgba(18, 20, 23, 0.72);
-	--dashboard-01-insights-chip-surface: rgba(255, 255, 255, 0.06);
-	--dashboard-01-insights-chip-border: rgba(255, 255, 255, 0.14);
-	--dashboard-01-insights-chip-foreground: oklch(0.985 0 0);
-	--dashboard-01-insights-meta: oklch(0.708 0 0);
-	--dashboard-01-insights-shadow:
-		0 1px 3px rgba(0, 0, 0, 0.32), 0 18px 40px -28px rgba(0, 0, 0, 0.55);
-	--team-lineup-metric-picker-foreground: oklch(0.985 0 0);
-	--dashboard-01-chrome-turbulence-opacity: 0.18;
-	--dashboard-01-chrome-turbulence-contrast: 190%;
-	--dashboard-01-chrome-turbulence-darkness: 0.8;
-	--dashboard-01-chrome-highlight-opacity: 0.15;
-	/* Dark layering: a solid shell (the --sidebar colour) under the content
-	   window (--background), with cards (--card) one step above that. */
-	--dashboard-01-chrome-backdrop-fill: oklch(0.145 0 0);
-	--dashboard-01-chrome-surface: oklch(0.145 0 0);
-	--dashboard-01-window-shadow: var(--custom-shadow);
-	--sidebar: var(--dashboard-01-chrome-surface);
-	--sidebar-foreground: oklch(0.985 0 0);
-	--sidebar-primary: var(--color-opal-1);
-	--sidebar-primary-foreground: oklch(0.985 0 0);
-	--sidebar-accent: oklch(0.269 0 0);
-	--sidebar-accent-foreground: oklch(0.985 0 0);
-	--sidebar-border: oklch(1 0 0 / 10%);
-	--sidebar-ring: oklch(0.556 0 0);
+	--dashboard-01-chrome-backdrop-fill: var(--chrome);
+	--dashboard-01-chrome-surface: var(--chrome);
 }
 
 html[data-app-shell],
@@ -380,18 +56,18 @@ html[data-app-shell],
 
 .dark .dashboard-01-preview {
 	background: transparent;
-	color: var(--foreground);
+	color: var(--ink);
 }
 
 .dashboard-01-preview,
-.dashboard-01-chrome-frame,
-.dashboard-01-chrome-sidebar [data-slot="sidebar-inner"] {
+.dashboard-01-chrome-frame {
 	position: relative;
 	isolation: isolate;
 }
 
 .dashboard-01-chrome-frame {
 	background: var(--dashboard-01-chrome-surface);
+	/* design-escape-ok(colour): macOS vibrancy, the glass frame's white highlight */
 	box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.24);
 	backdrop-filter: blur(20px) saturate(1.12);
 	-webkit-backdrop-filter: blur(20px) saturate(1.12);
@@ -403,12 +79,6 @@ html[data-app-shell],
 	box-shadow: none;
 }
 
-.dashboard-01-chrome-sidebar [data-slot="sidebar-inner"] {
-	overflow: hidden;
-	border-right-width: 0;
-	background: transparent;
-}
-
 :where(html)[data-app-shell] body::before,
 :where(html)[data-app-shell] body::after {
 	content: "";
@@ -418,30 +88,16 @@ html[data-app-shell],
 	z-index: 0;
 }
 
+/* The content window rests on the chrome like a card. */
 .dashboard-01-window {
-	box-shadow:
-		0 1px 2px rgb(17 24 39 / 0.08),
-		0 16px 40px -28px rgb(17 24 39 / 0.32),
-		0 0 0 1px rgb(17 24 39 / 0.04);
+	box-shadow: var(--shadow-card);
 }
 
-/* Dark: the custom shadow's outer parts only; its inset edge is drawn once,
-   over the page, by ::after below. Kept here as well, a page with no ground
-   of its own (Team) would show it twice. */
-.dark .dashboard-01-window,
-.dark .product-app-shell .dashboard-01-window {
-	box-shadow:
-		0 0 0 0.75px rgba(0, 0, 0, 0.1),
-		0 2px 2px 0 rgba(0, 0, 0, 0.1),
-		0 4px 4px 0 rgba(0, 0, 0, 0.1),
-		0 8px 8px 0 rgba(0, 0, 0, 0.1);
-}
-
-/* The window's inside edge, drawn over the page. The dark shadow's inset
+/* The window's inside edge, drawn over the page. The dark card shadow's inset
    rings paint beneath the window's content, so any page with a ground of its
-   own (and the header strip above it) covered them; this repeats them on
-   top, with the window's corners. Light mode's edge sits outside the window,
-   where nothing covers it. */
+   own (and the header strip above it) covers them; this draws the inset
+   hairline on top, with the window's corners. Light mode's edge sits outside
+   the window, where nothing covers it. */
 .dark .dashboard-01-window::after {
 	position: absolute;
 	inset: 0;
@@ -449,9 +105,7 @@ html[data-app-shell],
 	border-radius: inherit;
 	/* biome-ignore lint/correctness/noUnknownProperty: corner-shape (Chromium) keeps the edge on the window's squircle corners. */
 	corner-shape: inherit;
-	box-shadow:
-		inset 0 0.75px 0 0 rgba(255, 255, 255, 0.03),
-		inset 0 0 0 0.75px rgba(255, 255, 255, 0.03);
+	box-shadow: var(--shadow-inset);
 	content: "";
 	pointer-events: none;
 }
@@ -494,128 +148,8 @@ html[data-app-shell],
 	}
 }
 
-.dashboard-01-chrome-sidebar [data-sidebar-nav-icon-lane] svg {
-	stroke-width: 1.75;
-}
-
-.dashboard-01-chrome-sidebar
-	[data-slot="sidebar-inner"]
-	> .fluid-menu-hover-layer
-	.fluid-menu-hover-fill {
-	border-radius: 0;
-	background: var(--sidebar-row-hover-bg);
-	-webkit-mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
-	mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
-}
-
 [data-slot="dashboard-header"] .fluid-menu-hover-fill {
-	background: rgb(0 0 0 / 4%);
-}
-
-.dark [data-slot="dashboard-header"] .fluid-menu-hover-fill {
-	background: rgb(255 255 255 / 5%);
-}
-
-.dashboard-01-chrome-sidebar [data-sidebar-nav-row][data-active="true"] {
-	box-shadow:
-		inset 0 0 0 1px rgb(255 255 255 / 0.48),
-		0 1px 2px rgb(17 24 39 / 0.08);
-}
-
-.dark
-	.dashboard-01-chrome-sidebar
-	[data-sidebar-nav-row][data-active="true"]:not(
-		[data-sidebar-row-mode="collapsed"]
-	) {
-	box-shadow:
-		inset 0 0 0 1px rgb(255 255 255 / 0.08),
-		0 1px 2px rgb(0 0 0 / 0.24);
-}
-
-.dashboard-01-chrome-sidebar
-	[data-sidebar-nav-row][data-sidebar-row-mode="collapsed"] {
-	isolation: isolate;
-	border-radius: 0;
-	box-shadow: none;
-}
-
-.dashboard-01-chrome-sidebar
-	[data-sidebar-nav-row][data-sidebar-row-mode="collapsed"]::before {
-	position: absolute;
-	inset: 0;
-	z-index: -1;
-	background: var(--sidebar-row-hover-bg);
-	content: "";
-	opacity: 0;
-	transition:
-		background-color 160ms cubic-bezier(0.23, 1, 0.32, 1),
-		opacity 160ms cubic-bezier(0.23, 1, 0.32, 1);
-	-webkit-mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
-	mask: url("/opaline-trace-fill.svg") center / contain no-repeat;
-}
-
-.dashboard-01-chrome-sidebar
-	[data-sidebar-nav-row][data-sidebar-row-mode="collapsed"]::after {
-	position: absolute;
-	inset: 0;
-	z-index: -1;
-	background: rgb(255 255 255 / 0.48);
-	content: "";
-	opacity: 0;
-	-webkit-mask:
-		url("/opaline-trace-fill.svg") center / contain no-repeat,
-		url("/opaline-trace-fill.svg") center / calc(100% - 2px) calc(100% - 2px)
-		no-repeat;
-	-webkit-mask-composite: xor;
-	mask:
-		url("/opaline-trace-fill.svg") center / contain no-repeat,
-		url("/opaline-trace-fill.svg") center / calc(100% - 2px) calc(100% - 2px)
-		no-repeat;
-	mask-composite: exclude;
-}
-
-.dashboard-01-chrome-sidebar
-	[data-sidebar-nav-row][data-sidebar-row-mode="collapsed"]:not(
-		[data-fluid-menu-item]
-	):hover::before,
-.dashboard-01-chrome-sidebar
-	[data-sidebar-nav-row][data-sidebar-row-mode="collapsed"]:not(
-		[data-fluid-menu-item]
-	):active::before {
-	opacity: 1;
-}
-
-.dashboard-01-chrome-sidebar
-	[data-sidebar-nav-row][data-sidebar-row-mode="collapsed"][data-active="true"]::before {
-	background: var(--sidebar-row-active-bg);
-	filter: drop-shadow(0 1px 2px rgb(17 24 39 / 0.08));
-	opacity: 1;
-}
-
-.dashboard-01-chrome-sidebar
-	[data-sidebar-nav-row][data-sidebar-row-mode="collapsed"][data-active="true"]::after {
-	opacity: 1;
-}
-
-.dark
-	.dashboard-01-chrome-sidebar
-	[data-sidebar-nav-row][data-sidebar-row-mode="collapsed"][data-active="true"]::before {
-	filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.24));
-}
-
-.dark
-	.dashboard-01-chrome-sidebar
-	[data-sidebar-nav-row][data-sidebar-row-mode="collapsed"]::after {
-	background: rgb(255 255 255 / 0.08);
-}
-
-:where(
-		.dashboard-01-chrome-sidebar
-			[data-sidebar-nav-row][data-sidebar-row-mode="collapsed"]
-	)
-	[data-sidebar-nav-icon-lane] {
-	position: relative;
-	z-index: 1;
+	background: var(--hover);
 }
 
 .shell-bottom-navigation {
@@ -634,10 +168,6 @@ html[data-app-shell],
 /* The account avatar fills its 36px lane and takes the opaline silhouette,
    concentric inside the 44px capsule like the nav items' trace fills. */
 
-/* Row states mirror the collapsed left-sidebar rows
-   (.dashboard-01-chrome-sidebar [data-sidebar-row-mode="collapsed"]),
-   with faster hover-in and pointer-down scale feedback on top. */
-
 /* Deepens the press scale from shellPressMotionClassName's 0.98; the 160ms
    release transition it defines stays, so the scale-back runs in the same
    window as the active fill's fade-in. */
@@ -648,8 +178,8 @@ html[data-app-shell],
 	opacity: 1;
 	transform: translateY(0) scale(1);
 	transition:
-		opacity 160ms cubic-bezier(0.23, 1, 0.32, 1),
-		transform 220ms cubic-bezier(0.32, 0.72, 0, 1);
+		opacity var(--motion-duration) var(--motion-strong-easing),
+		transform var(--motion-medium-duration) var(--motion-drawer-easing);
 }
 
 @starting-style {
@@ -660,8 +190,8 @@ html[data-app-shell],
 }
 
 ::view-transition-group(shell-bottom-navigation) {
-	animation-duration: 240ms;
-	animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+	animation-duration: var(--motion-medium-duration);
+	animation-timing-function: var(--motion-drawer-easing);
 }
 
 ::view-transition-old(shell-bottom-navigation),
@@ -676,110 +206,6 @@ html[data-app-shell],
 
 	::view-transition-group(shell-bottom-navigation) {
 		animation-duration: 1ms;
-	}
-}
-
-.team-lineup-metric-button {
-	display: inline-flex;
-	align-items: center;
-	gap: 0;
-	width: fit-content;
-	max-width: 100%;
-	align-self: flex-start;
-	border-radius: 9px;
-	border: 1px solid var(--dashboard-01-metric-button-border);
-	background: var(--dashboard-01-metric-button-surface);
-	padding: 8px 12px;
-	text-align: left;
-	color: var(--team-lineup-metric-picker-foreground);
-	box-shadow:
-		0 1px 2px rgba(15, 23, 42, 0.06),
-		inset 0 1px 0 rgba(255, 255, 255, 0.32);
-	transition:
-		border-color 200ms ease,
-		box-shadow 200ms ease,
-		transform 200ms ease,
-		background 200ms ease;
-}
-
-.team-lineup-metric-button[data-selected="true"] {
-	border-color: color-mix(
-		in srgb,
-		var(--dashboard-01-metric-button-border) 72%,
-		white
-	);
-	background: var(--dashboard-01-metric-button-surface-selected);
-	color: var(--team-lineup-metric-picker-foreground);
-	box-shadow: var(--dashboard-01-metric-button-shadow-selected);
-	transform: translateY(-0.5px);
-}
-
-.team-lineup-metric-button:hover {
-	border-color: color-mix(
-		in srgb,
-		var(--dashboard-01-metric-button-border) 82%,
-		white
-	);
-	box-shadow:
-		0 1px 3px rgba(15, 23, 42, 0.08),
-		0 10px 18px -18px rgba(15, 23, 42, 0.2),
-		inset 0 1px 0 rgba(255, 255, 255, 0.42);
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.team-lineup-metric-button {
-		transition: none;
-	}
-}
-
-.team-lineup-metric-button__label {
-	display: block;
-	margin: 0;
-	font-family: var(--dashboard-01-font-sans);
-	font-style: normal;
-	font-weight: 500;
-	font-size: 14px;
-	line-height: 16px;
-	letter-spacing: -0.03em;
-	color: inherit;
-	text-box-trim: trim-both;
-	text-box-edge: cap alphabetic;
-}
-
-@utility dashboard-big-number {
-	font-family: var(--dashboard-01-font-roster-display);
-	font-style: normal;
-	font-weight: 800;
-	letter-spacing: -0.035em;
-	text-box-trim: trim-both;
-	text-box-edge: cap alphabetic;
-}
-
-@layer components {
-	.dashboard-01-insights-root {
-		background: var(--dashboard-01-insights-surface);
-		border: 1px solid var(--dashboard-01-insights-border);
-		box-shadow: var(--dashboard-01-insights-shadow);
-	}
-
-	.dashboard-01-insights-panel {
-		background: var(--dashboard-01-insights-subsurface);
-		border: 1px solid var(--dashboard-01-insights-border);
-		box-shadow: none;
-	}
-
-	.dashboard-01-insights-track {
-		background: var(--dashboard-01-insights-track);
-	}
-
-	.dashboard-01-insights-chip {
-		background: var(--dashboard-01-insights-chip-surface);
-		border-color: var(--dashboard-01-insights-chip-border);
-		color: var(--dashboard-01-insights-chip-foreground);
-	}
-
-	.dashboard-01-insights-meta {
-		color: var(--dashboard-01-insights-meta);
 	}
 }
 
@@ -824,28 +250,7 @@ html[data-app-shell],
 }
 
 .dashboard-01-preview > *,
-.dashboard-01-chrome-frame > *,
-.dashboard-01-chrome-sidebar [data-slot="sidebar-inner"] > * {
-	position: relative;
-	z-index: 1;
-}
-
-.team-lineup-featured-card::before {
-	content: "";
-	position: absolute;
-	inset: 0;
-	border-radius: inherit;
-	pointer-events: none;
-	opacity: var(--team-lineup-card-grain-opacity);
-	mix-blend-mode: multiply;
-	filter: contrast(var(--team-lineup-card-grain-contrast));
-	background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-	background-size: var(--team-lineup-card-grain-size)
-		var(--team-lineup-card-grain-size);
-	background-position: center;
-}
-
-.team-lineup-featured-card > * {
+.dashboard-01-chrome-frame > * {
 	position: relative;
 	z-index: 1;
 }

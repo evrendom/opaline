@@ -76,8 +76,8 @@ describe("TeamMemberOverviewTable", () => {
 
 		const table = screen.getByRole("table");
 		expect(table.parentElement).not.toHaveClass("px-16");
-		expect(table).toHaveClass("[&_tr>*:first-child]:pl-2");
-		expect(table).toHaveClass("[&_tr>*:last-child]:pr-2");
+		expect(table).toHaveClass("[&_tr>*:first-child]:pl-m");
+		expect(table).toHaveClass("[&_tr>*:last-child]:pr-m");
 	});
 
 	it("shows the top three models and collapses the remainder into a count", () => {

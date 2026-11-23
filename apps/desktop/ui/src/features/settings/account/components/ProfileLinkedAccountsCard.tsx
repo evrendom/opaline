@@ -34,7 +34,7 @@ export function ProfileLinkedAccountsCard({
 			description="Manage the sign-in methods connected to your account."
 		>
 			<WorkspaceSettingsRow label="Email & password">
-				<span className="workspace-settings-status">
+				<span className="settings-status">
 					{linkedProviders.has("credential") ? "Connected" : "Not linked"}
 				</span>
 			</WorkspaceSettingsRow>
@@ -46,12 +46,12 @@ export function ProfileLinkedAccountsCard({
 				.map((provider) => (
 					<WorkspaceSettingsRow key={provider.id} label={provider.label}>
 						{linkedProviders.has(provider.id) ? (
-							<span className="workspace-settings-status">Connected</span>
+							<span className="settings-status">Connected</span>
 						) : (
 							<Button
 								type="button"
-								variant="outline"
-								size="sm"
+								variant="primary"
+								size="md"
 								aria-label={`Link ${provider.label}`}
 								onClick={() => onLinkProvider(provider.id)}
 								disabled={isPending || linkingProvider !== null}

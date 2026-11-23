@@ -20,7 +20,7 @@ type Report = AnalysisHistoryReportOutput;
 type ReportResult = Report["results"][number];
 
 const MARKDOWN_CLASS_NAME =
-	"leading-relaxed [overflow-wrap:anywhere] [&_a]:underline [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:font-mono [&_code]:text-[0.8125rem] [&_h1]:mt-4 [&_h1]:font-semibold [&_h2]:mt-4 [&_h2]:font-semibold [&_h3]:mt-3 [&_h3]:font-semibold [&_li]:my-0.5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-2 [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_table]:my-2 [&_td]:border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:px-2 [&_th]:py-1 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0";
+	"[overflow-wrap:anywhere] [&_a]:underline [&_code]:corner-xs [&_code]:bg-field [&_code]:px-xs [&_code]:font-data [&_code]:text-body-l [&_h1]:mt-xl [&_h1]:font-heavy [&_h2]:mt-xl [&_h2]:font-heavy [&_h3]:mt-l [&_h3]:font-heavy [&_li]:my-xxs [&_ol]:my-m [&_ol]:list-decimal [&_ol]:pl-xl [&_p]:my-m [&_pre]:my-m [&_pre]:overflow-x-auto [&_pre]:corner-s [&_pre]:bg-field [&_pre]:p-l [&_pre_code]:bg-transparent [&_pre_code]:p-zero [&_table]:my-m [&_td]:edge-m [&_td]:px-m [&_td]:py-xs [&_th]:edge-m [&_th]:px-m [&_th]:py-xs [&_ul]:my-m [&_ul]:list-disc [&_ul]:pl-xl [&>*:first-child]:mt-zero [&>*:last-child]:mb-zero";
 const REMARK_PLUGINS = [remarkGfm, remarkAppLinks];
 
 export function ReportView({
@@ -43,26 +43,28 @@ export function ReportView({
 	return (
 		<main
 			data-selectable=""
-			className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-10 text-sm text-foreground"
+			className="mx-auto flex w-full max-w-3xl flex-col gap-xxxl px-xxl py-xxxl text-body-xl text-ink"
 		>
-			<header className="flex flex-col gap-2">
-				<p className="text-xs text-muted-foreground">Saved analysis</p>
-				<h1 className="text-xl font-medium text-balance">{report.question}</h1>
-				<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground">
+			<header className="flex flex-col gap-m">
+				<p className="text-body-m text-ink-3">Saved analysis</p>
+				<h1 className="text-display-xxs tracking-s font-medium text-balance">
+					{report.question}
+				</h1>
+				<div className="flex flex-wrap items-center gap-x-m gap-y-xs text-ink-3">
 					<span>
 						Saved {formatDay(report.createdAt)}
 						{authorName ? ` by ${authorName}` : ""}
 					</span>
 					<span aria-hidden="true">·</span>
 					<span>{dataWindow(report)}</span>
-					<Badge variant={report.shared ? "secondary" : "outline"}>
+					<Badge variant={report.shared ? "neutral" : "outline"}>
 						{report.shared ? "Shared with workspace" : "Not shared"}
 					</Badge>
 				</div>
 			</header>
 
-			<section aria-labelledby="report-answer" className="flex flex-col gap-2">
-				<h2 id="report-answer" className="text-base font-medium">
+			<section aria-labelledby="report-answer" className="flex flex-col gap-m">
+				<h2 id="report-answer" className="text-body-xxl font-medium">
 					Answer
 				</h2>
 				{markdown ? (
@@ -70,7 +72,7 @@ export function ReportView({
 						<Markdown remarkPlugins={REMARK_PLUGINS}>{markdown}</Markdown>
 					</div>
 				) : (
-					<p className="text-muted-foreground">No final answer was saved.</p>
+					<p className="text-ink-3">No final answer was saved.</p>
 				)}
 			</section>
 
@@ -78,15 +80,15 @@ export function ReportView({
 
 			<section
 				aria-labelledby="report-findings"
-				className="flex flex-col gap-2"
+				className="flex flex-col gap-m"
 			>
-				<h2 id="report-findings" className="text-base font-medium">
+				<h2 id="report-findings" className="text-body-xxl font-medium">
 					Findings
 				</h2>
 				{findings.length ? (
-					<ol className="flex list-decimal flex-col gap-3 pl-5">
+					<ol className="flex list-decimal flex-col gap-l pl-xl">
 						{findings.map((step) => (
-							<li key={step.id} className="pl-1">
+							<li key={step.id} className="pl-xs">
 								<p>{step.finding}</p>
 								<CitedRuns
 									runs={citedRuns.get(step.id) ?? []}
@@ -96,19 +98,19 @@ export function ReportView({
 						))}
 					</ol>
 				) : (
-					<p className="text-muted-foreground">No findings were saved.</p>
+					<p className="text-ink-3">No findings were saved.</p>
 				)}
 			</section>
 
-			<section aria-labelledby="report-steps" className="flex flex-col gap-3">
-				<h2 id="report-steps" className="text-base font-medium">
+			<section aria-labelledby="report-steps" className="flex flex-col gap-l">
+				<h2 id="report-steps" className="text-body-xxl font-medium">
 					Steps
 				</h2>
 				{report.steps.length ? (
-					<ol className="flex flex-col gap-4">
+					<ol className="flex flex-col gap-xl">
 						{report.steps.map((step) => (
-							<li key={step.id} className="flex flex-col gap-2">
-								<p className="font-mono text-xs">{step.question}</p>
+							<li key={step.id} className="flex flex-col gap-m">
+								<p className="font-data text-body-m">{step.question}</p>
 								{step.queries.map((query) => {
 									const result = results.get(query.id);
 									return result ? (
@@ -116,7 +118,7 @@ export function ReportView({
 									) : (
 										<p
 											key={query.id}
-											className="font-mono text-xs text-muted-foreground"
+											className="font-data text-body-m text-ink-3"
 										>
 											{query.id}
 											{query.unavailable ? ` (${query.unavailable})` : ""}
@@ -127,7 +129,7 @@ export function ReportView({
 						))}
 					</ol>
 				) : (
-					<p className="text-muted-foreground">No steps were recorded.</p>
+					<p className="text-ink-3">No steps were recorded.</p>
 				)}
 			</section>
 		</main>
@@ -136,13 +138,13 @@ export function ReportView({
 
 function HealthSection({ health }: { health: HealthBlock }) {
 	return (
-		<section aria-labelledby="report-health" className="flex flex-col gap-3">
-			<h2 id="report-health" className="text-base font-medium">
+		<section aria-labelledby="report-health" className="flex flex-col gap-l">
+			<h2 id="report-health" className="text-body-xxl font-medium">
 				Health
 			</h2>
 			{health.summary ? <p>{health.summary}</p> : null}
 			{health.actions.length ? (
-				<div className="flex flex-col gap-1">
+				<div className="flex flex-col gap-xs">
 					<h3 className="font-medium">Actions</h3>
 					<Table>
 						<TableHeader>
@@ -156,11 +158,13 @@ function HealthSection({ health }: { health: HealthBlock }) {
 						<TableBody>
 							{health.actions.map((action) => (
 								<TableRow key={`${action.rank}-${action.title}`}>
-									<TableCell className="whitespace-normal font-medium">
-										{action.title}
+									<TableCell>
+										<span className="whitespace-normal font-medium">
+											{action.title}
+										</span>
 									</TableCell>
-									<TableCell className="whitespace-normal">
-										{action.why}
+									<TableCell>
+										<span className="whitespace-normal">{action.why}</span>
 									</TableCell>
 									<TableCell>{action.impact}</TableCell>
 									<TableCell>{action.effort}</TableCell>
@@ -171,7 +175,7 @@ function HealthSection({ health }: { health: HealthBlock }) {
 				</div>
 			) : null}
 			{health.signals.length ? (
-				<div className="flex flex-col gap-1">
+				<div className="flex flex-col gap-xs">
 					<h3 className="font-medium">Signals</h3>
 					<Table>
 						<TableHeader>
@@ -183,8 +187,8 @@ function HealthSection({ health }: { health: HealthBlock }) {
 						<TableBody>
 							{health.signals.map((signal) => (
 								<TableRow key={`${signal.area}-${signal.label}`}>
-									<TableCell className="whitespace-normal">
-										{signal.label}
+									<TableCell>
+										<span className="whitespace-normal">{signal.label}</span>
 									</TableCell>
 									<TableCell>{signal.status}</TableCell>
 								</TableRow>
@@ -206,12 +210,12 @@ function CitedRuns({
 }) {
 	if (!runs.length) return null;
 	return (
-		<p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+		<p className="mt-xs flex flex-wrap gap-x-l gap-y-xs text-body-m text-ink-3">
 			<span>Runs:</span>
 			{runs.map((run) => (
 				<Link
 					key={`${run.sessionId}-${run.agentId}-${run.turn}`}
-					className="font-mono underline underline-offset-2 hover:text-foreground"
+					className="font-data underline underline-offset-2 hover:text-ink"
 					to={getWorkspaceAppPath(
 						workspaceSlug,
 						appRoutes.sessionDetail(run.sessionId),
@@ -227,8 +231,8 @@ function CitedRuns({
 
 function ResultTable({ result }: { result: ReportResult }) {
 	return (
-		<div className="flex flex-col gap-1 rounded-md border border-border/60 p-2">
-			<p className="text-xs text-muted-foreground">
+		<div className="flex flex-col gap-xs corner-s edge-m border-line p-m">
+			<p className="text-body-m text-ink-3">
 				{result.title}
 				{result.truncated ? " (cut)" : ""}
 			</p>
@@ -237,8 +241,8 @@ function ResultTable({ result }: { result: ReportResult }) {
 					<TableHeader>
 						<TableRow>
 							{result.columns.map((column) => (
-								<TableHead key={column} className="font-mono text-xs">
-									{column}
+								<TableHead key={column}>
+									<span className="font-data text-body-m">{column}</span>
 								</TableHead>
 							))}
 						</TableRow>
@@ -247,11 +251,8 @@ function ResultTable({ result }: { result: ReportResult }) {
 						{keyedRows(result.rows).map(({ key, row }) => (
 							<TableRow key={key}>
 								{row.map((cell, cellIndex) => (
-									<TableCell
-										key={`${result.columns[cellIndex] ?? cellIndex}`}
-										className="font-mono text-xs"
-									>
-										{cell}
+									<TableCell key={`${result.columns[cellIndex] ?? cellIndex}`}>
+										<span className="font-data text-body-m">{cell}</span>
 									</TableCell>
 								))}
 							</TableRow>
@@ -259,7 +260,7 @@ function ResultTable({ result }: { result: ReportResult }) {
 					</TableBody>
 				</Table>
 			) : (
-				<p className="text-xs text-muted-foreground">No rows.</p>
+				<p className="text-body-m text-ink-3">No rows.</p>
 			)}
 		</div>
 	);

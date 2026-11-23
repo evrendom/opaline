@@ -1,117 +1,75 @@
 .sessions-settings {
 	display: flex;
 	flex-direction: column;
-	gap: 40px;
-	padding-bottom: 32px;
-	font-size: 14px;
-	line-height: 1.5;
+	gap: var(--space-xxxl);
+	padding-bottom: var(--space-xxxl);
+	font-size: var(--size-xl);
+	line-height: var(--line-xl);
 }
 .sessions-settings-section {
 	display: flex;
 	flex-direction: column;
-	gap: 12px;
+	gap: var(--space-l);
 }
 .sessions-settings-heading {
 	display: flex;
 	flex-direction: column;
-	gap: 4px;
-	padding-inline: 20px;
-}
-.sessions-settings-card {
-	padding: 16px 20px;
+	gap: var(--space-xs);
+	padding-inline: var(--space-xl);
 }
 .sessions-settings h2 {
-	margin: 0;
-	font-size: 0.9375rem;
-	line-height: 20px;
-	font-weight: 500;
-	color: var(--foreground);
+	margin: var(--space-zero);
+	font-size: var(--size-xl);
+	line-height: var(--line-xl);
+	font-weight: var(--weight-body-medium);
+	color: var(--ink);
 }
 .sessions-settings p {
-	margin: 0;
-	color: var(--muted-foreground);
+	margin: var(--space-zero);
+	color: var(--ink-3);
 	text-wrap: pretty;
 }
 .sessions-settings-manage {
 	display: flex;
 	flex-direction: column;
-	gap: 10px;
+	gap: var(--space-m);
 }
 .sessions-settings-command {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 12px;
-	padding: 8px 10px 8px 14px;
-	border: 1px solid var(--border);
-	border-radius: 8px;
-	background: var(--settings-section-fill);
+	gap: var(--space-l);
+	padding: var(--space-m) var(--space-l) var(--space-m) var(--space-l);
+	border: var(--border-m) solid var(--line);
+	border-radius: var(--radius-s);
+	background: var(--surface);
 }
 .sessions-settings-command code {
 	min-width: 0;
 	overflow-wrap: anywhere;
-	font-size: 13px;
+	font-size: var(--size-l);
 }
 .sessions-settings .sessions-settings-note {
-	font-size: 12px;
-	line-height: 18px;
+	font-size: var(--size-m);
+	line-height: var(--line-m);
 }
 .sessions-settings-list-heading {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 12px;
+	gap: var(--space-l);
 }
 .sessions-settings-list-heading h2 {
 	display: flex;
 	align-items: center;
-	gap: 8px;
-}
-.sessions-settings-list-heading [data-slot="button"][data-variant="outline"] {
-	border: 0;
-	background: var(--background);
-	box-shadow: var(--custom-outline-shadow);
-}
-.sessions-settings-list-heading
-	[data-slot="button"][data-variant="outline"]:hover {
-	background: var(--muted);
+	gap: var(--space-m);
 }
 .sessions-settings-count {
-	color: var(--muted-foreground);
-	font-weight: 400;
+	color: var(--ink-3);
+	font-weight: var(--weight-body-regular);
 	font-variant-numeric: tabular-nums;
 }
 
-.sessions-settings-search {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	margin-bottom: 8px;
-	padding: 7px 10px;
-	border: 1px solid var(--border);
-	border-radius: 6px;
-	color: var(--muted-foreground);
-}
-.sessions-settings-search svg {
-	flex-shrink: 0;
-}
-.sessions-settings-search:focus-within {
-	outline: 2px solid var(--ring);
-	outline-offset: -1px;
-}
-.sessions-settings-search input {
-	width: 100%;
-	min-width: 0;
-	background: transparent;
-	font: inherit;
-	font-size: 13px;
-	color: var(--foreground);
-	border: 0;
-	outline: 0;
-}
-.sessions-settings-search input::placeholder {
-	color: var(--muted-foreground);
-}
 .sessions-settings-table-wrap {
 	max-width: 100%;
 	overflow-x: auto;
@@ -121,25 +79,25 @@
 	width: 100%;
 	border-collapse: collapse;
 	text-align: left;
-	font-size: 13px;
+	font-size: var(--size-l);
 }
 .sessions-settings-table th {
 	height: 36px;
-	color: var(--muted-foreground);
-	font-weight: 450;
+	color: var(--ink-3);
+	font-weight: var(--weight-body-regular);
 	white-space: nowrap;
 }
 .sessions-settings-table th,
 .sessions-settings-table td {
-	padding: 12px 8px;
-	border-bottom: 1px solid var(--border);
+	padding: var(--space-l) var(--space-m);
+	border-bottom: var(--border-m) solid var(--line);
 }
 .sessions-settings-table :is(th, td):first-child {
-	padding-left: 0;
+	padding-left: var(--space-zero);
 }
 .sessions-settings-table :is(th, td):last-child {
-	padding-right: 0;
-	padding-left: 24px;
+	padding-right: var(--space-zero);
+	padding-left: var(--space-xxl);
 	width: 145px;
 	white-space: nowrap;
 }
@@ -155,7 +113,7 @@
 }
 .sessions-settings-repo svg {
 	flex-shrink: 0;
-	color: var(--muted-foreground);
+	color: var(--ink-3);
 }
 .sessions-settings-repo-name {
 	display: block;
@@ -163,24 +121,24 @@
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	font-weight: 500;
+	font-weight: var(--weight-body-medium);
 }
 .sessions-settings-status {
 	display: inline-flex;
 	align-items: center;
 	gap: 7px;
-	color: var(--muted-foreground);
+	color: var(--ink-3);
 }
 .sessions-settings-status-dot {
 	width: 6px;
 	height: 6px;
 	flex-shrink: 0;
 	border-radius: 50%;
-	background: var(--muted-foreground);
+	background: var(--ink-3);
 	opacity: 0.5;
 }
 .sessions-settings-status[data-state="enabled"] .sessions-settings-status-dot {
-	background: #36966c;
+	background: var(--success);
 	opacity: 1;
 }
 .sessions-settings-status:is(
@@ -188,32 +146,27 @@
 		[data-state="mixed"]
 	)
 	> span {
-	background: #b48a39;
+	background: var(--warning);
 	opacity: 1;
 }
 .sessions-settings-status[data-state="unknown"] .sessions-settings-status-dot {
 	background: transparent;
-	border: 1px solid var(--muted-foreground);
+	border: var(--border-m) solid var(--ink-3);
 }
 .sessions-settings-empty {
-	padding: 28px 0;
-	color: var(--muted-foreground);
-}
-.sessions-settings-empty button {
-	text-decoration: underline;
-	text-underline-offset: 3px;
+	padding: var(--space-xxxl) var(--space-zero);
+	color: var(--ink-3);
 }
 .sessions-settings-status-note {
-	padding-top: 14px;
+	padding-top: var(--space-l);
 }
 @media (max-width: 640px) {
 	.sessions-settings,
 	.sessions-settings h2,
 	.sessions-settings p,
 	.sessions-settings-command code,
-	.sessions-settings-search input,
 	.sessions-settings-table {
-		font-size: 1rem;
+		font-size: var(--size-xxl);
 	}
 
 	.sessions-settings-repo-name {

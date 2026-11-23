@@ -7,7 +7,7 @@ import {
 import { type CSSProperties, type KeyboardEvent, useState } from "react";
 import { Link } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
-import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
+import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
 import { SERIES_COLORS } from "@/features/costs/chart-colors";
 import { formatReaderCost } from "@/features/sessions/reader/model/session-reader-model";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
@@ -155,7 +155,7 @@ export function PatternPane({
 									{userMap[example.userId] ?? "Member"} · Run {example.turn}
 								</span>
 							</span>
-							<span className="compass-row-sub inline-flex shrink-0 items-center gap-1">
+							<span className="compass-row-sub inline-flex shrink-0 items-center gap-xs">
 								{shortDate(example.startedAt)}
 								<IconExternalLink aria-hidden="true" className="size-3" />
 							</span>
@@ -167,7 +167,7 @@ export function PatternPane({
 				<h3>Fix</h3>
 				{pattern.fix ? (
 					<div className="compass-fix">
-						<span className="inline-flex items-center gap-1.5 font-medium">
+						<span className="inline-flex items-center gap-s font-medium">
 							<IconTool aria-hidden="true" className="size-3.5" />
 							Fixed {shortDate(pattern.fix.createdAt)}: {pattern.fix.note}
 						</span>
@@ -179,7 +179,7 @@ export function PatternPane({
 						</span>
 					</div>
 				) : (
-					<div className="flex flex-col gap-2">
+					<div className="flex flex-col gap-m">
 						<span className="compass-hint">
 							What did you change? A pointer, a check, a standard or a habit.
 							Compass then shows how often this happens since.
@@ -194,7 +194,7 @@ export function PatternPane({
 						<div>
 							<button
 								type="button"
-								className="cost-secondary-button"
+								className="secondary-button"
 								disabled={busy || note.trim().length < 3}
 								onClick={save}
 							>

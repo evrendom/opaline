@@ -1,7 +1,6 @@
 @import "@fontsource/geist-mono/400.css";
 @import "@fontsource/geist-mono/500.css";
-@import "@fontsource/nunito/700.css";
-@import "@fontsource/nunito/800.css";
+@import "@fontsource/geist-mono/600.css";
 
 /* Browsers that implement corner-shape (Chromium today). Squircle corners read
    less round than circular arcs at the same radius, so the larger radius only
@@ -22,11 +21,11 @@
    five evenly spaced stops along it, interpolated in OKLCH; each -tint keeps
    the hue at a pale lightness for fills (a deep one in dark mode, below). */
 @theme {
-	--color-opal-1: oklch(0.59 0.223 262.833);
-	--color-opal-2: oklch(0.583 0.239 281.458);
-	--color-opal-3: oklch(0.621 0.262 302.391);
-	--color-opal-4: oklch(0.668 0.273 323.991);
-	--color-opal-5: oklch(0.691 0.256 344.619);
+	--color-opal-1: var(--color-1);
+	--color-opal-2: var(--color-3);
+	--color-opal-3: var(--color-2);
+	--color-opal-4: var(--color-4);
+	--color-opal-5: var(--color-5);
 }
 
 @theme inline {
@@ -35,190 +34,35 @@
 	--color-opal-3-tint: var(--opal-3-tint);
 	--color-opal-4-tint: var(--opal-4-tint);
 	--color-opal-5-tint: var(--opal-5-tint);
-	--color-surface: var(--surface);
-	--color-heading: var(--heading);
-	--color-subheading: var(--subheading);
-	--color-hover: var(--hover);
-	--color-accent-hover: var(--accent-hover);
-	--color-accent-light: var(--accent-light);
-	--color-accent-text: var(--accent-text);
-	--color-status-success-bg: var(--status-success-bg);
-	--color-status-success-border: var(--status-success-border);
-	--color-status-success-text: var(--status-success-text);
-	--color-status-success-icon: var(--status-success-icon);
-	--color-status-error-bg: var(--status-error-bg);
-	--color-status-error-border: var(--status-error-border);
-	--color-status-error-text: var(--status-error-text);
-	--color-status-error-icon: var(--status-error-icon);
-	--color-status-warning-bg: var(--status-warning-bg);
-	--color-status-warning-border: var(--status-warning-border);
-	--color-status-warning-text: var(--status-warning-text);
-	--color-status-warning-icon: var(--status-warning-icon);
-	--color-status-info-bg: var(--status-info-bg);
-	--color-status-info-border: var(--status-info-border);
-	--color-status-info-text: var(--status-info-text);
-	--color-status-info-icon: var(--status-info-icon);
-	--color-chart-tooltip-bg: var(--chart-tooltip-bg);
-	--color-chart-tooltip-border: var(--chart-tooltip-border);
-	--color-chart-grid: var(--chart-grid);
-	--color-chart-axis: var(--chart-axis);
 }
 
 :root {
-	--app-font-heading: "Nunito", var(--font-sans);
+	--app-font-heading: var(--font-display);
+	/* The sheen's tints are opaque, pale in light and deep in dark, so a tile
+	   reads the same over the translucent sidebar as over a card. */
+	/* design-escape-ok(colour): artwork; the opal sheen's tile tint, oklch(0.95 0.035 262.833) */
 	--opal-1-tint: oklch(0.95 0.035 262.833);
+	/* design-escape-ok(colour): artwork; the opal sheen's tile tint, oklch(0.95 0.035 281.458) */
 	--opal-2-tint: oklch(0.95 0.035 281.458);
+	/* design-escape-ok(colour): artwork; the opal sheen's tile tint, oklch(0.95 0.035 302.391) */
 	--opal-3-tint: oklch(0.95 0.035 302.391);
+	/* design-escape-ok(colour): artwork; the opal sheen's tile tint, oklch(0.95 0.035 323.991) */
 	--opal-4-tint: oklch(0.95 0.035 323.991);
+	/* design-escape-ok(colour): artwork; the opal sheen's tile tint, oklch(0.95 0.035 344.619) */
 	--opal-5-tint: oklch(0.95 0.035 344.619);
-	--surface: #f7f8f9;
-	--heading: oklch(0.145 0 0);
-	--subheading: oklch(0.556 0 0);
-	--hover: oklch(0.97 0 0);
-	--accent-hover: oklch(0.205 0 0);
-	--accent-light: oklch(0.97 0 0);
-	--accent-text: oklch(0.205 0 0);
-	--status-success-bg: #f0fdf4;
-	--status-success-border: #bbf7d0;
-	--status-success-text: #166534;
-	--status-success-icon: #16a34a;
-	--status-error-bg: oklch(0.975 0.014 17.38);
-	--status-error-border: oklch(0.884 0.062 18.334);
-	--status-error-text: oklch(0.444 0.177 26.899);
-	--status-error-icon: oklch(0.577 0.245 27.325);
-	--status-warning-bg: oklch(0.987 0.026 102.212);
-	--status-warning-border: oklch(0.905 0.129 101.54);
-	--status-warning-text: oklch(0.473 0.124 46.201);
-	--status-warning-icon: oklch(0.646 0.222 41.116);
-	--status-info-bg: oklch(0.97 0.014 254.604);
-	--status-info-border: oklch(0.882 0.059 254.128);
-	--status-info-text: oklch(0.488 0.243 264.376);
-	--status-info-icon: oklch(0.546 0.245 262.881);
-	--chart-tooltip-bg: oklch(1 0 0);
-	--chart-tooltip-border: oklch(0.922 0 0);
-	--chart-grid: oklch(0.97 0 0);
-	--chart-axis: oklch(0.556 0 0);
-	/* Hairline-plus-soft-drop shadows that stand in for borders. Dark swaps
-	   them for an inset highlight edge over deeper drops (below). */
-	--custom-shadow:
-		0px 0px 0px 0.5px rgba(0, 0, 0, 0.06), 0px 0.5px 2px -0.5px rgba(
-			0,
-			0,
-			0,
-			0.06
-		),
-		0px 1px 4px 0px rgba(0, 0, 0, 0.04);
-	--custom-shadow-lifted:
-		0px 0px 0px 0.5px rgba(0, 0, 0, 0.08), 0px 1px 2px -0.5px rgba(
-			0,
-			0,
-			0,
-			0.06
-		),
-		0px 6px 12px -4px rgba(0, 0, 0, 0.1), 0px 16px 32px -8px rgba(0, 0, 0, 0.16);
-	--custom-shadow-secondary:
-		0px 0px 0px 0.5px rgba(0, 0, 0, 0.08), 0px 0.5px 2px -0.5px rgba(
-			0,
-			0,
-			0,
-			0.08
-		),
-		0px 2px 4px 0px rgba(0, 0, 0, 0.05);
-	/* Primary and destructive buttons. */
-	--custom-shadow-primary:
-		0px 0px 0px 0.5px rgba(0, 0, 0, 0.6), 0px 0.5px 2px -0.5px rgba(
-			0,
-			0,
-			0,
-			0.4
-		),
-		0px 2px 4px 0px rgba(0, 0, 0, 0.18);
-	--custom-shadow-destructive:
-		0px 0px 0px 0.5px rgba(244, 63, 94, 0.25),
-		0px 0.5px 2px -0.5px rgba(244, 63, 94, 0.18),
-		0px 2px 4px 0px rgba(244, 63, 94, 0.12);
-	/* Outline buttons. */
-	--custom-outline-shadow:
-		0px 0px 0px 0.5px rgba(0, 0, 0, 0.06), 0px 0.5px 2px -0.5px rgba(
-			0,
-			0,
-			0,
-			0.06
-		),
-		0px 2px 4px 0px rgba(0, 0, 0, 0.04);
 }
 
 .dark {
+	/* design-escape-ok(colour): artwork; the opal sheen's tile tint, oklch(0.28 0.08 262.833) */
 	--opal-1-tint: oklch(0.28 0.08 262.833);
+	/* design-escape-ok(colour): artwork; the opal sheen's tile tint, oklch(0.28 0.08 281.458) */
 	--opal-2-tint: oklch(0.28 0.08 281.458);
+	/* design-escape-ok(colour): artwork; the opal sheen's tile tint, oklch(0.28 0.08 302.391) */
 	--opal-3-tint: oklch(0.28 0.08 302.391);
+	/* design-escape-ok(colour): artwork; the opal sheen's tile tint, oklch(0.28 0.08 323.991) */
 	--opal-4-tint: oklch(0.28 0.08 323.991);
+	/* design-escape-ok(colour): artwork; the opal sheen's tile tint, oklch(0.28 0.08 344.619) */
 	--opal-5-tint: oklch(0.28 0.08 344.619);
-	--custom-shadow:
-		inset 0 0.75px 0 0 rgba(255, 255, 255, 0.03),
-		inset 0 0 0 0.75px rgba(255, 255, 255, 0.03), 0 0 0 0.75px rgba(
-			0,
-			0,
-			0,
-			0.1
-		),
-		0 2px 2px 0 rgba(0, 0, 0, 0.1), 0 4px 4px 0 rgba(0, 0, 0, 0.1),
-		0 8px 8px 0 rgba(0, 0, 0, 0.1);
-	--custom-shadow-lifted:
-		inset 0 0.75px 0 0 rgba(255, 255, 255, 0.06),
-		inset 0 0 0 0.75px rgba(255, 255, 255, 0.05), 0 0 0 0.75px rgba(
-			0,
-			0,
-			0,
-			0.3
-		),
-		0 4px 8px 0 rgba(0, 0, 0, 0.25), 0 12px 24px 0 rgba(0, 0, 0, 0.35),
-		0 24px 48px -8px rgba(0, 0, 0, 0.4);
-	--custom-shadow-secondary:
-		inset 0 0.5px 0 0 rgba(255, 255, 255, 0.04),
-		0 0 0 0.5px rgba(255, 255, 255, 0.08), 0 0.5px 2px 0 rgba(0, 0, 0, 0.25);
-	--custom-shadow-primary:
-		inset 0 0.5px 0 0 rgba(255, 255, 255, 0.45),
-		0 0 0 0.5px rgba(255, 255, 255, 0.55), 0 0.5px 2px 0 rgba(0, 0, 0, 0.5);
-	--custom-shadow-destructive:
-		inset 0 0.5px 0 0 rgba(244, 63, 94, 0.03),
-		0 0 0 0.5px rgba(244, 63, 94, 0.18), 0 0.5px 2px 0 rgba(244, 63, 94, 0.1);
-	--custom-outline-shadow:
-		inset 0 0.5px 0 0 rgba(255, 255, 255, 0.05),
-		inset 0 0 0 0.5px rgba(255, 255, 255, 0.045), 0 0 0 0.5px rgba(
-			0,
-			0,
-			0,
-			0.14
-		),
-		0 0.5px 2px -0.5px rgba(0, 0, 0, 0.14), 0 2px 4px 0 rgba(0, 0, 0, 0.08);
-	--surface: oklch(0.145 0 0);
-	--heading: oklch(0.985 0 0);
-	--subheading: oklch(0.708 0 0);
-	--hover: oklch(0.269 0 0);
-	--accent-hover: oklch(0.922 0 0);
-	--accent-light: oklch(0.269 0 0);
-	--accent-text: oklch(0.985 0 0);
-	--status-success-bg: oklch(0.266 0.065 152.934);
-	--status-success-border: oklch(0.393 0.095 152.535);
-	--status-success-text: oklch(0.793 0.118 152.498);
-	--status-success-icon: oklch(0.696 0.17 162.48);
-	--status-error-bg: oklch(0.258 0.092 26.042);
-	--status-error-border: oklch(0.396 0.141 25.723);
-	--status-error-text: oklch(0.808 0.114 19.571);
-	--status-error-icon: oklch(0.704 0.191 22.216);
-	--status-warning-bg: oklch(0.274 0.055 45.571);
-	--status-warning-border: oklch(0.414 0.112 45.904);
-	--status-warning-text: oklch(0.879 0.169 91.605);
-	--status-warning-icon: oklch(0.769 0.188 70.08);
-	--status-info-bg: oklch(0.282 0.091 267.935);
-	--status-info-border: oklch(0.379 0.146 265.522);
-	--status-info-text: oklch(0.785 0.115 274.713);
-	--status-info-icon: oklch(0.707 0.165 254.624);
-	--chart-tooltip-bg: oklch(0.205 0 0);
-	--chart-tooltip-border: oklch(1 0 0 / 10%);
-	--chart-grid: oklch(0.269 0 0);
-	--chart-axis: oklch(0.708 0 0);
 }
 
 @layer base {
@@ -227,92 +71,4 @@
 	#root {
 		@apply h-full;
 	}
-}
-
-/* Toolbar button (its Button "outline" / "secondary" variants at the
-   default size): a 32px white pill on a soft outline shadow, muted
-   14px text and 14px icons. `data-variant="secondary"` (or a pressed/active
-   state) lifts it to the stronger shadow with foreground text; `data-variant=
-   "chip"` is a quick-range chip, half-muted until picked. Unlayered on
-   purpose, so it wins over the utility classes the shared Button carries. */
-.toolbar-button {
-	position: relative;
-	display: inline-flex;
-	flex-shrink: 0;
-	align-items: center;
-	justify-content: center;
-	gap: 5.5px;
-	height: 32px;
-	padding: 0 12px;
-	border: 0;
-	border-radius: 9999px;
-	background: var(--card);
-	color: var(--muted-foreground);
-	box-shadow: var(--custom-outline-shadow);
-	font-size: 14px;
-	font-weight: 400;
-	line-height: 20px;
-	letter-spacing: normal;
-	white-space: nowrap;
-	outline: none;
-	transition:
-		color 150ms ease,
-		box-shadow 150ms ease;
-}
-.toolbar-button:has(> svg:first-child) {
-	padding-left: 10px;
-}
-.toolbar-button:has(> svg:last-child) {
-	padding-right: 10px;
-}
-.toolbar-button > svg {
-	width: 14px;
-	height: 14px;
-	flex-shrink: 0;
-}
-.toolbar-button:hover,
-.toolbar-button[aria-expanded="true"],
-.toolbar-button[data-popup-open] {
-	background: color-mix(in oklch, var(--muted) 50%, var(--card));
-}
-.toolbar-button:is(
-		[data-variant="secondary"],
-		[aria-pressed="true"],
-		[data-active="true"]
-	) {
-	color: var(--foreground);
-	box-shadow: var(--custom-shadow-secondary);
-}
-.toolbar-button[data-variant="chip"]:not([aria-pressed="true"]) {
-	color: color-mix(in oklch, var(--muted-foreground) 50%, transparent);
-}
-.toolbar-button[data-icon-only] {
-	width: 32px;
-	padding: 0;
-}
-.toolbar-button:disabled {
-	opacity: 0.5;
-	pointer-events: none;
-}
-
-/* Toolbar search field (its SearchInput): the toolbar
-   button's 32px white pill and outline shadow, with room for a leading
-   14px magnifier. */
-.toolbar-search {
-	height: 32px;
-	width: 100%;
-	border: 0;
-	border-radius: 9999px;
-	background: var(--card);
-	box-shadow: var(--custom-outline-shadow);
-	padding: 0 12px 0 32px;
-	font-size: 14px;
-	line-height: 20px;
-	color: var(--foreground);
-	outline: none;
-	transition: box-shadow 150ms ease;
-}
-.toolbar-search::placeholder {
-	color: var(--muted-foreground);
-	opacity: 1;
 }

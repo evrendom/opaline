@@ -106,7 +106,7 @@ export function RepoCiView({
 			{ replace: true },
 		);
 	return (
-		<div className="flex h-full min-h-0 gap-6 overflow-hidden pt-2 pr-8 pb-2 pl-6">
+		<div className="flex h-full min-h-0 gap-xxl overflow-hidden pt-m pr-xxxl pb-m pl-xxl">
 			<RepoPullColumn
 				costs={costs}
 				onPick={(key) => setPicks(key, null)}
@@ -154,7 +154,7 @@ export function RepoCiView({
 							row={shown}
 						/>
 					) : (
-						<div className="flex min-w-0 flex-1 flex-col p-4">
+						<div className="flex min-w-0 flex-1 flex-col p-xl">
 							<EmptyState
 								icon={IconGitPullRequest}
 								title="Pick a pull request"
@@ -186,8 +186,15 @@ function RepoPullColumn({
 	const [status, setStatus] = useState<PullStatus>("all");
 	const shownRows = rows.filter((row) => statusOf(row, status));
 	return (
-		<div className="-mb-2 flex min-h-0 w-[320px] shrink-0 flex-col gap-1.5">
-			<div className="flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-muted/50 px-1 text-xs">
+		<div className="-mb-m flex min-h-0 w-[320px] shrink-0 flex-col gap-s">
+			<div
+				className={cn(
+					"flex h-8 shrink-0 items-center gap-s",
+					"corner-s px-xs",
+					"text-body-m",
+					"bg-hover",
+				)}
+			>
 				<span>
 					<ViewToggle
 						label="Which pull requests to list"
@@ -201,9 +208,9 @@ function RepoPullColumn({
 					/>
 				</span>
 			</div>
-			<ScrollColumn className="-mx-1 px-1 pb-8">
+			<ScrollColumn className="-mx-xs px-xs pb-xxxl">
 				<FluidList>
-					<ul className="flex flex-col gap-0.5">
+					<ul className="flex flex-col gap-xxs">
 						{shownRows.map((row, index) => (
 							<li key={row.entry.key}>
 								<PullLine
@@ -285,7 +292,7 @@ function PullCostLabel({ cost }: { cost: PullCost | undefined }) {
 	return (
 		<span
 			title={known ? undefined : "No agent session's cost was found for it"}
-			className="w-12 shrink-0 text-right text-[11px] text-muted-foreground tabular-nums"
+			className="w-12 shrink-0 text-right text-body-s text-ink-3 tabular-nums"
 		>
 			{known ? money(cost.cost) : "—"}
 		</span>

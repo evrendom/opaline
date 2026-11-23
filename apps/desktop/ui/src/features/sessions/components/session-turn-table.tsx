@@ -14,6 +14,7 @@ import {
 } from "react";
 import { useLatestValueRef } from "@/app/hooks/useLatestValueRef";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
+import { TouchTarget } from "@/app/ui/touch-target";
 import type { ToolIconName } from "@/components/conversation/conversation-tools";
 import type { TraceIconTone } from "@/components/conversation/conversation-trace-icons";
 import type { SessionCompaction } from "./session-compactions";
@@ -45,6 +46,7 @@ import { SessionTurnTableSortableHeader } from "./session-turn-table-sortable-he
 import { useSessionTurnTableGeometry } from "./use-session-turn-table-geometry";
 import "./session-constellation-tree.css";
 import "./session-turn-table.css";
+import { Button } from "@/app/ui/button";
 
 export type SessionTurnTableOption = {
 	compactionsBefore: readonly SessionCompaction[];
@@ -224,15 +226,17 @@ function SessionTurnTableViewedRowsButton({
 	}
 
 	return (
-		<button
+		<Button
 			type="button"
+			variant="primary"
+			size="icon-sm"
 			aria-hidden={direction === undefined}
 			aria-label={
 				direction
 					? `Scroll ${direction === "above" ? "up" : "down"} to visible transcript rows`
 					: "Scroll to visible transcript rows"
 			}
-			className="group absolute left-2 z-30 flex size-6 items-center justify-center rounded-full bg-white opacity-100 shadow-[0_2px_6px_#00000024] dark:bg-popover dark:ring-1 dark:ring-white/10 outline-none data-[direction=above]:top-16 data-[direction=below]:bottom-11 data-[direction=none]:pointer-events-none data-[direction=none]:opacity-0 dark:shadow-none"
+			className="group absolute left-2 z-30 data-[direction=above]:top-16 data-[direction=below]:bottom-11 data-[direction=none]:hidden"
 			data-direction={direction ?? "none"}
 			disabled={direction === undefined}
 			onClick={scrollToViewedRows}
@@ -240,17 +244,14 @@ function SessionTurnTableViewedRowsButton({
 		>
 			<IconChevronUp
 				aria-hidden="true"
-				className="hidden size-4 shrink-0 stroke-[oklch(0.67_0.164_262.589)] group-data-[direction=above]:block"
+				className="hidden size-4 shrink-0 stroke-accent group-data-[direction=above]:block"
 			/>
 			<IconChevronDown
 				aria-hidden="true"
-				className="hidden size-4 shrink-0 stroke-[oklch(0.67_0.164_262.589)] group-data-[direction=below]:block"
+				className="hidden size-4 shrink-0 stroke-accent group-data-[direction=below]:block"
 			/>
-			<span
-				aria-hidden="true"
-				className="pointer-fine:hidden absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2"
-			/>
-		</button>
+			<TouchTarget />
+		</Button>
 	);
 }
 
@@ -426,7 +427,7 @@ export function SessionTurnTable({
 					aria-label="Session turn ledger"
 					className="block w-min min-w-full bg-(--session-turn-table-surface)"
 				>
-					<thead className="sticky top-0 z-10 block min-w-full border-b-[0.5px] border-(--session-overview-border) bg-(--session-turn-table-surface)">
+					<thead className="sticky top-0 z-10 block min-w-full edge-b-s border-line bg-(--session-turn-table-surface)">
 						<tr
 							className="grid h-(--session-turn-table-header-height) min-w-full bg-(--session-turn-table-surface) [grid-template-columns:var(--session-turn-grid-template)]"
 							style={getSessionTurnGridStyle(modelGridTemplate)}
@@ -451,13 +452,13 @@ export function SessionTurnTable({
 							{modelColumns.map((column, columnIndex) => (
 								<th
 									key={column.key}
-									className="h-full min-w-0 bg-(--session-turn-table-surface) text-left text-xs font-medium whitespace-nowrap text-(--session-overview-subtle)"
+									className="h-full min-w-0 bg-(--session-turn-table-surface) text-left text-body-m font-medium whitespace-nowrap text-ink-3"
 									scope="col"
 								>
 									{column.sortKey ? (
 										<SessionTurnTableSortableHeader
 											className={
-												column.key === "time" ? "pr-1.5 pl-0" : undefined
+												column.key === "time" ? "pr-s pl-zero" : undefined
 											}
 											columnIndex={columnIndex + (showSpeakerColumn ? 1 : 0)}
 											label={column.label}
@@ -466,7 +467,7 @@ export function SessionTurnTable({
 											sortKey={column.sortKey}
 										/>
 									) : (
-										<div className="flex h-full items-center px-1.5">
+										<div className="flex h-full items-center px-s">
 											<span className="max-w-full truncate">
 												{column.label}
 											</span>
@@ -505,15 +506,13 @@ export function SessionTurnTable({
 			</div>
 			<SessionTurnTableScrollbar scrollElementRef={scrollElementRef} />
 			{tableRows.length === 0 ? (
-				<div className="absolute inset-x-0 top-(--session-turn-table-header-height) bottom-0 flex items-center justify-center px-6 text-center">
-					<p className="text-sm text-(--session-overview-muted)">
-						No turns available.
-					</p>
+				<div className="absolute inset-x-0 top-(--session-turn-table-header-height) bottom-0 flex items-center justify-center px-xxl text-center">
+					<p className="text-body-xl text-ink-3">No turns available.</p>
 				</div>
 			) : null}
 			<div
 				aria-hidden="true"
-				className="pointer-events-none absolute inset-x-0 top-0 z-20 h-(--session-turn-table-header-height) border-t-[0.5px] border-(--session-overview-border)"
+				className="pointer-events-none absolute inset-x-0 top-0 z-20 h-(--session-turn-table-header-height) edge-t-s border-line"
 			/>
 			<SessionTurnTableViewedRowsButton
 				scrollElementRef={scrollElementRef}

@@ -1,0 +1,264 @@
+/* ============================================================
+   Opaline · tokens.css
+   Layer 1, the primitives, is src/app/theme.css: the neutral ramp, the
+   opal palette, success / warning / error, type, space, corners, strokes,
+   elevation and motion.
+   Layer 2, below, is the set of roles Opaline's screens are written against.
+   Components and patterns read Layer 2 only. `.dark` swaps Layer 1 and the
+   few roles that change character.
+   ============================================================ */
+
+:root {
+	/* -- Ground */
+	/* the window's content: a step off white in light, so white cards stand off it */
+	--canvas: color-mix(in oklab, var(--neutral-2) 60%, var(--neutral-1));
+	/* the frame behind the content window: the sidebar and window chrome */
+	--chrome: var(--canvas);
+	--surface: var(--neutral-1); /* cards, panels, popovers, menus, controls */
+	--inset: var(
+		--neutral-2
+	); /* a recessed area on the canvas: wells, code, rails */
+	--field: var(--neutral-3); /* inputs, chips, segmented tracks */
+	--hover: var(
+		--neutral-10-transparent
+	); /* a row under the pointer, and any soft tint: marks, stripes */
+	--hover-strong: var(--neutral-10-translucent); /* pressed, open, selected */
+	/* the ground of a text field or select: clear on the card shadow in light,
+	   a soft tint inside a hairline in dark */
+	--control: transparent;
+	--scrim: rgb(0 0 0 / 0.25); /* behind a dialog or sheet: always darkens */
+
+	/* -- Ink: four greys, loudest to quietest; no shades of them (an ink with
+	   an opacity snaps to the ink that holds it) */
+	--ink: var(--neutral-10); /* titles, body, values */
+	--ink-2: var(--neutral-8); /* secondary copy */
+	--ink-3: var(--neutral-7); /* meta, labels, icons */
+	--ink-4: var(
+		--neutral-6
+	); /* the quietest: disabled text, placeholders, separators */
+	--ink-inverse: var(--neutral-1);
+	/* the window chrome's quiet icons and labels (the window bar's arrows, the
+	   sidebar's section label): one mid-grey that reads on the light and the
+	   dark chrome alike */
+	--ink-chrome: var(--neutral-6);
+
+	/* -- Lines: white space first, a line next, a card last. Two strengths. */
+	--line: var(
+		--neutral-10-translucent
+	); /* hairlines, dividers, inputs, rails */
+	--line-soft: var(--neutral-10-transparent); /* chart grids, quiet dividers */
+
+	/* -- Action: neutral is the primary action; colour means state */
+	--primary: var(--neutral-9);
+	--primary-hover: color-mix(in oklch, var(--primary) 85%, var(--canvas));
+	--primary-fg: var(--neutral-1);
+	--focus: var(--neutral-6);
+	--focus-ring: color-mix(
+		in oklab,
+		var(--focus) 50%,
+		transparent
+	); /* the soft ring around a focused control */
+	--accent: var(--color-1); /* Opaline blue: links, selection, info */
+	--accent-tint: var(--color-1-transparent);
+	--accent-line: var(--color-1-translucent);
+	--accent-fg: #ffffff; /* text and icons on an accent fill, white in both modes */
+	--success-tint: color-mix(in oklab, var(--success) 12%, transparent);
+	--success-line: var(--success-translucent);
+	--warning-tint: var(--warning-transparent);
+	--warning-line: var(--warning-translucent);
+	--error-tint: var(--error-transparent);
+	--error-line: var(--error-translucent);
+
+	/* -- Elevation by role. A hairline plus a soft drop stands in for a border;
+	   dark trades the drop for an inset highlight edge. Tailwind reads each as
+	   `shadow-<role>` (registered below). They live here, not in the theme:
+	   each is a stack of hairline, contact and ambient layers, and dark swaps
+	   in inset highlights over black drops, which a theme shadow (one layer
+	   coloured from one neutral that flips with the mode) can't express. */
+	--shadow-card:
+		0 0 0 0.5px rgb(0 0 0 / 0.06), 0 0.5px 2px -0.5px rgb(0 0 0 / 0.06),
+		0 1px 4px 0 rgb(0 0 0 / 0.04);
+	--shadow-raised:
+		0 0 0 0.5px rgb(0 0 0 / 0.08), 0 0.5px 2px -0.5px rgb(0 0 0 / 0.08),
+		0 2px 4px 0 rgb(0 0 0 / 0.05);
+	/* a text field or select at rest */
+	--shadow-control: var(--shadow-card);
+	/* the inner hairline of a recessed well */
+	--shadow-inset: inset 0 0 0 0.5px rgb(0 0 0 / 0.06);
+	/* something floating free of a surface: a floating button, a tab menu, a
+	   toast, a scrub label. Its edge is a ring at the call site; dark keeps
+	   only the ring. */
+	--shadow-float:
+		0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+	/* -- Motion. The theme holds two timings: --motion-duration (150ms) and
+	   --motion-easing for small changes, --motion-large-duration (300ms) and
+	   --motion-large-easing for large ones. The roles below are the other
+	   timings the app really uses, named so call sites stop writing literals.
+	   Tailwind reads the easings as `ease-strong`, `ease-drawer`, `ease-wave`;
+	   durations as `duration-(--motion-medium-duration)`. */
+	--motion-quick-duration: 100ms; /* hover tints, a check appearing, flyouts */
+	--motion-medium-duration: 200ms; /* fades, sheets, a panel's width */
+	--motion-slow-duration: 650ms; /* a chart drawing in, a skeleton leaving */
+	--motion-strong-easing: cubic-bezier(
+		0.23,
+		1,
+		0.32,
+		1
+	); /* a strong ease-out: presses, things entering */
+	--motion-drawer-easing: cubic-bezier(
+		0.32,
+		0.72,
+		0,
+		1
+	); /* drawers, rails and rings settling */
+	--motion-wave-easing: cubic-bezier(
+		0.455,
+		0.03,
+		0.515,
+		0.955
+	); /* a symmetric in-out: strips growing, loops */
+
+	/* -- Third-party names (shadcn registry code, the sidebar primitive).
+	   Our code reads the roles above; these exist for code we don't own. */
+	--background: var(--canvas);
+	--secondary: var(--field);
+	--destructive: var(--error);
+	--input: var(--line);
+	--ring: var(--focus);
+	--radius: var(
+		--radius-m
+	); /* shadcn's base radius; its sm…4xl multiples scale from it */
+}
+
+.dark {
+	--canvas: var(--neutral-1);
+	--control: var(--hover);
+	--ink-chrome: var(--neutral-7);
+	--chrome: oklch(0.145 0 0); /* darker than the window it holds */
+	--surface: var(--neutral-2);
+	--primary: var(--neutral-10);
+	--shadow-card:
+		inset 0 0.75px 0 0 rgb(255 255 255 / 0.03),
+		inset 0 0 0 0.75px rgb(255 255 255 / 0.03), 0 0 0 0.75px rgb(0 0 0 / 0.1),
+		0 2px 2px 0 rgb(0 0 0 / 0.1), 0 4px 4px 0 rgb(0 0 0 / 0.1),
+		0 8px 8px 0 rgb(0 0 0 / 0.1);
+	--shadow-raised:
+		inset 0 0.5px 0 0 rgb(255 255 255 / 0.04),
+		0 0 0 0.5px rgb(255 255 255 / 0.08), 0 0.5px 2px 0 rgb(0 0 0 / 0.25);
+	--shadow-inset: inset 0 0 0 0.5px rgb(255 255 255 / 0.06);
+	--shadow-control: inset 0 0 0 0.5px var(--line-soft);
+	--shadow-float: 0 0 #0000;
+}
+
+/* Layer 2 as Tailwind colours: `bg-surface`, `text-ink-3`, `border-line`. */
+@theme inline {
+	--color-canvas: var(--canvas);
+	--color-surface: var(--surface);
+	--color-inset: var(--inset);
+	--color-field: var(--field);
+	--color-hover: var(--hover);
+	--color-hover-strong: var(--hover-strong);
+	--color-control: var(--control);
+	--color-scrim: var(--scrim);
+	--color-ink: var(--ink);
+	--color-ink-2: var(--ink-2);
+	--color-ink-3: var(--ink-3);
+	--color-ink-4: var(--ink-4);
+	--color-ink-inverse: var(--ink-inverse);
+	--color-ink-chrome: var(--ink-chrome);
+	--color-line: var(--line);
+	--color-line-soft: var(--line-soft);
+	--color-primary: var(--primary);
+	--color-primary-fg: var(--primary-fg);
+	--color-focus: var(--focus);
+	--color-focus-ring: var(--focus-ring);
+	--color-accent: var(--accent);
+	--color-accent-tint: var(--accent-tint);
+	--color-accent-line: var(--accent-line);
+	--color-accent-fg: var(--accent-fg);
+	--color-success-tint: var(--success-tint);
+	--color-success-line: var(--success-line);
+	--color-warning-tint: var(--warning-tint);
+	--color-warning-line: var(--warning-line);
+	--color-error-tint: var(--error-tint);
+	--color-error-line: var(--error-line);
+}
+
+/* Layer 2 elevation as Tailwind shadows: `shadow-card`, `shadow-raised`,
+   `shadow-control`, `shadow-inset`, `shadow-float`. Each utility reads the role variable of the
+   same name; `reference` keeps Tailwind from writing these names back over
+   the roles above. */
+@theme reference {
+	--shadow-card: var(--shadow-card);
+	--shadow-raised: var(--shadow-raised);
+	--shadow-control: var(--shadow-control);
+	--shadow-inset: var(--shadow-inset);
+	--shadow-float: var(--shadow-float);
+}
+
+/* Inset corners: a child drawn 1px inside a surface keeps its corners
+   concentric with the surface's (`corner-s-inset squircle:corner-xl-inset`
+   inside a `corner-s squircle:corner-xl` tile, `squircle:corner-l-inset`
+   inside a `squircle:corner-l` one: a hover or focus overlay). */
+@theme inline {
+	--corner-s-inset: calc(var(--radius-s) - 1px);
+	--corner-l-inset: calc(var(--radius-l) - 1px);
+	--corner-xl-inset: calc(var(--radius-xl) - 1px);
+	/* nested one space step inside or outside an xl squircle: a row highlight
+	   inset 4px in a card (18), a drop outline 4px around a shelf (26) */
+	--corner-xl-inner: calc(var(--radius-xl) - var(--space-xs));
+	--corner-xl-outer: calc(var(--radius-xl) + var(--space-xs));
+}
+
+/* Motion roles as Tailwind easings: `ease-base` and `ease-large` (the theme's
+   two timings), `ease-strong`, `ease-drawer`, `ease-wave`. */
+@theme reference {
+	--ease-base: var(--motion-easing);
+	--ease-large: var(--motion-large-easing);
+	--ease-strong: var(--motion-strong-easing);
+	--ease-drawer: var(--motion-drawer-easing);
+	--ease-wave: var(--motion-wave-easing);
+}
+
+/* Line and tracking for text that a body step can't carry on its own:
+   `line-solid` sets a label solid (line height 1) to centre it in a fixed-height
+   chip, bar or cell; `line-tight` is the dense 1.2 line of a figure row or a
+   10/12 tag. Pair each with a
+   `text-body-*` step, never a size. */
+@utility line-solid {
+	line-height: 1;
+}
+@utility line-tight {
+	line-height: 1.2;
+}
+
+/* The one keyboard-focus mark for buttons and anything clickable: a 2px
+   accent outline just outside the control, following its corners. An outline,
+   so it never fights the control's role shadow. Fields keep their own
+   `focus-visible:border-focus ring-focus-ring` pair. */
+@utility focus-outline {
+	outline: none;
+	&:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 1px;
+	}
+}
+
+/* -- Kept as authored: the sidebar primitive's
+   tokens (the window chrome, translucent for macOS vibrancy in app-surface.css). */
+:root {
+	--sidebar: oklch(0.985 0 0);
+	--sidebar-foreground: var(--ink);
+	--sidebar-primary: var(--ink);
+	--sidebar-primary-foreground: var(--neutral-2);
+	--sidebar-accent: var(--field);
+	--sidebar-accent-foreground: var(--ink);
+	--sidebar-border: var(--line);
+	--sidebar-ring: var(--ink-3);
+}
+
+.dark {
+	--sidebar: var(--chrome);
+	--sidebar-primary-foreground: var(--ink);
+}

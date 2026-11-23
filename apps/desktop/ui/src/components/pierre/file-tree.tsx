@@ -17,6 +17,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import {
 	FluidList,
 	type FluidListItems,
@@ -48,9 +49,9 @@ function RowTags({
 	const shown = tags.slice(0, ROW_TAGS);
 	const rest = tags.length - shown.length;
 	return (
-		<span className="flex shrink-0 items-center gap-0.5">
+		<span className="flex shrink-0 items-center gap-xxs">
 			{shown.map((tag) => (
-				<button
+				<Pressable
 					key={tag.id}
 					type="button"
 					tabIndex={-1}
@@ -60,12 +61,15 @@ function RowTags({
 						onPick?.(tag.id);
 					}}
 					className={cn(
-						"inline-flex items-center gap-0.5 rounded-[4px] px-1 font-mono text-[10px] leading-4 font-normal tabular-nums transition-colors",
+						"inline-flex items-center gap-xxs",
+						"corner-xs px-xs font-data text-body-xs font-regular tabular-nums",
+						"transition-colors",
 						tag.color
 							? ""
 							: tag.changed
-								? "bg-opal-2-tint text-opal-2 hover:bg-opal-2/20"
-								: "bg-muted text-muted-foreground hover:text-foreground",
+								? // design-escape-ok(base,opacity): data paint; a changed file's run tag in its opal colour
+									"bg-opal-2-tint text-color-3 hover:bg-opal-2/20"
+								: "bg-field text-ink-3 hover:text-ink",
 					)}
 					style={
 						tag.color
@@ -82,15 +86,15 @@ function RowTags({
 							// biome-ignore lint/suspicious/noArrayIndexKey: a fixed list, never reordered
 							key={`${index}:${dot}`}
 							aria-hidden="true"
-							className="size-1.5 shrink-0 rounded-full"
+							className="size-1.5 shrink-0 corner-full"
 							style={{ backgroundColor: dot }}
 						/>
 					))}
-				</button>
+				</Pressable>
 			))}
 			{rest > 0 ? (
 				<span
-					className="text-[10px] font-normal text-muted-foreground/70 tabular-nums"
+					className="text-body-xs font-regular text-ink-4 tabular-nums"
 					title={tags
 						.slice(ROW_TAGS)
 						.map((tag) => tag.label)
@@ -118,9 +122,10 @@ const STATUS_TITLE: Record<FileTreeStatus, string> = {
 };
 
 const STATUS_LOOK: Record<FileTreeStatus, string> = {
-	added: "text-opal-1",
-	deleted: "text-opal-5",
-	modified: "text-opal-3",
+	// design-escape-ok(base): data paint; file status marks in the opal palette
+	added: "text-color-1",
+	deleted: "text-color-5", // design-escape-ok(base): data paint; file status marks
+	modified: "text-color-2",
 	read: "",
 };
 
@@ -138,7 +143,7 @@ function RowIcon({
 	if (folder) {
 		const Folder = expanded ? IconFolderOpenFilled : IconFolderFilled;
 		return (
-			<Folder className="size-3.5 shrink-0 text-muted-foreground/50 transition-colors group-hover/row:text-muted-foreground" />
+			<Folder className="size-3.5 shrink-0 text-ink-4 transition-colors group-hover/row:text-ink-3" />
 		);
 	}
 	const { Icon } = getFileLanguage(name);
@@ -147,9 +152,7 @@ function RowIcon({
 			aria-hidden="true"
 			className={cn(
 				"size-3.5 shrink-0 transition-colors",
-				selected
-					? "text-foreground"
-					: "text-muted-foreground/50 group-hover/row:text-muted-foreground",
+				selected ? "text-ink" : "text-ink-4 group-hover/row:text-ink-3",
 			)}
 		/>
 	);
@@ -257,7 +260,7 @@ export function FileTree({
 		<div className="flex flex-col">
 			{model.rootLabel ? (
 				<div
-					className="truncate px-2.5 pb-1 text-xs text-muted-foreground/70 [direction:rtl] text-left"
+					className="truncate px-m pb-xs text-body-m text-ink-4 [direction:rtl] text-left"
 					title={model.rootLabel}
 				>
 					{`‎${model.rootLabel}‎`}
@@ -298,11 +301,15 @@ export function FileTree({
 								onFocus={() => fluid.current?.setActiveIndex(index)}
 								onKeyDown={(event) => onKeyDown(event, index)}
 								className={cn(
-									"group/row flex h-7 items-center gap-1.5 rounded-md pr-2.5 pl-1 text-[13px] outline-none select-none corner-squircle squircle:rounded-xl",
+									"group/row flex h-7 items-center gap-s",
+									"corner-s pr-m pl-xs corner-squircle",
+									"text-body-l",
+									"outline-none select-none",
+									"squircle:corner-l",
 									row.item?.dimmed && !isSelected && "opacity-40",
 									isSelected
-										? "bg-muted font-medium text-foreground"
-										: "text-muted-foreground hover:text-foreground",
+										? "bg-field font-medium text-ink"
+										: "text-ink-3 hover:text-ink",
 								)}
 							>
 								{row.ancestorKeys.map((key) => (
@@ -313,8 +320,8 @@ export function FileTree({
 										className={cn(
 											"h-full w-3 shrink-0 bg-[linear-gradient(to_right,transparent_6px,var(--guide)_6px,var(--guide)_7px,transparent_7px)]",
 											key === activeParentKey
-												? "[--guide:color-mix(in_oklab,var(--color-muted-foreground)_30%,transparent)]"
-												: "[--guide:color-mix(in_oklab,var(--color-border)_70%,transparent)]",
+												? "[--guide:var(--ink-4)]"
+												: "[--guide:var(--line)]",
 										)}
 									/>
 								))}
@@ -322,7 +329,7 @@ export function FileTree({
 									<IconChevronRight
 										aria-hidden="true"
 										className={cn(
-											"size-3 shrink-0 text-muted-foreground/60 transition-transform",
+											"size-3 shrink-0 text-ink-4 transition-transform",
 											row.isExpanded && "rotate-90",
 										)}
 									/>
@@ -343,7 +350,7 @@ export function FileTree({
 									{row.segments.map((segment, part) => (
 										<span key={row.segments.slice(0, part + 1).join("/")}>
 											{part > 0 ? (
-												<span className="text-muted-foreground/50"> / </span>
+												<span className="text-ink-4"> / </span>
 											) : null}
 											{segment}
 										</span>
@@ -353,14 +360,14 @@ export function FileTree({
 									<RowTags onPick={onPickTag} tags={row.item.tags} />
 								) : null}
 								{row.item?.badge ? (
-									<span className="shrink-0 text-xs font-normal text-muted-foreground/70 tabular-nums">
+									<span className="shrink-0 text-body-m font-regular text-ink-4 tabular-nums">
 										{row.item.badge}
 									</span>
 								) : null}
 								{showGitLane ? (
 									<span
 										className={cn(
-											"flex w-3 shrink-0 justify-center text-[11px] font-medium",
+											"flex w-3 shrink-0 justify-center text-body-s font-medium",
 											status && STATUS_LOOK[status],
 										)}
 										title={status ? STATUS_TITLE[status] : undefined}
@@ -368,12 +375,13 @@ export function FileTree({
 										{status === "read" ? (
 											<IconEyeFilled
 												aria-hidden="true"
-												className="size-3 text-muted-foreground/60"
+												className="size-3 text-ink-4"
 											/>
 										) : status ? (
 											STATUS_LETTER[status]
 										) : row.containsChange ? (
-											<span className="size-1.5 rounded-full bg-opal-3/60" />
+											// design-escape-ok(base): data paint; a changed folder's mark in the modified opal
+											<span className="size-1.5 corner-full bg-color-2/60" />
 										) : null}
 									</span>
 								) : null}

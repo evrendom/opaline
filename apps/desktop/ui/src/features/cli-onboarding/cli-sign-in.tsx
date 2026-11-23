@@ -1,4 +1,6 @@
 import { type FormEvent, useEffect, useState } from "react";
+import { Button } from "@/app/ui/button";
+import { Input } from "@/app/ui/input";
 import { usePasswordSignIn } from "@/features/auth/password-sign-in";
 import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import { authClient } from "@/lib/auth-client";
@@ -18,7 +20,6 @@ import {
 	signOutCliSession,
 } from "./cli-onboarding-auth";
 import "@/features/self-hosted/self-hosted.css";
-import "@/features/shell/website-button.css";
 import "./cli-onboarding.css";
 
 import { WelcomeBack, WelcomeProgress } from "./welcome-panel";
@@ -200,33 +201,39 @@ export function CliSignIn(props: CliSignInProps) {
 			{emailStage === "choice" ? (
 				<>
 					<div className="cli-onboarding-auth-options">
-						<button
+						<Button
 							type="button"
-							className="opaline-website-primary-button"
+							variant="primary"
+							size="lg"
+							className="w-full"
 							disabled={busy}
 							onClick={() =>
 								void run(() => signInCliWithProvider("github", callbackURL))
 							}
 						>
-							<span>Continue with GitHub</span>
-						</button>
-						<button
+							Continue with GitHub
+						</Button>
+						<Button
 							type="button"
+							size="lg"
+							className="w-full"
 							disabled={busy}
 							onClick={() =>
 								void run(() => signInCliWithProvider("google", callbackURL))
 							}
 						>
 							Continue with Google
-						</button>
+						</Button>
 						<span className="cli-onboarding-divider">or</span>
-						<button
+						<Button
 							type="button"
+							size="lg"
+							className="w-full"
 							disabled={busy}
 							onClick={() => setEmailStage("email")}
 						>
 							Continue with Email
-						</button>
+						</Button>
 					</div>
 					<p className="cli-onboarding-terms">
 						By continuing, you agree to our{" "}
@@ -240,8 +247,7 @@ export function CliSignIn(props: CliSignInProps) {
 						.
 					</p>
 					{localPreview ? (
-						<button
-							className="cli-onboarding-text-button"
+						<Button
 							type="button"
 							disabled={busy}
 							onClick={() =>
@@ -258,7 +264,7 @@ export function CliSignIn(props: CliSignInProps) {
 							}
 						>
 							Continue with local test account
-						</button>
+						</Button>
 					) : null}
 				</>
 			) : (
@@ -269,7 +275,7 @@ export function CliSignIn(props: CliSignInProps) {
 					{emailStage === "email" ? (
 						<>
 							<label htmlFor="cli-email">Email address</label>
-							<input
+							<Input
 								autoComplete="email"
 								id="cli-email"
 								name="email"
@@ -282,7 +288,7 @@ export function CliSignIn(props: CliSignInProps) {
 							{passwordSignIn ? (
 								<>
 									<label htmlFor="cli-password">Password</label>
-									<input
+									<Input
 										autoComplete="current-password"
 										id="cli-password"
 										name="password"
@@ -294,8 +300,10 @@ export function CliSignIn(props: CliSignInProps) {
 									/>
 								</>
 							) : null}
-							<button
-								className="cli-onboarding-primary"
+							<Button
+								variant="primary"
+								size="lg"
+								className="w-full"
 								disabled={busy}
 								type="submit"
 							>
@@ -306,10 +314,9 @@ export function CliSignIn(props: CliSignInProps) {
 									: busy
 										? "Sending…"
 										: "Send sign-in code"}
-							</button>
+							</Button>
 							{passwordAllowed ? (
-								<button
-									className="cli-onboarding-text-button"
+								<Button
 									type="button"
 									disabled={busy}
 									onClick={() => {
@@ -321,14 +328,14 @@ export function CliSignIn(props: CliSignInProps) {
 									{passwordSignIn
 										? "Use an email code instead"
 										: "Use a password instead"}
-								</button>
+								</Button>
 							) : null}
 						</>
 					) : (
 						<>
 							<p>Enter the 6-digit code sent to {email}.</p>
 							<label htmlFor="cli-email-code">Sign-in code</label>
-							<input
+							<Input
 								id="cli-email-code"
 								name="code"
 								autoComplete="one-time-code"
@@ -342,21 +349,22 @@ export function CliSignIn(props: CliSignInProps) {
 									setOtp(event.target.value.replace(/\D/gu, "").slice(0, 6))
 								}
 							/>
-							<button
-								className="cli-onboarding-primary"
+							<Button
+								variant="primary"
+								size="lg"
+								className="w-full"
 								disabled={busy}
 								type="submit"
 							>
 								{busy ? "Signing in…" : "Sign in"}
-							</button>
-							<button
-								className="cli-onboarding-text-button"
+							</Button>
+							<Button
 								type="button"
 								disabled={busy}
 								onClick={() => void run(() => sendCliEmailCode(email.trim()))}
 							>
 								Resend code
-							</button>
+							</Button>
 						</>
 					)}
 				</form>

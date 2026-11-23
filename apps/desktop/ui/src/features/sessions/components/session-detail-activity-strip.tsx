@@ -1,4 +1,5 @@
 // biome-ignore-all lint/nursery/noExcessiveLinesPerFile: Trigger and animated panel state must remain in one coordinated menu controller.
+
 import type { SessionDetailOverview } from "@rudel/api-routes";
 import {
 	type KeyboardEvent,
@@ -11,6 +12,8 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { Pressable } from "@/app/ui/pressable";
+import { TouchTarget } from "@/app/ui/touch-target";
 import { cn } from "@/lib/utils";
 import {
 	buildSessionDetailActivityGroups,
@@ -81,16 +84,13 @@ function SessionDetailActivityMenuItem({
 }) {
 	return (
 		<li className="session-detail-opaline-trigger-item">
-			<button
+			<Pressable
 				aria-expanded={flyoutsEnabled ? isOpen : undefined}
 				aria-haspopup={flyoutsEnabled ? "menu" : undefined}
 				className={cn(
-					"session-detail-opaline-trigger relative inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border-[0.5px] border-black/20 bg-white px-2.5 py-1 text-[0.8125rem]/5 font-medium text-black/60 disabled:pointer-events-none dark:border-white/25 dark:bg-(--session-overview-surface) dark:text-white/70",
-					flyoutsEnabled &&
-						"hover:bg-black/[0.063] hover:text-black/90 dark:hover:bg-white/[0.071] dark:hover:text-white/95",
-					flyoutsEnabled &&
-						isOpen &&
-						"bg-black/[0.063] text-black/90 dark:bg-white/[0.071] dark:text-white/95",
+					"session-detail-opaline-trigger relative inline-flex shrink-0 items-center justify-center gap-s corner-s border-[0.5px] border-line bg-canvas px-m py-xs text-body-l font-medium text-ink-2 disabled:opacity-100",
+					flyoutsEnabled && "hover:bg-hover-strong hover:text-ink",
+					flyoutsEnabled && isOpen && "bg-hover-strong text-ink",
 				)}
 				data-state={isOpen ? "open" : "closed"}
 				disabled={!flyoutsEnabled}
@@ -102,15 +102,12 @@ function SessionDetailActivityMenuItem({
 				ref={triggerRef}
 				type="button"
 			>
-				<span
-					aria-hidden="true"
-					className="pointer-events-none absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden"
-				/>
+				<TouchTarget className="pointer-events-none" />
 				<span>{group.label}</span>
-				<span className="text-black/60 tabular-nums dark:text-white/70">
+				<span className="text-ink-2 tabular-nums">
 					{group.totalCount.toLocaleString()}
 				</span>
-			</button>
+			</Pressable>
 		</li>
 	);
 }
@@ -498,7 +495,7 @@ export function SessionDetailActivityStrip({
 	return (
 		<header
 			ref={stripElementRef}
-			className="relative z-[60] flex h-11 shrink-0 items-center border-y-[0.5px] border-(--session-overview-border) bg-(--session-overview-surface) p-2"
+			className="relative z-[60] flex h-11 shrink-0 items-center border-y-[0.5px] border-line bg-canvas p-m"
 		>
 			<nav
 				aria-label="Session detail activity"
@@ -506,7 +503,7 @@ export function SessionDetailActivityStrip({
 			>
 				<ul
 					ref={triggerListElementRef}
-					className="flex w-max items-center gap-2"
+					className="flex w-max items-center gap-m"
 					data-session-detail-activity-items
 				>
 					{groups.map((group) => (
@@ -532,7 +529,8 @@ export function SessionDetailActivityStrip({
 				</ul>
 				{flyoutsEnabled && panelFrames.length > 0 ? (
 					<div
-						className="session-detail-opaline-menu absolute top-[calc(100%+1px)] right-0 left-0 overflow-hidden rounded-xl bg-white/90 text-[#282a30] shadow-[0_8px_32px_#08090a0d] ring-1 ring-black/8 backdrop-blur-2xl outline-none dark:bg-[#08090ae6] dark:text-[#f7f8f8] dark:shadow-[0_8px_32px_#08090a] dark:ring-white/8"
+						// design-escape-ok(opacity): the platform; a glass flyout, canvas at 90% over a backdrop blur
+						className="session-detail-opaline-menu absolute top-[calc(100%+1px)] right-0 left-0 overflow-hidden corner-l bg-canvas/90 text-ink shadow-float ring-1 ring-line backdrop-blur-2xl outline-none"
 						data-state={popupState}
 						onPointerEnter={() => clearTimer(closeTimerRef.current)}
 						onPointerLeave={scheduleClose}

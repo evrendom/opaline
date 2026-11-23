@@ -2,8 +2,9 @@ import {
 	type DashboardMetric,
 	GITHUB_INACTIVE_FILTER_TOOLTIP,
 } from "@rudel/api-routes";
-import { IconAlertTriangle, IconRefresh, IconX } from "@tabler/icons-react";
+import { IconAlertTriangle, IconX } from "@tabler/icons-react";
 import {
+	type ComponentProps,
 	type CSSProperties,
 	type ReactNode,
 	type RefObject,
@@ -15,10 +16,11 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { IntroReveal } from "@/app/ui/bones";
+import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
+import { Pressable } from "@/app/ui/pressable";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
-import { Button } from "@/components/dashboard/button";
 import { EmptyState } from "@/components/dashboard/page-parts";
-import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
+import { RetryButton } from "@/components/retry-button";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { useShellHeaderPortal } from "@/features/shell/shell-header-portal";
 import { useOptionalOrganization } from "@/features/workspace/organization/useOrganization";
@@ -60,6 +62,33 @@ const GITHUB_CARDS: readonly DashboardMetric[] = [
 	"mergedPullRequests",
 	"ciRuns",
 ];
+
+/** An active dashboard filter in the chart card's header: its dimension,
+ *  its value and a cross that removes it. `inactive` dims a filter the
+ *  charted metric ignores. */
+export function CostFilterChip({
+	dimension,
+	value,
+	inactive,
+	...props
+}: ComponentProps<"button"> & {
+	dimension: string;
+	value: string;
+	inactive: boolean;
+}) {
+	return (
+		<Pressable
+			type="button"
+			className="filter-chip"
+			data-inactive={inactive}
+			{...props}
+		>
+			<span className="filter-chip-dimension">{dimension}</span>
+			<span className="truncate">{value}</span>
+			<IconX size={12} className="shrink-0" />
+		</Pressable>
+	);
+}
 
 export function CostDashboardPage() {
 	const dashboard = useCostDashboard();
@@ -234,36 +263,28 @@ export function CostDashboardView({
 							}}
 						>
 							<TooltipTrigger
-								asChild
 								id={`cost-filter-${dimension}-${encodeURIComponent(id)}`}
 								onFocus={() => {
 									if (inactive) setFocusedFilter(`${dimension}:${id}`);
 								}}
 								onBlur={() => setFocusedFilter(null)}
-							>
-								<button
-									type="button"
-									key={`${dimension}:${id}`}
-									className="cost-filter-chip"
-									data-inactive={inactive}
-									aria-describedby={
-										inactive
-											? `cost-filter-description-${dimension}-${encodeURIComponent(id)}`
-											: undefined
-									}
-									onClick={() => toggle(dimension, id)}
-									title={`${COST_LABELS[dimension]}: ${costLabel(dimension, label) || "Unattributed"}`}
-									aria-label={`Remove ${dimension === "members" ? "member" : dimension === "models" ? "model" : COST_LABELS[dimension].toLowerCase()} filter ${costLabel(dimension, label)}${inactive ? ` (not applied to ${METRIC_LABELS[metric]})` : ""}`}
-								>
-									<span className="cost-filter-dimension">
-										{COST_LABELS[dimension]}
-									</span>
-									<span className="truncate">
-										{costLabel(dimension, label) || "Unattributed"}
-									</span>
-									<IconX size={12} className="shrink-0" />
-								</button>
-							</TooltipTrigger>
+								render={
+									<CostFilterChip
+										key={`${dimension}:${id}`}
+										dimension={COST_LABELS[dimension]}
+										value={costLabel(dimension, label) || "Unattributed"}
+										inactive={inactive}
+										aria-describedby={
+											inactive
+												? `cost-filter-description-${dimension}-${encodeURIComponent(id)}`
+												: undefined
+										}
+										onClick={() => toggle(dimension, id)}
+										title={`${COST_LABELS[dimension]}: ${costLabel(dimension, label) || "Unattributed"}`}
+										aria-label={`Remove ${dimension === "members" ? "member" : dimension === "models" ? "model" : COST_LABELS[dimension].toLowerCase()} filter ${costLabel(dimension, label)}${inactive ? ` (not applied to ${METRIC_LABELS[metric]})` : ""}`}
+									/>
+								}
+							/>
 							{inactive ? (
 								<TooltipContent
 									role="tooltip"
@@ -336,16 +357,12 @@ export function CostDashboardView({
 									title="The dashboard couldn’t load"
 									description={dashboardErrorText(query.error)}
 								>
-									<Button
-										variant="outline"
-										className="mx-auto mt-2"
-										onClick={() => {
+									<RetryButton
+										onRetry={() => {
 											void query.refetch();
 										}}
-									>
-										<IconRefresh />
-										Try again
-									</Button>
+										className="mx-auto mt-m"
+									/>
 								</EmptyState>
 							</div>
 						) : (
@@ -395,7 +412,7 @@ export function CostDashboardView({
 							{tabbed ? (
 								<div className="cost-breakdown-tabs" role="tablist">
 									{dimensions.map((dimension) => (
-										<button
+										<Pressable
 											key={dimension}
 											type="button"
 											role="tab"
@@ -403,7 +420,7 @@ export function CostDashboardView({
 											onClick={() => setBreakdownTab(dimension)}
 										>
 											{COST_LABELS[dimension]}
-										</button>
+										</Pressable>
 									))}
 								</div>
 							) : null}

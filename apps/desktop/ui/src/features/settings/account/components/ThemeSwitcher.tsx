@@ -2,7 +2,7 @@ import { IconDeviceLaptop, IconMoon, IconSun } from "@tabler/icons-react";
 import { motion } from "motion/react";
 import { useId } from "react";
 import { useTheme } from "@/app/providers/ThemeProvider";
-import { cn } from "@/lib/utils";
+import { Button } from "@/app/ui/button";
 
 const MORPH = { type: "spring", stiffness: 400, damping: 38 } as const;
 
@@ -23,34 +23,30 @@ export function ThemeSwitcher() {
 	const pillId = useId();
 
 	return (
-		<fieldset className="inline-flex items-center rounded-full">
+		<fieldset className="inline-flex items-center corner-full">
 			<legend className="sr-only">Theme</legend>
 			{THEME_OPTIONS.map(({ value, label, icon: Icon }) => {
 				const active = theme === value;
 				return (
-					<button
+					<Button
 						key={value}
 						type="button"
+						size="icon-sm"
 						aria-label={label}
 						aria-pressed={active}
 						title={label}
 						onClick={() => setTheme(value)}
-						className={cn(
-							"relative flex size-7 items-center justify-center rounded-full outline-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--dashboard-01-metric-button-focus-ring)]",
-							active
-								? "text-foreground"
-								: "text-muted-foreground/60 hover:text-foreground",
-						)}
+						className="relative"
 					>
 						{active ? (
 							<motion.span
 								layoutId={pillId}
 								transition={MORPH}
-								className="absolute inset-0 rounded-full bg-input/50 shadow-(--custom-shadow)"
+								className={"absolute inset-0 corner-full bg-hover shadow-card"}
 							/>
 						) : null}
 						<Icon aria-hidden="true" className="relative z-10 size-3.5" />
-					</button>
+					</Button>
 				);
 			})}
 		</fieldset>

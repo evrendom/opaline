@@ -1,6 +1,8 @@
 import type { SessionDetailTurnSummary } from "@rudel/api-routes";
 import { IconChevronRight } from "@tabler/icons-react";
 import { type ReactNode, useState } from "react";
+import { Button } from "@/app/ui/button";
+import { Pressable } from "@/app/ui/pressable";
 import {
 	Tooltip,
 	TooltipContent,
@@ -49,9 +51,9 @@ function Field({
 	value: ReactNode;
 }) {
 	return (
-		<div className={cn("flex min-w-0 flex-col gap-1", className)}>
-			<span className="text-xs text-muted-foreground">{label}</span>
-			<span className="text-[13px] tabular-nums">{value}</span>
+		<div className={cn("flex min-w-0 flex-col gap-xs", className)}>
+			<span className="text-body-m text-ink-3">{label}</span>
+			<span className="text-body-l tabular-nums">{value}</span>
 		</div>
 	);
 }
@@ -86,8 +88,8 @@ function BreakdownStrip({
 	if (parts.length === 0 || sum <= 0 || denom <= 0) return null;
 	const share = (value: number) => formatShare(value / denom);
 	return (
-		<span className="flex flex-col gap-3">
-			<span className="flex h-1 w-full gap-px overflow-hidden rounded-[1px]">
+		<span className="flex flex-col gap-l">
+			<span className="flex h-1 w-full gap-xxs overflow-hidden corner-xs">
 				<TooltipProvider>
 					{parts.map((part) => (
 						<Tooltip key={part.label}>
@@ -118,7 +120,13 @@ function BreakdownStrip({
 					))}
 				</TooltipProvider>
 			</span>
-			<span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground tabular-nums">
+			<span
+				className={cn(
+					"flex flex-wrap items-center gap-x-l gap-y-xs",
+					"text-body-s tabular-nums",
+					"text-ink-3",
+				)}
+			>
 				{parts.map((part) => (
 					// biome-ignore lint/a11y/noStaticElementInteractions: hover only dims the other segments, to find thin ones
 					<span
@@ -126,18 +134,16 @@ function BreakdownStrip({
 						onMouseEnter={() => setHovered(part.label)}
 						onMouseLeave={() => setHovered(null)}
 						className={cn(
-							"inline-flex cursor-zoom-in items-center gap-1.5 transition-opacity",
+							"inline-flex cursor-zoom-in items-center gap-s transition-opacity",
 							hovered !== null && hovered !== part.label && "opacity-40",
 						)}
 					>
 						<span
-							className={cn("size-2 rounded-xs", part.swatch)}
+							className={cn("size-2 corner-xs", part.swatch)}
 							style={{ backgroundColor: part.color }}
 						/>
 						{part.label} {format(part.value)}
-						<span className="text-muted-foreground/60">
-							{share(part.value)}
-						</span>
+						<span className="text-ink-4">{share(part.value)}</span>
 					</span>
 				))}
 			</span>
@@ -247,7 +253,7 @@ function TimeDistribution({
 				{ label: "Compacting", swatch: "bg-green-500", value: compacting },
 				{
 					label: "Waiting",
-					swatch: "bg-muted-foreground/15",
+					swatch: "bg-hover-strong",
 					value: Math.max(0, totalMs - covered),
 				},
 			]
@@ -267,32 +273,36 @@ const TAG_LIMIT = 12;
  * and removed — each group under its mark, every item a tag. */
 function Touched({ marks }: { marks: readonly SessionReaderTurnMark[] }) {
 	return (
-		<div className="flex flex-col gap-4">
+		<div className="flex flex-col gap-xl">
 			{marks.map((mark) => {
 				const { className, Icon, label, tint } = TURN_MARKS[mark.kind];
 				const shown = mark.items.slice(0, TAG_LIMIT);
 				const hidden = mark.items.slice(TAG_LIMIT);
 				return (
-					<div key={mark.kind} className="flex min-w-0 flex-col gap-2">
-						<span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+					<div key={mark.kind} className="flex min-w-0 flex-col gap-m">
+						<span className="flex items-center gap-s text-body-m text-ink-3">
 							<Icon aria-hidden="true" className={cn("size-3.5", className)} />
 							{label}
-							<span className="text-muted-foreground/60 tabular-nums">
+							<span className="text-ink-4 tabular-nums">
 								{mark.items.length}
 							</span>
 						</span>
-						<ul className="flex flex-wrap gap-1.5">
+						<ul className="flex flex-wrap gap-s">
 							{shown.map((item) => (
 								<li key={item} className="flex min-w-0 max-w-full">
 									{mark.kind === "skill" ? (
 										<span
 											title={item}
-											className="inline-flex h-6 max-w-full min-w-0 items-center gap-1.5 rounded-full bg-background pr-2.5 pl-1 shadow-(--custom-outline-shadow) dark:bg-card"
+											className={cn(
+												"inline-flex h-6 max-w-full min-w-0 items-center gap-s",
+												"corner-full pr-l pl-xs",
+												"bg-surface shadow-card",
+											)}
 										>
 											<OpalChip tint={tint} className={cn("size-4", className)}>
 												<Icon aria-hidden="true" className="size-2.5" />
 											</OpalChip>
-											<span className="truncate text-xs">{item}</span>
+											<span className="truncate text-body-m">{item}</span>
 										</span>
 									) : (
 										<FileTag path={item} />
@@ -302,7 +312,7 @@ function Touched({ marks }: { marks: readonly SessionReaderTurnMark[] }) {
 							{hidden.length > 0 ? (
 								<li
 									title={hidden.join("\n")}
-									className="flex h-6 items-center px-1 text-xs text-muted-foreground tabular-nums"
+									className="flex h-6 items-center px-xs text-body-m text-ink-3 tabular-nums"
 								>
 									+{hidden.length} more
 								</li>
@@ -331,67 +341,70 @@ function StepKinds({
 }) {
 	const [open, setOpen] = useState(true);
 	return (
-		<div className={cn("flex flex-col", open && "gap-3")}>
+		<div className={cn("flex flex-col", open && "gap-l")}>
 			<div className="flex items-center justify-between">
-				<button
+				<Pressable
 					type="button"
 					aria-expanded={open}
 					onClick={() => setOpen((value) => !value)}
-					className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+					className="flex items-center gap-xs text-body-m text-ink-3 hover:text-ink"
 				>
 					<IconChevronRight
 						aria-hidden="true"
 						className={cn("size-3.5 transition-transform", open && "rotate-90")}
 					/>
 					Steps · {options.length} {options.length === 1 ? "kind" : "kinds"}
-				</button>
+				</Pressable>
 				{filter.size > 0 ? (
-					<button
+					<Button
+						size="sm"
 						type="button"
 						onClick={() => {
 							for (const key of filter) onToggle(key);
 						}}
-						className="text-xs text-muted-foreground hover:text-foreground"
 					>
 						Show all
-					</button>
+					</Button>
 				) : null}
 			</div>
 			{open ? (
-				<div className="-mx-2 flex flex-col">
+				<div className="-mx-m flex flex-col">
 					{options.map((option) => {
 						const on = filter.has(option.key);
 						const dimmed = filter.size > 0 && !on;
 						return (
-							<button
+							<Pressable
 								key={option.key}
 								type="button"
 								aria-pressed={on}
 								onClick={() => onToggle(option.key)}
 								title={on ? "Show every step" : `Show only ${option.key}`}
 								className={cn(
-									"flex w-full items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-accent/80 dark:hover:bg-accent/50",
-									on && "bg-accent dark:bg-accent/70",
+									"flex w-full items-center gap-m",
+									"corner-s px-m py-xs",
+									"text-left",
+									"hover:bg-hover",
+									on && "bg-hover",
 								)}
 							>
 								<StepIconChip step={option.sample} />
 								<span
 									className={cn(
-										"min-w-0 truncate text-xs",
-										dimmed && "text-muted-foreground",
+										"min-w-0 truncate text-body-m",
+										dimmed && "text-ink-3",
 									)}
 								>
 									{option.key}
 								</span>
-								<span className="ml-auto shrink-0 text-[11px] tabular-nums">
+								<span className="ml-auto shrink-0 text-body-s tabular-nums">
 									×{option.count}
 								</span>
 								{option.errorCount > 0 ? (
-									<span className="shrink-0 text-[11px] text-rose-600 tabular-nums dark:text-rose-400">
+									<span className="shrink-0 text-body-s text-error tabular-nums">
 										{option.errorCount} failed
 									</span>
 								) : null}
-							</button>
+							</Pressable>
 						);
 					})}
 				</div>
@@ -432,15 +445,21 @@ export function RunOverview({
 	const options = scope ? getWaterfallFilterOptions(steps) : filterOptions;
 	const touched = scope ? getStepMarks(steps) : marks;
 	const tokens = (turn.inputTokens ?? 0) + (turn.outputTokens ?? 0);
+	const tokenValue = (
+		<span className="flex flex-col gap-m">
+			{formatCompactNumber(tokens)}
+			<TokenSplit turn={turn} />
+		</span>
+	);
 	return (
 		<>
 			{touched.length > 0 ? (
-				<div className="border-b border-border/40 px-5 pb-5">
+				<div className="edge-b-m border-line-soft px-xxl pb-xxl">
 					<Touched marks={touched} />
 				</div>
 			) : null}
 
-			<div className="border-b border-border/40 px-5 pb-5">
+			<div className="edge-b-m border-line-soft px-xxl pb-xxl">
 				<StepKinds
 					filter={filter}
 					onToggle={onToggleFilter}
@@ -453,8 +472,8 @@ export function RunOverview({
 			{scope ? null : (
 				<div
 					className={cn(
-						"grid grid-cols-2 gap-4 px-5",
-						totalMs > 0 && "border-b border-border/40 pb-5",
+						"grid grid-cols-2 gap-xl px-xxl",
+						totalMs > 0 && "edge-b-m border-line-soft pb-xxl",
 					)}
 				>
 					<Field label="Started" value={formatDateTime(turn.startedAt)} />
@@ -470,27 +489,20 @@ export function RunOverview({
 						label="Run ID"
 						className="col-span-2"
 						value={
-							<span className="flex items-center gap-1">
+							<span className="flex items-center gap-xs">
 								<span title={turn.turnId}>{shortRunId(turn.turnId)}</span>
 								<CopyButton value={turn.turnId} title="Copy run ID" />
 							</span>
 						}
 					/>
-					<Field
-						label="Tokens"
-						className="col-span-2 border-t border-border/40 pt-4"
-						value={
-							<span className="flex flex-col gap-2">
-								{formatCompactNumber(tokens)}
-								<TokenSplit turn={turn} />
-							</span>
-						}
-					/>
+					<div className="col-span-2 edge-t-m border-line-soft pt-xl">
+						<Field label="Tokens" value={tokenValue} />
+					</div>
 				</div>
 			)}
 
 			{totalMs > 0 ? (
-				<div className="flex flex-col gap-3 px-5">
+				<div className="flex flex-col gap-l px-xxl">
 					<Field
 						label="Time distribution"
 						value={formatSpanDuration(totalMs)}

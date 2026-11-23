@@ -16,6 +16,7 @@ import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
 import { Bone, Bones, Reveal } from "@/app/ui/bones";
+import { Pressable } from "@/app/ui/pressable";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { FluidList, useFluidListItem } from "@/components/fluid-list";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
@@ -78,7 +79,6 @@ import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { useUserMap } from "@/features/workspace/hooks/useUserMap";
 import { orpc } from "@/lib/orpc";
 import { cn } from "@/lib/utils";
-
 export type UseSection = "skills" | "mcp";
 
 const RUNS_STALE_TIME_MS = 5 * 60_000;
@@ -186,10 +186,10 @@ export function WorkspaceUseView({
 	const shownFile = file && !file.setupFile.startsWith("called:") ? file : null;
 
 	return (
-		<div className="h-full overflow-hidden pt-2 pr-8 pb-2 pl-6">
-			<div className="flex h-full min-h-0 gap-6">
-				<div className="-mb-2 flex min-h-0 shrink flex-col" style={RUNS_WIDTH}>
-					<ScrollColumn className="-mx-1 px-1 pb-8">
+		<div className="h-full overflow-hidden pt-m pr-xxxl pb-m pl-xxl">
+			<div className="flex h-full min-h-0 gap-xxl">
+				<div className="-mb-m flex min-h-0 shrink flex-col" style={RUNS_WIDTH}>
+					<ScrollColumn className="-mx-xs px-xs pb-xxxl">
 						{loading || (runs && runs.length > 0) ? (
 							<Reveal
 								label="Reading the runs"
@@ -393,8 +393,8 @@ function RunList({
 	return (
 		<FluidList>
 			{days.map((day) => (
-				<section key={day.label} className="flex flex-col gap-0.5">
-					<h3 className="px-2.5 pt-3 pb-1 text-[11px] font-medium text-muted-foreground first:pt-1">
+				<section key={day.label} className="flex flex-col gap-xxs">
+					<h3 className="px-l pt-l pb-xs text-body-s font-medium text-ink-3 first:pt-xs">
 						{day.label}
 					</h3>
 					{day.runs.map((run) => (
@@ -439,7 +439,7 @@ function RunRow({
 	const item = useFluidListItem<HTMLButtonElement>(index);
 	const prompt = run.prompt?.replace(/\s+/gu, " ").trim();
 	return (
-		<button
+		<Pressable
 			type="button"
 			ref={item.ref}
 			aria-current={isPicked || undefined}
@@ -451,8 +451,12 @@ function RunRow({
 			onPointerEnter={() => onWarm(run)}
 			title={prompt || undefined}
 			className={cn(
-				"relative flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left outline-none transition-colors corner-squircle squircle:rounded-xl",
-				isPicked && "bg-muted",
+				"relative flex w-full items-center gap-m",
+				"corner-s px-l py-s corner-squircle",
+				"text-left",
+				"transition-colors",
+				"squircle:corner-l",
+				isPicked && "bg-field",
 			)}
 		>
 			{run.agentId ? (
@@ -464,8 +468,8 @@ function RunRow({
 			)}
 			<span
 				className={cn(
-					"min-w-0 flex-1 truncate text-xs tabular-nums",
-					isPicked ? "text-foreground" : "text-foreground/90",
+					"min-w-0 flex-1 truncate text-body-m tabular-nums",
+					isPicked ? "text-ink" : "text-ink",
 				)}
 			>
 				{run.agentId
@@ -474,7 +478,7 @@ function RunRow({
 						? shortRunId(run.turnId)
 						: "—"}
 				{run.agentId && run.turnId ? (
-					<span className="inline-flex items-center gap-1 pl-1 align-middle text-muted-foreground">
+					<span className="inline-flex items-center gap-xs pl-xs align-middle text-ink-3">
 						in
 						<ModelChip chip="size-3.5" glyph="size-2" model={parentModel} />
 						{shortRunId(run.turnId)}
@@ -484,15 +488,20 @@ function RunRow({
 			{version ? (
 				<span
 					title={`Loaded version ${version}`}
-					className="shrink-0 rounded-sm bg-muted px-1 text-[10px] leading-4 font-medium text-muted-foreground tabular-nums"
+					className={cn(
+						"shrink-0",
+						"corner-xs px-xs",
+						"text-body-xs font-medium tabular-nums",
+						"bg-field text-ink-3",
+					)}
 				>
 					v{version}
 				</span>
 			) : null}
-			<span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+			<span className="shrink-0 text-body-s text-ink-3 tabular-nums">
 				{timeOfDay(run.startedAt)}
 			</span>
-		</button>
+		</Pressable>
 	);
 }
 
@@ -521,7 +530,7 @@ function McpRunCalls({
 	const calls = query.data?.calls;
 	const tag = version ? ` · v${version}` : "";
 	return (
-		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 pt-4 pr-4 pl-5">
+		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-s pt-xl pr-xl pl-xl">
 			<PickStrip
 				agent={run.agentId || null}
 				model={run.model ?? null}
@@ -552,8 +561,8 @@ function McpRunCalls({
 					sampleId="use-calls"
 				>
 					{() => (
-						<ScrollColumn className="-mx-1 min-h-0 flex-1 px-1 pb-8">
-							<ol className="flex flex-col gap-4 pt-2">
+						<ScrollColumn className="-mx-xs min-h-0 flex-1 px-xs pb-xxxl">
+							<ol className="flex flex-col gap-xl pt-m">
 								{(calls ?? []).map((call) => (
 									<li key={call.callId}>
 										<ToolCard
@@ -758,7 +767,7 @@ function RunTrace({
 				: `Loaded ${name}${tag}${steps.length > 1 ? `, ${steps.length} times` : ""}`
 			: undefined;
 	return (
-		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 pt-4 pr-4 pl-5">
+		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-s pt-xl pr-xl pl-xl">
 			<PickStrip
 				agent={agent}
 				model={model}
@@ -772,7 +781,13 @@ function RunTrace({
 						run.sessionId,
 						params,
 					)}
-					className="flex h-6 items-center gap-1 rounded-sm px-1.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+					className={cn(
+						"flex h-6 items-center gap-xs",
+						"corner-xs px-s",
+						"text-body-s line-tight",
+						"text-ink-3 transition-colors",
+						"hover:text-ink",
+					)}
 				>
 					Open in session
 					<IconArrowUpRight aria-hidden="true" className="size-3" />
@@ -829,7 +844,7 @@ function SkillTrace({
 		>
 			{() => (
 				<div className="flex min-h-0 flex-1 flex-col">
-					<ScrollColumn className="-mx-1 min-h-0 flex-1 px-1">
+					<ScrollColumn className="-mx-xs min-h-0 flex-1 px-xs">
 						{prompt ? (
 							<RunPrompt
 								agent={agent}
@@ -916,7 +931,7 @@ function CenteredState({
 	title: string;
 }) {
 	return (
-		<div className="flex min-w-0 flex-1 flex-col p-4">
+		<div className="flex min-w-0 flex-1 flex-col p-xl">
 			<EmptyState icon={icon} title={title} description={description}>
 				{children}
 			</EmptyState>
@@ -945,8 +960,8 @@ function OpenRunLink({
 			to={sessionPagePath(getShellRoutePath, undefined, run.sessionId, params)}
 			className={
 				compact
-					? "flex h-6 items-center gap-1 rounded-sm px-1.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
-					: "inline-flex h-8 items-center gap-1 rounded-md border border-border/60 px-3 text-xs font-medium transition-colors hover:bg-muted"
+					? "flex h-6 items-center gap-xs corner-xs px-s text-body-s line-tight text-ink-3 transition-colors hover:text-ink"
+					: "inline-flex h-8 items-center gap-xs corner-s edge-m border-line px-l text-body-m font-medium transition-colors hover:bg-field"
 			}
 		>
 			Open in session
@@ -958,13 +973,21 @@ function OpenRunLink({
 	);
 }
 
+// RunList: a day header, then rows of a model chip, the run's short id and
+// its time at the end.
 function RunListSample() {
 	return (
-		<div className="flex flex-col gap-0.5 pt-1">
-			{[72, 56, 80, 64, 50, 76, 60, 68, 54, 74].map((width) => (
-				<div key={width} className="flex h-7 items-center gap-2.5 px-2.5">
-					<Bone className="size-4 shrink-0 rounded-full" />
-					<Bone className="h-2.5 rounded-full" style={{ width: `${width}%` }} />
+		<div className="flex flex-col gap-xxs">
+			<Bone className="mx-l mt-xs mb-xs h-2 w-16 corner-full" />
+			{[56, 48, 60, 52, 44, 56, 50, 58].map((id, row) => (
+				<div
+					// biome-ignore lint/suspicious/noArrayIndexKey: a fixed sample
+					key={row}
+					className="flex h-8 items-center gap-m px-l"
+				>
+					<Bone className="size-4.5 shrink-0 corner-full" />
+					<Bone className="h-2.5 corner-full" style={{ width: id }} />
+					<Bone className="ml-auto h-2.5 w-9 shrink-0 corner-full" />
 				</div>
 			))}
 		</div>
@@ -987,9 +1010,9 @@ function RunPrompt({
 	const { avatarMap, userMap } = useUserMap();
 	const label = agent ? "Main agent" : (userMap[userId] ?? "Member");
 	return (
-		<div className="flex flex-col gap-2 pt-3 pb-4">
-			<p className="flex items-center gap-2 pl-9 text-xs text-muted-foreground">
-				<span className="font-medium text-foreground">{label}</span>
+		<div className="flex flex-col gap-m pt-l pb-xl">
+			<p className="flex items-center gap-m pl-xxxl text-body-m text-ink-3">
+				<span className="font-medium text-ink">{label}</span>
 				<span className="tabular-nums">{dateTime(startedAt)}</span>
 			</p>
 			<MemberBubble
@@ -1021,13 +1044,11 @@ function MiddleSample({ section }: { section: UseSection }) {
 			label={section === "mcp" ? "Reading the calls" : "Reading this run"}
 			className="min-w-0 flex-1"
 		>
-			<div className="flex h-full min-h-0 min-w-0 flex-col gap-1.5 pt-4 pr-4 pl-5">
-				<div className="flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-muted/50 px-2">
-					<Bone className="size-4 shrink-0 rounded-full" />
-					<Bone className="h-3 w-16 rounded-sm" />
-					<Bone className="h-2.5 w-24 rounded-sm" />
-					<span className="flex-1" />
-					<Bone className="h-2.5 w-20 rounded-sm" />
+			<div className="flex h-full min-h-0 min-w-0 flex-col gap-s pt-xl pr-xl pl-xl">
+				<div className="flex h-8 shrink-0 items-center gap-m px-m">
+					<Bone className="size-4 shrink-0 corner-full" />
+					<Bone className="h-2.5 w-24 corner-full" />
+					<Bone className="ml-auto h-2.5 w-16 corner-full" />
 				</div>
 				{section === "mcp" ? <McpCallsSample /> : <SkillTraceBody />}
 			</div>
@@ -1035,47 +1056,41 @@ function MiddleSample({ section }: { section: UseSection }) {
 	);
 }
 
+// A trace's steps: an icon, the step's label, its duration at the end.
 const TRACE_ROWS = [
-	{ id: "a", label: 56, left: 0, width: 22 },
-	{ id: "b", label: 40, left: 23, width: 4 },
-	{ id: "c", label: 64, left: 28, width: 3 },
-	{ id: "d", label: 56, left: 32, width: 18 },
-	{ id: "e", label: 48, left: 51, width: 2 },
-	{ id: "f", label: 56, left: 54, width: 26 },
-	{ id: "g", label: 44, left: 81, width: 3 },
+	{ id: "a", label: 120 },
+	{ id: "b", label: 88 },
+	{ id: "c", label: 136 },
+	{ id: "d", label: 104 },
+	{ id: "e", label: 96 },
+	{ id: "f", label: 128 },
 ];
 
 function SkillTraceBody() {
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
-			<div className="flex flex-col gap-2 pt-3 pb-5">
-				<div className="flex items-center gap-2 pl-9">
-					<Bone className="h-3 w-14 rounded-sm" />
-					<Bone className="h-3 w-20 rounded-sm" />
+			<div className="flex flex-col gap-m pt-l pb-xl">
+				<div className="flex items-center gap-m pl-xxxl">
+					<Bone className="h-2.5 w-20 corner-full" />
 				</div>
-				<div className="flex gap-3">
-					<Bone className="mt-1.5 size-6 shrink-0 rounded-full" />
-					<div className="flex min-w-0 flex-1 flex-col gap-2 rounded-lg bg-card px-3 py-3 shadow-(--custom-shadow) corner-squircle squircle:rounded-2xl">
-						<Bone className="h-3 w-full rounded-sm" />
-						<Bone className="h-3 w-10/12 rounded-sm" />
-						<Bone className="h-3 w-1/2 rounded-sm" />
+				<div className="flex gap-l">
+					<Bone className="size-6 shrink-0 corner-full" />
+					<div className="flex min-w-0 flex-1 flex-col gap-m pt-s">
+						<Bone className="h-2.5 w-full corner-full" />
+						<Bone className="h-2.5 w-10/12 corner-full" />
+						<Bone className="h-2.5 w-1/2 corner-full" />
 					</div>
 				</div>
 			</div>
-			<div className="flex flex-col gap-4 pl-[calc(2.25rem+9px)]">
+			<div className="flex flex-col gap-l pl-xxxl">
 				{TRACE_ROWS.map((row) => (
-					<div key={row.id} className="flex h-6 items-center gap-2">
-						<Bone className="size-5 shrink-0 rounded-md" />
+					<div key={row.id} className="flex h-6 items-center gap-m">
+						<Bone className="size-5 shrink-0 corner-s" />
 						<Bone
-							className="h-3 shrink-0 rounded-sm"
+							className="h-2.5 shrink-0 corner-full"
 							style={{ width: row.label }}
 						/>
-						<div className="relative h-3 min-w-0 flex-1">
-							<Bone
-								className="absolute inset-y-0 rounded-sm"
-								style={{ left: `${row.left}%`, width: `${row.width}%` }}
-							/>
-						</div>
+						<Bone className="ml-auto h-2.5 w-10 shrink-0 corner-full" />
 					</div>
 				))}
 			</div>
@@ -1085,58 +1100,68 @@ function SkillTraceBody() {
 
 const OUTPUT_LINES = [92, 78, 86, 64, 90, 72, 58, 84, 70, 46];
 
-function McpCallsSample() {
+// SetupCard: the file's mark, name and meta over a hairline, then its text.
+function FileCardSample() {
 	return (
-		<div className="flex flex-col gap-4 pt-2">
-			<div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-background px-3">
-				<div className="flex items-center gap-1.5 py-2.5">
-					<Bone className="h-4 w-14 rounded-sm" />
-					<Bone className="h-3 w-24 rounded-sm" />
-				</div>
-				{["command", "context"].map((key) => (
-					<div key={key} className="flex flex-col gap-1.5 py-2.5">
-						<Bone className="h-2.5 w-16 rounded-sm" />
-						<Bone className="h-3 w-3/4 rounded-sm" />
-					</div>
-				))}
+		<div className="flex flex-col">
+			<div className="flex items-center gap-m edge-b-m border-line-soft px-xl py-xl">
+				<Bone className="size-4 shrink-0 corner-xs" />
+				<Bone className="h-3 w-36 corner-full" />
+				<Bone className="h-2.5 w-28 corner-full" />
 			</div>
-			<div className="flex flex-col gap-2 px-1">
-				{OUTPUT_LINES.map((width) => (
-					<Bone
-						key={width}
-						className="h-3 rounded-sm"
-						style={{ width: `${width}%` }}
-					/>
+			<div className="flex flex-col gap-xl px-xl py-xl">
+				{FILE_PARAGRAPHS.map((paragraph) => (
+					<div key={paragraph.join()} className="flex flex-col gap-m">
+						{paragraph.map((width) => (
+							<Bone
+								key={width}
+								className="h-2.5 corner-full"
+								style={{ width: `${width}%` }}
+							/>
+						))}
+					</div>
 				))}
 			</div>
 		</div>
 	);
 }
 
-const FILE_LINES = [94, 88, 96, 70, 0, 90, 84, 92, 60, 0, 86, 94, 78].map(
-	(width, line) => ({ line, width }),
-);
+// The file's text: even lines in paragraphs, each ending short.
+const FILE_PARAGRAPHS = [
+	[94, 88, 62],
+	[90, 84, 92, 48],
+	[86, 70],
+];
 
-function FileCardSample() {
+function McpCallsSample() {
 	return (
-		<div className="flex flex-col">
-			<div className="flex items-center gap-2 border-b border-border/50 px-5 py-4">
-				<Bone className="size-4 shrink-0 rounded-full" />
-				<Bone className="h-3.5 w-28 rounded-sm" />
-			</div>
-			<div className="flex flex-col gap-2.5 px-5 py-5">
-				<Bone className="mb-1 h-4 w-1/3 rounded-sm" />
-				{FILE_LINES.map(({ line, width }) =>
-					width ? (
-						<Bone
-							key={line}
-							className="h-3 rounded-sm"
-							style={{ width: `${width}%` }}
-						/>
-					) : (
-						<span key={line} className="h-2" />
-					),
+		<div className="flex flex-col gap-xl pt-m">
+			<div
+				className={cn(
+					"flex flex-col",
+					"divide-y corner-m edge-m px-l",
+					"divide-line-soft border-line bg-canvas",
 				)}
+			>
+				<div className="flex items-center gap-s py-m">
+					<Bone className="h-2.5 w-14 corner-full" />
+					<Bone className="h-2.5 w-24 corner-full" />
+				</div>
+				{["command", "context"].map((key) => (
+					<div key={key} className="flex flex-col gap-s py-m">
+						<Bone className="h-2.5 w-16 corner-full" />
+						<Bone className="h-2.5 w-3/4 corner-full" />
+					</div>
+				))}
+			</div>
+			<div className="flex flex-col gap-m px-xs">
+				{OUTPUT_LINES.map((width) => (
+					<Bone
+						key={width}
+						className="h-2.5 corner-full"
+						style={{ width: `${width}%` }}
+					/>
+				))}
 			</div>
 		</div>
 	);

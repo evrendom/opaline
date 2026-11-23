@@ -1,13 +1,13 @@
 @reference "../../index.css";
 
 :root {
-	--bone: rgb(0 0 0 / 0.07);
-	--bone-shine: rgb(255 255 255 / 0.6);
+	/* a bone is the firm tint; its shimmer a wash of the canvas */
+	--bone: var(--hover-strong);
+	--bone-shine: color-mix(in oklab, var(--canvas) 60%, transparent);
 }
 
 .dark {
-	--bone: rgb(255 255 255 / 0.08);
-	--bone-shine: rgb(255 255 255 / 0.1);
+	--bone-shine: var(--hover);
 }
 
 .bones-fill,
@@ -50,9 +50,9 @@
 .cost-chart-canvas,
 .cost-metric-trend path {
 	transition:
-		opacity 320ms ease,
-		fill 320ms ease,
-		stroke 320ms ease;
+		opacity var(--motion-large-duration) var(--motion-easing),
+		fill var(--motion-large-duration) var(--motion-easing),
+		stroke var(--motion-large-duration) var(--motion-easing);
 }
 
 html[data-intro] .intro-region :is([data-nav-icon], [data-workspace-mark]) {

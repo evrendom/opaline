@@ -1,5 +1,6 @@
 import { IconArrowLeft, IconChevronRight } from "@tabler/icons-react";
 import { Button } from "@/app/ui/button";
+import { Pressable } from "@/app/ui/pressable";
 import type {
 	SessionDetailActivityGroup,
 	SessionDetailActivityOccurrence,
@@ -15,32 +16,32 @@ export function SessionDetailActivityPanel({
 	onSelectOccurrence: (occurrence: SessionDetailActivityOccurrence) => void;
 }) {
 	return (
-		<div className="min-h-0 overflow-hidden rounded-md">
+		<div className="min-h-0 overflow-hidden corner-s">
 			{group.occurrences.length > 0 ? (
 				<div className="max-h-72 overflow-y-auto">
 					<ul
 						aria-label={`${group.label} occurrences`}
-						className="grid grid-cols-2 gap-0.5 p-1"
+						className="grid grid-cols-2 gap-xxs p-xs"
 					>
 						{group.occurrences.map((occurrence) => (
 							<li key={occurrence.key}>
-								<button
-									className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-md px-4 py-3 text-left hover:bg-black/3 dark:hover:bg-white/3"
+								<Pressable
+									className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-l corner-s px-xl py-l hover:bg-hover"
 									onClick={() => onSelectOccurrence(occurrence)}
 									type="button"
 								>
 									<div className="min-w-0">
-										<p className="whitespace-pre-wrap break-words text-[0.8125rem]/5 font-medium tracking-[-0.01em] text-[#3c4149] dark:text-[#d0d6e0]">
+										<p className="whitespace-pre-wrap break-words text-body-l font-medium tracking-s text-ink-2">
 											{occurrence.detail}
 										</p>
 										{occurrence.supportingDetail ? (
-											<p className="mt-0.5 text-[0.75rem]/4 tracking-[-0.01em] text-[#6f6e77] tabular-nums dark:text-[#b4bcd099]">
+											<p className="mt-xxs text-body-m tracking-s text-ink-3 tabular-nums">
 												{occurrence.supportingDetail}
 											</p>
 										) : null}
 									</div>
-									<div className="flex min-w-0 items-center gap-1.5 text-[#6f6e77] dark:text-[#b4bcd099]">
-										<p className="truncate text-[0.8125rem]/5 tracking-[-0.01em] tabular-nums">
+									<div className="flex min-w-0 items-center gap-s text-ink-3">
+										<p className="truncate text-body-l tracking-s tabular-nums">
 											{occurrence.turnLabel}
 											{occurrence.time ? ` · ${occurrence.time}` : ""}
 										</p>
@@ -49,27 +50,27 @@ export function SessionDetailActivityPanel({
 											className="size-3.5 shrink-0"
 										/>
 									</div>
-								</button>
+								</Pressable>
 							</li>
 						))}
 					</ul>
 					{group.omittedCount > 0 ? (
-						<p className="border-t border-black/6 px-4 py-2 text-[0.75rem]/4 text-[#6f6e77] tabular-nums dark:border-white/8 dark:text-[#b4bcd099]">
+						<p className="edge-t-m border-line px-xl py-m text-body-m text-ink-3 tabular-nums">
 							+{group.omittedCount.toLocaleString()} more not shown
 						</p>
 					) : null}
 					{isLoading ? (
-						<p className="border-t border-black/6 px-4 py-2 text-[0.75rem]/4 text-[#6f6e77] dark:border-white/8 dark:text-[#b4bcd099]">
+						<p className="edge-t-m border-line px-xl py-m text-body-m text-ink-3">
 							Loading more signal occurrences…
 						</p>
 					) : null}
 				</div>
 			) : isLoading ? (
-				<p className="px-4 py-3 text-base text-[#6f6e77] sm:text-[0.8125rem]/5 dark:text-[#b4bcd099]">
+				<p className="px-xl py-l text-body-xxl text-ink-3 sm:text-body-l">
 					Loading signal occurrences…
 				</p>
 			) : (
-				<p className="px-4 py-3 text-base text-[#6f6e77] sm:text-[0.8125rem]/5 dark:text-[#b4bcd099]">
+				<p className="px-xl py-l text-body-xxl text-ink-3 sm:text-body-l">
 					{group.emptyLabel}
 				</p>
 			)}
@@ -91,35 +92,37 @@ export function SessionDetailActivityOccurrencePanel({
 	occurrence: SessionDetailActivityOccurrence;
 }) {
 	return (
-		<div className="min-h-0 overflow-hidden rounded-md">
-			<div className="flex h-9 items-center border-b border-black/6 px-1 dark:border-white/8">
-				<button
+		<div className="min-h-0 overflow-hidden corner-s">
+			<div className="flex h-9 items-center edge-b-m border-line px-xs">
+				<Button
 					aria-label={`Back to ${group.label}`}
-					className="flex size-7 shrink-0 items-center justify-center rounded-md text-[#5b5c5e] outline-none hover:bg-black/4 dark:text-[#c4c4c6] dark:hover:bg-white/6"
 					onClick={onBack}
+					size="icon-sm"
 					type="button"
+					variant="secondary"
 				>
-					<IconArrowLeft aria-hidden="true" className="size-3.5" />
-				</button>
-				<p className="min-w-0 flex-1 truncate px-1 text-[0.8125rem]/5 font-medium">
+					<IconArrowLeft aria-hidden="true" className="size-3.5 text-current" />
+				</Button>
+				<p className="min-w-0 flex-1 truncate px-xs text-body-l font-medium">
 					{group.label}
 				</p>
 			</div>
-			<div className="p-4">
-				<p className="whitespace-pre-wrap break-words text-[0.8125rem]/5 font-medium tracking-[-0.01em] text-[#3c4149] dark:text-[#d0d6e0]">
+			<div className="p-xl">
+				<p className="whitespace-pre-wrap break-words text-body-l font-medium tracking-s text-ink-2">
 					{occurrence.detail}
 				</p>
 				{occurrence.supportingDetail ? (
-					<p className="mt-1 text-[0.75rem]/4 tracking-[-0.01em] text-[#6f6e77] tabular-nums dark:text-[#b4bcd099]">
+					<p className="mt-xs text-body-m tracking-s text-ink-3 tabular-nums">
 						{occurrence.supportingDetail}
 					</p>
 				) : null}
-				<p className="mt-2 text-[0.75rem]/4 tracking-[-0.01em] text-[#6f6e77] tabular-nums dark:text-[#b4bcd099]">
+				<p className="mt-m text-body-m tracking-s text-ink-3 tabular-nums">
 					{occurrence.turnLabel}
 					{occurrence.time ? ` · ${occurrence.time}` : ""}
 				</p>
 				<Button
-					className="mt-3"
+					variant="primary"
+					className="mt-l"
 					onClick={() => {
 						onJump({
 							eventId: occurrence.eventId,
@@ -127,7 +130,7 @@ export function SessionDetailActivityOccurrencePanel({
 						});
 						window.setTimeout(onClose, 0);
 					}}
-					size="xs"
+					size="sm"
 					type="button"
 				>
 					View in transcript

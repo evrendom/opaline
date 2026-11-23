@@ -154,7 +154,7 @@ function ciBars(
 		.filter((step) => step.kind === "ci")
 		.flatMap(leaves)
 		.map((job) => ({
-			className: stepBar(job, model).className ?? "bg-zinc-400",
+			className: stepBar(job, model).className ?? "bg-ink-disabled",
 			from: job.startMs,
 			stepId: job.id,
 			title: `${job.name} · ${formatDuration(job.endMs - job.startMs)}`,
@@ -170,10 +170,10 @@ function ciBars(
 			{
 				className:
 					span.to === null
-						? "bg-zinc-400"
+						? "bg-ink-disabled"
 						: step.isError
 							? "bg-rose-500"
-							: "bg-zinc-400",
+							: "bg-ink-disabled",
 				from: span.from,
 				name: label,
 				open: span.to === null,

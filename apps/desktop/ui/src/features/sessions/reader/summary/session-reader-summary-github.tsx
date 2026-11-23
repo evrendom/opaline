@@ -35,13 +35,14 @@ export function pullRequestLook(pull: SessionPullRequest): {
 } {
 	if (pull.mergedAt)
 		return {
+			// design-escape-ok(colour): data paint; GitHub's merged purple
 			className: "text-violet-500",
 			icon: IconGitMerge,
 			label: "Merged",
 		};
 	if (pull.state === "closed")
 		return {
-			className: "text-rose-500",
+			className: "text-error",
 			icon: IconGitPullRequestClosed,
 			label: "Closed",
 		};
@@ -49,7 +50,7 @@ export function pullRequestLook(pull: SessionPullRequest): {
 		return { className: "", icon: IconGitPullRequestDraft, label: "Draft" };
 	if (pull.state === "open")
 		return {
-			className: "text-emerald-500",
+			className: "text-success",
 			icon: IconGitPullRequest,
 			label: "Open",
 		};
@@ -110,11 +111,11 @@ export function ciLook(conclusion: string | null): {
 	icon: Icon;
 } {
 	if (conclusion === null)
-		return { className: "text-amber-500", icon: IconCircleDashed };
+		return { className: "text-warning", icon: IconCircleDashed };
 	if (conclusion === "success")
-		return { className: "text-emerald-500", icon: IconCircleCheck };
+		return { className: "text-success", icon: IconCircleCheck };
 	if (conclusion === "failure" || conclusion === "timed_out")
-		return { className: "text-rose-500", icon: IconCircleX };
+		return { className: "text-error", icon: IconCircleX };
 	return { className: "", icon: IconCircleDashed };
 }
 
@@ -150,7 +151,7 @@ export function SummaryCi({
 							className="min-w-0 flex-1 truncate hover:underline"
 						>
 							{run.workflowName || "Workflow"}
-							<span className="ml-1.5 text-xs text-muted-foreground">
+							<span className="ml-s text-body-m text-ink-3">
 								{run.headBranch}
 								{run.headSha ? ` @${run.headSha.slice(0, 7)}` : ""}
 							</span>

@@ -47,7 +47,7 @@ export function SessionOverviewReadingLine({
 	return (
 		<div
 			aria-hidden="true"
-			className="pointer-events-none absolute inset-y-0 w-px -translate-x-1/2 bg-(--session-overview-accent)"
+			className="pointer-events-none absolute inset-y-0 w-px -translate-x-1/2 bg-accent"
 			data-session-overview-reading-line
 			style={{
 				left: `${(getChartX(ratio, config) / config.chartWidth) * 100}%`,

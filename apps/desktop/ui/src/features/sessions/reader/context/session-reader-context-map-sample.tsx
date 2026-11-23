@@ -29,11 +29,11 @@ const MAP_TILES = [
 
 export function ContextMapSample({ fill = false }: { fill?: boolean }) {
 	return (
-		<div className={cn("relative m-[3px]", fill ? "h-full" : "h-[274px]")}>
+		<div className={cn("relative m-xs", fill ? "h-full" : "h-[274px]")}>
 			{MAP_TILES.map(({ height, id, left, top, width }) => (
 				<Bone
 					key={id}
-					className="absolute rounded-md corner-squircle squircle:rounded-xl"
+					className="absolute corner-s corner-squircle squircle:corner-l"
 					style={{
 						height: `${height}%`,
 						left: `${left}%`,

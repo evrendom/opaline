@@ -1,5 +1,7 @@
 import { IconX } from "@tabler/icons-react";
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/app/ui/button";
+import { Pressable } from "@/app/ui/pressable";
 import { mountStarCard } from "./star-card-controller";
 import { useStarPrompt } from "./star-prompt";
 import "./sidebar-star-card.css";
@@ -59,7 +61,7 @@ function StarCard({
 				body: q(".star-card-body"),
 				fx: q(".star-card-fx"),
 				beams: [...card.querySelectorAll<HTMLElement>(".star-card-beam")],
-				close: q<HTMLButtonElement>(".star-card-close"),
+				close: q<HTMLButtonElement>("[data-star-card-close]"),
 			},
 			{
 				count,
@@ -77,21 +79,26 @@ function StarCard({
 		<div className="star-card-dock">
 			<section
 				ref={cardRef}
-				className="star-card rounded-[14px] squircle:rounded-[22px] corner-squircle"
+				className="star-card corner-l squircle:corner-xl corner-squircle"
 				aria-label="Star Opaline"
 			>
 				<span className="star-card-beam is-glow" aria-hidden="true" />
 				<span className="star-card-beam" aria-hidden="true" />
 				<span className="star-card-fx" aria-hidden="true" />
-				<button type="button" className="star-card-close" aria-label="Dismiss">
+				<Button
+					type="button"
+					size="icon-sm"
+					data-star-card-close=""
+					className="absolute top-2 right-2 z-6"
+					aria-label="Dismiss"
+				>
 					<IconX className="size-3.5" stroke={2} />
-				</button>
+				</Button>
 				<div className="star-card-flaps" aria-hidden="true" />
 				<p className="star-card-title">{TITLE}</p>
 				<p className="star-card-body" aria-live="polite" />
 				<div className="star-card-track-wrap">
-					<button
-						type="button"
+					<Pressable
 						className="star-card-track"
 						role="switch"
 						aria-checked="false"
@@ -101,7 +108,7 @@ function StarCard({
 							<span>Drag to star</span>
 						</span>
 						<span className="star-card-knob" />
-					</button>
+					</Pressable>
 				</div>
 			</section>
 		</div>

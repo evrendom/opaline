@@ -30,9 +30,9 @@ export function RunLegend({
 	});
 	if (run.flags.length === 0 && calls.length === 0) return null;
 	return (
-		<ul className="pointer-events-auto absolute bottom-2 left-2 z-30 flex max-w-[60%] flex-col gap-1 rounded-lg bg-card/95 px-2.5 py-2 text-[12px] leading-4 shadow-(--custom-shadow) backdrop-blur-sm corner-squircle squircle:rounded-2xl">
+		<ul className="pointer-events-auto absolute bottom-2 left-2 z-30 flex max-w-[60%] flex-col gap-xs corner-m bg-surface px-l py-m text-body-m shadow-card backdrop-blur-sm corner-squircle squircle:corner-xl">
 			{run.flags.map((kind) => (
-				<li key={kind} className="flex min-w-0 items-center gap-2">
+				<li key={kind} className="flex min-w-0 items-center gap-m">
 					<FlagChip kind={kind} />
 					<span className="truncate">
 						{MOMENT_KINDS_APPEARANCE[kind].label}
@@ -40,7 +40,7 @@ export function RunLegend({
 				</li>
 			))}
 			{calls.map(({ count, type }) => (
-				<li key={type.key} className="flex min-w-0 items-center gap-2">
+				<li key={type.key} className="flex min-w-0 items-center gap-m">
 					<OpalChip solid tint={TONE_TINT[toneOf(type.key)]} className="size-4">
 						<IconCircleXFilled
 							aria-hidden="true"
@@ -50,7 +50,7 @@ export function RunLegend({
 					</OpalChip>
 					<span className="truncate">
 						{type.label}
-						<span className="text-muted-foreground tabular-nums">
+						<span className="text-ink-3 tabular-nums">
 							{" "}
 							· {count} {count === 1 ? "call" : "calls"}
 						</span>

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Button } from "@/app/ui/button";
 import { DashboardDateControls } from "@/features/dashboard/components/DashboardDateControls";
 import { SessionsFocusedDayTag } from "./sessions-focused-day-tag";
 import { SessionsOverviewFiltersMenu } from "./sessions-overview-filters-menu";
@@ -21,7 +22,7 @@ export function SessionsOverviewControls({
 		<div
 			inert={inert}
 			data-slot="sessions-overview-controls"
-			className="pointer-events-none flex min-w-0 flex-1 items-center gap-2 *:pointer-events-auto"
+			className="pointer-events-none flex min-w-0 flex-1 items-center gap-m *:pointer-events-auto"
 		>
 			{toolbarStart}
 			<SessionsOverviewSortMenu
@@ -31,13 +32,9 @@ export function SessionsOverviewControls({
 				sort={tableState.sort}
 			/>
 			{tableState.filterCatalogError && !tableState.filterCatalogPending ? (
-				<button
-					type="button"
-					onClick={tableState.onRetryFilterCatalog}
-					className="rounded-md px-2 py-1 text-sm hover:bg-(--session-overview-hover)"
-				>
+				<Button type="button" onClick={tableState.onRetryFilterCatalog}>
 					Retry filters
-				</button>
+				</Button>
 			) : (
 				<SessionsOverviewFiltersMenu
 					variant="linear"

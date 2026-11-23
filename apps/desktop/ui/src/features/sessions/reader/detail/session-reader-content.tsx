@@ -404,7 +404,11 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 												<TabsBandFade className="top-(--stage-top) mr-(--reader-gutter) ml-(--reader-main-left)" />
 												<div
 													{...READER_CONTENT_MARK}
-													className="grid grid-cols-[var(--reader-rail)_minmax(0,1fr)_3.5rem] gap-8 px-(--reader-gutter) pt-2 pb-(--reader-inset) xl:grid-cols-[var(--reader-rail)_minmax(0,1fr)] xl:gap-(--reader-columns-gap)"
+													className={cn(
+														"grid grid-cols-[var(--reader-rail)_minmax(0,1fr)_3.5rem] gap-xxxl",
+														"px-(--reader-gutter) pt-m pb-(--reader-inset)",
+														"xl:grid-cols-[var(--reader-rail)_minmax(0,1fr)] xl:gap-(--reader-columns-gap)",
+													)}
 												>
 													<nav
 														aria-label="Session turns"
@@ -413,9 +417,9 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 														// top never moves, so the view wouldn't either. The
 														// turns are, so a turn opened at stays put while the
 														// turns above it grow (map column likewise).
-														className={`-mb-4 [overflow-anchor:none] ${READER_RAIL_BACKGROUND}`}
+														className={`-mb-xl [overflow-anchor:none] ${READER_RAIL_BACKGROUND}`}
 													>
-														<div className="sticky top-(--reader-rail-inset) flex h-[calc(100cqh-2*var(--reader-rail-inset))] min-h-0 flex-col gap-3">
+														<div className="sticky top-(--reader-rail-inset) flex h-[calc(100cqh-2*var(--reader-rail-inset))] min-h-0 flex-col gap-l">
 															<TurnRailList
 																activeTurn={activeTurn}
 																costThresholds={costThresholds}
@@ -433,7 +437,7 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 														</div>
 													</nav>
 
-													<div className="col-start-2 row-start-1 flex min-w-0 items-start gap-8 pt-(--reader-top)">
+													<div className="col-start-2 row-start-1 flex min-w-0 items-start gap-xxxl pt-(--reader-top)">
 														<div
 															className="flex min-w-0 flex-1 flex-col"
 															style={{ gap: TURN_GAP_PX }}
@@ -441,14 +445,14 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 															<div
 																ref={setJumpSlot}
 																className={cn(
-																	"pointer-events-none sticky top-[calc(var(--reader-top)-var(--reader-inset))] z-40 h-0 text-sm [overflow-anchor:none]",
+																	"pointer-events-none sticky top-[calc(var(--reader-top)-var(--reader-inset))] z-40 h-0 text-body-xl [overflow-anchor:none]",
 																	READING_MEASURE,
 																)}
 																style={{ marginBottom: -TURN_GAP_PX }}
 															/>
 															<FrozenSubagentsLayer onSlot={setFrozenSlot} />
 															{turns.length === 0 ? (
-																<p className="py-12 text-center text-sm text-muted-foreground">
+																<p className="py-xxxl text-center text-body-xl text-ink-3">
 																	{emptyMessage}
 																</p>
 															) : null}
@@ -511,7 +515,7 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 															turns={turns}
 														/>
 													</div>
-													<div className="col-start-3 row-start-1 grid w-14 xl:col-start-2 xl:mr-[calc(var(--reader-card)+2rem)] xl:justify-self-end">
+													<div className="col-start-3 row-start-1 grid w-14 xl:col-start-2 xl:mr-[calc(var(--reader-card)+var(--space-xxxl))] xl:justify-self-end">
 														<ReaderMap
 															focus={readFocus}
 															mapKey={mapKey}

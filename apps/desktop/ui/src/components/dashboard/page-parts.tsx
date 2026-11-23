@@ -1,9 +1,7 @@
 import type { Format } from "@number-flow/react";
 import type { Icon } from "@tabler/icons-react";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
-import { FlowNumber } from "@/app/ui/flow-number";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
-import { Card, CardHeader, CardTitle } from "@/components/dashboard/card";
+import { Card, CardHeader, CardTitle } from "@/app/ui/card";
 import {
 	Empty,
 	EmptyContent,
@@ -11,14 +9,22 @@ import {
 	EmptyHeader,
 	EmptyMedia,
 	EmptyTitle,
-} from "@/components/dashboard/empty";
-import { Skeleton } from "@/components/dashboard/skeleton";
-import { TableCell, TableRow } from "@/components/dashboard/table";
+} from "@/app/ui/empty";
+import { FlowNumber } from "@/app/ui/flow-number";
+import { Pressable } from "@/app/ui/pressable";
+import { Skeleton } from "@/app/ui/skeleton";
+import { TableCell, TableRow } from "@/app/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import {
 	OpalineShape,
 	restingChipClassName,
 } from "@/features/shell/components/shell-nav-icon";
 import { cn } from "@/lib/utils";
+
+type EmptyStateIcon = React.ComponentType<{
+	className?: string;
+	"aria-hidden"?: boolean | "true" | "false";
+}>;
 
 export function EmptyState({
 	icon: Icon,
@@ -28,7 +34,7 @@ export function EmptyState({
 	className,
 	iconClassName,
 }: {
-	icon: React.ComponentType<{ className?: string }>;
+	icon: EmptyStateIcon;
 	title?: string;
 	description?: string;
 	children?: React.ReactNode;
@@ -36,20 +42,20 @@ export function EmptyState({
 	iconClassName?: string;
 }) {
 	return (
-		<Empty className={cn("border border-dashed", className)}>
+		<Empty className={className}>
 			<EmptyHeader>
 				<EmptyMedia
 					variant="icon"
-					className={title || description || children ? undefined : "mb-0"}
+					className={title || description || children ? undefined : "mb-zero"}
 				>
 					<OpalineShape
 						className={cn(
 							"absolute inset-0",
 							restingChipClassName,
-							"[--opal-ring:rgb(17_24_39/0.08)]",
+							"[--opal-ring:var(--line)]",
 						)}
 					/>
-					<Icon className={cn("relative", iconClassName)} />
+					<Icon aria-hidden="true" className={cn("relative", iconClassName)} />
 				</EmptyMedia>
 				{title || description || children ? (
 					<EmptyContent>
@@ -60,6 +66,30 @@ export function EmptyState({
 				) : null}
 			</EmptyHeader>
 		</Empty>
+	);
+}
+
+/** A whole page's empty, error or not-found state: `EmptyState` filling the
+ *  page body. `action` is usually a `RetryButton`. */
+export function PageEmptyState({
+	icon,
+	title,
+	description,
+	action,
+	className,
+}: {
+	icon: EmptyStateIcon;
+	title: string;
+	description: string;
+	action?: React.ReactNode;
+	className?: string;
+}) {
+	return (
+		<div className={cn("flex min-h-64 flex-1 flex-col p-xxl", className)}>
+			<EmptyState icon={icon} title={title} description={description}>
+				{action}
+			</EmptyState>
+		</div>
 	);
 }
 
@@ -96,13 +126,11 @@ export function TableRowsSkeleton({
 							{c.w && (
 								<div
 									className={cn(
-										"flex items-center gap-2",
+										"flex items-center gap-m",
 										c.align === "right" && "justify-end",
 									)}
 								>
-									{c.icon && (
-										<Skeleton className="size-4 shrink-0 rounded-md" />
-									)}
+									{c.icon && <Skeleton className="size-4 shrink-0 corner-s" />}
 									<Skeleton className={cn("h-4", c.w)} />
 								</div>
 							)}
@@ -163,46 +191,40 @@ export function StatCard({
 		<Card
 			size="sm"
 			skullet-block={onSelect ? "" : undefined}
-			className={cn(
-				"data-[size=sm]:py-3.5",
-				onSelect &&
-					"relative transition-shadow hover:shadow-(--custom-shadow-secondary)",
-			)}
+			// The selected card rings in its series accent (data paint).
 			style={
 				selected && accent
 					? {
-							boxShadow: `var(--custom-shadow), 0 1.5px 2px color-mix(in oklch, ${accent} 25%, transparent), inset 0 0 0 1px color-mix(in oklch, ${accent} 20%, transparent)`,
+							boxShadow: `var(--shadow-card), 0 1.5px 2px color-mix(in oklch, ${accent} 25%, transparent), inset 0 0 0 1px color-mix(in oklch, ${accent} 20%, transparent)`,
 						}
 					: undefined
 			}
+			className={onSelect ? "relative" : undefined}
 		>
 			{onSelect ? (
-				<button
+				<Pressable
 					type="button"
 					aria-label={label}
 					aria-pressed={selected}
 					onClick={onSelect}
-					className={cn("absolute inset-0 z-10 rounded-[inherit] outline-none")}
+					className="absolute inset-0 z-10 corner-m corner-squircle transition-colors hover:bg-hover squircle:corner-xl"
 				/>
 			) : null}
-			<CardHeader className="gap-1.5 group-data-[size=sm]/card:px-4">
-				<div className="flex min-w-0 items-center justify-between gap-2">
+			<CardHeader>
+				<div className="flex min-w-0 items-center justify-between gap-m">
 					<div
 						className={cn(
-							"flex items-center gap-1.75",
+							"flex items-center gap-s",
 							note ? "shrink-0" : "min-w-0",
 						)}
 					>
 						{StatIcon && (
 							<StatIcon
-								className={cn(
-									"size-3.5 shrink-0 text-muted-foreground",
-									iconClassName,
-								)}
+								className={cn("size-3.5 shrink-0 text-ink-3", iconClassName)}
 							/>
 						)}
 						{shortLabel ? (
-							<span className="truncate text-sm text-foreground">
+							<span className="truncate text-body-xl text-ink">
 								<span className="hidden @[15rem]/card-header:inline">
 									{label}
 								</span>
@@ -211,19 +233,21 @@ export function StatCard({
 								</span>
 							</span>
 						) : (
-							<span className="truncate text-sm text-foreground">{label}</span>
+							<span className="truncate text-body-xl text-ink">{label}</span>
 						)}
 						{badge ? <span className="flex shrink-0">{badge}</span> : null}
 					</div>
 					<div
 						className={cn(
-							"flex items-center gap-2.5",
-							note ? "min-w-0 gap-2" : "shrink-0",
+							"flex items-center gap-m",
+							note ? "min-w-0 gap-m" : "shrink-0",
 						)}
 					>
 						{note && !noteBelow && !loading ? (
-							<CardTitle className="inline-flex min-w-0 items-center gap-1 overflow-hidden tracking-tight whitespace-nowrap tabular-nums opacity-45">
-								{note}
+							<CardTitle className="min-w-0">
+								<span className="inline-flex min-w-0 items-center gap-xs overflow-hidden whitespace-nowrap text-ink-4 tabular-nums">
+									{note}
+								</span>
 							</CardTitle>
 						) : null}
 						<StatValue
@@ -249,8 +273,8 @@ export function StatCard({
 					</div>
 				</div>
 				{note && noteBelow && !loading ? (
-					<CardTitle className="min-w-0 tracking-tight text-pretty tabular-nums opacity-45">
-						{note}
+					<CardTitle className="min-w-0">
+						<span className="text-pretty text-ink-4 tabular-nums">{note}</span>
 					</CardTitle>
 				) : null}
 			</CardHeader>
@@ -271,24 +295,21 @@ function StatValue({
 }) {
 	if (!tip)
 		return (
-			<CardTitle className="shrink-0 tracking-tight tabular-nums" title={title}>
-				{children}
+			<CardTitle className="shrink-0" title={title}>
+				<span className="tabular-nums">{children}</span>
 			</CardTitle>
 		);
 	return (
 		<Tooltip>
 			<TooltipTrigger
 				render={
-					<CardTitle
-						className="relative z-20 shrink-0 cursor-default tracking-tight tabular-nums"
-						onClick={onSelect}
-					/>
+					<CardTitle className="relative z-20 shrink-0" onClick={onSelect} />
 				}
 			>
-				{children}
+				<span className="tabular-nums">{children}</span>
 			</TooltipTrigger>
-			<TooltipContent side="top" className="tabular-nums">
-				{tip}
+			<TooltipContent side="top">
+				<span className="tabular-nums">{tip}</span>
 			</TooltipContent>
 		</Tooltip>
 	);
@@ -300,7 +321,7 @@ export function ScrollFade({
 	children,
 	className,
 	containerClassName,
-	fromClassName = "from-card",
+	fromClassName = "from-surface",
 }: {
 	children: React.ReactNode;
 	/** Classes for the scroll viewport (e.g. `max-h-72`, padding). */
@@ -339,14 +360,14 @@ export function ScrollFade({
 			</div>
 			<div
 				className={cn(
-					"pointer-events-none absolute inset-x-0 top-0 h-10 bg-linear-to-b to-transparent transition-opacity duration-150",
+					"pointer-events-none absolute inset-x-0 top-0 h-10 bg-linear-to-b to-transparent transition-opacity duration-(--motion-duration)",
 					fromClassName,
 					edges.top ? "opacity-100" : "opacity-0",
 				)}
 			/>
 			<div
 				className={cn(
-					"pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-linear-to-t to-transparent transition-opacity duration-150",
+					"pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-linear-to-t to-transparent transition-opacity duration-(--motion-duration)",
 					fromClassName,
 					edges.bottom ? "opacity-75" : "opacity-0",
 				)}

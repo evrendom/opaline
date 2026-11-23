@@ -34,7 +34,7 @@ function MemberActivitySparkline({ values }: { values: readonly number[] }) {
 	const totalSessions = values.reduce((total, value) => total + value, 0);
 
 	if (values.length === 0) {
-		return <p className="text-base text-muted-foreground sm:text-sm">—</p>;
+		return <p className="text-body-xxl text-ink-3 sm:text-body-xl">—</p>;
 	}
 
 	return (
@@ -45,7 +45,7 @@ function MemberActivitySparkline({ values }: { values: readonly number[] }) {
 			viewBox={`0 0 ${SPARKLINE_WIDTH} ${SPARKLINE_HEIGHT}`}
 		>
 			<polyline
-				className="fill-none stroke-[#266df0]"
+				className="fill-none stroke-accent"
 				points={buildSparklinePoints(values)}
 				strokeLinecap="round"
 				strokeLinejoin="round"
@@ -65,7 +65,7 @@ function SessionMemberAvatar({
 }) {
 	const isTrigger = size === "trigger";
 	const avatarClassName = cn(
-		"shrink-0 rounded-full object-cover outline-1 -outline-offset-1 outline-black/5 dark:outline-white/10",
+		"shrink-0 corner-full object-cover outline-(length:--border-m) -outline-offset-1 outline-line-soft",
 		isTrigger ? "size-4.5" : "size-6",
 	);
 
@@ -85,11 +85,14 @@ function SessionMemberAvatar({
 		<span
 			aria-hidden="true"
 			className={cn(
-				"flex shrink-0 items-center justify-center rounded-full bg-muted outline-1 -outline-offset-1 outline-black/5 dark:outline-white/10",
+				"flex shrink-0 items-center justify-center",
+				"corner-full",
+				"bg-field -outline-offset-1 outline-line-soft",
+				"outline-(length:--border-m)",
 				isTrigger ? "size-4.5" : "size-6",
 			)}
 		>
-			<IconUser className="size-4 shrink-0 text-muted-foreground" />
+			<IconUser className="size-4 shrink-0 text-ink-3" />
 		</span>
 	);
 }
@@ -121,7 +124,7 @@ export function SessionMemberProfilePreview({
 					trigger ?? (
 						<span
 							skullet-block=""
-							className="relative flex size-4.5 shrink-0 cursor-help items-center justify-center rounded-full outline-none data-popup-open:outline-2 data-popup-open:outline-offset-2 data-popup-open:outline-(--session-overview-accent)"
+							className="relative flex size-4.5 shrink-0 cursor-help items-center justify-center corner-full outline-none data-popup-open:outline-(length:--border-l) data-popup-open:outline-offset-2 data-popup-open:outline-accent"
 							data-slot="session-member-profile-trigger"
 						/>
 					)
@@ -144,15 +147,15 @@ export function SessionMemberProfilePreview({
 					sideOffset={2}
 				>
 					<PreviewCard.Popup
-						className="w-52 origin-(--transform-origin) rounded-lg bg-popover p-2.5 text-popover-foreground ring-1 ring-foreground/10 outline-none transition-[opacity,transform] duration-100 data-ending-style:scale-98 data-ending-style:opacity-0 data-starting-style:scale-98 data-starting-style:opacity-0 dark:ring-foreground/15"
+						className="w-52 origin-(--transform-origin) corner-m bg-surface p-l text-ink ring-1 ring-line outline-none transition-[opacity,transform] duration-(--motion-quick-duration) data-ending-style:scale-98 data-ending-style:opacity-0 data-starting-style:scale-98 data-starting-style:opacity-0"
 						data-slot="session-member-profile-preview"
 					>
-						<div className="flex min-w-0 items-center gap-2">
+						<div className="flex min-w-0 items-center gap-m">
 							<SessionMemberAvatar avatarUrl={avatarUrl} size="profile" />
-							<p className="min-w-0 flex-1 truncate text-base font-medium sm:text-sm">
+							<p className="min-w-0 flex-1 truncate text-body-xxl font-medium sm:text-body-xl">
 								{userLabel}
 							</p>
-							<p className="shrink-0 text-base text-muted-foreground tabular-nums sm:text-sm">
+							<p className="shrink-0 text-body-xxl text-ink-3 tabular-nums sm:text-body-xl">
 								{activityTotal.toLocaleString()} sessions
 							</p>
 						</div>

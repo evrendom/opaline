@@ -1,6 +1,7 @@
 import type { AnalysisHistorySearchOutput } from "@rudel/api-routes";
 import { Link, useParams } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
+import { Badge } from "@/app/ui/badge";
 import { CardContent } from "@/app/ui/card";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
 import { dataWindow, formatDay } from "@/features/reports/report-dates";
@@ -41,10 +42,12 @@ export function ReportsSettingsPage() {
 
 	if (!query.isPending && query.isError) {
 		return (
-			<div className="workspace-settings-page">
+			<div className="settings-page">
 				<SettingsSectionCard>
-					<CardContent className="text-sm text-muted-foreground">
-						Reports couldn&apos;t be loaded right now.
+					<CardContent>
+						<p className="text-ink-3">
+							Reports couldn&apos;t be loaded right now.
+						</p>
 					</CardContent>
 				</SettingsSectionCard>
 			</div>
@@ -54,7 +57,7 @@ export function ReportsSettingsPage() {
 	return (
 		<SettingsPageReveal routeId="reports" loading={query.isPending}>
 			{() => (
-				<div className="workspace-settings-page">
+				<div className="settings-page">
 					<WorkspaceSettingsGroup
 						title="Reports"
 						description={
@@ -65,7 +68,7 @@ export function ReportsSettingsPage() {
 					>
 						{reports.length ? (
 							<ul
-								className="workspace-settings-list reports-settings-list"
+								className="settings-list reports-settings-list"
 								aria-label="Saved reports"
 							>
 								{reports.map((report) => (
@@ -81,9 +84,7 @@ export function ReportsSettingsPage() {
 								))}
 							</ul>
 						) : (
-							<p className="workspace-settings-empty">
-								{REPORTS_SETTINGS_EMPTY}
-							</p>
+							<p className="settings-empty">{REPORTS_SETTINGS_EMPTY}</p>
 						)}
 					</WorkspaceSettingsGroup>
 				</div>
@@ -110,11 +111,9 @@ function ReportRow({
 				description={`Saved ${formatDay(report.createdAt)}${authorName ? ` by ${authorName}` : ""} · ${dataWindow(report)}`}
 			>
 				{report.shared ? (
-					<span className="workspace-settings-badge">
-						Shared with workspace
-					</span>
+					<Badge>Shared with workspace</Badge>
 				) : (
-					<span className="workspace-settings-status">Not shared</span>
+					<span className="settings-status">Not shared</span>
 				)}
 			</WorkspaceSettingsRow>
 		</Link>

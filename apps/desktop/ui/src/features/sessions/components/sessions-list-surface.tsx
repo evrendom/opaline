@@ -1,5 +1,6 @@
 import type { SessionAnalytics } from "@rudel/api-routes";
 import { type Ref, useState } from "react";
+import { Button } from "@/app/ui/button";
 import { SearchInput } from "@/components/dashboard/data-table";
 import { orderSessionsForDisplay } from "@/features/sessions/session-ordering";
 import { useSessionIdSearch } from "@/features/sessions/use-session-id-search";
@@ -56,10 +57,11 @@ export function SessionsListSurface({
 		<div
 			className={cn(
 				"dashboardy-page min-w-0 overscroll-x-none",
-				layout === "page" && "px-4 pb-6 pt-2 sm:px-6 lg:px-[76px] lg:pb-8",
-				layout === "pane" && "h-full min-h-0 overflow-y-auto p-4 sm:p-5",
+				layout === "page" &&
+					"px-xl pb-xxl pt-m sm:px-xxl lg:px-xxxl lg:pb-xxxl",
+				layout === "pane" && "h-full min-h-0 overflow-y-auto p-xl sm:p-xxl",
 				layout === "workspace" &&
-					"flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-[color:var(--dashboardy-surface-opaque)]",
+					"flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-canvas",
 			)}
 		>
 			<div
@@ -77,23 +79,23 @@ export function SessionsListSurface({
 					)}
 				>
 					{data.uploadFailuresError ? (
-						<p className="px-4 py-3 text-base text-(--dashboardy-muted) sm:text-sm">
+						<p className="px-xl py-l text-body-xxl text-ink-3 sm:text-body-xl">
 							Some upload errors couldn’t be loaded.{" "}
-							<button
-								type="button"
-								className="underline"
+							<Button
+								variant="link"
+								size="inline"
 								onClick={data.retryUploadFailures}
 							>
 								Try again
-							</button>
+							</Button>
 						</p>
 					) : null}
 					{isSnapshotSessionsError ? (
 						<div
 							className={cn(
-								"border-b border-black/6 px-6 py-12 text-center text-[color:var(--dashboardy-muted)] dark:border-white/8",
-								layout === "page" && "text-sm",
-								layout === "pane" && "text-base sm:text-sm",
+								"edge-b-m border-line px-xxl py-xxxl text-center text-ink-3",
+								layout === "page" && "text-body-xl",
+								layout === "pane" && "text-body-xxl sm:text-body-xl",
 							)}
 						>
 							We couldn&apos;t load the session overview for this range.

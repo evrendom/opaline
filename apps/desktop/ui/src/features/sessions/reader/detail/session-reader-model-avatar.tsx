@@ -16,14 +16,11 @@ export function ModelAvatar({
 	solid?: boolean;
 }) {
 	if (loading) {
-		return <Skeleton className="size-6 shrink-0 rounded-full" />;
+		return <Skeleton className="size-6 shrink-0 corner-full" />;
 	}
 	return (
 		<ModelChip
-			chip={cn(
-				"size-6",
-				(flat || shadowless) && "drop-shadow-none dark:drop-shadow-none",
-			)}
+			chip={cn("size-6", (flat || shadowless) && "drop-shadow-none")}
 			glyph="size-3.5"
 			model={model}
 			solid={solid}

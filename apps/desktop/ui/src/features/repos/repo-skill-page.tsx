@@ -7,6 +7,7 @@ import {
 import { useCallback, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
+import { Pressable } from "@/app/ui/pressable";
 import { SkillMark } from "@/components/skill-mark";
 import { useDateRange } from "@/features/analytics/date-range/useDateRange";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
@@ -120,7 +121,7 @@ export function SkillPage({
 					value={view}
 					onChange={selectView}
 					label="Skill views"
-					className="pr-8 pl-6"
+					className="pr-xxxl pl-xxl"
 				/>
 				{/* The workspace dashboard over this skill's sessions (in the repo):
 				    the same cards, chart and breakdowns, computed from the rows.
@@ -167,7 +168,7 @@ export function SkillPage({
 				aria-label="Skill file"
 				className={cn(
 					SESSION_OVERVIEW_SURFACE_CLASS_NAME,
-					"h-[calc(100dvh-3.5rem)] gap-4 p-4 md:h-auto",
+					"h-[calc(100dvh-3.5rem)] gap-xl p-xl md:h-auto",
 				)}
 			>
 				{pick?.kind === "step" ? (
@@ -175,7 +176,7 @@ export function SkillPage({
 				) : pick?.kind === "skill" ? (
 					<SkillFileCard key={pick.name} name={pick.name} />
 				) : null}
-				<div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg bg-card shadow-(--custom-shadow) corner-squircle squircle:rounded-3xl dark:bg-muted-foreground/10">
+				<div className="flex min-h-0 flex-1 flex-col overflow-hidden corner-m bg-surface shadow-card corner-squircle squircle:corner-xl">
 					<HistoricalSkillDetailContent
 						key={skillName}
 						detail={skill.data}
@@ -208,20 +209,20 @@ function SkillHeader({
 	const shellRoute = useCurrentShellRoute();
 	if (!headerPortal) return null;
 	const crumbClassName =
-		"flex shrink-0 items-center gap-2 text-muted-foreground transition-colors hover:text-foreground";
+		"flex shrink-0 items-center gap-m text-ink-3 transition-colors hover:text-ink";
 	const separator = (
 		<IconChevronRight
 			aria-hidden="true"
-			className="size-4 shrink-0 text-muted-foreground/50"
+			className="size-4 shrink-0 text-ink-4"
 			stroke={1.5}
 		/>
 	);
 	return createPortal(
 		<nav
 			aria-label="Skill breadcrumb"
-			className="flex min-w-0 flex-1 items-center gap-1.5 text-base font-medium tracking-tight"
+			className="flex min-w-0 flex-1 items-center gap-s text-body-xxl font-medium tracking-xs"
 		>
-			<button
+			<Pressable
 				type="button"
 				onClick={onBackToList}
 				data-fluid-menu-root=""
@@ -234,15 +235,15 @@ function SkillHeader({
 					tone={shellRoute.tone}
 				/>
 				{shellRoute.title}
-			</button>
+			</Pressable>
 			{separator}
 			{repo ? (
 				<>
-					<button
+					<Pressable
 						type="button"
 						onClick={repo.onBack}
 						data-fluid-menu-root=""
-						className={cn(crumbClassName, "min-w-0 shrink gap-1.5")}
+						className={cn(crumbClassName, "min-w-0 shrink gap-s")}
 					>
 						<ShellNavIcon
 							icon={shellRouteMap.repos.icon}
@@ -251,13 +252,13 @@ function SkillHeader({
 							tone={shellRoute.tone}
 						/>
 						<span className="truncate">{repo.name}</span>
-					</button>
+					</Pressable>
 					{separator}
 				</>
 			) : null}
-			<span aria-current="page" className="flex min-w-0 items-center gap-1.5">
+			<span aria-current="page" className="flex min-w-0 items-center gap-s">
 				{/* The skill's own mark, as on its row in the skills table. */}
-				<SkillMark skill={skillName} className="size-4.5 text-[10px]" />
+				<SkillMark skill={skillName} className="size-4.5 text-body-xs" />
 				<span className="truncate">{skillName}</span>
 			</span>
 		</nav>,
@@ -274,7 +275,7 @@ function SkillFileCard({ name }: { name: string }) {
 	return (
 		<section
 			aria-label={`${name} skill file`}
-			className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg bg-card shadow-(--custom-shadow) corner-squircle squircle:rounded-3xl dark:bg-muted-foreground/10"
+			className="flex min-h-0 flex-1 flex-col overflow-hidden corner-m bg-surface shadow-card corner-squircle squircle:corner-xl"
 		>
 			<HistoricalSkillDetailContent
 				detail={skill.data}

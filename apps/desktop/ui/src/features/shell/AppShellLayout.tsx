@@ -21,10 +21,7 @@ import { ShellDashboardRangeControls } from "@/features/costs/dashboard-range-co
 import { AppSidebar } from "@/features/shell/components/AppSidebar";
 import { LastSessionUploadBar } from "@/features/shell/components/last-session-upload-bar";
 import { SiteHeader } from "@/features/shell/components/SiteHeader";
-import {
-	ShellWindowColumn,
-	shellWindowRadiusClassName,
-} from "@/features/shell/components/shell-window-column";
+import { ShellWindowColumn } from "@/features/shell/components/shell-window-column";
 import { shellNavigationRoutes } from "@/features/shell/config/shell-routes";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { NewseshListHeaderPortalContext } from "@/features/shell/newsesh-list-header-portal";
@@ -174,14 +171,14 @@ export function LeftSidebarAppShellLayout() {
 				<div
 					className={cn(
 						"@container/main flex min-h-0 flex-1 flex-col",
-						!isFixedWorkspaceRoute && "gap-2",
+						!isFixedWorkspaceRoute && "gap-m",
 					)}
 				>
 					<div
 						className={cn(
 							"flex min-h-0 flex-1 flex-col",
 							isFixedWorkspaceRoute && "overflow-hidden",
-							!isFixedWorkspaceRoute && "gap-4 py-4 md:gap-6 md:py-6",
+							!isFixedWorkspaceRoute && "gap-xl py-xl md:gap-xxl md:py-xxl",
 						)}
 					>
 						<Outlet />
@@ -204,7 +201,7 @@ export function LeftSidebarAppShellLayout() {
 						<ShellBottomNavigationPortalContext.Provider value={null}>
 							<div
 								className={cn(
-									"dashboard-01-preview h-dvh overflow-hidden overscroll-none text-foreground",
+									"dashboard-01-preview h-dvh overflow-hidden overscroll-none text-ink",
 									isWelcome && "cli-welcome-shell",
 									!demo && !isWelcome && "product-app-shell",
 								)}
@@ -223,23 +220,16 @@ export function LeftSidebarAppShellLayout() {
 									inert={isWelcome || undefined}
 								>
 									<SidebarProvider
-										className="group/shell dashboard-01-chrome-frame relative h-full min-h-0 overflow-clip overscroll-none"
+										className="group/shell dashboard-01-chrome-frame desktop-drag-wrapper relative h-full min-h-0 overflow-clip overscroll-none"
 										style={shellChromeStyle}
 									>
-										<AppSidebar />
+										<AppSidebar fillHeight={isWelcome} />
 										<ShellWindowColumn
 											footer={
 												showLastSessionUpload ? <LastSessionUploadBar /> : null
 											}
 										>
-											<SidebarInset
-												className={cn(
-													"dashboard-01-window min-h-0 min-w-0 overflow-hidden overscroll-none bg-[var(--dashboard-01-content-background)]",
-													shellWindowRadiusClassName,
-												)}
-											>
-												{shellWindowContent}
-											</SidebarInset>
+											<SidebarInset>{shellWindowContent}</SidebarInset>
 										</ShellWindowColumn>
 									</SidebarProvider>
 								</div>

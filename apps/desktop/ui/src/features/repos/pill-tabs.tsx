@@ -6,6 +6,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { cn } from "@/lib/utils";
 
 type PillBox = { left: number; width: number };
@@ -48,7 +49,7 @@ export function PillTabs<T extends string>({
 			className={cn(
 				// The content background, as the page header has: the shell window
 				// draws its edge as an inset ring, which a transparent row shows.
-				"relative flex h-11 shrink-0 items-center gap-1 bg-[var(--dashboard-01-content-background)]",
+				"relative flex h-11 shrink-0 items-center gap-xs bg-[var(--canvas)]",
 				className,
 			)}
 		>
@@ -57,7 +58,10 @@ export function PillTabs<T extends string>({
 					ref={pillRef}
 					aria-hidden="true"
 					className={cn(
-						"pointer-events-none absolute top-1/2 left-0 h-8 origin-left rounded-md bg-muted corner-squircle squircle:rounded-xl will-change-transform dark:bg-muted/50",
+						"absolute top-1/2 left-0 h-8",
+						"corner-s corner-squircle",
+						"pointer-events-none origin-left bg-field will-change-transform",
+						"squircle:corner-l",
 						pillClassName,
 					)}
 					style={{
@@ -70,7 +74,7 @@ export function PillTabs<T extends string>({
 				const active = id === shown;
 				const TabIcon = active && activeIcon ? activeIcon : icon;
 				return (
-					<button
+					<Pressable
 						key={id}
 						type="button"
 						role="tab"
@@ -81,22 +85,26 @@ export function PillTabs<T extends string>({
 							onChange(id);
 						}}
 						className={cn(
-							"relative flex h-8 items-center rounded-md px-2.5 text-sm font-medium transition-colors outline-none corner-squircle squircle:rounded-xl",
-							active && !pill && cn("bg-muted dark:bg-muted/50", pillClassName),
+							"relative flex h-8 items-center",
+							"corner-s px-l corner-squircle",
+							"text-body-xl font-medium",
+							"transition-colors",
+							"squircle:corner-l",
+							active && !pill && cn("bg-field", pillClassName),
 							active
 								? empty
-									? "text-foreground/45"
-									: "text-foreground"
+									? "text-ink-3"
+									: "text-ink"
 								: empty
-									? "text-muted-foreground/45 hover:text-muted-foreground"
-									: "text-muted-foreground hover:text-foreground",
+									? "text-ink-4 hover:text-ink-3"
+									: "text-ink-3 hover:text-ink",
 						)}
 					>
-						<span className="flex items-center gap-1.5">
+						<span className="flex items-center gap-s">
 							<TabIcon aria-hidden="true" className="size-3.5" />
 							{tabLabel}
 						</span>
-					</button>
+					</Pressable>
 				);
 			})}
 			{trailing ? (

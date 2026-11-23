@@ -16,6 +16,7 @@ import {
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
+import { Pressable } from "@/app/ui/pressable";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { DateRangeOverride } from "@/features/analytics/date-range/DateRangeProvider";
 import type { DashboardVariant } from "@/features/costs/cost-dashboard-page";
@@ -128,8 +129,11 @@ const SETUP_TABS = ["instructions", "skills", "mcp"] as const;
 const TAB_PANE =
 	"absolute inset-0 flex min-h-0 min-w-0 flex-col overflow-hidden";
 
+// The rail sits where the Sessions overview's does (the stage's own origin,
+// the default 32px gutter), so it's the same size on both pages; only the
+// content beside it is offset onto the stage.
 const STAGE_PANE =
-	"absolute inset-x-0 top-(--stage-top) bottom-0 left-[calc(var(--reader-gutter)-1.5rem)] flex min-h-0 min-w-0 flex-col overflow-hidden";
+	"absolute inset-0 flex min-h-0 min-w-0 flex-col overflow-hidden";
 
 export function RepoDetailPage({
 	repoKey,
@@ -171,7 +175,7 @@ export function RepoDetailPage({
 	const shownTab = clickedTab ? clickedTab.to : tab;
 	const summaryPane = useMemo(
 		() => (
-			<div className="flex h-full min-h-0 min-w-0 flex-col pt-2 pr-8 pb-2 pl-6">
+			<div className="flex h-full min-h-0 min-w-0 flex-col pt-m pr-xxxl pb-m pl-xxl">
 				<RepoSessionBoxes fill />
 			</div>
 		),
@@ -220,7 +224,7 @@ export function RepoDetailPage({
 							sessionFilter={{ repoKey }}
 							range={range}
 							sessionCount={undefined}
-							rowHighlightClassName="rounded-lg corner-squircle squircle:rounded-2xl"
+							rowHighlightClassName="corner-m corner-squircle squircle:corner-xl-inner"
 							detailHref={(id) =>
 								id
 									? appRoutes.repoDetail(repoKey, id)
@@ -277,7 +281,7 @@ export function RepoDetailPage({
 			? { startDate: pickedRange.start, endDate: pickedRange.end }
 			: range,
 		sessionCount: undefined,
-		rowHighlightClassName: "rounded-lg corner-squircle squircle:rounded-2xl",
+		rowHighlightClassName: "corner-m corner-squircle squircle:corner-xl-inner",
 		detailHref: (id) =>
 			id
 				? appRoutes.repoDetail(repoKey, id)
@@ -287,7 +291,7 @@ export function RepoDetailPage({
 	};
 	const sessions = <UsageSessionsPane {...sessionsProps} />;
 	return (
-		<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-[var(--dashboard-01-content-background,#fcfcfc)] text-(--dashboardy-heading) [--reader-page:var(--dashboard-01-content-background,#fcfcfc)]">
+		<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-canvas text-ink [--reader-page:var(--canvas)]">
 			<RepoDetailHeader
 				repoKey={repoKey}
 				name={name}
@@ -310,7 +314,7 @@ export function RepoDetailPage({
 									<div className="relative isolate min-h-0 min-w-0 flex-1 overflow-hidden [--dashboard-01-content-background:var(--dashboard-01-stage-background)] [--panes-top:calc(var(--stage-top)-0.125rem)] [--stage-top:--spacing(2)] [--tabs-band:--spacing(19)]">
 										<div
 											aria-hidden="true"
-											className="pointer-events-none absolute top-(--stage-top) right-0 bottom-0 left-(--reader-gutter) -z-10 -ml-6 rounded-tl-lg bg-(--dashboard-01-stage-background) corner-squircle squircle:rounded-tl-3xl"
+											className="pointer-events-none absolute top-(--stage-top) right-0 bottom-0 left-(--reader-gutter) -z-10 -ml-xxl corner-tl-m bg-(--dashboard-01-stage-background) corner-squircle squircle:corner-tl-xl"
 										/>
 										{headerControls
 											? createPortal(
@@ -323,12 +327,7 @@ export function RepoDetailPage({
 												)
 											: null}
 										{
-											<div
-												className={cn(
-													STAGE_PANE,
-													"flex-row [--cost-page-gutter:--spacing(6)]",
-												)}
-											>
+											<div className={cn(STAGE_PANE, "flex-row")}>
 												<ShellHeaderPortalContext.Provider value={null}>
 													<div className="flex h-full w-[300px] shrink-0 flex-col overflow-y-auto">
 														<DotPreviewContext.Provider value={preview}>
@@ -339,7 +338,7 @@ export function RepoDetailPage({
 														</DotPreviewContext.Provider>
 													</div>
 												</ShellHeaderPortalContext.Provider>
-												<div className="relative min-w-0 flex-1">
+												<div className="relative mt-(--stage-top) ml-m min-w-0 flex-1">
 													<Activity
 														mode={shownTab === "summary" ? "visible" : "hidden"}
 													>
@@ -413,7 +412,7 @@ function RepoDashboard({
 	);
 	if (repositories.isError || repositories.data?.length === 0)
 		return (
-			<div className="px-8 py-6">
+			<div className="flex h-full min-h-0 flex-1 flex-col px-xxxl py-xxl">
 				<EmptyState
 					icon={IconFolder}
 					title={
@@ -443,7 +442,7 @@ function RepoDashboard({
  * breadcrumb whose section leads back to the list, extended by the open
  * session's id (the repo crumb then leads back to its sessions), and a slot
  * at the row's right end for the open session's controls. */
-function RepoDetailHeader({
+export function RepoDetailHeader({
 	repoKey,
 	name,
 	onBack,
@@ -463,11 +462,11 @@ function RepoDetailHeader({
 	const repoHue = useRepositoryHue(repoKey);
 	if (!headerPortal) return null;
 	const crumbClassName =
-		"flex items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground";
+		"flex items-center gap-s text-ink-3 transition-colors hover:text-ink";
 	const separator = (
 		<IconChevronRight
 			aria-hidden="true"
-			className="size-4 shrink-0 text-muted-foreground/50"
+			className="size-4 shrink-0 text-ink-4"
 			stroke={1.5}
 		/>
 	);
@@ -481,13 +480,13 @@ function RepoDetailHeader({
 		<>
 			<nav
 				aria-label="Repo breadcrumb"
-				className="flex min-w-0 flex-1 items-center gap-1.5 text-base font-medium tracking-tight"
+				className="flex min-w-0 items-center gap-s text-body-xxl font-medium tracking-xs"
 			>
-				<button
+				<Pressable
 					type="button"
 					onClick={onBack}
 					data-fluid-menu-root=""
-					className={cn(crumbClassName, "shrink-0 gap-2")}
+					className={cn(crumbClassName, "shrink-0 gap-m")}
 				>
 					<ShellNavIcon
 						icon={shellRoute.icon}
@@ -496,22 +495,22 @@ function RepoDetailHeader({
 						tone={shellRoute.tone}
 					/>
 					{shellRoute.title}
-				</button>
+				</Pressable>
 				{separator}
 				{sessionId ? (
 					<>
-						<button
+						<Pressable
 							type="button"
 							onClick={onBackToSessions}
 							data-fluid-menu-root=""
 							className={cn(crumbClassName, "min-w-0 shrink")}
 						>
 							{repoLabel}
-						</button>
+						</Pressable>
 						{separator}
 						<span
 							aria-current="page"
-							className="flex min-w-0 items-center gap-1.5"
+							className="flex min-w-0 items-center gap-s"
 						>
 							{/* The Sessions section's own chip, colour included. */}
 							<ShellNavIcon
@@ -525,18 +524,19 @@ function RepoDetailHeader({
 						</span>
 					</>
 				) : (
-					<span
-						aria-current="page"
-						className="flex min-w-0 items-center gap-1.5"
-					>
+					<span aria-current="page" className="flex min-w-0 items-center gap-s">
 						{repoLabel}
 					</span>
 				)}
 			</nav>
+			{/* The controls take the free width, so a crumb portalled first (a
+			    picked run or subagent) follows the breadcrumb and the pager
+			    stays on the right; they never shrink, so the breadcrumb
+			    truncates first when the header is tight. */}
 			<div
 				ref={setControls}
 				data-fluid-menu-root=""
-				className="flex min-w-0 shrink-0 items-center justify-end empty:hidden"
+				className="ml-auto flex shrink-0 grow items-center justify-end empty:hidden"
 			/>
 		</>,
 		headerPortal,

@@ -85,11 +85,10 @@ interface CollapsedTraceCountStyle extends CSSProperties {
 
 const COLLAPSED_TRACE_COUNT_STYLE: CollapsedTraceCountStyle = {
 	"--trace-icon-bg":
-		"color-mix(in srgb, var(--conversation-trace-connector-color, var(--session-overview-border)) 75%, transparent)",
+		"color-mix(in srgb, var(--conversation-trace-connector-color, var(--line)) 75%, transparent)",
 	background:
-		"color-mix(in srgb, var(--conversation-trace-connector-color, var(--session-overview-border)) 75%, transparent)",
-	color:
-		"var(--constellation-tree-tertiary, var(--session-overview-subtle, var(--session-overview-muted)))",
+		"color-mix(in srgb, var(--conversation-trace-connector-color, var(--line)) 75%, transparent)",
+	color: "var(--ink-3, var(--ink-3, var(--ink-3)))",
 	height: 16,
 	mask: 'var(--opaline-trace-mask, url("/opaline-trace-fill.svg")) center / contain no-repeat',
 	WebkitMask:
@@ -144,7 +143,7 @@ const CONVERSATION_TRACE_TREE_COMPACT_ROW_HEIGHT = 32;
 const TRACE_EVENT_ICON_RAIL_OFFSET = 14;
 const COLLAPSED_TRACE_ICON_LIMIT = 25;
 const traceCollapsiblePanelClassName =
-	"h-(--collapsible-panel-height) min-w-0 overflow-clip transition-[height,opacity] duration-200 ease-[cubic-bezier(0.2,0,0,1)] data-ending-style:h-0 data-ending-style:opacity-0 data-starting-style:h-0 data-starting-style:opacity-0 motion-reduce:transition-none";
+	"h-(--collapsible-panel-height) min-w-0 overflow-clip transition-[height,opacity] duration-(--motion-medium-duration) ease-drawer data-ending-style:h-0 data-ending-style:opacity-0 data-starting-style:h-0 data-starting-style:opacity-0 motion-reduce:transition-none";
 type ConversationTraceTreeConnectorShape = "branch" | "through";
 
 function SplitRailEventIconSegments({
@@ -289,9 +288,8 @@ function ConversationTraceTreeRail({
 				viewBox={`0 0 ${railX + 1} ${rowHeight}`}
 				width={railX + 1}
 				style={{
-					stroke:
-						"var(--conversation-trace-connector-color, var(--session-overview-border))",
-					strokeWidth: "var(--conversation-trace-connector-width, 1)",
+					stroke: "var(--conversation-trace-connector-color, var(--line))",
+					strokeWidth: "var(--border-s)",
 				}}
 			>
 				{hideIncomingRail ? null : (
@@ -339,9 +337,8 @@ function ConversationTraceTreeRail({
 			viewBox={`0 0 ${railX + 1} ${rowHeight}`}
 			width={railX + 1}
 			style={{
-				stroke:
-					"var(--conversation-trace-connector-color, var(--session-overview-border))",
-				strokeWidth: "var(--conversation-trace-connector-width, 1)",
+				stroke: "var(--conversation-trace-connector-color, var(--line))",
+				strokeWidth: "var(--border-s)",
 			}}
 		>
 			<path
@@ -398,9 +395,8 @@ function ConversationTraceTreeExpandedBodyRails({
 			strokeLinecap="round"
 			width={width}
 			style={{
-				stroke:
-					"var(--conversation-trace-connector-color, var(--session-overview-border))",
-				strokeWidth: "var(--conversation-trace-connector-width, 1)",
+				stroke: "var(--conversation-trace-connector-color, var(--line))",
+				strokeWidth: "var(--border-s)",
 			}}
 		>
 			{activeRails.map((rail) => (
@@ -486,9 +482,8 @@ function ConversationTraceTreeConnector({
 			viewBox={`0 0 ${connectorWidth} ${rowHeight}`}
 			width={connectorWidth}
 			style={{
-				stroke:
-					"var(--conversation-trace-connector-color, var(--session-overview-border))",
-				strokeWidth: "var(--conversation-trace-connector-width, 1)",
+				stroke: "var(--conversation-trace-connector-color, var(--line))",
+				strokeWidth: "var(--border-s)",
 			}}
 		>
 			{rendersAncestorRails
@@ -589,7 +584,7 @@ function ConversationTraceTreeConnector({
 							x={currentX - TRACE_DOT_RADIUS}
 							y={elbowY - TRACE_DOT_RADIUS}
 							style={{
-								fill: "var(--conversation-trace-junction-color, var(--conversation-trace-connector-color, var(--session-overview-border)))",
+								fill: "var(--conversation-trace-junction-color, var(--conversation-trace-connector-color, var(--line)))",
 								mask: 'var(--opaline-trace-mask, url("/opaline-trace-fill.svg")) center / contain no-repeat',
 								WebkitMask:
 									'var(--opaline-trace-mask, url("/opaline-trace-fill.svg")) center / contain no-repeat',
@@ -661,7 +656,7 @@ export function ConversationTraceTreeNode({
 		<div
 			className={cn(
 				"relative min-w-0",
-				sticky && "sticky bg-(--session-overview-surface)",
+				sticky && "sticky bg-canvas",
 				className,
 			)}
 			data-trace-debug-field={`depth-${depth}-row`}
@@ -683,7 +678,7 @@ export function ConversationTraceTreeNode({
 			{childRailExitLength > 0 ? (
 				<span
 					aria-hidden="true"
-					className="pointer-events-none absolute bottom-0 z-10 hidden -translate-x-1/2 bg-[color:var(--conversation-trace-connector-color,var(--session-overview-border))]"
+					className="pointer-events-none absolute bottom-0 z-10 hidden -translate-x-1/2 bg-[color:var(--conversation-trace-connector-color,var(--line))]"
 					data-trace-tree-child-entry-rail
 					data-trace-tree-line
 					data-trace-tree-line-depth={depth + 1}
@@ -697,7 +692,7 @@ export function ConversationTraceTreeNode({
 			{showsDescendantRail ? (
 				<span
 					aria-hidden="true"
-					className="pointer-events-none absolute bottom-0 left-(--conversation-trace-tree-descend-x) -translate-x-1/2 bg-[color:var(--conversation-trace-connector-color,var(--session-overview-border))]"
+					className="pointer-events-none absolute bottom-0 left-(--conversation-trace-tree-descend-x) -translate-x-1/2 bg-[color:var(--conversation-trace-connector-color,var(--line))]"
 					data-trace-tree-descendant-rail
 					data-trace-tree-line
 					style={{
@@ -781,7 +776,7 @@ export function ConversationTraceTreeItem({
 				{incomingRailExtension > 0 ? (
 					<span
 						aria-hidden="true"
-						className="pointer-events-none absolute hidden -translate-x-1/2 bg-[color:var(--conversation-trace-connector-color,var(--session-overview-border))]"
+						className="pointer-events-none absolute hidden -translate-x-1/2 bg-[color:var(--conversation-trace-connector-color,var(--line))]"
 						data-trace-tree-entry-rail
 						data-trace-tree-line
 						data-trace-tree-line-depth={depth}
@@ -831,7 +826,7 @@ export function ConversationTraceTreeItem({
 						subtree !== undefined ? (
 							<span
 								aria-hidden="true"
-								className="pointer-events-none absolute inset-y-0 -translate-x-1/2 bg-[color:var(--conversation-trace-connector-color,var(--session-overview-border))]"
+								className="pointer-events-none absolute inset-y-0 -translate-x-1/2 bg-[color:var(--conversation-trace-connector-color,var(--line))]"
 								data-trace-tree-line
 								style={{
 									left: `${descendantX}px`,
@@ -895,10 +890,10 @@ export function ConversationTraceRootNode({
 // Timeline metadata: quiet 12/16 text, tabular numerals, and
 // semantic foreground hierarchy without pill surfaces or tracking changes.
 const traceRequestTagClassName =
-	"inline-flex min-w-0 max-w-full items-center font-sans text-[calc(var(--spacing)*3)]/[1rem] font-normal tracking-normal text-(--session-overview-subtle) tabular-nums";
+	"inline-flex min-w-0 max-w-full items-center font-body text-body-m font-regular tracking-m text-ink-3 tabular-nums";
 
 const traceRequestSeparatorClassName =
-	"shrink-0 font-sans text-[calc(var(--spacing)*3)]/[1rem] font-normal tracking-normal text-(--session-overview-subtle)";
+	"shrink-0 font-body text-body-m font-regular tracking-m text-ink-3";
 
 type TraceRequestPresentation =
 	| "header"
@@ -1043,13 +1038,14 @@ export function AgentTraceRequestDisplay({
 	if (presentation === "inline") {
 		return (
 			<span
-				className="ml-auto flex min-w-0 max-w-[55%] shrink-[2] items-center gap-1.5 overflow-hidden whitespace-nowrap"
+				className={cn(
+					"flex min-w-0 max-w-[55%] shrink-[2] items-center gap-s overflow-hidden",
+					"ml-auto",
+					"whitespace-nowrap",
+				)}
 				data-trace-request-metadata-group
 			>
-				<span
-					className="shrink-0 text-(--session-overview-subtle)"
-					title={`Model call ${index}`}
-				>
+				<span className="shrink-0 text-ink-3" title={`Model call ${index}`}>
 					<TraceExchangeIcon className="size-3" />
 				</span>
 				<AgentTraceRequestUsageItems
@@ -1069,7 +1065,7 @@ export function AgentTraceRequestDisplay({
 		return (
 			<span
 				className={cn(
-					"flex min-w-0 items-center gap-2 px-3",
+					"flex min-w-0 items-center gap-m px-l",
 					contextStrip ? "h-6" : "min-h-10",
 				)}
 				title={`Model call ${index}`}
@@ -1080,12 +1076,12 @@ export function AgentTraceRequestDisplay({
 						"h-px min-w-4 flex-1",
 						contextStrip
 							? "bg-(--conversation-trace-call-accent) opacity-40"
-							: "bg-(--session-overview-border)",
+							: "bg-line",
 					)}
 					data-trace-tree-line
 				/>
 				<span
-					className="flex min-w-0 shrink items-center gap-1.5 whitespace-nowrap"
+					className="flex min-w-0 shrink items-center gap-s whitespace-nowrap"
 					data-trace-request-metadata-group
 				>
 					<AgentTraceRequestUsageItems
@@ -1122,7 +1118,7 @@ export function AgentTraceRequestDisplay({
 			</span>
 			{expanded === false ? collapsedPreview : null}
 			<span
-				className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5"
+				className="flex min-w-0 flex-1 flex-wrap items-center gap-s"
 				data-trace-request-metadata-group
 			>
 				<span
@@ -1244,7 +1240,7 @@ export function AgentCollapsedTraceIcons({
 	return (
 		<span
 			aria-hidden="true"
-			className="flex min-w-0 flex-1 items-center overflow-hidden pl-1"
+			className="flex min-w-0 flex-1 items-center overflow-hidden pl-xs"
 			data-trace-collapsed-flow
 			data-trace-collapsed-flow-truncated={truncated || undefined}
 		>
@@ -1256,7 +1252,7 @@ export function AgentCollapsedTraceIcons({
 				>
 					{clusterIndex === 0 ? null : (
 						<span
-							className="h-px w-1.5 shrink-0 bg-(--session-overview-border)"
+							className="h-px w-1.5 shrink-0 bg-line"
 							data-trace-collapsed-flow-connector
 							data-trace-tree-line
 						/>
@@ -1264,13 +1260,13 @@ export function AgentCollapsedTraceIcons({
 					{cluster.map(({ Icon, key, label, tone, toolIcon }, stepIndex) => (
 						<span
 							key={key}
-							className={cn("relative", stepIndex > 0 && "-ml-2")}
+							className={cn("relative", stepIndex > 0 && "-ml-m")}
 							data-trace-collapsed-flow-step
 							style={{ zIndex: cluster.length - stepIndex }}
 							title={label}
 						>
 							<TraceIcon
-								className="border-(--session-overview-border) text-(--session-overview-muted)"
+								className="border-line text-ink-3"
 								icon={Icon}
 								toolIcon={toolIcon}
 								tone={tone}
@@ -1284,12 +1280,9 @@ export function AgentCollapsedTraceIcons({
 					className="flex shrink-0 items-center"
 					data-trace-collapsed-flow-count-slot
 				>
+					<span className="h-px w-1.5 shrink-0 bg-line" data-trace-tree-line />
 					<span
-						className="h-px w-1.5 shrink-0 bg-(--session-overview-border)"
-						data-trace-tree-line
-					/>
-					<span
-						className="flex shrink-0 items-center justify-center font-sans text-[8px] leading-none font-medium tracking-[-0.08em] tabular-nums [text-indent:-1.5px]"
+						className="flex shrink-0 items-center justify-center font-body text-body-xxs line-solid font-medium tracking-xs tabular-nums [text-indent:-1.5px]"
 						data-trace-collapsed-flow-count
 						data-trace-icon
 						data-trace-icon-tone="neutral"
@@ -1337,7 +1330,7 @@ function AgentTraceTreeBranchList({
 								rowHeight={CONVERSATION_TRACE_TREE_COMPACT_ROW_HEIGHT}
 								subtree={child.subtree}
 							>
-								<div className="-ml-3">{child.row}</div>
+								<div className="-ml-l">{child.row}</div>
 							</ConversationTraceTreeItem>
 						</li>
 					);
@@ -1382,7 +1375,7 @@ function AgentTraceTreeBranchList({
 								sticky={branch.sticky}
 								subtree={subtree}
 							>
-								<div className="-ml-3">{branch.root.row}</div>
+								<div className="-ml-l">{branch.root.row}</div>
 							</ConversationTraceTreeItem>
 						</li>
 					);
@@ -1404,7 +1397,7 @@ function AgentTraceTreeBranchList({
 								rowHeight={CONVERSATION_TRACE_TREE_COMPACT_ROW_HEIGHT}
 								subtree={child.subtree}
 							>
-								<div className="-ml-3">{child.row}</div>
+								<div className="-ml-l">{child.row}</div>
 							</ConversationTraceTreeItem>
 						</li>
 					);
@@ -1458,7 +1451,7 @@ function AgentTraceTreeRenderedSectionItem({
 					depth={2}
 					rowHeight={section.flatRequestRows ? 24 : undefined}
 				>
-					<span className="-ml-3 block">{section.header(undefined, null)}</span>
+					<span className="-ml-l block">{section.header(undefined, null)}</span>
 				</ConversationTraceTreeItem>
 			</li>
 		);
@@ -1490,10 +1483,10 @@ function AgentTraceTreeRenderedSectionItem({
 							sticky={false}
 						>
 							<Collapsible.Trigger
-								className="group block w-full text-left outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--session-overview-accent)"
+								className="group block w-full text-left focus-outline"
 								data-trace-hover-row
 							>
-								<span className="-ml-3 block">
+								<span className="-ml-l block">
 									{section.header(open, collapsedPreview)}
 								</span>
 							</Collapsible.Trigger>
@@ -1508,10 +1501,10 @@ function AgentTraceTreeRenderedSectionItem({
 						subtree={branchPanel}
 					>
 						<Collapsible.Trigger
-							className="group block w-full text-left outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--session-overview-accent)"
+							className="group block w-full text-left focus-outline"
 							data-trace-hover-row
 						>
-							<span className="-ml-3 block">
+							<span className="-ml-l block">
 								{section.header(open, collapsedPreview)}
 							</span>
 						</Collapsible.Trigger>
@@ -1667,7 +1660,7 @@ export function AgentTraceTreeSection({
 				subtree={sectionPanel}
 			>
 				<div
-					className="@container/model-header flex min-h-10 min-w-0 items-center gap-2 pr-3"
+					className="@container/model-header flex min-h-10 min-w-0 items-center gap-m pr-l"
 					data-transcript-model-header-source="row"
 					data-transcript-model-header-terminal={
 						modelHeaderData.terminal || undefined
@@ -1676,11 +1669,11 @@ export function AgentTraceTreeSection({
 					style={headerHeight ? { minHeight: headerHeight } : undefined}
 				>
 					{expandable ? (
-						<Collapsible.Trigger className="group flex min-h-10 min-w-0 flex-1 items-center gap-2 text-left outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--session-overview-accent)">
+						<Collapsible.Trigger className="group flex min-h-10 min-w-0 flex-1 items-center gap-m text-left focus-outline">
 							{modelHeader}
 						</Collapsible.Trigger>
 					) : (
-						<div className="flex min-h-10 min-w-0 flex-1 items-center gap-2 text-left">
+						<div className="flex min-h-10 min-w-0 flex-1 items-center gap-m text-left">
 							{modelHeader}
 						</div>
 					)}

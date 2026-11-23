@@ -3,6 +3,7 @@ import {
 	type SessionFileChange,
 } from "@rudel/api-routes";
 import { IconAlertTriangleFilled, IconArrowUpRight } from "@tabler/icons-react";
+import { Badge } from "@/app/ui/badge";
 import { Button } from "@/app/ui/button";
 import { DiffView } from "@/components/pierre/diff-view";
 import type { DiffHunk } from "@/components/pierre/line-diff";
@@ -39,9 +40,15 @@ export function ChangeBlock({
 		minute: "2-digit",
 	});
 	return (
-		<li className="flex scroll-mt-2 flex-col gap-2 py-4 first:pt-2">
-			<div className="flex min-h-6 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground/70 tabular-nums">
-				<span className="font-medium text-foreground">
+		<li className="flex scroll-mt-2 flex-col gap-m py-xl first:pt-m">
+			<div
+				className={cn(
+					"flex min-h-6 flex-wrap items-center gap-x-s gap-y-xs",
+					"text-body-m tabular-nums",
+					"text-ink-4",
+				)}
+			>
+				<span className="font-medium text-ink">
 					{OPERATION_LABEL[change.operation]}
 				</span>
 				<span>
@@ -50,22 +57,22 @@ export function ChangeBlock({
 				</span>
 				{change.agentId ? (
 					<SubagentTag
-						className="inline-flex shrink gap-1"
+						className="inline-flex shrink gap-xs"
 						subagentId={change.agentId}
 						title="Made by a subagent"
 					/>
 				) : null}
 				{change.failed ? (
-					<span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-1.5 py-px text-destructive">
-						<IconAlertTriangleFilled className="size-3" />
+					<Badge variant="error">
+						<IconAlertTriangleFilled aria-hidden="true" />
 						Failed, nothing changed
-					</span>
+					</Badge>
 				) : null}
 				{turnId ? (
 					<Button
-						size="xs"
-						variant="ghost"
-						className="ml-auto text-muted-foreground"
+						size="sm"
+						variant="secondary"
+						className="ml-auto"
 						onClick={() => onOpenTurn(turnId, change.agentId || undefined)}
 					>
 						Turn {shortRunId(turnId)}
@@ -90,7 +97,7 @@ export function ChangeBlock({
 					)}
 				</LazyBlock>
 			) : (
-				<p className="text-xs text-muted-foreground">No change in text.</p>
+				<p className="text-body-m text-ink-4">No change in text.</p>
 			)}
 			{change.cut ? <Cut /> : null}
 		</li>
@@ -99,7 +106,7 @@ export function ChangeBlock({
 
 export function Cut() {
 	return (
-		<p className="text-xs text-muted-foreground/70">
+		<p className="text-body-m text-ink-4">
 			Cut at {SESSION_FILE_TEXT_LIMIT.toLocaleString()} characters; the rest is
 			in the transcript.
 		</p>

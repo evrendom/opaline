@@ -10,6 +10,7 @@ import { useMemo, useState } from "react";
 import { Reveal } from "@/app/ui/bones";
 import { Button } from "@/app/ui/button";
 import { SearchInput } from "@/components/dashboard/data-table";
+import { PageEmptyState } from "@/components/dashboard/page-parts";
 import {
 	buildRangeBound,
 	isRangeFilterActive,
@@ -17,7 +18,7 @@ import {
 	OverviewRangeFiltersMenu,
 	type RangeBound,
 } from "@/components/overview-list";
-import { UsageStateMessage } from "@/components/usage-collection-view";
+import { RetryButton } from "@/components/retry-button";
 import { ToolbarSortMenu } from "@/features/sessions/components/sessions-overview-sort-menu";
 import {
 	SESSION_OVERVIEW_SURFACE_CLASS_NAME,
@@ -126,7 +127,7 @@ export function SkillsPageView({
 			>
 				{/* The sessions toolbar: search, sort and filter on 24px gutters. */}
 				<div
-					className="flex h-12 shrink-0 items-center gap-2 px-6"
+					className="flex h-12 shrink-0 items-center gap-m px-xxl"
 					data-slot="skills-overview-toolbar"
 				>
 					<SearchInput
@@ -160,30 +161,21 @@ export function SkillsPageView({
 					/>
 				</div>
 				{!isPending && isError ? (
-					<UsageStateMessage
-						icon={<IconBook aria-hidden="true" />}
+					<PageEmptyState
+						icon={IconBook}
 						title="Skills couldn’t be loaded"
 						description="Your historical sessions are still available. Try loading this view again."
-						action={
-							<Button
-								type="button"
-								size="sm"
-								variant="outline"
-								onClick={onRetry}
-							>
-								Try again
-							</Button>
-						}
+						action={<RetryButton className="h-8 gap-xs" onRetry={onRetry} />}
 					/>
 				) : !isPending && (skills?.length ?? 0) === 0 ? (
-					<UsageStateMessage
-						icon={<IconBook aria-hidden="true" />}
+					<PageEmptyState
+						icon={IconBook}
 						title="No skills yet"
 						description="Skills will appear here when Claude or Codex sessions include a recorded skill use."
 					/>
 				) : !isPending && visibleSkills.length === 0 ? (
-					<UsageStateMessage
-						icon={<IconZoomCancel aria-hidden="true" />}
+					<PageEmptyState
+						icon={IconZoomCancel}
 						title="No matching skills"
 						description={
 							hasActiveFilters
@@ -193,8 +185,8 @@ export function SkillsPageView({
 						action={
 							<Button
 								type="button"
-								size="sm"
-								variant="outline"
+								size="md"
+								variant="primary"
 								onClick={() => {
 									setSearch("");
 									clearFilters();

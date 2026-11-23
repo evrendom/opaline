@@ -18,7 +18,7 @@ const COMPACTION_FROM = 0.3;
 const CONTEXT_HEADROOM = 1.1;
 
 export const LANE_LABEL =
-	"absolute text-[8px] leading-none font-medium tabular-nums";
+	"absolute text-body-xxs line-solid font-medium tabular-nums";
 
 export function ContextLane({
 	compactions: recorded,
@@ -108,7 +108,15 @@ export function ContextLane({
 		}),
 	];
 	return (
-		<div className="relative h-8 overflow-hidden rounded-[5px] before:absolute before:inset-0 before:-z-10 before:bg-muted/60">
+		<div
+			className={cn(
+				"relative h-8 overflow-hidden",
+				// design-escape-ok(radius): shipped value; 5px corner
+				"rounded-[5px]",
+				// design-escape-ok(opacity): no role renders this; field/60
+				"before:absolute before:inset-0 before:-z-10 before:bg-field/60",
+			)}
+		>
 			<svg
 				aria-hidden="true"
 				className="absolute inset-0 size-full"
@@ -117,10 +125,12 @@ export function ContextLane({
 			>
 				<path
 					d={`${path} L ${x(points.at(-1)?.atMs ?? view.to)} 100 L ${x(points[0]?.atMs ?? view.from)} 100 Z`}
+					// design-escape-ok(colour): shipped value; violet-500 context lane
 					className="fill-violet-500/15"
 				/>
 				<path
 					d={path}
+					// design-escape-ok(colour): shipped value; violet-500 context lane
 					className="fill-none stroke-violet-500"
 					strokeWidth={1.25}
 					vectorEffect="non-scaling-stroke"
@@ -129,7 +139,7 @@ export function ContextLane({
 					<path
 						key={fall.atMs}
 						d={`M ${x(fall.atMs)} ${y(fall.from)} L ${x(fall.atMs)} ${y(fall.to)}`}
-						className="fill-none stroke-green-500"
+						className="fill-none stroke-success"
 						strokeWidth={1.5}
 						vectorEffect="non-scaling-stroke"
 					/>
@@ -146,14 +156,20 @@ export function ContextLane({
 			<Tip
 				label={`Context at each model call · peak ${formatCompactNumber(peak)}${windowKnown ? ` of a ${formatCompactNumber(window)} window` : ""}`}
 			>
-				<span className={cn(LANE_LABEL, "top-1 right-1 text-muted-foreground")}>
+				<span className={cn(LANE_LABEL, "top-1 right-1 text-ink-3")}>
 					{formatCompactNumber(window)}
 				</span>
 			</Tip>
-			<span className={cn(LANE_LABEL, "bottom-1 left-1 text-violet-500")}>
+			<span
+				// design-escape-ok(colour): shipped value; violet-500 context lane
+				className={cn(LANE_LABEL, "bottom-1 left-1 text-violet-500")}
+			>
 				{fillAt(view.from)}
 			</span>
-			<span className={cn(LANE_LABEL, "right-1 bottom-1 text-violet-500")}>
+			<span
+				// design-escape-ok(colour): shipped value; violet-500 context lane
+				className={cn(LANE_LABEL, "right-1 bottom-1 text-violet-500")}
+			>
 				{fillAt(view.to)}
 			</span>
 		</div>

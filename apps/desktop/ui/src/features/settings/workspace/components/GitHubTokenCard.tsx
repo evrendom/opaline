@@ -108,8 +108,8 @@ export function GitHubTokenCard({
 				>
 					<a
 						data-slot="button"
-						data-variant="outline"
-						className={buttonVariants({ variant: "outline", size: "sm" })}
+						data-variant="primary"
+						className={buttonVariants({ variant: "primary", size: "md" })}
 						href="../../dashboard?metric=mergedPullRequests"
 					>
 						Open dashboard

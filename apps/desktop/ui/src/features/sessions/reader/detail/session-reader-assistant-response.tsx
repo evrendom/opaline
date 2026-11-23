@@ -71,7 +71,7 @@ function AnswerLink({
 			<GitHubLink
 				href={href}
 				label="Open on GitHub"
-				className="ml-0.5 inline-flex align-middle"
+				className="ml-xxs inline-flex align-middle"
 			/>
 		</>
 	);
@@ -100,10 +100,10 @@ export const AssistantResponse = memo(function AssistantResponse({
 	text: string;
 }) {
 	return (
-		<div className="group/bubble flex items-start justify-between gap-2 px-1">
+		<div className="group/bubble flex items-start justify-between gap-m px-xs">
 			<div
 				data-selectable=""
-				className="min-w-0 flex-1 text-sm leading-relaxed [overflow-wrap:anywhere] [&_a]:underline [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:font-mono [&_code]:text-[0.8125rem] [&_h1]:mt-3 [&_h1]:font-semibold [&_h2]:mt-3 [&_h2]:font-semibold [&_h3]:mt-3 [&_h3]:font-semibold [&_li]:my-0.5 [&_ol]:my-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-1.5 [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_table]:my-2 [&_td]:border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:px-2 [&_th]:py-1 [&_ul]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
+				className="min-w-0 flex-1 text-body-xl [overflow-wrap:anywhere] [&_a]:underline [&_code]:corner-xs [&_code]:bg-field [&_code]:px-xs [&_code]:font-data [&_code]:text-body-l [&_h1]:mt-l [&_h1]:font-heavy [&_h2]:mt-l [&_h2]:font-heavy [&_h3]:mt-l [&_h3]:font-heavy [&_li]:my-xxs [&_ol]:my-s [&_ol]:list-decimal [&_ol]:pl-xl [&_p]:my-s [&_pre]:my-m [&_pre]:overflow-x-auto [&_pre]:corner-s [&_pre]:bg-field [&_pre]:p-l [&_pre_code]:bg-transparent [&_pre_code]:p-zero [&_table]:my-m [&_td]:edge-m [&_td]:px-m [&_td]:py-xs [&_th]:edge-m [&_th]:px-m [&_th]:py-xs [&_ul]:my-s [&_ul]:list-disc [&_ul]:pl-xl [&>*:first-child]:mt-zero [&>*:last-child]:mb-zero"
 			>
 				<Markdown components={SIGNAL_MARKDOWN} remarkPlugins={REMARK_PLUGINS}>
 					{text}
@@ -119,10 +119,10 @@ export const AssistantResponse = memo(function AssistantResponse({
 export function AssistantSkeleton() {
 	return (
 		<Bones label="Reading the response">
-			<div className="flex flex-col gap-2 px-1 pt-1">
-				<Bone className="h-3.5 w-full rounded-sm" />
-				<Bone className="h-3.5 w-11/12 rounded-sm" />
-				<Bone className="h-3.5 w-2/3 rounded-sm" />
+			<div className="flex flex-col gap-m px-xs pt-xs">
+				<Bone className="h-3.5 w-full corner-xs" />
+				<Bone className="h-3.5 w-11/12 corner-xs" />
+				<Bone className="h-3.5 w-2/3 corner-xs" />
 			</div>
 		</Bones>
 	);

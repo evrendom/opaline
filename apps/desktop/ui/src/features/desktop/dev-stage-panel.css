@@ -6,24 +6,26 @@
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	gap: 6px;
+	gap: var(--space-s);
 	translate: -50% 0;
-	font-size: 12px;
+	font-size: var(--size-m);
+	line-height: var(--line-m);
+	letter-spacing: var(--letter-spacing-m);
 	-webkit-app-region: no-drag;
 }
 
 .dev-stage-toggle,
 .dev-stage-list {
-	border: 1px solid var(--border);
-	background: var(--popover);
-	color: var(--popover-foreground);
-	box-shadow: 0 6px 24px rgb(0 0 0 / 0.14);
+	border: var(--border-m) solid var(--line);
+	background: var(--surface);
+	color: var(--ink);
+	box-shadow: var(--shadow-float);
 }
 
 .dev-stage-toggle {
-	padding: 6px 12px;
-	border-radius: 999px;
-	font-weight: 500;
+	padding: var(--space-s) var(--space-l);
+	border-radius: var(--radius-full);
+	font-weight: var(--weight-body-medium);
 	font-variant-numeric: tabular-nums;
 	cursor: pointer;
 }
@@ -31,31 +33,33 @@
 .dev-stage-list {
 	display: flex;
 	flex-direction: column;
-	gap: 6px;
+	gap: var(--space-s);
 	min-width: 220px;
-	padding: 8px;
-	border-radius: 12px;
+	padding: var(--space-m);
+	border-radius: var(--radius-l);
 }
 
 .dev-stage-group {
 	display: flex;
 	flex-direction: column;
-	gap: 1px;
+	gap: var(--space-xxs);
 }
 
 .dev-stage-group > span,
 .dev-stage-list > small {
-	padding: 2px 10px;
-	color: var(--muted-foreground);
-	font-size: 11px;
+	padding: var(--space-xxs) var(--space-l);
+	color: var(--ink-3);
+	font-size: var(--size-s);
+	line-height: var(--line-s);
+	letter-spacing: var(--letter-spacing-s);
 }
 
 .dev-stage-list button {
 	display: flex;
 	align-items: center;
-	gap: 8px;
-	padding: 5px 10px;
-	border-radius: 7px;
+	gap: var(--space-m);
+	padding: var(--space-s) var(--space-l);
+	border-radius: var(--radius-s);
 	text-align: left;
 	white-space: nowrap;
 	cursor: pointer;
@@ -63,18 +67,18 @@
 
 .dev-stage-list button b {
 	min-width: 1.25em;
-	color: var(--muted-foreground);
+	color: var(--ink-3);
 	font-variant-numeric: tabular-nums;
-	font-weight: 500;
+	font-weight: var(--weight-body-medium);
 }
 
 .dev-stage-list button:hover {
-	background: var(--accent);
+	background: var(--hover);
 }
 
 .dev-stage-list button[aria-pressed="true"] {
 	background: var(--primary);
-	color: var(--primary-foreground);
+	color: var(--primary-fg);
 }
 
 .dev-stage-list button[aria-pressed="true"] b {

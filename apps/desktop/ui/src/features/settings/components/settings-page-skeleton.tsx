@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Badge } from "@/app/ui/badge";
 import { Bones, Reveal } from "@/app/ui/bones";
 import type { PrimarySettingsRouteId } from "@/features/settings/config/settings-routes";
 import { REPORTS_SETTINGS_DESCRIPTION } from "@/features/settings/reports/reports-settings-copy";
@@ -16,7 +17,7 @@ import {
 function SettingsPageSample({ routeId }: { routeId: PrimarySettingsRouteId }) {
 	if (routeId === "sessions") return <SessionsSettingsSample />;
 	return (
-		<div className="workspace-settings-page">
+		<div className="settings-page">
 			{routeId === "workspace" ? (
 				<WorkspaceSettingsSample />
 			) : routeId === "members" ? (
@@ -32,7 +33,7 @@ function SettingsPageSample({ routeId }: { routeId: PrimarySettingsRouteId }) {
 							label="A saved analysis of the team's sessions"
 							description="Saved last week"
 						>
-							<span className="workspace-settings-badge">Shared</span>
+							<Badge>Shared</Badge>
 						</WorkspaceSettingsRow>
 					))}
 				</WorkspaceSettingsGroup>

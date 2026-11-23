@@ -13,15 +13,15 @@ const languageSignalScanCache = new Map<
 >();
 
 const SIGNAL_MARK_BASE_CLASS_NAME =
-	"inline rounded-[8px] px-[4px] py-[2px] font-sans text-[13px] leading-[20px] font-normal select-none [box-decoration-break:clone] [-webkit-box-decoration-break:clone]";
+	"inline corner-s px-xs py-xxs font-body text-body-l font-regular select-none [box-decoration-break:clone] [-webkit-box-decoration-break:clone]";
 
 const SIGNAL_MARK_CATEGORY_CLASS_NAMES: Readonly<
 	Record<LanguageSignalMatch["category"], string>
 > = {
-	negative: "bg-[#ffe4e6] text-[#be123c] dark:bg-[#4c1d25] dark:text-[#fb7185]",
-	swear: "bg-[#ffe4e6] text-[#be123c] dark:bg-[#4c1d25] dark:text-[#fb7185]",
-	apology: "bg-[#fef3c7] text-[#b45309] dark:bg-[#493719] dark:text-[#fbbf24]",
-	positive: "bg-[#dcfce7] text-[#15803d] dark:bg-[#173d2a] dark:text-[#4ade80]",
+	negative: "bg-error-tint text-error",
+	swear: "bg-error-tint text-error",
+	apology: "bg-warning-tint text-warning",
+	positive: "bg-success-tint text-success",
 };
 
 export const signalMarkClassName = (
@@ -29,7 +29,7 @@ export const signalMarkClassName = (
 ) =>
 	`${SIGNAL_MARK_BASE_CLASS_NAME} ${SIGNAL_MARK_CATEGORY_CLASS_NAMES[category]}`;
 
-const SEARCH_MARK_CLASS_NAME = "bg-yellow-300 text-inherit dark:bg-yellow-700";
+const SEARCH_MARK_CLASS_NAME = "bg-warning-translucent text-inherit";
 const SignalTextSearchQueryContext = createContext<string | undefined>(
 	undefined,
 );

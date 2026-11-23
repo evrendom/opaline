@@ -58,9 +58,11 @@ export function DeleteAccountDialog({
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent>
 				<DialogHeader>
-					<DialogTitle className="flex items-center gap-2">
-						<IconAlertTriangle className="text-destructive" />
-						Delete account
+					<DialogTitle>
+						<span className="flex items-center gap-m">
+							<IconAlertTriangle className="text-error" />
+							Delete account
+						</span>
 					</DialogTitle>
 					<DialogDescription>
 						This permanently deletes <strong>{user.name}</strong> ({user.email})
@@ -68,19 +70,20 @@ export function DeleteAccountDialog({
 					</DialogDescription>
 				</DialogHeader>
 
-				<div className="flex flex-col gap-4">
-					<p className="text-sm text-muted-foreground">
+				<div className="flex flex-col gap-xl">
+					<p className="text-body-xl text-ink-3">
 						Your account, API keys, sessions, linked logins, workspace
 						memberships, and any workspaces where you are the only member will
 						be removed. Uploaded session analytics may persist for a short time
 						in cold storage.
 					</p>
 
-					<Field className="gap-2">
+					<Field>
 						<FieldLabel htmlFor="delete-account-confirm">
 							Type {user.email} to confirm
 						</FieldLabel>
 						<Input
+							variant="plain"
 							id="delete-account-confirm"
 							value={confirmEmail}
 							onChange={(event) => setConfirmEmail(event.target.value)}
@@ -89,13 +92,14 @@ export function DeleteAccountDialog({
 						/>
 					</Field>
 
-					{error ? <p className="text-sm text-destructive">{error}</p> : null}
+					{error ? <p className="text-body-xl text-error">{error}</p> : null}
 				</div>
 
 				<DialogFooter>
 					<Button
 						type="button"
-						variant="outline"
+						variant="secondary"
+						size="lg"
 						onClick={() => onOpenChange(false)}
 						disabled={isDeleting}
 					>
@@ -103,7 +107,8 @@ export function DeleteAccountDialog({
 					</Button>
 					<Button
 						type="button"
-						variant="destructive"
+						variant="danger"
+						size="lg"
 						onClick={() => void handleDelete()}
 						disabled={!canDelete}
 					>

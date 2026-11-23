@@ -69,7 +69,7 @@ const plotY = (fraction: number) =>
 	`calc(${PLOT_TOP}px + ${fraction} * (100% - ${PLOT_TOP + PLOT_BOTTOM}px))`;
 const labelStyle = {
 	position: "absolute",
-	color: "var(--cost-muted)",
+	color: "var(--ink-3)",
 	fontSize: LABEL_FONT_SIZE,
 	lineHeight: 1,
 	whiteSpace: "nowrap",
@@ -198,7 +198,7 @@ export function DemoTrendPreview({
 						x2={1000}
 						y1={y(tick) * 1000}
 						y2={y(tick) * 1000}
-						stroke="var(--cost-border)"
+						stroke="var(--line)"
 						strokeDasharray="3 4"
 						vectorEffect="non-scaling-stroke"
 					/>

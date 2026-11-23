@@ -1,29 +1,110 @@
 "use client";
 
-import type * as React from "react";
+import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+type TableContextValue = {
+	stickyHeader: boolean;
+};
+
+const TableContext = React.createContext<TableContextValue>({
+	stickyHeader: false,
+});
+
+const alignClass = {
+	left: "text-left",
+	center: "text-center",
+	right: "text-right tabular-nums",
+} as const;
+
+type Align = keyof typeof alignClass;
+
+function Table({
+	className,
+	maxHeight,
+	stickyHeader,
+	...props
+}: React.ComponentProps<"table"> & {
+	/** Cap the table height so the body scrolls internally (enables a sticky header). */
+	maxHeight?: number | string;
+	/** Pin the header while the body scrolls. Auto-enabled when `maxHeight` is set. */
+	stickyHeader?: boolean;
+}) {
+	const scrollable = maxHeight != null;
+	const sticky = stickyHeader ?? scrollable;
+	// A sticky header with no internal max-height pins against the *page*
+	// scroll — any overflow on this wrapper would create a scroll container
+	// that traps `position: sticky`, so the wrapper stays overflow-visible.
+	const stickyPage = sticky && !scrollable;
+	const containerRef = React.useRef<HTMLDivElement>(null);
+	// When the table is wider than its container the horizontal scroll should
+	// stay contained to the table, not spill into the page. CSS can't express
+	// "overflow only when overflowing", so measure: restore overflow-x-auto
+	// only while the table actually overflows (the pinned header is sacrificed
+	// in that cramped state — sticky can't survive a scroll container).
+	const [overflowing, setOverflowing] = React.useState(false);
+	React.useEffect(() => {
+		if (!stickyPage) return;
+		const el = containerRef.current;
+		const table = el?.querySelector("table");
+		if (!el || !table) return;
+		const measure = () =>
+			setOverflowing(table.offsetWidth > el.clientWidth + 1);
+		measure();
+		const ro = new ResizeObserver(measure);
+		ro.observe(el);
+		ro.observe(table);
+		return () => ro.disconnect();
+	}, [stickyPage]);
 	return (
-		<div
-			data-slot="table-container"
-			className="relative w-full overflow-x-auto"
-		>
-			<table
-				data-slot="table"
-				className={cn("w-full caption-bottom text-sm", className)}
-				{...props}
-			/>
-		</div>
+		<TableContext.Provider value={{ stickyHeader: sticky }}>
+			<div
+				ref={containerRef}
+				data-slot="table-container"
+				className={cn(
+					"relative w-full",
+					(!stickyPage || overflowing) && "overflow-x-auto",
+					scrollable && "overflow-y-auto",
+				)}
+				style={scrollable ? { maxHeight } : undefined}
+			>
+				<table
+					data-slot="table"
+					className={cn(
+						"w-full caption-bottom text-body-xl",
+						// Extra right padding on the last column pulls its content in from
+						// the screen edge so right-aligned values are easier to scan.
+						// Applied here (not on TableHead/TableCell) so it wins over their
+						// px-8 and covers any cell component in the last slot.
+						"[&_th:last-child]:pr-xxxl [&_td:last-child]:pr-xxxl",
+						className,
+					)}
+					{...props}
+				/>
+			</div>
+		</TableContext.Provider>
 	);
 }
 
 function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
+	const { stickyHeader } = React.useContext(TableContext);
 	return (
 		<thead
 			data-slot="table-header"
-			className={cn("[&_tr]:border-b", className)}
+			className={cn(
+				// Height on the row too: Safari doesn't propagate a thead height down
+				// to its tr the way Chromium does.
+				"h-13 [&_tr]:h-13",
+				// When sticky, a solid page bg so scrolling rows don't show through.
+				// The row's border-b doesn't travel with a sticky thead under
+				// border-collapse, so draw the bottom rule as a 1px line-soft bar along
+				// each cell's foot (same color as the body row borders) and drop the
+				// row's own border so the two don't stack into a thicker line at rest.
+				stickyHeader &&
+					"sticky top-0 z-10 bg-canvas [&_tr]:edge-b-none [&_th]:relative [&_th]:after:absolute [&_th]:after:inset-x-0 [&_th]:after:bottom-0 [&_th]:after:h-px [&_th]:after:bg-line-soft",
+				className,
+			)}
 			{...props}
 		/>
 	);
@@ -33,31 +114,50 @@ function TableBody({ className, ...props }: React.ComponentProps<"tbody">) {
 	return (
 		<tbody
 			data-slot="table-body"
-			className={cn("[&_tr:last-child]:border-0", className)}
+			className={cn("[&_tr:last-child]:edge-none", className)}
 			{...props}
 		/>
 	);
 }
 
-function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
-	return (
-		<tfoot
-			data-slot="table-footer"
-			className={cn(
-				"border-t bg-muted/50 font-medium [&>tr]:last:border-b-0",
-				className,
-			)}
-			{...props}
-		/>
-	);
-}
+function TableRow({
+	className,
+	interactive,
+	onClick,
+	onKeyDown,
+	tabIndex,
+	...props
+}: React.ComponentProps<"tr"> & {
+	interactive?: boolean;
+}) {
+	// Mirror a click on Enter/Space so interactive rows are keyboard-operable.
+	const handleKeyDown =
+		interactive && onClick
+			? (e: React.KeyboardEvent<HTMLTableRowElement>) => {
+					onKeyDown?.(e);
+					if (!e.defaultPrevented && (e.key === "Enter" || e.key === " ")) {
+						e.preventDefault();
+						e.currentTarget.click();
+					}
+				}
+			: onKeyDown;
 
-function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
 	return (
 		<tr
 			data-slot="table-row"
+			data-interactive={interactive || undefined}
+			tabIndex={interactive ? (tabIndex ?? 0) : tabIndex}
+			onClick={onClick}
+			onKeyDown={handleKeyDown}
 			className={cn(
-				"border-b transition-colors hover:bg-muted/50 has-aria-expanded:bg-muted/50 data-[state=selected]:bg-muted",
+				"[&_th:last-child]:edge-none edge-b-m border-line-soft data-[state=selected]:bg-field has-aria-expanded:bg-hover",
+				"data-interactive:hover:bg-hover data-interactive:outline-none data-interactive:focus-visible:bg-hover",
+				// Hide the hovered row's bottom border and the previous row's (which
+				// draws the hovered row's top edge) so the highlight reads as one
+				// seamless block instead of a stripe with lines through it. An
+				// expanded row (aria-expanded=true) is already one block with the
+				// drawer beneath it and keeps its top edge on hover.
+				"data-interactive:hover:border-transparent has-[+tr[data-interactive]:not([aria-expanded=true]):hover]:border-transparent",
 				className,
 			)}
 			{...props}
@@ -65,12 +165,17 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
 	);
 }
 
-function TableHead({ className, ...props }: React.ComponentProps<"th">) {
+function TableHead({
+	className,
+	align,
+	...props
+}: Omit<React.ComponentProps<"th">, "align"> & { align?: Align }) {
 	return (
 		<th
 			data-slot="table-head"
 			className={cn(
-				"h-12 px-3 text-left align-middle font-medium whitespace-nowrap text-foreground [&:has([role=checkbox])]:pr-0",
+				"text-left align-middle font-medium whitespace-nowrap has-[[role=checkbox]]:pr-zero px-xxxl",
+				align && alignClass[align],
 				className,
 			)}
 			{...props}
@@ -78,12 +183,17 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
 	);
 }
 
-function TableCell({ className, ...props }: React.ComponentProps<"td">) {
+function TableCell({
+	className,
+	align,
+	...props
+}: Omit<React.ComponentProps<"td">, "align"> & { align?: Align }) {
 	return (
 		<td
 			data-slot="table-cell"
 			className={cn(
-				"p-3 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0",
+				"align-middle whitespace-nowrap has-[[role=checkbox]]:pr-zero py-m px-xxxl",
+				align && alignClass[align],
 				className,
 			)}
 			{...props}
@@ -91,26 +201,4 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
 	);
 }
 
-function TableCaption({
-	className,
-	...props
-}: React.ComponentProps<"caption">) {
-	return (
-		<caption
-			data-slot="table-caption"
-			className={cn("mt-4 text-sm text-muted-foreground", className)}
-			{...props}
-		/>
-	);
-}
-
-export {
-	Table,
-	TableHeader,
-	TableBody,
-	TableFooter,
-	TableHead,
-	TableRow,
-	TableCell,
-	TableCaption,
-};
+export { Table, TableHeader, TableBody, TableHead, TableRow, TableCell };

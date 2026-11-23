@@ -1,5 +1,5 @@
 import { IconChartArea } from "@tabler/icons-react";
-import { EmptyMedia } from "@/components/dashboard/empty";
+import { EmptyMedia } from "@/app/ui/empty";
 import {
 	OpalineShape,
 	restingChipClassName,
@@ -9,12 +9,12 @@ import { cn } from "@/lib/utils";
 export function ChartEmptyNotice({ title }: { title: string }) {
 	return (
 		<div className="cost-chart-empty">
-			<EmptyMedia variant="icon" className="mb-0">
+			<EmptyMedia variant="icon" className="mb-zero">
 				<OpalineShape
 					className={cn(
 						"absolute inset-0",
 						restingChipClassName,
-						"[--opal-ring:rgb(17_24_39/0.08)]",
+						"[--opal-ring:var(--line)]",
 					)}
 				/>
 				<IconChartArea className="relative" />

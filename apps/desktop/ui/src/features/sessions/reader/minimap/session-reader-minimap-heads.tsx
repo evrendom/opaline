@@ -70,23 +70,23 @@ export function MinimapHeads({
 			className="pointer-events-none absolute inset-0 z-20"
 		>
 			<Head x={main.member * width} y={y}>
-				<Avatar className="size-3 shadow-(--custom-shadow) after:hidden">
+				<Avatar size="sm" className="size-3">
 					{member.imageUrl ? (
 						<AvatarImage src={member.imageUrl} alt="" />
 					) : null}
-					<AvatarFallback className="text-[0.4rem]">
+					<AvatarFallback>
 						{member.label.charAt(0).toUpperCase()}
 					</AvatarFallback>
 				</Avatar>
 			</Head>
 			<Head x={main.agent * width} y={y}>
-				<span className="-m-1.5 flex scale-50">
+				<span className="-m-s flex scale-50">
 					<ModelAvatar loading={false} model={model} shadowless solid />
 				</span>
 			</Head>
 			{[...byLane].map(([lane, first]) => (
 				<Head key={lane} x={subagentX(lane, lanes) * width} y={y}>
-					<span className="-m-0.5 flex scale-75">
+					<span className="-m-xxs flex scale-75">
 						<SubagentChip
 							ringed
 							selected={first.id === focus}

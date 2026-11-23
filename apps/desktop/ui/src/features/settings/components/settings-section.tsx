@@ -1,18 +1,10 @@
 import type * as React from "react";
 import { Card } from "@/app/ui/card";
-import { cn } from "@/lib/utils";
 import "./settings-section.css";
 
 export function SettingsSectionCard({
-	className,
 	size = "sm",
 	...props
 }: React.ComponentProps<typeof Card>) {
-	return (
-		<Card
-			size={size}
-			className={cn("settings-section-surface py-4 ring-0", className)}
-			{...props}
-		/>
-	);
+	return <Card size={size} {...props} />;
 }

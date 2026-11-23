@@ -24,9 +24,9 @@ export type FieldSpec = { label: string; value: ReactNode; wide?: boolean };
 
 export function Field({ label, value, wide }: FieldSpec) {
 	return (
-		<div className={cn("flex min-w-0 flex-col gap-1", wide && "col-span-2")}>
-			<span className="text-xs text-muted-foreground">{label}</span>
-			<span className="text-[13px] tabular-nums [overflow-wrap:anywhere]">
+		<div className={cn("flex min-w-0 flex-col gap-xs", wide && "col-span-2")}>
+			<span className="text-body-m text-ink-3">{label}</span>
+			<span className="text-body-l tabular-nums [overflow-wrap:anywhere]">
 				{value}
 			</span>
 		</div>
@@ -44,7 +44,7 @@ function StartedField(atMs: number, turnStartMs: number): FieldSpec {
 		value: (
 			<span>
 				+{formatDuration(atMs - turnStartMs)}{" "}
-				<span className="text-muted-foreground">{formatTimeOfDay(atMs)}</span>
+				<span className="text-ink-3">{formatTimeOfDay(atMs)}</span>
 			</span>
 		),
 	};
@@ -146,7 +146,7 @@ function ciFields(
 		{
 			label: "Commit",
 			value: (
-				<span className="font-mono text-xs">
+				<span className="font-data text-body-m">
 					{run.headBranch || "—"}
 					{run.headSha ? ` @ ${run.headSha.slice(0, 7)}` : ""}
 				</span>
@@ -158,7 +158,7 @@ function ciFields(
 	fields.push({
 		label: "GitHub",
 		value: (
-			<span className="inline-flex items-center gap-1">
+			<span className="inline-flex items-center gap-xs">
 				<CiViewLink
 					github={url}
 					picks={ciRunPicks(run)}

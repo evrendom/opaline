@@ -191,15 +191,18 @@ export function GhostTiles({
 				aria-hidden="true"
 				data-ghost-key={ghost.tile.key}
 				className={cn(
-					"pointer-events-none absolute z-30 overflow-hidden rounded-md corner-squircle squircle:rounded-xl border",
+					"absolute z-30 overflow-hidden",
+					"corner-s corner-squircle edge-m",
+					"pointer-events-none",
+					"squircle:corner-l",
 					tile.part ? look.className : "border-transparent",
 				)}
 				style={{ ...look.style, ...px(ghost.from) }}
 			>
 				<span
 					className={cn(
-						"flex min-w-0 items-center gap-1.5 text-[13px] leading-5",
-						roomy ? "px-2.5 py-1" : "h-full justify-center",
+						"flex min-w-0 items-center gap-s text-body-l",
+						roomy ? "px-l py-xs" : "h-full justify-center",
 					)}
 				>
 					<Glyph aria-hidden="true" className="size-3.5 shrink-0" />

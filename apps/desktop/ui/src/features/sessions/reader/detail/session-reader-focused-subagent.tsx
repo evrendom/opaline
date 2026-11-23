@@ -83,11 +83,11 @@ export function FocusedSubagent({
 		<div
 			ref={rootRef}
 			{...turnMarks({ index: 0, turnId: turn.turnId })}
-			className="flex w-full flex-col gap-8 text-sm"
+			className="flex w-full flex-col gap-xxxl text-body-xl"
 		>
 			<div
 				ref={stripRef}
-				className="sticky top-[calc(var(--stage-top,var(--reader-top,1rem))+0.5rem)] z-40 -mt-[calc(var(--reader-top,1rem)-var(--stage-top,var(--reader-top,1rem)))] xl:-mr-(--scrollbar,0px) bg-(--dashboard-01-content-background,var(--background)) before:pointer-events-none before:absolute before:-z-10 before:inset-x-0 before:bottom-full before:h-2 before:bg-(--dashboard-01-content-background,var(--background)) after:pointer-events-none after:absolute after:-z-10 after:inset-x-0 after:top-full after:h-4 after:bg-linear-to-b after:from-(--dashboard-01-content-background,var(--background)) after:to-transparent"
+				className="sticky top-[calc(var(--stage-top,var(--reader-top,1rem))+0.5rem)] z-40 -mt-[calc(var(--reader-top,var(--space-xl))-var(--stage-top,var(--reader-top,var(--space-xl))))] xl:-mr-(--scrollbar,0px) bg-(--dashboard-01-content-background,var(--canvas)) before:pointer-events-none before:absolute before:-z-10 before:inset-x-0 before:bottom-full before:h-2 before:bg-(--dashboard-01-content-background,var(--canvas)) after:pointer-events-none after:absolute after:-z-10 after:inset-x-0 after:top-full after:h-4 after:bg-linear-to-b after:from-(--dashboard-01-content-background,var(--canvas)) after:to-transparent"
 			>
 				<SubagentStrip
 					launch={launch}
@@ -98,7 +98,7 @@ export function FocusedSubagent({
 			</div>
 			<div ref={belowRef} className="contents">
 				{brief?.prompt ? (
-					<div className={cn("flex flex-col gap-2", READING_MEASURE)}>
+					<div className={cn("flex flex-col gap-m", READING_MEASURE)}>
 						<MemberBubble
 							avatar={<ModelAvatar loading={false} model={model} />}
 							imageUrl={undefined}
@@ -108,14 +108,14 @@ export function FocusedSubagent({
 						/>
 					</div>
 				) : null}
-				<div {...TURN_ANSWER_MARK} className="flex flex-col gap-4">
+				<div {...TURN_ANSWER_MARK} className="flex flex-col gap-xl">
 					<Reveal
 						label="Reading this subagent"
 						loading={!body}
 						sample={
-							<div className="flex flex-col gap-2 px-1 pt-1">
-								<Bone className="h-3.5 w-full rounded-sm" />
-								<Bone className="h-3.5 w-2/3 rounded-sm" />
+							<div className="flex flex-col gap-m px-xs pt-xs">
+								<Bone className="h-3.5 w-full corner-xs" />
+								<Bone className="h-3.5 w-2/3 corner-xs" />
 							</div>
 						}
 						sampleId="reader-subagent"

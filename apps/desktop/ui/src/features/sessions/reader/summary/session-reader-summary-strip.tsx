@@ -1,6 +1,7 @@
 import type { SessionDetailTurnSummary } from "@rudel/api-routes";
 import { type ReactNode, useMemo } from "react";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
+import { Card, CardContent } from "@/app/ui/card";
 import type { NormalizedSessionDetailOverview } from "../../components/session-detail-fast-response";
 import { useSessionReaderBodies } from "../detail/use-session-reader-bodies";
 import { getReaderWaterfall } from "../model/session-reader-model";
@@ -33,9 +34,11 @@ export function SummaryStrip({
 			/>
 		);
 	return (
-		<div className="hidden flex-col rounded-lg bg-card px-3 py-2.5 text-xs shadow-(--custom-shadow) corner-squircle has-[li]:flex squircle:rounded-3xl">
-			{children}
-		</div>
+		<Card size="sm" className="hidden has-[li]:flex">
+			<CardContent>
+				<div className="text-body-m">{children}</div>
+			</CardContent>
+		</Card>
 	);
 }
 

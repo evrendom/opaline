@@ -42,13 +42,13 @@ function getInitials(name: string, email: string) {
 function MemberActivity({ row }: { row: TeamPageMemberRow | undefined }) {
 	if (!row?.hasActivity) {
 		return (
-			<p className="workspace-settings-member-activity">
+			<p className="settings-member-activity">
 				No sessions in the last 12 months
 			</p>
 		);
 	}
 	return (
-		<p className="workspace-settings-member-activity">
+		<p className="settings-member-activity">
 			<span>
 				{formatCompactWholeNumber(row.totalSessions)}{" "}
 				{row.totalSessions === 1 ? "session" : "sessions"}
@@ -98,7 +98,7 @@ export function WorkspaceMembersTable({
 	);
 	if (members.length === 0) {
 		return (
-			<p className="workspace-settings-empty">
+			<p className="settings-empty">
 				No members are visible for this workspace yet.
 			</p>
 		);
@@ -106,13 +106,13 @@ export function WorkspaceMembersTable({
 
 	return (
 		<>
-			<ul className="workspace-settings-list" aria-label="Workspace members">
+			<ul className="settings-list" aria-label="Workspace members">
 				{members.map((member) => (
 					<li key={member.id}>
 						<WorkspaceSettingsRow
 							label={
 								// Member row: name with the email beside it.
-								<div className="workspace-settings-member-identity">
+								<div className="settings-member-identity">
 									<Avatar size="sm">
 										{member.user.image ? (
 											<AvatarImage
@@ -124,8 +124,8 @@ export function WorkspaceMembersTable({
 											{getInitials(member.user.name, member.user.email)}
 										</AvatarFallback>
 									</Avatar>
-									<div className="workspace-settings-member-text">
-										<div className="workspace-settings-member-copy">
+									<div className="settings-member-text">
+										<div className="settings-member-copy">
 											<span>{member.user.name || member.user.email}</span>
 											<span>{member.user.email}</span>
 										</div>
@@ -133,7 +133,7 @@ export function WorkspaceMembersTable({
 											<MemberActivity row={activity.get(member.user.id)} />
 										) : (
 											<p
-												className="workspace-settings-member-activity"
+												className="settings-member-activity"
 												aria-hidden="true"
 											>
 												 
@@ -143,7 +143,7 @@ export function WorkspaceMembersTable({
 								</div>
 							}
 						>
-							<div className="workspace-settings-role">
+							<div className="settings-role">
 								{member.role === "owner" ? (
 									<WorkspaceOwnerBadge />
 								) : canEdit ? (
@@ -158,6 +158,7 @@ export function WorkspaceMembersTable({
 									>
 										<SelectTrigger
 											size="sm"
+											className="w-full"
 											aria-label={`Role for ${member.user.name || member.user.email}`}
 										>
 											<SelectValue>
@@ -180,7 +181,7 @@ export function WorkspaceMembersTable({
 										</SelectContent>
 									</Select>
 								) : (
-									<span className="workspace-settings-status">
+									<span className="settings-status">
 										<WorkspaceRoleLabel
 											value={member.role === "admin" ? "admin" : "member"}
 										/>
@@ -191,9 +192,8 @@ export function WorkspaceMembersTable({
 								signInLink.canCopy(member) ? (
 									<Button
 										type="button"
-										variant="ghost"
-										size="icon-sm"
-										className="workspace-settings-icon-button"
+										variant="secondary"
+										size="icon"
 										aria-label={
 											pendingKey === `link:${member.id}`
 												? `Making a sign-in link for ${member.user.name || member.user.email}`
@@ -206,24 +206,17 @@ export function WorkspaceMembersTable({
 										<IconLink aria-hidden="true" />
 									</Button>
 								) : (
-									<span
-										aria-hidden="true"
-										className="workspace-settings-icon-slot"
-									/>
+									<span aria-hidden="true" className="settings-icon-slot" />
 								)
 							) : null}
 							{canEdit && member.role === "owner" ? (
-								<span
-									aria-hidden="true"
-									className="workspace-settings-icon-slot"
-								/>
+								<span aria-hidden="true" className="settings-icon-slot" />
 							) : null}
 							{canEdit && member.role !== "owner" ? (
 								<Button
 									type="button"
-									variant="ghost"
-									size="icon-sm"
-									className="workspace-settings-icon-button"
+									variant="secondary"
+									size="icon"
 									aria-label={
 										pendingKey === `remove:${member.id}`
 											? `Removing ${member.user.name || member.user.email}`
@@ -257,14 +250,16 @@ export function WorkspaceMembersTable({
 					<DialogFooter>
 						<Button
 							type="button"
-							variant="outline"
+							variant="secondary"
+							size="lg"
 							onClick={() => setRemoving(null)}
 						>
 							Cancel
 						</Button>
 						<Button
 							type="button"
-							variant="destructive"
+							variant="danger"
+							size="lg"
 							onClick={() => {
 								if (removing) onRemove(removing.id);
 								setRemoving(null);

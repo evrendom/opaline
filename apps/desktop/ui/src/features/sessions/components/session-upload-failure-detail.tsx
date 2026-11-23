@@ -42,16 +42,18 @@ export function SessionUploadFailureDetail({
 	}).filter(([, value]) => value !== undefined && value !== "");
 	return (
 		<article
-			className="h-full min-w-0 overflow-y-auto px-5 py-6 text-base text-(--dashboardy-heading) sm:px-8 sm:py-8 sm:text-sm"
+			className="h-full min-w-0 overflow-y-auto px-xxl py-xxl text-body-xxl text-ink sm:px-xxxl sm:py-xxxl sm:text-body-xl"
 			aria-label="Session upload failure"
 		>
-			<div className="flex min-w-0 max-w-3xl flex-col gap-6">
-				<div className="flex min-w-0 flex-col gap-3">
-					<h1 className="text-balance text-xl font-medium">Upload failed</h1>
-					<p className="whitespace-pre-wrap wrap-anywhere text-pretty text-(--dashboardy-heading)">
+			<div className="flex min-w-0 max-w-3xl flex-col gap-xxl">
+				<div className="flex min-w-0 flex-col gap-l">
+					<h1 className="text-balance text-display-xxs tracking-s font-medium">
+						Upload failed
+					</h1>
+					<p className="whitespace-pre-wrap wrap-anywhere text-pretty text-ink">
 						{failure.error}
 					</p>
-					<p className="text-pretty text-(--dashboardy-muted)">
+					<p className="text-pretty text-ink-3">
 						{failure.retryable ? (
 							<>
 								Retry this session with <code>opaline upload</code>.
@@ -65,14 +67,14 @@ export function SessionUploadFailureDetail({
 						)}
 					</p>
 				</div>
-				<dl className="min-w-0 divide-y divide-black/6 dark:divide-white/8">
+				<dl className="min-w-0 divide-y divide-line">
 					{fields.map(([label, value]) => (
 						<div
 							key={label}
-							className="grid min-w-0 grid-cols-1 gap-1 py-3 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-x-6"
+							className="grid min-w-0 grid-cols-1 gap-xs py-l sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-x-xxl"
 						>
 							<dt className="font-medium">{label}</dt>
-							<dd className="min-w-0 wrap-anywhere text-(--dashboardy-muted) tabular-nums">
+							<dd className="min-w-0 wrap-anywhere text-ink-3 tabular-nums">
 								{value}
 							</dd>
 						</div>

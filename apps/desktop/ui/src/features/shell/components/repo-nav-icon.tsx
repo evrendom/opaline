@@ -69,6 +69,7 @@ export function RepoNavIcon({
 					live={status === "live"}
 					className={cn(
 						"absolute top-0 right-0 ring-[1.5px] ring-sidebar",
+						// the live-upload dot keeps its emerald, brighter than success
 						!active && "bg-emerald-500/55",
 					)}
 				/>
@@ -88,7 +89,8 @@ function RepoUploadDot({
 		<span
 			aria-hidden="true"
 			className={cn(
-				"pointer-events-none size-1.5 shrink-0 rounded-full bg-emerald-500",
+				// the live-upload dot keeps its emerald, brighter than success
+				"pointer-events-none size-1.5 shrink-0 corner-full bg-emerald-500",
 				live && "animate-repo-live motion-reduce:animate-none",
 				className,
 			)}

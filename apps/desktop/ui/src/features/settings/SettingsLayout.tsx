@@ -27,6 +27,7 @@ import {
 	useNavigate,
 } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
+import { IconPlugFilled } from "@/app/ui/icon-plug-filled";
 import {
 	Select,
 	SelectContent,
@@ -34,7 +35,6 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/app/ui/select";
-import { IconPlugFilled } from "@/components/ui/icon-plug-filled";
 import {
 	LOCAL_APP_HIDDEN_SETTINGS,
 	useLocalDesktopApp,
@@ -66,6 +66,55 @@ const settingsTabIcons: Record<SettingsRouteId, [Icon, Icon]> = {
 	"create-workspace": [IconSquareRoundedPlus, IconSquareRoundedPlusFilled],
 };
 
+/** One section in the settings sidebar: its outline icon at rest, the
+ *  filled one and the sliding card under it when it is the open section. */
+export function SettingsSectionTab({
+	routeId,
+	to,
+	active,
+}: {
+	routeId: SettingsRouteId;
+	to: string;
+	active: boolean;
+}) {
+	const [OutlineIcon, FilledIcon] = settingsTabIcons[routeId];
+	const TabIcon = active ? FilledIcon : OutlineIcon;
+	return (
+		<li>
+			<Link
+				to={to}
+				aria-current={active ? "page" : undefined}
+				className={cn(
+					"relative flex h-8 items-center",
+					"corner-s px-l corner-squircle",
+					"text-body-xl font-medium",
+					"focus-outline",
+					"squircle:corner-l pointer-coarse:h-12",
+					active
+						? "text-ink"
+						: "text-ink-3 hover:text-ink hover:transition-colors",
+				)}
+			>
+				{active ? (
+					<motion.span
+						layoutId="settings-tab-bg"
+						initial={false}
+						transition={{
+							duration: 0.2,
+							ease: [0.32, 0.72, 0, 1],
+						}}
+						className="absolute inset-0 z-0 corner-s bg-surface shadow-card corner-squircle squircle:corner-l"
+					/>
+				) : null}
+				<span className="relative z-10 flex items-center gap-s">
+					<TabIcon aria-hidden="true" className="size-3.5" />
+					{settingsRouteMap[routeId].label}
+				</span>
+			</Link>
+		</li>
+	);
+}
+
 export function SettingsLayout() {
 	const { state } = useOrganization();
 	const { query } = useGitHubConnection(state.activeOrg?.id ?? null);
@@ -94,53 +143,36 @@ export function SettingsLayout() {
 			className="@container/settings flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
 			data-slot="settings-layout"
 		>
-			<div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-hidden px-6 @min-[640px]/settings:grid-cols-[168px_minmax(0,1fr)] @min-[640px]/settings:grid-rows-[minmax(0,1fr)] @min-[640px]/settings:gap-8">
+			<div
+				className={cn(
+					"grid min-h-0 min-w-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] gap-xl overflow-hidden",
+					"px-xxl",
+					"@min-[640px]/settings:grid-cols-[168px_minmax(0,1fr)] @min-[640px]/settings:grid-rows-[minmax(0,1fr)] @min-[640px]/settings:gap-xxxl",
+				)}
+			>
 				<aside
-					className="hidden min-h-0 min-w-0 overflow-y-auto overscroll-none px-1 pt-2 pb-4 md:pb-6 @min-[640px]/settings:block"
+					className={cn(
+						"hidden min-h-0 min-w-0 overflow-y-auto overscroll-none",
+						"px-xs pt-m pb-xl",
+						"md:pb-xxl @min-[640px]/settings:block",
+					)}
 					data-slot="settings-sidebar"
 				>
 					<nav aria-label="Settings sections">
-						<ul className="flex flex-col gap-1">
-							{routes.map((route) => {
-								const active = route.id === activeRouteId;
-								const [OutlineIcon, FilledIcon] = settingsTabIcons[route.id];
-								const TabIcon = active ? FilledIcon : OutlineIcon;
-								return (
-									<li key={route.id}>
-										<Link
-											to={getShellRoutePath(route.path)}
-											aria-current={active ? "page" : undefined}
-											className={cn(
-												"relative flex h-8 items-center rounded-md px-2.5 text-sm font-medium outline-none corner-squircle squircle:rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--dashboard-01-metric-button-focus-ring)] pointer-coarse:h-12",
-												active
-													? "text-foreground"
-													: "text-muted-foreground hover:text-foreground hover:transition-colors",
-											)}
-										>
-											{active ? (
-												<motion.span
-													layoutId="settings-tab-bg"
-													initial={false}
-													transition={{
-														duration: 0.2,
-														ease: [0.32, 0.72, 0, 1],
-													}}
-													className="absolute inset-0 z-0 rounded-md bg-card shadow-(--custom-shadow) corner-squircle squircle:rounded-xl dark:bg-muted-foreground/10"
-												/>
-											) : null}
-											<span className="relative z-10 flex items-center gap-1.5">
-												<TabIcon aria-hidden="true" className="size-3.5" />
-												{route.label}
-											</span>
-										</Link>
-									</li>
-								);
-							})}
+						<ul className="flex flex-col gap-xs">
+							{routes.map((route) => (
+								<SettingsSectionTab
+									key={route.id}
+									routeId={route.id}
+									to={getShellRoutePath(route.path)}
+									active={route.id === activeRouteId}
+								/>
+							))}
 						</ul>
 					</nav>
 				</aside>
 				<div
-					className="min-w-0 pt-4 @min-[640px]/settings:hidden"
+					className="min-w-0 pt-xl @min-[640px]/settings:hidden"
 					data-slot="settings-mobile-navigation"
 				>
 					<Select
@@ -152,7 +184,7 @@ export function SettingsLayout() {
 					>
 						<SelectTrigger
 							aria-label="Settings section"
-							className="w-full rounded-md bg-transparent text-base data-[size=default]:h-12"
+							className="w-full data-[size=md]:h-12"
 						>
 							<SelectValue>{settingsRouteMap[activeRouteId].label}</SelectValue>
 						</SelectTrigger>
@@ -171,10 +203,10 @@ export function SettingsLayout() {
 				<div
 					ref={fadeRef}
 					{...fade}
-					className="scroll-fade -mx-2 min-h-0 min-w-0 overflow-y-auto overscroll-none px-2"
+					className="scroll-fade -mx-m min-h-0 min-w-0 overflow-y-auto overscroll-none px-m"
 					data-slot="settings-content"
 				>
-					<div className="settings-page-content pt-2">
+					<div className="settings-page-content pt-m">
 						<h1 className="settings-page-title">
 							{settingsRouteMap[activeRouteId].label}
 						</h1>

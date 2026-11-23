@@ -11,10 +11,12 @@ import { type ReactNode, useMemo, useRef, useState } from "react";
 import type { ChevronProps, DateRange } from "react-day-picker";
 import { Button } from "@/app/ui/button";
 import { Calendar } from "@/app/ui/calendar";
+import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
 import { Popover, PopoverTrigger } from "@/app/ui/popover";
-import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
 import { SessionMenuPopoverContent } from "@/features/sessions/components/session-menu-popover-content";
 import "./analytics-date-range-picker.css";
+
+import { Pressable } from "@/app/ui/pressable";
 import { getSupportedAnalyticsDateRange } from "@/lib/analytics-date-range";
 import { formatIsoDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -24,7 +26,6 @@ import {
 	parseIsoDateOnly,
 	resolveMatchingAnalyticsPreset,
 } from "../date-presets";
-
 export type AnalyticsDateRangePickerProps = {
 	maxDays?: number;
 	startDate: string;
@@ -57,7 +58,7 @@ function LinearCalendarChevron({
 			aria-hidden="true"
 			size={size}
 			stroke={1.75}
-			className={cn("session-menu-icon size-4", className)}
+			className={cn("menu-icon size-4", className)}
 		/>
 	);
 }
@@ -182,10 +183,11 @@ export function AnalyticsDateRangePicker({
 		>
 			<PopoverTrigger
 				render={
-					<button
+					<Button
 						type="button"
-						data-variant="secondary"
-						className={cn("toolbar-button", triggerClassName)}
+						variant="primary"
+						data-active
+						className={triggerClassName}
 					/>
 				}
 			>
@@ -206,10 +208,7 @@ export function AnalyticsDateRangePicker({
 				sideOffset={6}
 				data-slot="popover-content"
 				aria-label="Date range"
-				className={cn(
-					"session-menu-surface session-date-picker",
-					contentClassName,
-				)}
+				className={cn("menu-surface session-date-picker", contentClassName)}
 			>
 				<form
 					className="flex min-h-0 flex-col overflow-hidden"
@@ -225,22 +224,22 @@ export function AnalyticsDateRangePicker({
 					>
 						<div
 							data-fluid-menu-root=""
-							className="session-menu-list session-date-picker-presets"
+							className="menu-list session-date-picker-presets"
 						>
 							<FluidMenuHover />
 							{presets.map((preset) => {
 								const isActive = preset.id === activePresetId;
 
 								return (
-									<button
+									<Pressable
 										key={preset.id}
 										type="button"
 										aria-pressed={isActive}
-										className="session-menu-row"
+										className="menu-row"
 										onClick={() => applyPreset(preset)}
 									>
 										<span className="truncate">{preset.label}</span>
-									</button>
+									</Pressable>
 								);
 							})}
 						</div>
@@ -290,44 +289,48 @@ export function AnalyticsDateRangePicker({
 
 	function renderCalendar(linear: boolean) {
 		return (
-			<Calendar
-				mode="range"
-				defaultMonth={draftDateRange?.from}
-				selected={draftDateRange}
-				onSelect={setDraftDateRange}
-				today={today}
-				weekStartsOn={1}
-				showOutsideDays={!linear}
-				numberOfMonths={2}
-				fixedWeeks={linear}
-				data-date-picker={linear ? "true" : undefined}
-				data-multiple-months={linear ? "true" : undefined}
-				components={{ Chevron: LinearCalendarChevron }}
-				modifiers={linear ? { day_weekends: { dayOfWeek: [0, 6] } } : undefined}
-				modifiersClassNames={
-					linear
-						? {
-								day_weekends: "rdp-day_weekends",
-							}
-						: undefined
-				}
-				className="bg-transparent session-date-picker-calendar"
-				classNames={{
-					button_next: "session-date-picker-nav-button",
-					button_previous: "session-date-picker-nav-button",
-					caption_label: "session-date-picker-month-label",
-					month: "flex min-w-0 flex-1 flex-col gap-2.5",
-					month_caption: "flex h-8 w-full items-center justify-center px-0",
-					months: "relative flex flex-col gap-5 md:flex-row md:gap-[0.96rem]",
-					// Layout: the arrows at the outer edges of the months.
-					nav: "pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between *:pointer-events-auto",
-					week: "mt-1 flex w-full",
-					weekday: "session-date-picker-weekday",
-				}}
-				disabled={(date) =>
-					date < supportedDateRange.start || date > supportedDateRange.end
-				}
-			/>
+			<div className="session-date-picker-calendar">
+				<Calendar
+					mode="range"
+					defaultMonth={draftDateRange?.from}
+					selected={draftDateRange}
+					onSelect={setDraftDateRange}
+					today={today}
+					weekStartsOn={1}
+					showOutsideDays={!linear}
+					numberOfMonths={2}
+					fixedWeeks={linear}
+					data-date-picker={linear ? "true" : undefined}
+					data-multiple-months={linear ? "true" : undefined}
+					components={{ Chevron: LinearCalendarChevron }}
+					modifiers={
+						linear ? { day_weekends: { dayOfWeek: [0, 6] } } : undefined
+					}
+					modifiersClassNames={
+						linear
+							? {
+									day_weekends: "rdp-day_weekends",
+								}
+							: undefined
+					}
+					classNames={{
+						button_next: "session-date-picker-nav-button",
+						button_previous: "session-date-picker-nav-button",
+						caption_label: "session-date-picker-month-label",
+						month: "flex min-w-0 flex-1 flex-col gap-m",
+						month_caption:
+							"flex h-8 w-full items-center justify-center px-zero",
+						months: "relative flex flex-col gap-xl md:flex-row",
+						// Layout: the arrows at the outer edges of the months.
+						nav: "pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between *:pointer-events-auto",
+						week: "mt-xs flex w-full",
+						weekday: "session-date-picker-weekday",
+					}}
+					disabled={(date) =>
+						date < supportedDateRange.start || date > supportedDateRange.end
+					}
+				/>
+			</div>
 		);
 	}
 
@@ -336,9 +339,8 @@ export function AnalyticsDateRangePicker({
 			<>
 				<Button
 					type="button"
-					variant="ghost"
-					size="sm"
-					className="session-date-picker-action session-date-picker-cancel"
+					variant="secondary"
+					size="md"
 					onClick={() => {
 						resetDraftDateRange();
 						setOpen(false);
@@ -347,9 +349,9 @@ export function AnalyticsDateRangePicker({
 					Cancel
 				</Button>
 				<Button
+					variant="primary"
 					type="submit"
-					size="sm"
-					className="session-date-picker-action session-date-picker-apply"
+					size="md"
 					disabled={!canApplyRange}
 				>
 					Apply

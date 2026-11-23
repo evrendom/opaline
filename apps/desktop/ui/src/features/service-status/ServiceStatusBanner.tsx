@@ -28,10 +28,10 @@ export function ServiceStatusBanner() {
 	if (status !== "analytics-unavailable") return null;
 
 	return (
-		<output className="flex items-start gap-2 border-b border-amber-300/60 bg-amber-50 px-4 py-2 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-100">
+		<output className="flex items-start gap-m edge-b-m border-warning-line bg-warning-tint px-xl py-m text-body-xl text-warning">
 			<IconAlertTriangle
 				aria-hidden="true"
-				className="mt-0.5 size-4 shrink-0"
+				className="mt-xxs size-4 shrink-0"
 			/>
 			<p>
 				Analytics are temporarily unavailable because our database provider is

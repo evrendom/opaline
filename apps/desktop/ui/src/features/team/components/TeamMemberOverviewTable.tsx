@@ -1,8 +1,8 @@
 import { useMemo, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
 import { Reveal } from "@/app/ui/bones";
+import { FluidHoverHighlight } from "@/app/ui/fluid-hover-highlight";
 import { SearchInput } from "@/components/dashboard/data-table";
-import { FluidHoverHighlight } from "@/components/ui/fluid-hover-highlight";
 import { DashboardModelBadges } from "@/features/dashboard/components/DashboardModelBadges";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
 import { ToolbarSortMenu } from "@/features/sessions/components/sessions-overview-sort-menu";
@@ -100,7 +100,7 @@ function buildSparklinePoints(values: readonly number[]) {
 
 function ActivitySparkline({ values }: { values: readonly number[] }) {
 	if (values.length === 0) {
-		return <p className="text-base text-muted-foreground sm:text-sm">—</p>;
+		return <p className="text-body-xxl text-ink-3 sm:text-body-xl">—</p>;
 	}
 
 	const totalSessions = values.reduce((total, value) => total + value, 0);
@@ -114,7 +114,7 @@ function ActivitySparkline({ values }: { values: readonly number[] }) {
 			viewBox={`0 0 ${SPARKLINE_WIDTH} ${SPARKLINE_HEIGHT}`}
 		>
 			<polyline
-				className="fill-none stroke-[#4D80E6]"
+				className="fill-none stroke-accent"
 				points={buildSparklinePoints(values)}
 				strokeLinecap="round"
 				strokeLinejoin="round"
@@ -199,12 +199,12 @@ function ModelComposition({
 
 	return (
 		<div
-			className="flex min-w-0 items-center gap-1.5 overflow-hidden"
+			className="flex min-w-0 items-center gap-s overflow-hidden"
 			title={modelNames || "No model activity"}
 		>
 			<DashboardModelBadges models={visibleModels} size="table" />
 			{hiddenModelCount > 0 ? (
-				<p className="shrink-0 text-base font-medium text-muted-foreground tabular-nums sm:text-sm">
+				<p className="shrink-0 text-body-xxl font-medium text-ink-3 tabular-nums sm:text-body-xl">
 					+{hiddenModelCount}
 				</p>
 			) : null}
@@ -216,8 +216,8 @@ function ModelComposition({
 // metrics in fixed tracks with their units inline, so they line up without
 // column headers (kept for screen readers).
 const METRIC_CELL_CLASS_NAME =
-	"h-16 px-3 py-0 text-right align-middle text-xs tabular-nums whitespace-nowrap text-(--session-overview-muted)";
-const METRIC_UNIT_CLASS_NAME = "text-(--session-overview-subtle)";
+	"h-16 px-l py-zero text-right align-middle text-body-m tabular-nums whitespace-nowrap text-ink-2";
+const METRIC_UNIT_CLASS_NAME = "text-ink-3";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** When a teammate was last active, by day (the roster keeps dates, not
@@ -256,14 +256,14 @@ export function LastActive({
 						: `${Math.floor(days / 365)}y ago`;
 	return (
 		<span
-			className="inline-flex items-center gap-2"
+			className="inline-flex items-center gap-m"
 			title={`Last active ${formatLastActiveDate(lastActiveDate)}`}
 		>
 			<span
 				aria-hidden="true"
 				className={cn(
-					"size-1.5 shrink-0 rounded-full",
-					days < 7 ? "bg-[#22c55e]" : "bg-black/20 dark:bg-white/25",
+					"size-1.5 shrink-0 corner-full",
+					days < 7 ? "bg-success" : "bg-ink-4",
 				)}
 			/>
 			<time dateTime={lastActiveDate ?? undefined}>{label}</time>
@@ -284,28 +284,26 @@ function TeamMemberRow({
 	useRegisterFluidHoverItem(registerItem, index, rowRef);
 	return (
 		<tr ref={rowRef} className="relative z-10 h-16">
-			<td className="h-16 py-0 pr-3 pl-0 align-middle">
-				<div className="flex min-w-0 items-center gap-3">
-					<Avatar className="size-8 overflow-hidden bg-background outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10">
+			<td className="h-16 py-zero pr-l pl-zero align-middle">
+				<div className="flex min-w-0 items-center gap-l">
+					<Avatar>
 						{row.imageUrl ? <AvatarImage alt="" src={row.imageUrl} /> : null}
-						<AvatarFallback className="bg-muted font-medium text-foreground">
+						<AvatarFallback>
 							{getMemberInitials(row.displayName)}
 						</AvatarFallback>
 					</Avatar>
 					<div className="min-w-0">
-						<p className="truncate text-sm/5 font-medium text-(--session-overview-text)">
+						<p className="truncate text-body-xl font-medium text-ink">
 							{row.displayName}
 						</p>
-						<p className="truncate text-xs/4 text-(--session-overview-muted)">
-							{row.role}
-						</p>
+						<p className="truncate text-body-m text-ink-2">{row.role}</p>
 					</div>
 				</div>
 			</td>
-			<td className="h-16 px-3 py-0 align-middle">
+			<td className="h-16 px-l py-zero align-middle">
 				<ModelComposition usage={row.modelUsage} />
 			</td>
-			<td className="h-16 px-3 py-0 align-middle">
+			<td className="h-16 px-l py-zero align-middle">
 				<ActivitySparkline values={row.activityTrend} />
 			</td>
 			<td className={METRIC_CELL_CLASS_NAME}>
@@ -321,15 +319,10 @@ function TeamMemberRow({
 				<span>{formatCompactWholeNumber(row.totalTokens)}</span>
 				<span className={METRIC_UNIT_CLASS_NAME}> tok</span>
 			</td>
-			<td
-				className={cn(
-					METRIC_CELL_CLASS_NAME,
-					"font-medium text-(--session-overview-text)",
-				)}
-			>
+			<td className={cn(METRIC_CELL_CLASS_NAME, "font-medium text-ink")}>
 				{formatCompactWholeCurrency(row.cost)}
 			</td>
-			<td className={cn(METRIC_CELL_CLASS_NAME, "pr-0 pl-3")}>
+			<td className={cn(METRIC_CELL_CLASS_NAME, "pr-zero pl-l")}>
 				<LastActive lastActiveDate={row.lastActiveDate} />
 			</td>
 		</tr>
@@ -418,8 +411,8 @@ export function TeamMemberOverviewTable({
 	}, [rows, search, sort]);
 
 	return (
-		<div className="-mx-2">
-			<div className="flex h-12 items-center gap-2 px-2">
+		<div className="-mx-m">
+			<div className="flex h-12 items-center gap-m px-m">
 				<SearchInput
 					value={search}
 					onChange={setSearch}
@@ -469,9 +462,9 @@ function MembersTable({
 			>
 				<FluidHoverHighlight
 					hover={hover}
-					className="z-0 rounded-none bg-(--session-overview-hover)"
+					className="z-0 corner-zero bg-hover"
 				/>
-				<table className="relative w-full min-w-240 border-collapse [&_tr>*:first-child]:pl-2 [&_tr>*:last-child]:pr-2">
+				<table className="relative w-full min-w-240 border-collapse [&_tr>*:first-child]:pl-m [&_tr>*:last-child]:pr-m">
 					<colgroup>
 						<col className="w-[24%]" />
 						<col className="w-[21%]" />

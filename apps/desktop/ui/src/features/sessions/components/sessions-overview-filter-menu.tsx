@@ -1,8 +1,12 @@
 import { IconCheck, IconSearch } from "@tabler/icons-react";
 import { useId, useState } from "react";
 import { Checkbox } from "@/app/ui/checkbox";
-import { Input } from "@/app/ui/input";
-import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
+import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
+import {
+	InputGroup,
+	InputGroupAddon,
+	InputGroupInput,
+} from "@/app/ui/input-group";
 import type { SessionOverviewFilterOption } from "@/features/sessions/components/sessions-overview-table-utils";
 
 export function SessionOverviewFilterOptionsPanel({
@@ -38,30 +42,30 @@ export function SessionOverviewFilterOptionsPanel({
 	return (
 		<>
 			{canSearch ? (
-				<div className="relative border-b border-border/60 p-2">
+				<div className="relative edge-b-m border-line p-m">
 					<label className="sr-only" htmlFor={`${controlId}-search`}>
 						{`Search ${label.toLocaleLowerCase()}`}
 					</label>
-					<IconSearch
-						aria-hidden="true"
-						className="pointer-events-none absolute top-1/2 left-5 size-4 -translate-y-1/2 text-muted-foreground"
-					/>
-					<Input
-						id={`${controlId}-search`}
-						type="text"
-						name={`${controlId}-search`}
-						className="h-8 rounded-lg bg-muted/60 pr-2 pl-9 text-sm"
-						placeholder={`Search ${label.toLocaleLowerCase()}`}
-						value={searchQuery}
-						onChange={(event) => setSearchQuery(event.target.value)}
-					/>
+					<InputGroup>
+						<InputGroupAddon>
+							<IconSearch aria-hidden="true" className="size-4 text-ink-3" />
+						</InputGroupAddon>
+						<InputGroupInput
+							id={`${controlId}-search`}
+							type="text"
+							name={`${controlId}-search`}
+							placeholder={`Search ${label.toLocaleLowerCase()}`}
+							value={searchQuery}
+							onChange={(event) => setSearchQuery(event.target.value)}
+						/>
+					</InputGroup>
 				</div>
 			) : null}
 			<div
 				className={
 					variant !== "default"
-						? "session-menu-list"
-						: "max-h-72 overflow-y-auto overscroll-contain p-1.5"
+						? "menu-list"
+						: "max-h-72 overflow-y-auto overscroll-contain p-s"
 				}
 				data-session-filter-scroll-region="true"
 				data-fluid-menu-root=""
@@ -76,25 +80,21 @@ export function SessionOverviewFilterOptionsPanel({
 							<label
 								key={option.value}
 								htmlFor={optionId}
-								className="session-menu-row"
+								className="menu-row"
 								title={option.value}
 							>
-								<input
+								<Checkbox
 									id={optionId}
-									type="checkbox"
 									checked={isChecked}
-									className="peer sr-only"
+									className="sr-only"
 									name={optionId}
-									onChange={(event) =>
-										onOptionChecked(option.value, event.target.checked)
+									onCheckedChange={(checked) =>
+										onOptionChecked(option.value, Boolean(checked))
 									}
 								/>
 								{variant === "linear-side" ? (
-									<span className="session-menu-check-slot" aria-hidden="true">
-										<span
-											className="session-menu-checkbox"
-											data-checked={isChecked}
-										>
+									<span className="menu-check-slot" aria-hidden="true">
+										<span className="menu-checkbox" data-checked={isChecked}>
 											{isChecked ? (
 												<IconCheck aria-hidden="true" className="size-2.5" />
 											) : null}
@@ -105,7 +105,7 @@ export function SessionOverviewFilterOptionsPanel({
 								{variant === "linear" && isChecked ? (
 									<IconCheck
 										aria-hidden="true"
-										className="size-3.5 shrink-0 text-black dark:text-[#f4f4f5]"
+										className="size-3.5 shrink-0 text-ink"
 									/>
 								) : null}
 							</label>
@@ -113,7 +113,7 @@ export function SessionOverviewFilterOptionsPanel({
 							<label
 								key={option.value}
 								htmlFor={optionId}
-								className="flex min-h-9 items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium outline-none hover:bg-accent hover:text-accent-foreground"
+								className="flex min-h-9 items-center gap-l corner-m px-l py-s text-body-xl font-medium focus-outline hover:bg-hover hover:text-ink"
 								title={option.value}
 							>
 								<Checkbox
@@ -128,13 +128,13 @@ export function SessionOverviewFilterOptionsPanel({
 						);
 					})
 				) : (
-					<p className="px-3 py-6 text-center text-sm text-muted-foreground">
+					<p className="px-l py-xxl text-center text-body-xl text-ink-3">
 						No options found.
 					</p>
 				)}
 			</div>
 			{variant === "default" ? (
-				<div className="border-t border-border/60 px-3 py-2 text-xs tabular-nums text-muted-foreground">
+				<div className="edge-t-m border-line px-l py-m text-body-m tabular-nums text-ink-3">
 					{selectedOptionCount.toLocaleString()} of{" "}
 					{options.length.toLocaleString()} selected
 				</div>

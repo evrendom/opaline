@@ -65,7 +65,7 @@ describe("session turn table scroll root", () => {
 		expect(markup).toContain("sticky top-0");
 		expect(markup).toContain("h-(--session-turn-table-header-height)");
 		expect(markup).toContain(
-			"sticky top-0 z-10 block min-w-full border-b-[0.5px] border-(--session-overview-border)",
+			"sticky top-0 z-10 block min-w-full edge-b-s border-line",
 		);
 		expect(markup).toContain("data-session-turn-table-scrollbar");
 		expect(markup).toContain("data-session-turn-table-scrollbar-thumb");

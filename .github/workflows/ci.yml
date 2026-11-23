@@ -89,6 +89,11 @@ jobs:
       - name: Test the repository scripts
         run: bun test ./scripts/check-disclosure.test.ts ./scripts/selfhost-artifact.test.ts ./scripts/ci-tests.test.ts
 
+      # Every design-system escape in the Mac app UI, held by a ratchet
+      # (apps/desktop/ui/tools/design-escapes.ts and its baseline).
+      - name: Check design-system escapes
+        run: bun run check:design
+
       - name: Lint
         run: bun run lint
 

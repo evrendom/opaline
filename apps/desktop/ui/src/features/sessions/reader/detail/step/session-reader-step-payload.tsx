@@ -1,5 +1,6 @@
 import { IconChevronRight } from "@tabler/icons-react";
 import { type ReactNode, useState } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { CopyButton } from "@/features/shell/components/copy-button";
 import { cn } from "@/lib/utils";
 import { HighlightedCode } from "./session-reader-step-payloads";
@@ -30,23 +31,28 @@ export function PayloadSection({
 	const [full, setFull] = useState(false);
 	const clipped = !full && value.length > PAYLOAD_PREVIEW_CHARS;
 	return (
-		<div className={cn("flex flex-col gap-2 px-5", className)}>
+		<div className={cn("flex flex-col gap-m px-xxl", className)}>
 			<div className="flex items-center justify-between">
-				<button
+				<Pressable
 					type="button"
 					aria-expanded={open}
 					onClick={() => setOpen((value) => !value)}
-					className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+					className={cn(
+						"flex min-w-0 items-center gap-s",
+						"text-body-m",
+						"text-ink-3 transition-colors",
+						"hover:text-ink",
+					)}
 				>
 					<IconChevronRight
 						aria-hidden="true"
 						className={cn("size-3 transition-transform", open && "rotate-90")}
 					/>
 					{label}
-					<span className="text-muted-foreground/60 tabular-nums">
+					<span className="text-ink-4 tabular-nums">
 						{hint ?? sizeHint(value)}
 					</span>
-				</button>
+				</Pressable>
 				<CopyButton value={value} title={`Copy ${label.toLowerCase()}`} />
 			</div>
 			{open && payload.show === "body" ? payload.body : null}
@@ -60,21 +66,21 @@ export function PayloadSection({
 			{open && payload.show === "text" ? (
 				<pre
 					className={cn(
-						"rounded-md bg-muted p-3 whitespace-pre-wrap [overflow-wrap:anywhere]",
-						payload.prose ? "font-sans text-[13px] leading-relaxed" : "text-xs",
+						"corner-s bg-field p-l whitespace-pre-wrap [overflow-wrap:anywhere]",
+						payload.prose ? "font-body text-body-l" : "text-body-m",
 					)}
 				>
 					{clipped ? `${value.slice(0, PAYLOAD_PREVIEW_CHARS)}…` : value}
 				</pre>
 			) : null}
 			{open && payload.show !== "body" && clipped ? (
-				<button
+				<Pressable
 					type="button"
 					onClick={() => setFull(true)}
-					className="w-fit text-xs text-muted-foreground hover:text-foreground"
+					className="w-fit text-body-m text-ink-3 hover:text-ink"
 				>
 					Show all {sizeHint(value)}
-				</button>
+				</Pressable>
 			) : null}
 		</div>
 	);

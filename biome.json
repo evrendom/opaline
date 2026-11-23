@@ -22,7 +22,8 @@
 			"!apps/desktop/shell/glass3d",
 			"!apps/desktop/shell/onboarding",
 			"!apps/desktop/shell/icon",
-			"!apps/desktop/shell/dmg"
+			"!apps/desktop/shell/dmg",
+			"!apps/desktop/ui/src/app/theme.css"
 		]
 	},
 	"formatter": {
@@ -56,6 +57,24 @@
 			"formatter": { "enabled": false }
 		},
 		{
+			"includes": ["apps/desktop/ui/**"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"paths": {
+									"radix-ui": "Primitives are Base UI. Use the one in apps/desktop/ui/src/app/ui (see apps/desktop/ui/FRONTEND.md).",
+									"lucide-react": "Icons come from @tabler/icons-react only (see apps/desktop/ui/FRONTEND.md)."
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		{
 			"includes": [
 				"apps/desktop/ui/src/components/analytics/**",
 				"apps/desktop/ui/src/components/conversation/**",
@@ -79,6 +98,8 @@
 							"level": "error",
 							"options": {
 								"paths": {
+									"radix-ui": "Primitives are Base UI. Use the one in apps/desktop/ui/src/app/ui (see apps/desktop/ui/FRONTEND.md).",
+									"lucide-react": "Icons come from @tabler/icons-react only (see apps/desktop/ui/FRONTEND.md).",
 									"react": {
 										"importNames": ["useEffect"],
 										"message": "Derive state first, then use dedicated hooks like useMountEffect when an effect is still necessary."

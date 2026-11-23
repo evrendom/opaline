@@ -1,4 +1,5 @@
 import { type ReactNode, useCallback, useState } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { cn } from "@/lib/utils";
 
 export function TwoLines({
@@ -23,7 +24,7 @@ export function TwoLines({
 	);
 	const folded = !expanded && overflows;
 	return (
-		<div className="flex min-w-0 flex-col items-start gap-1.5">
+		<div className="flex min-w-0 flex-col items-start gap-s">
 			<div
 				ref={measure}
 				className={cn(
@@ -37,13 +38,13 @@ export function TwoLines({
 				{children}
 			</div>
 			{overflows || expanded ? (
-				<button
+				<Pressable
 					type="button"
 					onClick={() => setExpanded((value) => !value)}
-					className="text-xs text-muted-foreground hover:text-foreground"
+					className="text-body-m text-ink-3 hover:text-ink"
 				>
 					{expanded ? "Show less" : "Show more"}
-				</button>
+				</Pressable>
 			) : null}
 		</div>
 	);

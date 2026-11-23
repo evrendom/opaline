@@ -1,5 +1,5 @@
 import { type RefObject, useLayoutEffect, useRef } from "react";
-import { clampPaneSize } from "@/components/ui/horizontal-resize-utils";
+import { clampPaneSize } from "@/app/ui/horizontal-resize-utils";
 import {
 	MAXIMUM_SESSION_TURN_TABLE_PANE_WIDTH_PX,
 	MINIMUM_SESSION_TURN_TABLE_PANE_WIDTH_PX,

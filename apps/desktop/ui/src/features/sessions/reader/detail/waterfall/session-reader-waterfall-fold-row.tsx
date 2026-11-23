@@ -1,5 +1,6 @@
 import { IconStack2 } from "@tabler/icons-react";
 import type { CSSProperties } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { cn } from "@/lib/utils";
 import type { SessionReaderStep } from "../../model/session-reader-model";
 import {
@@ -59,7 +60,7 @@ export function FoldRow({
 			<OpalChip
 				open={expanded}
 				tint="var(--color-slate-500)"
-				className="text-muted-foreground"
+				className="text-ink-3"
 			>
 				<IconStack2 aria-hidden="true" className="size-3" />
 			</OpalChip>
@@ -68,9 +69,7 @@ export function FoldRow({
 		<span className="min-w-0 truncate">
 			{variant === "repeat" ? (
 				<>
-					<span className="text-muted-foreground tabular-nums">
-						×{steps.length}
-					</span>{" "}
+					<span className="text-ink-3 tabular-nums">×{steps.length}</span>{" "}
 					<span>{head.name}</span>
 				</>
 			) : (
@@ -78,18 +77,16 @@ export function FoldRow({
 					<span className="tabular-nums">
 						{steps.length} {variant === "filtered" ? "hidden" : "steps"}
 					</span>
-					<span className="ml-1.5 text-muted-foreground">
-						{summarizeSteps(steps)}
-					</span>
+					<span className="ml-s text-ink-3">{summarizeSteps(steps)}</span>
 				</>
 			)}
 		</span>
 	);
 	const bar = (
 		<ProgressBar
-			baseClassName="bg-muted-foreground/25"
-			color="var(--muted-foreground)"
-			fillClassName="bg-muted-foreground/50"
+			baseClassName="bg-hover-strong"
+			color="var(--ink-3)"
+			fillClassName="bg-ink-4"
 			left={offset}
 			width={width}
 		>
@@ -116,20 +113,20 @@ export function FoldRow({
 				...steps.map((step) => step.backgroundFromMs ?? step.endMs),
 			)}
 			className={cn(
-				"relative rounded-md group/toggle",
+				"relative corner-s group/toggle",
 				rowState(!expanded && holdsSelection),
 				variant === "filtered" && !expanded && "opacity-60",
 			)}
 			{...toggleFocus}
 		>
-			<button
+			<Pressable
 				type="button"
 				onClick={holdsSelection ? onToggle : onSelect}
 				aria-expanded={expanded}
 				className={cn(totals ? GRID : GRID_UNTIMED, ROW)}
 			>
 				<div
-					className={cn("flex min-w-0 items-center gap-2 pr-3", INDENT)}
+					className={cn("flex min-w-0 items-center gap-m pr-l", INDENT)}
 					style={{ "--depth": row.depth } as CSSProperties}
 				>
 					{chip}
@@ -139,7 +136,7 @@ export function FoldRow({
 				{totals ? (
 					<RowTotals cost={null} durationMs={durationMs} tokens={0} />
 				) : null}
-			</button>
+			</Pressable>
 			<ChipToggle
 				className={INDENT}
 				label={variant === "repeat" ? "each call" : "these steps"}

@@ -54,7 +54,7 @@ export const restingChipClassName =
 // opaque, so the chip doesn't show through and strokes don't darken where
 // they overlap. Alpha blending is a mix in sRGB.
 export const restingGlyphClassName =
-	"text-[color:color-mix(in_srgb,var(--muted-foreground)_70%,var(--sidebar))]";
+	"text-[color:color-mix(in_srgb,var(--ink-3)_70%,var(--sidebar))]";
 
 // Adapted from the NavIcon: the outline glyph cross-fades
 // into its filled variant when the section is active, and the resting chip and
@@ -72,7 +72,7 @@ export function ShellNavIcon({
 	tone?: ShellNavTone;
 }) {
 	const fade =
-		"transition-opacity duration-100 ease-in-out will-change-[opacity]";
+		"transition-opacity duration-(--motion-quick-duration) ease-wave will-change-[opacity]";
 	// The sidebar forces `[&_svg]:size-4.5`; the important sizes below win.
 	const glyphClassName = tone ? "size-3.5!" : "size-4.5!";
 	const glyphCell = cn("relative flex [grid-area:1/1]", fade);
@@ -82,7 +82,7 @@ export function ShellNavIcon({
 			skullet-own=""
 			data-nav-icon=""
 			className={cn(
-				"relative grid size-4.5 shrink-0 place-items-center transition-colors duration-100 ease-in-out",
+				"relative grid size-4.5 shrink-0 place-items-center transition-colors duration-(--motion-quick-duration) ease-wave",
 				active && tone ? tone.glyph : restingGlyphClassName,
 			)}
 		>

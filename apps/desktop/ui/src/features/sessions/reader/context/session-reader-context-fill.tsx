@@ -46,7 +46,7 @@ export function ContextFill({
 	if (range) return <ContextRange {...range} />;
 	const share = Math.min(fill.share, 1);
 	const ring = (
-		<span className="inline-flex items-center gap-1.5">
+		<span className="inline-flex items-center gap-s">
 			<svg aria-hidden="true" className="size-3 -rotate-90" viewBox="0 0 12 12">
 				<circle
 					cx="6"
@@ -55,7 +55,7 @@ export function ContextFill({
 					fill="none"
 					stroke="currentColor"
 					strokeWidth="2"
-					className="text-muted-foreground/20"
+					className="text-line"
 				/>
 				<circle
 					cx="6"
@@ -67,16 +67,12 @@ export function ContextFill({
 					strokeDasharray={`${Math.max(share * 100, 1)} 100`}
 					strokeLinecap="round"
 					strokeWidth="2"
-					className={
-						share > 0.8 ? "text-amber-500" : "text-muted-foreground/70"
-					}
+					className={share > 0.8 ? "text-warning" : "text-ink-3"}
 				/>
 			</svg>
 			<span>
 				{Math.max(1, Math.round(fill.share * 100))}%
-				{compact ? null : (
-					<span className="text-muted-foreground"> context window</span>
-				)}
+				{compact ? null : <span className="text-ink-3"> context window</span>}
 			</span>
 		</span>
 	);
@@ -114,7 +110,7 @@ function ContextRange({
 				last.reported ? "as the agent reported it" : "from the model catalog"
 			})`}
 		>
-			<span className="inline-flex items-center gap-1.5">
+			<span className="inline-flex items-center gap-s">
 				<svg
 					aria-hidden="true"
 					className="size-3 -rotate-90"
@@ -127,7 +123,7 @@ function ContextRange({
 						fill="none"
 						stroke="currentColor"
 						strokeWidth="2"
-						className="text-muted-foreground/20"
+						className="text-line"
 					/>
 					<circle
 						cx="6"
@@ -138,7 +134,7 @@ function ContextRange({
 						stroke="currentColor"
 						strokeDasharray={`${Math.max(start * 100, 1)} 100`}
 						strokeWidth="2"
-						className="text-muted-foreground/40"
+						className="text-ink-4"
 					/>
 					<circle
 						cx="6"
@@ -150,19 +146,14 @@ function ContextRange({
 						strokeDasharray={`${Math.max((end >= start ? end - start : end) * 100, 1)} 100`}
 						strokeDashoffset={end >= start ? -start * 100 : 0}
 						strokeWidth="2"
-						className={end > 0.8 ? "text-amber-500" : "text-muted-foreground"}
+						className={end > 0.8 ? "text-warning" : "text-ink-3"}
 					/>
 				</svg>
-				<span className="inline-flex items-center gap-1">
-					<span className="text-muted-foreground">
-						{percentOf(first.share)}
-					</span>
-					<IconArrowRight
-						aria-hidden="true"
-						className="size-3 text-muted-foreground/70"
-					/>
+				<span className="inline-flex items-center gap-xs">
+					<span className="text-ink-3">{percentOf(first.share)}</span>
+					<IconArrowRight aria-hidden="true" className="size-3 text-ink-4" />
 					<span>{percentOf(last.share)}</span>
-					<span className="text-muted-foreground">context window</span>
+					<span className="text-ink-3">context window</span>
 				</span>
 			</span>
 		</Tip>

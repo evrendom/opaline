@@ -11,6 +11,7 @@ import { Link } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
 import { Reveal } from "@/app/ui/bones";
 import { EmptyState } from "@/components/dashboard/page-parts";
+import { RetryButton } from "@/components/retry-button";
 import { sessionDetailInitialQueryOptions } from "@/features/sessions/components/session-detail-fast-query";
 import type { NormalizedSessionDetailOverview } from "@/features/sessions/components/session-detail-fast-response";
 import { useSessionDetailOverviewPages } from "@/features/sessions/components/use-session-detail-overview-pages";
@@ -66,16 +67,16 @@ export function SessionPreview({ sessionId }: { sessionId: string }) {
 		<LiveSessionContext overview={overview} />
 	) : null;
 	return (
-		<div className="flex min-h-0 flex-1 flex-col gap-2">
-			<div className="@container/head flex h-7 min-w-0 shrink-0 items-center gap-1.5 px-[3px]">
-				<span className="min-w-0 flex-1 truncate text-[13px] font-medium">
+		<div className="flex min-h-0 flex-1 flex-col gap-m">
+			<div className="@container/head flex h-7 min-w-0 shrink-0 items-center gap-s px-xxs">
+				<span className="min-w-0 flex-1 truncate text-body-l font-medium">
 					{shortId(sessionId)}
 				</span>
-				<span ref={setToggleSlot} className="mr-1.5 flex empty:hidden" />
+				<span ref={setToggleSlot} className="mr-s flex empty:hidden" />
 				<Link
 					to={getShellRoutePath(appRoutes.repoDetail(repoKey, sessionId))}
 					aria-label="Open session"
-					className="inline-flex h-7 shrink-0 items-center justify-center gap-1 rounded-lg bg-card pr-2 pl-2.5 text-xs font-medium text-muted-foreground shadow-(--custom-shadow) transition-colors corner-squircle outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 squircle:rounded-[14px] dark:bg-muted-foreground/10 @max-[30rem]/head:w-7 @max-[30rem]/head:px-0"
+					className="inline-flex h-7 shrink-0 items-center justify-center gap-xs corner-m bg-surface pr-m pl-l text-body-m font-medium text-ink-3 shadow-card transition-colors corner-squircle outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-focus-ring squircle:corner-l @max-[30rem]/head:w-7 @max-[30rem]/head:px-zero"
 				>
 					<span className="@max-[30rem]/head:sr-only">Open session</span>
 					<IconArrowUpRight aria-hidden="true" className="size-3.5 shrink-0" />
@@ -86,15 +87,12 @@ export function SessionPreview({ sessionId }: { sessionId: string }) {
 					icon={IconRefresh}
 					title="This session didn't load"
 					description="Its detail took too long to come back."
-					className="min-h-0 flex-1 rounded-md corner-squircle squircle:rounded-xl"
+					className="min-h-0 flex-1 corner-s corner-squircle squircle:corner-l"
 				>
-					<button
-						type="button"
-						onClick={() => void initial.refetch()}
-						className="mx-auto mt-2 inline-flex h-7 items-center rounded-md bg-muted/70 px-2.5 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-					>
-						Try again
-					</button>
+					<RetryButton
+						onRetry={() => void initial.refetch()}
+						className="mx-auto mt-m"
+					/>
 				</EmptyState>
 			) : (
 				<ContextToggleSlot.Provider value={toggleSlot}>

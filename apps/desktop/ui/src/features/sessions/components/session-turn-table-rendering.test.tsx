@@ -185,8 +185,9 @@ describe("SessionTurnTable rendering", () => {
 				visibleSpeakers={new Set<SessionTurnTableSpeaker>(["model"])}
 			/>,
 		);
-		expect(userItem).toHaveClass("opacity-40");
-		expect(modelItem).not.toHaveClass("opacity-40");
+		// The unselected row dims its icon and label, not the menu item itself.
+		expect(userItem.querySelector(".opacity-40")).not.toBeNull();
+		expect(modelItem.querySelector(".opacity-40")).toBeNull();
 		expect(modelItem).not.toHaveAttribute("data-disabled");
 		expect(
 			container.querySelector(

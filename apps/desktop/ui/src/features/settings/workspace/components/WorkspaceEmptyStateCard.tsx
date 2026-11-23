@@ -20,7 +20,7 @@ export function WorkspaceEmptyStateCard() {
 				</CardDescription>
 			</CardHeader>
 			<CardContent>
-				<Link to="#new-workspace" className={buttonVariants({ size: "sm" })}>
+				<Link to="#new-workspace" className={buttonVariants({ size: "md" })}>
 					<IconPlus data-icon="inline-start" />
 					Create workspace
 				</Link>

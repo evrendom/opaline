@@ -1,7 +1,6 @@
 import { Menu } from "@base-ui/react/menu";
-import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
+import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
 import { cn } from "@/lib/utils";
-import "./session-menu.css";
 
 type SessionMenuPopupProps = Omit<Menu.Popup.Props, "className"> &
 	Pick<Menu.Positioner.Props, "align"> & {
@@ -21,7 +20,7 @@ export function SessionMenuPopup({
 			<Menu.Positioner align={align} sideOffset={6} className="z-50">
 				<Menu.Popup
 					data-fluid-menu-root={fluidHover ? "" : undefined}
-					className={cn("session-menu-surface session-menu-sort", className)}
+					className={cn("menu-surface menu-sort", className)}
 					{...props}
 				>
 					{fluidHover ? <FluidMenuHover /> : null}

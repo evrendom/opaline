@@ -140,12 +140,12 @@ export function firstTryCounts(pulls: readonly RepoPull[]) {
 }
 
 export const OUTCOME_TONE: Record<CiRound["outcome"], string> = {
-	passed: "bg-emerald-500",
-	failed: "bg-rose-500",
-	flaky: "bg-amber-400",
-	running: "bg-sky-400",
-	cancelled: "bg-muted-foreground/40",
-	other: "bg-muted-foreground/30",
+	passed: "bg-success",
+	failed: "bg-error",
+	flaky: "bg-warning-translucent",
+	running: "bg-accent-line",
+	cancelled: "bg-ink-4",
+	other: "bg-ink-4",
 };
 
 export const FIRST_TRY_WORDS: Record<FirstTry, string> = {

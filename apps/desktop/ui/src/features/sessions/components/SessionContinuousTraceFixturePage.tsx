@@ -7,6 +7,7 @@ import {
 	useState,
 } from "react";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
+import { Button } from "@/app/ui/button";
 import type { TraceItem } from "@/components/conversation/conversation-trace";
 import {
 	buildConversationTraceFixtureTurns,
@@ -575,7 +576,7 @@ export function SessionContinuousTraceFixturePage() {
 			data-trace-fixture-scroller
 			data-trace-fixture-total-turns={fixtureOptions.length}
 			data-session-constellation-version="v2"
-			className="session-constellation-tree session-constellation-tree-v2 session-transcript-mask isolate h-dvh min-w-0 overflow-y-auto overscroll-contain bg-(--session-overview-surface) antialiased [--session-overview-accent:#266df0] [--session-overview-border:#eeeff1] [--session-overview-hover:#f6f7f7] [--session-overview-muted:rgba(0,0,0,0.63)] [--session-overview-subtle:rgba(0,0,0,0.5)] [--session-overview-surface:#fff] [--session-overview-text:#101112] [font-family:Inter,sans-serif] [overflow-anchor:none] [scrollbar-gutter:stable]"
+			className="session-constellation-tree session-constellation-tree-v2 session-transcript-mask isolate h-dvh min-w-0 overflow-y-auto overscroll-contain bg-canvas antialiased [overflow-anchor:none] [scrollbar-gutter:stable]"
 		>
 			{mountsThread ? (
 				<SessionTranscriptList
@@ -602,34 +603,34 @@ export function SessionContinuousTraceFixturePage() {
 				/>
 			) : null}
 			{streamsTurnBodies ? (
-				<button
+				<Button
 					className="sr-only"
 					data-trace-fixture-hydrate
 					onClick={hydrateTurnBodies}
 					type="button"
 				>
 					Hydrate turn bodies
-				</button>
+				</Button>
 			) : null}
 			{profilesScrolling ? (
-				<button
+				<Button
 					className="sr-only"
 					data-trace-fixture-reset-profile
 					onClick={resetRenderProfile}
 					type="button"
 				>
 					Reset render profile
-				</button>
+				</Button>
 			) : null}
-			<button
+			<Button
 				className="sr-only"
 				data-trace-fixture-prepend
 				onClick={prependFixtureTurns}
 				type="button"
 			>
 				Prepend turns
-			</button>
-			<button
+			</Button>
+			<Button
 				className="sr-only"
 				data-trace-fixture-jump-first
 				onClick={() => {
@@ -644,8 +645,8 @@ export function SessionContinuousTraceFixturePage() {
 				type="button"
 			>
 				Jump to first turn
-			</button>
-			<button
+			</Button>
+			<Button
 				className="sr-only"
 				data-trace-fixture-jump-last
 				onClick={() => {
@@ -660,16 +661,16 @@ export function SessionContinuousTraceFixturePage() {
 				type="button"
 			>
 				Jump to last turn
-			</button>
-			<button
+			</Button>
+			<Button
 				className="sr-only"
 				data-trace-fixture-reset-row-paints
 				onClick={() => setDebugPaintEpoch((current) => current + 1)}
 				type="button"
 			>
 				Reset row paint markers
-			</button>
-			<button
+			</Button>
+			<Button
 				className="sr-only"
 				data-trace-fixture-toggle-level
 				onClick={() =>
@@ -680,7 +681,7 @@ export function SessionContinuousTraceFixturePage() {
 				type="button"
 			>
 				Toggle transcript level
-			</button>
+			</Button>
 		</div>
 	);
 }

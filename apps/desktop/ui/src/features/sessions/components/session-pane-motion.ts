@@ -17,5 +17,5 @@ export const sessionPaneMotionStyle: SessionPaneMotionStyle = {
 			bounce: spring.slow.bounce,
 		}),
 	),
-	"--session-pane-fade-enter": `${spring.slow.duration}s ease-out`,
+	"--session-pane-fade-enter": `${spring.slow.duration}s var(--motion-easing)`,
 };

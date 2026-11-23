@@ -60,6 +60,7 @@ packages/api-routes/.fact-review/
 !.claude/skills/clickhouse-js-node-troubleshooting/
 !.claude/skills/clickhouse-query/
 !.claude/skills/code-architecture/
+!.claude/skills/opaline-design/
 !.claude/skills/environment-variables/
 !.claude/skills/library-docs/
 !.claude/skills/pr-creation/

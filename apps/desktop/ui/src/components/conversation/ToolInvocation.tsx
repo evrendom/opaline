@@ -1,4 +1,5 @@
 import { useId, useState } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { cn } from "@/lib/utils";
 import { CodeBlock } from "./CodeBlock";
 import { formatShellOutput } from "./conversation-tools";
@@ -74,53 +75,59 @@ export function ToolInvocation({
 	return (
 		<div
 			className={cn(
-				"overflow-hidden rounded-[1rem] border",
-				isError
-					? "border-[color:var(--dashboardy-border)] bg-[color:var(--dashboardy-danger-surface)]"
-					: "border-[color:var(--dashboardy-divider)] bg-[color:color-mix(in_srgb,var(--dashboardy-subsurface)_82%,white)]",
+				"overflow-hidden corner-l edge-m",
+				isError ? "border-line bg-error-tint" : "border-line bg-inset",
 				className,
 			)}
 		>
-			<button
+			<Pressable
 				type="button"
 				onClick={() => setIsExpanded(!isExpanded)}
 				aria-expanded={isExpanded}
 				aria-controls={panelId}
-				className="flex min-w-0 w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-[color:var(--dashboardy-subsurface-strong)] focus-visible:bg-[color:var(--dashboardy-subsurface-strong)]"
+				className={cn(
+					"flex min-w-0 w-full items-center gap-l",
+					"px-xl py-xl",
+					"text-left",
+					"transition-colors",
+					"hover:bg-field",
+				)}
 			>
 				{isExpanded ? (
-					<TraceChevronDownIcon className="size-4 shrink-0 text-[color:var(--dashboardy-muted)]" />
+					<TraceChevronDownIcon className="size-4 shrink-0 text-ink-3" />
 				) : (
-					<TraceChevronRightIcon className="size-4 shrink-0 text-[color:var(--dashboardy-muted)]" />
+					<TraceChevronRightIcon className="size-4 shrink-0 text-ink-3" />
 				)}
-				<div className="flex size-8 shrink-0 items-center justify-center rounded-full border border-[color:var(--dashboardy-border)] bg-[color:var(--dashboardy-surface)]">
+				<div
+					className={cn(
+						"flex size-8 shrink-0 items-center justify-center",
+						"corner-full edge-m",
+						"border-line bg-canvas",
+					)}
+				>
 					{isError ? (
-						<TraceAlertIcon className="size-4 text-[color:var(--dashboardy-danger-foreground)]" />
+						<TraceAlertIcon className="size-4 text-error" />
 					) : (
-						<TraceTerminalIcon className="size-4 text-[color:var(--dashboardy-heading)]" />
+						<TraceTerminalIcon className="size-4 text-ink" />
 					)}
 				</div>
-				<div className="grid min-w-0 flex-1 gap-1">
+				<div className="grid min-w-0 flex-1 gap-xs">
 					<p
 						className={cn(
-							"font-mono text-sm font-semibold",
-							isError
-								? "text-[color:var(--dashboardy-danger-foreground)]"
-								: "text-[color:var(--dashboardy-heading)]",
+							"font-data text-body-xl font-heavy",
+							isError ? "text-error" : "text-ink",
 						)}
 					>
 						{toolName}
 					</p>
-					<p className="truncate text-sm text-[color:var(--dashboardy-muted)]">
-						{formatInput()}
-					</p>
+					<p className="truncate text-body-xl text-ink-3">{formatInput()}</p>
 				</div>
-			</button>
+			</Pressable>
 
 			{isExpanded && (
 				<div
 					id={panelId}
-					className="space-y-3.5 border-t border-[color:var(--dashboardy-divider)] px-4 py-4"
+					className="space-y-xl edge-t-m border-line px-xl py-xl"
 				>
 					{/* Tool Input */}
 					<CodeBlock

@@ -7,8 +7,9 @@ import { IconFileText, IconPlug, IconSparkles } from "@tabler/icons-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Fragment, type ReactNode, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { Pressable } from "@/app/ui/pressable";
+import { Skeleton as Bar } from "@/app/ui/skeleton";
 import { EmptyState } from "@/components/dashboard/page-parts";
-import { Skeleton as Bar } from "@/components/dashboard/skeleton";
 import {
 	FluidList,
 	FluidListItem,
@@ -149,7 +150,7 @@ function CalledServerCard({
 }) {
 	const calls = tools.reduce((sum, tool) => sum + tool.calls, 0);
 	return (
-		<div className="flex min-w-0 flex-1 flex-col p-4">
+		<div className="flex min-w-0 flex-1 flex-col p-xl">
 			<EmptyState
 				icon={IconPlug}
 				title={`${setupName(file)} sent no instructions`}
@@ -162,20 +163,22 @@ function CalledServerCard({
 function ListedSkillCard({ skill }: { skill: RepositoryListedSkill }) {
 	return (
 		<div className="flex min-h-0 min-w-0 flex-1 flex-col">
-			<header className="flex flex-col gap-2 border-b border-border/50 px-5 py-4">
-				<div className="flex min-w-0 items-center gap-2">
+			<header className="flex flex-col gap-m edge-b-m border-line-soft px-xl py-xl">
+				<div className="flex min-w-0 items-center gap-m">
 					<span className="flex shrink-0 opacity-60 grayscale">
 						<SkillMarkGlyph />
 					</span>
-					<h2 className="min-w-0 truncate text-sm font-medium">{skill.name}</h2>
-					<span className="shrink-0 text-xs text-muted-foreground">
+					<h2 className="min-w-0 truncate text-body-xl font-medium">
+						{skill.name}
+					</h2>
+					<span className="shrink-0 text-body-m text-ink-3">
 						Loaded, never called
 					</span>
 				</div>
 			</header>
-			<div className="flex flex-col gap-3 px-5 py-4 text-[13px] leading-relaxed">
+			<div className="flex flex-col gap-l px-xl py-xl text-body-l">
 				{skill.description ? <p>{skill.description}</p> : null}
-				<p className="text-xs text-muted-foreground">
+				<p className="text-body-m text-ink-3">
 					Offered in {skill.sessions}{" "}
 					{skill.sessions === 1 ? "session" : "sessions"} of this repo in the
 					range, never called.
@@ -303,7 +306,7 @@ export function RepoSetupView({
 	if (query.isPending) return <SetupSkeleton />;
 	if (!sectionFiles || (sectionFiles.length === 0 && listed.length === 0))
 		return (
-			<div className="h-full pt-2 pr-8 pb-2 pl-6">
+			<div className="flex h-full flex-col pt-m pr-xxxl pb-m pl-xxl">
 				<EmptyState
 					icon={copy.icon}
 					title={query.isError ? copy.failed : copy.title}
@@ -316,10 +319,17 @@ export function RepoSetupView({
 			</div>
 		);
 	return (
-		<div className="h-full overflow-hidden pt-2 pr-8 pb-2 pl-6">
-			<div className="flex h-full min-h-0 gap-6">
-				<div className="-mb-2 flex min-h-0 w-[320px] shrink-0 flex-col gap-1.5">
-					<div className="flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-muted/50 pr-1 pl-2 text-xs">
+		<div className="h-full overflow-hidden pt-m pr-xxxl pb-m pl-xxl">
+			<div className="flex h-full min-h-0 gap-xxl">
+				<div className="-mb-m flex min-h-0 w-[320px] shrink-0 flex-col gap-s">
+					<div
+						className={cn(
+							"flex h-8 shrink-0 items-center gap-s",
+							"corner-s pr-xs pl-m",
+							"text-body-m",
+							"bg-hover",
+						)}
+					>
 						<span className="shrink-0 font-medium">Entire repo</span>
 						{section !== "mcp" ? (
 							<span className="ml-auto">
@@ -336,12 +346,12 @@ export function RepoSetupView({
 							</span>
 						) : null}
 					</div>
-					<ScrollColumn className="-mx-1 px-1 pb-8">
+					<ScrollColumn className="-mx-xs px-xs pb-xxxl">
 						<FluidList>
 							{groups.map((group, groupIndex) => (
-								<section key={group.label} className="flex flex-col gap-0.5">
+								<section key={group.label} className="flex flex-col gap-xxs">
 									{groups.length > 1 ? (
-										<h3 className="px-2.5 pt-3 pb-1 text-[11px] font-medium text-muted-foreground">
+										<h3 className="px-l pt-l pb-xs text-body-s font-medium text-ink-3">
 											{group.label}
 										</h3>
 									) : null}
@@ -407,7 +417,7 @@ export function RepoSetupView({
 								</section>
 							))}
 							{listed.length > 0 ? (
-								<section className="flex flex-col gap-0.5">
+								<section className="flex flex-col gap-xxs">
 									{listed.map((each, at) => (
 										<RepoSetupRow
 											key={each.file.setupFile}
@@ -507,7 +517,7 @@ export function RepoSetupView({
 									/>
 								</div>
 							) : (
-								<div className="flex min-w-0 flex-1 flex-col p-4">
+								<div className="flex min-w-0 flex-1 flex-col p-xl">
 									<EmptyState
 										icon={copy.icon}
 										title={copy.pick}
@@ -538,36 +548,43 @@ function ToolRows({
 }) {
 	if (tools.length === 0) return null;
 	return (
-		<ol aria-label="Tools called" className="ml-6 flex flex-col gap-0.5 pb-1">
+		<ol
+			aria-label="Tools called"
+			className="ml-xxl flex flex-col gap-xxs pb-xs"
+		>
 			{tools.map((tool, index) => {
 				const isPicked = tool.name === picked;
 				return (
 					<li key={tool.name}>
 						<FluidListItem<HTMLButtonElement> index={20_000 + index}>
 							{(item) => (
-								<button
+								<Pressable
 									type="button"
 									ref={item.ref}
 									aria-current={isPicked || undefined}
 									onClick={() => onPick(tool.name)}
 									onFocus={item.onFocus}
 									className={cn(
-										"relative flex w-full items-baseline gap-1.5 rounded-md py-1 pr-2.5 pl-3 text-left text-[11px] tabular-nums outline-none transition-colors corner-squircle squircle:rounded-xl",
-										isPicked && "bg-muted",
+										"relative flex w-full items-baseline gap-s",
+										"corner-s py-xs pr-l pl-l corner-squircle",
+										"text-left text-body-s tabular-nums",
+										"transition-colors",
+										"squircle:corner-l",
+										isPicked && "bg-field",
 									)}
 								>
 									<span
 										className={cn(
 											"min-w-0 truncate",
-											isPicked ? "text-foreground" : "text-foreground/80",
+											isPicked ? "text-ink" : "text-ink",
 										)}
 									>
 										{tool.name}
 									</span>
-									<span className="ml-auto shrink-0 text-muted-foreground">
+									<span className="ml-auto shrink-0 text-ink-3">
 										{tool.calls} {tool.calls === 1 ? "call" : "calls"}
 									</span>
-								</button>
+								</Pressable>
 							)}
 						</FluidListItem>
 					</li>
@@ -621,28 +638,32 @@ function VersionRows({
 		[versions],
 	);
 	return (
-		<ol aria-label="Versions" className="ml-6 flex flex-col gap-0.5 pb-1">
+		<ol aria-label="Versions" className="ml-xxl flex flex-col gap-xxs pb-xs">
 			{[...versions].reverse().map((version, index) => {
 				const isShown = version === shown;
 				return (
 					<li key={version.version}>
 						<FluidListItem<HTMLButtonElement> index={10_000 + index}>
 							{(item) => (
-								<button
+								<Pressable
 									type="button"
 									ref={item.ref}
 									aria-current={isShown || undefined}
 									onClick={() => pick(version.version)}
 									onFocus={item.onFocus}
 									className={cn(
-										"relative flex w-full items-baseline gap-1.5 rounded-md py-1 pr-2.5 pl-3 text-left text-[11px] tabular-nums outline-none transition-colors corner-squircle squircle:rounded-xl",
-										isShown && "bg-muted",
+										"relative flex w-full items-baseline gap-s",
+										"corner-s py-xs pr-l pl-l corner-squircle",
+										"text-left text-body-s tabular-nums",
+										"transition-colors",
+										"squircle:corner-l",
+										isShown && "bg-field",
 									)}
 								>
 									<span
 										className={cn(
 											"shrink-0",
-											isShown ? "text-foreground" : "text-foreground/80",
+											isShown ? "text-ink" : "text-ink",
 										)}
 									>
 										v{numbers.get(version.version)}
@@ -650,11 +671,11 @@ function VersionRows({
 									<VersionChange
 										change={changes.get(version.version) ?? null}
 									/>
-									<span className="ml-auto shrink-0 text-muted-foreground">
+									<span className="ml-auto shrink-0 text-ink-3">
 										{version.sessions}{" "}
 										{version.sessions === 1 ? "session" : "sessions"}
 									</span>
-								</button>
+								</Pressable>
 							)}
 						</FluidListItem>
 					</li>
@@ -675,12 +696,8 @@ function VersionChange({
 			className="shrink-0 tabular-nums"
 			title="Lines added and removed since the version before"
 		>
-			<span className="text-emerald-600 dark:text-emerald-400">
-				+{change.added}
-			</span>{" "}
-			<span className="text-rose-600 dark:text-rose-400">
-				−{change.removed}
-			</span>
+			<span className="text-success">+{change.added}</span>{" "}
+			<span className="text-error">−{change.removed}</span>
 		</span>
 	);
 }
@@ -720,24 +737,25 @@ function RepoSetupRow({
 	const name = (
 		<span
 			title={file.setupFile}
-			className={cn(
-				"truncate text-xs",
-				isPicked ? "text-foreground" : "text-foreground/90",
-			)}
+			className={cn("truncate text-body-m", isPicked ? "text-ink" : "text-ink")}
 		>
 			{setupName(file)}
 		</span>
 	);
 	return (
-		<button
+		<Pressable
 			type="button"
 			ref={item.ref}
 			aria-current={isPicked || undefined}
 			onClick={() => onPick(file.setupFile)}
 			onFocus={item.onFocus}
 			className={cn(
-				"relative flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left outline-none transition-colors corner-squircle squircle:rounded-xl",
-				isPicked && "bg-muted",
+				"relative flex w-full items-center gap-m",
+				"corner-s px-l py-s corner-squircle",
+				"text-left",
+				"transition-colors",
+				"squircle:corner-l",
+				isPicked && "bg-field",
 			)}
 		>
 			<span
@@ -752,31 +770,27 @@ function RepoSetupRow({
 			>
 				<SetupMark file={file} />
 			</span>
-			<span className="flex min-w-0 flex-1 items-baseline gap-1.5">
+			<span className="flex min-w-0 flex-1 items-baseline gap-s">
 				{name}
 				{file.scope !== "mcp" && owner ? (
-					<span className="shrink-0 text-[11px] text-muted-foreground">
-						{owner}
-					</span>
+					<span className="shrink-0 text-body-s text-ink-3">{owner}</span>
 				) : null}
 				{root ? (
-					<span className="shrink-0 text-[11px] text-muted-foreground">
-						{root}
-					</span>
+					<span className="shrink-0 text-body-s text-ink-3">{root}</span>
 				) : null}
 				{meta !== undefined ? (
 					meta ? (
-						<span className="ml-auto shrink-0 text-[11px] text-muted-foreground tabular-nums">
+						<span className="ml-auto shrink-0 text-body-s text-ink-3 tabular-nums">
 							{meta}
 						</span>
 					) : null
 				) : file.versions > 1 ? (
-					<span className="ml-auto shrink-0 text-[11px] text-muted-foreground tabular-nums">
+					<span className="ml-auto shrink-0 text-body-s text-ink-3 tabular-nums">
 						{file.versions} versions
 					</span>
 				) : null}
 			</span>
-		</button>
+		</Pressable>
 	);
 }
 
@@ -802,24 +816,24 @@ const CARD_SKELETON = [88, 72, 80, 56, 76, 64, 84, 48];
 function SetupSkeleton() {
 	return (
 		<div
-			className="h-full overflow-hidden pt-2 pr-8 pb-2 pl-6"
+			className="h-full overflow-hidden pt-m pr-xxxl pb-m pl-xxl"
 			aria-hidden="true"
 		>
-			<div className="flex h-full min-h-0 gap-6">
-				<div className="-mb-2 flex min-h-0 w-[320px] shrink-0 flex-col gap-1.5">
-					<div className="flex h-8 shrink-0 items-center rounded-md bg-muted/50 pl-2">
-						<Bar className="h-2.5 w-20 rounded-full" />
+			<div className="flex h-full min-h-0 gap-xxl">
+				<div className="-mb-m flex min-h-0 w-[320px] shrink-0 flex-col gap-s">
+					<div className="flex h-8 shrink-0 items-center corner-s bg-hover pl-m">
+						<Bar className="h-2.5 w-20 corner-full" />
 					</div>
-					<div className="flex flex-col gap-0.5">
+					<div className="flex flex-col gap-xxs">
 						{LIST_SKELETON.map((width, index) => (
 							<div
 								// biome-ignore lint/suspicious/noArrayIndexKey: a fixed placeholder list
 								key={index}
-								className="flex h-7 items-center gap-2.5 px-2.5"
+								className="flex h-7 items-center gap-m px-l"
 							>
-								<Bar className="size-4 shrink-0 rounded-full" />
+								<Bar className="size-4 shrink-0 corner-full" />
 								<Bar
-									className="h-2.5 rounded-full"
+									className="h-2.5 corner-full"
 									style={{ width: `${width}%` }}
 								/>
 							</div>
@@ -827,31 +841,31 @@ function SetupSkeleton() {
 					</div>
 				</div>
 				<div className={RUNS_SHELF}>
-					<div className={cn(RAIL_SHELF, "w-[120px] px-3.5 pt-3")}>
+					<div className={cn(RAIL_SHELF, "w-[120px] px-l pt-l")}>
 						{RAIL_SKELETON.map((width, index) => (
 							<Bar
 								// biome-ignore lint/suspicious/noArrayIndexKey: a fixed placeholder list
 								key={index}
-								className="my-2 h-2.5 rounded-full"
+								className="my-m h-2.5 corner-full"
 								style={{ width: `${width}%` }}
 							/>
 						))}
 					</div>
 					<div
 						className={cn(
-							"relative z-10 flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden px-5 py-4",
+							"relative z-10 flex min-h-0 min-w-0 flex-1 flex-col gap-l overflow-hidden px-xl py-xl",
 							CARD,
 						)}
 					>
-						<div className="flex items-center gap-2 pb-3">
-							<Bar className="size-4 shrink-0 rounded-full" />
-							<Bar className="h-3 w-40 rounded-full" />
+						<div className="flex items-center gap-m pb-l">
+							<Bar className="size-4 shrink-0 corner-full" />
+							<Bar className="h-3 w-40 corner-full" />
 						</div>
 						{CARD_SKELETON.map((width, index) => (
 							<Bar
 								// biome-ignore lint/suspicious/noArrayIndexKey: a fixed placeholder list
 								key={index}
-								className="h-2.5 rounded-full"
+								className="h-2.5 corner-full"
 								style={{ width: `${width}%` }}
 							/>
 						))}

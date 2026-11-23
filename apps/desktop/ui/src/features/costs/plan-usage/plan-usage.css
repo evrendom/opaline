@@ -18,7 +18,7 @@
 	}
 }
 .plan-usage-bone {
-	fill: var(--bone);
+	fill: var(--hover-strong);
 }
 .plan-usage-loading-bar {
 	position: absolute;
@@ -27,7 +27,7 @@
 	gap: var(--segment-gap);
 	transform-origin: bottom;
 	will-change: transform;
-	animation: plan-usage-bar-wave 1.6s ease-in-out infinite;
+	animation: plan-usage-bar-wave 1.6s var(--motion-wave-easing) infinite;
 }
 .plan-usage-loading-bar > span {
 	border-radius: var(--segment-radius);
@@ -95,8 +95,8 @@
 }
 .plan-usage-preview-label {
 	position: absolute;
-	color: var(--cost-muted);
-	font-size: 11px;
+	color: var(--ink-3);
+	font-size: var(--size-s);
 	line-height: 1;
 	white-space: nowrap;
 }

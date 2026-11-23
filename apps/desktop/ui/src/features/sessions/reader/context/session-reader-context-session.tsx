@@ -293,14 +293,14 @@ function WholeContext({
 		);
 	if (!done)
 		return (
-			<div className="flex flex-col gap-3">
+			<div className="flex flex-col gap-l">
 				<ContextBar map={null} titleId={undefined} />
 				<ContextMapFrame>
 					<Bones label="Reading its context">
 						<ContextMapSample />
 					</Bones>
 					{footer ? (
-						<div className="flex px-[3px] pt-2 pb-[3px]">{footer}</div>
+						<div className="flex px-xs pt-m pb-xs">{footer}</div>
 					) : null}
 				</ContextMapFrame>
 			</div>

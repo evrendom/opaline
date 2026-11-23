@@ -35,12 +35,12 @@ export function SessionContinuousTurnSkeleton({
 			{hasMemberMessage ? (
 				<>
 					<ConversationTraceTreeItem continues depth={1} rowHeight={40}>
-						<div className="flex min-h-10 min-w-0 items-center gap-2 pr-3">
-							<Skeleton className="size-5 shrink-0 rounded-sm bg-[color:var(--dashboardy-subsurface-strong)]" />
-							<p className="shrink-0 text-xs font-medium text-(--session-overview-text)">
+						<div className="flex min-h-10 min-w-0 items-center gap-m pr-l">
+							<Skeleton className="size-5 shrink-0 corner-xs bg-field" />
+							<p className="shrink-0 text-body-m font-medium text-ink">
 								{userLabel}
 							</p>
-							<p className="min-w-0 flex-1 truncate text-[0.8125rem] leading-5 text-(--session-overview-text)">
+							<p className="min-w-0 flex-1 truncate text-body-l text-ink">
 								<SignalText
 									scanSignals={scanMemberLanguageSignals}
 									text={option.memberPreview}
@@ -48,8 +48,8 @@ export function SessionContinuousTurnSkeleton({
 							</p>
 						</div>
 					</ConversationTraceTreeItem>
-					<div className="grid min-w-0 gap-2 py-2 pr-3 pl-[3.25rem]">
-						<p className="line-clamp-3 whitespace-pre-wrap break-words text-[0.8125rem] leading-6 text-(--session-overview-text)">
+					<div className="grid min-w-0 gap-m py-m pr-l pl-xxxl">
+						<p className="line-clamp-3 whitespace-pre-wrap break-words text-body-l text-ink">
 							<SignalText
 								scanSignals={scanMemberLanguageSignals}
 								text={option.memberPreview}
@@ -57,7 +57,7 @@ export function SessionContinuousTurnSkeleton({
 						</p>
 						{previewTruncated ? (
 							<Skeleton
-								className="h-3 rounded-sm bg-[color:var(--dashboardy-subsurface-strong)]"
+								className="h-3 corner-xs bg-field"
 								data-session-skeleton-preview-continuation
 								style={getSkeletonWidthStyle(
 									option.key,
@@ -76,11 +76,11 @@ export function SessionContinuousTurnSkeleton({
 				descends={rows.length > 0}
 				rowHeight={40}
 			>
-				<div className="flex min-h-10 min-w-0 items-center gap-2 pr-3">
-					<Skeleton className="size-5 shrink-0 rounded-sm bg-[color:var(--dashboardy-subsurface-strong)]" />
-					<Skeleton className="h-3 w-20 shrink-0 rounded-sm bg-[color:var(--dashboardy-subsurface-strong)]" />
+				<div className="flex min-h-10 min-w-0 items-center gap-m pr-l">
+					<Skeleton className="size-5 shrink-0 corner-xs bg-field" />
+					<Skeleton className="h-3 w-20 shrink-0 corner-xs bg-field" />
 					<Skeleton
-						className="h-3 max-w-72 flex-1 rounded-sm bg-[color:var(--dashboardy-subsurface-strong)]"
+						className="h-3 max-w-72 flex-1 corner-xs bg-field"
 						style={getSkeletonWidthStyle(option.key, "model-preview", 0)}
 					/>
 				</div>
@@ -115,19 +115,19 @@ function SkeletonTraceRowContent({
 	if (row.kind === "message") {
 		return (
 			<div
-				className="-ml-3 grid min-h-28 min-w-0 content-center gap-2 pr-3"
+				className="-ml-l grid min-h-28 min-w-0 content-center gap-m pr-l"
 				data-session-skeleton-row-kind="message"
 			>
 				<Skeleton
-					className="h-3 rounded-sm bg-[color:var(--dashboardy-subsurface-strong)]"
+					className="h-3 corner-xs bg-field"
 					style={getSkeletonWidthStyle(option.key, row.kind, row.index)}
 				/>
 				<Skeleton
-					className="h-3 rounded-sm bg-[color:var(--dashboardy-subsurface-strong)]"
+					className="h-3 corner-xs bg-field"
 					style={getSkeletonWidthStyle(option.key, "message-tail", row.index)}
 				/>
 				<Skeleton
-					className="h-3 rounded-sm bg-[color:var(--dashboardy-subsurface-strong)]"
+					className="h-3 corner-xs bg-field"
 					style={getSkeletonWidthStyle(option.key, "message-detail", row.index)}
 				/>
 			</div>
@@ -137,21 +137,19 @@ function SkeletonTraceRowContent({
 	return (
 		<div
 			className={cn(
-				"-ml-3 flex h-6 min-w-0 items-center gap-2 pr-3",
-				row.kind === "error" &&
-					"border-l-2 border-[color:var(--dashboardy-danger-foreground)] bg-[color:var(--dashboardy-danger-surface)] pl-2",
+				"-ml-l flex h-6 min-w-0 items-center gap-m pr-l",
+				row.kind === "error" && "edge-l-l border-error bg-error-tint pl-m",
 			)}
 			data-session-skeleton-row-kind={row.kind}
 		>
 			<Skeleton
 				className={cn(
-					"size-4 shrink-0 rounded-sm bg-[color:var(--dashboardy-subsurface-strong)]",
-					row.kind === "error" &&
-						"bg-[color:var(--dashboardy-danger-foreground)]/20",
+					"size-4 shrink-0 corner-xs bg-field",
+					row.kind === "error" && "bg-error-tint",
 				)}
 			/>
 			<Skeleton
-				className="h-3 rounded-sm bg-[color:var(--dashboardy-subsurface-strong)]"
+				className="h-3 corner-xs bg-field"
 				style={getSkeletonWidthStyle(option.key, row.kind, row.index)}
 			/>
 		</div>
@@ -168,13 +166,13 @@ function SkeletonChipRows({ option }: { option: SessionTurnTablePaneOption }) {
 		group.values.length > 0 ? (
 			<div
 				key={group.kind}
-				className="flex min-h-8 flex-wrap items-center gap-1.5 pr-3 pl-[3.25rem]"
+				className="flex min-h-8 flex-wrap items-center gap-s pr-l pl-xxxl"
 				data-session-skeleton-row-kind={`${group.kind}-chips`}
 			>
 				{group.values.map((value, index) => (
 					<Skeleton
 						key={`${group.kind}-${value}`}
-						className="h-5 rounded-[5px] bg-[color:var(--dashboardy-subsurface-strong)]"
+						className="h-5 corner-xs bg-field"
 						style={getSkeletonChipWidthStyle(option.key, group.kind, index)}
 					/>
 				))}

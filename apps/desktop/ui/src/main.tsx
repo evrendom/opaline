@@ -58,7 +58,8 @@ const isStandaloneDevRoute =
 	import.meta.env.DEV &&
 	(window.location.pathname === "/dev/trace-tree-fixture" ||
 		window.location.pathname === "/dev/session-detail-fast-integration" ||
-		window.location.pathname === "/dev/transcript-mask");
+		window.location.pathname === "/dev/transcript-mask" ||
+		window.location.pathname === "/dev/design-system");
 
 function BootDone() {
 	useLayoutEffect(() => {

@@ -3,28 +3,28 @@
 	flex-shrink: 0;
 	min-width: 0;
 	border: 0;
-	gap: 2px;
+	gap: var(--space-xxs);
 	margin-left: auto;
-	padding: 2px;
-	border-radius: 9px;
-	background: var(--cost-soft);
+	padding: var(--space-xxs);
+	border-radius: var(--radius-m);
+	background: var(--hover);
 }
 .cost-chart-kind > button {
-	padding: 3px 10px;
+	padding: var(--space-xxs) var(--space-m);
 	white-space: nowrap;
-	border-radius: 7px;
-	color: var(--cost-muted);
-	font-size: 0.8125rem;
+	border-radius: var(--radius-s);
+	color: var(--ink-3);
+	font-size: var(--size-l);
 	transition:
-		background-color 120ms ease,
-		color 120ms ease;
+		background-color var(--motion-duration) var(--motion-easing),
+		color var(--motion-duration) var(--motion-easing);
 }
 .cost-chart-kind > button:hover {
-	color: var(--cost-foreground);
+	color: var(--ink);
 }
 .cost-chart-kind > button[aria-pressed="true"] {
-	color: var(--cost-foreground);
-	background: var(--cost-hover);
+	color: var(--ink);
+	background: var(--hover);
 }
 
 .cost-chart-canvas[data-kind="dots"] > :not(.cost-dot-chart) {
@@ -36,7 +36,7 @@
 	z-index: 1;
 	display: grid;
 	place-items: center;
-	padding: 8px 12px;
+	padding: var(--space-m) var(--space-l);
 	container-type: size;
 }
 .cost-dot-frame {
@@ -57,10 +57,10 @@
 .cost-dot-axis > div {
 	position: absolute;
 	height: 12px;
-	font-size: 0.6875rem;
-	line-height: 12px;
-	font-weight: 500;
-	color: var(--cost-muted);
+	font-size: var(--size-s);
+	line-height: 1;
+	font-weight: var(--weight-body-medium);
+	color: var(--ink-3);
 	white-space: nowrap;
 	font-variant-numeric: tabular-nums;
 }
@@ -69,10 +69,10 @@
 	left: var(--axis-at);
 }
 .cost-dot-axis > div[data-selected] {
-	color: var(--cost-foreground);
+	color: var(--ink);
 }
 .cost-dot-axis > div {
-	transition: filter 120ms ease-out;
+	transition: filter var(--motion-duration) var(--motion-easing);
 }
 .cost-dot-axis > div[data-faded] {
 	filter: opacity(0.35);
@@ -85,10 +85,10 @@
 	transform: translateX(
 		clamp(0px, calc(var(--axis-at) - 50%), calc(var(--axis-span) - 100%))
 	);
-	transition: transform 160ms ease-out;
+	transition: transform var(--motion-duration) var(--motion-easing);
 }
 .cost-dot-axis[data-axis="y"] > div[data-hover] {
-	transition: top 160ms ease-out;
+	transition: top var(--motion-duration) var(--motion-easing);
 }
 .cost-dot-axis[data-axis="x"] > div[data-end] {
 	left: auto;
@@ -138,7 +138,7 @@
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	gap: 6px;
+	gap: var(--space-s);
 	grid-row: span 2;
 }
 .cost-dot {
@@ -148,7 +148,7 @@
 	width: var(--dot-cell);
 	height: var(--dot-cell);
 	border-radius: 28%;
-	transition: transform 120ms ease;
+	transition: transform var(--motion-duration) var(--motion-easing);
 }
 .cost-dot::before {
 	content: "";
@@ -175,16 +175,16 @@
 	transform: scale(1.12);
 }
 .cost-dot[data-outside] {
-	--dot-fill: color-mix(in oklab, var(--cost-muted) 60%, transparent);
+	--dot-fill: color-mix(in oklab, var(--ink-3) 60%, transparent);
 }
 .cost-dot[data-outside]::before {
 	mask-image: var(--pebble-dotted, none);
 }
 .cost-dot[data-empty] {
-	--dot-fill: var(--cost-soft);
+	--dot-fill: var(--hover);
 }
 .cost-dot[data-muted] {
-	--dot-fill: var(--cost-soft);
+	--dot-fill: var(--hover);
 }
 .cost-dot-mark {
 	position: absolute;
@@ -193,19 +193,20 @@
 	z-index: 1;
 	width: 36%;
 	aspect-ratio: 1;
-	border-radius: 9999px;
+	border-radius: var(--radius-full);
+	/* design-escape-ok(colour): artwork; the white pip on a cost-heat dot */
 	background: rgb(255 255 255 / 0.45);
 	transform: translate(-50%, -50%);
 }
 .cost-dot-label {
-	font-size: 0.6875rem;
-	color: var(--cost-muted);
+	font-size: var(--size-s);
+	color: var(--ink-3);
 	white-space: nowrap;
 }
 .cost-dot-halo {
 	position: absolute;
 	pointer-events: none;
-	background: color-mix(in oklab, var(--cost-foreground) 12%, transparent);
+	background: color-mix(in oklab, var(--ink) 12%, transparent);
 	mask:
 		linear-gradient(#000 0 0),
 		var(--pebble-fill) var(--halo-pad) var(--halo-pad) / var(--halo-size)
@@ -224,18 +225,17 @@ button.cost-dot-grid {
 	cursor: default;
 }
 button.cost-dot-grid:focus-visible {
-	outline: 2px solid
-		color-mix(in oklab, var(--cost-foreground) 40%, transparent);
+	outline: 2px solid color-mix(in oklab, var(--ink) 40%, transparent);
 	outline-offset: 2px;
-	border-radius: 6px;
+	border-radius: var(--radius-xs);
 }
 button.cost-dot-grid {
 	position: relative;
 }
 .cost-dot-crosshair {
-	transition: opacity 180ms ease-out;
+	transition: opacity var(--motion-medium-duration) var(--motion-easing);
 	--cross-gap: 3px;
-	--cross-line: color-mix(in oklab, var(--cost-foreground) 22%, transparent);
+	--cross-line: color-mix(in oklab, var(--ink) 22%, transparent);
 	position: absolute;
 	inset: 0;
 	pointer-events: none;
@@ -243,20 +243,20 @@ button.cost-dot-grid {
 .cost-dot-crosshair > span {
 	position: absolute;
 	transition:
-		left 110ms ease-out,
-		top 110ms ease-out,
-		width 110ms ease-out,
-		height 110ms ease-out;
+		left var(--motion-quick-duration) var(--motion-easing),
+		top var(--motion-quick-duration) var(--motion-easing),
+		width var(--motion-quick-duration) var(--motion-easing),
+		height var(--motion-quick-duration) var(--motion-easing);
 }
 .cost-dot-crosshair > [data-part="ring"] {
 	left: calc(var(--cross-x) - var(--cross-gap));
 	top: calc(var(--cross-y) - var(--cross-gap));
 	width: calc(var(--cross-size) + 2 * var(--cross-gap));
 	height: calc(var(--cross-size) + 2 * var(--cross-gap));
-	color: var(--cost-foreground);
+	color: var(--ink);
 }
 .cost-dot-crosshair[data-tone="hover"] > [data-part="ring"] {
-	color: color-mix(in oklab, var(--cost-foreground) 55%, transparent);
+	color: color-mix(in oklab, var(--ink) 55%, transparent);
 }
 .cost-dot-crosshair > [data-part="ring"] > svg {
 	display: block;

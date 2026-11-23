@@ -130,19 +130,17 @@ describe("session overview drag zoom selection", () => {
 		expect(markup).toContain('aria-label="3 file edits"');
 		expect(markup).toContain('title="3 file edits"');
 		expect(markup).toContain("Edits 3");
-		expect(markup).toContain("rounded-(--activity-tag-radius)");
-		expect(markup).toContain(
-			"rounded-[calc(var(--activity-tag-radius)-var(--activity-tag-inset))]",
-		);
+		expect(markup).toContain('data-slot="tag"');
+		expect(markup).toContain("size-1.5 shrink-0 corner-s");
 		expect(markup).toContain("Zoom In");
 		expect(markup).toContain("items-center");
 		expect(markup).toContain("self-center");
 		expect(markup).toContain("h-14");
 		expect(markup).toContain("w-80");
-		expect(markup).toContain("font-sans");
+		expect(markup).toContain("font-body");
 		expect(markup).toContain('data-slot="button"');
-		expect(markup).toContain('data-variant="default"');
-		expect(markup).toContain('data-size="xs"');
+		expect(markup).toContain('data-variant="secondary"');
+		expect(markup).toContain('data-size="sm"');
 		expect(markup).toContain("h-6");
 	});
 
@@ -183,8 +181,8 @@ describe("session overview drag zoom selection", () => {
 
 		expect(markup).toContain("h-14");
 		expect(markup).toContain("w-80");
-		expect(markup).toContain("font-sans");
-		expect(markup).not.toContain("font-mono");
+		expect(markup).toContain("font-body");
+		expect(markup).not.toContain("font-data");
 		expect(markup).toContain("Time unavailable");
 		expect(markup).toContain("Errors 1");
 		expect(markup).not.toContain("IN-TOK");

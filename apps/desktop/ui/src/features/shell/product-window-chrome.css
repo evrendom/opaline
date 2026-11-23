@@ -1,7 +1,7 @@
 .product-brand-wordmark {
 	display: inline-flex;
 	align-items: center;
-	color: oklch(0 0 0 / 0.88);
+	color: var(--ink);
 }
 
 .product-brand-lockup {
@@ -27,14 +27,14 @@
 	filter: none;
 }
 .dark .product-brand-wordmark {
-	color: oklch(1 0 0 / 0.88);
+	color: var(--ink);
 }
 
 /* The same outer glass frame surrounds the demo and personal setup. */
 .product-window-frame {
 	overflow: hidden;
-	border-radius: var(--instant-v2-dashboard-window-radius, 12px);
-	background: rgba(235, 235, 235, 0.7);
+	border-radius: var(--radius-l);
+	background: var(--hover-strong);
 	box-shadow:
 		inset 0 1px 0 oklch(1 0 0 / 0.82),
 		inset 0 -1px 0 oklch(0.18 0.012 275 / 0.1),
@@ -51,7 +51,7 @@
 /* Dark: the shell's own solid canvas behind a hairline edge (self-contained,
    since the landing page has none of the app's shadow tokens). */
 .dark .product-window-frame {
-	background: oklch(0.145 0 0);
+	background: var(--chrome);
 	box-shadow:
 		0 0 0 1px rgb(255 255 255 / 0.07),
 		0 24px 48px -12px rgb(0 0 0 / 0.5);
@@ -60,22 +60,18 @@
 }
 
 .dashboard-01-preview > .product-window-frame {
-	border-bottom-right-radius: 0;
-	border-bottom-left-radius: 0;
+	border-bottom-right-radius: var(--radius-zero);
+	border-bottom-left-radius: var(--radius-zero);
 }
 
 .product-window-frame > .dashboard-01-chrome-frame {
 	min-height: 0;
 }
 
-.product-window-frame [data-slot="sidebar"] {
-	height: 100%;
-}
-
 /* Full-bleed in the product; the colours stay the demo's. */
 .product-app-shell.dashboard-01-preview,
 .product-app-shell .dashboard-01-chrome-frame {
-	border-radius: 0;
+	border-radius: var(--radius-zero);
 	box-shadow: none;
 }
 
@@ -84,7 +80,7 @@
 	z-index: 0;
 	inset: -64px -80px;
 	pointer-events: none;
-	border-radius: 300px;
+	border-radius: var(--radius-full);
 	filter: blur(50px);
 	background: linear-gradient(115deg, #fff1b9, #fff3c9 48%, #ffe4b2);
 }
@@ -113,7 +109,7 @@
 	position: absolute;
 	inset: 0;
 	opacity: 0;
-	transition: opacity 1800ms ease-in-out;
+	transition: opacity 1800ms var(--motion-wave-easing);
 }
 .product-window-backdrop::before {
 	background: linear-gradient(115deg, #d5f7eb, #daf4f7 48%, #dce8fb);

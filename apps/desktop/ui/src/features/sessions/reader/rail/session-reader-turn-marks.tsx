@@ -26,25 +26,25 @@ export const TURN_MARKS: Record<
 	{ className: string; Icon: Icon; label: string; tint: string }
 > = {
 	"file-added": {
-		className: "text-emerald-600 dark:text-emerald-400",
+		className: "text-success",
 		Icon: IconFilePlus,
 		label: "Added",
 		tint: "var(--color-emerald-500)",
 	},
 	"file-edited": {
-		className: "text-blue-600 dark:text-blue-400",
+		className: "text-accent",
 		Icon: IconPencil,
 		label: "Edited",
 		tint: "var(--color-blue-500)",
 	},
 	"file-removed": {
-		className: "text-rose-600 dark:text-rose-400",
+		className: "text-error",
 		Icon: IconFileMinus,
 		label: "Removed",
 		tint: "var(--color-rose-500)",
 	},
 	skill: {
-		className: "text-amber-600 dark:text-amber-400",
+		className: "text-warning",
 		Icon: IconBolt,
 		label: "Skill",
 		tint: "var(--color-amber-500)",
@@ -79,7 +79,7 @@ function MarkStack({ marks }: { marks: readonly StackMark[] }) {
 			{marks.map((mark, index) => (
 				<span
 					key={mark.key}
-					className={cn("relative flex", index > 0 && "-ml-1")}
+					className={cn("relative flex", index > 0 && "-ml-xs")}
 					style={{ zIndex: marks.length - index }}
 				>
 					<OpalChip
@@ -98,19 +98,19 @@ function MarkStack({ marks }: { marks: readonly StackMark[] }) {
 
 const SIGNAL_MARKS: Record<SessionReaderTurnSignal, Omit<StackMark, "key">> = {
 	apology: {
-		className: "text-amber-600 dark:text-amber-400",
+		className: "text-warning",
 		Icon: IconAlertTriangle,
 		tint: "var(--color-amber-500)",
 		title: "Apology",
 	},
 	positive: {
-		className: "text-emerald-600 dark:text-emerald-400",
+		className: "text-success",
 		Icon: IconThumbUp,
 		tint: "var(--color-emerald-500)",
 		title: "Positive signal",
 	},
 	trouble: {
-		className: "text-rose-600 dark:text-rose-400",
+		className: "text-error",
 		Icon: IconAlertTriangle,
 		tint: "var(--color-rose-500)",
 		title: "Error or negative signal",
@@ -167,7 +167,12 @@ export function RunTouchTags({
 			<span
 				key={mark.kind}
 				title={markTitle(label, mark.items)}
-				className="inline-flex h-5 items-center gap-1 rounded-full bg-background pr-2 pl-0.5 text-foreground/80 tabular-nums shadow-(--custom-outline-shadow) dark:bg-card"
+				className={cn(
+					"inline-flex h-5 items-center gap-xs",
+					"corner-full pr-m pl-xxs",
+					"tabular-nums",
+					"bg-surface text-ink shadow-card",
+				)}
 			>
 				<OpalChip tint={tint} className={cn("size-4", className)}>
 					<Icon aria-hidden="true" className="size-2.5" />

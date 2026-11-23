@@ -1,39 +1,16 @@
 .settings-page-content {
-	--settings-section-fill: var(--card);
-	--settings-section-border: #00000016;
 	width: 100%;
 	max-width: 640px;
 	min-width: 0;
 	margin-inline: auto;
-	padding-top: 24px;
+	padding-top: var(--space-xxl);
 }
 
 .settings-page-title {
-	padding: 0 20px 32px;
-	font-size: 1.5rem;
-	line-height: 2rem;
-	font-weight: 500;
-	letter-spacing: -0.01em;
+	padding: var(--space-zero) var(--space-xl) var(--space-xxxl);
+	font-size: var(--display-size-xs);
+	line-height: var(--display-line-xs);
+	font-weight: var(--weight-body-medium);
+	letter-spacing: var(--display-letter-spacing-xs);
 	text-wrap: balance;
-}
-
-/* The app's card: rounded-lg bg-card shadow-(--custom-shadow), squircle
-   rounded-3xl where the browser supports it. */
-.settings-section-surface {
-	border-radius: var(--radius-lg);
-	background: var(--card);
-	box-shadow: var(--custom-shadow);
-}
-
-/* biome-ignore lint/correctness/noUnknownProperty: corner-shape is new (Chromium 139+); Biome does not know it yet. */
-@supports (corner-shape: squircle) {
-	.settings-section-surface {
-		border-radius: var(--radius-3xl);
-		/* biome-ignore lint/correctness/noUnknownProperty: see the @supports note above. */
-		corner-shape: squircle;
-	}
-}
-
-.dark .settings-page-content {
-	--settings-section-border: #ffffff22;
 }

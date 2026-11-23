@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { cn } from "@/lib/utils";
 import { squarify } from "../summary/session-reader-breakdown";
 import { TINT, tileGlyph, tileLook } from "./session-reader-context-bar";
@@ -145,7 +146,7 @@ export function ContextRunTiles({
 						key={each.key}
 						title={each.label}
 						className={cn(
-							"absolute rounded-[4px] border corner-squircle transition-opacity squircle:rounded-[8px]",
+							"absolute corner-xs edge-m corner-squircle transition-opacity squircle:corner-s",
 							detailed ? look.className : "border-current/20",
 							tone && markGlow(tone),
 							anyLit && !holds && (detailed ? "opacity-55" : "opacity-25"),
@@ -162,17 +163,21 @@ export function ContextRunTiles({
 						}
 					>
 						{named ? (
-							<button
+							<Pressable
 								type="button"
 								data-context-tile=""
 								onClick={(event) =>
 									onPick?.({ key: each.key, thing: null }, event.shiftKey)
 								}
-								className="absolute inset-x-0 top-0 flex h-5 items-center gap-1 px-1.5 text-left text-[11px] leading-5 font-medium"
+								className={cn(
+									"absolute inset-x-0 top-0 flex h-5 items-center gap-xs",
+									"px-s",
+									"text-left text-body-s font-medium",
+								)}
 							>
 								<Glyph className="size-3 shrink-0" />
 								<span className="truncate">{each.label}</span>
-							</button>
+							</Pressable>
 						) : null}
 						<span
 							className="absolute"
@@ -254,12 +259,15 @@ function Thing({
 			<Glyph className={cn("relative size-3", !lit && "opacity-45")} />
 		) : null;
 	const litLook =
-		"border-[1.5px] border-(--tint) bg-[color-mix(in_oklab,var(--tint)_35%,transparent)] text-(--tint) hover:bg-[color-mix(in_oklab,var(--tint)_55%,transparent)]";
+		"edge-l border-(--tint) bg-[color-mix(in_oklab,var(--tint)_35%,transparent)] text-(--tint) hover:bg-[color-mix(in_oklab,var(--tint)_55%,transparent)]";
 	if (!lit && !detailed)
 		return (
 			<span
 				className={cn(
-					"absolute flex items-center justify-center rounded-[3px] border border-current corner-squircle squircle:rounded-[6px]",
+					"absolute flex items-center justify-center",
+					"corner-xs edge-m corner-squircle",
+					"border-current",
+					"squircle:corner-xs",
 					quiet ? "opacity-10" : "opacity-25",
 				)}
 				style={style}
@@ -268,7 +276,7 @@ function Thing({
 			</span>
 		);
 	return (
-		<button
+		<Pressable
 			type="button"
 			data-context-tile=""
 			title={thing.label}
@@ -282,14 +290,15 @@ function Thing({
 				else onOpen();
 			}}
 			className={cn(
-				"pointer-events-auto absolute z-10 flex items-center justify-center rounded-[3px] corner-squircle transition-colors squircle:rounded-[6px]",
-				lit
-					? litLook
-					: "border border-current/25 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]",
+				"absolute z-10 flex items-center justify-center",
+				"corner-xs corner-squircle",
+				"pointer-events-auto transition-colors",
+				"squircle:corner-xs",
+				lit ? litLook : "edge-m border-current/25 hover:bg-field",
 			)}
 			style={style}
 		>
 			{mark}
-		</button>
+		</Pressable>
 	);
 }

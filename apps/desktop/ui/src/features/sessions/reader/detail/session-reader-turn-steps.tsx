@@ -2,12 +2,11 @@ import type { SessionDetailTurnSummary } from "@rudel/api-routes";
 import {
 	IconAlertTriangle,
 	IconArrowDown,
-	IconArrowsDiagonal,
-	IconArrowsDiagonalMinimize2,
 	IconArrowUp,
 	IconGhost,
 } from "@tabler/icons-react";
 import { type ReactNode, useMemo } from "react";
+import { Tag } from "@/app/ui/tag";
 import { ConversationTracePlanTag } from "@/components/conversation/conversation-trace-plan-tag";
 import { formatConversationModelSetting } from "@/components/conversation/model-section-header";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
@@ -46,10 +45,7 @@ import {
 	OpalChip,
 	Tip,
 } from "./waterfall/session-reader-waterfall-chips";
-import {
-	barGeometry,
-	rowState,
-} from "./waterfall/session-reader-waterfall-layout";
+import { barGeometry } from "./waterfall/session-reader-waterfall-layout";
 import { getWaterfallFilterOptions } from "./waterfall/session-reader-waterfall-rows";
 
 export function RunSummaryBar({
@@ -58,7 +54,6 @@ export function RunSummaryBar({
 	id,
 	mode,
 	model,
-	onToggle,
 	shortId = shortRunId(id),
 	waterfall,
 }: {
@@ -67,62 +62,48 @@ export function RunSummaryBar({
 	id: string;
 	mode?: ReturnType<typeof getReaderRunMode>;
 	model: string | null;
-	onToggle?: () => void;
 	shortId?: string;
 	waterfall: SessionReaderWaterfall;
 }) {
 	const steps = waterfall.allSteps.filter(isAgentStep);
 	const setting = formatConversationModelSetting(mode?.modelSetting);
 	const className = cn(
-		"group/run -mx-1.5 flex gap-3 rounded-md px-1.5 py-1.5 text-xs text-muted-foreground transition-colors",
-		onToggle && "w-full text-left",
-		onToggle && rowState(false),
+		"flex gap-l",
+		"-mx-s corner-s px-s py-s",
+		"text-body-m",
+		"text-ink-3",
 	);
 	const content = (
 		<>
-			<span className="flex min-w-0 flex-1 flex-col gap-3">
-				<span className="flex items-center gap-2">
+			<span className="flex min-w-0 flex-1 flex-col gap-l">
+				<span className="flex items-center gap-m">
 					<ModelChip model={model} />
-					<span className="flex min-w-0 flex-1 items-center gap-0.5">
+					<span className="flex min-w-0 flex-1 items-center gap-xxs">
 						<Tip label={id} side="bottom">
-							<span className="truncate font-heading text-base font-medium text-foreground tabular-nums">
+							<span className="truncate font-body text-body-xxl font-medium text-ink tabular-nums">
 								{shortId}
 							</span>
 						</Tip>
-						{onToggle ? null : (
-							<CopyButton
-								className="[&_svg]:size-4"
-								title={copyLabel}
-								value={id}
-							/>
-						)}
-						<span className="ml-auto flex min-w-0 items-center gap-1.5 pl-2 text-xs text-muted-foreground">
+						<span
+							className={cn(
+								"flex min-w-0 items-center gap-s",
+								"ml-auto pl-m",
+								"text-body-m",
+								"text-ink-3",
+							)}
+						>
 							{model ? (
 								<span className="truncate">
 									{formatModelDisplayLabel(model)}
 								</span>
 							) : null}
 							{setting ? (
-								<span className="shrink-0 text-muted-foreground/60">
-									{setting}
-								</span>
+								<span className="shrink-0 text-ink-4">{setting}</span>
 							) : null}
 							{mode?.planMode ? <ConversationTracePlanTag /> : null}
 						</span>
 					</span>
-					{onToggle ? (
-						expanded ? (
-							<IconArrowsDiagonalMinimize2
-								aria-hidden="true"
-								className="size-4 shrink-0 text-muted-foreground/60 transition-colors group-hover/run:text-foreground"
-							/>
-						) : (
-							<IconArrowsDiagonal
-								aria-hidden="true"
-								className="size-4 shrink-0 text-muted-foreground/60 transition-colors group-hover/run:text-foreground"
-							/>
-						)
-					) : null}
+					<CopyButton className="[&_svg]:size-4" title={copyLabel} value={id} />
 				</span>
 				{expanded ? null : (
 					<StepStrip focus={null} steps={steps} waterfall={waterfall} />
@@ -130,19 +111,7 @@ export function RunSummaryBar({
 			</span>
 		</>
 	);
-	return onToggle ? (
-		<button
-			type="button"
-			aria-expanded={expanded}
-			aria-label={expanded ? "Fold the trace" : "Expand the trace"}
-			onClick={onToggle}
-			className={className}
-		>
-			{content}
-		</button>
-	) : (
-		<div className={className}>{content}</div>
-	);
+	return <div className={className}>{content}</div>;
 }
 
 type StripFocus = {
@@ -163,7 +132,7 @@ function StepStrip({
 	return (
 		<span
 			aria-hidden="true"
-			className="relative h-2 w-full shrink-0 overflow-hidden rounded-xs bg-muted-foreground/10"
+			className="relative h-2 w-full shrink-0 overflow-hidden corner-xs bg-hover"
 		>
 			{steps.map((step) => {
 				const { offset, width } = barGeometry(
@@ -177,7 +146,7 @@ function StepStrip({
 					<span
 						key={step.id}
 						className={cn(
-							"absolute inset-y-0 min-w-0.5 transition-[opacity,background-color] duration-200",
+							"absolute inset-y-0 min-w-0.5 transition-[opacity,background-color] duration-(--motion-medium-duration)",
 							!lit && "opacity-15",
 						)}
 						style={{
@@ -243,7 +212,7 @@ export function TurnSteps({
 				open: ui.open,
 			}}
 			header={
-				<div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+				<div className="flex flex-wrap items-center gap-s text-body-m text-ink-3">
 					<RunTags
 						agentCount={agentCount}
 						costShade={costShade}
@@ -313,11 +282,17 @@ function RunStepTags({
 			{agentCount > 0 ? (
 				<span
 					title={`${agentCount} ${agentCount === 1 ? "subagent" : "subagents"}`}
-					className="inline-flex h-5 items-center gap-1 rounded-full bg-background pr-2 pl-0.5 text-foreground/80 tabular-nums shadow-(--custom-outline-shadow) dark:bg-card"
+					className={cn(
+						"inline-flex h-5 items-center gap-xs",
+						"corner-full pr-m pl-xxs",
+						"tabular-nums",
+						"bg-surface text-ink shadow-card",
+					)}
 				>
 					<OpalChip
 						tint="var(--color-indigo-500)"
-						className="size-4 text-indigo-600 dark:text-indigo-400"
+						// design-escape-ok(base): data paint; a category colour from the opal sheen
+						className="size-4 text-color-3"
 					>
 						<IconGhost
 							aria-hidden="true"
@@ -341,16 +316,21 @@ function RunNumberTags({
 }) {
 	return (
 		<>
-			<RunTag className="gap-1.5" title="Input / output tokens">
-				<TokenCounts turn={turn} />
+			<RunTag title="Input / output tokens">
+				<span className="inline-flex items-center gap-s">
+					<TokenCounts turn={turn} />
+				</span>
 			</RunTag>
 			{getContextFill(turn) ? (
 				<RunTag>
 					<ContextFill turn={turn} />
 				</RunTag>
 			) : null}
-			<RunTag className={costShade}>
-				{formatReaderCost(turn.estimatedCost)}
+			<RunTag>
+				{/* The cost's heat is data paint, so it colours the figure, not the Tag. */}
+				<span className={costShade}>
+					{formatReaderCost(turn.estimatedCost)}
+				</span>
 			</RunTag>
 			<RunAlertTags turn={turn} />
 		</>
@@ -364,11 +344,11 @@ export function TokenCounts({
 }) {
 	return (
 		<>
-			<span className="inline-flex items-center gap-0.5">
+			<span className="inline-flex items-center gap-xxs">
 				<IconArrowUp aria-label="Input" className="size-3" />
 				{formatCompactNumber(turn.inputTokens ?? 0)}
 			</span>
-			<span className="inline-flex items-center gap-0.5">
+			<span className="inline-flex items-center gap-xxs">
 				<IconArrowDown aria-label="Output" className="size-3" />
 				{formatCompactNumber(turn.outputTokens ?? 0)}
 			</span>
@@ -403,10 +383,7 @@ function RunAlertTags({
 						onHover ? (turn.errorCount === 1 ? "error" : "errors") : undefined
 					}
 				>
-					<OpalChip
-						tint="var(--color-rose-500)"
-						className="size-4 text-rose-600 dark:text-rose-400"
-					>
+					<OpalChip tint="var(--color-rose-500)" className="size-4 text-error">
 						<IconAlertTriangle aria-hidden="true" className="size-2.5" />
 					</OpalChip>
 					{turn.errorCount}
@@ -420,7 +397,7 @@ function RunAlertTags({
 				>
 					<OpalChip
 						tint="var(--color-amber-500)"
-						className="size-4 text-amber-600 dark:text-amber-400"
+						className="size-4 text-warning"
 					>
 						<IconAlertTriangle aria-hidden="true" className="size-2.5" />
 					</OpalChip>
@@ -431,25 +408,8 @@ function RunAlertTags({
 	);
 }
 
-function RunTag({
-	children,
-	className,
-	title,
-}: {
-	children: ReactNode;
-	className?: string;
-	title?: string;
-}) {
-	const tag = (
-		<span
-			className={cn(
-				"inline-flex h-5 items-center rounded-full bg-background px-2 text-foreground/80 tabular-nums shadow-(--custom-outline-shadow) dark:bg-card",
-				className,
-			)}
-		>
-			{children}
-		</span>
-	);
+function RunTag({ children, title }: { children: ReactNode; title?: string }) {
+	const tag = <Tag size="md">{children}</Tag>;
 	return title ? (
 		<Tip label={title} side="bottom">
 			{tag}

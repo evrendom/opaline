@@ -112,12 +112,12 @@ function FooterLabel({
 			animate="shown"
 			exit="leave"
 			transition={reduceMotion ? { duration: 0 } : HANDOVER}
-			className="flex items-center gap-1.25 whitespace-nowrap [grid-area:1/1]"
+			className="flex items-center gap-xs whitespace-nowrap [grid-area:1/1]"
 		>
 			{children}
 			<IconArrowUpRight
 				aria-hidden="true"
-				className="-ml-0.5 size-3.25 text-muted-foreground transition-colors group-hover/last-upload:text-foreground"
+				className="-ml-xxs size-3.25 text-ink-3 transition-colors group-hover/last-upload:text-ink"
 			/>
 		</motion.span>
 	);
@@ -147,9 +147,9 @@ export function LastSessionUploadBar() {
 	const direction = running ? 1 : -1;
 
 	return (
-		<div className="flex h-8 shrink-0 items-center gap-4 px-1 text-xs text-muted-foreground tabular-nums">
+		<div className="flex h-8 shrink-0 items-center gap-xl px-xs text-body-m text-ink-3 tabular-nums">
 			{initialImport ? (
-				<output className="flex items-center gap-1.25">
+				<output className="flex items-center gap-xs">
 					<IconLoader2
 						aria-hidden="true"
 						className="size-3.25 animate-spin opacity-80"
@@ -168,7 +168,7 @@ export function LastSessionUploadBar() {
 							? "Open your sessions"
 							: `Open the session ${localApp ? "that ended" : "uploaded"} ${fixedFormat ? formatUtcTime(shownAt) : shownAt.toLocaleString()}`
 					}
-					className="group/last-upload flex items-center gap-1.25 rounded-sm outline-none transition-colors hover:text-foreground"
+					className="group/last-upload flex items-center gap-xs corner-xs outline-none transition-colors hover:text-ink"
 				>
 					{localApp ? (
 						<IconRobot aria-hidden="true" className="size-3.25 opacity-80" />
@@ -182,7 +182,7 @@ export function LastSessionUploadBar() {
 						<AnimatePresence initial={false} custom={direction}>
 							{running ? (
 								<FooterLabel key="running" direction={direction}>
-									<span className="text-foreground">
+									<span className="text-ink">
 										<FlowNumber value={agentsRunning} format={PLAIN_NUMBER} />
 									</span>
 									{agentsRunning === 1 ? "agent running" : "agents running"}
@@ -190,7 +190,7 @@ export function LastSessionUploadBar() {
 							) : shownAt ? (
 								<FooterLabel key="last" direction={direction}>
 									{localApp ? "Last agent run" : "Last session uploaded"}
-									<span className="text-foreground">
+									<span className="text-ink">
 										{fixedFormat
 											? formatUtcTime(shownAt)
 											: shownAt.toLocaleString(undefined, {

@@ -11,7 +11,12 @@ import type { DiffHunk } from "@/components/pierre/line-diff";
 import { formatPaddedTimeOfDay } from "@/lib/format";
 import { wholeText } from "./session-files-model";
 import { RunCrumbs } from "./session-reader-file-detail";
-import { Crumb, ScrollColumn } from "./session-reader-files-parts";
+import {
+	Crumb,
+	ReaderPane,
+	ReaderPaneHeader,
+	ReaderPaneScroll,
+} from "./session-reader-files-parts";
 
 function splitByRanges(
 	text: string,
@@ -85,46 +90,49 @@ export function SeenFile({
 	const others = step.paths.length - 1;
 	const time = formatPaddedTimeOfDay(step.at);
 	return (
-		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 pt-4 pr-4 pl-5">
-			<div className="flex min-h-7 shrink-0 flex-wrap items-center gap-x-3 gap-y-1">
-				<div className="flex min-w-0 flex-1 items-center gap-1.5">
-					{run ? (
-						<RunCrumbs
-							agent={agent}
-							onClearAgent={onClearAgent}
-							onClearRun={onClearRun}
-							run={run}
-						/>
-					) : null}
-					<Crumb onClear={onClearRead} title={path}>
-						<span className="inline-flex items-center gap-1">
-							<IconEyeFilled
-								aria-hidden="true"
-								className="size-3.5 text-muted-foreground"
+		<ReaderPane>
+			<ReaderPaneHeader
+				crumbs={
+					<>
+						{run ? (
+							<RunCrumbs
+								agent={agent}
+								onClearAgent={onClearAgent}
+								onClearRun={onClearRun}
+								run={run}
 							/>
-							{name}
-						</span>
-					</Crumb>
-				</div>
-				<span className="text-xs whitespace-nowrap text-muted-foreground tabular-nums">
+						) : null}
+						<Crumb onClear={onClearRead} title={path}>
+							<span className="inline-flex items-center gap-xs">
+								<IconEyeFilled
+									aria-hidden="true"
+									className="size-3.5 text-ink-3"
+								/>
+								{name}
+							</span>
+						</Crumb>
+					</>
+				}
+			>
+				<span className="text-body-m whitespace-nowrap text-ink-3 tabular-nums">
 					{said}
 					{others > 0
 						? ` · read with ${others} other ${others === 1 ? "file" : "files"}`
 						: ""}
 					{` · seen at ${time}`}
 				</span>
-			</div>
-			<ScrollColumn className="-mr-4 -ml-1.5 pr-4 pl-1.5">
-				<div className="flex flex-col gap-2 pt-2 pb-4">
+			</ReaderPaneHeader>
+			<ReaderPaneScroll>
+				<div className="flex flex-col gap-m pt-m pb-xl">
 					<DiffView hunks={hunks} language={languageForPath(path)} />
 					{seen.cut ? (
-						<p className="text-xs text-muted-foreground/70">
+						<p className="text-body-m text-ink-4">
 							Cut at {SESSION_RUN_SEEN_LIMIT.toLocaleString()} characters; the
 							rest is in the transcript.
 						</p>
 					) : null}
 				</div>
-			</ScrollColumn>
-		</div>
+			</ReaderPaneScroll>
+		</ReaderPane>
 	);
 }

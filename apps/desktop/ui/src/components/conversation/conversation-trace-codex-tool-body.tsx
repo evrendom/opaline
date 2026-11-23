@@ -55,12 +55,12 @@ export function CodexToolCallBody(props: Props) {
 		!result?.isError;
 	return (
 		<div
-			className="grid gap-3"
+			className="grid gap-l"
 			data-trace-codex-details
 			data-trace-activity-kind={activity.kind}
 		>
 			{activity.status === "failed" ? (
-				<p className="text-[0.8125rem] text-[color:var(--dashboardy-danger-foreground)]">
+				<p className="text-body-l text-error">
 					Call failed
 					{translation.exitCode !== undefined
 						? ` · Exit ${translation.exitCode}`
@@ -103,11 +103,11 @@ export function CodexToolCallBody(props: Props) {
 					result={text !== undefined ? { ...result, content: text } : result}
 				/>
 			) : activity.sharedResultId ? (
-				<p className="text-[0.8125rem] text-[color:var(--dashboardy-muted)]">
+				<p className="text-body-l text-ink-3">
 					Output is shared with other calls below.
 				</p>
 			) : (
-				<p className="text-[0.8125rem] text-[color:var(--dashboardy-muted)]">
+				<p className="text-body-l text-ink-3">
 					No result recorded for this call.
 				</p>
 			)}
@@ -118,10 +118,10 @@ export function CodexToolCallBody(props: Props) {
 
 function ActivityTargets({ activity }: { activity: TranscriptToolActivity }) {
 	return (
-		<ul aria-label="Tool actions" className="grid gap-2">
+		<ul aria-label="Tool actions" className="grid gap-m">
 			{keyActions(activity.actions).map(({ action, key }) => (
 				<li
-					className="flex min-w-0 items-start gap-2 text-[0.8125rem] leading-5"
+					className="flex min-w-0 items-start gap-m text-body-l"
 					data-trace-activity-kind={action.kind}
 					key={key}
 				>
@@ -130,13 +130,11 @@ function ActivityTargets({ activity }: { activity: TranscriptToolActivity }) {
 						toolIcon={activityIcon(action.kind)}
 						tone="neutral"
 					/>
-					<div className="grid min-w-0 gap-0.5">
-						<span className="text-[color:var(--dashboardy-muted)]">
-							{action.verb}
-						</span>
+					<div className="grid min-w-0 gap-xxs">
+						<span className="text-ink-3">{action.verb}</span>
 						{[...new Set(action.targets)].map((target) => (
 							<code
-								className="break-words whitespace-pre-wrap font-mono text-[0.75rem]"
+								className="break-words whitespace-pre-wrap font-data text-body-m"
 								key={target}
 							>
 								{target}
@@ -165,11 +163,9 @@ function RawToolDetails({
 			data-trace-raw-details
 			onToggle={(event) => setOpen(event.currentTarget.open)}
 		>
-			<summary className="w-fit text-[0.75rem] text-[color:var(--dashboardy-muted)]">
-				Raw data
-			</summary>
+			<summary className="w-fit text-body-m text-ink-3">Raw data</summary>
 			{open ? (
-				<div className="mt-2 grid gap-3">
+				<div className="mt-m grid gap-l">
 					<CodeBlock
 						code={JSON.stringify(getRawToolInput(input), null, 2)}
 						filename={`Raw input · ${toolName}`}
@@ -198,14 +194,14 @@ function RawToolDetails({
 
 function PatchBody({ translation }: { translation: CodexToolTranslation }) {
 	return (
-		<div className="grid gap-3" data-trace-codex-patch-details>
+		<div className="grid gap-l" data-trace-codex-patch-details>
 			{translation.files.map((file) => (
 				<div
-					className="grid gap-1"
+					className="grid gap-xs"
 					key={`${file.operation}:${file.path}:${file.movePath ?? ""}`}
 				>
 					{file.movePath ? (
-						<p className="font-mono text-[0.75rem] text-[color:var(--dashboardy-muted)]">
+						<p className="font-data text-body-m text-ink-3">
 							Moved to {file.movePath}
 						</p>
 					) : null}
@@ -226,20 +222,18 @@ function PatchBody({ translation }: { translation: CodexToolTranslation }) {
 
 function PlanBody({ translation }: { translation: CodexToolTranslation }) {
 	return (
-		<div className="grid gap-3" data-trace-codex-plan-details>
+		<div className="grid gap-l" data-trace-codex-plan-details>
 			{translation.planExplanation ? (
-				<p className="text-[0.8125rem] leading-5">
-					{translation.planExplanation}
-				</p>
+				<p className="text-body-l">{translation.planExplanation}</p>
 			) : null}
-			<ul aria-label="Plan steps" className="grid gap-1.5">
+			<ul aria-label="Plan steps" className="grid gap-s">
 				{translation.planSteps.map((item) => (
 					<li
-						className="flex items-start gap-2 text-[0.8125rem] leading-5"
+						className="flex items-start gap-m text-body-l"
 						data-plan-status={item.status}
 						key={`${item.status}:${item.step}`}
 					>
-						<span className="font-mono text-[0.6875rem] text-[color:var(--dashboardy-muted)]">
+						<span className="font-data text-body-s text-ink-3">
 							{item.status.replaceAll("_", " ")}
 						</span>
 						<span>{item.step}</span>

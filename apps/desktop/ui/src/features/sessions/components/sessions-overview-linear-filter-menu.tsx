@@ -3,7 +3,9 @@ import {
 	IconChevronRight,
 	IconFilterEdit,
 } from "@tabler/icons-react";
-import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
+import { Button } from "@/app/ui/button";
+import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
+import { Pressable } from "@/app/ui/pressable";
 
 type LinearFilterItem = {
 	group: "identity" | "usage" | "activity";
@@ -22,19 +24,21 @@ export function LinearActiveFiltersButton({
 	const label = `Review ${count.toLocaleString()} active session ${count === 1 ? "filter" : "filters"}`;
 
 	return (
-		<button
+		<Button
 			type="button"
+			variant="secondary"
+			size="icon"
 			aria-label={label}
-			className="relative flex size-7 shrink-0 items-center justify-center rounded-md text-black outline-none hover:bg-[#ececed] focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-black dark:text-[#f4f4f5] dark:hover:bg-white/8"
+			className="relative"
 			onClick={onClick}
 			title={label}
 		>
-			<IconFilterEdit aria-hidden="true" className="size-4" />
+			<IconFilterEdit aria-hidden="true" className="size-4 text-current" />
 			<span
 				aria-hidden="true"
-				className="absolute top-1 right-1 size-1.5 rounded-full bg-black ring-1 ring-[#fcfcfc] dark:bg-[#f4f4f5] dark:ring-[#1c1c1d]"
+				className="absolute top-1 right-1 size-1.5 corner-full bg-ink ring-1 ring-canvas"
 			/>
-		</button>
+		</Button>
 	);
 }
 
@@ -52,12 +56,12 @@ export function LinearFilterList<TFilter extends LinearFilterItem>({
 	onActivate: (filterKey: TFilter["key"], row: HTMLButtonElement) => void;
 }) {
 	if (filters.length === 0) {
-		return <p className="session-menu-empty">No matching filters</p>;
+		return <p className="menu-empty">No matching filters</p>;
 	}
 
 	return (
 		<div
-			className="session-menu-list"
+			className="menu-list"
 			data-session-filter-scroll-region="true"
 			data-fluid-menu-root=""
 		>
@@ -75,12 +79,12 @@ export function LinearFilterList<TFilter extends LinearFilterItem>({
 					return (
 						<li key={filter.key}>
 							{showSeparator ? (
-								<div aria-hidden="true" className="session-menu-separator" />
+								<div aria-hidden="true" className="menu-separator" />
 							) : null}
-							<button
+							<Pressable
 								type="button"
 								aria-label={`Configure ${filter.label} filter`}
-								className="session-menu-row"
+								className="menu-row"
 								data-active={isActive ? "true" : undefined}
 								data-previewed={isPreviewed ? "true" : undefined}
 								aria-expanded={isPreviewed}
@@ -92,22 +96,19 @@ export function LinearFilterList<TFilter extends LinearFilterItem>({
 									onActivate(filter.key, event.currentTarget)
 								}
 							>
-								<span className="session-menu-icon flex size-4 items-center justify-center">
+								<span className="menu-icon flex size-4 items-center justify-center">
 									<filter.icon aria-hidden="true" className="size-4" />
 								</span>
 								<span className="min-w-0 flex-1 truncate">{filter.label}</span>
 								{isActive ? (
-									<span
-										aria-hidden="true"
-										className="session-menu-active-dot"
-									/>
+									<span aria-hidden="true" className="menu-active-dot" />
 								) : null}
 								<IconChevronRight
 									aria-hidden="true"
-									className="session-menu-icon size-3"
+									className="menu-icon size-3"
 									stroke={2.25}
 								/>
-							</button>
+							</Pressable>
 						</li>
 					);
 				})}

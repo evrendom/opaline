@@ -107,17 +107,17 @@ export function getTraceCallGroupStyle(
 			Math.max((groupIndex ?? 1) - 1, 0) % TRACE_CALL_ACCENTS.length
 		] ??
 		TRACE_CALL_ACCENTS[0] ??
-		"var(--session-overview-accent)";
+		"var(--accent)";
 
 	return {
 		"--conversation-trace-call-accent": accent,
 		"--conversation-trace-connector-color":
-			treatment === "connector" ? accent : "var(--session-overview-border)",
+			treatment === "connector" ? accent : "var(--line)",
 		"--conversation-trace-connector-width":
 			treatment === "connector" ? 2.25 : 1,
 		"--conversation-trace-row-surface":
 			treatment === "fill"
-				? `color-mix(in srgb, ${accent} 8%, var(--session-overview-surface))`
-				: "var(--session-overview-surface)",
+				? `color-mix(in srgb, ${accent} 8%, var(--canvas))`
+				: "var(--canvas)",
 	};
 }

@@ -56,7 +56,9 @@ export function ContextPartTiles({
 					<span
 						key={part.key}
 						className={cn(
-							"absolute flex items-center justify-center overflow-hidden rounded-[3px] border corner-squircle squircle:rounded-[6px]",
+							"absolute flex items-center justify-center overflow-hidden",
+							"corner-xs edge-m corner-squircle",
+							"squircle:corner-xs",
 							look.className,
 						)}
 						style={{

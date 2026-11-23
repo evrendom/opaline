@@ -155,7 +155,7 @@ export function SetupRunTrace({
 	);
 	if (status === "failed")
 		return (
-			<p className="py-1 pl-2 text-[11px] text-muted-foreground">
+			<p className="py-xs pl-m text-body-s text-ink-3">
 				This run could not be read.
 			</p>
 		);
@@ -164,11 +164,11 @@ export function SetupRunTrace({
 			label="Reading this run"
 			loading={status === "loading" || !waterfall}
 			sample={
-				<div className="flex flex-col gap-2 py-2">
+				<div className="flex flex-col gap-m py-m">
 					{[80, 64, 72].map((width) => (
 						<Bone
 							key={width}
-							className="h-3.5 rounded-md"
+							className="h-3.5 corner-s"
 							style={{ width: `${width}%` }}
 						/>
 					))}
@@ -178,7 +178,7 @@ export function SetupRunTrace({
 		>
 			{() =>
 				waterfall ? (
-					<div ref={attachPane} className="pb-8 pl-[calc(2.25rem+9px)]">
+					<div ref={attachPane} className="pb-xxxl pl-xxxl">
 						<TraceAttempts
 							lanesSlot={null}
 							model={waterfall.model}

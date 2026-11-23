@@ -11,6 +11,7 @@ import {
 	useLayoutEffect,
 	useRef,
 } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { SkillMark } from "@/components/skill-mark";
 import { getSkillMarkLook } from "@/components/skill-mark-look";
 import {
@@ -21,7 +22,6 @@ import { OpalineShape } from "@/features/shell/components/shell-nav-icon";
 import { RichSkillDocument } from "@/features/skills/components/rich-skill-document";
 import { cn } from "@/lib/utils";
 import { skillDescription } from "./skill-description";
-
 export function SkillCardsGrid({
 	skills,
 	onSelect,
@@ -33,7 +33,7 @@ export function SkillCardsGrid({
 		<ScrollColumn className="min-w-0 overscroll-contain">
 			<ul
 				aria-label="Skills"
-				className="grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,13.5rem),1fr))] gap-5 p-4 sm:p-5 lg:p-6"
+				className="grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,13.5rem),1fr))] gap-xl p-xl lg:p-xxl"
 			>
 				{skills.map((skill) => (
 					<li key={skill.name} className="min-w-0">
@@ -83,15 +83,13 @@ const SkillCard = memo(function SkillCard({
 			}
 		>
 			{description ? (
-				<p className="pt-1.5 text-[13px] leading-5 text-pretty text-[color:var(--dashboardy-heading)]/75">
-					{description}
-				</p>
+				<p className="pt-s text-body-l text-pretty text-ink-2">{description}</p>
 			) : skill.contentPreview ? (
-				<div className="min-h-0 flex-1 overflow-hidden pt-1.5">
+				<div className="min-h-0 flex-1 overflow-hidden pt-s">
 					<RichSkillDocument content={skill.contentPreview} variant="preview" />
 				</div>
 			) : (
-				<p className="pt-1.5 text-xs leading-5 text-[color:var(--dashboardy-subtle)]">
+				<p className="pt-s text-body-m text-ink-4">
 					No description was recovered for this skill.
 				</p>
 			)}
@@ -127,44 +125,47 @@ export function OverviewCard({
 				CARD,
 			)}
 		>
-			<button
+			<Pressable
 				type="button"
 				aria-label={`Open ${name}`}
 				onClick={() => onSelect(name)}
-				className="absolute inset-0 z-20 rounded-lg corner-squircle squircle:rounded-3xl outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--dashboard-01-metric-button-focus-ring)]"
+				className="absolute inset-0 z-20 corner-m corner-squircle squircle:corner-xl"
 			/>
 			<div className="pointer-events-none flex min-h-0 flex-1 flex-col">
 				<div
 					skullet-block=""
 					className="relative h-20 shrink-0 overflow-hidden"
 					style={{
-						background: `radial-gradient(120% 140% at 0% 0%, color-mix(in oklab, ${tint} 70%, white 12%) 0%, transparent 60%), linear-gradient(135deg, color-mix(in oklab, ${tint} 62%, var(--card)), color-mix(in oklab, ${tint} 26%, var(--card)))`,
+						background: `radial-gradient(120% 140% at 0% 0%, color-mix(in oklab, ${tint} 70%, white 12%) 0%, transparent 60%), linear-gradient(135deg, color-mix(in oklab, ${tint} 62%, var(--surface)), color-mix(in oklab, ${tint} 26%, var(--surface)))`,
 					}}
 				>
 					<span
 						aria-hidden="true"
 						skullet-ignore=""
-						className="absolute -right-3 -bottom-7 rotate-[-14deg] text-[88px] leading-none opacity-15"
+						className="absolute -right-3 -bottom-7 rotate-[-14deg] text-display-xxl line-solid tracking-s opacity-15"
 					>
 						<span>{emoji}</span>
 					</span>
-					<div className="absolute inset-x-3 top-3 flex items-center gap-1">
+					<div className="absolute inset-x-3 top-3 flex items-center gap-xs">
 						{pills}
 					</div>
 				</div>
-				<div className="relative -mt-5 flex min-w-0 shrink-0 flex-col gap-2 px-4">
+				<div className="relative -mt-xl flex min-w-0 shrink-0 flex-col gap-m px-xl">
 					<span className="relative grid size-11 place-items-center">
 						<span
 							aria-hidden="true"
 							skullet-ignore=""
 							className="absolute inset-0"
 						>
-							<OpalineShape className="absolute inset-0 [--opal-fill:var(--card)] [--opal-ring:transparent]" />
+							<OpalineShape className="absolute inset-0 [--opal-fill:var(--surface)] [--opal-ring:transparent]" />
 						</span>
-						<SkillMark skill={name} className="relative size-10 text-xl" />
+						<SkillMark
+							skill={name}
+							className="relative size-10 text-display-xxs"
+						/>
 					</span>
 					<h2
-						className="min-w-0 truncate text-[17px] leading-6 font-semibold tracking-[-0.015em] text-[color:var(--dashboardy-heading)]"
+						className="min-w-0 truncate text-body-xxl font-heavy tracking-xs text-ink"
 						title={name}
 					>
 						{name}
@@ -172,7 +173,7 @@ export function OverviewCard({
 				</div>
 				<div
 					ref={body}
-					className="relative mx-4 flex min-h-0 flex-1 overflow-hidden [mask-image:linear-gradient(to_bottom,#000_calc(100%-3rem),transparent)]"
+					className="relative mx-xl flex min-h-0 flex-1 overflow-hidden [mask-image:linear-gradient(to_bottom,#000_calc(100%-3rem),transparent)]"
 				>
 					{children}
 				</div>
@@ -205,7 +206,13 @@ export function StripPill({
 	return (
 		<span
 			title={title}
-			className="inline-flex items-center gap-1 rounded-full bg-black/30 px-2 py-0.5 text-[11px] font-medium text-white tabular-nums"
+			className={cn(
+				"inline-flex items-center gap-xs",
+				"corner-full px-m py-xxs",
+				"text-body-s font-medium tabular-nums",
+				// design-escape-ok(colour): artwork; a scrim pill over the card's tinted art, the same in both modes
+				"bg-black/30 text-white",
+			)}
 		>
 			<span className="inline-flex opacity-80">
 				<Icon aria-hidden className="size-3" />

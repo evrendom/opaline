@@ -19,7 +19,7 @@ export function SessionOverviewZoomSelectionBand({
 			viewBox={`0 0 ${config.chartWidth} ${config.chartHeight}`}
 		>
 			<rect
-				className="fill-(--session-overview-muted)"
+				className="fill-ink-3"
 				data-session-overview-zoom-selection
 				fillOpacity={0.5}
 				height={config.chartHeight}

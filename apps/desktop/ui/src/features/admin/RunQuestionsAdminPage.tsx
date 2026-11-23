@@ -6,7 +6,15 @@ import {
 } from "@rudel/api-routes";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/app/ui/button";
+import { Input } from "@/app/ui/input";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/app/ui/select";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
 import { client } from "@/lib/orpc";
 
@@ -49,15 +57,15 @@ export function RunQuestionsAdminPage() {
 	);
 
 	return (
-		<main className="mx-auto flex max-w-3xl flex-col gap-6 px-6 py-10 text-sm text-foreground">
-			<header className="flex flex-col gap-1">
-				<h1 className="text-lg font-medium">Run questions</h1>
-				<p className="text-muted-foreground">
+		<main className="mx-auto flex max-w-3xl flex-col gap-xxl px-xxl py-xxxl text-body-xl text-ink">
+			<header className="flex flex-col gap-xs">
+				<h1 className="text-body-xxl font-medium">Run questions</h1>
+				<p className="text-ink-3">
 					Yes/no questions agents can ask about runs, answered as the
 					probability of yes. A new wording is a new question; earlier answers
 					keep their wording. Test a question on 20 runs before turning it on.
 				</p>
-				<ul className="list-disc pl-5 text-muted-foreground">
+				<ul className="list-disc pl-xl text-ink-3">
 					<li>Ask one yes/no question; split a compound condition in two.</li>
 					<li>
 						Phrase it so a high value means yes (not "Was the run free of
@@ -82,16 +90,16 @@ export function RunQuestionsAdminPage() {
 				}
 			/>
 			{error ? (
-				<p role="alert" className="text-destructive">
+				<p role="alert" className="text-error">
 					{error}
 				</p>
 			) : null}
 			{questions.isError ? (
-				<p role="alert" className="text-destructive">
+				<p role="alert" className="text-error">
 					Couldn't load the run questions: {questions.error.message}
 				</p>
 			) : null}
-			<ul className="flex flex-col gap-3" aria-label="Run questions">
+			<ul className="flex flex-col gap-l" aria-label="Run questions">
 				{live?.map((question) => (
 					<QuestionRow
 						key={question.id}
@@ -121,15 +129,15 @@ export function RunQuestionsAdminPage() {
 					/>
 				))}
 				{live?.length === 0 ? (
-					<li className="text-muted-foreground">No run questions yet.</li>
+					<li className="text-ink-3">No run questions yet.</li>
 				) : null}
 			</ul>
 			{retired?.length ? (
 				<details>
-					<summary className="text-muted-foreground">
+					<summary className="text-ink-3">
 						Removed and reworded ({retired.length})
 					</summary>
-					<ul className="mt-2 flex flex-col gap-1 text-muted-foreground">
+					<ul className="mt-m flex flex-col gap-xs text-ink-3">
 						{retired.map((question) => (
 							<li key={question.id}>
 								{question.question} <code>{question.id}</code>
@@ -168,19 +176,20 @@ function AddQuestionForm({
 		}
 	};
 	return (
-		<form onSubmit={submit} className="flex flex-col gap-2">
-			<div className="flex gap-2">
+		<form onSubmit={submit} className="flex flex-col gap-m">
+			<div className="flex gap-m">
 				<label className="sr-only" htmlFor="run-question-new">
 					New run question
 				</label>
-				<input
+				<Input
 					id="run-question-new"
 					value={wording}
 					onChange={(event) => setWording(event.target.value)}
 					placeholder="Did the agent struggle to find the right file?"
-					className="h-9 flex-1 rounded-md border bg-background px-3"
+					className="flex-1"
 				/>
 				<Button
+					variant="primary"
 					type="submit"
 					disabled={
 						wording.trim().length < 10 ||
@@ -193,36 +202,38 @@ function AddQuestionForm({
 					Add
 				</Button>
 			</div>
-			<label className="flex flex-col gap-1 text-muted-foreground">
-				Tag label (optional): the short name the dashboard shows, at most{" "}
-				{RUN_QUESTION_LABEL_MAX_CHARS} characters
-				<input
+			<div className="flex flex-col gap-xs">
+				<label htmlFor="run-question-new-label" className="text-ink-3">
+					Tag label (optional): the short name the dashboard shows, at most{" "}
+					{RUN_QUESTION_LABEL_MAX_CHARS} characters
+				</label>
+				<Input
+					id="run-question-new-label"
 					value={label}
 					onChange={(event) => setLabel(event.target.value)}
 					placeholder="Hunted for files"
 					maxLength={RUN_QUESTION_LABEL_MAX_CHARS}
-					className="h-8 rounded-md border bg-background px-3 text-foreground"
 				/>
-			</label>
+			</div>
 			<details>
-				<summary className="text-muted-foreground">Criteria (optional)</summary>
-				<div className="mt-2 flex flex-col gap-2">
-					<label className="flex flex-col gap-1">
-						A yes looks like
-						<input
+				<summary className="text-ink-3">Criteria (optional)</summary>
+				<div className="mt-m flex flex-col gap-m">
+					<div className="flex flex-col gap-xs">
+						<label htmlFor="run-question-new-yes">A yes looks like</label>
+						<Input
+							id="run-question-new-yes"
 							value={yes}
 							onChange={(event) => setYes(event.target.value)}
-							className="h-8 rounded-md border bg-background px-3"
 						/>
-					</label>
-					<label className="flex flex-col gap-1">
-						A no looks like
-						<input
+					</div>
+					<div className="flex flex-col gap-xs">
+						<label htmlFor="run-question-new-no">A no looks like</label>
+						<Input
+							id="run-question-new-no"
 							value={no}
 							onChange={(event) => setNo(event.target.value)}
-							className="h-8 rounded-md border bg-background px-3"
 						/>
-					</label>
+					</div>
 				</div>
 			</details>
 		</form>
@@ -254,23 +265,23 @@ function QuestionRow({
 		wording: string;
 	} | null>(null);
 	return (
-		<li className="flex flex-col gap-2 rounded-md border p-3">
+		<li className="flex flex-col gap-m corner-s edge-m p-l">
 			{editing === null ? (
-				<div className="flex items-start justify-between gap-3">
-					<div className="flex flex-col gap-1">
+				<div className="flex items-start justify-between gap-l">
+					<div className="flex flex-col gap-xs">
 						<span>{question.question}</span>
-						<span className="text-xs text-muted-foreground">
+						<span className="text-body-m text-ink-3">
 							Tag:{" "}
 							{question.label ?? (
 								<span className="italic">none, the wording cut short</span>
 							)}
 						</span>
 						{question.criteria ? (
-							<span className="text-xs text-muted-foreground">
+							<span className="text-body-m text-ink-3">
 								Yes: {question.criteria.true} · No: {question.criteria.false}
 							</span>
 						) : null}
-						<span className="text-xs text-muted-foreground">
+						<span className="text-body-m text-ink-3">
 							<code>{question.id}</code> ·{" "}
 							{question.state === "on" ? "On" : "Draft"} ·{" "}
 							{question.testedPrecision !== null
@@ -280,18 +291,18 @@ function QuestionRow({
 									: "Untested"}
 						</span>
 					</div>
-					<div className="flex shrink-0 gap-1">
-						<Button size="sm" variant="outline" onClick={onToggleTest}>
+					<div className="flex shrink-0 gap-xs">
+						<Button size="md" variant="primary" onClick={onToggleTest}>
 							{testing ? "Close test" : "Test"}
 						</Button>
 						{question.state === "draft" ? (
-							<Button size="sm" onClick={onTurnOn}>
+							<Button variant="primary" size="md" onClick={onTurnOn}>
 								Turn on
 							</Button>
 						) : null}
 						<Button
-							size="sm"
-							variant="ghost"
+							size="md"
+							variant="secondary"
 							onClick={() =>
 								setEditing({
 									label: question.label ?? "",
@@ -301,58 +312,61 @@ function QuestionRow({
 						>
 							Edit
 						</Button>
-						<Button size="sm" variant="ghost" onClick={onRemove}>
+						<Button size="md" variant="secondary" onClick={onRemove}>
 							Remove
 						</Button>
 					</div>
 				</div>
 			) : (
 				<form
-					className="flex flex-col gap-2"
+					className="flex flex-col gap-m"
 					onSubmit={async (event) => {
 						event.preventDefault();
 						if (await onEdit(editing.wording, editing.label.trim() || null))
 							setEditing(null);
 					}}
 				>
-					<div className="flex gap-2">
+					<div className="flex gap-m">
 						<label className="sr-only" htmlFor={`run-question-${question.id}`}>
 							New wording
 						</label>
-						<input
+						<Input
 							id={`run-question-${question.id}`}
 							value={editing.wording}
 							onChange={(event) =>
 								setEditing({ ...editing, wording: event.target.value })
 							}
-							className="h-8 flex-1 rounded-md border bg-background px-3"
+							className="flex-1"
 						/>
-						<Button size="sm" type="submit">
+						<Button variant="primary" size="md" type="submit">
 							{editing.wording.trim() === question.question
 								? "Save label"
 								: "Save as new question"}
 						</Button>
 						<Button
-							size="sm"
-							variant="ghost"
+							size="md"
+							variant="secondary"
 							type="button"
 							onClick={() => setEditing(null)}
 						>
 							Cancel
 						</Button>
 					</div>
-					<label className="flex items-center gap-2 text-xs text-muted-foreground">
-						Tag label
-						<input
+					<div className="flex items-center gap-m text-body-m text-ink-3">
+						<label htmlFor={`run-question-label-${question.id}`}>
+							Tag label
+						</label>
+						<Input
+							id={`run-question-label-${question.id}`}
 							aria-label="Tag label"
 							value={editing.label}
 							onChange={(event) =>
 								setEditing({ ...editing, label: event.target.value })
 							}
 							maxLength={RUN_QUESTION_LABEL_MAX_CHARS}
-							className="h-7 flex-1 rounded-md border bg-background px-2 text-foreground"
+							className="flex-1"
 						/>
-					</label>
+					</div>
 				</form>
 			)}
 			{testing ? (
@@ -407,43 +421,52 @@ function QuestionTest({
 	const runs = test.data?.runs ?? [];
 	const judged = runs.filter((run) => verdictKey(run) in verdicts);
 	return (
-		<section className="flex flex-col gap-2 border-t pt-2" aria-label="Test">
-			<div className="flex items-center gap-2">
+		<section className="flex flex-col gap-m edge-t-m pt-m" aria-label="Test">
+			<div className="flex items-center gap-m">
 				<label htmlFor={`run-question-test-${question.id}`}>
 					Test on the newest 20 runs of
 				</label>
-				<select
-					id={`run-question-test-${question.id}`}
+				<Select
 					value={workspaceId}
-					onChange={(event) => setChosen(event.target.value)}
-					className="h-8 rounded-md border bg-background px-2"
+					onValueChange={(value) => setChosen(String(value ?? ""))}
 				>
-					{organizations.map((organization) => (
-						<option key={organization.id} value={organization.id}>
-							{organization.name}
-						</option>
-					))}
-				</select>
+					<SelectTrigger id={`run-question-test-${question.id}`} size="sm">
+						<SelectValue />
+					</SelectTrigger>
+					<SelectContent>
+						{organizations.map((organization) => (
+							<SelectItem key={organization.id} value={organization.id}>
+								{organization.name}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
 				{providers.length ? (
 					<>
 						<label htmlFor={`run-question-provider-${question.id}`}>
 							Answered by
 						</label>
-						<select
-							id={`run-question-provider-${question.id}`}
+						<Select
 							value={provider}
-							onChange={(event) => {
+							onValueChange={(value) => {
 								setVerdicts({});
-								setPickedProvider(event.target.value);
+								setPickedProvider(String(value ?? ""));
 							}}
-							className="h-8 rounded-md border bg-background px-2"
 						>
-							{providers.map((name) => (
-								<option key={name} value={name}>
-									{name}
-								</option>
-							))}
-						</select>
+							<SelectTrigger
+								id={`run-question-provider-${question.id}`}
+								size="sm"
+							>
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								{providers.map((name) => (
+									<SelectItem key={name} value={name}>
+										{name}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
 					</>
 				) : null}
 				<Button
@@ -469,33 +492,35 @@ function QuestionTest({
 			<TestStatus test={test.data} />
 			{runs.length ? (
 				<table className="w-full text-left">
-					<thead className="text-xs text-muted-foreground">
+					<thead className="text-body-m text-ink-3">
 						<tr>
-							<th className="py-1 font-normal">Prompt</th>
-							<th className="py-1 font-normal">Yes</th>
-							<th className="py-1 font-normal">Your verdict</th>
+							<th className="py-xs font-regular">Prompt</th>
+							<th className="py-xs font-regular">Yes</th>
+							<th className="py-xs font-regular">Your verdict</th>
 						</tr>
 					</thead>
 					<tbody>
 						{runs.map((run) => (
-							<tr key={verdictKey(run)} className="border-t align-top">
-								<td className="py-1 pr-2">{run.promptHead || run.sessionId}</td>
-								<td className="py-1 pr-2 tabular-nums">
+							<tr key={verdictKey(run)} className="edge-t-m align-top">
+								<td className="py-xs pr-m">
+									{run.promptHead || run.sessionId}
+								</td>
+								<td className="py-xs pr-m tabular-nums">
 									{run.probability === null ? "…" : run.probability.toFixed(2)}
 								</td>
-								<td className="py-1">
-									<fieldset className="flex gap-1">
+								<td className="py-xs">
+									<fieldset className="flex gap-xs">
 										<legend className="sr-only">
 											Is the answer yes for {run.promptHead || run.sessionId}?
 										</legend>
 										{[true, false].map((yes) => (
 											<Button
 												key={String(yes)}
-												size="xs"
+												size="sm"
 												variant={
 													verdicts[verdictKey(run)] === yes
-														? "default"
-														: "outline"
+														? "primary"
+														: "primary"
 												}
 												aria-pressed={verdicts[verdictKey(run)] === yes}
 												onClick={() =>
@@ -514,7 +539,8 @@ function QuestionTest({
 			) : null}
 			{judged.length ? (
 				<Button
-					size="sm"
+					variant="primary"
+					size="md"
 					className="self-start"
 					onClick={() =>
 						run(() =>
@@ -540,21 +566,21 @@ function QuestionTest({
 
 function TestStatus({ test }: { test: RunQuestionTest | undefined }) {
 	if (!test || test.status === "none")
-		return <p className="text-muted-foreground">Not tested yet.</p>;
+		return <p className="text-ink-3">Not tested yet.</p>;
 	if (test.status === "queued")
 		return (
-			<p className="text-muted-foreground">
+			<p className="text-ink-3">
 				Answering… results appear within a few minutes.
 			</p>
 		);
 	if (test.status === "failed")
 		return (
-			<p role="alert" className="text-destructive">
+			<p role="alert" className="text-error">
 				The test failed after its retries; run it again.
 			</p>
 		);
 	return (
-		<p className="text-muted-foreground">
+		<p className="text-ink-3">
 			Answered. Mark each run's true answer to measure precision.
 		</p>
 	);

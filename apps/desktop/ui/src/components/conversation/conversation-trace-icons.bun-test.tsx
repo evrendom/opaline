@@ -82,7 +82,7 @@ describe("ModelTraceIcon", () => {
 		expect(claudeMarkup).toContain("text-[#D97757]");
 		expect(claudeMarkup).toContain("--opal-tint:#D97757");
 		expect(chatGptMarkup).toContain('data-trace-icon-tone="openai"');
-		expect(chatGptMarkup).toContain("text-foreground");
+		expect(chatGptMarkup).toContain("text-ink");
 		expect(chatGptMarkup).toContain("--opal-tint:#10A37F");
 	});
 });
@@ -100,6 +100,6 @@ describe("UserTraceAvatar", () => {
 		expect(markup).toContain("data-user-trace-avatar-shell");
 		expect(markup).toContain("drop-shadow-[0_0_0.75px_rgb(0_0_0_/_14%)]");
 		expect(markup).not.toContain("outline-1");
-		expect(markup).toContain("size-full rounded-full object-cover");
+		expect(markup).toContain("size-full corner-full object-cover");
 	});
 });

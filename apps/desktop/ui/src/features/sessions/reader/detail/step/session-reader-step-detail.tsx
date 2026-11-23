@@ -6,6 +6,7 @@ import {
 } from "@tabler/icons-react";
 import { type ReactNode, useContext, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { Card, CardContent } from "@/app/ui/card";
 import {
 	ConversationSkillLinkContext,
 	ConversationSkillTurnContext,
@@ -145,20 +146,20 @@ export function SessionReaderStepDetail({
 					: "sticky top-(--reader-top,var(--reader-inset)) w-full shrink-0 self-start @3xl/steps:w-(--reader-card)",
 				top &&
 					!fit &&
-					"flex max-h-[calc(100cqh-var(--reader-top,var(--reader-inset))-var(--reader-inset))] flex-col gap-3 @3xl/steps:h-[calc(100cqh-var(--reader-top,var(--reader-inset))-var(--reader-inset))]",
+					"flex max-h-[calc(100cqh-var(--reader-top,var(--reader-inset))-var(--reader-inset))] flex-col gap-l @3xl/steps:h-[calc(100cqh-var(--reader-top,var(--reader-inset))-var(--reader-inset))]",
 			)}
 		>
 			{top ? (
-				<div className="shrink-0 rounded-lg bg-card px-2 pt-2 pb-1.5 shadow-(--custom-shadow) corner-squircle squircle:rounded-3xl">
-					{top}
-				</div>
+				<Card size="sm" className="shrink-0">
+					<CardContent>{top}</CardContent>
+				</Card>
 			) : null}
 			<div
 				ref={panelRef}
 				className={cn(
 					"flex flex-col overflow-hidden",
 					!bare &&
-						"rounded-lg bg-card shadow-(--custom-shadow) corner-squircle squircle:rounded-3xl",
+						"corner-m bg-surface shadow-card corner-squircle squircle:corner-xl",
 					fit
 						? "min-h-0 flex-1"
 						: top
@@ -166,14 +167,14 @@ export function SessionReaderStepDetail({
 							: "max-h-[calc(100cqh-2*var(--reader-inset))] @3xl/steps:h-[calc(100cqh-2*var(--reader-inset))]",
 				)}
 			>
-				<div className="flex shrink-0 flex-col gap-2 px-5 pt-4 pb-3">
-					<div className="flex items-center gap-1 text-xs text-muted-foreground tabular-nums">
+				<div className="flex shrink-0 flex-col gap-m px-xxl pt-xl pb-l">
+					<div className="flex items-center gap-xs text-body-m text-ink-3 tabular-nums">
 						{shownId ? (
 							<span title={shownId}>
 								{agentId ? shortSubagentId(agentId) : shortStepId(shownId)}
 							</span>
 						) : null}
-						<div className="ml-auto flex shrink-0 items-center gap-1">
+						<div className="ml-auto flex shrink-0 items-center gap-xs">
 							{shownId ? <CopyButton value={shownId} title="Copy ID" /> : null}
 							<StepHeadToggles
 								expanded={expanded}
@@ -183,7 +184,7 @@ export function SessionReaderStepDetail({
 							/>
 						</div>
 					</div>
-					<div className="flex min-w-0 items-center gap-2 text-sm font-medium">
+					<div className="flex min-w-0 items-center gap-m text-body-xl font-medium">
 						{step ? (
 							<StepIconChip step={step} />
 						) : (
@@ -194,7 +195,7 @@ export function SessionReaderStepDetail({
 						{skillHref && step?.toolEvent?.skillContent ? (
 							<Link
 								to={skillHref}
-								className="truncate underline decoration-foreground/20 underline-offset-4 transition-colors hover:decoration-foreground"
+								className="truncate underline decoration-line underline-offset-4 transition-colors hover:decoration-ink"
 							>
 								{step?.name}
 							</Link>
@@ -212,18 +213,24 @@ export function SessionReaderStepDetail({
 						{isTool && step?.kind !== "agent" && step?.isError ? (
 							<IconAlertTriangleFilled
 								aria-label="Failed"
-								className="size-3.5 shrink-0 text-rose-500"
+								className="size-3.5 shrink-0 text-error"
 							/>
 						) : null}
 					</div>
 				</div>
 
 				{skillHref ? (
-					<div className="shrink-0 px-5 pt-3 pb-2">
+					<div className="shrink-0 px-xxl pt-l pb-m">
 						<Link
 							to={skillHref}
 							title="Open the skill"
-							className="inline-flex items-center gap-1 rounded-full bg-card py-1 pr-2 pl-2.5 text-xs font-medium shadow-(--custom-shadow) transition-colors hover:bg-muted dark:bg-muted-foreground/10"
+							className={cn(
+								"inline-flex items-center gap-xs",
+								"corner-full py-xs pr-m pl-l",
+								"text-body-m font-medium",
+								"bg-surface shadow-card transition-colors",
+								"hover:bg-hover",
+							)}
 						>
 							Open details
 							<IconArrowUpRight
@@ -241,11 +248,11 @@ export function SessionReaderStepDetail({
 					ref={bodyFade.ref}
 					{...bodyFade.fade}
 					className={cn(
-						"flex min-h-0 flex-1 flex-col gap-4 pt-1",
+						"flex min-h-0 flex-1 flex-col gap-xl pt-xs",
 						frozen
 							? "overflow-hidden"
 							: "scroll-fade overflow-y-auto *:shrink-0",
-						frozen ? "pb-0" : thinking ? "pb-4" : "pb-5",
+						frozen ? "pb-zero" : thinking ? "pb-xl" : "pb-xxl",
 					)}
 				>
 					{raw ? (
@@ -255,10 +262,10 @@ export function SessionReaderStepDetail({
 							{step && withFields && !expanded && fields.length > 0 ? (
 								<div
 									className={cn(
-										"grid shrink-0 grid-cols-2 gap-4 px-5",
+										"grid shrink-0 grid-cols-2 gap-xl px-xxl",
 										!shell &&
 											(subagent || payloads.length > 0) &&
-											"border-b border-border/40 pb-5",
+											"edge-b-m border-line-soft pb-xxl",
 									)}
 								>
 									{fields.map((field) => (
@@ -272,14 +279,14 @@ export function SessionReaderStepDetail({
 							{carded && step?.toolEvent ? (
 								<div
 									className={cn(
-										"flex flex-col gap-3",
+										"flex flex-col gap-l",
 										frozen
 											? "min-h-0 flex-1"
-											: "border-b border-border/40 pb-5",
+											: "edge-b-m border-line-soft pb-xxl",
 									)}
 								>
 									{shell && !expanded ? (
-										<div className="shrink-0 px-5 empty:hidden">
+										<div className="shrink-0 px-xxl empty:hidden">
 											<ShellCallFields event={step.toolEvent} />
 										</div>
 									) : null}
@@ -307,8 +314,8 @@ export function SessionReaderStepDetail({
 								</div>
 							) : null}
 							{step?.isError && step.result && step.kind !== "ci" && !carded ? (
-								<div className="mx-5 flex flex-col gap-1 rounded-lg bg-destructive/20 px-3 py-2.5 text-sm text-destructive corner-squircle">
-									<span className="flex items-center gap-1.5 font-medium">
+								<div className="mx-xxl flex flex-col gap-xs corner-m bg-error-tint px-l py-l text-body-xl text-error corner-squircle">
+									<span className="flex items-center gap-s font-medium">
 										<IconAlertTriangleFilled className="size-3.5 shrink-0" />
 										Error
 									</span>
@@ -320,10 +327,10 @@ export function SessionReaderStepDetail({
 							{!step || subagent ? (
 								<div
 									className={cn(
-										"flex flex-col gap-4",
+										"flex flex-col gap-xl",
 										subagent &&
 											payloads.length > 0 &&
-											"border-b border-border/40 pb-5",
+											"edge-b-m border-line-soft pb-xxl",
 									)}
 								>
 									<RunOverview
@@ -338,7 +345,7 @@ export function SessionReaderStepDetail({
 									key={`${selectionKey}:${payload.label}`}
 									className={cn(
 										index < payloads.length - 1 &&
-											"border-b border-border/40 pb-5",
+											"edge-b-m border-line-soft pb-xxl",
 									)}
 									{...payload}
 								/>

@@ -1,5 +1,6 @@
 import type { SessionDetailTurnSummary } from "@rudel/api-routes";
 import { memo, useMemo } from "react";
+import { Button } from "@/app/ui/button";
 import { cn } from "@/lib/utils";
 import type { RunQuestionAnswer } from "../../run-question-tags";
 import {
@@ -61,8 +62,6 @@ export const TurnBlock = memo(function TurnBlock({
 	const body = bodyState.status === "ready" ? bodyState.body : null;
 	const { open } = useRunUi(store, turn.turnId);
 	const callsHidden = hidden.has("toolCalls");
-	const toggleRun = () =>
-		store.update(turn.turnId, (state) => ({ open: !state.open }));
 	const memberText = body ? getReaderMemberText(body) : turn.userPreview;
 	const finalMessage = body ? getReaderFinalMessage(body) : null;
 	const waterfall = useMemo(
@@ -75,7 +74,6 @@ export const TurnBlock = memo(function TurnBlock({
 			id={turn.turnId}
 			mode={body ? getReaderRunMode(body) : undefined}
 			model={model}
-			onToggle={toggleRun}
 			waterfall={waterfall}
 		/>
 	) : null;
@@ -84,7 +82,7 @@ export const TurnBlock = memo(function TurnBlock({
 		<div
 			{...TURN_REPLY_MARK}
 			className={cn(
-				"flex gap-3",
+				"flex gap-l",
 				body ? "w-full max-w-[33rem]" : READING_MEASURE,
 			)}
 		>
@@ -93,20 +91,21 @@ export const TurnBlock = memo(function TurnBlock({
 				{bodyState.status === "loading" ? (
 					<AssistantSkeleton />
 				) : bodyState.status === "failed" ? (
-					<p className="pt-0.5 text-sm text-muted-foreground">
+					<p className="pt-xxs text-body-xl text-ink-3">
 						This turn could not be loaded.{" "}
-						<button
+						<Button
+							variant="link"
+							size="inline"
 							type="button"
 							onClick={() => onRetry(turn.turnId)}
-							className="underline underline-offset-2 hover:text-foreground"
 						>
 							Retry
-						</button>
+						</Button>
 					</p>
 				) : finalMessage ? (
 					<AssistantResponse text={finalMessage} />
 				) : (
-					<p className="pt-0.5 text-sm italic text-muted-foreground">
+					<p className="pt-xxs text-body-xl italic text-ink-3">
 						No response recorded.
 					</p>
 				)}
@@ -118,10 +117,10 @@ export const TurnBlock = memo(function TurnBlock({
 		<div
 			data-turn-steps={turn.toolCallCount}
 			data-turn-pending={body ? undefined : ""}
-			className="flex w-full flex-col gap-8 text-sm"
+			className="flex w-full flex-col gap-xxxl text-body-xl"
 		>
 			{memberText && !hidden.has("prompts") ? (
-				<div className={cn("flex flex-col gap-2", READING_MEASURE)}>
+				<div className={cn("flex flex-col gap-m", READING_MEASURE)}>
 					<MemberFactLine
 						frustrated={frustrated}
 						questions={questions}
@@ -139,7 +138,7 @@ export const TurnBlock = memo(function TurnBlock({
 
 			<div
 				{...TURN_ANSWER_MARK}
-				className="relative flex scroll-mt-(--reader-top,1rem) flex-col gap-4"
+				className="relative flex scroll-mt-(--reader-top,1rem) flex-col gap-xl"
 			>
 				{body ? null : (
 					<PendingSubagentMarks durations={subagentDurations} turn={turn} />

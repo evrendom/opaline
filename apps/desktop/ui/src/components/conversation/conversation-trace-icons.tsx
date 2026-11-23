@@ -12,7 +12,7 @@ import {
 } from "./conversation-trace-glyphs";
 
 const iconShellClassName =
-	"flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-[color:var(--dashboardy-border)] text-[color:var(--dashboardy-muted)]";
+	"flex size-5 shrink-0 items-center justify-center overflow-hidden corner-xs edge-m border-line text-ink-3";
 
 export type TraceIconTone =
 	| "amber"
@@ -175,13 +175,14 @@ export function UserTraceAvatar({
 	return (
 		<span
 			className={cn(
+				// design-escape-ok(shadow): artwork; the model icon's hairline edge
 				"relative flex size-5 shrink-0 drop-shadow-[0_0_0.75px_rgb(0_0_0_/_14%)]",
 				className,
 			)}
 			data-user-trace-avatar-shell
 		>
 			<TraceDisclosureFrame
-				className="flex size-full items-center justify-center rounded-full text-[color:var(--dashboardy-muted)]"
+				className="flex size-full items-center justify-center corner-full text-ink-3"
 				expanded={expanded}
 				expandable={expandable}
 			>
@@ -191,7 +192,7 @@ export function UserTraceAvatar({
 						alt=""
 						width={20}
 						height={20}
-						className="size-full rounded-full object-cover"
+						className="size-full corner-full object-cover"
 					/>
 				) : (
 					<TraceUserIcon className="size-3" />

@@ -1,4 +1,4 @@
-import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
+import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
 import { DashboardDateControls } from "@/features/dashboard/components/DashboardDateControls";
 import { CHART_INTERVALS, type ChartInterval } from "./chart-interval";
 import { ChartIntervalPicker } from "./chart-interval-picker";

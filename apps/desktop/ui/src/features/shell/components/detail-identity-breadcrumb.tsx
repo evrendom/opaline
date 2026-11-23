@@ -1,4 +1,5 @@
 import { IconChevronRight } from "@tabler/icons-react";
+import { Pressable } from "@/app/ui/pressable";
 import { cn } from "@/lib/utils";
 
 interface DetailIdentityItem {
@@ -18,33 +19,31 @@ export function DetailIdentityBreadcrumb({
 }) {
 	return (
 		<nav aria-label={label} className="min-w-0 flex-1 overflow-hidden">
-			<ol className="flex min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain whitespace-nowrap">
+			<ol className="flex min-w-0 items-center gap-xs overflow-x-auto overscroll-x-contain whitespace-nowrap">
 				{items.map((item, index) => {
 					const current = index === items.length - 1;
 					const className = cn(
 						"max-w-80 truncate",
-						current
-							? "text-black/87.5 dark:text-white/90"
-							: "text-black/[0.608] dark:text-white/60",
+						current ? "text-ink" : "text-ink-3",
 						item.mono && "tabular-nums",
 					);
 					return (
 						<li
 							key={item.label}
-							className="flex min-w-0 shrink-0 items-center gap-1 text-[0.8125rem]/5 font-medium tracking-normal"
+							className={cn(
+								"flex min-w-0 shrink-0 items-center gap-xs",
+								"font-medium tracking-m",
+								"text-body-l",
+							)}
 							title={`${item.label}: ${item.title ?? item.value}`}
 						>
 							{item.onClick ? (
-								<button
-									type="button"
-									className={cn(
-										className,
-										"rounded-sm outline-none hover:text-foreground",
-									)}
+								<Pressable
+									className={cn(className, "corner-xs hover:text-ink")}
 									onClick={item.onClick}
 								>
 									{item.value}
-								</button>
+								</Pressable>
 							) : (
 								<span
 									aria-current={current ? "page" : undefined}
@@ -56,7 +55,7 @@ export function DetailIdentityBreadcrumb({
 							{!current ? (
 								<IconChevronRight
 									aria-hidden="true"
-									className="size-4 shrink-0 text-[#ededed] dark:text-[#373737]"
+									className="size-4 shrink-0 text-line"
 								/>
 							) : null}
 						</li>

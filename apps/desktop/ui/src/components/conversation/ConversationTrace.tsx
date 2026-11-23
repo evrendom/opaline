@@ -1,5 +1,6 @@
 // biome-ignore-all lint/nursery/noExcessiveLinesPerFile: The shared trace entry point coordinates three render modes.
 import { type ReactNode, useId, useMemo, useState } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import {
 	isSlashCommandMessage,
 	parseSlashCommand,
@@ -100,8 +101,7 @@ export {
 	TraceTextDisclosureIcon,
 } from "./expandable-trace-row";
 
-const speakerLabelClassName =
-	"shrink-0 [font-family:var(--app-font-heading)] text-[0.8125rem]/[1.125rem] font-bold text-[color:var(--dashboardy-heading)]";
+const speakerLabelClassName = "shrink-0 text-body-l font-heavy text-ink";
 
 function AgentSection({
 	events,
@@ -157,15 +157,21 @@ function AgentSection({
 			return (
 				<div
 					id={anchorId}
-					className="min-w-0 scroll-mt-6 border-b border-(--session-overview-border) bg-(--session-overview-surface) [--conversation-trace-sticky-offset:2.25rem]"
+					className="min-w-0 scroll-mt-6 edge-b-m border-line bg-canvas [--conversation-trace-sticky-offset:2.25rem]"
 				>
-					<div className="sticky top-0 z-30 flex min-h-9 min-w-0 items-center gap-2 border-b border-(--session-overview-border) bg-(--session-overview-surface) px-3 py-2">
+					<div
+						className={cn(
+							"sticky top-0 z-30 flex min-h-9 min-w-0 items-center gap-m",
+							"edge-b-m px-l py-m",
+							"border-line bg-canvas",
+						)}
+					>
 						<ModelTraceIcon
 							expanded={false}
 							expandable={false}
 							model={agentModel}
 						/>
-						<p className="min-w-0 truncate text-xs font-medium text-(--session-overview-muted)">
+						<p className="min-w-0 truncate text-body-m font-medium text-ink-3">
 							{agentLabel}
 						</p>
 						{planMode ? <ConversationTracePlanTag /> : null}
@@ -173,7 +179,7 @@ function AgentSection({
 							<div className="ml-auto min-w-0">{headerTrailing}</div>
 						) : null}
 					</div>
-					<div className="grid min-w-0 divide-y divide-[color:var(--dashboardy-divider)] pl-7">
+					<div className="grid min-w-0 divide-y divide-line pl-xxxl">
 						{eventRows}
 					</div>
 				</div>
@@ -183,21 +189,21 @@ function AgentSection({
 		return (
 			<div
 				id={anchorId}
-				className="flex min-w-0 scroll-mt-6 items-start gap-2 [--conversation-trace-sticky-offset:0rem]"
+				className="flex min-w-0 scroll-mt-6 items-start gap-m [--conversation-trace-sticky-offset:0rem]"
 			>
 				<ModelTraceIcon
 					expanded={false}
 					expandable={false}
 					model={agentModel}
 				/>
-				<div className="grid min-w-0 flex-1 gap-2">
-					<div className="flex min-w-0 items-center gap-1.5">
-						<p className="min-w-0 truncate text-xs font-medium text-[color:var(--dashboardy-muted)]">
+				<div className="grid min-w-0 flex-1 gap-m">
+					<div className="flex min-w-0 items-center gap-s">
+						<p className="min-w-0 truncate text-body-m font-medium text-ink-3">
 							{agentLabel}
 						</p>
 						{planMode ? <ConversationTracePlanTag /> : null}
 					</div>
-					<div className="grid divide-y divide-[color:var(--dashboardy-divider)] border-t border-[color:var(--dashboardy-divider)]">
+					<div className="grid divide-y divide-line edge-t-m border-line">
 						{eventRows}
 					</div>
 				</div>
@@ -209,28 +215,21 @@ function AgentSection({
 		<div
 			id={anchorId}
 			className={cn(
-				"isolate min-w-0 scroll-mt-6 overflow-clip rounded-[0.75rem]",
-				open
-					? "bg-transparent"
-					: "border border-[color:var(--dashboardy-border)] bg-[color:var(--dashboardy-subsurface)]",
+				"isolate min-w-0 scroll-mt-6 overflow-clip corner-l",
+				open ? "bg-transparent" : "edge-m border-line bg-inset",
 			)}
 		>
-			<div
-				className={cn(
-					open &&
-						"sticky top-0 z-30 bg-[color:var(--dashboardy-surface-opaque)]",
-				)}
-			>
-				<button
+			<div className={cn(open && "sticky top-0 z-30 bg-canvas")}>
+				<Pressable
 					type="button"
 					onClick={() => setOpen(!open)}
 					aria-expanded={open}
 					aria-controls={panelId}
 					className={cn(
 						traceRowClassName,
-						"group gap-2",
+						"group gap-m",
 						open &&
-							"rounded-t-[0.75rem] border border-[color:var(--dashboardy-border)] bg-[color:var(--dashboardy-subsurface-opaque)] [border-bottom-color:var(--dashboardy-divider)]",
+							"corner-t-l edge-m border-line bg-inset [border-bottom-color:var(--line)]",
 					)}
 				>
 					<ModelTraceIcon expanded={open} model={agentModel} />
@@ -238,12 +237,16 @@ function AgentSection({
 					{planMode ? <ConversationTracePlanTag /> : null}
 					{!open ? <AgentToolStrip events={events} /> : null}
 					<span className="min-w-0 flex-1" />
-				</button>
+				</Pressable>
 			</div>
 			{open ? (
 				<div
 					id={panelId}
-					className="grid divide-y divide-[color:var(--dashboardy-divider)] rounded-b-[0.75rem] border-x border-b border-[color:var(--dashboardy-border)] bg-[color:var(--dashboardy-surface)] [--conversation-trace-sticky-offset:2.375rem]"
+					className={cn(
+						"grid [--conversation-trace-sticky-offset:2.375rem]",
+						"divide-y corner-b-l edge-x-m edge-b-m",
+						"divide-line border-line bg-canvas",
+					)}
 				>
 					{eventRows}
 				</div>
@@ -259,8 +262,8 @@ function UserTraceContent({ content }: { content: UserContent }) {
 
 	if (slashCommandInfo) {
 		return (
-			<div className="grid gap-2">
-				<div className="flex flex-wrap gap-2">
+			<div className="grid gap-m">
+				<div className="flex flex-wrap gap-m">
 					{slashCommandInfo.commandName ? (
 						<ConversationTraceTag
 							className="max-w-[18rem] shrink-0"
@@ -272,7 +275,7 @@ function UserTraceContent({ content }: { content: UserContent }) {
 					) : null}
 				</div>
 				{slashCommandInfo.commandArgs ? (
-					<p className="max-w-[65ch] whitespace-pre-wrap break-words font-mono text-[0.8125rem] leading-6 text-[color:var(--dashboardy-heading)] [overflow-wrap:anywhere]">
+					<p className="max-w-[65ch] whitespace-pre-wrap break-words font-data text-body-l text-ink [overflow-wrap:anywhere]">
 						{slashCommandInfo.commandArgs}
 					</p>
 				) : null}
@@ -365,7 +368,7 @@ function TraceRow({
 					leading={<TraceIcon icon={TraceFileIcon} tone="grass" />}
 					textDisclosure
 					body={
-						<p className="whitespace-pre-wrap text-[0.8125rem] leading-6 text-[color:var(--dashboardy-heading)]">
+						<p className="whitespace-pre-wrap text-body-l text-ink">
 							<SignalText text={item.text} />
 						</p>
 					}
@@ -396,7 +399,7 @@ function TraceRow({
 					timestamp={timestamp}
 					textDisclosure
 					body={
-						<p className="whitespace-pre-wrap font-mono text-[0.8125rem] leading-6 text-[color:var(--dashboardy-heading)]">
+						<p className="whitespace-pre-wrap font-data text-body-l text-ink">
 							{item.text}
 						</p>
 					}
@@ -437,7 +440,7 @@ function TraceRow({
 				textDisclosure
 				className={cn(
 					expandedSpeakerLayout !== "trace-tree" &&
-						"overflow-clip rounded-[0.75rem] border border-[color:var(--dashboardy-border)] bg-[color:var(--dashboardy-surface)]",
+						"overflow-clip corner-l edge-m border-line bg-canvas",
 				)}
 				body={<UserTraceContent content={item.content} />}
 			/>
@@ -944,7 +947,7 @@ export function ConversationTrace({
 			<ol
 				className={cn(
 					"grid [--conversation-trace-sticky-offset:0rem]",
-					expandedSpeakerLayout === "table-row" ? "gap-0" : "gap-1.5",
+					expandedSpeakerLayout === "table-row" ? "gap-zero" : "gap-s",
 					className,
 				)}
 			>

@@ -1,9 +1,9 @@
 import { IconFileSearch, IconLock } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
-import { Button } from "@/app/ui/button";
 import { Skeleton } from "@/app/ui/skeleton";
-import { UsageStateMessage } from "@/components/usage-collection-view";
+import { PageEmptyState } from "@/components/dashboard/page-parts";
+import { RetryButton } from "@/components/retry-button";
 import { useUserMap } from "@/features/workspace/hooks/useUserMap";
 import { orpc } from "@/lib/orpc";
 import { ReportView } from "./report-view";
@@ -32,23 +32,23 @@ export function ReportPage() {
 		const code = errorCode(report.error);
 		if (code === "NOT_FOUND" || code === "BAD_REQUEST")
 			return (
-				<UsageStateMessage
-					icon={<IconFileSearch aria-hidden="true" />}
+				<PageEmptyState
+					icon={IconFileSearch}
 					title="Report not found"
 					description="This analysis does not exist in this workspace, or it has not been shared with you."
 				/>
 			);
 		if (code === "FORBIDDEN" || code === "UNAUTHORIZED")
 			return (
-				<UsageStateMessage
-					icon={<IconLock aria-hidden="true" />}
+				<PageEmptyState
+					icon={IconLock}
 					title="You can't open this report"
 					description="Ask its author to share it with the workspace."
 				/>
 			);
 		return (
-			<UsageStateMessage
-				icon={<IconFileSearch aria-hidden="true" />}
+			<PageEmptyState
+				icon={IconFileSearch}
 				title="The report couldn't be loaded"
 				description={
 					code === "PRECONDITION_FAILED"
@@ -56,16 +56,11 @@ export function ReportPage() {
 						: "Try loading it again."
 				}
 				action={
-					<Button
-						type="button"
-						size="sm"
-						variant="outline"
-						onClick={() => {
+					<RetryButton
+						onRetry={() => {
 							void report.refetch();
 						}}
-					>
-						Try again
-					</Button>
+					/>
 				}
 			/>
 		);
@@ -85,12 +80,12 @@ function ReportSkeleton() {
 	return (
 		<main
 			aria-label="Loading report"
-			className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-6 py-10"
+			className="mx-auto flex w-full max-w-3xl flex-col gap-xl px-xxl py-xxxl"
 		>
-			<Skeleton className="h-3 w-24 rounded-sm" />
-			<Skeleton className="h-6 w-2/3 rounded-sm" />
-			<Skeleton className="h-4 w-1/2 rounded-sm" />
-			<Skeleton className="mt-4 h-32 w-full rounded-md" />
+			<Skeleton className="h-3 w-24 corner-xs" />
+			<Skeleton className="h-6 w-2/3 corner-xs" />
+			<Skeleton className="h-4 w-1/2 corner-xs" />
+			<Skeleton className="mt-xl h-32 w-full corner-s" />
 		</main>
 	);
 }

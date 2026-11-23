@@ -24,8 +24,8 @@ export function AccountDangerZoneCard({
 				>
 					<Button
 						type="button"
-						variant="destructive"
-						size="sm"
+						variant="danger"
+						size="md"
 						onClick={() => setOpen(true)}
 					>
 						<IconTrash aria-hidden="true" />

@@ -1,8 +1,6 @@
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
-
-const buttonClassName =
-	"flex size-7 items-center justify-center rounded-md text-[color:var(--dashboard-01-rail-icon)] transition-colors hover:bg-[color:var(--dashboard-01-rail-hover)] hover:text-[color:var(--dashboard-01-rail-icon-active)]";
+import { Button } from "@/app/ui/button";
 
 export function DesktopWindowBar() {
 	const navigate = useNavigate();
@@ -16,22 +14,22 @@ export function DesktopWindowBar() {
 					<span />
 				</span>
 			) : null}
-			<button
+			<Button
 				type="button"
+				size="icon-sm"
 				aria-label="Back"
-				className={buttonClassName}
 				onClick={() => navigate(-1)}
 			>
-				<IconChevronLeft className="size-4" stroke={1.75} />
-			</button>
-			<button
+				<IconChevronLeft className="size-4 text-ink-chrome" stroke={1.75} />
+			</Button>
+			<Button
 				type="button"
+				size="icon-sm"
 				aria-label="Forward"
-				className={buttonClassName}
 				onClick={() => navigate(1)}
 			>
-				<IconChevronRight className="size-4" stroke={1.75} />
-			</button>
+				<IconChevronRight className="size-4 text-ink-chrome" stroke={1.75} />
+			</Button>
 		</div>
 	);
 }

@@ -1,4 +1,5 @@
 import { type ReactNode, useId, useMemo, useState } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import type {
 	TextContent,
 	ThinkingContent,
@@ -92,48 +93,50 @@ function XmlBlock({
 	return (
 		<div
 			data-testid="message-xml-block"
-			className="overflow-hidden rounded-[1rem] border border-[color:var(--dashboardy-border)] bg-[color:var(--dashboardy-surface)]"
+			className="overflow-hidden corner-l edge-m border-line bg-canvas"
 		>
-			<button
+			<Pressable
 				type="button"
 				onClick={() => setIsOpen((current) => !current)}
 				aria-expanded={isOpen}
 				aria-controls={panelId}
-				className="flex w-full items-start gap-3 border-b border-[color:var(--dashboardy-divider)] bg-[color:color-mix(in_srgb,var(--dashboardy-subsurface)_82%,white)] px-4 py-3 text-left"
+				className={cn(
+					"flex w-full items-start gap-l",
+					"edge-b-m px-xl py-l",
+					"text-left",
+					"border-line bg-inset",
+				)}
 			>
-				<div className="mt-0.5 shrink-0 text-[color:var(--dashboardy-muted)]">
+				<div className="mt-xxs shrink-0 text-ink-3">
 					{isOpen ? (
 						<TraceChevronDownIcon className="size-4" />
 					) : (
 						<TraceChevronRightIcon className="size-4" />
 					)}
 				</div>
-				<div className="grid min-w-0 flex-1 gap-0.5">
-					<p className="text-[0.8125rem] font-semibold text-[color:var(--dashboardy-heading)]">
+				<div className="grid min-w-0 flex-1 gap-xxs">
+					<p className="text-body-l font-heavy text-ink">
 						{formatTagLabel(tag)}
 					</p>
 					{isOpen ? null : (
-						<p className="text-[0.8125rem] text-[color:var(--dashboardy-muted)] [overflow-wrap:anywhere]">
+						<p className="text-body-l text-ink-3 [overflow-wrap:anywhere]">
 							{formatXmlBlockSummary(entries)}
 						</p>
 					)}
 				</div>
-			</button>
+			</Pressable>
 			{isOpen ? (
-				<div
-					id={panelId}
-					className="divide-y divide-[color:var(--dashboardy-divider)]"
-				>
+				<div id={panelId} className="divide-y divide-line">
 					{entries.map((entry, entryIndex) => (
 						<div
 							// biome-ignore lint/suspicious/noArrayIndexKey: parsed XML fields are static and may repeat names
 							key={`${entry.key}:${entryIndex}`}
-							className="flex gap-4 px-4 py-3"
+							className="flex gap-xl px-xl py-l"
 						>
-							<p className="min-w-[6.5rem] shrink-0 text-[0.8125rem] font-medium text-[color:var(--dashboardy-muted)]">
+							<p className="min-w-[6.5rem] shrink-0 text-body-l font-medium text-ink-3">
 								{formatTagLabel(entry.key)}
 							</p>
-							<p className="break-all font-mono text-[0.8125rem] leading-5 text-[color:var(--dashboardy-heading)]">
+							<p className="break-all font-data text-body-l text-ink">
 								{entry.value}
 							</p>
 						</div>
@@ -146,7 +149,7 @@ function XmlBlock({
 
 function renderTextParts(parts: ReadonlyArray<TextPart>, key: string) {
 	return (
-		<div key={key} data-testid="message-text-block" className="space-y-3.5">
+		<div key={key} data-testid="message-text-block" className="space-y-xl">
 			{parts.map((part, partIdx) => {
 				if (part.type === "code") {
 					return (
@@ -176,7 +179,7 @@ function renderTextParts(parts: ReadonlyArray<TextPart>, key: string) {
 							// biome-ignore lint/suspicious/noArrayIndexKey: static parsed content blocks
 							key={partIdx}
 							data-testid="message-content-notice"
-							className="whitespace-pre-wrap break-words text-[0.8125rem] leading-5 text-[color:var(--dashboardy-muted)] italic [overflow-wrap:anywhere]"
+							className="whitespace-pre-wrap break-words text-body-l text-ink-3 italic [overflow-wrap:anywhere]"
 						>
 							{part.content}
 						</p>
@@ -188,7 +191,7 @@ function renderTextParts(parts: ReadonlyArray<TextPart>, key: string) {
 						key={partIdx}
 						className="max-w-[65ch]"
 					>
-						<p className="whitespace-pre-wrap break-words text-[0.8125rem] leading-5 text-[color:var(--dashboardy-heading)] text-pretty [overflow-wrap:anywhere]">
+						<p className="whitespace-pre-wrap break-words text-body-l text-ink text-pretty [overflow-wrap:anywhere]">
 							{renderInlineCode(part.content)}
 						</p>
 					</div>
@@ -219,7 +222,7 @@ function renderStrongText(text: string, keyPrefix: string): ReactNode[] {
 			content.push(
 				<strong
 					key={`${keyPrefix}-strong-${match.index}`}
-					className="font-semibold"
+					className="font-heavy"
 				>
 					<SignalText text={strongText} />
 				</strong>,
@@ -324,12 +327,7 @@ export function MessageContent({ content, className }: MessageContentProps) {
 
 	if (!content) {
 		return (
-			<div
-				className={cn(
-					"text-sm italic text-[color:var(--dashboardy-muted)]",
-					className,
-				)}
-			>
+			<div className={cn("text-body-xl italic text-ink-3", className)}>
 				(No content)
 			</div>
 		);
@@ -337,7 +335,7 @@ export function MessageContent({ content, className }: MessageContentProps) {
 
 	if (typeof content === "string") {
 		return (
-			<div className={cn("space-y-3.5", className)}>
+			<div className={cn("space-y-xl", className)}>
 				{renderTextParts(renderPlan.textPartsByBlock[0] ?? [], "plain-content")}
 			</div>
 		);
@@ -345,12 +343,7 @@ export function MessageContent({ content, className }: MessageContentProps) {
 
 	if (!Array.isArray(content)) {
 		return (
-			<div
-				className={cn(
-					"text-sm italic text-[color:var(--dashboardy-muted)]",
-					className,
-				)}
-			>
+			<div className={cn("text-body-xl italic text-ink-3", className)}>
 				(Invalid content format: {typeof content})
 			</div>
 		);
@@ -370,7 +363,7 @@ export function MessageContent({ content, className }: MessageContentProps) {
 	}
 
 	return (
-		<div className={cn("space-y-3.5", className)}>
+		<div className={cn("space-y-xl", className)}>
 			{renderPlan.visibleBlocks.map((block, blockIndex) => {
 				const blockKey = getMessageBlockKey(block, blockIndex);
 
@@ -392,12 +385,12 @@ export function MessageContent({ content, className }: MessageContentProps) {
 						return (
 							<div
 								key={blockKey}
-								className="rounded-[1rem] border border-[color:var(--dashboardy-divider)] bg-[color:color-mix(in_srgb,var(--dashboardy-subsurface)_82%,white)] px-4 py-3.5"
+								className="corner-l edge-m border-line bg-inset px-xl py-xl"
 							>
-								<p className="mb-1 text-sm font-semibold text-[color:var(--dashboardy-heading)]">
+								<p className="mb-xs text-body-xl font-heavy text-ink">
 									Thinking
 								</p>
-								<p className="whitespace-pre-wrap text-[0.8125rem] leading-5 text-[color:var(--dashboardy-muted)] italic text-pretty">
+								<p className="whitespace-pre-wrap text-body-l text-ink-3 italic text-pretty">
 									<SignalText text={block.thinking} />
 								</p>
 							</div>
@@ -443,18 +436,16 @@ export function MessageContent({ content, className }: MessageContentProps) {
 							<div
 								key={blockKey}
 								className={cn(
-									"grid gap-2.5 rounded-[1rem] border p-3.5",
+									"grid gap-l corner-l edge-m p-xl",
 									block.is_error
-										? "border-[color:var(--dashboardy-border)] bg-[color:var(--dashboardy-danger-surface)]"
-										: "border-[color:var(--dashboardy-divider)] bg-[color:color-mix(in_srgb,var(--dashboardy-subsurface)_82%,white)]",
+										? "border-line bg-error-tint"
+										: "border-line bg-inset",
 								)}
 							>
 								<p
 									className={cn(
-										"text-sm font-semibold",
-										block.is_error
-											? "text-[color:var(--dashboardy-danger-foreground)]"
-											: "text-[color:var(--dashboardy-heading)]",
+										"text-body-xl font-heavy",
+										block.is_error ? "text-error" : "text-ink",
 									)}
 								>
 									{block.is_error ? "Tool Error" : "Tool Result"}
@@ -476,7 +467,7 @@ export function MessageContent({ content, className }: MessageContentProps) {
 			{omittedBlockCount > 0 ? (
 				<p
 					data-testid="message-block-limit-notice"
-					className="whitespace-pre-wrap break-words text-[0.8125rem] leading-5 text-[color:var(--dashboardy-muted)] italic [overflow-wrap:anywhere]"
+					className="whitespace-pre-wrap break-words text-body-l text-ink-3 italic [overflow-wrap:anywhere]"
 				>
 					Additional content not shown ({omittedBlockCount}{" "}
 					{omittedBlockCount === 1 ? "block" : "blocks"} omitted).

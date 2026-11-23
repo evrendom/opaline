@@ -90,17 +90,18 @@ export function CreateWorkspaceCard({
 						readOnly
 					/>
 				</WorkspaceSettingsRow>
-				<div className="workspace-settings-actions">
+				<div className="settings-actions">
 					{error ? (
-						<p
-							id={`${nameId}-error`}
-							role="alert"
-							className="workspace-settings-error"
-						>
+						<p id={`${nameId}-error`} role="alert" className="settings-error">
 							{error}
 						</p>
 					) : null}
-					<Button type="submit" size="sm" disabled={isCreating || !slugPreview}>
+					<Button
+						variant="primary"
+						type="submit"
+						size="md"
+						disabled={isCreating || !slugPreview}
+					>
 						{isCreating ? "Creating workspace…" : submitLabel}
 					</Button>
 				</div>
@@ -111,7 +112,7 @@ export function CreateWorkspaceCard({
 
 export function CreateWorkspacePage() {
 	return (
-		<div className="workspace-settings-page">
+		<div className="settings-page">
 			<CreateWorkspaceCard />
 		</div>
 	);

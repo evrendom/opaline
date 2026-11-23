@@ -1,10 +1,9 @@
 import type { ReactNode } from "react";
+import { useOptionalSidebar } from "@/app/ui/sidebar";
 import { cn } from "@/lib/utils";
 
 /** The window plus the strip of canvas under it.
- * The column owns the inset's canvas margin, which SidebarInset only applies
- * as the sidebar's direct sibling, so pair it with `shellWindowRadiusClassName`
- * on the inset. */
+ * The column owns the canvas margin around the window (SidebarInset). */
 export function ShellWindowColumn({
 	children,
 	footer,
@@ -14,11 +13,16 @@ export function ShellWindowColumn({
 	 *  keeps it. */
 	footer?: ReactNode;
 }) {
+	// The desktop window bar makes room for the traffic lights when the
+	// sidebar is collapsed (app-shell.css reads this).
+	const sidebar = useOptionalSidebar();
+	const sidebarState = sidebar && !sidebar.isMobile ? sidebar.state : undefined;
 	return (
 		<div
+			data-sidebar-state={sidebarState}
 			className={cn(
-				"flex min-h-0 min-w-0 flex-1 flex-col md:peer-data-[variant=inset]:mx-2 md:peer-data-[variant=inset]:mt-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2",
-				!footer && "md:peer-data-[variant=inset]:mb-2",
+				"flex min-h-0 min-w-0 flex-1 flex-col md:peer-data-[variant=inset]:mx-m md:peer-data-[variant=inset]:mt-m md:peer-data-[variant=inset]:ml-zero md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-m",
+				!footer && "md:peer-data-[variant=inset]:mb-m",
 			)}
 		>
 			{children}
@@ -26,9 +30,6 @@ export function ShellWindowColumn({
 		</div>
 	);
 }
-
-export const shellWindowRadiusClassName =
-	"md:rounded-lg squircle:md:rounded-3xl";
 
 /** Holds the footer's height while there is nothing to show. */
 export function ShellWindowFooterPlaceholder() {

@@ -1,0 +1,424 @@
+/* ============================================================
+   Opaline · theme.css: Layer 1, the primitives
+   The neutral ramp, the opal palette, success / warning / error (each with
+   its -transparent and -translucent levels), the type scales, space,
+   corners, strokes, the theme's three shadows and motion, in light (:root)
+   and dark (.dark). The first block registers them as Tailwind utilities
+   (text-body-*, text-display-*, corner-*, edge-*, gap-m …).
+   Screens never read these directly: they read the Layer 2 roles in
+   tokens.css. A new primitive goes here; a new role goes in tokens.css.
+   ============================================================ */
+
+@theme inline reference {
+  /* Colors */
+  --color-color-1: var(--color-1);
+  --color-color-2: var(--color-2);
+  --color-color-3: var(--color-3);
+  --color-color-4: var(--color-4);
+  --color-color-5: var(--color-5);
+  --color-color-5-translucent: var(--color-5-translucent);
+  --color-neutral-3: var(--neutral-3);
+  --color-neutral-10: var(--neutral-10);
+  --color-neutral-10-transparent: var(--neutral-10-transparent);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-warning-translucent: var(--warning-translucent);
+  --color-error: var(--error);
+
+  /* Fonts */
+  --font-weight-regular: var(--weight-regular);
+  --font-weight-medium: var(--weight-medium);
+  --font-weight-heavy: var(--weight-heavy);
+
+  /* Body text */
+  --text-body-xxs: var(--size-xxs);
+  --text-body-xxs--line-height: var(--line-xxs);
+  --text-body-xxs--letter-spacing: var(--letter-spacing-xxs);
+  --text-body-xs: var(--size-xs);
+  --text-body-xs--line-height: var(--line-xs);
+  --text-body-xs--letter-spacing: var(--letter-spacing-xs);
+  --text-body-s: var(--size-s);
+  --text-body-s--line-height: var(--line-s);
+  --text-body-s--letter-spacing: var(--letter-spacing-s);
+  --text-body-m: var(--size-m);
+  --text-body-m--line-height: var(--line-m);
+  --text-body-m--letter-spacing: var(--letter-spacing-m);
+  --text-body-l: var(--size-l);
+  --text-body-l--line-height: var(--line-l);
+  --text-body-l--letter-spacing: var(--letter-spacing-l);
+  --text-body-xl: var(--size-xl);
+  --text-body-xl--line-height: var(--line-xl);
+  --text-body-xl--letter-spacing: var(--letter-spacing-xl);
+  --text-body-xxl: var(--size-xxl);
+  --text-body-xxl--line-height: var(--line-xxl);
+  --text-body-xxl--letter-spacing: var(--letter-spacing-xxl);
+  --tracking-xs: var(--tracking-xs);
+  --tracking-s: var(--tracking-s);
+  --tracking-m: var(--tracking-m);
+  --tracking-l: var(--tracking-l);
+  --tracking-xl: var(--tracking-xl);
+
+  /* Display text */
+  --text-display-xxs: var(--display-size-xxs);
+  --text-display-xxs--line-height: var(--display-line-xxs);
+  --text-display-xxs--letter-spacing: var(--display-letter-spacing-xxs);
+  --text-display-xs: var(--display-size-xs);
+  --text-display-xs--line-height: var(--display-line-xs);
+  --text-display-xs--letter-spacing: var(--display-letter-spacing-xs);
+  --text-display-s: var(--display-size-s);
+  --text-display-s--line-height: var(--display-line-s);
+  --text-display-s--letter-spacing: var(--display-letter-spacing-s);
+  --text-display-xxl: var(--display-size-xxl);
+  --text-display-xxl--line-height: var(--display-line-xxl);
+  --text-display-xxl--letter-spacing: var(--display-letter-spacing-xxl);
+
+  /* Spacing */
+  --padding-zero: var(--space-zero);
+  --padding-xxs: var(--space-xxs);
+  --padding-xs: var(--space-xs);
+  --padding-s: var(--space-s);
+  --padding-m: var(--space-m);
+  --padding-l: var(--space-l);
+  --padding-xl: var(--space-xl);
+  --padding-xxl: var(--space-xxl);
+  --padding-xxxl: var(--space-xxxl);
+  --margin-zero: var(--space-zero);
+  --margin-xxs: var(--space-xxs);
+  --margin-xs: var(--space-xs);
+  --margin-s: var(--space-s);
+  --margin-m: var(--space-m);
+  --margin-l: var(--space-l);
+  --margin-xl: var(--space-xl);
+  --margin-xxl: var(--space-xxl);
+  --margin-xxxl: var(--space-xxxl);
+  --gap-zero: var(--space-zero);
+  --gap-xxs: var(--space-xxs);
+  --gap-xs: var(--space-xs);
+  --gap-s: var(--space-s);
+  --gap-m: var(--space-m);
+  --gap-l: var(--space-l);
+  --gap-xl: var(--space-xl);
+  --gap-xxl: var(--space-xxl);
+  --gap-xxxl: var(--space-xxxl);
+  --space-zero: var(--space-zero);
+  --space-xxs: var(--space-xxs);
+  --space-xs: var(--space-xs);
+  --space-s: var(--space-s);
+  --space-m: var(--space-m);
+  --space-l: var(--space-l);
+  --space-xl: var(--space-xl);
+  --space-xxl: var(--space-xxl);
+  --space-xxxl: var(--space-xxxl);
+
+  /* Corners and edges */
+  --corner-zero: var(--radius-zero);
+  --corner-xs: var(--radius-xs);
+  --corner-s: var(--radius-s);
+  --corner-m: var(--radius-m);
+  --corner-l: var(--radius-l);
+  --corner-xl: var(--radius-xl);
+  --corner-full: var(--radius-full);
+  --edge-none: var(--border-none);
+  --edge-s: var(--border-s);
+  --edge-m: var(--border-m);
+  --edge-l: var(--border-l);
+
+}
+
+/* Fonts. Each sets the face and points font-regular, font-medium and
+   font-heavy at its weights. */
+@utility font-body {
+  font-family: var(--font-body);
+  --weight-regular: var(--weight-body-regular);
+  --weight-medium: var(--weight-body-medium);
+  --weight-heavy: var(--weight-body-heavy);
+}
+
+@utility font-display {
+  font-family: var(--font-display);
+  --weight-regular: var(--weight-display-regular);
+  --weight-medium: var(--weight-display-medium);
+  --weight-heavy: var(--weight-display-heavy);
+}
+
+@utility font-data {
+  font-family: var(--font-data);
+  --weight-regular: var(--weight-data-regular);
+  --weight-medium: var(--weight-data-medium);
+  --weight-heavy: var(--weight-data-heavy);
+}
+
+/* Corners: corner-m for all four, corner-t-m for the top two. */
+@utility corner-* {
+  border-radius: --value(--corner-*);
+}
+
+@utility corner-t-* {
+  border-top-left-radius: --value(--corner-*);
+  border-top-right-radius: --value(--corner-*);
+}
+
+@utility corner-r-* {
+  border-top-right-radius: --value(--corner-*);
+  border-bottom-right-radius: --value(--corner-*);
+}
+
+@utility corner-b-* {
+  border-bottom-right-radius: --value(--corner-*);
+  border-bottom-left-radius: --value(--corner-*);
+}
+
+@utility corner-l-* {
+  border-top-left-radius: --value(--corner-*);
+  border-bottom-left-radius: --value(--corner-*);
+}
+
+@utility corner-tl-* {
+  border-top-left-radius: --value(--corner-*);
+}
+
+@utility corner-tr-* {
+  border-top-right-radius: --value(--corner-*);
+}
+
+@utility corner-br-* {
+  border-bottom-right-radius: --value(--corner-*);
+}
+
+@utility corner-bl-* {
+  border-bottom-left-radius: --value(--corner-*);
+}
+
+@utility corner-s-* {
+  border-start-start-radius: --value(--corner-*);
+  border-end-start-radius: --value(--corner-*);
+}
+
+@utility corner-e-* {
+  border-start-end-radius: --value(--corner-*);
+  border-end-end-radius: --value(--corner-*);
+}
+
+@utility corner-ss-* {
+  border-start-start-radius: --value(--corner-*);
+}
+
+@utility corner-se-* {
+  border-start-end-radius: --value(--corner-*);
+}
+
+@utility corner-ee-* {
+  border-end-end-radius: --value(--corner-*);
+}
+
+@utility corner-es-* {
+  border-end-start-radius: --value(--corner-*);
+}
+
+/* Edges: edge-m for all sides, edge-b-m for the bottom. Each sets a width
+   and keeps the stroke’s style, so border colors, shadows and focus rings
+   compose with it. */
+@utility edge-* {
+  border-style: var(--tw-border-style, solid);
+  border-width: --value(--edge-*);
+}
+
+@utility edge-x-* {
+  border-left-style: var(--tw-border-style, solid);
+  border-left-width: --value(--edge-*);
+  border-right-style: var(--tw-border-style, solid);
+  border-right-width: --value(--edge-*);
+}
+
+@utility edge-y-* {
+  border-top-style: var(--tw-border-style, solid);
+  border-top-width: --value(--edge-*);
+  border-bottom-style: var(--tw-border-style, solid);
+  border-bottom-width: --value(--edge-*);
+}
+
+@utility edge-t-* {
+  border-top-style: var(--tw-border-style, solid);
+  border-top-width: --value(--edge-*);
+}
+
+@utility edge-r-* {
+  border-right-style: var(--tw-border-style, solid);
+  border-right-width: --value(--edge-*);
+}
+
+@utility edge-b-* {
+  border-bottom-style: var(--tw-border-style, solid);
+  border-bottom-width: --value(--edge-*);
+}
+
+@utility edge-l-* {
+  border-left-style: var(--tw-border-style, solid);
+  border-left-width: --value(--edge-*);
+}
+
+@utility edge-s-* {
+  border-inline-start-style: var(--tw-border-style, solid);
+  border-inline-start-width: --value(--edge-*);
+}
+
+@utility edge-e-* {
+  border-inline-end-style: var(--tw-border-style, solid);
+  border-inline-end-width: --value(--edge-*);
+}
+
+:root {
+  /* Colors */
+  --color-1: #2e70ff;
+  --color-1-translucent: #2e70ff4a;
+  --color-1-transparent: #2e70ff17;
+  --color-2: #a847ff;
+  --color-2-translucent: #a847ff21;
+  --color-3: #6d58ff;
+  --color-3-translucent: #6d58ff21;
+  --color-4: #e03bf0;
+  --color-5: #ff3dc0;
+  --color-5-translucent: #ff3dc01f;
+  --neutral-1: #ffffff;
+  --neutral-2: #fafafa;
+  --neutral-3: #f5f5f5;
+  --neutral-4: #e5e5e5;
+  --neutral-5: #d4d4d4;
+  --neutral-5-translucent: #d4d4d466;
+  --neutral-6: #a1a1a1;
+  --neutral-7: #737373;
+  --neutral-8: #525252;
+  --neutral-9: #262626;
+  --neutral-10: #0a0a0a;
+  --neutral-10-translucent: #0a0a0a14;
+  --neutral-10-transparent: #0a0a0a0a;
+  --success: #009966;
+  --success-translucent: #00996666;
+  --warning: #e17100;
+  --warning-translucent: #e171003d;
+  --warning-transparent: #e1710024;
+  /* rose, as main drew every error mark: rose-600 in light, rose-500 in dark */
+  --error: #ec003f;
+  --error-translucent: #ec003f36;
+  --error-transparent: #ec003f1c;
+
+  /* Fonts */
+  --font-body: "Inter Variable", sans-serif;
+  --font-display: "Inter Variable", sans-serif;
+  --font-data: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --weight-body-regular: 400;
+  --weight-body-medium: 500;
+  --weight-body-heavy: 600;
+  --weight-display-regular: 400;
+  --weight-display-medium: 500;
+  --weight-display-heavy: 600;
+  --weight-data-regular: 400;
+  --weight-data-heavy: 600;
+  --weight-data-medium: 500;
+  --weight-regular: var(--weight-body-regular);
+  --weight-medium: var(--weight-body-medium);
+  --weight-heavy: var(--weight-body-heavy);
+
+  /* Body text */
+  --size-xxs: 8px;
+  --line-xxs: 12px;
+  --letter-spacing-xxs: 0em;
+  --size-xs: 10px;
+  --line-xs: 14px;
+  --letter-spacing-xs: 0em;
+  --size-s: 11px;
+  --line-s: 16px;
+  --letter-spacing-s: 0em;
+  --size-m: 12px;
+  --line-m: 16px;
+  --letter-spacing-m: 0em;
+  --size-l: 13px;
+  --line-l: 20px;
+  --letter-spacing-l: 0em;
+  --size-xl: 14px;
+  --line-xl: 20px;
+  --letter-spacing-xl: 0em;
+  --size-xxl: 16px;
+  --line-xxl: 24px;
+  --letter-spacing-xxl: 0em;
+  --tracking-xs: -0.015em;
+  --tracking-s: 0em;
+  --tracking-m: 0em;
+  --tracking-l: 0em;
+  --tracking-xl: 0.02em;
+
+  /* Display text */
+  --display-size-xxs: 20px;
+  --display-line-xxs: 28px;
+  --display-letter-spacing-xxs: -0.015em;
+  --display-size-xs: 24px;
+  --display-line-xs: 32px;
+  --display-letter-spacing-xs: -0.015em;
+  --display-size-s: 30px;
+  --display-line-s: 36px;
+  --display-letter-spacing-s: -0.015em;
+  --display-size-xxl: 88px;
+  --display-line-xxl: 88px;
+  --display-letter-spacing-xxl: -0.015em;
+
+  /* Spacing */
+  --space-zero: 0px;
+  --space-xxs: 2px;
+  --space-xs: 4px;
+  --space-s: 6px;
+  --space-m: 8px;
+  --space-l: 12px;
+  --space-xl: 16px;
+  --space-xxl: 24px;
+  --space-xxxl: 32px;
+
+  /* Corners and edges */
+  --radius-zero: 0px;
+  --radius-xs: 6px;
+  --radius-s: 8px;
+  --radius-m: 10px;
+  --radius-l: 14px;
+  --radius-xl: 22px;
+  --radius-full: 9999px;
+  --border-none: 0px;
+  --border-s: 0.5px;
+  --border-m: 1px;
+  --border-l: 2px;
+
+  /* Motion */
+  --motion-duration: 150ms;
+  --motion-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --motion-large-duration: 300ms;
+  --motion-large-easing: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dark {
+  /* Colors */
+  --color-1-translucent: #2e70ff82;
+  --color-1-transparent: #2e70ff42;
+  --color-2-translucent: #a847ff3b;
+  --color-3-translucent: #6d58ff42;
+  --color-5-translucent: #ff3dc06b;
+  --neutral-1: #0f0f0f;
+  --neutral-2: #171717;
+  --neutral-3: #262626;
+  --neutral-4: #404040;
+  --neutral-5: #525252;
+  --neutral-5-translucent: #52525266;
+  --neutral-6: #737373;
+  --neutral-7: #a1a1a1;
+  --neutral-8: #d4d4d4;
+  --neutral-9: #e5e5e5;
+  --neutral-10: #fafafa;
+  --neutral-10-translucent: #fafafa1c;
+  --neutral-10-transparent: #fafafa0d;
+  --success: #00bc7d;
+  --success-translucent: #00bc7d5c;
+  --warning: #fe9a00;
+  --warning-translucent: #fe9a0066;
+  --warning-transparent: #fe9a002b;
+  --error: #ff2056;
+  --error-translucent: #ff205666;
+  --error-transparent: #ff20562b;
+
+}

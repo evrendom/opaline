@@ -23,7 +23,7 @@ import { type CSSProperties, type ReactNode, useState } from "react";
 import { Link } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
 import { Bone, Reveal } from "@/app/ui/bones";
-import { FluidMenuHover } from "@/components/ui/fluid-menu-hover";
+import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
 import { formatReaderCost } from "@/features/sessions/reader/model/session-reader-model";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { useUserMap } from "@/features/workspace/hooks/useUserMap";
@@ -96,7 +96,7 @@ export function RunPane({
 					<FluidMenuHover items="a" />
 					<Link
 						to={getShellRoutePath(appRoutes.sessionDetail(run.sessionId))}
-						className="cost-text-button inline-flex items-center gap-1"
+						className="text-button inline-flex items-center gap-xs"
 					>
 						Open the session
 						<IconExternalLink aria-hidden="true" className="size-3.5" />
@@ -194,7 +194,7 @@ export function RunPaneSample({ run }: { run: NoticeableRun }) {
 				<div className="compass-detail-actions">
 					<span
 						skullet-block=""
-						className="cost-text-button inline-flex items-center gap-1"
+						className="text-button inline-flex items-center gap-xs"
 					>
 						Open the session
 						<IconExternalLink aria-hidden="true" className="size-3.5" />
@@ -248,7 +248,7 @@ function FlagItem({ flag }: { flag: RunFlag }) {
 		<li>
 			<button
 				type="button"
-				className="compass-flag-item"
+				className="compass-flag-item focus-outline"
 				style={{ "--glyph-color": kind.color } as CSSProperties}
 				onClick={() =>
 					document
@@ -315,10 +315,10 @@ function Observation({
 			</p>
 		);
 	return (
-		<div className="flex flex-col items-start gap-1.5">
+		<div className="flex flex-col items-start gap-s">
 			<button
 				type="button"
-				className="cost-secondary-button inline-flex items-center gap-1.5"
+				className="secondary-button inline-flex items-center gap-s"
 				onClick={observe}
 				disabled={busy}
 			>
@@ -464,7 +464,7 @@ function ContextGroup({
 			{head.starting.length > 0 ? <FlagMarkers flags={head.starting} /> : null}
 			<button
 				type="button"
-				className="compass-timeline-line compass-timeline-group"
+				className="compass-timeline-line compass-timeline-group focus-outline"
 				onClick={() => setOpen(true)}
 			>
 				<IconFileText aria-hidden="true" className="compass-timeline-icon" />
@@ -542,7 +542,7 @@ function TimelineItem({
 			{record.text && record.kind !== "file_change" ? (
 				<button
 					type="button"
-					className="compass-timeline-text"
+					className="compass-timeline-text focus-outline"
 					data-open={open || undefined}
 					data-long={long || undefined}
 					aria-expanded={long ? open : undefined}
@@ -614,11 +614,11 @@ function fileOpLabel(op: string): string {
 
 function TimelineSkeleton() {
 	return (
-		<div className="flex flex-col gap-3" aria-hidden="true">
+		<div className="flex flex-col gap-l" aria-hidden="true">
 			{[0, 1, 2, 3, 4, 5].map((index) => (
-				<div key={index} className="flex flex-col gap-1.5">
-					<Bone className="h-3.5 w-40 rounded-[4px]" />
-					<Bone className="h-3 w-full max-w-120 rounded-[4px]" />
+				<div key={index} className="flex flex-col gap-s">
+					<Bone className="h-3.5 w-40 corner-xs" />
+					<Bone className="h-3 w-full max-w-120 corner-xs" />
 				</div>
 			))}
 		</div>

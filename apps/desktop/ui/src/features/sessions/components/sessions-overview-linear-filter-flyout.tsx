@@ -165,7 +165,7 @@ export function SessionMenuFlyoutSurface({
 				fitsRight ? rightLeft : 2 - parentBorder - surface.offsetWidth,
 			);
 			surface.style.setProperty(
-				"--session-menu-flyout-origin",
+				"--menu-flyout-origin",
 				`${fitsRight ? "0" : "100%"} ${rowTop - top}px`,
 			);
 			setPosition((previous) =>
@@ -192,7 +192,7 @@ export function SessionMenuFlyoutSurface({
 			ref={surfaceRef}
 			role="dialog"
 			aria-label={`${label} filter`}
-			className="session-menu-surface session-menu-flyout"
+			className="menu-surface menu-flyout"
 			data-kind={kind}
 			style={position}
 			onMouseEnter={onMouseEnter}

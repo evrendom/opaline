@@ -242,11 +242,11 @@ export function getCostQuintiles(values: readonly number[]): number[] {
 
 // Green = cheapest, red = priciest. Literal classes so Tailwind keeps them.
 const COST_HEAT_SHADES = [
-	"text-green-600 dark:text-green-400",
-	"text-yellow-600 dark:text-yellow-400",
+	"text-success",
+	"text-yellow-600 dark:text-yellow-400", // design-escape-ok(dark): data paint; cost heat's middle hues
 	"text-amber-600 dark:text-amber-400",
-	"text-orange-600 dark:text-orange-400",
-	"text-red-600 dark:text-red-400",
+	"text-orange-600 dark:text-orange-400", // design-escape-ok(dark): data paint; cost heat's middle hues
+	"text-error",
 ] as const;
 
 export function getCostShade(

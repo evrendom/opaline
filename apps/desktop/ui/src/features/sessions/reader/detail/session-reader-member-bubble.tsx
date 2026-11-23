@@ -1,6 +1,8 @@
 import { scanMemberLanguageSignals } from "@rudel/language-signals";
 import { type ReactNode, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
+import { Card, CardContent } from "@/app/ui/card";
+import { Pressable } from "@/app/ui/pressable";
 import { SignalText } from "@/components/signal-text";
 import { cn } from "@/lib/utils";
 import { TwoLines } from "./session-reader-two-lines";
@@ -27,8 +29,8 @@ export function MemberBubble({
 	const message = (
 		<p
 			className={cn(
-				"whitespace-pre-wrap text-sm [overflow-wrap:anywhere]",
-				preview && "text-muted-foreground",
+				"whitespace-pre-wrap text-body-xl [overflow-wrap:anywhere]",
+				preview && "text-ink-3",
 			)}
 		>
 			<SignalText
@@ -38,29 +40,33 @@ export function MemberBubble({
 		</p>
 	);
 	return (
-		<div className="flex gap-3">
+		<div className="flex gap-l">
 			{avatar ? (
-				<span className="mt-1.5 flex shrink-0">{avatar}</span>
+				<span className="mt-s flex shrink-0">{avatar}</span>
 			) : (
-				<Avatar className="mt-1.5 size-6 shrink-0 shadow-(--custom-shadow) after:hidden">
+				<Avatar size="sm" className="mt-s shrink-0">
 					{imageUrl ? <AvatarImage src={imageUrl} alt="" /> : null}
-					<AvatarFallback className="text-[0.625rem]">
-						{label.charAt(0).toUpperCase()}
-					</AvatarFallback>
+					<AvatarFallback>{label.charAt(0).toUpperCase()}</AvatarFallback>
 				</Avatar>
 			)}
-			<div className="min-w-0 flex-1 rounded-lg bg-card px-3 py-2.5 shadow-(--custom-shadow) corner-squircle squircle:rounded-2xl">
-				{folded ? <TwoLines className="text-sm">{message}</TwoLines> : message}
-				{!folded && text.length > MEMBER_TEXT_CLAMP ? (
-					<button
-						type="button"
-						onClick={() => setExpanded((value) => !value)}
-						className="mt-1.5 text-xs text-muted-foreground hover:text-foreground"
-					>
-						{expanded ? "Show less" : "Show more"}
-					</button>
-				) : null}
-			</div>
+			<Card size="sm" className="min-w-0 flex-1">
+				<CardContent>
+					{folded ? (
+						<TwoLines className="text-body-xl">{message}</TwoLines>
+					) : (
+						message
+					)}
+					{!folded && text.length > MEMBER_TEXT_CLAMP ? (
+						<Pressable
+							type="button"
+							onClick={() => setExpanded((value) => !value)}
+							className="mt-s text-body-m text-ink-3 hover:text-ink"
+						>
+							{expanded ? "Show less" : "Show more"}
+						</Pressable>
+					) : null}
+				</CardContent>
+			</Card>
 		</div>
 	);
 }

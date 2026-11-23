@@ -185,16 +185,18 @@ const LINE_LOOK: Record<
 	{ mark: string; row: string; sign: string; signColor: string }
 > = {
 	added: {
-		mark: "rounded-[3px] bg-green-500/20 box-decoration-clone",
+		mark: "corner-xs bg-green-500/20 box-decoration-clone",
 		row: "bg-green-500/10",
 		sign: "+",
+		// design-escape-ok(dark): data paint; the added-line sign lightens on dark
 		signColor: "text-green-600 dark:text-green-400",
 	},
 	context: { mark: "", row: "", sign: " ", signColor: "" },
 	removed: {
-		mark: "rounded-[3px] bg-red-500/20 box-decoration-clone",
+		mark: "corner-xs bg-red-500/20 box-decoration-clone",
 		row: "bg-red-500/10",
 		sign: "−",
+		// design-escape-ok(dark): data paint; the removed-line sign lightens on dark
 		signColor: "text-red-600 dark:text-red-400",
 	},
 };
@@ -238,7 +240,7 @@ function renderRow(
 		return (
 			<div
 				key={`separator-${hunk.oldStart}-${hunk.newStart}`}
-				className="flex gap-2 px-1.5 py-1 text-muted-foreground/70 italic"
+				className="flex gap-m px-s py-xs text-ink-4 italic"
 			>
 				<span skullet-ignore="" className="shrink-0" style={numberStyle} />
 				<span skullet-ignore="" className="w-2 shrink-0" />
@@ -259,25 +261,23 @@ function renderRow(
 			<div
 				key={`${line.oldNumber ?? ""}:${line.newNumber ?? ""}`}
 				className={cn(
-					"flex min-h-[1.2em] gap-2 px-1.5",
-					isLit && "bg-foreground/[0.07] dark:bg-foreground/[0.09]",
-					isLit && !litAt(row.line - 1) && "rounded-t-md",
-					isLit && !litAt(row.line + 1) && "rounded-b-md",
+					"flex min-h-[1.2em] gap-m px-s",
+					isLit && "bg-hover-strong",
+					isLit && !litAt(row.line - 1) && "corner-t-s",
+					isLit && !litAt(row.line + 1) && "corner-b-s",
 				)}
 			>
 				<span
 					className={cn(
 						"shrink-0 text-right tabular-nums select-none",
-						isLit ? "text-muted-foreground" : "text-muted-foreground/30",
+						isLit ? "text-ink-3" : "text-ink-4",
 					)}
 					style={numberStyle}
 				>
 					{line.newNumber}
 				</span>
 				<span skullet-ignore="" className="w-2 shrink-0" />
-				<span
-					className={cn("whitespace-pre", !isLit && "text-muted-foreground/40")}
-				>
+				<span className={cn("whitespace-pre", !isLit && "text-ink-4")}>
 					{isLit ? lineContent(line.text, tokens, line.marks, "") : line.text}
 				</span>
 			</div>
@@ -291,24 +291,21 @@ function renderRow(
 		<div
 			key={`${line.oldNumber ?? ""}:${line.newNumber ?? ""}`}
 			className={cn(
-				"flex min-h-[1.2em] gap-2 px-1.5",
+				"flex min-h-[1.2em] gap-m px-s",
 				look.row,
-				opens && "rounded-t-md",
-				closes && "rounded-b-md",
+				opens && "corner-t-s",
+				closes && "corner-b-s",
 			)}
 		>
 			<span
-				className="shrink-0 text-right text-muted-foreground/50 tabular-nums select-none"
+				className="shrink-0 text-right text-ink-4 tabular-nums select-none"
 				style={numberStyle}
 			>
 				{line.kind === "removed" ? line.oldNumber : line.newNumber}
 			</span>
 			<span
 				skullet-ignore=""
-				className={cn(
-					"w-2 shrink-0 text-muted-foreground/70 select-none",
-					look.signColor,
-				)}
+				className={cn("w-2 shrink-0 text-ink-4 select-none", look.signColor)}
 			>
 				{look.sign}
 			</span>
@@ -464,7 +461,7 @@ export function DiffView({
 			aria-label="Diff"
 			data-selectable=""
 			className={cn(
-				"scroll-fade-x -mx-1.5 overflow-x-auto font-mono text-[11px] leading-relaxed outline-none",
+				"scroll-fade-x -mx-s overflow-x-auto font-data text-body-s outline-none",
 				className,
 			)}
 		>

@@ -3,9 +3,7 @@ import {
 	IconArrowsDiagonalMinimize2,
 	IconBraces,
 } from "@tabler/icons-react";
-
-const TOGGLE =
-	"inline-flex shrink-0 items-center justify-center rounded p-1 text-muted-foreground/60 transition-colors outline-none hover:text-foreground aria-pressed:text-foreground";
+import { Button } from "@/app/ui/button";
 
 export function StepHeadToggles({
 	expanded,
@@ -21,12 +19,12 @@ export function StepHeadToggles({
 	return (
 		<>
 			{onExpand ? (
-				<button
+				<Button
+					size="icon-sm"
 					type="button"
 					aria-label="Expand"
 					aria-pressed={expanded}
 					title={expanded ? "Show the run again" : "Expand the step"}
-					className={TOGGLE}
 					onClick={() => onExpand(!expanded)}
 				>
 					{expanded ? (
@@ -37,18 +35,18 @@ export function StepHeadToggles({
 					) : (
 						<IconArrowsDiagonal aria-hidden="true" className="size-4" />
 					)}
-				</button>
+				</Button>
 			) : null}
-			<button
+			<Button
+				size="icon-sm"
 				type="button"
 				aria-label="Raw"
 				aria-pressed={raw}
 				title={raw ? "Show the overview" : "Show the raw step"}
-				className={TOGGLE}
 				onClick={onRaw}
 			>
 				<IconBraces aria-hidden="true" className="size-4" />
-			</button>
+			</Button>
 		</>
 	);
 }

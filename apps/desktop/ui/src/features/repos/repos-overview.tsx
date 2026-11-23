@@ -9,9 +9,11 @@ import {
 } from "@tabler/icons-react";
 import { memo, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { Badge } from "@/app/ui/badge";
 import { Reveal } from "@/app/ui/bones";
 import { Button } from "@/app/ui/button";
 import { SearchInput } from "@/components/dashboard/data-table";
+import { PageEmptyState } from "@/components/dashboard/page-parts";
 import {
 	buildRangeBound,
 	compactNumber,
@@ -26,8 +28,8 @@ import {
 	OverviewRangeFiltersMenu,
 	type RangeBound,
 } from "@/components/overview-list";
+import { RetryButton } from "@/components/retry-button";
 import { SkillMark } from "@/components/skill-mark";
-import { UsageStateMessage } from "@/components/usage-collection-view";
 import { formatCost } from "@/features/costs/cost-format";
 import { ToolbarSortMenu } from "@/features/sessions/components/sessions-overview-sort-menu";
 import {
@@ -147,7 +149,7 @@ export function ReposOverview({
 			>
 				{/* The sessions toolbar: search, sort and filter on 24px gutters. */}
 				<div
-					className="flex h-12 shrink-0 items-center gap-2 px-6"
+					className="flex h-12 shrink-0 items-center gap-m px-xxl"
 					data-slot="repos-overview-toolbar"
 				>
 					<SearchInput
@@ -180,30 +182,21 @@ export function ReposOverview({
 					/>
 				</div>
 				{!isPending && isError ? (
-					<UsageStateMessage
-						icon={<IconBook aria-hidden="true" />}
+					<PageEmptyState
+						icon={IconBook}
 						title="Repos couldn’t be loaded"
 						description="Your historical sessions are still available. Try loading this view again."
-						action={
-							<Button
-								type="button"
-								size="sm"
-								variant="outline"
-								onClick={onRetry}
-							>
-								Try again
-							</Button>
-						}
+						action={<RetryButton className="h-8 gap-xs" onRetry={onRetry} />}
 					/>
 				) : !isPending && (repos?.length ?? 0) === 0 ? (
-					<UsageStateMessage
-						icon={<IconBook aria-hidden="true" />}
+					<PageEmptyState
+						icon={IconBook}
 						title="No repos yet"
 						description="Repositories will appear here when sessions are uploaded."
 					/>
 				) : !isPending && visibleRepos.length === 0 ? (
-					<UsageStateMessage
-						icon={<IconZoomCancel aria-hidden="true" />}
+					<PageEmptyState
+						icon={IconZoomCancel}
 						title="No matching repos"
 						description={
 							hasActiveFilters
@@ -213,8 +206,8 @@ export function ReposOverview({
 						action={
 							<Button
 								type="button"
-								size="sm"
-								variant="outline"
+								size="md"
+								variant="primary"
 								onClick={() => {
 									setSearch("");
 									clearFilters();
@@ -294,7 +287,7 @@ const SAMPLE_REPOS: RepositorySummary[] = [
 	};
 });
 
-function ReposList({
+export function ReposList({
 	avatarMap,
 	getRepoHref,
 	repos,
@@ -356,17 +349,17 @@ const RepoRow = memo(function RepoRow({
 			>
 				<div className={OVERVIEW_ROW_LEAD_CELL_CLASS_NAME}>
 					<SkillMark skill={identity.repoLabel} emoji="📂" />
-					<div className="flex min-w-0 flex-1 flex-col gap-0.5">
-						<div className="flex min-w-0 items-center gap-2">
+					<div className="flex min-w-0 flex-1 flex-col gap-xxs">
+						<div className="flex min-w-0 items-center gap-m">
 							<p
-								className="min-w-0 truncate text-base/5 font-medium text-(--session-overview-text) sm:text-sm/5"
+								className="min-w-0 truncate text-body-xl font-medium text-ink"
 								title={identity.repoLabel}
 							>
 								{identity.repoLabel}
 							</p>
 							<RepoSignals repo={repo} />
 						</div>
-						<div className="flex min-w-0 items-center gap-1.5 text-xs/4 text-(--session-overview-muted)">
+						<div className="flex min-w-0 items-center gap-s text-body-m text-ink-2">
 							<OverviewMembers
 								avatarMap={avatarMap}
 								topUserIds={repo.topUsers.map((user) => user.userId)}
@@ -396,7 +389,7 @@ const RepoRow = memo(function RepoRow({
 				<div
 					className={cn(
 						OVERVIEW_METRIC_CELL_CLASS_NAME,
-						"font-medium text-(--session-overview-text)",
+						"font-medium text-ink",
 					)}
 					title={
 						repo.estimatedCost === null
@@ -435,35 +428,30 @@ export function RepoSignals({ repo }: { repo: RepositorySummary }) {
 			count: repo.signals.userNegative,
 			label: "negative",
 			title: "Negative user signals",
-			color:
-				"bg-[#ffe4e6] text-[#be123c] dark:bg-[#411b25] dark:text-[#fda4af]",
+			variant: "error" as const,
 		},
 		{
 			count: repo.signals.modelApologies,
 			label: "apologies",
 			title: "Model apologies",
-			color:
-				"bg-[#fef3c7] text-[#b45309] dark:bg-[#40321b] dark:text-[#fcd34d]",
+			variant: "warning" as const,
 		},
 	].filter((signal) => signal.count > 0);
 	if (signals.length === 0) return null;
 	return (
 		<ul
 			aria-label="Frustrations"
-			className="flex min-w-0 shrink list-none items-center gap-1 overflow-hidden"
+			className="flex min-w-0 shrink list-none items-center gap-xs overflow-hidden"
 		>
 			{signals.map((signal) => (
-				<li
+				<Badge
 					key={signal.label}
+					render={<li />}
 					title={signal.title}
-					className={cn(
-						"shrink-0 rounded-sm px-1.5 py-0.5 text-[0.625rem]/3 whitespace-nowrap",
-						signal.color,
-					)}
+					variant={signal.variant}
 				>
-					<span className="tabular-nums">{signal.count.toLocaleString()}</span>{" "}
-					{signal.label}
-				</li>
+					{`${signal.count.toLocaleString()} ${signal.label}`}
+				</Badge>
 			))}
 		</ul>
 	);
@@ -485,20 +473,18 @@ function RepoLastActive({ lastActiveAt }: { lastActiveAt: string }) {
 				: "older";
 	return (
 		<span
-			className="inline-flex min-w-0 items-center gap-2"
+			className="inline-flex min-w-0 items-center gap-m"
 			title={`Last active ${formatExactDateTime(lastActiveAt)}`}
 			data-repo-last-active={recency}
 		>
 			<span aria-hidden="true" className="relative flex size-1.5 shrink-0">
 				{recency === "now" ? (
-					<span className="absolute inset-0 animate-ping rounded-full bg-[#22c55e] opacity-60 motion-reduce:animate-none" />
+					<span className="absolute inset-0 animate-ping corner-full bg-success opacity-60 motion-reduce:animate-none" />
 				) : null}
 				<span
 					className={cn(
-						"relative size-1.5 rounded-full",
-						recency === "older"
-							? "bg-black/20 dark:bg-white/25"
-							: "bg-[#22c55e]",
+						"relative size-1.5 corner-full",
+						recency === "older" ? "bg-ink-4" : "bg-success",
 					)}
 				/>
 			</span>

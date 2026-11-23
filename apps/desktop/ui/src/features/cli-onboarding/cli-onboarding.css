@@ -4,255 +4,65 @@
 	min-height: 0;
 	pointer-events: auto;
 	overflow: auto;
-	border-radius: 8px;
+	border-radius: var(--radius-s);
 	padding: clamp(20px, 3vw, 40px);
-	background: var(--dashboard-01-content-background);
-	color: #252826;
-	font:
-		14px / 1.5 Inter,
-		system-ui,
-		sans-serif;
+	background: var(--canvas);
+	color: var(--ink);
+	font-family: var(--font-body);
+	font-size: var(--size-xl);
+	letter-spacing: var(--letter-spacing-xl);
+	line-height: var(--line-xl);
 	text-align: left;
 }
-.cli-onboarding-heading {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	gap: 24px;
-	margin: 0 auto 36px;
-	max-width: 1160px;
-}
-.cli-onboarding-eyebrow {
-	font-size: 12px;
-	color: #69716c;
-	margin: 0 0 8px;
-}
 .cli-onboarding-surface h1 {
-	font-size: 28px;
-	line-height: 1.2;
-	letter-spacing: -0.035em;
-	font-weight: 550;
-	margin: 0 0 10px;
+	font-size: var(--display-size-s);
+	line-height: var(--display-line-s);
+	letter-spacing: var(--display-letter-spacing-s);
+	font-weight: var(--weight-body-heavy);
+	margin: var(--space-zero) var(--space-zero) var(--space-l);
 }
 .cli-onboarding-surface h2 {
-	font-size: 18px;
-	line-height: 1.35;
-	font-weight: 550;
-	margin: 0 0 12px;
-	letter-spacing: -0.025em;
+	font-size: var(--size-xxl);
+	line-height: var(--line-xxl);
+	font-weight: var(--weight-body-heavy);
+	margin: var(--space-zero) var(--space-zero) var(--space-l);
+	letter-spacing: var(--letter-spacing-xxl);
 }
 .cli-onboarding-surface p {
-	color: #6b716d;
-	margin: 0 0 20px;
-}
-.cli-onboarding-steps {
-	display: flex;
-	list-style: none;
-	padding: 0;
-	margin: 0;
-	gap: 20px;
-	color: #858b87;
-	white-space: nowrap;
-}
-.cli-onboarding-steps li {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-}
-.cli-onboarding-steps span {
-	display: grid;
-	place-items: center;
-	width: 24px;
-	height: 24px;
-	border: 1px solid #dedfdd;
-	border-radius: 50%;
-	font-size: 11px;
-}
-.cli-onboarding-steps [aria-current] {
-	color: #275e46;
-}
-.cli-onboarding-steps [aria-current] span {
-	background: #e5f0e9;
-	border-color: #b6cebe;
-}
-.cli-onboarding-columns {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
-	align-items: start;
-	gap: 40px;
-	max-width: 1160px;
-	margin: auto;
-}
-.cli-onboarding-repositories h2 {
-	display: flex;
-	justify-content: space-between;
-	gap: 16px;
-	align-items: center;
-}
-.cli-onboarding-repositories h2 span {
-	font-size: 12px;
-	font-weight: 400;
-	color: #737973;
-	letter-spacing: 0;
-}
-.cli-onboarding-repository-scroll {
-	max-height: 45svh;
-	overflow: auto;
-}
-.cli-onboarding-repository {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr) auto auto;
-	gap: 20px;
-	padding: 16px 0;
-	border-bottom: 1px solid #e7e8e5;
-}
-.cli-onboarding-repository span:first-child {
-	overflow-wrap: anywhere;
-}
-.cli-onboarding-repository span:not(:first-child) {
-	color: #747c76;
-	font-size: 12px;
-}
-.cli-onboarding-surface .cli-onboarding-empty {
-	font-size: 12px;
-	margin-top: 22px;
-	max-width: 430px;
-}
-.cli-onboarding-card {
-	padding: 28px;
-	border: 1px solid #e2e6e0;
-	border-radius: 14px;
-	background: white;
-	box-shadow: 0 2px 8px #20332406;
-}
-.cli-onboarding-card button {
-	min-height: 44px;
-	border-radius: 8px;
-	font: inherit;
-}
-.cli-onboarding-card button:disabled {
-	opacity: 0.55;
-	cursor: wait;
-}
-.cli-onboarding-card button:focus-visible,
-.cli-onboarding-card input:focus-visible {
-	outline: 2px solid #428363;
-	outline-offset: 3px;
+	color: var(--ink-3);
+	margin: var(--space-zero) var(--space-zero) var(--space-xxl);
 }
 .cli-onboarding-auth-options {
 	display: grid;
-	gap: 10px;
-}
-.cli-onboarding-auth-options button {
-	border: 1px solid #dfe4de;
-	background: #fff;
-	padding: 10px 14px;
+	gap: var(--space-l);
 }
 .cli-onboarding-divider {
 	text-align: center;
-	color: #959b96;
-	font-size: 12px;
-	padding: 2px;
-}
-.cli-onboarding-primary {
-	width: 100%;
-	border: 1px solid #285b43;
-	background: #285b43;
-	color: white;
-	padding: 10px 14px;
-}
-.cli-onboarding-card .cli-onboarding-text-button {
-	border: 0;
-	background: transparent;
-	color: #63726a;
-	padding: 8px 0;
-	font-size: 12px;
-	text-decoration: underline;
+	color: var(--ink-3);
+	font-size: var(--size-m);
+	line-height: var(--line-m);
+	letter-spacing: var(--letter-spacing-m);
+	padding: var(--space-xxs);
 }
 .cli-onboarding-surface .cli-onboarding-terms {
-	font-size: 11px;
-	margin: 20px 0 0;
+	font-size: var(--size-s);
+	line-height: var(--line-s);
+	letter-spacing: var(--letter-spacing-s);
+	margin: var(--space-xxl) var(--space-zero) var(--space-zero);
 }
 .cli-onboarding-terms a {
 	color: inherit;
 	text-decoration: underline;
 }
 .cli-onboarding-surface .cli-onboarding-error {
-	color: #a33b30;
+	color: var(--error);
 }
 .cli-onboarding-email {
 	display: grid;
-	gap: 12px;
+	gap: var(--space-l);
 }
 .cli-onboarding-email label {
-	font-size: 12px;
-}
-.cli-onboarding-email input {
-	min-width: 0;
-	width: 100%;
-	border: 1px solid #ccd5ce;
-	border-radius: 7px;
-	padding: 10px 12px;
-	min-height: 44px;
-	font: inherit;
-}
-.cli-setup-command,
-.cli-setup-open {
-	border: 1px solid #c5d7ca;
-	border-radius: 6px;
-	background: white;
-	padding: 5px 10px;
-}
-.cli-setup-command {
-	justify-self: end;
-	white-space: nowrap;
-}
-.cli-setup-open {
-	align-self: center;
-	margin: 12px;
-}
-@media (max-width: 800px) {
-	.cli-onboarding-heading {
-		align-items: start;
-		flex-direction: column;
-		gap: 8px;
-		margin-bottom: 28px;
-	}
-	.cli-onboarding-columns {
-		grid-template-columns: 1fr;
-		gap: 28px;
-	}
-	.cli-onboarding-card {
-		grid-row: 1;
-		max-width: 440px;
-		width: 100%;
-	}
-	.cli-onboarding-repository {
-		gap: 12px;
-	}
-	.cli-onboarding-steps {
-		gap: 16px;
-		font-size: 12px;
-	}
-}
-
-/* Dark: only the rules the current sign-in and welcome screens still render. */
-.dark .cli-onboarding-surface {
-	color: oklch(0.985 0 0);
-}
-.dark .cli-onboarding-surface p {
-	color: oklch(0.708 0 0);
-}
-.dark .cli-onboarding-auth-options button {
-	border-color: rgb(255 255 255 / 15%);
-	background: var(--card);
-}
-.dark .cli-onboarding-divider {
-	color: oklch(0.556 0 0);
-}
-.dark .cli-onboarding-surface .cli-onboarding-error {
-	color: oklch(0.704 0.191 22.216);
-}
-.dark .cli-onboarding-email input {
-	border-color: rgb(255 255 255 / 15%);
+	font-size: var(--size-m);
+	line-height: var(--line-m);
+	letter-spacing: var(--letter-spacing-m);
 }

@@ -16,22 +16,15 @@ const MODEL_MARK_CLASS_NAME =
 const MODEL_BACKGROUND_CLASS_NAME =
 	"absolute inset-0 [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]";
 const MODEL_ICON_SHELL_CLASS_NAME =
+	// design-escape-ok(shadow): artwork; the model icon's hairline edge
 	"session-turn-table-model-icon-shell relative flex size-5 shrink-0 drop-shadow-[0_0_0.75px_rgb(0_0_0_/_14%)]";
 const MODEL_ICON_CLASS_NAME =
-	"session-turn-table-model-icon size-5 rounded-none border-0 bg-white shadow-none dark:bg-[color-mix(in_oklab,#fff_14%,var(--background))] [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]";
+	"session-turn-table-model-icon size-5 corner-zero edge-none bg-field shadow-none [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]";
 
 export function SessionModelLoadingMark() {
 	return (
-		<span
-			aria-hidden="true"
-			className={cn(MODEL_MARK_CLASS_NAME, "text-[#111] dark:text-white")}
-		>
-			<span
-				className={cn(
-					MODEL_BACKGROUND_CLASS_NAME,
-					"bg-black/4 dark:bg-white/8",
-				)}
-			>
+		<span aria-hidden="true" className={cn(MODEL_MARK_CLASS_NAME, "text-ink")}>
+			<span className={cn(MODEL_BACKGROUND_CLASS_NAME, "bg-hover")}>
 				<SessionModelProgressRing progress="loading" />
 			</span>
 			<span className={MODEL_ICON_SHELL_CLASS_NAME}>
@@ -91,32 +84,35 @@ export function SessionModelMark({
 	const demo = useDemoRuntime();
 	const userTitle = `Session owner: ${userLabel}`;
 	const avatar = (
-		<Avatar
-			aria-label={userTitle}
-			className="absolute -right-0.5 -bottom-0.5 size-3.5 cursor-help bg-(--session-overview-surface) ring-1 ring-(--session-overview-surface) after:border-black/5 dark:after:border-white/10"
-			role="img"
-		>
-			{avatarUrl ? (
-				demo ? (
-					<img
-						alt=""
-						data-slot="avatar-image"
-						className="aspect-square size-full rounded-full object-cover"
-						src={avatarUrl}
-					/>
-				) : (
-					<AvatarImage alt="" decoding="async" loading="lazy" src={avatarUrl} />
-				)
-			) : null}
-			{!(demo && avatarUrl) ? (
-				<AvatarFallback className="bg-(--session-overview-surface)">
-					<IconUser
-						aria-hidden="true"
-						className="size-2.5 shrink-0 text-(--session-overview-muted)"
-					/>
-				</AvatarFallback>
-			) : null}
-		</Avatar>
+		<span className="absolute -right-0.5 -bottom-0.5 flex cursor-help corner-full bg-canvas ring-1 ring-canvas">
+			<Avatar aria-label={userTitle} className="size-3.5" role="img">
+				{avatarUrl ? (
+					demo ? (
+						<img
+							alt=""
+							data-slot="avatar-image"
+							className="aspect-square size-full corner-full object-cover"
+							src={avatarUrl}
+						/>
+					) : (
+						<AvatarImage
+							alt=""
+							decoding="async"
+							loading="lazy"
+							src={avatarUrl}
+						/>
+					)
+				) : null}
+				{!(demo && avatarUrl) ? (
+					<AvatarFallback>
+						<IconUser
+							aria-hidden="true"
+							className="size-2.5 shrink-0 text-ink-3"
+						/>
+					</AvatarFallback>
+				) : null}
+			</Avatar>
+		</span>
 	);
 
 	return (
@@ -124,19 +120,22 @@ export function SessionModelMark({
 			skullet-block=""
 			className={cn(
 				MODEL_MARK_CLASS_NAME,
-				"rounded-full",
+				"corner-full",
+				// design-escape-ok(colour): data paint; Claude's brand orange on its model mark
 				tone.icon === "claude" && "text-[#b96949]",
-				tone.icon === "codex" && "text-[#111] dark:text-white",
+				tone.icon === "codex" && "text-ink",
+				// design-escape-ok(colour): data paint; Gemini's brand colour
 				tone.icon === "gemini" && "text-[#3C7BFF]",
-				tone.icon === null && "text-(--session-overview-muted)",
+				tone.icon === null && "text-ink-3",
 			)}
 		>
 			<span
 				{...iconAccessibility}
 				className={cn(
 					MODEL_BACKGROUND_CLASS_NAME,
+					// design-escape-ok(colour): data paint; Claude's brand orange, tinted behind its model mark
 					tone.icon === "claude" && "bg-[#cc7d5e]/10",
-					tone.icon !== "claude" && "bg-black/4 dark:bg-white/8",
+					tone.icon !== "claude" && "bg-hover",
 					progress && tone.identityIconClassName,
 				)}
 				data-session-model-background
@@ -154,7 +153,7 @@ export function SessionModelMark({
 				className={cn(
 					MODEL_ICON_SHELL_CLASS_NAME,
 					disclosure &&
-						"grid place-items-center *:col-start-1 *:row-start-1 *:transition-[opacity,rotate,scale] *:duration-150 *:ease-out",
+						"grid place-items-center *:col-start-1 *:row-start-1 *:transition-[opacity,rotate,scale] *:duration-(--motion-duration) *:ease-out",
 				)}
 				data-session-detail-model-mark
 			>

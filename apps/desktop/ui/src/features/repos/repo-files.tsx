@@ -14,9 +14,9 @@ import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
 import { Reveal } from "@/app/ui/bones";
-import { Button } from "@/components/dashboard/button";
+import { Button } from "@/app/ui/button";
+import { Skeleton } from "@/app/ui/skeleton";
 import { EmptyState } from "@/components/dashboard/page-parts";
-import { Skeleton } from "@/components/dashboard/skeleton";
 import { CodeSample, CodeSkeleton } from "@/components/pierre/code-skeleton";
 import { DiffView, languageForPath } from "@/components/pierre/diff-view";
 import { FileTree } from "@/components/pierre/file-tree";
@@ -25,6 +25,9 @@ import { wholeText } from "@/features/sessions/reader/files/session-files-model"
 import {
 	CARD,
 	Crumb,
+	ReaderPane,
+	ReaderPaneHeader,
+	ReaderPaneScroll,
 	ScrollColumn,
 	ViewToggle,
 } from "@/features/sessions/reader/files/session-reader-files-parts";
@@ -115,9 +118,16 @@ export function RepoFiles({ repoKey }: { repoKey: string }) {
 		);
 	return (
 		<FilesPane>
-			<div className="flex h-full min-h-0 gap-6">
-				<div className="-mb-2 flex min-h-0 w-[320px] shrink-0 flex-col gap-1.5">
-					<div className="flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-muted/50 pr-1 pl-2 text-xs">
+			<div className="flex h-full min-h-0 gap-xxl">
+				<div className="-mb-m flex min-h-0 w-[320px] shrink-0 flex-col gap-s">
+					<div
+						className={cn(
+							"flex h-8 shrink-0 items-center gap-s",
+							"corner-s pr-xs pl-m",
+							"text-body-m",
+							"bg-hover",
+						)}
+					>
 						<span className="shrink-0 font-medium">Entire repo</span>
 						<span className="ml-auto">
 							<ViewToggle
@@ -132,8 +142,8 @@ export function RepoFiles({ repoKey }: { repoKey: string }) {
 							/>
 						</span>
 					</div>
-					<div className="-mx-1 flex min-h-0 flex-1 flex-col">
-						<ScrollColumn className="px-1 pb-8">
+					<div className="-mx-xs flex min-h-0 flex-1 flex-col">
+						<ScrollColumn className="px-xs pb-xxxl">
 							{files ? (
 								<FileTree items={items} onSelect={pick} selected={picked} />
 							) : (
@@ -188,15 +198,15 @@ export function RepoFiles({ repoKey }: { repoKey: string }) {
 										repository={tree.data.repository}
 									/>
 								) : (
-									<p className="px-5 py-4 text-[13px] text-muted-foreground">
-										<span className="font-mono">{picked}</span> isn't among the
+									<p className="px-xl py-xl text-body-l text-ink-3">
+										<span className="font-data">{picked}</span> isn't among the
 										files this repo's sessions changed or read.
 									</p>
 								)
 							) : picked && !files ? (
 								<FileDetailSkeleton />
 							) : (
-								<div className="flex min-w-0 flex-1 flex-col p-4">
+								<div className="flex min-w-0 flex-1 flex-col p-xl">
 									<EmptyState
 										icon={IconFile}
 										title="Pick a file"
@@ -214,7 +224,9 @@ export function RepoFiles({ repoKey }: { repoKey: string }) {
 
 function FilesPane({ children }: { children: React.ReactNode }) {
 	return (
-		<div className="h-full overflow-hidden pt-2 pr-8 pb-2 pl-6">{children}</div>
+		<div className="flex h-full flex-col overflow-hidden pt-m pr-xxxl pb-m pl-xxl">
+			{children}
+		</div>
 	);
 }
 
@@ -233,8 +245,8 @@ function FilesUnavailable({
 					description="Opaline reads files from GitHub when you open them and never stores them."
 				>
 					<Button
-						variant="outline"
-						className="mx-auto mt-2"
+						variant="primary"
+						className="mx-auto mt-m"
 						render={<Link to={getShellRoutePath(appRoutes.settingsGitHub())} />}
 					>
 						<IconBrandGithub />
@@ -289,24 +301,32 @@ function RepoFileDetail({
 		.map(encodeURIComponent)
 		.join("/")}`;
 	return (
-		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 pt-4 pr-4 pl-5">
-			<div className="flex min-h-7 shrink-0 flex-wrap items-center gap-x-3 gap-y-1">
-				<div className="flex min-w-0 flex-1 items-center gap-1.5">
-					<Crumb title={path}>{name}</Crumb>
-				</div>
+		<ReaderPane>
+			<ReaderPaneHeader crumbs={<Crumb title={path}>{name}</Crumb>}>
 				<a
 					href={githubUrl}
 					target="_blank"
 					rel="noreferrer"
 					title="View on GitHub"
-					className="inline-flex h-6 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+					className={cn(
+						"inline-flex h-6 items-center gap-xs",
+						"corner-s px-m",
+						"text-body-m font-medium",
+						"text-ink-3 transition-colors",
+						"hover:text-ink",
+					)}
 				>
 					<IconBrandGithub aria-hidden="true" className="size-3.5" />
 					{repository.commitSha.slice(0, 7)}
 				</a>
-			</div>
+			</ReaderPaneHeader>
 			<span
-				className="-mt-1 shrink-0 truncate pl-2 text-left text-xs text-muted-foreground/70 [direction:rtl]"
+				className={cn(
+					"shrink-0 [direction:rtl]",
+					"-mt-xs pl-m",
+					"truncate text-left text-body-m",
+					"text-ink-4",
+				)}
 				title={directory}
 			>
 				{`‎${directory}‎`}
@@ -316,11 +336,11 @@ function RepoFileDetail({
 					icon={IconAlertTriangle}
 					title="The file could not be read"
 					description="Reading it from GitHub failed. Pick it again in a moment."
-					className="mt-3"
+					className="mt-l"
 				/>
 			) : !file || hunks ? (
-				<ScrollColumn className="-mr-4 -ml-1.5 pr-4 pl-1.5">
-					<div className="flex flex-col gap-2 pt-2 pb-4">
+				<ReaderPaneScroll>
+					<div className="flex flex-col gap-m pt-m pb-xl">
 						<Reveal
 							label="Loading the file"
 							loading={!file}
@@ -334,11 +354,11 @@ function RepoFileDetail({
 							}
 						</Reveal>
 					</div>
-				</ScrollColumn>
+				</ReaderPaneScroll>
 			) : file.status !== "text" ? (
 				<FileNotShown file={file} />
 			) : null}
-		</div>
+		</ReaderPane>
 	);
 }
 
@@ -375,7 +395,7 @@ function FileNotShown({
 			icon={copy.icon}
 			title={copy.title}
 			description={copy.description}
-			className="mt-3"
+			className="mt-l"
 		/>
 	);
 }
@@ -430,12 +450,12 @@ function TreeSkeleton() {
 				<div
 					// biome-ignore lint/suspicious/noArrayIndexKey: a fixed placeholder list
 					key={index}
-					className="flex h-7 shrink-0 items-center gap-2 pr-2.5"
+					className="flex h-7 shrink-0 items-center gap-m pr-l"
 					style={{ paddingLeft: 8 + depth * 12 }}
 				>
-					<Skeleton className="size-3.5 shrink-0 rounded-[4px]" />
+					<Skeleton className="size-3.5 shrink-0 corner-xs" />
 					<Skeleton
-						className="h-2.5 rounded-full"
+						className="h-2.5 corner-full"
 						style={{ width: `${width}%` }}
 					/>
 				</div>
@@ -447,19 +467,19 @@ function TreeSkeleton() {
 function FileDetailSkeleton() {
 	return (
 		<div
-			className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 pt-4 pr-4 pl-5"
+			className="flex min-h-0 min-w-0 flex-1 flex-col gap-s pt-xl pr-xl pl-xl"
 			aria-hidden="true"
 		>
-			<div className="flex min-h-7 items-center gap-3">
+			<div className="flex min-h-7 items-center gap-l">
 				<Skeleton className="h-5 w-40" />
 				<Skeleton className="ml-auto h-4 w-32" />
 			</div>
 			<Skeleton className="h-3 w-56 shrink-0" />
-			<ScrollColumn className="-mr-4 -ml-1.5 pr-4 pl-1.5">
-				<div className="flex flex-col gap-2 pt-2 pb-4">
+			<ReaderPaneScroll>
+				<div className="flex flex-col gap-m pt-m pb-xl">
 					<CodeSkeleton label="Loading the file" />
 				</div>
-			</ScrollColumn>
+			</ReaderPaneScroll>
 		</div>
 	);
 }

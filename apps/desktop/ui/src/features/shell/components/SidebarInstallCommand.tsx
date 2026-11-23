@@ -27,12 +27,11 @@ export function SidebarInstallCommand() {
 			<SidebarMenuButton
 				data-sidebar-interactive=""
 				data-copied={copied ? "true" : undefined}
-				className="copy-button"
 				aria-label={label}
 				title={label}
 				onClick={() => void copy()}
 			>
-				<span className="grid size-4.5 shrink-0 place-items-center text-[color:color-mix(in_srgb,var(--muted-foreground)_70%,var(--sidebar))]">
+				<span className="grid size-4.5 shrink-0 place-items-center text-[color:color-mix(in_srgb,var(--ink-3)_70%,var(--sidebar))]">
 					<CopyIcon className="size-4.5!" />
 				</span>
 				<span className="min-w-0 flex-1 truncate">{command}</span>

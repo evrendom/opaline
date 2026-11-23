@@ -218,7 +218,7 @@ export function SessionReaderCiView({
 		return (
 			<Frame>
 				<SessionSubagents onOpen={openSubagent} subagents={subagents}>
-					<div className="flex h-full min-h-0 gap-6">
+					<div className="flex h-full min-h-0 gap-xxl">
 						{railColumn}
 						<RailEmptyPane>{empty}</RailEmptyPane>
 					</div>
@@ -249,7 +249,7 @@ export function SessionReaderCiView({
 	return (
 		<Frame>
 			<SessionSubagents onOpen={openSubagent} subagents={subagents}>
-				<div className="flex h-full min-h-0 gap-6">
+				<div className="flex h-full min-h-0 gap-xxl">
 					{railColumn}
 					<Reveal
 						fill
@@ -257,14 +257,14 @@ export function SessionReaderCiView({
 						label="Reading the pull requests and CI this session reached"
 						loading={pending}
 						sample={
-							<div className="flex h-full min-h-0 gap-6">
+							<div className="flex h-full min-h-0 gap-xxl">
 								<CiColumnsSample agent={agent} model={model} run={run} />
 							</div>
 						}
 						sampleId="reader-ci"
 					>
 						{() => (
-							<div className="flex h-full min-h-0 gap-6">
+							<div className="flex h-full min-h-0 gap-xxl">
 								<CiPullColumn
 									agent={agent}
 									model={model}
@@ -319,6 +319,6 @@ export function SessionReaderCiView({
 
 function Frame({ children }: { children: ReactNode }) {
 	return (
-		<div className="h-full overflow-hidden px-8 pt-2 pb-2">{children}</div>
+		<div className="h-full overflow-hidden px-xxxl pt-m pb-m">{children}</div>
 	);
 }

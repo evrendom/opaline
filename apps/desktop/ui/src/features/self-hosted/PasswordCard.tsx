@@ -137,19 +137,16 @@ export function PasswordCard() {
 					disabled={saving}
 				/>
 			</WorkspaceSettingsRow>
-			<form
-				id={formId}
-				onSubmit={submit}
-				className="workspace-settings-actions"
-			>
+			<form id={formId} onSubmit={submit} className="settings-actions">
 				{problem ? (
-					<p role="alert" className="mb-3 text-sm text-destructive">
+					<p role="alert" className="mb-l text-body-xl text-error">
 						{problem}
 					</p>
 				) : null}
 				<Button
+					variant="primary"
 					type="submit"
-					size="sm"
+					size="md"
 					disabled={saving || currentPasswordRequired === null}
 				>
 					{saving ? "Changing…" : "Change password"}

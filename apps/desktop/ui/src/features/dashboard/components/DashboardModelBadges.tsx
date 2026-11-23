@@ -26,41 +26,41 @@ function shouldHideModelBadge(model: string) {
 	return normalizedModel.includes("synthetic");
 }
 
+// Model badges set their type solid and a hair tight so the cap-trimmed label
+// centres in a fixed-height pill.
+const BADGE_TRACKING = "tracking-xs";
+const CAP_TRIM_LABEL =
+	"flex min-w-0 items-center line-solid [text-box-edge:cap_alphabetic] [text-box-trim:trim-both]";
+
 function getModelBadgeSizeClasses(
 	size: DashboardModelBadgeSize,
 ): ModelBadgeSizeClasses {
 	if (size === "md") {
 		return {
-			badgeClassName:
-				"h-8 gap-2 text-[0.8125rem] font-medium tracking-[-0.01em]",
+			badgeClassName: `h-8 gap-m text-body-l font-medium ${BADGE_TRACKING}`,
 			chipClassName: "size-5",
 			glyphClassName: "size-3",
-			labelClassName:
-				"flex min-w-0 items-center leading-none [text-box-edge:cap_alphabetic] [text-box-trim:trim-both]",
-			paddingClassName: "px-3",
+			labelClassName: CAP_TRIM_LABEL,
+			paddingClassName: "px-l",
 		};
 	}
 
 	if (size === "table") {
 		return {
-			badgeClassName:
-				"h-5 gap-1 text-base font-medium tracking-[-0.01em] sm:text-sm",
+			badgeClassName: `h-5 gap-xs text-body-xxl font-medium ${BADGE_TRACKING} sm:text-body-xl`,
 			chipClassName: "size-4",
 			glyphClassName: "size-2.5",
-			labelClassName:
-				"flex min-w-0 items-center leading-none [text-box-edge:cap_alphabetic] [text-box-trim:trim-both]",
-			paddingClassName: "px-2",
+			labelClassName: CAP_TRIM_LABEL,
+			paddingClassName: "px-m",
 		};
 	}
 
 	return {
-		badgeClassName:
-			"h-5 gap-1 text-[0.6875rem] font-semibold tracking-[-0.01em]",
+		badgeClassName: `h-5 gap-xs text-body-s font-semibold ${BADGE_TRACKING}`,
 		chipClassName: "size-4",
 		glyphClassName: "size-2.5",
-		labelClassName:
-			"flex min-w-0 items-center leading-none [text-box-edge:cap_alphabetic] [text-box-trim:trim-both]",
-		paddingClassName: "px-2",
+		labelClassName: CAP_TRIM_LABEL,
+		paddingClassName: "px-m",
 	};
 }
 
@@ -131,16 +131,18 @@ export function DashboardModelIdentity({
 
 	return (
 		<Tooltip>
-			<TooltipTrigger asChild>
-				<div className={cn("cursor-help", className)}>
-					{getModelBadgeTone(model).icon ? (
-						<ModelChip model={model} tip={false} />
-					) : null}
-					<div className="shrink-0 font-mono text-base font-semibold tracking-normal text-[color:var(--dashboardy-heading)] tabular-nums sm:text-[0.8125rem]">
-						{safeMessageCount}
+			<TooltipTrigger
+				render={
+					<div className={cn("cursor-help", className)}>
+						{getModelBadgeTone(model).icon ? (
+							<ModelChip model={model} tip={false} />
+						) : null}
+						<div className="shrink-0 font-data text-body-xxl font-heavy text-ink tabular-nums sm:text-body-l">
+							{safeMessageCount}
+						</div>
 					</div>
-				</div>
-			</TooltipTrigger>
+				}
+			/>
 			<TooltipContent>
 				{modelLabel}: {safeMessageCount} messages
 			</TooltipContent>
@@ -162,10 +164,10 @@ export function DashboardModelBadges({
 		return (
 			<span
 				className={cn(
-					"text-[color:var(--dashboardy-muted)]",
+					"text-ink-3",
 					size === "table"
-						? "text-base font-medium tracking-[-0.01em] sm:text-sm"
-						: "text-[12px]",
+						? "text-body-xxl font-medium sm:text-body-xl"
+						: "text-body-m",
 				)}
 			>
 				—
@@ -182,7 +184,7 @@ export function DashboardModelBadges({
 				return (
 					<span
 						key={model}
-						className={`inline-flex max-w-full items-center justify-center rounded-full border leading-none tabular-nums ${sizeClasses.badgeClassName} ${sizeClasses.paddingClassName} ${badgeTone.chipClassName}`}
+						className={`inline-flex max-w-full items-center justify-center corner-full edge-m line-solid tabular-nums ${sizeClasses.badgeClassName} ${sizeClasses.paddingClassName} ${badgeTone.chipClassName}`}
 					>
 						{badgeTone.icon ? (
 							<ModelChip

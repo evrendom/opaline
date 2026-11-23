@@ -69,7 +69,7 @@ describe("SessionWorkspaceResizeHandle", () => {
 		const separator = screen.getByRole("separator", {
 			name: "Resize sessions overview and detail panes",
 		});
-		expect(separator).toHaveClass("relative", "h-full", "w-3", "-mx-1.5");
+		expect(separator).toHaveClass("relative", "h-full", "w-3", "-mx-s");
 		expect(separator).not.toHaveClass("absolute");
 	});
 

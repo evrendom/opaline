@@ -10,50 +10,58 @@
    2,130ms  squares begin separating
    2,250ms  copy icon is restored */
 
-.copy-button {
+/* The icon carries its own timings and reads the copied state from the
+   nearest element marked `data-copied` (a Button, a row), so no wrapper class
+   is needed. */
+.copy-icon {
 	--copy-shape-duration: 120ms;
 	--copy-shape-return-delay: 130ms;
-	--copy-check-duration: 100ms;
+	--copy-check-duration: var(--motion-quick-duration);
 	--copy-check-delay: 90ms;
 }
 
-.copy-button .copy-icon {
+.copy-icon {
 	overflow: visible;
 }
 
-.copy-button .copy-icon-lower,
-.copy-button .copy-icon-upper,
-.copy-button .copy-icon-mask-shape {
+.copy-icon .copy-icon-lower,
+.copy-icon .copy-icon-upper,
+.copy-icon .copy-icon-mask-shape {
 	width: 10.5px;
 	height: 10.5px;
 	rx: 2px;
 	transition:
-		transform var(--copy-shape-duration) ease-out var(--copy-shape-return-delay),
-		width var(--copy-shape-duration) ease-out var(--copy-shape-return-delay),
-		height var(--copy-shape-duration) ease-out var(--copy-shape-return-delay),
-		rx var(--copy-shape-duration) ease-out var(--copy-shape-return-delay);
+		transform var(--copy-shape-duration) var(--motion-easing)
+		var(--copy-shape-return-delay),
+		width var(--copy-shape-duration) var(--motion-easing)
+		var(--copy-shape-return-delay),
+		height var(--copy-shape-duration) var(--motion-easing)
+		var(--copy-shape-return-delay),
+		rx var(--copy-shape-duration) var(--motion-easing)
+		var(--copy-shape-return-delay);
 }
 
-.copy-button .copy-icon-lower,
-.copy-button .copy-icon-mask-shape {
+.copy-icon .copy-icon-lower,
+.copy-icon .copy-icon-mask-shape {
 	transform-origin: 10px 14px;
 }
 
-.copy-button .copy-icon-upper {
+.copy-icon .copy-icon-upper {
 	transform-origin: 14px 10px;
 }
 
-.copy-button .copy-icon-check {
+.copy-icon .copy-icon-check {
 	opacity: 0;
 	stroke-dasharray: 0 1;
 	stroke-dashoffset: -1;
 	transition:
-		stroke-dasharray var(--copy-check-duration) ease-out,
-		stroke-dashoffset var(--copy-check-duration) ease-out,
+		stroke-dasharray var(--copy-check-duration) var(--motion-easing),
+		stroke-dashoffset var(--copy-check-duration) var(--motion-easing),
 		opacity 0ms linear var(--copy-check-duration);
 }
 
-.copy-button[data-copied="true"]
+[data-copied="true"]
+	.copy-icon
 	:is(.copy-icon-lower, .copy-icon-upper, .copy-icon-mask-shape) {
 	width: 14.5px;
 	height: 14.5px;
@@ -61,26 +69,27 @@
 	transition-delay: 0ms;
 }
 
-.copy-button[data-copied="true"] :is(.copy-icon-lower, .copy-icon-mask-shape) {
+[data-copied="true"] .copy-icon :is(.copy-icon-lower, .copy-icon-mask-shape) {
 	transform: translateY(-4px);
 }
 
-.copy-button[data-copied="true"] .copy-icon-upper {
+[data-copied="true"] .copy-icon .copy-icon-upper {
 	transform: translateX(-4px);
 }
 
-.copy-button[data-copied="true"] .copy-icon-check {
+[data-copied="true"] .copy-icon .copy-icon-check {
 	opacity: 1;
 	stroke-dasharray: 1 1;
 	stroke-dashoffset: 0;
 	transition:
-		stroke-dasharray var(--copy-check-duration) ease-out var(--copy-check-delay),
+		stroke-dasharray var(--copy-check-duration) var(--motion-easing)
+		var(--copy-check-delay),
 		stroke-dashoffset 0ms linear,
 		opacity 0ms linear;
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.copy-button .copy-icon * {
+	.copy-icon * {
 		transition-delay: 0ms;
 		transition-duration: 0.01ms;
 	}

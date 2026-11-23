@@ -1,5 +1,6 @@
 import { IconArrowUpRight } from "@tabler/icons-react";
 import { useState } from "react";
+import { Button } from "@/app/ui/button";
 import { cn } from "@/lib/utils";
 import { squarify } from "../summary/session-reader-breakdown";
 import { tileGlyph, tileLook } from "./session-reader-context-bar";
@@ -65,7 +66,7 @@ export function RunZoom({
 			<div
 				ref={measure}
 				className={cn(
-					"relative min-h-0 flex-1 rounded-md border corner-squircle squircle:rounded-xl",
+					"relative min-h-0 flex-1 corner-s edge-m corner-squircle squircle:corner-l",
 					look.className,
 				)}
 				style={look.style}
@@ -80,7 +81,7 @@ export function RunZoom({
 					return (
 						<div
 							key={run.key}
-							className="absolute overflow-hidden rounded-md border border-current/20 bg-card corner-squircle squircle:rounded-xl"
+							className="absolute overflow-hidden corner-s edge-m border-current/20 bg-surface corner-squircle squircle:corner-l"
 							style={{
 								height: h,
 								left: cell.left + GAP / 2,
@@ -88,7 +89,7 @@ export function RunZoom({
 								width: w,
 							}}
 						>
-							<span className="absolute top-1.5 left-2 flex min-w-0 items-center gap-1.5 text-[12px] leading-4 font-medium">
+							<span className="absolute top-1.5 left-2 flex min-w-0 items-center gap-s text-body-m font-medium">
 								<Glyph className="size-3.5 shrink-0" />
 								<span className="truncate">{run.label}</span>
 							</span>
@@ -102,16 +103,17 @@ export function RunZoom({
 								top={TOP}
 								w={w}
 							/>
-							<button
+							<Button
+								size="sm"
 								type="button"
 								data-context-pick=""
 								onClick={() => onOpen(id, firstLitStep(run, lits))}
 								aria-label={`Open ${run.label} in Detail`}
-								className="absolute right-1.5 bottom-1.5 z-20 inline-flex h-6 items-center gap-0.5 rounded-md bg-muted/70 pr-1 pl-2 text-[12px] font-medium text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground"
+								className="absolute right-1.5 bottom-1.5 z-20"
 							>
 								Detail
 								<IconArrowUpRight aria-hidden="true" className="size-3" />
-							</button>
+							</Button>
 						</div>
 					);
 				})}

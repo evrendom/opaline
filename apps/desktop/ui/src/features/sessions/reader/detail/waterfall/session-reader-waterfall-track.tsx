@@ -22,14 +22,14 @@ export function RowTotals({
 	tokens: number;
 }) {
 	return (
-		<div className="flex flex-col items-end pr-1 text-right">
+		<div className="flex flex-col items-end pr-xs text-right">
 			{durationMs !== null ? (
-				<span className="text-[11px] font-medium text-foreground/80 tabular-nums">
+				<span className="text-body-s font-medium text-ink tabular-nums">
 					{formatSpanDuration(durationMs)}
 				</span>
 			) : null}
 			{cost !== null || tokens > 0 ? (
-				<span className="hidden text-[10px] whitespace-nowrap text-muted-foreground tabular-nums @lg:inline">
+				<span className="hidden text-body-xs whitespace-nowrap text-ink-3 tabular-nums @lg:inline">
 					{cost !== null ? formatReaderCost(cost) : null}
 					{cost !== null && tokens > 0 ? " · " : null}
 					{tokens > 0 ? formatCompactNumber(tokens) : null}
@@ -53,7 +53,7 @@ export function TimeRuler({ total }: { total: number }) {
 					className={cn(
 						// One line: a label at the track's end has no width left to
 						// lay out in, so "4m 10s" would otherwise stack its words.
-						"absolute top-0 text-[10px] whitespace-nowrap text-muted-foreground/50 tabular-nums",
+						"absolute top-0 text-body-xs whitespace-nowrap text-ink-4 tabular-nums",
 						fraction === 1 && "-translate-x-full",
 						// The inner labels collide on a short track, so only the two
 						// ends show there.
@@ -105,7 +105,7 @@ export function ProgressBar({
 			data-mark=""
 			data-progress-host=""
 			data-width={width}
-			className="group/host absolute top-1/2 h-2 min-w-0.5 -translate-y-1/2 overflow-hidden rounded-xs *:absolute *:inset-y-0 *:duration-300 *:ease-out"
+			className="group/host absolute top-1/2 h-2 min-w-0.5 -translate-y-1/2 overflow-hidden corner-zero *:absolute *:inset-y-0 *:duration-(--motion-large-duration) *:ease-out"
 			style={{ left: `${left}%`, width: `${width}%` }}
 		>
 			<div
@@ -136,7 +136,7 @@ export function ProgressBar({
 
 export function RanOnChip({ ms }: { ms: number }) {
 	return (
-		<span className="absolute top-1/2 right-0 -translate-y-1/2 rounded-sm bg-background px-1 text-[10px] leading-4 text-muted-foreground tabular-nums">
+		<span className="absolute top-1/2 right-0 -translate-y-1/2 corner-xs bg-canvas px-xs text-body-xs text-ink-3 tabular-nums">
 			+{formatRanOn(ms)}
 		</span>
 	);
@@ -153,7 +153,7 @@ export function RunningBar({
 		<div
 			aria-hidden="true"
 			className={cn(
-				"pointer-events-none absolute top-1/2 h-2 min-w-0.5 -translate-y-1/2 rounded-xs",
+				"pointer-events-none absolute top-1/2 h-2 min-w-0.5 -translate-y-1/2 corner-zero",
 				bar.className,
 			)}
 			style={{ ...bar.style, left: `${span.offset}%`, width: `${span.width}%` }}
@@ -189,10 +189,10 @@ export function TrackLabel({
 		<span
 			aria-hidden="true"
 			className={cn(
-				"pointer-events-none absolute top-1/2 -translate-y-1/2 truncate text-[11px] leading-4 text-muted-foreground",
+				"pointer-events-none absolute top-1/2 -translate-y-1/2 truncate text-body-s text-ink-3",
 				end > 70 &&
 					offset < 30 &&
-					"rounded-sm bg-(--dashboard-01-content-background,var(--background)) px-1",
+					"corner-xs bg-(--dashboard-01-content-background,var(--canvas)) px-xs",
 				className,
 			)}
 			style={place}

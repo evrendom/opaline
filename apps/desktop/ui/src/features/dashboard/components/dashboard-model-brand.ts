@@ -101,8 +101,7 @@ export function getModelBadgeTone(model: string): ModelBadgeTone {
 
 	if (normalizedModel.includes("gemini")) {
 		return {
-			chipClassName:
-				"border-black/10 bg-[#FFFFFF] text-[#111111] shadow-none dark:border-white/10 dark:bg-white/8 dark:text-white",
+			chipClassName: "border-line bg-surface text-ink shadow-none",
 			icon: "gemini",
 			identityIconClassName: "",
 		};
@@ -117,8 +116,7 @@ export function getModelBadgeTone(model: string): ModelBadgeTone {
 		normalizedModel.includes("mythos")
 	) {
 		return {
-			chipClassName:
-				"border-black/10 bg-[#FFFFFF] text-[#111111] shadow-none dark:border-white/10 dark:bg-white/8 dark:text-white",
+			chipClassName: "border-line bg-surface text-ink shadow-none",
 			icon: "claude",
 			identityIconClassName: "text-[#CC7D5E]",
 		};
@@ -126,10 +124,9 @@ export function getModelBadgeTone(model: string): ModelBadgeTone {
 
 	if (normalizedModel.includes("codex")) {
 		return {
-			chipClassName:
-				"border-black/10 bg-[#FFFFFF] text-[#111111] shadow-none dark:border-white/10 dark:bg-white/8 dark:text-white",
+			chipClassName: "border-line bg-surface text-ink shadow-none",
 			icon: "codex",
-			identityIconClassName: "text-[#111111] dark:text-white",
+			identityIconClassName: "text-ink",
 		};
 	}
 
@@ -139,16 +136,14 @@ export function getModelBadgeTone(model: string): ModelBadgeTone {
 		/(?:^|[\s/:_-])o[134](?:$|[\s/:_-])/u.test(normalizedModel)
 	) {
 		return {
-			chipClassName:
-				"border-black/10 bg-[#FFFFFF] text-[#111111] shadow-none dark:border-white/10 dark:bg-white/8 dark:text-white",
+			chipClassName: "border-line bg-surface text-ink shadow-none",
 			icon: "codex",
-			identityIconClassName: "text-[#111111] dark:text-white",
+			identityIconClassName: "text-ink",
 		};
 	}
 
 	return {
-		chipClassName:
-			"border-[color:var(--dashboardy-chip-border)] bg-[color:var(--dashboardy-chip-surface)] text-[color:var(--dashboardy-chip-foreground)]",
+		chipClassName: "border-accent-tint bg-accent-tint text-accent",
 		icon: null,
 		identityIconClassName: "",
 	};
@@ -162,7 +157,7 @@ export function getModelBrandChip(
 		return { glyphClassName: "text-[#D97757]", tint: "#D97757" };
 	}
 	if (icon === "codex") {
-		return { glyphClassName: "text-foreground", tint: "#10A37F" };
+		return { glyphClassName: "text-ink", tint: "#10A37F" };
 	}
 	if (icon === "gemini") {
 		return { glyphClassName: "", tint: "#3C7BFF" };

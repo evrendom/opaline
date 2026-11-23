@@ -36,7 +36,7 @@ function Skeleton({
 	return (
 		<span ref={host} className="contents">
 			<SkeletonBox
-				className={cn("rounded-2xl", className)}
+				className={cn("corner-xl-inner", className)}
 				style={{ ...SIZED_BY_CLASS, ...style }}
 			/>
 		</span>

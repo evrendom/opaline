@@ -79,21 +79,19 @@ function StepFigure({
 					: `${note}: ${formatShare(fill)} of the run's`
 			}
 		>
-			<div className="flex min-w-0 flex-col gap-1">
-				<span className="truncate text-xs/4 text-muted-foreground">
-					{title}
-				</span>
-				<span className="flex min-w-0 items-baseline gap-1.5 text-[13px]/4 tabular-nums">
-					<span className="truncate text-foreground">{value ?? "—"}</span>
+			<div className="flex min-w-0 flex-col gap-xs">
+				<span className="truncate text-body-m text-ink-3">{title}</span>
+				<span className="flex min-w-0 items-baseline gap-s text-body-l line-tight tabular-nums">
+					<span className="truncate text-ink">{value ?? "—"}</span>
 					{share === null ? null : (
-						<span className="shrink-0 text-[11px] text-muted-foreground/70">
+						<span className="shrink-0 text-body-s text-ink-4">
 							{formatShare(fill)}
 						</span>
 					)}
 				</span>
-				<span className="relative h-1 overflow-hidden rounded-full bg-muted-foreground/10">
+				<span className="relative h-1 overflow-hidden corner-full bg-hover">
 					<span
-						className="absolute inset-y-0 left-0 rounded-full"
+						className="absolute inset-y-0 left-0 corner-full"
 						style={{ backgroundColor: color, width: `${fill * 100}%` }}
 					/>
 				</span>
@@ -132,7 +130,7 @@ export function StepBreakdowns({
 	const spent = callSpent !== null && runSpent > 0 ? callSpent : null;
 	const tokens = call && runTokens > 0 ? callTokens(call) : null;
 	return (
-		<div className="grid grid-cols-3 gap-4">
+		<div className="grid grid-cols-3 gap-xl">
 			<StepFigure
 				color={color}
 				note="Its time"

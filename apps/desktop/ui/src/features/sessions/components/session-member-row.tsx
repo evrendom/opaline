@@ -1,5 +1,6 @@
 import { scanMemberLanguageSignals } from "@rudel/language-signals";
 import { type ReactNode, useId } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import {
 	type ConversationTraceSpeakerLayout,
 	ConversationTraceTreeItem,
@@ -31,7 +32,7 @@ function UserPrompt({
 	trailingContent?: ReactNode;
 }) {
 	return (
-		<p className="max-w-[65ch] whitespace-pre-wrap break-words text-[0.8125rem] leading-6 text-(--session-overview-text) [overflow-wrap:anywhere]">
+		<p className="max-w-[65ch] whitespace-pre-wrap break-words text-body-l text-ink [overflow-wrap:anywhere]">
 			<SignalText
 				scanSignals={scanMemberLanguageSignals}
 				text={userContentText(content)}
@@ -41,7 +42,7 @@ function UserPrompt({
 	);
 }
 
-const userPromptRowClassName = "min-w-0 pt-0 pr-3 pb-2 pl-[1.8125rem]";
+const userPromptRowClassName = "min-w-0 pt-zero pr-l pb-m pl-xxxl";
 
 export function SessionMemberRow({
 	active,
@@ -91,24 +92,27 @@ export function SessionMemberRow({
 		);
 		const showFullPrompt = !promptCollapsible || promptExpanded;
 		const promptControl = promptCollapsible ? (
-			<button
+			<Pressable
 				type="button"
 				aria-controls={promptPanelId}
 				aria-expanded={promptExpanded}
-				className="group inline-flex items-center gap-0.5 align-baseline rounded-sm text-xs font-medium text-(--session-overview-muted) outline-none hover:text-(--session-overview-text)"
+				className={cn(
+					"group inline-flex items-center gap-xxs",
+					"corner-xs",
+					"align-baseline text-body-m font-medium",
+					"text-ink-3",
+					"hover:text-ink",
+				)}
 				data-trace-content-disclosure
 				onClick={() => setPromptExpanded((current) => !current)}
 			>
 				{promptExpanded ? "Less" : "More"}
 				<TraceTextDisclosureIcon expanded={promptExpanded} />
-			</button>
+			</Pressable>
 		) : null;
 		const promptItems = items.filter((item) => item.kind === "user");
 		const promptRows = (
-			<div
-				id={promptPanelId}
-				className="grid min-w-0 divide-y divide-(--session-overview-border)"
-			>
+			<div id={promptPanelId} className="grid min-w-0 divide-y divide-line">
 				{showFullPrompt ? (
 					promptItems.map((item, index) => (
 						<div key={item.id} className={userPromptRowClassName}>
@@ -159,7 +163,11 @@ export function SessionMemberRow({
 					subtree={promptRows}
 				>
 					<div
-						className="flex min-h-10 w-full min-w-0 items-center gap-2 pr-3 text-left"
+						className={cn(
+							"flex min-h-10 w-full min-w-0 items-center gap-m",
+							"pr-l",
+							"text-left",
+						)}
 						data-transcript-user-header-source="row"
 						style={headerHeight ? { minHeight: headerHeight } : undefined}
 					>
@@ -170,7 +178,7 @@ export function SessionMemberRow({
 						/>
 						<h3
 							id={headingId}
-							className="min-w-0 shrink-0 truncate text-xs font-medium text-(--session-overview-text)"
+							className="min-w-0 shrink-0 truncate text-body-m font-medium text-ink"
 						>
 							{userLabel}
 						</h3>
@@ -187,9 +195,15 @@ export function SessionMemberRow({
 		return (
 			<section
 				aria-labelledby={headingId}
-				className="min-w-0 border-b border-(--session-overview-border) bg-(--session-overview-surface)"
+				className="min-w-0 edge-b-m border-line bg-canvas"
 			>
-				<div className="sticky top-0 z-20 flex min-h-9 min-w-0 items-center gap-2 border-b border-(--session-overview-border) bg-(--session-overview-surface) px-3 py-2">
+				<div
+					className={cn(
+						"sticky top-0 z-20 flex min-h-9 min-w-0 items-center gap-m",
+						"edge-b-m px-l py-m",
+						"border-line bg-canvas",
+					)}
+				>
 					<UserTraceAvatar
 						expanded={false}
 						expandable={false}
@@ -197,7 +211,7 @@ export function SessionMemberRow({
 					/>
 					<h3
 						id={headingId}
-						className="min-w-0 truncate text-xs font-medium text-(--session-overview-muted)"
+						className="min-w-0 truncate text-body-m font-medium text-ink-3"
 					>
 						{userLabel}
 					</h3>
@@ -205,10 +219,10 @@ export function SessionMemberRow({
 						<div className="ml-auto min-w-0">{headerTrailing}</div>
 					) : null}
 				</div>
-				<div className="grid min-w-0 divide-y divide-(--session-overview-border)">
+				<div className="grid min-w-0 divide-y divide-line">
 					{items.map((item) =>
 						item.kind === "user" ? (
-							<div key={item.id} className="min-w-0 py-2 pr-3 pl-10">
+							<div key={item.id} className="min-w-0 py-m pr-l pl-xxxl">
 								<UserPrompt content={item.content} />
 							</div>
 						) : null,
@@ -221,18 +235,15 @@ export function SessionMemberRow({
 	return (
 		<section
 			aria-labelledby={headingId}
-			className="flex min-w-0 items-start gap-2 py-5"
+			className="flex min-w-0 items-start gap-m py-xxl"
 		>
 			<UserTraceAvatar
 				expanded={false}
 				expandable={false}
 				imageUrl={userImageUrl}
 			/>
-			<div className="grid min-w-0 flex-1 gap-2">
-				<h3
-					id={headingId}
-					className="text-xs font-medium text-(--session-overview-subtle)"
-				>
+			<div className="grid min-w-0 flex-1 gap-m">
+				<h3 id={headingId} className="text-body-m font-medium text-ink-3">
 					{userLabel}
 				</h3>
 				{items.map((item) =>

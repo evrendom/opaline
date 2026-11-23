@@ -14,13 +14,15 @@ import {
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "@/app/ui/button";
-import { SearchInput } from "@/components/dashboard/data-table";
 import {
 	HorizontalResizeHandle,
 	useElementWidth,
 	useStoredPaneSize,
-} from "@/components/ui/horizontal-resize-handle";
-import { clampPaneSize } from "@/components/ui/horizontal-resize-utils";
+} from "@/app/ui/horizontal-resize-handle";
+import { clampPaneSize } from "@/app/ui/horizontal-resize-utils";
+import { Pressable } from "@/app/ui/pressable";
+import { SearchInput } from "@/components/dashboard/data-table";
+import { RetryButton } from "@/components/retry-button";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { useLocalDesktopApp } from "@/features/desktop/local-app";
 import {
@@ -120,13 +122,13 @@ export function SessionUsageDetail({
 						// on hover, outside the header's fluid fill); the name is the title.
 						<nav
 							aria-label={`${kind} breadcrumb`}
-							className="flex min-w-0 flex-1 items-center gap-1.5 text-base font-medium tracking-tight"
+							className="flex min-w-0 flex-1 items-center gap-s text-body-xxl font-medium"
 						>
-							<button
+							<Pressable
 								type="button"
 								onClick={onBack}
 								data-fluid-menu-root=""
-								className="flex shrink-0 items-center gap-2 text-muted-foreground transition-colors hover:text-foreground"
+								className="flex shrink-0 items-center gap-m text-ink-3 transition-colors hover:text-ink"
 							>
 								<ShellNavIcon
 									icon={shellRoute.icon}
@@ -135,10 +137,10 @@ export function SessionUsageDetail({
 									tone={shellRoute.tone}
 								/>
 								{shellRoute.title}
-							</button>
+							</Pressable>
 							<IconChevronRight
 								aria-hidden="true"
-								className="size-4 shrink-0 text-muted-foreground/50"
+								className="size-4 shrink-0 text-ink-4"
 								stroke={1.5}
 							/>
 							<span aria-current="page" className="truncate">
@@ -170,7 +172,7 @@ export function SessionUsageDetail({
 					<HorizontalResizeHandle
 						ariaLabel={`Resize ${kind.toLowerCase()} usage panel`}
 						direction={1}
-						className="hidden border-l border-(--session-overview-border) md:block"
+						className="hidden edge-l-m border-line md:block"
 						defaultValue={DEFAULT_USAGE_WIDTH}
 						maximum={maximum}
 						minimum={minimum}
@@ -185,7 +187,7 @@ export function SessionUsageDetail({
 					/>
 					<section
 						aria-label={`${kind} content`}
-						className="flex min-h-0 min-w-0 flex-col overflow-hidden border-t border-(--session-overview-border) md:border-t-0"
+						className="flex min-h-0 min-w-0 flex-col overflow-hidden edge-t-m border-line md:edge-t-none"
 					>
 						<h1 className="sr-only">{name}</h1>
 						{children}
@@ -463,14 +465,11 @@ export function UsageSessionsPane({
 					}}
 				/>
 				{sessionsQuery.isError && !sessionsQuery.data ? (
-					<Button
-						variant="ghost"
-						onClick={() => {
+					<RetryButton
+						onRetry={() => {
 							void sessionsQuery.refetch();
 						}}
-					>
-						Try again
-					</Button>
+					/>
 				) : null}
 			</div>
 		</>
@@ -528,12 +527,12 @@ export function UsageSessionDetail({
 			value={navigationHost ?? sessionHeaderPortal}
 		>
 			{backBar ? (
-				<div className="flex h-12 shrink-0 items-center gap-2 border-b border-(--session-overview-border) px-3">
+				<div className="flex h-12 shrink-0 items-center gap-m edge-b-m border-line px-l">
 					<Button
 						aria-label={backLabel}
 						title={backLabel}
-						variant="ghost"
-						size="icon-sm"
+						variant="secondary"
+						size="icon"
 						onClick={onBack}
 					>
 						<IconChevronLeft size={16} />

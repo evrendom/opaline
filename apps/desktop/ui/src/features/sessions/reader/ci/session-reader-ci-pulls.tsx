@@ -1,5 +1,6 @@
 import { IconBrandGithub } from "@tabler/icons-react";
 import { type ReactNode, useMemo } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { FluidList, useFluidListItem } from "@/components/fluid-list";
 import { cn } from "@/lib/utils";
 import { ScrollColumn } from "../files/session-reader-files-parts";
@@ -25,11 +26,11 @@ import {
 import { pullRequestUrl } from "./session-reader-run-ci";
 
 const TONE: Record<CiLinePart["tone"], string> = {
-	failed: "text-rose-600 dark:text-rose-400",
-	flaky: "text-amber-600 dark:text-amber-400",
-	muted: "text-muted-foreground",
-	passed: "text-emerald-600 dark:text-emerald-400",
-	running: "text-amber-600 dark:text-amber-400",
+	failed: "text-error",
+	flaky: "text-warning",
+	muted: "text-ink-3",
+	passed: "text-success",
+	running: "text-warning",
 };
 
 export type CiPullRow = {
@@ -89,23 +90,23 @@ export function CiPullColumn({
 }) {
 	const prs = rows.filter((row) => row.entry.pull).length;
 	return (
-		<div className="-mb-2 flex min-h-0 w-[380px] shrink-0 flex-col gap-1.5 pt-(--panes-top)">
+		<div className="-mb-m flex min-h-0 w-[380px] shrink-0 flex-col gap-s pt-(--panes-top)">
 			<PickStrip
 				agent={agent}
 				model={model}
 				run={run}
 				summary={`${prs} ${prs === 1 ? "PR" : "PRs"}`}
 			/>
-			<ScrollColumn className="-mx-1 px-1 pb-8">
+			<ScrollColumn className="-mx-xs px-xs pb-xxxl">
 				{rows.length === 0 ? (
-					<p className="py-1 pl-2 text-[11px] text-muted-foreground">
+					<p className="py-xs pl-m text-body-s text-ink-3">
 						{agent
 							? "This subagent reached no CI."
 							: "No CI reached in this run."}
 					</p>
 				) : (
 					<FluidList>
-						<ul className="flex flex-col gap-0.5">
+						<ul className="flex flex-col gap-xxs">
 							{rows.map((row, index) => (
 								<li key={row.entry.key}>
 									<PullLine
@@ -127,7 +128,7 @@ export function CiPullColumn({
 					</FluidList>
 				)}
 				{!run && unplaced > 0 ? (
-					<p className="px-2.5 py-2 text-[11px] text-muted-foreground">
+					<p className="px-l py-m text-body-s text-ink-3">
 						{unplaced} more {unplaced === 1 ? "run" : "runs"} reached CI with no
 						line in the rail to match; their CI shows here.
 					</p>
@@ -160,14 +161,14 @@ function CiLine({
 	return (
 		<span
 			className={cn(
-				"flex min-w-0 flex-wrap items-baseline gap-x-1.5 tabular-nums",
+				"flex min-w-0 flex-wrap items-baseline gap-x-s tabular-nums",
 				className,
 			)}
 		>
 			{parts.map((part, index) => (
-				<span key={part.text} className="inline-flex items-baseline gap-1.5">
+				<span key={part.text} className="inline-flex items-baseline gap-s">
 					{index > 0 ? (
-						<span aria-hidden="true" className="text-muted-foreground/50">
+						<span aria-hidden="true" className="text-ink-4">
 							·
 						</span>
 					) : null}
@@ -203,41 +204,48 @@ export function PullLine({
 		<div
 			ref={item.ref}
 			className={cn(
-				"relative flex flex-col gap-1 rounded-md px-2.5 py-1.5 transition-colors corner-squircle squircle:rounded-xl",
-				isPicked && "bg-muted",
+				"relative flex flex-col gap-xs",
+				"corner-s px-l py-s corner-squircle",
+				"transition-colors",
+				"squircle:corner-l",
+				isPicked && "bg-field",
 			)}
 		>
-			<button
+			<Pressable
 				type="button"
 				aria-current={isPicked || undefined}
 				onClick={onPick}
 				onFocus={item.onFocus}
-				className="flex w-full items-start gap-2.5 text-left outline-none after:absolute after:inset-0 after:rounded-md"
+				className={cn(
+					"flex w-full items-start gap-l",
+					"text-left",
+					"after:absolute after:inset-0 after:corner-s",
+				)}
 			>
 				<PullGlyph
 					aria-hidden="true"
 					className={cn(
-						"mt-px size-4 shrink-0",
-						look.className || "text-muted-foreground/70",
+						"mt-xxs size-4 shrink-0",
+						look.className || "text-ink-4",
 					)}
 				/>
 				<span
 					title={pull?.title ?? undefined}
 					className={cn(
-						"min-w-0 flex-1 truncate text-xs",
-						isPicked ? "text-foreground" : "text-foreground/90",
+						"min-w-0 flex-1 truncate text-body-m",
+						isPicked ? "text-ink" : "text-ink",
 					)}
 				>
 					{pullTitle(row.entry)}
 				</span>
 				{pull ? (
-					<span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+					<span className="shrink-0 text-body-s text-ink-3 tabular-nums">
 						#{pull.number}
 					</span>
 				) : null}
-			</button>
+			</Pressable>
 			{row.rounds.length > 0 || meta ? (
-				<div className="pointer-events-none relative flex min-w-0 items-center gap-2 pl-6.5">
+				<div className="pointer-events-none relative flex min-w-0 items-center gap-m pl-xxl">
 					{row.rounds.length > 0 ? (
 						<CiRoundDots
 							onPick={onPickRun}
@@ -246,7 +254,7 @@ export function PullLine({
 						/>
 					) : null}
 					{meta ? (
-						<span className="ml-auto flex shrink-0 items-center leading-none [&>*]:leading-none">
+						<span className="ml-auto flex shrink-0 items-center line-solid [&>*]:line-solid">
 							{meta}
 						</span>
 					) : null}
@@ -278,18 +286,15 @@ export function CiPullCard({
 	const push = row.rounds[pushIndex];
 	return (
 		<div className="flex min-h-0 min-w-0 flex-1 flex-col">
-			<header className="flex flex-col gap-1.5 border-b border-border/50 px-5 py-4">
-				<div className="flex min-w-0 items-center gap-2">
+			<header className="flex flex-col gap-s edge-b-m border-line-soft px-xxl py-xl">
+				<div className="flex min-w-0 items-center gap-m">
 					<PullGlyph
 						aria-hidden="true"
-						className={cn(
-							"size-4 shrink-0",
-							look.className || "text-muted-foreground",
-						)}
+						className={cn("size-4 shrink-0", look.className || "text-ink-3")}
 					/>
 					<h2
 						title={pull?.title ?? undefined}
-						className="min-w-0 truncate text-sm font-medium"
+						className="min-w-0 truncate text-body-xl font-medium"
 					>
 						{pullTitle(row.entry)}
 					</h2>
@@ -300,7 +305,13 @@ export function CiPullCard({
 						/>
 					) : null}
 				</div>
-				<p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-xs text-muted-foreground tabular-nums">
+				<p
+					className={cn(
+						"flex min-w-0 flex-wrap items-baseline gap-x-m",
+						"text-body-m tabular-nums",
+						"text-ink-3",
+					)}
+				>
 					{pull ? (
 						<span>
 							{pull.repository ? `${pull.repository}#` : "#"}
@@ -313,14 +324,14 @@ export function CiPullCard({
 						</span>
 					)}
 					{pull?.headRef ? (
-						<span className="truncate font-mono text-[11px]">
+						<span className="truncate font-data text-body-s">
 							{pull.headRef}
 						</span>
 					) : null}
 				</p>
-				<CiLine className="text-xs" summary={row.summary} />
+				<CiLine className="text-body-m" summary={row.summary} />
 			</header>
-			<ScrollColumn className="flex flex-col gap-5 px-3 py-4 *:shrink-0">
+			<ScrollColumn className="flex flex-col gap-xxl px-l py-xl *:shrink-0">
 				{push ? (
 					<CiPushDetail
 						index={pushIndex}
@@ -335,9 +346,9 @@ export function CiPullCard({
 					pull={pull}
 					rounds={row.rounds}
 				/>
-				{reachedBy ? <div className="px-3">{reachedBy}</div> : null}
+				{reachedBy ? <div className="px-l">{reachedBy}</div> : null}
 				{row.runs.length === 0 ? (
-					<p className="px-3 text-xs text-muted-foreground">
+					<p className="px-l text-body-m text-ink-3">
 						{row.titleChecks > 0
 							? `Only the PR Title check ran for it, ${row.titleChecks} times.`
 							: "No CI linked to it."}
