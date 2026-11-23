@@ -554,7 +554,7 @@ export function ConversationTraceEventRow({
 				fullPreviewText={undefined}
 				label={
 					<ConversationTraceTag
-						className="min-w-0 max-w-[36rem] shrink pl-s"
+						className="min-w-0 max-w-[36rem] shrink"
 						data-trace-shell-command-tag
 						hideIcon
 						title={shellCommand}

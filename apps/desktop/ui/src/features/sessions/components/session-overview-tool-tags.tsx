@@ -10,7 +10,6 @@ import {
 	type UseHint,
 	writeUseHint,
 } from "../reader/detail/reader-use-hint";
-import { SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME } from "./session-overview-row-elements";
 
 export type SessionMcpServerUse = { server: string; at: number };
 
@@ -59,7 +58,7 @@ function ToolTag({
 	return (
 		<span
 			className={cn(
-				SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME,
+				"flex min-w-0 shrink items-center text-body-xs font-regular tabular-nums",
 				"h-[1.1875rem] max-w-44 gap-xs [corner-shape:superellipse(1.25)]",
 				"corner-m py-xxs pr-s pl-xxs",
 				"text-ink bg-field shadow-card",
@@ -99,7 +98,7 @@ function ToolTag({
 	);
 }
 
-function Tag(props: ToolTagProps & { linked: boolean }) {
+function ToolChip(props: ToolTagProps & { linked: boolean }) {
 	const { linked, ...tag } = props;
 	if (props.names.length === 0) return null;
 	return linked && tag.href ? (
@@ -122,7 +121,7 @@ export function SessionOverviewToolTags({
 	const firstServer = mcpServers?.[0];
 	return (
 		<>
-			<Tag
+			<ToolChip
 				linked={linked}
 				kind="skill"
 				names={skills}
@@ -132,7 +131,7 @@ export function SessionOverviewToolTags({
 						: undefined
 				}
 			/>
-			<Tag
+			<ToolChip
 				linked={linked}
 				kind="mcp"
 				names={(mcpServers ?? []).map((use) => mcpServerLabel(use.server))}

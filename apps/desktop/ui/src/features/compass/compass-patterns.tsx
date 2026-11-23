@@ -10,6 +10,7 @@ import { appRoutes } from "@/app/routes";
 import { Button } from "@/app/ui/button";
 import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
 import { Pressable } from "@/app/ui/pressable";
+import { Stat, StatGroup } from "@/app/ui/stat";
 import { Textarea } from "@/app/ui/textarea";
 import { SERIES_COLORS } from "@/features/costs/chart-colors";
 import { formatReaderCost } from "@/features/sessions/reader/model/session-reader-model";
@@ -119,20 +120,13 @@ export function PatternPane({
 				<h2 className="compass-detail-title">{pattern.label}</h2>
 				<p className="compass-detail-summary">{pattern.summary}</p>
 			</header>
-			<dl className="compass-properties">
-				<div>
-					<dt>Runs</dt>
-					<dd>{pattern.runs}</dd>
-				</div>
-				<div>
-					<dt>Members</dt>
-					<dd>{pattern.members}</dd>
-				</div>
-				<div>
-					<dt>Cost</dt>
-					<dd>{formatReaderCost(pattern.costUsd)}</dd>
-				</div>
-			</dl>
+			<div className="corner-m bg-hover px-xl py-l">
+				<StatGroup>
+					<Stat label="Runs" value={pattern.runs} />
+					<Stat label="Members" value={pattern.members} />
+					<Stat label="Cost" value={formatReaderCost(pattern.costUsd)} />
+				</StatGroup>
+			</div>
 			{pattern.weekly.length >= 3 ? (
 				<section className="compass-detail-section" aria-label="Weeks">
 					<h3>Per week</h3>

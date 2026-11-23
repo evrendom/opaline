@@ -1,6 +1,6 @@
 import type { ComponentPropsWithoutRef } from "react";
+import { Tag } from "@/app/ui/tag";
 import { ModelChip } from "@/features/sessions/reader/detail/waterfall/session-reader-waterfall-chips";
-import { cn } from "@/lib/utils";
 import { ConversationSkillIcon } from "./conversation-skill-icon";
 import type { ToolIconName } from "./conversation-tools";
 import {
@@ -10,12 +10,8 @@ import {
 import { getModelIconComponent } from "./conversation-trace-model-icon";
 import { CONVERSATION_TOOL_ICONS } from "./conversation-trace-tool-icons";
 
-export const CONVERSATION_TRACE_TAG_CLASS_NAME =
-	"inline-flex h-5 items-center gap-xs truncate corner-xs bg-field pr-s pl-xxs dashboardy-mono text-body-m font-medium text-ink shadow-inset select-none";
-
-const defaultIconClassName = "size-3.5 shrink-0 text-ink-3";
 // design-escape-ok(colour): data paint; TypeScript's brand colour
-const typeScriptIconClassName = "size-3.5 shrink-0 text-[#3178c6]";
+const typeScriptIconClassName = "text-[#3178c6]";
 
 function isTypeScriptFile(value: string) {
 	return /\.(?:cts|mts|ts|tsx)$/i.test(value);
@@ -63,24 +59,30 @@ export function ConversationTraceTag({
 			: usesMarkdownIcon
 				? "markdown"
 				: toolIcon;
-	const iconClassName = usesTypeScriptIcon
-		? typeScriptIconClassName
-		: defaultIconClassName;
+	// The Tag sizes and greys its icons; only TypeScript's keeps its colour.
+	const iconClassName = usesTypeScriptIcon ? typeScriptIconClassName : "";
 
 	return (
-		<span
+		<Tag
 			{...props}
-			className={cn(CONVERSATION_TRACE_TAG_CLASS_NAME, className)}
+			size="md"
+			className={className}
 			data-trace-tag-context={context}
 		>
 			{hideIcon ? null : ModelIcon ? (
-				<ModelChip chip="size-4" glyph="size-2.5" model={model} tip={false} />
+				<ModelChip
+					chip="size-4"
+					// text-current keeps the brand colour the chip sets, not the Tag's grey.
+					glyph="size-2.5 text-current"
+					model={model}
+					tip={false}
+				/>
 			) : toolIcon === "sparkle" ? (
 				<ConversationSkillIcon skill={value} className={iconClassName} />
 			) : (
 				<ContextIcon className={iconClassName} />
 			)}
 			{children}
-		</span>
+		</Tag>
 	);
 }

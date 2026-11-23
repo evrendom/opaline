@@ -1,14 +1,8 @@
 import type { SessionAnalytics } from "@rudel/api-routes";
 import { IconGhost } from "@tabler/icons-react";
+import { Tag } from "@/app/ui/tag";
 import { TraceBotIcon } from "@/components/conversation/conversation-trace-glyphs";
-import { cn } from "@/lib/utils";
 import { resolveSessionNativeSubagentCount } from "./session-overview-metrics";
-import {
-	SESSION_OVERVIEW_ICON_TAG_CLASS_NAME,
-	SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME,
-	SESSION_OVERVIEW_TAG_ICON_CLASS_NAME,
-	SESSION_OVERVIEW_TAG_NUMBER_CLASS_NAME,
-} from "./session-overview-row-elements";
 
 type SessionSubagentData = Pick<
 	SessionAnalytics,
@@ -19,11 +13,6 @@ type SessionSubagentData = Pick<
 	| "linked_subagent_count"
 	| "linked_subagents"
 >;
-
-const SUBAGENT_TAG_CLASS_NAME = cn(
-	SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME,
-	"shrink-0 whitespace-nowrap bg-hover text-ink-2",
-);
 
 const SUBAGENT_ROW_TITLES: Record<
 	NonNullable<SessionAnalytics["subagent_of"]>["kind"],
@@ -60,21 +49,13 @@ export function SessionOverviewSubagentCountTag({
 	const count = getSessionOverviewSubagentCount(session);
 	if (count === 0) return null;
 	return (
-		<span
-			className={cn(
-				SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME,
-				SESSION_OVERVIEW_ICON_TAG_CLASS_NAME,
-				"shrink-0 bg-field text-ink-2",
-			)}
+		<Tag
 			data-session-overview-subagent-count={count}
 			title={`${count} ${count === 1 ? "subagent" : "subagents"}`}
 		>
-			<IconGhost
-				aria-hidden="true"
-				className={SESSION_OVERVIEW_TAG_ICON_CLASS_NAME}
-			/>
-			<span className={SESSION_OVERVIEW_TAG_NUMBER_CLASS_NAME}>{count}</span>
-		</span>
+			<IconGhost aria-hidden="true" />
+			<span>{count}</span>
+		</Tag>
 	);
 }
 
@@ -84,13 +65,12 @@ export function SessionOverviewSubagentTag({
 	subagentOf: NonNullable<SessionAnalytics["subagent_of"]>;
 }) {
 	return (
-		<span
-			className={SUBAGENT_TAG_CLASS_NAME}
+		<Tag
 			data-session-overview-subagent-tag={subagentOf.kind}
 			title={SUBAGENT_ROW_TITLES[subagentOf.kind]}
 		>
-			<TraceBotIcon className="size-3 shrink-0" />
+			<TraceBotIcon />
 			<span>Subagent</span>
-		</span>
+		</Tag>
 	);
 }

@@ -1,4 +1,5 @@
 import { IconAlertCircle, IconUser } from "@tabler/icons-react";
+import { Tag } from "@/app/ui/tag";
 import { ConversationTraceTag } from "@/components/conversation/conversation-trace-tag";
 import { cn } from "@/lib/utils";
 import { SessionModelMark } from "./session-model-mark";
@@ -6,8 +7,6 @@ import {
 	SESSION_OVERVIEW_CELL_CLASS_NAME,
 	SESSION_OVERVIEW_METADATA_CLASS_NAME,
 	SESSION_OVERVIEW_ROW_CLASS_NAME,
-	SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME,
-	SESSION_OVERVIEW_SWEAR_TAG_CLASS_NAME,
 	SessionLanguageSignalTag,
 } from "./session-overview-row-elements";
 import { SessionOverviewSubagentCountTag } from "./session-overview-subagent-tags";
@@ -166,18 +165,14 @@ export function SessionsOverviewPendingRow({
 						/>
 					)}
 					{showErrors && (
-						<span
-							className={cn(
-								SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME,
-								SESSION_OVERVIEW_SWEAR_TAG_CLASS_NAME,
-								"shrink-0",
-							)}
+						<Tag
+							tone="error"
 							data-session-overview-error-tag
 							title="Error count will appear after upload"
 						>
-							<IconAlertCircle aria-hidden="true" className="size-3 shrink-0" />
+							<IconAlertCircle aria-hidden="true" />
 							<span className="inline-block h-1.5 w-2 corner-xs bg-current/20" />
-						</span>
+						</Tag>
 					)}
 				</div>
 				<div className={cellClassName} data-session-overview-column="skills">

@@ -62,8 +62,6 @@ export const TurnBlock = memo(function TurnBlock({
 	const body = bodyState.status === "ready" ? bodyState.body : null;
 	const { open } = useRunUi(store, turn.turnId);
 	const callsHidden = hidden.has("toolCalls");
-	const toggleRun = () =>
-		store.update(turn.turnId, (state) => ({ open: !state.open }));
 	const memberText = body ? getReaderMemberText(body) : turn.userPreview;
 	const finalMessage = body ? getReaderFinalMessage(body) : null;
 	const waterfall = useMemo(
@@ -76,7 +74,6 @@ export const TurnBlock = memo(function TurnBlock({
 			id={turn.turnId}
 			mode={body ? getReaderRunMode(body) : undefined}
 			model={model}
-			onToggle={toggleRun}
 			waterfall={waterfall}
 		/>
 	) : null;

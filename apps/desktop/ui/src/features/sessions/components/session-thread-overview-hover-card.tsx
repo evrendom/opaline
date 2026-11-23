@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { Button } from "@/app/ui/button";
+import { Tag } from "@/app/ui/tag";
 import { TouchTarget } from "@/app/ui/touch-target";
 import {
 	getSessionOverviewCallActivityCounts,
@@ -184,8 +185,8 @@ function SessionOverviewActivityTag({
 	title: string;
 }) {
 	return (
-		<div
-			className="flex h-4 shrink-0 items-center gap-xxs corner-m bg-hover-strong pr-xs pl-xxs"
+		<Tag
+			render={<div />}
 			data-session-overview-activity-tag={kind}
 			title={title}
 		>
@@ -194,7 +195,7 @@ function SessionOverviewActivityTag({
 				className={`size-1.5 shrink-0 corner-s ${getSessionOverviewEventDotColorClassName(kind)}`}
 			/>
 			<span>{`${label} ${count.toLocaleString()}`}</span>
-		</div>
+		</Tag>
 	);
 }
 

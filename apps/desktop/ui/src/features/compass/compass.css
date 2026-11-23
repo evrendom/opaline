@@ -426,10 +426,6 @@
 	border-radius: var(--radius-s);
 	font-size: var(--size-l);
 }
-.compass-settings-label {
-	flex: 1;
-	min-width: 0;
-}
 .compass-settings-value {
 	display: inline-flex;
 	flex-shrink: 0;

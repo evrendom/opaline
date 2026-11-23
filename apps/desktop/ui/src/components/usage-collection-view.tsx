@@ -25,7 +25,7 @@ import {
 } from "@/app/ui/input-group";
 import { Pressable } from "@/app/ui/pressable";
 import { Skeleton } from "@/app/ui/skeleton";
-import { CONVERSATION_TRACE_TAG_CLASS_NAME } from "@/components/conversation/conversation-trace-tag";
+import { Tag } from "@/app/ui/tag";
 import { PageEmptyState } from "@/components/dashboard/page-parts";
 import { RetryButton } from "@/components/retry-button";
 import { SkillMark } from "@/components/skill-mark";
@@ -471,17 +471,10 @@ function UsageSummary({
 							/>
 						))}
 						{hiddenRepoCount > 0 ? (
-							<span
-								className={cn(
-									CONVERSATION_TRACE_TAG_CLASS_NAME,
-									"shrink-0 px-s",
-								)}
-							>
-								<span className="font-body font-regular text-ink-2 tabular-nums">
-									+{hiddenRepoCount.toLocaleString()}
-									<span className="sr-only"> more repositories</span>
-								</span>
-							</span>
+							<Tag size="md">
+								+{hiddenRepoCount.toLocaleString()}
+								<span className="sr-only"> more repositories</span>
+							</Tag>
 						) : null}
 					</dd>
 				</div>
@@ -520,29 +513,23 @@ function RepositoryChip({
 	sessionCount: number;
 }) {
 	return (
-		<span
-			className={cn(
-				CONVERSATION_TRACE_TAG_CLASS_NAME,
-				"min-w-0 gap-s overflow-visible font-regular",
-			)}
+		<Tag
+			size="md"
+			className="shrink"
 			title={`Repository ${label}, ${formatCompactSessionCount(sessionCount)}`}
 		>
-			<IconFolder
-				aria-hidden="true"
-				className={USAGE_METADATA_ICON_CLASS_NAME}
-			/>
-			<span className="min-w-0 truncate font-body">{label}</span>
+			<IconFolder aria-hidden="true" />
+			<span className="min-w-0 truncate">{label}</span>
 			<span
 				className={cn(
-					"shrink-0",
+					"ml-xs shrink-0",
 					"edge-l-m pl-s",
-					"font-body tabular-nums",
 					"border-line text-ink-3",
 				)}
 			>
 				{sessionCount.toLocaleString()}
 			</span>
-		</span>
+		</Tag>
 	);
 }
 

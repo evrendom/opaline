@@ -2,13 +2,11 @@ import type { SessionDetailTurnSummary } from "@rudel/api-routes";
 import {
 	IconAlertTriangle,
 	IconArrowDown,
-	IconArrowsDiagonal,
-	IconArrowsDiagonalMinimize2,
 	IconArrowUp,
 	IconGhost,
 } from "@tabler/icons-react";
 import { type ReactNode, useMemo } from "react";
-import { Pressable } from "@/app/ui/pressable";
+import { Tag } from "@/app/ui/tag";
 import { ConversationTracePlanTag } from "@/components/conversation/conversation-trace-plan-tag";
 import { formatConversationModelSetting } from "@/components/conversation/model-section-header";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
@@ -47,10 +45,7 @@ import {
 	OpalChip,
 	Tip,
 } from "./waterfall/session-reader-waterfall-chips";
-import {
-	barGeometry,
-	rowState,
-} from "./waterfall/session-reader-waterfall-layout";
+import { barGeometry } from "./waterfall/session-reader-waterfall-layout";
 import { getWaterfallFilterOptions } from "./waterfall/session-reader-waterfall-rows";
 
 export function RunSummaryBar({
@@ -59,7 +54,6 @@ export function RunSummaryBar({
 	id,
 	mode,
 	model,
-	onToggle,
 	shortId = shortRunId(id),
 	waterfall,
 }: {
@@ -68,19 +62,16 @@ export function RunSummaryBar({
 	id: string;
 	mode?: ReturnType<typeof getReaderRunMode>;
 	model: string | null;
-	onToggle?: () => void;
 	shortId?: string;
 	waterfall: SessionReaderWaterfall;
 }) {
 	const steps = waterfall.allSteps.filter(isAgentStep);
 	const setting = formatConversationModelSetting(mode?.modelSetting);
 	const className = cn(
-		"group/run flex gap-l",
+		"flex gap-l",
 		"-mx-s corner-s px-s py-s",
 		"text-body-m",
-		"text-ink-3 transition-colors",
-		onToggle && "w-full text-left",
-		onToggle && rowState(false),
+		"text-ink-3",
 	);
 	const content = (
 		<>
@@ -93,13 +84,6 @@ export function RunSummaryBar({
 								{shortId}
 							</span>
 						</Tip>
-						{onToggle ? null : (
-							<CopyButton
-								className="[&_svg]:size-4"
-								title={copyLabel}
-								value={id}
-							/>
-						)}
 						<span
 							className={cn(
 								"flex min-w-0 items-center gap-s",
@@ -119,19 +103,7 @@ export function RunSummaryBar({
 							{mode?.planMode ? <ConversationTracePlanTag /> : null}
 						</span>
 					</span>
-					{onToggle ? (
-						expanded ? (
-							<IconArrowsDiagonalMinimize2
-								aria-hidden="true"
-								className="size-4 shrink-0 text-ink-4 transition-colors group-hover/run:text-ink"
-							/>
-						) : (
-							<IconArrowsDiagonal
-								aria-hidden="true"
-								className="size-4 shrink-0 text-ink-4 transition-colors group-hover/run:text-ink"
-							/>
-						)
-					) : null}
+					<CopyButton className="[&_svg]:size-4" title={copyLabel} value={id} />
 				</span>
 				{expanded ? null : (
 					<StepStrip focus={null} steps={steps} waterfall={waterfall} />
@@ -139,19 +111,7 @@ export function RunSummaryBar({
 			</span>
 		</>
 	);
-	return onToggle ? (
-		<Pressable
-			type="button"
-			aria-expanded={expanded}
-			aria-label={expanded ? "Fold the trace" : "Expand the trace"}
-			onClick={onToggle}
-			className={className}
-		>
-			{content}
-		</Pressable>
-	) : (
-		<div className={className}>{content}</div>
-	);
+	return <div className={className}>{content}</div>;
 }
 
 type StripFocus = {
@@ -356,16 +316,21 @@ function RunNumberTags({
 }) {
 	return (
 		<>
-			<RunTag className="gap-s" title="Input / output tokens">
-				<TokenCounts turn={turn} />
+			<RunTag title="Input / output tokens">
+				<span className="inline-flex items-center gap-s">
+					<TokenCounts turn={turn} />
+				</span>
 			</RunTag>
 			{getContextFill(turn) ? (
 				<RunTag>
 					<ContextFill turn={turn} />
 				</RunTag>
 			) : null}
-			<RunTag className={costShade}>
-				{formatReaderCost(turn.estimatedCost)}
+			<RunTag>
+				{/* The cost's heat is data paint, so it colours the figure, not the Tag. */}
+				<span className={costShade}>
+					{formatReaderCost(turn.estimatedCost)}
+				</span>
 			</RunTag>
 			<RunAlertTags turn={turn} />
 		</>
@@ -443,28 +408,8 @@ function RunAlertTags({
 	);
 }
 
-function RunTag({
-	children,
-	className,
-	title,
-}: {
-	children: ReactNode;
-	className?: string;
-	title?: string;
-}) {
-	const tag = (
-		<span
-			className={cn(
-				"inline-flex h-5 items-center",
-				"corner-full px-m",
-				"tabular-nums",
-				"bg-surface text-ink shadow-card",
-				className,
-			)}
-		>
-			{children}
-		</span>
-	);
+function RunTag({ children, title }: { children: ReactNode; title?: string }) {
+	const tag = <Tag size="md">{children}</Tag>;
 	return title ? (
 		<Tip label={title} side="bottom">
 			{tag}

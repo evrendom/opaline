@@ -1,4 +1,5 @@
 import { getRawToolInput, type TraceEvent } from "@rudel/api-routes";
+import { Tag } from "@/app/ui/tag";
 import { mcpTool } from "../../model/session-reader-mcp-tool";
 import { JsonTree } from "./session-reader-json-tree";
 import { HighlightedCode } from "./session-reader-step-payloads";
@@ -48,9 +49,7 @@ export function McpCall({ event }: { event: ToolEvent }) {
 		<div className="flex flex-col divide-y divide-line-soft corner-m edge-m border-line bg-canvas px-l">
 			{named ? (
 				<p className="flex min-w-0 items-baseline gap-s py-m">
-					<span className="shrink-0 corner-xs bg-field px-xs text-body-xs font-medium text-ink-3 [line-height:var(--line-m)]">
-						{named.server}
-					</span>
+					<Tag>{named.server}</Tag>
 					<span className="min-w-0 truncate font-data text-body-m">
 						{named.tool}
 					</span>

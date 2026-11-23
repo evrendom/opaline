@@ -11,6 +11,7 @@ import {
 	getWorkspaceSlugFromPath,
 } from "@/app/routes";
 import { Pressable } from "@/app/ui/pressable";
+import { Tag } from "@/app/ui/tag";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import { ConversationSkillLink } from "@/components/conversation/conversation-skill-link";
 import { ConversationTraceTag } from "@/components/conversation/conversation-trace-tag";
@@ -59,14 +60,9 @@ import {
 } from "./session-overview-live-row";
 import {
 	SESSION_OVERVIEW_CELL_CLASS_NAME,
-	SESSION_OVERVIEW_ICON_TAG_CLASS_NAME,
 	SESSION_OVERVIEW_METADATA_CLASS_NAME,
 	SESSION_OVERVIEW_MODEL_LABEL_CLASS_NAME,
 	SESSION_OVERVIEW_ROW_CLASS_NAME,
-	SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME,
-	SESSION_OVERVIEW_SWEAR_TAG_CLASS_NAME,
-	SESSION_OVERVIEW_TAG_ICON_CLASS_NAME,
-	SESSION_OVERVIEW_TAG_NUMBER_CLASS_NAME,
 	SessionOverviewLanguageSignals,
 } from "./session-overview-row-elements";
 import { SessionOverviewToolTags } from "./session-overview-tool-tags";
@@ -442,13 +438,8 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 				{!failure &&
 				errorCount !== 0 &&
 				!(errorCount === null && transcriptSubagent !== null) ? (
-					<span
-						className={cn(
-							SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME,
-							SESSION_OVERVIEW_ICON_TAG_CLASS_NAME,
-							SESSION_OVERVIEW_SWEAR_TAG_CLASS_NAME,
-							"shrink-0",
-						)}
+					<Tag
+						tone="error"
 						data-session-overview-error-tag
 						title={
 							errorCount === null
@@ -456,14 +447,9 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 								: `${formatNumber(errorCount)} detected tool/API ${errorCount === 1 ? "error" : "errors"}`
 						}
 					>
-						<IconAlertCircle
-							aria-hidden="true"
-							className={SESSION_OVERVIEW_TAG_ICON_CLASS_NAME}
-						/>
-						<span className={SESSION_OVERVIEW_TAG_NUMBER_CLASS_NAME}>
-							{errorCount === null ? "—" : formatNumber(errorCount)}
-						</span>
-					</span>
+						<IconAlertCircle aria-hidden="true" />
+						<span>{errorCount === null ? "—" : formatNumber(errorCount)}</span>
+					</Tag>
 				) : null}
 			</div>
 			{showSkillsColumn ? (

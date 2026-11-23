@@ -187,14 +187,10 @@ describe("ConversationTraceEventRow shell calls", () => {
 		expect(markup).not.toContain(">Ran<");
 		expect(markup).toContain('aria-expanded="false"');
 		expect(markup).not.toContain("data-trace-expanded-content");
+		expect(markup).toContain('data-slot="tag"');
+		expect(markup).toContain('data-size="md"');
 		expect(markup).toContain("h-5");
-		expect(markup).toContain("items-center");
-		expect(markup).toContain("inline-flex h-5 items-center gap-xs");
-		expect(markup).toContain("corner-xs");
-		expect(markup).toContain("pl-s");
-		expect(markup).not.toContain("pl-xxs");
-		expect(markup).toContain("pr-s");
-		expect(markup).toContain("dashboardy-mono");
+		expect(markup).toContain("px-s");
 		expect(markup).toContain(
 			'<code class="min-w-0 truncate whitespace-pre font-data font-regular tracking-m [font-variant-ligatures:none]"',
 		);

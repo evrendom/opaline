@@ -130,7 +130,7 @@ describe("session overview drag zoom selection", () => {
 		expect(markup).toContain('aria-label="3 file edits"');
 		expect(markup).toContain('title="3 file edits"');
 		expect(markup).toContain("Edits 3");
-		expect(markup).toContain("h-4 shrink-0 items-center gap-xxs corner-m");
+		expect(markup).toContain('data-slot="tag"');
 		expect(markup).toContain("size-1.5 shrink-0 corner-s");
 		expect(markup).toContain("Zoom In");
 		expect(markup).toContain("items-center");

@@ -149,7 +149,7 @@ describe("SessionThreadOverviewHoverCard", () => {
 		expect(markup).toContain("Writes 1");
 		expect(markup).toContain("Edits 3");
 		expect(markup).not.toContain("Subagents 1");
-		expect(markup).toContain("h-4 shrink-0 items-center gap-xxs corner-m");
+		expect(markup).toContain('data-slot="tag"');
 		expect(markup).toContain("w-full");
 		expect(markup).toContain("justify-start");
 		expect(markup).toContain(

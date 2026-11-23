@@ -5,7 +5,7 @@ import {
 } from "@rudel/api-routes";
 import { IconAdjustmentsHorizontal } from "@tabler/icons-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { type CSSProperties, useId, useState } from "react";
+import { type CSSProperties, useState } from "react";
 import { toast } from "sonner";
 import { Checkbox } from "@/app/ui/checkbox";
 import { Input } from "@/app/ui/input";
@@ -117,7 +117,6 @@ function FlagSettingRow({
 	frustrationCheck: boolean;
 	onChange: (next: Partial<FlagSetting>) => void;
 }) {
-	const checkboxId = useId();
 	const appearance = MOMENT_KINDS_APPEARANCE[flag.kind];
 	const Glyph = appearance.icon;
 	const description =
@@ -127,19 +126,18 @@ function FlagSettingRow({
 	return (
 		<div className="compass-settings-row" title={description}>
 			<Checkbox
-				id={checkboxId}
+				className="min-w-0 flex-1"
 				checked={setting.enabled}
 				disabled={!canEdit}
 				onCheckedChange={(checked) => onChange({ enabled: checked })}
-			/>
-			<Glyph
-				aria-hidden="true"
-				className="compass-row-glyph"
-				style={{ "--glyph-color": appearance.color } as CSSProperties}
-			/>
-			<label htmlFor={checkboxId} className="compass-settings-label">
+			>
+				<Glyph
+					aria-hidden="true"
+					className="compass-row-glyph"
+					style={{ "--glyph-color": appearance.color } as CSSProperties}
+				/>
 				{flag.label}
-			</label>
+			</Checkbox>
 			{flag.value ? (
 				<FlagValueInput
 					key={setting.value ?? flag.value.defaultValue}
