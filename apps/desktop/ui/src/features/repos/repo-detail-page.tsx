@@ -129,8 +129,11 @@ const SETUP_TABS = ["instructions", "skills", "mcp"] as const;
 const TAB_PANE =
 	"absolute inset-0 flex min-h-0 min-w-0 flex-col overflow-hidden";
 
+// The rail sits where the Sessions overview's does (the stage's own origin,
+// the default 32px gutter), so it's the same size on both pages; only the
+// content beside it is offset onto the stage.
 const STAGE_PANE =
-	"absolute inset-x-0 top-(--stage-top) bottom-0 left-[calc(var(--reader-gutter)-1.5rem)] flex min-h-0 min-w-0 flex-col overflow-hidden";
+	"absolute inset-0 flex min-h-0 min-w-0 flex-col overflow-hidden";
 
 export function RepoDetailPage({
 	repoKey,
@@ -327,7 +330,7 @@ export function RepoDetailPage({
 											<div
 												className={cn(
 													STAGE_PANE,
-													"flex-row [--cost-page-gutter:--spacing(6)]",
+													"flex-row",
 												)}
 											>
 												<ShellHeaderPortalContext.Provider value={null}>
@@ -340,7 +343,7 @@ export function RepoDetailPage({
 														</DotPreviewContext.Provider>
 													</div>
 												</ShellHeaderPortalContext.Provider>
-												<div className="relative min-w-0 flex-1">
+												<div className="relative mt-(--stage-top) ml-m min-w-0 flex-1">
 													<Activity
 														mode={shownTab === "summary" ? "visible" : "hidden"}
 													>
