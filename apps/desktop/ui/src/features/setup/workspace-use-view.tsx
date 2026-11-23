@@ -16,7 +16,6 @@ import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
 import { Bone, Bones, Reveal } from "@/app/ui/bones";
-import { Empty, EmptyHeader } from "@/app/ui/empty";
 import { Pressable } from "@/app/ui/pressable";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { FluidList, useFluidListItem } from "@/components/fluid-list";
@@ -184,10 +183,6 @@ export function WorkspaceUseView({
 	const loading = !settled || (of !== null && runsQuery.isPending);
 	const missing =
 		settled && (!file || (runs !== undefined && runs.length === 0));
-	// Until the file is known, the page can't tell runs from none: it draws
-	// the empty state's frame, and the run list and trace only once a file
-	// (so likely runs) is known.
-	const knowsFile = settled && file != null;
 	const shownFile = file && !file.setupFile.startsWith("called:") ? file : null;
 
 	return (
@@ -195,7 +190,7 @@ export function WorkspaceUseView({
 			<div className="flex h-full min-h-0 gap-xxl">
 				<div className="-mb-m flex min-h-0 shrink flex-col" style={RUNS_WIDTH}>
 					<ScrollColumn className="-mx-xs px-xs pb-xxxl">
-						{(loading && knowsFile) || (runs && runs.length > 0) ? (
+						{loading || (runs && runs.length > 0) ? (
 							<Reveal
 								label="Reading the runs"
 								loading={loading}
@@ -263,10 +258,8 @@ export function WorkspaceUseView({
 							section={section}
 							version={pickedVersion?.number ?? null}
 						/>
-					) : loading && knowsFile ? (
-						<MiddleSample section={section} />
 					) : loading ? (
-						<UnknownSample section={section} />
+						<MiddleSample section={section} />
 					) : (
 						<CenteredState
 							icon={copy.icon}
@@ -279,13 +272,13 @@ export function WorkspaceUseView({
 					className={cn("flex min-h-0 shrink overflow-hidden", CARD)}
 					style={FILE_CARD_WIDTH}
 				>
-					{shownFile ? (
+					{shownFile || (!server && loading) ? (
 						<Reveal
 							fill
 							className="min-w-0 flex-1"
 							label="Reading the file"
-							loading={false}
-							sample={null}
+							loading={!shownFile}
+							sample={<FileCardSample />}
 							sampleId="use-file"
 						>
 							{() =>
@@ -980,13 +973,21 @@ function OpenRunLink({
 	);
 }
 
+// RunList: a day header, then rows of a model chip, the run's short id and
+// its time at the end.
 function RunListSample() {
 	return (
-		<div className="flex flex-col gap-xxs pt-xs">
-			{[72, 56, 80, 64, 50, 76, 60, 68, 54, 74].map((width) => (
-				<div key={width} className="flex h-7 items-center gap-m px-l">
-					<Bone className="size-4 shrink-0 corner-full" />
-					<Bone className="h-2.5 corner-full" style={{ width: `${width}%` }} />
+		<div className="flex flex-col gap-xxs">
+			<Bone className="mx-l mt-xs mb-xs h-2 w-16 corner-full" />
+			{[56, 48, 60, 52, 44, 56, 50, 58].map((id, row) => (
+				<div
+					// biome-ignore lint/suspicious/noArrayIndexKey: a fixed sample
+					key={row}
+					className="flex h-8 items-center gap-m px-l"
+				>
+					<Bone className="size-4.5 shrink-0 corner-full" />
+					<Bone className="h-2.5 corner-full" style={{ width: id }} />
+					<Bone className="ml-auto h-2.5 w-9 shrink-0 corner-full" />
 				</div>
 			))}
 		</div>
@@ -1035,28 +1036,6 @@ function dateTime(iso: string): string {
 		minute: "2-digit",
 		month: "short",
 	});
-}
-
-// The empty state's frame, in bones: what the page most often turns into
-// while it can't yet tell whether there are runs.
-function UnknownSample({ section }: { section: UseSection }) {
-	return (
-		<Bones
-			fill
-			label={section === "mcp" ? "Reading the calls" : "Reading this run"}
-			className="flex min-w-0 flex-1"
-		>
-			<div className="flex h-full min-w-0 flex-1 flex-col p-xl">
-				<Empty className="flex-1">
-					<EmptyHeader>
-						<Bone className="size-8 corner-m" />
-						<Bone className="mt-s h-3 w-40 corner-full" />
-						<Bone className="h-2.5 w-56 corner-full" />
-					</EmptyHeader>
-				</Empty>
-			</div>
-		</Bones>
-	);
 }
 
 function MiddleSample({ section }: { section: UseSection }) {
@@ -1120,6 +1099,39 @@ function SkillTraceBody() {
 }
 
 const OUTPUT_LINES = [92, 78, 86, 64, 90, 72, 58, 84, 70, 46];
+
+// SetupCard: the file's mark, name and meta over a hairline, then its text.
+function FileCardSample() {
+	return (
+		<div className="flex flex-col">
+			<div className="flex items-center gap-m edge-b-m border-line-soft px-xl py-xl">
+				<Bone className="size-4 shrink-0 corner-xs" />
+				<Bone className="h-3 w-36 corner-full" />
+				<Bone className="h-2.5 w-28 corner-full" />
+			</div>
+			<div className="flex flex-col gap-xl px-xl py-xl">
+				{FILE_PARAGRAPHS.map((paragraph) => (
+					<div key={paragraph.join()} className="flex flex-col gap-m">
+						{paragraph.map((width) => (
+							<Bone
+								key={width}
+								className="h-2.5 corner-full"
+								style={{ width: `${width}%` }}
+							/>
+						))}
+					</div>
+				))}
+			</div>
+		</div>
+	);
+}
+
+// The file's text: even lines in paragraphs, each ending short.
+const FILE_PARAGRAPHS = [
+	[94, 88, 62],
+	[90, 84, 92, 48],
+	[86, 70],
+];
 
 function McpCallsSample() {
 	return (
