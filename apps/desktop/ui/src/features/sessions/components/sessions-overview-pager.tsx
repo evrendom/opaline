@@ -68,7 +68,7 @@ export function SessionsOverviewPager({
 					aria-label="Previous page"
 					disabled={!canPrevious}
 					onClick={() => onPage(page - 1)}
-					size="icon"
+					size="icon-sm"
 					variant={canPrevious ? "primary" : "secondary"}
 				>
 					<IconChevronLeft />
@@ -77,7 +77,7 @@ export function SessionsOverviewPager({
 					aria-label="Next page"
 					disabled={!canNext}
 					onClick={() => onPage(page + 1)}
-					size="icon"
+					size="icon-sm"
 					variant={canNext ? "primary" : "secondary"}
 				>
 					<IconChevronRight />

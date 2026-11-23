@@ -43,8 +43,10 @@ its content from 80px. Use it for notes, descriptions and messages.
 ## Select
 
 `src/app/ui/select.tsx`: `Select`, `SelectTrigger`, `SelectValue`,
-`SelectContent` and `SelectItem`. Trigger sizes are `sm` (32px) and `md`
-(36px, the default). Use `sm` inside a table row.
+`SelectContent` and `SelectItem`. Trigger sizes are `md` (36px, the default: a form field) and `sm` (24px:
+the dense one, inside a line or a table row, such as a pager's page size or
+a role cell). `sm` is Button `sm`'s pill on the muted `field` fill, 12px
+text, with no control shadow.
 
 ```tsx
 // Correct: from WorkspaceMembersTable

@@ -86,7 +86,13 @@ function SelectTrigger({
 				"aria-invalid:border-error aria-invalid:ring-[1.5px] aria-invalid:ring-error-line",
 				"data-placeholder:text-ink-4",
 				"data-[size=md]:h-9",
-				"data-[size=sm]:h-8",
+				// sm: the dense one, inside a line or a table row (a pager's page
+				// size, a role cell): Button sm's 24px pill on the muted field
+				// fill, no control shadow, 12px text.
+				"data-[size=sm]:h-6 data-[size=sm]:gap-xs data-[size=sm]:py-zero data-[size=sm]:pr-s data-[size=sm]:pl-m",
+				"data-[size=sm]:corner-full data-[size=sm]:corner-round data-[size=sm]:squircle:corner-full",
+				"data-[size=sm]:bg-field data-[size=sm]:text-body-m data-[size=sm]:shadow-none",
+				"data-[size=sm]:hover:bg-hover-strong",
 				"*:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-s",
 				"[&_svg]:pointer-events-none [&_svg]:shrink-0",
 				"[&_svg:not([class*='size-'])]:size-4",
@@ -97,7 +103,12 @@ function SelectTrigger({
 			{children}
 			<SelectPrimitive.Icon
 				render={
-					<IconSelector className="pointer-events-none size-3.5 text-ink-4" />
+					<IconSelector
+						className={cn(
+							"pointer-events-none text-ink-4",
+							size === "sm" ? "size-3" : "size-3.5",
+						)}
+					/>
 				}
 			/>
 		</SelectPrimitive.Trigger>
