@@ -383,6 +383,8 @@ function motionOf(u: string): boolean {
 
 /** Which rule a class breaks, if any. */
 export function classifyClass(word: string): Rule | undefined {
+	// nothing presses down: no scale or nudge while held
+	if (/(?:^|:)active:-?(?:scale|translate)(?:-|$)/.test(word)) return "motion";
 	const u = utilityOf(word).replace(/^-/, "");
 	if (!u) return undefined;
 	const base = withoutModifier(u);

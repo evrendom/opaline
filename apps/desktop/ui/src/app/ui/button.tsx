@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 // <Link>, not a button. An invalid button takes the error edge inside an
 // error-line ring; keyboard focus is the system's one mark, `focus-outline`.
 const buttonVariants = cva(
-	"group/button inline-flex shrink-0 items-center justify-center corner-full bg-clip-padding text-body-xl font-medium whitespace-nowrap transition-all hover:duration-(--motion-duration) focus-outline select-none active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-error aria-invalid:ring-[1.5px] aria-invalid:ring-error-line [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
+	"group/button inline-flex shrink-0 items-center justify-center corner-full bg-clip-padding text-body-xl font-medium whitespace-nowrap transition-all hover:duration-(--motion-duration) focus-outline select-none disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-error aria-invalid:ring-[1.5px] aria-invalid:ring-error-line [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
 	{
 		variants: {
 			variant: {

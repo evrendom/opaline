@@ -44,6 +44,10 @@ footer and sign-in, `md` everywhere else (a page's main action included), and
 `sm` only inside a dense line (a status line, a table row). An icon-only button
 needs an `aria-label`.
 
+Nothing presses down: no button, tab, chip or row scales or moves while it's
+held. Hover and the pressed or open fill are the only feedback. The check
+flags `active:scale-*` and `active:translate-*`.
+
 ```tsx
 // Correct: a dialog footer, from DeleteWorkspaceDialog
 <Button onClick={onClose}>Cancel</Button>

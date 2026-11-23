@@ -201,6 +201,13 @@ describe("design-system escape check", () => {
 		expect(stripCssComments("a /* x\ny */ b")).toBe("a     \n     b");
 	});
 
+	test("no press-down: active scale or translate is motion", () => {
+		expect(classifyClass("active:scale-[0.97]")).toBe("motion");
+		expect(classifyClass("active:scale-95")).toBe("motion");
+		expect(classifyClass("hover:active:-translate-y-px")).toBe("motion");
+		expect(classifyClass("active:bg-field")).toBeUndefined();
+	});
+
 	test("arbitrary type properties in a class", () => {
 		expect(classifyClass("[font-family:Inter,sans-serif]")).toBe("type");
 		expect(classifyClass("[font-weight:450]")).toBe("type");
