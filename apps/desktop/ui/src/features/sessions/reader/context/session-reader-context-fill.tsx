@@ -55,7 +55,7 @@ export function ContextFill({
 					fill="none"
 					stroke="currentColor"
 					strokeWidth="2"
-					className="text-ink-4"
+					className="text-line"
 				/>
 				<circle
 					cx="6"
@@ -67,7 +67,7 @@ export function ContextFill({
 					strokeDasharray={`${Math.max(share * 100, 1)} 100`}
 					strokeLinecap="round"
 					strokeWidth="2"
-					className={share > 0.8 ? "text-warning" : "text-ink-4"}
+					className={share > 0.8 ? "text-warning" : "text-ink-3"}
 				/>
 			</svg>
 			<span>
@@ -123,7 +123,7 @@ function ContextRange({
 						fill="none"
 						stroke="currentColor"
 						strokeWidth="2"
-						className="text-ink-4"
+						className="text-line"
 					/>
 					<circle
 						cx="6"

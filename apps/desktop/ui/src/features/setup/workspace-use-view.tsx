@@ -16,6 +16,7 @@ import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
 import { Bone, Bones, Reveal } from "@/app/ui/bones";
+import { Empty, EmptyHeader } from "@/app/ui/empty";
 import { Pressable } from "@/app/ui/pressable";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { FluidList, useFluidListItem } from "@/components/fluid-list";
@@ -183,6 +184,10 @@ export function WorkspaceUseView({
 	const loading = !settled || (of !== null && runsQuery.isPending);
 	const missing =
 		settled && (!file || (runs !== undefined && runs.length === 0));
+	// Until the file is known, the page can't tell runs from none: it draws
+	// the empty state's frame, and the run list and trace only once a file
+	// (so likely runs) is known.
+	const knowsFile = settled && file != null;
 	const shownFile = file && !file.setupFile.startsWith("called:") ? file : null;
 
 	return (
@@ -190,7 +195,7 @@ export function WorkspaceUseView({
 			<div className="flex h-full min-h-0 gap-xxl">
 				<div className="-mb-m flex min-h-0 shrink flex-col" style={RUNS_WIDTH}>
 					<ScrollColumn className="-mx-xs px-xs pb-xxxl">
-						{loading || (runs && runs.length > 0) ? (
+						{(loading && knowsFile) || (runs && runs.length > 0) ? (
 							<Reveal
 								label="Reading the runs"
 								loading={loading}
@@ -258,8 +263,10 @@ export function WorkspaceUseView({
 							section={section}
 							version={pickedVersion?.number ?? null}
 						/>
-					) : loading ? (
+					) : loading && knowsFile ? (
 						<MiddleSample section={section} />
+					) : loading ? (
+						<UnknownSample section={section} />
 					) : (
 						<CenteredState
 							icon={copy.icon}
@@ -272,13 +279,13 @@ export function WorkspaceUseView({
 					className={cn("flex min-h-0 shrink overflow-hidden", CARD)}
 					style={FILE_CARD_WIDTH}
 				>
-					{shownFile || (!server && loading) ? (
+					{shownFile ? (
 						<Reveal
 							fill
 							className="min-w-0 flex-1"
 							label="Reading the file"
-							loading={!shownFile}
-							sample={<FileCardSample />}
+							loading={false}
+							sample={null}
 							sampleId="use-file"
 						>
 							{() =>
@@ -1030,6 +1037,28 @@ function dateTime(iso: string): string {
 	});
 }
 
+// The empty state's frame, in bones: what the page most often turns into
+// while it can't yet tell whether there are runs.
+function UnknownSample({ section }: { section: UseSection }) {
+	return (
+		<Bones
+			fill
+			label={section === "mcp" ? "Reading the calls" : "Reading this run"}
+			className="flex min-w-0 flex-1"
+		>
+			<div className="flex h-full min-w-0 flex-1 flex-col p-xl">
+				<Empty className="flex-1">
+					<EmptyHeader>
+						<Bone className="size-8 corner-m" />
+						<Bone className="mt-s h-3 w-40 corner-full" />
+						<Bone className="h-2.5 w-56 corner-full" />
+					</EmptyHeader>
+				</Empty>
+			</div>
+		</Bones>
+	);
+}
+
 function MiddleSample({ section }: { section: UseSection }) {
 	return (
 		<Bones
@@ -1120,38 +1149,6 @@ function McpCallsSample() {
 						className="h-2.5 corner-full"
 						style={{ width: `${width}%` }}
 					/>
-				))}
-			</div>
-		</div>
-	);
-}
-
-// A document: even lines in paragraphs, each ending short.
-const FILE_PARAGRAPHS = [
-	[94, 88, 96, 62],
-	[90, 84, 92, 48],
-	[86, 94, 70],
-];
-
-function FileCardSample() {
-	return (
-		<div className="flex flex-col">
-			<div className="flex items-center gap-m edge-b-m border-line-soft px-xl py-xl">
-				<Bone className="size-4 shrink-0 corner-full" />
-				<Bone className="h-2.5 w-28 corner-full" />
-			</div>
-			<div className="flex flex-col gap-xl px-xl py-xl">
-				<Bone className="h-3.5 w-1/3 corner-full" />
-				{FILE_PARAGRAPHS.map((paragraph) => (
-					<div key={paragraph.join()} className="flex flex-col gap-m">
-						{paragraph.map((width) => (
-							<Bone
-								key={width}
-								className="h-2.5 corner-full"
-								style={{ width: `${width}%` }}
-							/>
-						))}
-					</div>
 				))}
 			</div>
 		</div>
