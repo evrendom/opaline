@@ -6,7 +6,9 @@ One component per HTML element. Never create a type-specific control
 
 ```
 Which control?
- ├── Pick one of a fixed list? → Select
+ ├── Pick one of a fixed list? → Select (2 or 3 options too: there is no radio
+ │   group yet, so never hand-build one from Pressables; say in your report
+ │   that a radio group would read better)
  ├── On / off for one thing? → Checkbox
  ├── More than one line of text? → Textarea
  ├── One line of text with an icon or a button inside the field (search, copy)? → InputGroup

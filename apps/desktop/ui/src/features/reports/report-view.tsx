@@ -57,7 +57,7 @@ export function ReportView({
 					</span>
 					<span aria-hidden="true">·</span>
 					<span>{dataWindow(report)}</span>
-					<Badge variant={report.shared ? "secondary" : "outline"}>
+					<Badge variant={report.shared ? "neutral" : "outline"}>
 						{report.shared ? "Shared with workspace" : "Not shared"}
 					</Badge>
 				</div>

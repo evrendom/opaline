@@ -407,10 +407,17 @@ function Identity() {
 				where="Only the report page: whether a report is shared."
 			>
 				<State label="secondary (shared)">
-					<Badge variant="secondary">Shared</Badge>
+					<Badge>Shared</Badge>
 				</State>
 				<State label="outline (private)">
 					<Badge variant="outline">Private</Badge>
+				</State>
+				<State label="success · warning · error">
+					<div className="flex gap-xs">
+						<Badge variant="success">Up to date</Badge>
+						<Badge variant="warning">Interrupted</Badge>
+						<Badge variant="error">Failed</Badge>
+					</div>
 				</State>
 			</Specimen>
 			<Specimen

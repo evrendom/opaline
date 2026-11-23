@@ -79,12 +79,16 @@ fill in `-tint`, and an edge or ring in `-line`. Colour means state. Never
 colour something just to make it stand out: a neutral screen with one state
 colour reads; a colourful one doesn't.
 
+A status on a pill is a `Badge` with a tone (see [surfaces.md](surfaces.md)).
+For state colour anywhere else (an icon, a line of text, a chart mark), use
+the roles directly:
+
 ```tsx
-// Correct: a failed CI chip
-<span className="bg-error-tint text-error">Failed</span>
+// Correct: an error line under a field
+<p className="text-body-m text-error">{message}</p>
 
 // Incorrect: a palette class and an opacity
-<span className="bg-rose-500/10 text-rose-600">Failed</span>
+<p className="text-rose-600/90">{message}</p>
 ```
 
 ## Never

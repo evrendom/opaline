@@ -68,10 +68,30 @@ page.
 
 ## Badge
 
-`src/app/ui/badge.tsx`. Variants are `secondary` (a field chip, the default)
-and `outline` (a card-shadow chip). Use it for a status word ("Shared",
-"Owner"). For a state colour, use a span with the state roles
-(`bg-success-tint text-success`); see [colors.md](colors.md).
+`src/app/ui/badge.tsx`. Use it for every status word on a pill: "Shared",
+"Owner", "Up to date", "Failed". Never hand-build a status chip from a
+`span` with a pill corner and a tint: that's a Badge.
+
+Variants are `neutral`, `outline`, `success`, `warning` and `error`. Nothing
+else exists.
+
+```
+Which tone?
+ ├── Did it fail, or is it invalid or destructive? → variant="error"
+ ├── Does it need attention, or was it interrupted? → variant="warning"
+ ├── Is it done, passed or healthy? → variant="success"
+ ├── Is it a secondary label on a card (Private, Draft)? → variant="outline"
+ └── Default, including in progress (add a spinner icon) → leave variant off (neutral)
+```
+
+```tsx
+// Correct
+<Badge variant="error"><IconAlertTriangle aria-hidden="true" />Failed</Badge>
+<Badge><IconLoader2 aria-hidden="true" className="animate-spin" />Syncing</Badge>
+
+// Incorrect: a hand-built status chip
+<span className="corner-full bg-error-tint px-m text-error">Failed</span>
+```
 
 ## Avatar
 
