@@ -1,4 +1,5 @@
 import { type ReactNode, useId, useMemo, useState } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import type {
 	TextContent,
 	ThinkingContent,
@@ -94,13 +95,13 @@ function XmlBlock({
 			data-testid="message-xml-block"
 			className="overflow-hidden corner-l edge-m border-line bg-canvas"
 		>
-			<button
+			<Pressable
 				type="button"
 				onClick={() => setIsOpen((current) => !current)}
 				aria-expanded={isOpen}
 				aria-controls={panelId}
 				className={cn(
-					"flex w-full items-start gap-l focus-outline",
+					"flex w-full items-start gap-l",
 					"edge-b-m px-xl py-l",
 					"text-left",
 					"border-line bg-inset",
@@ -123,7 +124,7 @@ function XmlBlock({
 						</p>
 					)}
 				</div>
-			</button>
+			</Pressable>
 			{isOpen ? (
 				<div id={panelId} className="divide-y divide-line">
 					{entries.map((entry, entryIndex) => (

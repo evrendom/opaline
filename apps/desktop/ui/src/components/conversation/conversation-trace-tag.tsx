@@ -11,7 +11,7 @@ import { getModelIconComponent } from "./conversation-trace-model-icon";
 import { CONVERSATION_TOOL_ICONS } from "./conversation-trace-tool-icons";
 
 export const CONVERSATION_TRACE_TAG_CLASS_NAME =
-	"inline-flex h-5 items-center gap-xs truncate corner-xs bg-canvas pr-s pl-xxs dashboardy-mono text-body-m font-medium text-ink shadow-card select-none dark:bg-hover-strong dark:shadow-inset";
+	"inline-flex h-5 items-center gap-xs truncate corner-xs bg-field pr-s pl-xxs dashboardy-mono text-body-m font-medium text-ink shadow-inset select-none";
 
 const defaultIconClassName = "size-3.5 shrink-0 text-ink-3";
 // design-escape-ok(colour): data paint; TypeScript's brand colour

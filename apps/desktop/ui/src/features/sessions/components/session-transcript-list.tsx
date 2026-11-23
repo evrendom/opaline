@@ -76,6 +76,7 @@ import {
 	useTranscriptStickyHeaderWrappers,
 } from "./use-transcript-sticky-header-wrappers";
 import "./session-transcript-mask.css";
+import { Pressable } from "@/app/ui/pressable";
 
 const TRANSCRIPT_OVERSCAN = 8;
 const TRANSCRIPT_EDGE_LOAD_DISTANCE = 10;
@@ -1285,12 +1286,12 @@ function TranscriptRowContent({
 		}
 		case "section-overflow":
 			return (
-				<button
+				<Pressable
 					type="button"
-					className="min-h-11 w-full edge-y-m border-line px-l text-left text-body-m text-ink-3 focus-outline"
+					className="min-h-11 w-full edge-y-m border-line px-l text-body-m text-ink-3"
 				>
 					Show {row.hidden.events.toLocaleString()} more {row.hidden.kindLabel}
-				</button>
+				</Pressable>
 			);
 		case "turn-fold":
 			return (
@@ -1359,7 +1360,7 @@ function TranscriptRowContent({
 			);
 		case "no-response":
 			return (
-				<p className="py-[calc(var(--space-xxl)*5/3)] text-center text-body-xl text-ink-3">
+				<p className="py-xxxl text-center text-body-xl text-ink-3">
 					No response recorded
 				</p>
 			);

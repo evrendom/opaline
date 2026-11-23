@@ -1,5 +1,6 @@
 import { scanMemberLanguageSignals } from "@rudel/language-signals";
 import { type ReactNode, useId } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import {
 	type ConversationTraceSpeakerLayout,
 	ConversationTraceTreeItem,
@@ -41,8 +42,7 @@ function UserPrompt({
 	);
 }
 
-const userPromptRowClassName =
-	"min-w-0 pt-zero pr-l pb-m pl-[calc(var(--space-xxl)*1.25)]";
+const userPromptRowClassName = "min-w-0 pt-zero pr-l pb-m pl-xxxl";
 
 export function SessionMemberRow({
 	active,
@@ -92,7 +92,7 @@ export function SessionMemberRow({
 		);
 		const showFullPrompt = !promptCollapsible || promptExpanded;
 		const promptControl = promptCollapsible ? (
-			<button
+			<Pressable
 				type="button"
 				aria-controls={promptPanelId}
 				aria-expanded={promptExpanded}
@@ -100,7 +100,7 @@ export function SessionMemberRow({
 					"group inline-flex items-center gap-xxs",
 					"corner-xs",
 					"align-baseline text-body-m font-medium",
-					"text-ink-3 focus-outline",
+					"text-ink-3",
 					"hover:text-ink",
 				)}
 				data-trace-content-disclosure
@@ -108,7 +108,7 @@ export function SessionMemberRow({
 			>
 				{promptExpanded ? "Less" : "More"}
 				<TraceTextDisclosureIcon expanded={promptExpanded} />
-			</button>
+			</Pressable>
 		) : null;
 		const promptItems = items.filter((item) => item.kind === "user");
 		const promptRows = (
@@ -222,10 +222,7 @@ export function SessionMemberRow({
 				<div className="grid min-w-0 divide-y divide-line">
 					{items.map((item) =>
 						item.kind === "user" ? (
-							<div
-								key={item.id}
-								className="min-w-0 py-m pr-l pl-[calc(var(--space-xxl)*5/3)]"
-							>
+							<div key={item.id} className="min-w-0 py-m pr-l pl-xxxl">
 								<UserPrompt content={item.content} />
 							</div>
 						) : null,

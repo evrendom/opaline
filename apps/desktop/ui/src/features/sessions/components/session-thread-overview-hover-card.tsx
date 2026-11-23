@@ -92,6 +92,7 @@ function SessionContextUtilizationRing({
 			aria-valuemin={0}
 			aria-valuenow={roundedPercentage}
 			aria-valuetext={valueText}
+			// design-escape-ok(dark): data paint; the context ring's hue for each mode
 			className="relative flex size-4 shrink-0 items-center justify-center [--session-context-ring-color:var(--session-context-ring-color-light)] dark:[--session-context-ring-color:var(--session-context-ring-color-dark)]"
 			data-session-overview-context-utilization
 			role="progressbar"

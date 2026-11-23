@@ -1,10 +1,8 @@
 import { IconCalendarOff, IconFilterOff } from "@tabler/icons-react";
+import { Button } from "@/app/ui/button";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { useDotPick } from "@/features/costs/cost-hover-date";
 import { dayLabel } from "./sessions-focused-day-tag";
-
-const LINK_BUTTON_CLASS_NAME =
-	"mx-auto corner-s px-m py-xs text-body-xl font-medium text-accent focus-outline hover:bg-hover";
 
 export function SessionsOverviewEmpty({
 	noneInRange,
@@ -28,13 +26,9 @@ export function SessionsOverviewEmpty({
 							: "No sessions match the selected filters"
 					}
 				>
-					<button
-						type="button"
-						className={LINK_BUTTON_CLASS_NAME}
-						onClick={onClearFilters}
-					>
+					<Button type="button" className="mx-auto" onClick={onClearFilters}>
 						Clear filters
-					</button>
+					</Button>
 				</EmptyState>
 			) : picked && dotPick ? (
 				<EmptyState
@@ -42,13 +36,13 @@ export function SessionsOverviewEmpty({
 					title={`No sessions on ${dayLabel(picked)}`}
 					description="Pick another day, or show every day in the range."
 				>
-					<button
+					<Button
 						type="button"
-						className={LINK_BUTTON_CLASS_NAME}
+						className="mx-auto"
 						onClick={() => dotPick.pick(null)}
 					>
 						Show every day
-					</button>
+					</Button>
 				</EmptyState>
 			) : (
 				<EmptyState

@@ -31,7 +31,7 @@ export function SessionChartLoading() {
 	return (
 		<div
 			aria-hidden="true"
-			className="h-[4.07rem] shrink-0 overflow-hidden edge-b-m border-line bg-inset dark:bg-canvas"
+			className="h-[4.07rem] shrink-0 overflow-hidden edge-b-m border-line bg-canvas"
 			data-session-chart-loading
 		>
 			{/* The wave draws its baseline at 50 and its guides a quarter, half
@@ -105,10 +105,7 @@ export function SessionTranscriptLoading() {
 			data-session-transcript-loading
 		>
 			<output className="sr-only">Loading conversation</output>
-			<div
-				aria-hidden="true"
-				className="flex flex-col gap-[calc(var(--space-xxl)*4/3)]"
-			>
+			<div aria-hidden="true" className="flex flex-col gap-xxxl">
 				{[0, 1, 2].map((turn) => (
 					<div
 						key={turn}

@@ -48,7 +48,7 @@ export function SessionContinuousTurnSkeleton({
 							</p>
 						</div>
 					</ConversationTraceTreeItem>
-					<div className="grid min-w-0 gap-m py-m pr-l pl-[calc(var(--space-xxl)*2.25)]">
+					<div className="grid min-w-0 gap-m py-m pr-l pl-xxxl">
 						<p className="line-clamp-3 whitespace-pre-wrap break-words text-body-l text-ink">
 							<SignalText
 								scanSignals={scanMemberLanguageSignals}
@@ -166,7 +166,7 @@ function SkeletonChipRows({ option }: { option: SessionTurnTablePaneOption }) {
 		group.values.length > 0 ? (
 			<div
 				key={group.kind}
-				className="flex min-h-8 flex-wrap items-center gap-s pr-l pl-[calc(var(--space-xxl)*2.25)]"
+				className="flex min-h-8 flex-wrap items-center gap-s pr-l pl-xxxl"
 				data-session-skeleton-row-kind={`${group.kind}-chips`}
 			>
 				{group.values.map((value, index) => (

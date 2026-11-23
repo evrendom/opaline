@@ -46,6 +46,7 @@ import { SessionTurnTableSortableHeader } from "./session-turn-table-sortable-he
 import { useSessionTurnTableGeometry } from "./use-session-turn-table-geometry";
 import "./session-constellation-tree.css";
 import "./session-turn-table.css";
+import { Button } from "@/app/ui/button";
 
 export type SessionTurnTableOption = {
 	compactionsBefore: readonly SessionCompaction[];
@@ -225,15 +226,17 @@ function SessionTurnTableViewedRowsButton({
 	}
 
 	return (
-		<button
+		<Button
 			type="button"
+			variant="primary"
+			size="icon-sm"
 			aria-hidden={direction === undefined}
 			aria-label={
 				direction
 					? `Scroll ${direction === "above" ? "up" : "down"} to visible transcript rows`
 					: "Scroll to visible transcript rows"
 			}
-			className="group absolute left-2 z-30 flex size-6 items-center justify-center corner-full bg-surface opacity-100 shadow-float focus-outline data-[direction=above]:top-16 data-[direction=below]:bottom-11 data-[direction=none]:pointer-events-none data-[direction=none]:opacity-0"
+			className="group absolute left-2 z-30 data-[direction=above]:top-16 data-[direction=below]:bottom-11 data-[direction=none]:hidden"
 			data-direction={direction ?? "none"}
 			disabled={direction === undefined}
 			onClick={scrollToViewedRows}
@@ -248,7 +251,7 @@ function SessionTurnTableViewedRowsButton({
 				className="hidden size-4 shrink-0 stroke-accent group-data-[direction=below]:block"
 			/>
 			<TouchTarget />
-		</button>
+		</Button>
 	);
 }
 

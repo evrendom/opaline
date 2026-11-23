@@ -79,9 +79,9 @@ function ContextChips({
 		<div className="flex shrink-0 flex-wrap items-center gap-m bg-canvas px-xxl pt-xs pb-l">
 			<ContextChip
 				icon={
-					<Avatar className="size-3.5 after:hidden">
+					<Avatar size="sm" className="size-3.5 after:hidden">
 						{avatarUrl ? <AvatarImage src={avatarUrl} alt="" /> : null}
-						<AvatarFallback className="text-body-xxs">
+						<AvatarFallback>
 							{safeUserDisplayName.charAt(0).toUpperCase()}
 						</AvatarFallback>
 					</Avatar>

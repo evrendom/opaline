@@ -8,6 +8,7 @@ import {
 } from "@rudel/api-routes";
 import { splitDisplayTextParts } from "@rudel/language-signals";
 import { type ReactNode, useMemo, useState } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { cn } from "@/lib/utils";
 import { SignalText } from "../signal-text";
 import { CodeBlock, type CodeLineKind } from "./CodeBlock";
@@ -132,7 +133,7 @@ function ConversationTraceInteractionEpisodeEvents({
 				</TraceExpansionIdProvider>
 			))}
 			{remaining > 0 ? (
-				<button
+				<Pressable
 					type="button"
 					onClick={() =>
 						setVisibleLimit((current) =>
@@ -142,14 +143,14 @@ function ConversationTraceInteractionEpisodeEvents({
 							),
 						)
 					}
-					className="min-h-11 px-l text-left text-body-m font-medium text-ink-3 focus-outline"
+					className="min-h-11 px-l text-left text-body-m font-medium text-ink-3"
 					data-trace-interaction-episode-more
 				>
 					{`Show ${Math.min(
 						remaining,
 						INTERACTION_EPISODE_EVENT_PAGE_SIZE,
 					).toLocaleString()} more operations (${remaining.toLocaleString()} remaining)`}
-				</button>
+				</Pressable>
 			) : null}
 		</div>
 	);

@@ -1,17 +1,10 @@
 import { IconArrowDown, IconArrowLeft, IconArrowUp } from "@tabler/icons-react";
 import type { ReactNode } from "react";
+import { Button } from "@/app/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import { TouchTarget } from "@/app/ui/touch-target";
 import type { SessionNavigation } from "@/features/sessions/session-navigation";
 import { cn } from "@/lib/utils";
-
-const sessionTraceDockPressClassName =
-	"scale-100 transition-transform duration-(--motion-duration) ease-base active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100";
-
-const sessionTraceDockButtonClassName = cn(
-	"group relative flex size-9 shrink-0 items-center justify-center corner-zero text-ink focus-outline hover:bg-hover disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:active:scale-100 dark:hover:bg-hover-strong",
-	sessionTraceDockPressClassName,
-);
 
 function SessionTraceNavigationButton({
 	disabled,
@@ -28,16 +21,17 @@ function SessionTraceNavigationButton({
 		<Tooltip>
 			<TooltipTrigger
 				render={
-					<button
+					<Button
 						type="button"
+						size="icon"
 						aria-label={label}
-						className={sessionTraceDockButtonClassName}
+						className="group relative"
 						disabled={disabled}
 						onClick={onClick}
 					>
 						{icon}
 						<TouchTarget className="size-12" />
-					</button>
+					</Button>
 				}
 			/>
 			<TooltipContent side="top" sideOffset={10}>
@@ -68,17 +62,11 @@ export function SessionTraceDock({
 			aria-label="Session controls"
 			className="shell-dock-content flex min-w-0 items-center gap-xs"
 		>
-			<button
+			<Button
 				type="button"
+				size="lg"
 				aria-label="Back to sessions"
-				className={cn(
-					"group relative flex h-9 shrink-0 items-center gap-s",
-					"corner-zero pl-m pr-l",
-					"text-body-xxl font-medium",
-					"text-ink focus-outline",
-					"hover:bg-hover dark:hover:bg-hover-strong sm:text-body-xl",
-					sessionTraceDockPressClassName,
-				)}
+				className="group relative"
 				onClick={onReturn}
 			>
 				<IconArrowLeft
@@ -87,7 +75,7 @@ export function SessionTraceDock({
 				/>
 				<span>Back</span>
 				<TouchTarget className="size-12" />
-			</button>
+			</Button>
 			<div aria-hidden="true" className="h-5 w-px shrink-0 bg-hover-strong" />
 			<SessionTraceNavigationButton
 				disabled={!navigation.hasPreviousSession}

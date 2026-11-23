@@ -29,7 +29,7 @@ export class SessionDetailErrorBoundary extends Component<
 	override render() {
 		if (this.state.hasError) {
 			return (
-				<div className="flex h-full min-h-0 min-w-0 flex-1 flex-col p-[calc(var(--space-xxl)*4/3)]">
+				<div className="flex h-full min-h-0 min-w-0 flex-1 flex-col p-xxxl">
 					<EmptyState
 						icon={IconAlertTriangle}
 						title="This session couldn’t be shown"

@@ -20,6 +20,7 @@ import {
 	useStoredPaneSize,
 } from "@/app/ui/horizontal-resize-handle";
 import { clampPaneSize } from "@/app/ui/horizontal-resize-utils";
+import { Pressable } from "@/app/ui/pressable";
 import { SearchInput } from "@/components/dashboard/data-table";
 import { RetryButton } from "@/components/retry-button";
 import { useDemoRuntime } from "@/features/demo/demo-runtime";
@@ -123,11 +124,11 @@ export function SessionUsageDetail({
 							aria-label={`${kind} breadcrumb`}
 							className="flex min-w-0 flex-1 items-center gap-s text-body-xxl font-medium"
 						>
-							<button
+							<Pressable
 								type="button"
 								onClick={onBack}
 								data-fluid-menu-root=""
-								className="flex shrink-0 items-center gap-m text-ink-3 transition-colors focus-outline hover:text-ink"
+								className="flex shrink-0 items-center gap-m text-ink-3 transition-colors hover:text-ink"
 							>
 								<ShellNavIcon
 									icon={shellRoute.icon}
@@ -136,7 +137,7 @@ export function SessionUsageDetail({
 									tone={shellRoute.tone}
 								/>
 								{shellRoute.title}
-							</button>
+							</Pressable>
 							<IconChevronRight
 								aria-hidden="true"
 								className="size-4 shrink-0 text-ink-4"

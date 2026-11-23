@@ -1,4 +1,5 @@
 import { IconChevronDown, IconChevronUp } from "@tabler/icons-react";
+import { Pressable } from "@/app/ui/pressable";
 import { TouchTarget } from "@/app/ui/touch-target";
 import { cn } from "@/lib/utils";
 import type {
@@ -24,7 +25,7 @@ export function SessionTurnTableSortableHeader({
 	const isActive = sort.key === sortKey;
 
 	return (
-		<button
+		<Pressable
 			type="button"
 			aria-label={`Sort by ${label}, ${
 				isActive && sort.direction === "asc" ? "descending" : "ascending"
@@ -32,7 +33,7 @@ export function SessionTurnTableSortableHeader({
 			className={cn(
 				"relative flex h-full w-full min-w-0 items-center gap-xs",
 				"text-left text-body-m font-medium whitespace-nowrap",
-				"text-ink-3 focus-outline",
+				"text-ink-3",
 				"focus-visible:z-10",
 				columnIndex === 0 ? "pr-s pl-l" : "px-s",
 				className,
@@ -58,6 +59,6 @@ export function SessionTurnTableSortableHeader({
 				</span>
 			</span>
 			<TouchTarget />
-		</button>
+		</Pressable>
 	);
 }

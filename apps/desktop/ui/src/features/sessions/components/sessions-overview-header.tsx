@@ -1,5 +1,6 @@
 import { IconChevronDown, IconChevronUp } from "@tabler/icons-react";
 import type { ReactNode } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { TouchTarget } from "@/app/ui/touch-target";
 import {
 	SESSION_OVERVIEW_GRID_CLASS_NAME,
@@ -106,7 +107,7 @@ function SessionOverviewSortableHeader({
 	const isActive = sort.key === sortKey;
 
 	return (
-		<button
+		<Pressable
 			type="button"
 			aria-label={`Sort by ${label}, ${
 				isActive && sort.direction === "asc" ? "descending" : "ascending"
@@ -115,11 +116,10 @@ function SessionOverviewSortableHeader({
 				"relative flex h-full min-w-0 flex-1 items-center gap-xs",
 				"px-l",
 				"text-left text-body-xxl font-medium whitespace-nowrap",
-				"text-ink focus-outline",
+				"text-ink",
 				"hover:bg-hover",
 				"focus-visible:z-10",
 				"sm:text-body-xl",
-				"dark:text-ink",
 				align === "right" ? "justify-end text-right" : "justify-start",
 			)}
 			onClick={() => onSort(sortKey)}
@@ -133,6 +133,6 @@ function SessionOverviewSortableHeader({
 				)
 			) : null}
 			<TouchTarget />
-		</button>
+		</Pressable>
 	);
 }

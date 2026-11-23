@@ -1,4 +1,5 @@
 import { IconChevronDown, IconChevronRight } from "@tabler/icons-react";
+import { Pressable } from "@/app/ui/pressable";
 import type { SessionCompaction } from "./session-compactions";
 import type { SessionTurnEpisode } from "./session-turn-episodes";
 
@@ -29,10 +30,10 @@ export function SessionTurnEpisodeRow({
 	return (
 		<tr className="min-w-full edge-b-m border-line bg-inset">
 			<td>
-				<button
+				<Pressable
 					type="button"
 					aria-expanded={!collapsed}
-					className="flex min-h-9 w-full items-center gap-m px-l text-left text-body-m font-medium text-ink focus-outline"
+					className="flex min-h-9 w-full items-center gap-m px-l text-left text-body-m font-medium text-ink"
 					onClick={onToggle}
 				>
 					{collapsed ? (
@@ -47,7 +48,7 @@ export function SessionTurnEpisodeRow({
 					<span className="shrink-0 font-regular text-ink-3 tabular-nums">
 						{episode.indices.length} turns · {episode.stats.tools} tools
 					</span>
-				</button>
+				</Pressable>
 			</td>
 		</tr>
 	);

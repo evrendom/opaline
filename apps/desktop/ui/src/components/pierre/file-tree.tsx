@@ -17,6 +17,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import {
 	FluidList,
 	type FluidListItems,
@@ -50,7 +51,7 @@ function RowTags({
 	return (
 		<span className="flex shrink-0 items-center gap-xxs">
 			{shown.map((tag) => (
-				<button
+				<Pressable
 					key={tag.id}
 					type="button"
 					tabIndex={-1}
@@ -60,7 +61,7 @@ function RowTags({
 						onPick?.(tag.id);
 					}}
 					className={cn(
-						"inline-flex items-center gap-xxs focus-outline",
+						"inline-flex items-center gap-xxs",
 						"corner-xs px-xs font-mono text-body-xs font-regular tabular-nums",
 						"transition-colors",
 						tag.color
@@ -89,7 +90,7 @@ function RowTags({
 							style={{ backgroundColor: dot }}
 						/>
 					))}
-				</button>
+				</Pressable>
 			))}
 			{rest > 0 ? (
 				<span
@@ -259,7 +260,7 @@ export function FileTree({
 		<div className="flex flex-col">
 			{model.rootLabel ? (
 				<div
-					className="truncate px-[calc(var(--space-m)+var(--space-xxs))] pb-xs text-body-m text-ink-3 [direction:rtl] text-left"
+					className="truncate px-m pb-xs text-body-m text-ink-3 [direction:rtl] text-left"
 					title={model.rootLabel}
 				>
 					{`‎${model.rootLabel}‎`}
@@ -301,7 +302,7 @@ export function FileTree({
 								onKeyDown={(event) => onKeyDown(event, index)}
 								className={cn(
 									"group/row flex h-7 items-center gap-s",
-									"corner-s pr-[calc(var(--space-m)+var(--space-xxs))] pl-xs corner-squircle",
+									"corner-s pr-m pl-xs corner-squircle",
 									"text-body-l",
 									"outline-none select-none",
 									"squircle:corner-l",

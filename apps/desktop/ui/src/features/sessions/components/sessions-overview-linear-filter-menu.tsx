@@ -5,6 +5,7 @@ import {
 } from "@tabler/icons-react";
 import { Button } from "@/app/ui/button";
 import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
+import { Pressable } from "@/app/ui/pressable";
 
 type LinearFilterItem = {
 	group: "identity" | "usage" | "activity";
@@ -28,7 +29,7 @@ export function LinearActiveFiltersButton({
 			variant="secondary"
 			size="icon"
 			aria-label={label}
-			className="relative size-7 corner-s text-ink hover:bg-hover-strong"
+			className="relative"
 			onClick={onClick}
 			title={label}
 		>
@@ -80,7 +81,7 @@ export function LinearFilterList<TFilter extends LinearFilterItem>({
 							{showSeparator ? (
 								<div aria-hidden="true" className="menu-separator" />
 							) : null}
-							<button
+							<Pressable
 								type="button"
 								aria-label={`Configure ${filter.label} filter`}
 								className="menu-row"
@@ -107,7 +108,7 @@ export function LinearFilterList<TFilter extends LinearFilterItem>({
 									className="menu-icon size-3"
 									stroke={2.25}
 								/>
-							</button>
+							</Pressable>
 						</li>
 					);
 				})}

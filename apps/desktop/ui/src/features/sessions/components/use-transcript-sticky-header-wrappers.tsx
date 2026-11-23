@@ -2,6 +2,7 @@
 
 import type { VirtualItem } from "@tanstack/react-virtual";
 import { memo, useCallback, useRef, useState } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { TouchTarget } from "@/app/ui/touch-target";
 import { ConversationTraceTreeItem } from "@/components/conversation/ConversationTrace";
 import type { TraceEvent } from "@/components/conversation/conversation-trace";
@@ -144,10 +145,10 @@ export function TranscriptFoldSummaryControl({
 		.join(", ");
 	return (
 		<div className="min-w-0 pr-l">
-			<button
+			<Pressable
 				aria-expanded={expanded}
 				aria-label={`${action} ${label}${metricLabel ? `: ${metricLabel}` : ""}`}
-				className="group group/fold pointer-events-auto relative flex h-8 max-w-full min-w-0 select-none items-center gap-m corner-s pr-s pl-l text-left text-body-s text-ink-3 focus-outline hover:text-ink"
+				className="group group/fold pointer-events-auto relative flex h-8 max-w-full min-w-0 select-none items-center gap-m corner-s pr-s pl-l text-body-s text-ink-3 hover:text-ink"
 				data-transcript-fold-turn-id={turnId}
 				data-trace-hover-row
 				onClick={onToggle}
@@ -183,7 +184,7 @@ export function TranscriptFoldSummaryControl({
 					aria-hidden="true"
 					className={cn("size-3 shrink-0", !expanded && "-rotate-90")}
 				/>
-			</button>
+			</Pressable>
 		</div>
 	);
 }

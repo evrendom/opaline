@@ -10,6 +10,7 @@ import {
 } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { Button } from "@/app/ui/button";
 import { Skeleton } from "@/app/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import { TouchTarget } from "@/app/ui/touch-target";
@@ -40,11 +41,7 @@ type SessionDetailHeaderProps = {
 	where?: ReactNode;
 };
 
-// Record pill: round segments that tint on hover inside an
-// outlined pill.
-const sessionHeaderNavigationButtonClassName =
-	"relative flex h-full items-center corner-full p-m text-ink-3 focus-outline transition-colors hover:bg-hover hover:text-ink disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-ink-3";
-
+// Record pill: round icon buttons inside an outlined pill.
 const sessionMetricsGroupClassName =
 	"flex w-fit min-w-0 max-w-full items-center divide-x divide-line overflow-x-auto";
 
@@ -54,29 +51,28 @@ const sessionMetricItemClassName =
 const sessionIdentitySkeletonClassName = "flex shrink-0 items-start gap-m";
 
 function SessionHeaderNavigationButton({
-	className = sessionHeaderNavigationButtonClassName,
 	disabled = false,
 	icon,
 	label,
 	onClick,
 }: {
-	className?: string;
 	disabled?: boolean;
 	icon: ReactNode;
 	label: string;
 	onClick: () => void;
 }) {
 	return (
-		<button
+		<Button
 			type="button"
+			size="icon"
 			aria-label={label}
-			className={className}
+			className="relative"
 			disabled={disabled}
 			onClick={onClick}
 		>
 			{icon}
 			<TouchTarget />
-		</button>
+		</Button>
 	);
 }
 

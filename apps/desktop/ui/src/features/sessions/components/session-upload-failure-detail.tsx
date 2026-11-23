@@ -37,7 +37,7 @@ export function SessionUploadFailureDetail({
 	}).filter(([, value]) => value !== undefined && value !== "");
 	return (
 		<article
-			className="h-full min-w-0 overflow-y-auto px-xxl py-xxl text-body-xxl text-ink sm:px-[calc(var(--space-xxl)*4/3)] sm:py-[calc(var(--space-xxl)*4/3)] sm:text-body-xl"
+			className="h-full min-w-0 overflow-y-auto px-xxl py-xxl text-body-xxl text-ink sm:px-xxxl sm:py-xxxl sm:text-body-xl"
 			aria-label="Session upload failure"
 		>
 			<div className="flex min-w-0 max-w-3xl flex-col gap-xxl">

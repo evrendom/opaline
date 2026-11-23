@@ -1,4 +1,5 @@
 import { useId, useState } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { cn } from "@/lib/utils";
 import { CodeBlock } from "./CodeBlock";
 import { formatShellOutput } from "./conversation-tools";
@@ -79,7 +80,7 @@ export function ToolInvocation({
 				className,
 			)}
 		>
-			<button
+			<Pressable
 				type="button"
 				onClick={() => setIsExpanded(!isExpanded)}
 				aria-expanded={isExpanded}
@@ -89,7 +90,7 @@ export function ToolInvocation({
 					"px-xl py-xl",
 					"text-left",
 					"transition-colors",
-					"focus-outline hover:bg-field",
+					"hover:bg-field",
 				)}
 			>
 				{isExpanded ? (
@@ -121,7 +122,7 @@ export function ToolInvocation({
 					</p>
 					<p className="truncate text-body-xl text-ink-3">{formatInput()}</p>
 				</div>
-			</button>
+			</Pressable>
 
 			{isExpanded && (
 				<div

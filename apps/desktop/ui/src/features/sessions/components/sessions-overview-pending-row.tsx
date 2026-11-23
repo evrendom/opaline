@@ -231,8 +231,7 @@ export function SessionsOverviewPendingRow({
 						className={cn(
 							"flex size-5 shrink-0 items-center justify-center",
 							"corner-full",
-							"bg-hover text-ink-4",
-							"dark:bg-hover-strong dark:text-ink-4",
+							"bg-field text-ink-4",
 						)}
 					>
 						<IconUser className="size-3.5" />
