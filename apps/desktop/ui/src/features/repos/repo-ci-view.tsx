@@ -106,7 +106,7 @@ export function RepoCiView({
 			{ replace: true },
 		);
 	return (
-		<div className="flex h-full min-h-0 gap-xxl overflow-hidden pt-m pr-[calc(var(--space-xxl)*4/3)] pb-m pl-xxl">
+		<div className="flex h-full min-h-0 gap-xxl overflow-hidden pt-m pr-xxxl pb-m pl-xxl">
 			<RepoPullColumn
 				costs={costs}
 				onPick={(key) => setPicks(key, null)}
@@ -208,7 +208,7 @@ function RepoPullColumn({
 					/>
 				</span>
 			</div>
-			<ScrollColumn className="-mx-xs px-xs pb-[calc(var(--space-xxl)*4/3)]">
+			<ScrollColumn className="-mx-xs px-xs pb-xxxl">
 				<FluidList>
 					<ul className="flex flex-col gap-xxs">
 						{shownRows.map((row, index) => (

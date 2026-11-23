@@ -16,6 +16,7 @@ import {
 	useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { Pressable } from "@/app/ui/pressable";
 import { TipLayer } from "@/features/sessions/reader/detail/waterfall/session-reader-tips";
 import {
 	formatDuration,
@@ -142,7 +143,7 @@ function GroupGap() {
 const AgentGlyph = LANE_LOOK.agent.glyph;
 
 const TRACE_WINDOW =
-	"pointer-events-none absolute -top-1.5 -bottom-0.5 -z-5 hidden corner-xs bg-canvas corner-squircle squircle:corner-l shadow-card will-change-transform dark:bg-hover-strong";
+	"pointer-events-none absolute -top-1.5 -bottom-0.5 -z-5 hidden corner-xs bg-surface corner-squircle squircle:corner-l shadow-card will-change-transform";
 
 export function RunLanes({
 	onlyPickedLane = false,
@@ -386,14 +387,14 @@ export function RunLanes({
 		return (
 			<div key={lane.id} className="flex h-4 items-center gap-xs">
 				{onOpen ? (
-					<button
+					<Pressable
 						type="button"
 						aria-label={`Open ${lane.label}'s thread`}
 						onClick={onOpen}
-						className="group/open flex corner-full focus-outline"
+						className="group/open flex corner-full"
 					>
 						{mark}
-					</button>
+					</Pressable>
 				) : (
 					mark
 				)}
@@ -626,7 +627,7 @@ export function RunLanes({
 					) : null}
 					{unused > 0 && !narrowed ? (
 						<div className="flex h-2 items-center justify-center pt-xxs">
-							<button
+							<Pressable
 								type="button"
 								aria-pressed={allLanes}
 								aria-label={
@@ -640,14 +641,14 @@ export function RunLanes({
 										: `Show all lanes, ${unused} this run didn't use`
 								}
 								onClick={() => setAllLanes((shown) => !shown)}
-								className="inline-flex items-center corner-xs px-xxs text-ink-3 hover:bg-hover hover:text-ink focus-outline"
+								className="inline-flex items-center corner-xs px-xxs text-ink-3 hover:bg-hover hover:text-ink"
 							>
 								{allLanes ? (
 									<IconChevronUp aria-hidden="true" className="size-2.5" />
 								) : (
 									<IconChevronDown aria-hidden="true" className="size-2.5" />
 								)}
-							</button>
+							</Pressable>
 						</div>
 					) : null}
 				</div>

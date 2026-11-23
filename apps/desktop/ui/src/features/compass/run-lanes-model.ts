@@ -55,7 +55,7 @@ function barColor(step: SessionReaderStep): string {
 	if (step.isError) return "bg-rose-500";
 	if (step.waitsOnYou || step.harness === "member") return "bg-amber-400";
 	if (step.harness) return ACTIVITY_COLOR[activityOf(step)];
-	if (step.kind === "message") return "bg-violet-300 dark:bg-violet-300";
+	if (step.kind === "message") return "bg-violet-300";
 	return ACTIVITY_COLOR[activityOf(step)];
 }
 

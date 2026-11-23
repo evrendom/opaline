@@ -17,6 +17,7 @@ import {
 	useLayoutEffect,
 	useState,
 } from "react";
+import { Button } from "@/app/ui/button";
 import { FlowFigure } from "@/app/ui/flow-number";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
@@ -253,15 +254,17 @@ export function ExpandButton({
 }) {
 	const Icon = expanded ? IconArrowsDiagonalMinimize2 : IconArrowsDiagonal;
 	return (
-		<button
-			type="button"
-			className="cost-metric-expand focus-outline"
-			aria-expanded={expanded}
-			aria-label={expanded ? "Collapse details" : "Expand details"}
-			onClick={onToggle}
-		>
-			<Icon aria-hidden="true" />
-		</button>
+		<span className="cost-metric-expand">
+			<Button
+				type="button"
+				size="icon-sm"
+				aria-expanded={expanded}
+				aria-label={expanded ? "Collapse details" : "Expand details"}
+				onClick={onToggle}
+			>
+				<Icon aria-hidden="true" />
+			</Button>
+		</span>
 	);
 }
 

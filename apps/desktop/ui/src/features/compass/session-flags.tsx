@@ -8,6 +8,7 @@ import {
 import { IconAlertTriangle } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
 import { type ReactNode, startTransition, useMemo, useState } from "react";
+import { Button } from "@/app/ui/button";
 import {
 	OpalChip,
 	Tip,
@@ -15,7 +16,6 @@ import {
 import { railLineKey } from "@/features/sessions/reader/rail/session-reader-turn-rail-row";
 import { useOptionalOrganization } from "@/features/workspace/organization/useOrganization";
 import { orpc } from "@/lib/orpc";
-import { cn } from "@/lib/utils";
 import { FlagKindsPopup } from "./compass-moments";
 import { MOMENT_KINDS_APPEARANCE } from "./moment-labels";
 import { useCompassAccess } from "./use-compass-access";
@@ -181,6 +181,7 @@ function FlagTag({ kinds }: { kinds: readonly MomentKind[] }) {
 				solid
 				tint="var(--color-rose-500)"
 				title={labels.join(", ")}
+				// design-escape-ok(dark): artwork; cancels the opal chip's drop, which OpalChip paints per mode
 				className="size-4 drop-shadow-none dark:drop-shadow-none"
 			>
 				<IconAlertTriangle aria-hidden="true" className="size-2.5 text-error" />
@@ -254,9 +255,6 @@ export function useTurnFlags(
 	return { enabled, flags, pending: enabled && query.isPending };
 }
 
-const FLAG_TRIGGER =
-	"inline-flex h-7 w-fit min-w-7 shrink-0 items-center justify-center gap-xs corner-full bg-surface px-m text-body-m font-medium shadow-card transition-colors hover:bg-hover data-popup-open:bg-hover focus-outline";
-
 function SessionFlagFilter({
 	byKind,
 	className,
@@ -283,18 +281,15 @@ function SessionFlagFilter({
 	const menuPicks = new Set([...own].filter((kind) => byKind.has(kind)));
 	if (byKind.size === 0)
 		return loading ? (
-			<button
+			<Button
 				type="button"
+				variant="primary"
 				disabled
 				aria-label="Loading flags"
-				className={cn(
-					FLAG_TRIGGER,
-					"cursor-default text-ink-3 opacity-40 hover:bg-surface",
-					className,
-				)}
+				className={className}
 			>
 				<IconAlertTriangle aria-hidden="true" className="size-3.5" />
-			</button>
+			</Button>
 		) : null;
 	const on = menuPicks.size > 0;
 	const pick = (kinds: MomentKind[]) => {
@@ -319,11 +314,9 @@ function SessionFlagFilter({
 							? `Turns flagged ${[...menuPicks].map((kind) => MOMENT_KINDS_APPEARANCE[kind].label).join(", ")}, ${shown}`
 							: `Filter turns by flag, ${shown} flagged`
 					}
-					className={cn(
-						FLAG_TRIGGER,
-						on ? "text-ink" : "text-ink-3",
-						className,
-					)}
+					render={<Button variant="primary" />}
+					data-active={on || undefined}
+					className={className}
 				>
 					{on ? (
 						<>

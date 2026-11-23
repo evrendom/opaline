@@ -40,7 +40,7 @@
 
 .rich-skill-document h1,
 .rich-skill-document h2 {
-	margin: calc(var(--space-xxl) * 4 / 3) var(--space-zero) var(--space-zero);
+	margin: var(--space-xxxl) var(--space-zero) var(--space-zero);
 	font-size: var(--display-size-xxs);
 	font-weight: var(--weight-body-heavy);
 	line-height: var(--display-line-xxs);

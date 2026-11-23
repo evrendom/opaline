@@ -12,6 +12,7 @@ import {
 import { useSearchParams } from "react-router-dom";
 import { Reveal } from "@/app/ui/bones";
 import { useElementWidth } from "@/app/ui/horizontal-resize-handle";
+import { Pressable } from "@/app/ui/pressable";
 import { getModelIconComponent } from "@/components/conversation/conversation-trace-model-icon";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
@@ -338,7 +339,7 @@ export function RepoSessionBoxes({ fill = false }: { fill?: boolean }) {
 					<div
 						data-session-pick=""
 						className={cn(
-							"relative mt-[calc(var(--space-xs)+var(--space-xxs)/2)] flex flex-col",
+							"relative mt-xs flex flex-col",
 							fill ? "min-h-0 flex-1" : "h-[420px]",
 						)}
 						style={{ "--tint": look.color } as CSSProperties}
@@ -510,11 +511,11 @@ function SessionTile({
 				dimmed && "[filter:opacity(0.4)]",
 				picked &&
 					// design-escape-ok(shadow): data paint; the picked tile glows in its session tint
-					"z-40 bg-[color-mix(in_oklab,var(--tint)_34%,transparent)] shadow-[0_2px_10px_-2px_color-mix(in_oklab,var(--tint)_45%,transparent)] dark:bg-[color-mix(in_oklab,var(--tint)_40%,transparent)] dark:shadow-[0_2px_12px_-2px_color-mix(in_oklab,var(--tint)_55%,transparent)]",
+					"z-40 bg-[color-mix(in_oklab,var(--tint)_34%,transparent)] shadow-[0_2px_10px_-2px_color-mix(in_oklab,var(--tint)_45%,transparent)]",
 			)}
 			style={{ height: h, left: tile.x, top: tile.y, width: w }}
 		>
-			<button
+			<Pressable
 				type="button"
 				aria-pressed={picked}
 				aria-label={`Show what's in session ${label}`}
@@ -522,15 +523,13 @@ function SessionTile({
 				onPointerEnter={onIntent}
 				onFocus={onIntent}
 				title={`${session.sessionId}\n${figure}`}
-				className="absolute inset-0 corner-s-inset corner-squircle focus-outline transition-colors hover:bg-hover squircle:corner-l-inset"
+				className="absolute inset-0 corner-s-inset corner-squircle transition-colors hover:bg-hover squircle:corner-l-inset"
 			/>
 			<span
 				aria-hidden="true"
 				className={cn(
 					"pointer-events-none relative flex min-w-0 flex-col text-body-l",
-					showName
-						? "px-[calc(var(--space-m)+var(--space-xxs))] py-xs"
-						: "h-full items-center justify-center",
+					showName ? "px-l py-xs" : "h-full items-center justify-center",
 				)}
 			>
 				<span className="flex min-w-0 items-center gap-s">

@@ -7,7 +7,10 @@ import {
 import { type CSSProperties, type KeyboardEvent, useState } from "react";
 import { Link } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
+import { Button } from "@/app/ui/button";
 import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
+import { Pressable } from "@/app/ui/pressable";
+import { Textarea } from "@/app/ui/textarea";
 import { SERIES_COLORS } from "@/features/costs/chart-colors";
 import { formatReaderCost } from "@/features/sessions/reader/model/session-reader-model";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
@@ -35,7 +38,7 @@ export function PatternRow({
 }) {
 	const group = layerGroup(pattern.layer);
 	return (
-		<button
+		<Pressable
 			type="button"
 			className="compass-item"
 			aria-current={selected || undefined}
@@ -64,7 +67,7 @@ export function PatternRow({
 				</span>
 				<span>{formatReaderCost(pattern.costUsd)}</span>
 			</span>
-		</button>
+		</Pressable>
 	);
 }
 
@@ -184,22 +187,20 @@ export function PatternPane({
 							What did you change? A pointer, a check, a standard or a habit.
 							Compass then shows how often this happens since.
 						</span>
-						<textarea
+						<Textarea
 							value={note}
 							onChange={(event) => setNote(event.target.value)}
 							maxLength={500}
 							aria-label="The fix"
-							className="compass-note"
 						/>
 						<div>
-							<button
+							<Button
 								type="button"
-								className="secondary-button"
 								disabled={busy || note.trim().length < 3}
 								onClick={save}
 							>
 								{busy ? "Saving…" : "Record the fix"}
-							</button>
+							</Button>
 						</div>
 					</div>
 				)}

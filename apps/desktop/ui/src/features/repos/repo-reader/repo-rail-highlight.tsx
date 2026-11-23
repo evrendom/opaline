@@ -8,6 +8,7 @@ import {
 	useMemo,
 	useState,
 } from "react";
+import { Button } from "@/app/ui/button";
 import {
 	DotFocusContext,
 	DotFocusDaysContext,
@@ -132,25 +133,28 @@ export function RailHighlightProvider({
 	const lead = onClear ? (
 		<span
 			title={name}
-			className="group/tag inline-flex h-8 min-w-0 items-center gap-xs corner-full bg-surface pr-l pl-s text-body-m font-medium text-ink shadow-card"
+			className="group/tag inline-flex h-8 min-w-0 items-center gap-xs corner-full bg-surface pr-l pl-xs text-body-m font-medium text-ink shadow-card"
 		>
-			<button
-				type="button"
+			<Button
+				variant="secondary"
+				size="icon-sm"
 				aria-label={`Stop filtering by ${name}`}
 				onClick={onClear}
-				className="grid size-5 shrink-0 place-items-center corner-full focus-outline"
+				className="shrink-0"
 			>
-				{TabIcon ? (
-					<TabIcon
+				<span aria-hidden="true" className="grid place-items-center">
+					{TabIcon ? (
+						<TabIcon
+							aria-hidden="true"
+							className={`${swap} group-hover/tag:scale-50 group-hover/tag:opacity-0 group-has-focus-visible/tag:scale-50 group-has-focus-visible/tag:opacity-0`}
+						/>
+					) : null}
+					<IconX
 						aria-hidden="true"
-						className={`${swap} group-hover/tag:scale-50 group-hover/tag:opacity-0 group-has-focus-visible/tag:scale-50 group-has-focus-visible/tag:opacity-0`}
+						className={`${swap} scale-50 text-ink-3 opacity-0 group-hover/tag:scale-100 group-hover/tag:opacity-100 group-has-focus-visible/tag:scale-100 group-has-focus-visible/tag:opacity-100 hover:text-ink`}
 					/>
-				) : null}
-				<IconX
-					aria-hidden="true"
-					className={`${swap} scale-50 text-ink-3 opacity-0 group-hover/tag:scale-100 group-hover/tag:opacity-100 group-has-focus-visible/tag:scale-100 group-has-focus-visible/tag:opacity-100 hover:text-ink`}
-				/>
-			</button>
+				</span>
+			</Button>
 			<span className="min-w-0 truncate">{name}</span>
 		</span>
 	) : null;

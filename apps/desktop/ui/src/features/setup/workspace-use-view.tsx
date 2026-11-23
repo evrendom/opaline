@@ -16,6 +16,7 @@ import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
 import { Bone, Bones, Reveal } from "@/app/ui/bones";
+import { Pressable } from "@/app/ui/pressable";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { FluidList, useFluidListItem } from "@/components/fluid-list";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
@@ -78,7 +79,6 @@ import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { useUserMap } from "@/features/workspace/hooks/useUserMap";
 import { orpc } from "@/lib/orpc";
 import { cn } from "@/lib/utils";
-
 export type UseSection = "skills" | "mcp";
 
 const RUNS_STALE_TIME_MS = 5 * 60_000;
@@ -186,10 +186,10 @@ export function WorkspaceUseView({
 	const shownFile = file && !file.setupFile.startsWith("called:") ? file : null;
 
 	return (
-		<div className="h-full overflow-hidden pt-m pr-[calc(var(--space-xxl)*4/3)] pb-m pl-xxl">
+		<div className="h-full overflow-hidden pt-m pr-xxxl pb-m pl-xxl">
 			<div className="flex h-full min-h-0 gap-xxl">
 				<div className="-mb-m flex min-h-0 shrink flex-col" style={RUNS_WIDTH}>
-					<ScrollColumn className="-mx-xs px-xs pb-[calc(var(--space-xxl)*4/3)]">
+					<ScrollColumn className="-mx-xs px-xs pb-xxxl">
 						{loading || (runs && runs.length > 0) ? (
 							<Reveal
 								label="Reading the runs"
@@ -394,7 +394,7 @@ function RunList({
 		<FluidList>
 			{days.map((day) => (
 				<section key={day.label} className="flex flex-col gap-xxs">
-					<h3 className="px-[calc(var(--space-m)+var(--space-xxs))] pt-l pb-xs text-body-s font-medium text-ink-3 first:pt-xs">
+					<h3 className="px-l pt-l pb-xs text-body-s font-medium text-ink-3 first:pt-xs">
 						{day.label}
 					</h3>
 					{day.runs.map((run) => (
@@ -439,7 +439,7 @@ function RunRow({
 	const item = useFluidListItem<HTMLButtonElement>(index);
 	const prompt = run.prompt?.replace(/\s+/gu, " ").trim();
 	return (
-		<button
+		<Pressable
 			type="button"
 			ref={item.ref}
 			aria-current={isPicked || undefined}
@@ -451,10 +451,10 @@ function RunRow({
 			onPointerEnter={() => onWarm(run)}
 			title={prompt || undefined}
 			className={cn(
-				"relative flex w-full items-center gap-[calc(var(--space-m)+var(--space-xxs))]",
-				"corner-s px-[calc(var(--space-m)+var(--space-xxs))] py-s corner-squircle",
+				"relative flex w-full items-center gap-m",
+				"corner-s px-l py-s corner-squircle",
 				"text-left",
-				"focus-outline transition-colors",
+				"transition-colors",
 				"squircle:corner-l",
 				isPicked && "bg-field",
 			)}
@@ -501,7 +501,7 @@ function RunRow({
 			<span className="shrink-0 text-body-s text-ink-3 tabular-nums">
 				{timeOfDay(run.startedAt)}
 			</span>
-		</button>
+		</Pressable>
 	);
 }
 
@@ -530,7 +530,7 @@ function McpRunCalls({
 	const calls = query.data?.calls;
 	const tag = version ? ` · v${version}` : "";
 	return (
-		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-s pt-xl pr-xl pl-[calc(var(--space-xl)+var(--space-xs))]">
+		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-s pt-xl pr-xl pl-xl">
 			<PickStrip
 				agent={run.agentId || null}
 				model={run.model ?? null}
@@ -561,7 +561,7 @@ function McpRunCalls({
 					sampleId="use-calls"
 				>
 					{() => (
-						<ScrollColumn className="-mx-xs min-h-0 flex-1 px-xs pb-[calc(var(--space-xxl)*4/3)]">
+						<ScrollColumn className="-mx-xs min-h-0 flex-1 px-xs pb-xxxl">
 							<ol className="flex flex-col gap-xl pt-m">
 								{(calls ?? []).map((call) => (
 									<li key={call.callId}>
@@ -767,7 +767,7 @@ function RunTrace({
 				: `Loaded ${name}${tag}${steps.length > 1 ? `, ${steps.length} times` : ""}`
 			: undefined;
 	return (
-		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-s pt-xl pr-xl pl-[calc(var(--space-xl)+var(--space-xs))]">
+		<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-s pt-xl pr-xl pl-xl">
 			<PickStrip
 				agent={agent}
 				model={model}
@@ -977,10 +977,7 @@ function RunListSample() {
 	return (
 		<div className="flex flex-col gap-xxs pt-xs">
 			{[72, 56, 80, 64, 50, 76, 60, 68, 54, 74].map((width) => (
-				<div
-					key={width}
-					className="flex h-7 items-center gap-[calc(var(--space-m)+var(--space-xxs))] px-[calc(var(--space-m)+var(--space-xxs))]"
-				>
+				<div key={width} className="flex h-7 items-center gap-m px-l">
 					<Bone className="size-4 shrink-0 corner-full" />
 					<Bone className="h-2.5 corner-full" style={{ width: `${width}%` }} />
 				</div>
@@ -1006,7 +1003,7 @@ function RunPrompt({
 	const label = agent ? "Main agent" : (userMap[userId] ?? "Member");
 	return (
 		<div className="flex flex-col gap-m pt-l pb-xl">
-			<p className="flex items-center gap-m pl-[calc(var(--space-xxl)*1.5)] text-body-m text-ink-3">
+			<p className="flex items-center gap-m pl-xxxl text-body-m text-ink-3">
 				<span className="font-medium text-ink">{label}</span>
 				<span className="tabular-nums">{dateTime(startedAt)}</span>
 			</p>
@@ -1039,7 +1036,7 @@ function MiddleSample({ section }: { section: UseSection }) {
 			label={section === "mcp" ? "Reading the calls" : "Reading this run"}
 			className="min-w-0 flex-1"
 		>
-			<div className="flex h-full min-h-0 min-w-0 flex-col gap-s pt-xl pr-xl pl-[calc(var(--space-xl)+var(--space-xs))]">
+			<div className="flex h-full min-h-0 min-w-0 flex-col gap-s pt-xl pr-xl pl-xl">
 				<div
 					className={cn(
 						"flex h-8 shrink-0 items-center gap-s",
@@ -1072,8 +1069,8 @@ const TRACE_ROWS = [
 function SkillTraceBody() {
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
-			<div className="flex flex-col gap-m pt-l pb-[calc(var(--space-xl)+var(--space-xs))]">
-				<div className="flex items-center gap-m pl-[calc(var(--space-xxl)*1.5)]">
+			<div className="flex flex-col gap-m pt-l pb-xl">
+				<div className="flex items-center gap-m pl-xxxl">
 					<Bone className="h-3 w-14 corner-xs" />
 					<Bone className="h-3 w-20 corner-xs" />
 				</div>
@@ -1086,7 +1083,7 @@ function SkillTraceBody() {
 					</div>
 				</div>
 			</div>
-			<div className="flex flex-col gap-xl pl-[calc(var(--space-xxl)+var(--space-l)+var(--space-m))]">
+			<div className="flex flex-col gap-xl pl-xxxl">
 				{TRACE_ROWS.map((row) => (
 					<div key={row.id} className="flex h-6 items-center gap-m">
 						<Bone className="size-5 shrink-0 corner-s" />
@@ -1119,15 +1116,12 @@ function McpCallsSample() {
 					"divide-line-soft border-line bg-canvas",
 				)}
 			>
-				<div className="flex items-center gap-s py-[calc(var(--space-m)+var(--space-xxs))]">
+				<div className="flex items-center gap-s py-m">
 					<Bone className="h-4 w-14 corner-xs" />
 					<Bone className="h-3 w-24 corner-xs" />
 				</div>
 				{["command", "context"].map((key) => (
-					<div
-						key={key}
-						className="flex flex-col gap-s py-[calc(var(--space-m)+var(--space-xxs))]"
-					>
+					<div key={key} className="flex flex-col gap-s py-m">
 						<Bone className="h-2.5 w-16 corner-xs" />
 						<Bone className="h-3 w-3/4 corner-xs" />
 					</div>
@@ -1153,11 +1147,11 @@ const FILE_LINES = [94, 88, 96, 70, 0, 90, 84, 92, 60, 0, 86, 94, 78].map(
 function FileCardSample() {
 	return (
 		<div className="flex flex-col">
-			<div className="flex items-center gap-m edge-b-m border-line-soft px-[calc(var(--space-xl)+var(--space-xs))] py-xl">
+			<div className="flex items-center gap-m edge-b-m border-line-soft px-xl py-xl">
 				<Bone className="size-4 shrink-0 corner-full" />
 				<Bone className="h-3.5 w-28 corner-xs" />
 			</div>
-			<div className="flex flex-col gap-[calc(var(--space-m)+var(--space-xxs))] px-[calc(var(--space-xl)+var(--space-xs))] py-[calc(var(--space-xl)+var(--space-xs))]">
+			<div className="flex flex-col gap-m px-xl py-xl">
 				<Bone className="mb-xs h-4 w-1/3 corner-xs" />
 				{FILE_LINES.map(({ line, width }) =>
 					width ? (

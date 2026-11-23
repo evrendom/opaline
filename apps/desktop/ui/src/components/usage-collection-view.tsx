@@ -18,6 +18,12 @@ import {
 } from "@/app/ui/avatar";
 import { Button } from "@/app/ui/button";
 import { FluidHoverHighlight } from "@/app/ui/fluid-hover-highlight";
+import {
+	InputGroup,
+	InputGroupAddon,
+	InputGroupInput,
+} from "@/app/ui/input-group";
+import { Pressable } from "@/app/ui/pressable";
 import { Skeleton } from "@/app/ui/skeleton";
 import { CONVERSATION_TRACE_TAG_CLASS_NAME } from "@/components/conversation/conversation-trace-tag";
 import { PageEmptyState } from "@/components/dashboard/page-parts";
@@ -54,7 +60,7 @@ interface UsageCollectionViewProps {
 
 // Card grid: 16px gaps, its edges on the page title's 32px gutter.
 const USAGE_GRID_CLASS_NAME =
-	"grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,13.5rem),1fr))] gap-xl px-xl pt-xs pb-xxl sm:px-[calc(var(--space-xxl)*4/3)]";
+	"grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,13.5rem),1fr))] gap-xl px-xl pt-xs pb-xxl sm:px-xxxl";
 // Card: a squircle on its soft hairline shadow, no border.
 const USAGE_CARD_CLASS_NAME =
 	"relative flex h-full w-full min-w-0 flex-col overflow-hidden corner-m bg-surface text-left text-ink shadow-card squircle:corner-xl corner-squircle";
@@ -155,22 +161,20 @@ export function UsageCollectionHeader({
 				<label className="sr-only" htmlFor={`${kind}-search`}>
 					Search {kind}
 				</label>
-				<IconSearch
-					aria-hidden="true"
-					className={cn(
-						"absolute top-1/2 left-2.5 z-10 size-3.5",
-						"pointer-events-none -translate-y-1/2 text-ink-4",
-					)}
-				/>
-				<input
-					id={`${kind}-search`}
-					name={`${kind}-search`}
-					type="search"
-					value={search}
-					onChange={(event) => onSearchChange(event.currentTarget.value)}
-					placeholder={`Search ${kind}`}
-					className="toolbar-search"
-				/>
+				<InputGroup variant="toolbar">
+					<InputGroupAddon>
+						<IconSearch aria-hidden="true" className="size-3.5 text-ink-4" />
+					</InputGroupAddon>
+					<InputGroupInput
+						id={`${kind}-search`}
+						name={`${kind}-search`}
+						type="search"
+						value={search}
+						onChange={(event) => onSearchChange(event.currentTarget.value)}
+						placeholder={`Search ${kind}`}
+						className="h-8"
+					/>
+				</InputGroup>
 			</div>
 		</div>
 	);
@@ -245,7 +249,6 @@ function UsageCollectionState({
 					<Button
 						type="button"
 						size="md"
-						className="h-8 gap-xs"
 						variant="primary"
 						onClick={onClearSearch}
 					>
@@ -351,15 +354,15 @@ const UsageCard = memo(function UsageCard({
 			data-usage-card
 			data-skill-card
 		>
-			<button
+			<Pressable
 				type="button"
 				aria-label={`Open ${skill.name}`}
 				onClick={() => onSelectItem(skill.id)}
 				onFocus={() => setActiveIndex(index)}
-				className="absolute inset-0 z-20 corner-m corner-squircle squircle:corner-xl focus-outline focus-visible:-outline-offset-2"
+				className="absolute inset-0 z-20 corner-m corner-squircle squircle:corner-xl focus-visible:-outline-offset-2"
 			/>
 			<div className="pointer-events-none flex min-h-0 flex-1 flex-col">
-				<header className="flex min-h-16 flex-1 items-center gap-[calc(var(--space-m)+var(--space-xxs))] px-[calc(var(--space-xl)+var(--space-xs))] py-xl">
+				<header className="flex min-h-16 flex-1 items-center gap-m px-xl py-xl">
 					<SkillMark skill={skill.name} emoji={skill.emoji} />
 					<h2
 						className={cn(
@@ -372,7 +375,7 @@ const UsageCard = memo(function UsageCard({
 						{skill.name}
 					</h2>
 				</header>
-				<footer className="shrink-0 edge-t-m border-line px-[calc(var(--space-xl)+var(--space-xs))] py-xl">
+				<footer className="shrink-0 edge-t-m border-line px-xl py-xl">
 					<UsageSummary
 						avatarMap={avatarMap}
 						attribution={skill.attribution}
@@ -438,7 +441,7 @@ function UsageSummary({
 							<UsageUserAvatar avatarUrl={undefined} title={undefined} />
 						)}
 						{hiddenUserCount > 0 ? (
-							<AvatarGroupCount className="bg-hover font-body text-body-m text-ink-2 ring-canvas tabular-nums">
+							<AvatarGroupCount>
 								+{hiddenUserCount.toLocaleString()}
 								<span className="sr-only"> more users</span>
 							</AvatarGroupCount>
@@ -495,11 +498,11 @@ function UsageUserAvatar({
 	title: string | undefined;
 }) {
 	return (
-		<Avatar title={title} size="sm" className="bg-canvas after:border-line">
+		<Avatar title={title} size="sm">
 			{avatarUrl ? (
 				<AvatarImage alt="" src={avatarUrl} decoding="async" loading="lazy" />
 			) : null}
-			<AvatarFallback className="bg-hover">
+			<AvatarFallback>
 				<IconUser
 					aria-hidden="true"
 					className={USAGE_METADATA_ICON_CLASS_NAME}
@@ -550,7 +553,7 @@ function UsageCollectionSkeleton({ kind }: { kind: "skills" | "repos" }) {
 			<div className={USAGE_GRID_CLASS_NAME}>
 				{["first", "second", "third", "fourth", "fifth", "sixth"].map((key) => (
 					<div key={key} className={USAGE_CARD_CLASS_NAME}>
-						<div className="flex min-h-16 flex-1 items-center gap-[calc(var(--space-m)+var(--space-xxs))] px-[calc(var(--space-xl)+var(--space-xs))] py-xl">
+						<div className="flex min-h-16 flex-1 items-center gap-m px-xl py-xl">
 							<Skeleton className="size-9 shrink-0 [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]" />
 							<Skeleton className="h-5 min-w-0 flex-1" />
 						</div>

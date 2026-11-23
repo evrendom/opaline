@@ -40,18 +40,20 @@ import {
 import {
 	Area,
 	CartesianGrid,
+	Tooltip as ChartTooltip,
 	ComposedChart,
 	Line,
 	ResponsiveContainer,
-	Tooltip,
 	XAxis,
 	type XAxisTickContentProps,
 	YAxis,
 } from "recharts";
 import { introRequested } from "@/app/first-open";
+import { Button } from "@/app/ui/button";
 import { ChartLoadingWave } from "@/app/ui/chart-loading-wave";
 import { FlowFigure, FlowNumber } from "@/app/ui/flow-number";
 import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
+import { Pressable } from "@/app/ui/pressable";
 import { Skeleton } from "@/app/ui/skeleton";
 import {
 	Tooltip as InfoTooltip,
@@ -987,9 +989,9 @@ export function CostChart({
 								{sampled ? null : metric === "agentRuns" ||
 									metric === "ciRuns" ? (
 									<>
-										<button
+										<Pressable
 											type="button"
-											className="cost-legend-item cost-duration-legend focus-outline"
+											className="cost-legend-item cost-duration-legend"
 											data-percentile="median"
 											aria-label="Median duration"
 											title={
@@ -1009,10 +1011,10 @@ export function CostChart({
 													)}
 												/>
 											</strong>
-										</button>
-										<button
+										</Pressable>
+										<Pressable
 											type="button"
-											className="cost-legend-item cost-duration-legend focus-outline"
+											className="cost-legend-item cost-duration-legend"
 											data-percentile="p95"
 											aria-label="P95 duration"
 											title={
@@ -1030,12 +1032,12 @@ export function CostChart({
 													figure={runDurationFigure(durationStats?.p95Seconds)}
 												/>
 											</strong>
-										</button>
+										</Pressable>
 									</>
 								) : metric === "mergedPullRequests" && !ciChart ? (
-									<button
+									<Pressable
 										type="button"
-										className="cost-legend-item cost-duration-legend focus-outline"
+										className="cost-legend-item cost-duration-legend"
 										data-percentile="p95"
 										aria-label="CI failures per PR"
 										title="Failed CI attempts per merged PR, counting only PRs whose CI history is available. Re-runs count. Grouped by merge date (UTC)."
@@ -1059,7 +1061,7 @@ export function CostChart({
 												/>
 											)}
 										</strong>
-									</button>
+									</Pressable>
 								) : null}
 							</div>
 							{history && !sampled && !ciChart ? (
@@ -1114,26 +1116,28 @@ export function CostChart({
 							{sampled && data !== null ? null : coverage &&
 								data?.incomplete ? (
 								<output className="cost-chart-coverage">
-									<button
+									<Button
 										type="button"
-										className="text-button cost-coverage-refresh"
+										size="sm"
+										className="shrink-0"
 										onClick={onRefresh}
 										disabled={refreshing}
 									>
 										{refreshing ? "Refreshing…" : "Refresh"}
-									</button>
+									</Button>
 								</output>
 							) : unavailable ? (
 								<output className="cost-chart-coverage">
 									<span>{unavailableLabel}</span>
-									<button
+									<Button
 										type="button"
-										className="text-button cost-coverage-refresh"
+										size="sm"
+										className="shrink-0"
 										onClick={onRefresh}
 										disabled={refreshing}
 									>
 										{refreshing ? "Refreshing…" : "Refresh"}
-									</button>
+									</Button>
 								</output>
 							) : null}
 						</div>
@@ -1143,7 +1147,7 @@ export function CostChart({
 								{splitBy !== "none" ? (
 									<span className="cost-chart-split">
 										Split by
-										<button
+										<Pressable
 											type="button"
 											className="filter-chip"
 											onClick={onResetSplit}
@@ -1152,7 +1156,7 @@ export function CostChart({
 										>
 											<span className="truncate">{COST_LABELS[splitBy]}</span>
 											<IconX size={12} className="shrink-0" />
-										</button>
+										</Pressable>
 									</span>
 								) : null}
 								{filters}
@@ -1167,10 +1171,9 @@ export function CostChart({
 								aria-label="Pull requests or CI runs"
 							>
 								{(["mergedPullRequests", "ciRuns"] as const).map((value) => (
-									<button
+									<Pressable
 										key={value}
 										type="button"
-										className="focus-outline"
 										aria-pressed={selectedMetric === value}
 										onClick={() => onMetricChange(value)}
 										onPointerEnter={
@@ -1178,22 +1181,21 @@ export function CostChart({
 										}
 									>
 										{METRIC_LABELS[value]}
-									</button>
+									</Pressable>
 								))}
 							</fieldset>
 						) : null}
 						{dots === "switch" ? (
 							<fieldset className="cost-chart-kind" aria-label="Chart style">
 								{(["line", "dots"] as const).map((value) => (
-									<button
+									<Pressable
 										key={value}
 										type="button"
-										className="focus-outline"
 										aria-pressed={kind === value}
 										onClick={() => setKind(value)}
 									>
 										{value === "line" ? "Line" : "Dots"}
-									</button>
+									</Pressable>
 								))}
 							</fieldset>
 						) : null}
@@ -1398,7 +1400,7 @@ export function CostChart({
 												}
 											/>
 										) : null}
-										<Tooltip
+										<ChartTooltip
 											active={phase === "idle" ? undefined : false}
 											// Follows the pointer across, but holds one height near the
 											// top of the plot instead of tracking the pointer's height.
@@ -1790,7 +1792,7 @@ function Metric({
 			<div className="cost-metric-header">
 				<div className="cost-metric-label">
 					<MetricIcon className="cost-metric-icon" aria-hidden="true" />
-					<button
+					<Pressable
 						type="button"
 						className="cost-metric-select"
 						aria-pressed={primary}
@@ -1801,7 +1803,7 @@ function Metric({
 						onFocus={onIntent}
 					>
 						{label}
-					</button>
+					</Pressable>
 				</div>
 				{value === undefined ? (
 					<Skeleton className="cost-metric-skeleton corner-xs" />

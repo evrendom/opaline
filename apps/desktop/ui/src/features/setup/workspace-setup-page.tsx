@@ -1,5 +1,6 @@
 import { IconChevronRight } from "@tabler/icons-react";
 import { createPortal } from "react-dom";
+import { Pressable } from "@/app/ui/pressable";
 import { SkillMark } from "@/components/skill-mark";
 import { ShellNavIcon } from "@/features/shell/components/shell-nav-icon";
 import { useCollapseSidebarBelow } from "@/features/shell/hooks/use-collapse-sidebar-below";
@@ -20,7 +21,7 @@ export function WorkspaceSetupPage({
 }) {
 	useCollapseSidebarBelow(SIDEBAR_COLLAPSE_BELOW_PX);
 	return (
-		<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-inset dark:bg-canvas text-ink [--reader-page:var(--canvas)]">
+		<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-canvas text-ink [--reader-page:var(--canvas)]">
 			<WorkspaceSetupHeader name={name} onBackToList={onBackToList} />
 			<h1 className="sr-only">{name}</h1>
 			<div className="relative isolate min-h-0 min-w-0 flex-1 overflow-hidden [--dashboard-01-content-background:var(--dashboard-01-stage-background)] [--stage-top:--spacing(2)]">
@@ -51,11 +52,11 @@ function WorkspaceSetupHeader({
 			aria-label={`${shellRoute.title} breadcrumb`}
 			className="flex min-w-0 flex-1 items-center gap-s text-body-xxl font-medium tracking-xs"
 		>
-			<button
+			<Pressable
 				type="button"
 				onClick={onBackToList}
 				data-fluid-menu-root=""
-				className="flex shrink-0 items-center gap-m text-ink-3 transition-colors hover:text-ink focus-outline"
+				className="flex shrink-0 items-center gap-m text-ink-3 transition-colors hover:text-ink"
 			>
 				<ShellNavIcon
 					icon={shellRoute.icon}
@@ -64,7 +65,7 @@ function WorkspaceSetupHeader({
 					tone={shellRoute.tone}
 				/>
 				{shellRoute.title}
-			</button>
+			</Pressable>
 			<IconChevronRight
 				aria-hidden="true"
 				className="size-4 shrink-0 text-ink-4"

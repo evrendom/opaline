@@ -22,6 +22,7 @@ export function ChartIntervalPicker({
 						htmlFor={`${id}-${option.value}`}
 						className="menu-row"
 					>
+						{/* design-escape-ok(element): native; the visually hidden radio the menu row's label drives, no radio primitive */}
 						<input
 							id={`${id}-${option.value}`}
 							name={`${id}-interval`}

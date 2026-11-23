@@ -206,7 +206,6 @@ export function ReposOverview({
 							<Button
 								type="button"
 								size="md"
-								className="h-8 gap-xs"
 								variant="primary"
 								onClick={() => {
 									setSearch("");

@@ -11,6 +11,7 @@ import {
 	EmptyTitle,
 } from "@/app/ui/empty";
 import { FlowNumber } from "@/app/ui/flow-number";
+import { Pressable } from "@/app/ui/pressable";
 import { Skeleton } from "@/app/ui/skeleton";
 import { TableCell, TableRow } from "@/app/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
@@ -41,7 +42,7 @@ export function EmptyState({
 	iconClassName?: string;
 }) {
 	return (
-		<Empty className={cn("edge-m border-dashed", className)}>
+		<Empty className={className}>
 			<EmptyHeader>
 				<EmptyMedia
 					variant="icon"
@@ -190,10 +191,7 @@ export function StatCard({
 		<Card
 			size="sm"
 			skullet-block={onSelect ? "" : undefined}
-			className={cn(
-				"data-[size=sm]:py-[calc(var(--space-l)+var(--space-xxs))]",
-				onSelect && "relative transition-shadow hover:shadow-raised",
-			)}
+			// The selected card rings in its series accent (data paint).
 			style={
 				selected && accent
 					? {
@@ -201,21 +199,22 @@ export function StatCard({
 						}
 					: undefined
 			}
+			className={onSelect ? "relative" : undefined}
 		>
 			{onSelect ? (
-				<button
+				<Pressable
 					type="button"
 					aria-label={label}
 					aria-pressed={selected}
 					onClick={onSelect}
-					className="absolute inset-0 z-10 corner-m corner-squircle squircle:corner-xl focus-outline"
+					className="absolute inset-0 z-10 corner-m corner-squircle transition-colors hover:bg-hover squircle:corner-xl"
 				/>
 			) : null}
-			<CardHeader className="gap-s group-data-[size=sm]/card:px-xl">
+			<CardHeader>
 				<div className="flex min-w-0 items-center justify-between gap-m">
 					<div
 						className={cn(
-							"flex items-center gap-[calc(var(--space-s)+var(--space-xxs)/2)]",
+							"flex items-center gap-s",
 							note ? "shrink-0" : "min-w-0",
 						)}
 					>
@@ -240,19 +239,15 @@ export function StatCard({
 					</div>
 					<div
 						className={cn(
-							"flex items-center gap-[calc(var(--space-m)+var(--space-xxs))]",
+							"flex items-center gap-m",
 							note ? "min-w-0 gap-m" : "shrink-0",
 						)}
 					>
 						{note && !noteBelow && !loading ? (
-							<CardTitle
-								className={cn(
-									"inline-flex min-w-0 items-center gap-xs overflow-hidden",
-									"tracking-xs whitespace-nowrap tabular-nums",
-									"opacity-45",
-								)}
-							>
-								{note}
+							<CardTitle className="min-w-0">
+								<span className="inline-flex min-w-0 items-center gap-xs overflow-hidden whitespace-nowrap text-ink-4 tabular-nums">
+									{note}
+								</span>
 							</CardTitle>
 						) : null}
 						<StatValue
@@ -278,8 +273,8 @@ export function StatCard({
 					</div>
 				</div>
 				{note && noteBelow && !loading ? (
-					<CardTitle className="min-w-0 tracking-xs text-pretty tabular-nums opacity-45">
-						{note}
+					<CardTitle className="min-w-0">
+						<span className="text-pretty text-ink-4 tabular-nums">{note}</span>
 					</CardTitle>
 				) : null}
 			</CardHeader>
@@ -300,24 +295,21 @@ function StatValue({
 }) {
 	if (!tip)
 		return (
-			<CardTitle className="shrink-0 tracking-xs tabular-nums" title={title}>
-				{children}
+			<CardTitle className="shrink-0" title={title}>
+				<span className="tabular-nums">{children}</span>
 			</CardTitle>
 		);
 	return (
 		<Tooltip>
 			<TooltipTrigger
 				render={
-					<CardTitle
-						className="relative z-20 shrink-0 cursor-default tracking-xs tabular-nums"
-						onClick={onSelect}
-					/>
+					<CardTitle className="relative z-20 shrink-0" onClick={onSelect} />
 				}
 			>
-				{children}
+				<span className="tabular-nums">{children}</span>
 			</TooltipTrigger>
-			<TooltipContent side="top" className="tabular-nums">
-				{tip}
+			<TooltipContent side="top">
+				<span className="tabular-nums">{tip}</span>
 			</TooltipContent>
 		</Tooltip>
 	);
