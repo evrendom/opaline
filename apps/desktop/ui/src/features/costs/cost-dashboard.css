@@ -1169,17 +1169,14 @@
 	margin-top: var(--space-m);
 }
 
-/* Breakdown rows sized to the space under the chart (data-sized, from
-   CostDashboardView) at most: a row is as tall as its tallest card's rows, up
-   to the height that fits the page, and a longer list scrolls inside. */
+/* Breakdown rows take the space under the chart (data-sized, from
+   CostDashboardView): every card is that one height whichever metric is
+   picked and however few rows it has, and a longer list scrolls inside. */
 .cost-breakdowns[data-sized] {
 	grid-auto-rows: auto;
 }
 .cost-breakdowns[data-sized] .cost-breakdown {
 	min-height: 0;
-	max-height: var(--breakdown-row-height);
-}
-.cost-breakdowns[data-sized][data-loading] .cost-breakdown {
 	height: var(--breakdown-row-height);
 }
 .cost-breakdowns[data-sized] .cost-scroll-fade {
