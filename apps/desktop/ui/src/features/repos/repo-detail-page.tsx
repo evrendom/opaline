@@ -327,12 +327,7 @@ export function RepoDetailPage({
 												)
 											: null}
 										{
-											<div
-												className={cn(
-													STAGE_PANE,
-													"flex-row",
-												)}
-											>
+											<div className={cn(STAGE_PANE, "flex-row")}>
 												<ShellHeaderPortalContext.Provider value={null}>
 													<div className="flex h-full w-[300px] shrink-0 flex-col overflow-y-auto">
 														<DotPreviewContext.Provider value={preview}>
