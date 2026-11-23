@@ -35,12 +35,9 @@ import {
 	useMetricPreviews,
 	usePrefetchDashboardMetric,
 } from "@/features/costs/use-metric-previews";
-import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
 import { UsageSessionsPane } from "@/features/sessions/components/session-usage-detail";
 import { SESSION_OVERVIEW_SURFACE_CLASS_NAME } from "@/features/sessions/components/sessions-overview-table-utils";
-import { ModelChip } from "@/features/sessions/reader/detail/waterfall/session-reader-waterfall-chips";
 import { SessionInRepo } from "@/features/sessions/reader/session-reader-in-repo";
-import { useSessionModel } from "@/features/sessions/use-session-model";
 import { useGitHubConnection } from "@/features/settings/github/use-github-connection";
 import { CopyButton } from "@/features/shell/components/copy-button";
 import {
@@ -513,7 +510,20 @@ export function RepoDetailHeader({
 							{repoLabel}
 						</Pressable>
 						{separator}
-						<RepoSessionCrumb sessionId={sessionId} />
+						<span
+							aria-current="page"
+							className="flex min-w-0 items-center gap-s"
+						>
+							{/* The Sessions section's own chip, colour included. */}
+							<ShellNavIcon
+								icon={shellRouteMap.sessions.icon}
+								activeIcon={shellRouteMap.sessions.activeIcon}
+								active
+								tone={shellRouteMap.sessions.tone}
+							/>
+							<span className="truncate">{sessionId}</span>
+							<CopyButton value={sessionId} title="Copy session ID" />
+						</span>
 					</>
 				) : (
 					<span aria-current="page" className="flex min-w-0 items-center gap-s">
@@ -528,34 +538,5 @@ export function RepoDetailHeader({
 			/>
 		</>,
 		headerPortal,
-	);
-}
-
-/** The session crumb, as the Sessions header names it: the model's chip and
- * name, then "Session" and the short id (the full id in its title and copy). */
-function RepoSessionCrumb({ sessionId }: { sessionId: string }) {
-	const model = useSessionModel(sessionId);
-	return (
-		<span aria-current="page" className="flex min-w-0 items-center gap-s">
-			{model ? (
-				<>
-					<ModelChip model={model} />
-					<span className="shrink-0">{formatModelDisplayLabel(model)}</span>
-				</>
-			) : (
-				// The Sessions section's own chip, until the model is known.
-				<ShellNavIcon
-					icon={shellRouteMap.sessions.icon}
-					activeIcon={shellRouteMap.sessions.activeIcon}
-					active
-					tone={shellRouteMap.sessions.tone}
-				/>
-			)}
-			<span className="shrink-0">Session</span>
-			<span title={sessionId} className="truncate">
-				{sessionId.split("-")[0]}
-			</span>
-			<CopyButton value={sessionId} title="Copy session ID" />
-		</span>
 	);
 }
