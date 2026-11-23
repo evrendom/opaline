@@ -482,7 +482,7 @@ export function RepoDetailHeader({
 		<>
 			<nav
 				aria-label="Repo breadcrumb"
-				className="flex min-w-0 flex-1 items-center gap-s text-body-xxl font-medium tracking-xs"
+				className="flex min-w-0 items-center gap-s text-body-xxl font-medium tracking-xs"
 			>
 				<Pressable
 					type="button"
@@ -531,10 +531,14 @@ export function RepoDetailHeader({
 					</span>
 				)}
 			</nav>
+			{/* The controls take the free width, so a crumb portalled first (a
+			    picked run or subagent) follows the breadcrumb and the pager
+			    stays on the right; they never shrink, so the breadcrumb
+			    truncates first when the header is tight. */}
 			<div
 				ref={setControls}
 				data-fluid-menu-root=""
-				className="flex min-w-0 shrink-0 items-center justify-end empty:hidden"
+				className="ml-auto flex shrink-0 grow items-center justify-end empty:hidden"
 			/>
 		</>,
 		headerPortal,
