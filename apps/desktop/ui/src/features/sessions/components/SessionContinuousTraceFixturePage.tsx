@@ -7,6 +7,7 @@ import {
 	useState,
 } from "react";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
+import { Button } from "@/app/ui/button";
 import type { TraceItem } from "@/components/conversation/conversation-trace";
 import {
 	buildConversationTraceFixtureTurns,
@@ -602,35 +603,35 @@ export function SessionContinuousTraceFixturePage() {
 				/>
 			) : null}
 			{streamsTurnBodies ? (
-				<button
-					className="sr-only focus-outline"
+				<Button
+					className="sr-only"
 					data-trace-fixture-hydrate
 					onClick={hydrateTurnBodies}
 					type="button"
 				>
 					Hydrate turn bodies
-				</button>
+				</Button>
 			) : null}
 			{profilesScrolling ? (
-				<button
-					className="sr-only focus-outline"
+				<Button
+					className="sr-only"
 					data-trace-fixture-reset-profile
 					onClick={resetRenderProfile}
 					type="button"
 				>
 					Reset render profile
-				</button>
+				</Button>
 			) : null}
-			<button
-				className="sr-only focus-outline"
+			<Button
+				className="sr-only"
 				data-trace-fixture-prepend
 				onClick={prependFixtureTurns}
 				type="button"
 			>
 				Prepend turns
-			</button>
-			<button
-				className="sr-only focus-outline"
+			</Button>
+			<Button
+				className="sr-only"
 				data-trace-fixture-jump-first
 				onClick={() => {
 					const turnId = options[0]?.turnId;
@@ -644,9 +645,9 @@ export function SessionContinuousTraceFixturePage() {
 				type="button"
 			>
 				Jump to first turn
-			</button>
-			<button
-				className="sr-only focus-outline"
+			</Button>
+			<Button
+				className="sr-only"
 				data-trace-fixture-jump-last
 				onClick={() => {
 					const turnId = options.at(-1)?.turnId;
@@ -660,17 +661,17 @@ export function SessionContinuousTraceFixturePage() {
 				type="button"
 			>
 				Jump to last turn
-			</button>
-			<button
-				className="sr-only focus-outline"
+			</Button>
+			<Button
+				className="sr-only"
 				data-trace-fixture-reset-row-paints
 				onClick={() => setDebugPaintEpoch((current) => current + 1)}
 				type="button"
 			>
 				Reset row paint markers
-			</button>
-			<button
-				className="sr-only focus-outline"
+			</Button>
+			<Button
+				className="sr-only"
 				data-trace-fixture-toggle-level
 				onClick={() =>
 					setTraceCallDisplayMode((current) =>
@@ -680,7 +681,7 @@ export function SessionContinuousTraceFixturePage() {
 				type="button"
 			>
 				Toggle transcript level
-			</button>
+			</Button>
 		</div>
 	);
 }

@@ -12,6 +12,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { TouchTarget } from "@/app/ui/touch-target";
 import { cn } from "@/lib/utils";
 import {
@@ -83,11 +84,11 @@ function SessionDetailActivityMenuItem({
 }) {
 	return (
 		<li className="session-detail-opaline-trigger-item">
-			<button
+			<Pressable
 				aria-expanded={flyoutsEnabled ? isOpen : undefined}
 				aria-haspopup={flyoutsEnabled ? "menu" : undefined}
 				className={cn(
-					"session-detail-opaline-trigger relative inline-flex shrink-0 items-center justify-center gap-s corner-s border-[0.5px] border-line bg-canvas px-[calc(var(--space-m)+var(--space-xxs))] py-xs text-body-l font-medium text-ink-2 focus-outline disabled:pointer-events-none",
+					"session-detail-opaline-trigger relative inline-flex shrink-0 items-center justify-center gap-s corner-s border-[0.5px] border-line bg-canvas px-m py-xs text-body-l font-medium text-ink-2 disabled:opacity-100",
 					flyoutsEnabled && "hover:bg-hover-strong hover:text-ink",
 					flyoutsEnabled && isOpen && "bg-hover-strong text-ink",
 				)}
@@ -106,7 +107,7 @@ function SessionDetailActivityMenuItem({
 				<span className="text-ink-2 tabular-nums">
 					{group.totalCount.toLocaleString()}
 				</span>
-			</button>
+			</Pressable>
 		</li>
 	);
 }

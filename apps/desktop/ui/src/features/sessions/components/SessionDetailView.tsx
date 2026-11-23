@@ -71,7 +71,7 @@ function SessionDetailStateMessage({
 	title: string;
 }) {
 	return (
-		<div className="flex h-full min-h-0 flex-col p-[calc(var(--space-xxl)*4/3)]">
+		<div className="flex h-full min-h-0 flex-col p-xxxl">
 			<EmptyState description={description} icon={icon} title={title}>
 				{onRetry ? (
 					<RetryButton

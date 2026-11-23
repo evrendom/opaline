@@ -8,6 +8,7 @@ import {
 	PopoverTitle,
 	PopoverTrigger,
 } from "@/app/ui/popover";
+import { Pressable } from "@/app/ui/pressable";
 import { TouchTarget } from "@/app/ui/touch-target";
 import { FilterTriggerLabel } from "@/components/filter-trigger-label";
 import { SessionOverviewFilterOptionsPanel } from "@/features/sessions/components/sessions-overview-filter-menu";
@@ -308,14 +309,13 @@ export function SessionsOverviewFiltersMenu({
 						{activeFilterCount > 0 ? (
 							<div className="menu-footer">
 								<div aria-hidden="true" className="menu-separator" />
-								<button
-									type="button"
+								<Pressable
 									aria-label="Clear all filters"
 									className="menu-row"
 									onClick={onClearAll}
 								>
 									Clear all
-								</button>
+								</Pressable>
 							</div>
 						) : null}
 						{selectedFilter ? (
@@ -349,9 +349,9 @@ export function SessionsOverviewFiltersMenu({
 									<Button
 										type="button"
 										variant="secondary"
-										size="icon"
+										size="icon-sm"
 										aria-label="Back to all filters"
-										className="relative size-7 corner-s text-ink-3"
+										className="relative"
 										onClick={() => setSelectedFilterKey(null)}
 									>
 										<IconArrowLeft
@@ -361,18 +361,21 @@ export function SessionsOverviewFiltersMenu({
 										<TouchTarget className="size-12" />
 									</Button>
 								) : null}
-								<PopoverTitle className="truncate text-body-xl font-heavy">
-									{selectedFilter ? selectedFilter.label : "Filters"}
+								<PopoverTitle className="min-w-0">
+									<span className="block truncate">
+										{selectedFilter ? selectedFilter.label : "Filters"}
+									</span>
 								</PopoverTitle>
 							</div>
-							<button
+							<Button
 								type="button"
+								size="sm"
 								aria-label={
 									selectedFilter
 										? `Clear ${selectedFilter.label} filter`
 										: "Clear all filters"
 								}
-								className="shrink-0 corner-s px-s py-xs text-body-m font-medium text-primary focus-outline hover:bg-hover disabled:pointer-events-none disabled:opacity-40"
+								className="shrink-0"
 								disabled={
 									selectedFilter
 										? !isToolbarFilterActive(
@@ -399,7 +402,7 @@ export function SessionsOverviewFiltersMenu({
 								}}
 							>
 								{selectedFilter ? "Clear" : "Clear all"}
-							</button>
+							</Button>
 						</div>
 
 						{selectedFilter ? (
@@ -446,11 +449,10 @@ export function SessionsOverviewFiltersMenu({
 									);
 
 									return (
-										<button
+										<Pressable
 											key={filter.key}
-											type="button"
 											aria-label={`Configure ${filter.label} filter`}
-											className="flex min-h-9 w-full items-center gap-l corner-m px-l py-s text-left text-body-xl font-medium focus-outline hover:bg-hover hover:text-ink"
+											className="flex min-h-9 w-full items-center gap-l corner-m px-l py-s text-body-xl font-medium hover:bg-hover hover:text-ink"
 											onClick={() => setSelectedFilterKey(filter.key)}
 										>
 											<span className="min-w-0 flex-1 truncate">
@@ -473,7 +475,7 @@ export function SessionsOverviewFiltersMenu({
 												aria-hidden="true"
 												className="size-4 shrink-0 text-ink-3"
 											/>
-										</button>
+										</Pressable>
 									);
 								})}
 							</div>

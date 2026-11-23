@@ -1298,7 +1298,7 @@ function SessionDetailInlineSubagentBranch({
 
 	return (
 		<div
-			className="min-w-0 pl-[calc(var(--space-xxl)*1.5)]"
+			className="min-w-0 pl-xxxl"
 			data-session-subagent-branch={branch.subagentId}
 		>
 			<TraceExpansionNamespaceProvider namespace={branch.subagentId}>

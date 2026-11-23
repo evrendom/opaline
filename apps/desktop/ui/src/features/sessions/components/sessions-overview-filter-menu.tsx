@@ -2,7 +2,11 @@ import { IconCheck, IconSearch } from "@tabler/icons-react";
 import { useId, useState } from "react";
 import { Checkbox } from "@/app/ui/checkbox";
 import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
-import { Input } from "@/app/ui/input";
+import {
+	InputGroup,
+	InputGroupAddon,
+	InputGroupInput,
+} from "@/app/ui/input-group";
 import type { SessionOverviewFilterOption } from "@/features/sessions/components/sessions-overview-table-utils";
 
 export function SessionOverviewFilterOptionsPanel({
@@ -42,19 +46,19 @@ export function SessionOverviewFilterOptionsPanel({
 					<label className="sr-only" htmlFor={`${controlId}-search`}>
 						{`Search ${label.toLocaleLowerCase()}`}
 					</label>
-					<IconSearch
-						aria-hidden="true"
-						className="pointer-events-none absolute top-1/2 left-5 size-4 -translate-y-1/2 text-ink-3"
-					/>
-					<Input
-						id={`${controlId}-search`}
-						type="text"
-						name={`${controlId}-search`}
-						className="h-8 corner-m bg-hover pr-m pl-[calc(var(--space-xxl)*1.5)] text-body-xl"
-						placeholder={`Search ${label.toLocaleLowerCase()}`}
-						value={searchQuery}
-						onChange={(event) => setSearchQuery(event.target.value)}
-					/>
+					<InputGroup>
+						<InputGroupAddon>
+							<IconSearch aria-hidden="true" className="size-4 text-ink-3" />
+						</InputGroupAddon>
+						<InputGroupInput
+							id={`${controlId}-search`}
+							type="text"
+							name={`${controlId}-search`}
+							placeholder={`Search ${label.toLocaleLowerCase()}`}
+							value={searchQuery}
+							onChange={(event) => setSearchQuery(event.target.value)}
+						/>
+					</InputGroup>
 				</div>
 			) : null}
 			<div
@@ -79,14 +83,13 @@ export function SessionOverviewFilterOptionsPanel({
 								className="menu-row"
 								title={option.value}
 							>
-								<input
+								<Checkbox
 									id={optionId}
-									type="checkbox"
 									checked={isChecked}
-									className="peer sr-only"
+									className="sr-only"
 									name={optionId}
-									onChange={(event) =>
-										onOptionChecked(option.value, event.target.checked)
+									onCheckedChange={(checked) =>
+										onOptionChecked(option.value, Boolean(checked))
 									}
 								/>
 								{variant === "linear-side" ? (

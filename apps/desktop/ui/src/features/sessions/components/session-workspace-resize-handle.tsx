@@ -144,7 +144,7 @@ export function SessionWorkspaceResizeHandle({
 			aria-valuemin={SESSION_LIST_PANE_MIN_WIDTH}
 			aria-valuenow={SESSION_LIST_PANE_MIN_WIDTH}
 			data-slot="session-workspace-resize-handle"
-			className="relative z-30 -mx-s hidden h-full w-3 shrink-0 cursor-col-resize touch-none edge-none bg-transparent outline-none before:pointer-events-none before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-hover hover:before:bg-ink-4 focus-visible:before:bg-accent sm:block dark:before:bg-hover-strong dark:hover:before:bg-ink-4"
+			className="relative z-30 -mx-s hidden h-full w-3 shrink-0 cursor-col-resize touch-none edge-none bg-transparent outline-none before:pointer-events-none before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-line hover:before:bg-ink-4 focus-visible:before:bg-accent sm:block"
 			onDoubleClick={() => {
 				const shellWindow = shellWindowRef.current;
 				if (!shellWindow) return;

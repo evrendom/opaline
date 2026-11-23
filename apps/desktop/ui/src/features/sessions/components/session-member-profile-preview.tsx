@@ -147,7 +147,7 @@ export function SessionMemberProfilePreview({
 					sideOffset={2}
 				>
 					<PreviewCard.Popup
-						className="w-52 origin-(--transform-origin) corner-m bg-surface p-[calc(var(--space-m)+var(--space-xxs))] text-ink ring-1 ring-line outline-none transition-[opacity,transform] duration-(--motion-quick-duration) data-ending-style:scale-98 data-ending-style:opacity-0 data-starting-style:scale-98 data-starting-style:opacity-0"
+						className="w-52 origin-(--transform-origin) corner-m bg-surface p-l text-ink ring-1 ring-line outline-none transition-[opacity,transform] duration-(--motion-quick-duration) data-ending-style:scale-98 data-ending-style:opacity-0 data-starting-style:scale-98 data-starting-style:opacity-0"
 						data-slot="session-member-profile-preview"
 					>
 						<div className="flex min-w-0 items-center gap-m">

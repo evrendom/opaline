@@ -66,8 +66,8 @@ export function SessionOverviewRangeFilterPanel({
 		<div
 			className={
 				variant === "linear"
-					? "min-h-0 flex-1 px-m pt-[calc(var(--space-m)+var(--space-xxs))] pb-m [--slider-range-card-inset:0.5rem] [--slider-range-card-radius:var(--radius-l)] [--session-range-slider-background:var(--inset)] dark:[--session-range-slider-background:var(--hover-strong)]"
-					: "px-m pt-l pb-m [--slider-range-card-inset:0.5rem] [--slider-range-card-radius:var(--radius-l)] [--session-range-slider-background:var(--field)] dark:[--session-range-slider-background:var(--hover-strong)]"
+					? "min-h-0 flex-1 px-m pt-m pb-m [--slider-range-card-inset:0.5rem] [--slider-range-card-radius:var(--radius-l)] [--session-range-slider-background:var(--field)]"
+					: "px-m pt-l pb-m [--slider-range-card-inset:0.5rem] [--slider-range-card-radius:var(--radius-l)] [--session-range-slider-background:var(--field)]"
 			}
 		>
 			<SliderRangeInput

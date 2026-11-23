@@ -39,8 +39,7 @@ import type { SessionTurnSelection } from "./session-turn-table-selection";
 import { recordAnchorJournal } from "./transcript-forensics";
 import { useSessionDetailOverviewPages } from "./use-session-detail-overview-pages";
 
-const columnBottomPaddingClassName =
-	"pb-[calc(var(--space-xxl)*10/3+env(safe-area-inset-bottom))]";
+const columnBottomPaddingClassName = "pb-xxxl";
 
 export function SessionDetailFastContent({
 	showOverviewStrip = true,

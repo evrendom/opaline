@@ -10,6 +10,7 @@ import {
 	getWorkspaceAppPath,
 	getWorkspaceSlugFromPath,
 } from "@/app/routes";
+import { Pressable } from "@/app/ui/pressable";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import { ConversationSkillLink } from "@/components/conversation/conversation-skill-link";
 import { ConversationTraceTag } from "@/components/conversation/conversation-trace-tag";
@@ -112,8 +113,6 @@ type SessionsOverviewRowProps = {
 };
 
 const MAX_SESSION_OVERVIEW_SKILL_TAGS = 7;
-const SESSION_OVERVIEW_TOOLTIP_CLASS_NAME =
-	"whitespace-nowrap corner-s edge-m border-line bg-surface px-[calc(var(--space-m)+var(--space-xxs))] py-s text-body-m font-medium text-ink shadow-float tabular-nums";
 // CSS selects both tags and the matching count, including before demo hydration.
 // Column widths grow continuously; only the number of skill tags changes in tiers.
 const SESSION_OVERVIEW_SKILL_OVERFLOW_TIERS = [
@@ -252,8 +251,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 		!isClickable && "opacity-65",
 		// An open row shares the tint of the panel folded out beneath it, and
 		// rounds its top as the block's top edge.
-		expanded &&
-			"corner-t-m bg-field corner-squircle squircle:corner-t-xl dark:bg-surface",
+		expanded && "corner-t-m bg-field corner-squircle squircle:corner-t-xl",
 	);
 	const cellClassName = cn(
 		SESSION_OVERVIEW_CELL_CLASS_NAME,
@@ -511,13 +509,14 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 					/>
 					<TooltipContent
 						align="center"
-						className={SESSION_OVERVIEW_TOOLTIP_CLASS_NAME}
 						data-session-overview-date-tooltip
 						hideArrow
 						side="left"
 						sideOffset={8}
 					>
-						{dateTooltipLabel}
+						<span className="whitespace-nowrap tabular-nums">
+							{dateTooltipLabel}
+						</span>
 					</TooltipContent>
 				</Tooltip>
 			</div>
@@ -565,7 +564,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 					{rowContents}
 				</Link>
 			) : isClickable && onSessionClick ? (
-				<button
+				<Pressable
 					type="button"
 					aria-pressed={expanded === undefined ? isActive : undefined}
 					aria-expanded={expanded}
@@ -575,7 +574,7 @@ export const SessionsOverviewRow = memo(function SessionsOverviewRow({
 					onClick={() => onSessionClick(session)}
 				>
 					{rowContents}
-				</button>
+				</Pressable>
 			) : (
 				<div className={rowClassName} data-dashboard-grid-row-scope="session">
 					{rowContents}

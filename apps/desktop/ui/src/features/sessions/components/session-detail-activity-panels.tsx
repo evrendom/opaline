@@ -1,5 +1,6 @@
 import { IconArrowLeft, IconChevronRight } from "@tabler/icons-react";
 import { Button } from "@/app/ui/button";
+import { Pressable } from "@/app/ui/pressable";
 import type {
 	SessionDetailActivityGroup,
 	SessionDetailActivityOccurrence,
@@ -24,8 +25,8 @@ export function SessionDetailActivityPanel({
 					>
 						{group.occurrences.map((occurrence) => (
 							<li key={occurrence.key}>
-								<button
-									className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-l corner-s px-xl py-l text-left focus-outline hover:bg-hover"
+								<Pressable
+									className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-l corner-s px-xl py-l hover:bg-hover"
 									onClick={() => onSelectOccurrence(occurrence)}
 									type="button"
 								>
@@ -49,7 +50,7 @@ export function SessionDetailActivityPanel({
 											className="size-3.5 shrink-0"
 										/>
 									</div>
-								</button>
+								</Pressable>
 							</li>
 						))}
 					</ul>
@@ -95,9 +96,8 @@ export function SessionDetailActivityOccurrencePanel({
 			<div className="flex h-9 items-center edge-b-m border-line px-xs">
 				<Button
 					aria-label={`Back to ${group.label}`}
-					className="size-7 corner-s text-ink-2 dark:hover:bg-hover-strong"
 					onClick={onBack}
-					size="icon"
+					size="icon-sm"
 					type="button"
 					variant="secondary"
 				>
@@ -122,7 +122,7 @@ export function SessionDetailActivityOccurrencePanel({
 				</p>
 				<Button
 					variant="primary"
-					className="mt-l px-[calc(var(--space-m)+var(--space-xxs))] [&_svg:not([class*='size-'])]:size-3"
+					className="mt-l"
 					onClick={() => {
 						onJump({
 							eventId: occurrence.eventId,

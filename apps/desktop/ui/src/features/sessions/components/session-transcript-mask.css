@@ -24,7 +24,7 @@
 	display: none;
 }
 
-.transcript-mask-demo:has([data-transcript-mask-toggle]:checked)
+.transcript-mask-demo:has([data-transcript-mask-toggle][data-checked])
 	[data-transcript-mask-overlay] {
 	display: block;
 }

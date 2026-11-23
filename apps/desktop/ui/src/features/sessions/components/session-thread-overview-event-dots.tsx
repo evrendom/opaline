@@ -96,12 +96,18 @@ function getEventCount(events: readonly SessionThreadOverviewTimelineEvent[]) {
 export function getSessionOverviewEventDotColorClassName(
 	kind: SessionThreadOverviewTimelineEventKind,
 ) {
+	// Each event kind's hue lightens a step on the dark canvas.
 	return cn(
+		// design-escape-ok(dark): data paint; the error event hue
 		kind === "error" && "bg-red-600 dark:bg-red-400",
+		// design-escape-ok(dark): data paint; the file-edit event hue
 		kind === "file-edit" && "bg-amber-600 dark:bg-amber-400",
+		// design-escape-ok(dark): data paint; the file-read event hue
 		kind === "file-read" && "bg-sky-600 dark:bg-sky-400",
+		// design-escape-ok(dark): data paint; the file-write event hue
 		kind === "file-write" && "bg-emerald-600 dark:bg-emerald-400",
 		kind === "skill" && "bg-accent",
+		// design-escape-ok(dark): data paint; the subagent event hue
 		kind === "subagent" && "bg-fuchsia-600 dark:bg-fuchsia-400",
 	);
 }

@@ -58,7 +58,7 @@ export function SessionsListSurface({
 			className={cn(
 				"dashboardy-page min-w-0 overscroll-x-none",
 				layout === "page" &&
-					"px-xl pb-xxl pt-m sm:px-xxl lg:px-[calc(var(--space-xxl)*3.25)] lg:pb-[calc(var(--space-xxl)*4/3)]",
+					"px-xl pb-xxl pt-m sm:px-xxl lg:px-xxxl lg:pb-xxxl",
 				layout === "pane" && "h-full min-h-0 overflow-y-auto p-xl sm:p-xxl",
 				layout === "workspace" &&
 					"flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-canvas",
@@ -93,7 +93,7 @@ export function SessionsListSurface({
 					{isSnapshotSessionsError ? (
 						<div
 							className={cn(
-								"edge-b-m border-line px-xxl py-[calc(var(--space-xxl)*2)] text-center text-ink-3",
+								"edge-b-m border-line px-xxl py-xxxl text-center text-ink-3",
 								layout === "page" && "text-body-xl",
 								layout === "pane" && "text-body-xxl sm:text-body-xl",
 							)}

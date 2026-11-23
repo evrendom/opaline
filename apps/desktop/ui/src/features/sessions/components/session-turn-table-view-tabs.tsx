@@ -4,6 +4,7 @@ import {
 	DropdownMenuContent,
 	DropdownMenuTrigger,
 } from "@/app/ui/dropdown-menu";
+import { Pressable } from "@/app/ui/pressable";
 import { TouchTarget } from "@/app/ui/touch-target";
 import {
 	ModelTraceIcon,
@@ -107,13 +108,11 @@ export function SessionTurnTableSpeakerVisibilityControls({
 			<DropdownMenu>
 				<DropdownMenuTrigger
 					render={
-						<button
-							type="button"
+						<Pressable
 							aria-label={`Choose visible rows: ${visibleSpeakerLabel}`}
 							className={cn(
 								"relative flex h-8 w-9 shrink-0 items-center justify-start",
 								"corner-xs",
-								"focus-outline",
 								"focus-visible:z-10",
 							)}
 						/>
@@ -151,7 +150,7 @@ export function SessionTurnTableSpeakerVisibilityControls({
 				</DropdownMenuTrigger>
 				<DropdownMenuContent
 					align="start"
-					className="w-auto min-w-40 corner-m bg-canvas p-xs text-ink shadow-float ring-1 ring-line dark:bg-surface dark:text-ink"
+					className="w-auto min-w-40"
 					sideOffset={4}
 				>
 					{SESSION_TURN_TABLE_SPEAKERS.map((speaker) => {
@@ -161,10 +160,6 @@ export function SessionTurnTableSpeakerVisibilityControls({
 							<DropdownMenuCheckboxItem
 								key={speaker}
 								checked={selected}
-								className={cn(
-									"corner-s py-s pr-[calc(var(--space-xxl)*1.25)] pl-m text-body-m font-medium",
-									!selected && "opacity-40",
-								)}
 								closeOnClick={false}
 								data-turn-table-speaker={speaker}
 								onCheckedChange={() => handleVisibilityToggle(speaker)}
@@ -175,7 +170,10 @@ export function SessionTurnTableSpeakerVisibilityControls({
 								}
 							>
 								<span
-									className={cn("flex shrink-0", !selected && "saturate-0")}
+									className={cn(
+										"flex shrink-0",
+										!selected && "opacity-40 saturate-0",
+									)}
 								>
 									<SessionTurnTableSpeakerIcon
 										model={model}
@@ -183,7 +181,9 @@ export function SessionTurnTableSpeakerVisibilityControls({
 										userImageUrl={userImageUrl}
 									/>
 								</span>
-								{speakerLabels[speaker]}
+								<span className={cn(!selected && "opacity-40")}>
+									{speakerLabels[speaker]}
+								</span>
 							</DropdownMenuCheckboxItem>
 						);
 					})}

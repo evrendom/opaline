@@ -188,6 +188,7 @@ const LINE_LOOK: Record<
 		mark: "corner-xs bg-green-500/20 box-decoration-clone",
 		row: "bg-green-500/10",
 		sign: "+",
+		// design-escape-ok(dark): data paint; the added-line sign lightens on dark
 		signColor: "text-green-600 dark:text-green-400",
 	},
 	context: { mark: "", row: "", sign: " ", signColor: "" },
@@ -195,6 +196,7 @@ const LINE_LOOK: Record<
 		mark: "corner-xs bg-red-500/20 box-decoration-clone",
 		row: "bg-red-500/10",
 		sign: "−",
+		// design-escape-ok(dark): data paint; the removed-line sign lightens on dark
 		signColor: "text-red-600 dark:text-red-400",
 	},
 };

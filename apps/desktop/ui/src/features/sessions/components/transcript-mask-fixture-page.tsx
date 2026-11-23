@@ -1,3 +1,4 @@
+import { Checkbox } from "@/app/ui/checkbox";
 import { ConversationTrace } from "@/components/conversation/ConversationTrace";
 import type { TraceItem } from "@/components/conversation/conversation-trace";
 import {
@@ -68,12 +69,11 @@ export function TranscriptMaskFixturePage() {
 						The exposed panes are the production scroll surface with no rows.
 					</p>
 				</div>
-				<label className="flex min-h-11 items-center gap-m text-body-m font-medium">
-					<input
-						className="size-4"
-						data-transcript-mask-toggle
-						type="checkbox"
-					/>
+				<label
+					className="flex min-h-11 items-center gap-m text-body-m font-medium"
+					htmlFor="transcript-mask-toggle"
+				>
+					<Checkbox data-transcript-mask-toggle id="transcript-mask-toggle" />
 					Overlay real rows
 				</label>
 			</header>

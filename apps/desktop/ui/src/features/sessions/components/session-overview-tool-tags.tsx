@@ -62,9 +62,8 @@ function ToolTag({
 				SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME,
 				"h-[1.1875rem] max-w-44 gap-xs [corner-shape:superellipse(1.25)]",
 				"corner-m py-xxs pr-s pl-xxs",
-				"text-ink bg-surface shadow-card",
-				"dark:bg-hover-strong",
-				onOpen && "cursor-pointer hover:bg-hover",
+				"text-ink bg-field shadow-card",
+				onOpen && "cursor-pointer hover:bg-hover-strong",
 			)}
 			data-session-overview-tool-tag={kind}
 			{...(onOpen

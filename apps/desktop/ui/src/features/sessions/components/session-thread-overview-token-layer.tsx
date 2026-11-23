@@ -34,6 +34,7 @@ function PulseGradient({ gradientId, signal, tone }: PulseSeriesLayer) {
 	return (
 		<linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
 			<stop
+				// design-escape-ok(dark): data paint; the token area's fill strengthens on the dark canvas
 				className="[stop-color:var(--accent)] [stop-opacity:0.08] dark:[stop-opacity:0.12]"
 				offset="0%"
 			/>

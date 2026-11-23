@@ -7,6 +7,7 @@ import {
 	useId,
 	useSyncExternalStore,
 } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { cn } from "@/lib/utils";
 import { compactPreview } from "./conversation-trace";
 import { TraceTreeRowBodySlotContext } from "./conversation-trace-row-body-context";
@@ -341,19 +342,19 @@ export function ExpandableTraceRow({
 				{leading}
 				{expandable && disclosureLabel ? label : null}
 				{expandable ? (
-					<button
+					<Pressable
 						type="button"
 						data-trace-content-disclosure
 						onClick={() => setOpen((current) => !current)}
 						aria-label={disclosureLabel}
 						aria-expanded={expanded}
 						aria-controls={panelId}
-						className="group flex min-w-0 flex-1 items-center gap-zero text-left focus-outline"
+						className="group flex min-w-0 flex-1 items-center gap-zero text-left"
 					>
 						{disclosureLabel ? null : label}
 						{children}
 						<TraceTextDisclosureIcon expanded={expanded} />
-					</button>
+					</Pressable>
 				) : (
 					<div className="flex min-w-0 flex-1 items-center gap-m">
 						{label}

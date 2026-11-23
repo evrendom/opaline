@@ -1,4 +1,6 @@
 import type { CSSProperties, KeyboardEvent, PointerEvent } from "react";
+import { Button } from "@/app/ui/button";
+import { Pressable } from "@/app/ui/pressable";
 import type { SessionThreadOverviewChartRow } from "./session-thread-overview-chart";
 import type { SessionThreadOverviewStripConfig } from "./session-thread-overview-config";
 import { getChartX, getTurnLabel } from "./session-thread-overview-strip-utils";
@@ -78,14 +80,14 @@ export function SessionOverviewTimelineFooter({
 					</span>
 				) : null}
 				{onResetZoom ? (
-					<button
+					<Button
 						type="button"
+						size="sm"
 						aria-label="Reset timeline zoom"
-						className="h-5 corner-xs px-s text-body-xs font-medium text-ink focus-outline hover:bg-hover"
 						onClick={onResetZoom}
 					>
 						Reset zoom
-					</button>
+					</Button>
 				) : (
 					<span />
 				)}
@@ -129,7 +131,7 @@ export function SessionOverviewTurnHitTargets({
 					return null;
 				}
 				return (
-					<button
+					<Pressable
 						key={option.key}
 						type="button"
 						aria-describedby={
@@ -137,7 +139,7 @@ export function SessionOverviewTurnHitTargets({
 						}
 						aria-label={`Select ${getTurnLabel(option)}`}
 						aria-pressed={row.index === selectedIndex}
-						className="absolute inset-y-0 w-5 -translate-x-1/2 cursor-crosshair corner-xs focus-outline"
+						className="absolute inset-y-0 w-5 -translate-x-1/2 cursor-crosshair corner-xs"
 						data-session-overview-turn-hit-target
 						style={{
 							left: `${(getChartX(row.xRatio, config) / config.chartWidth) * 100}%`,

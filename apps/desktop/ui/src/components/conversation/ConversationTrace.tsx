@@ -1,5 +1,6 @@
 // biome-ignore-all lint/nursery/noExcessiveLinesPerFile: The shared trace entry point coordinates three render modes.
 import { type ReactNode, useId, useMemo, useState } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import {
 	isSlashCommandMessage,
 	parseSlashCommand,
@@ -178,7 +179,7 @@ function AgentSection({
 							<div className="ml-auto min-w-0">{headerTrailing}</div>
 						) : null}
 					</div>
-					<div className="grid min-w-0 divide-y divide-line pl-[calc(var(--space-xxl)*1.25)]">
+					<div className="grid min-w-0 divide-y divide-line pl-xxxl">
 						{eventRows}
 					</div>
 				</div>
@@ -219,14 +220,14 @@ function AgentSection({
 			)}
 		>
 			<div className={cn(open && "sticky top-0 z-30 bg-canvas")}>
-				<button
+				<Pressable
 					type="button"
 					onClick={() => setOpen(!open)}
 					aria-expanded={open}
 					aria-controls={panelId}
 					className={cn(
 						traceRowClassName,
-						"group gap-m focus-outline",
+						"group gap-m",
 						open &&
 							"corner-t-l edge-m border-line bg-inset [border-bottom-color:var(--line)]",
 					)}
@@ -236,7 +237,7 @@ function AgentSection({
 					{planMode ? <ConversationTracePlanTag /> : null}
 					{!open ? <AgentToolStrip events={events} /> : null}
 					<span className="min-w-0 flex-1" />
-				</button>
+				</Pressable>
 			</div>
 			{open ? (
 				<div

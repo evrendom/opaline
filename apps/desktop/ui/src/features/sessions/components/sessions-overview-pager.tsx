@@ -45,11 +45,10 @@ export function SessionsOverviewPager({
 				value={String(pageSize)}
 				onValueChange={(value) => value && onPageSize(Number(value))}
 			>
-				<SelectTrigger
-					title="Sessions per page"
-					className="h-auto data-[size=md]:h-auto gap-s corner-s squircle:corner-s edge-none bg-transparent p-zero text-body-m text-ink-4 tabular-nums shadow-none transition-[color,box-shadow] hover:text-ink dark:edge-none dark:bg-transparent dark:shadow-none dark:hover:bg-transparent"
-				>
-					{shown === 0 ? "0" : `${first + 1} to ${first + shown}`}
+				<SelectTrigger size="sm" title="Sessions per page">
+					<span className="tabular-nums">
+						{shown === 0 ? "0" : `${first + 1} to ${first + shown}`}
+					</span>
 				</SelectTrigger>
 				<SelectContent
 					className="w-auto min-w-28"

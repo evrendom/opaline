@@ -19,7 +19,7 @@ const MODEL_ICON_SHELL_CLASS_NAME =
 	// design-escape-ok(shadow): artwork; the model icon's hairline edge
 	"session-turn-table-model-icon-shell relative flex size-5 shrink-0 drop-shadow-[0_0_0.75px_rgb(0_0_0_/_14%)]";
 const MODEL_ICON_CLASS_NAME =
-	"session-turn-table-model-icon size-5 corner-zero edge-none bg-canvas shadow-none dark:bg-field [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]";
+	"session-turn-table-model-icon size-5 corner-zero edge-none bg-field shadow-none [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]";
 
 export function SessionModelLoadingMark() {
 	return (
@@ -84,32 +84,35 @@ export function SessionModelMark({
 	const demo = useDemoRuntime();
 	const userTitle = `Session owner: ${userLabel}`;
 	const avatar = (
-		<Avatar
-			aria-label={userTitle}
-			className="absolute -right-0.5 -bottom-0.5 size-3.5 cursor-help bg-canvas ring-1 ring-canvas after:border-line dark:after:border-line"
-			role="img"
-		>
-			{avatarUrl ? (
-				demo ? (
-					<img
-						alt=""
-						data-slot="avatar-image"
-						className="aspect-square size-full corner-full object-cover"
-						src={avatarUrl}
-					/>
-				) : (
-					<AvatarImage alt="" decoding="async" loading="lazy" src={avatarUrl} />
-				)
-			) : null}
-			{!(demo && avatarUrl) ? (
-				<AvatarFallback className="bg-canvas">
-					<IconUser
-						aria-hidden="true"
-						className="size-2.5 shrink-0 text-ink-3"
-					/>
-				</AvatarFallback>
-			) : null}
-		</Avatar>
+		<span className="absolute -right-0.5 -bottom-0.5 flex cursor-help corner-full bg-canvas ring-1 ring-canvas">
+			<Avatar aria-label={userTitle} className="size-3.5" role="img">
+				{avatarUrl ? (
+					demo ? (
+						<img
+							alt=""
+							data-slot="avatar-image"
+							className="aspect-square size-full corner-full object-cover"
+							src={avatarUrl}
+						/>
+					) : (
+						<AvatarImage
+							alt=""
+							decoding="async"
+							loading="lazy"
+							src={avatarUrl}
+						/>
+					)
+				) : null}
+				{!(demo && avatarUrl) ? (
+					<AvatarFallback>
+						<IconUser
+							aria-hidden="true"
+							className="size-2.5 shrink-0 text-ink-3"
+						/>
+					</AvatarFallback>
+				) : null}
+			</Avatar>
+		</span>
 	);
 
 	return (
