@@ -1037,18 +1037,10 @@ function MiddleSample({ section }: { section: UseSection }) {
 			className="min-w-0 flex-1"
 		>
 			<div className="flex h-full min-h-0 min-w-0 flex-col gap-s pt-xl pr-xl pl-xl">
-				<div
-					className={cn(
-						"flex h-8 shrink-0 items-center gap-s",
-						"corner-s px-m",
-						"bg-hover",
-					)}
-				>
+				<div className="flex h-8 shrink-0 items-center gap-m px-m">
 					<Bone className="size-4 shrink-0 corner-full" />
-					<Bone className="h-3 w-16 corner-xs" />
-					<Bone className="h-2.5 w-24 corner-xs" />
-					<span className="flex-1" />
-					<Bone className="h-2.5 w-20 corner-xs" />
+					<Bone className="h-2.5 w-24 corner-full" />
+					<Bone className="ml-auto h-2.5 w-16 corner-full" />
 				</div>
 				{section === "mcp" ? <McpCallsSample /> : <SkillTraceBody />}
 			</div>
@@ -1056,14 +1048,14 @@ function MiddleSample({ section }: { section: UseSection }) {
 	);
 }
 
+// A trace's steps: an icon, the step's label, its duration at the end.
 const TRACE_ROWS = [
-	{ id: "a", label: 56, left: 0, width: 22 },
-	{ id: "b", label: 40, left: 23, width: 4 },
-	{ id: "c", label: 64, left: 28, width: 3 },
-	{ id: "d", label: 56, left: 32, width: 18 },
-	{ id: "e", label: 48, left: 51, width: 2 },
-	{ id: "f", label: 56, left: 54, width: 26 },
-	{ id: "g", label: 44, left: 81, width: 3 },
+	{ id: "a", label: 120 },
+	{ id: "b", label: 88 },
+	{ id: "c", label: 136 },
+	{ id: "d", label: 104 },
+	{ id: "e", label: 96 },
+	{ id: "f", label: 128 },
 ];
 
 function SkillTraceBody() {
@@ -1071,32 +1063,26 @@ function SkillTraceBody() {
 		<div className="flex h-full min-h-0 flex-1 flex-col">
 			<div className="flex flex-col gap-m pt-l pb-xl">
 				<div className="flex items-center gap-m pl-xxxl">
-					<Bone className="h-3 w-14 corner-xs" />
-					<Bone className="h-3 w-20 corner-xs" />
+					<Bone className="h-2.5 w-20 corner-full" />
 				</div>
 				<div className="flex gap-l">
-					<Bone className="mt-s size-6 shrink-0 corner-full" />
-					<div className="flex min-w-0 flex-1 flex-col gap-m corner-m bg-surface px-l py-l shadow-card corner-squircle squircle:corner-xl-inner">
-						<Bone className="h-3 w-full corner-xs" />
-						<Bone className="h-3 w-10/12 corner-xs" />
-						<Bone className="h-3 w-1/2 corner-xs" />
+					<Bone className="size-6 shrink-0 corner-full" />
+					<div className="flex min-w-0 flex-1 flex-col gap-m pt-s">
+						<Bone className="h-2.5 w-full corner-full" />
+						<Bone className="h-2.5 w-10/12 corner-full" />
+						<Bone className="h-2.5 w-1/2 corner-full" />
 					</div>
 				</div>
 			</div>
-			<div className="flex flex-col gap-xl pl-xxxl">
+			<div className="flex flex-col gap-l pl-xxxl">
 				{TRACE_ROWS.map((row) => (
 					<div key={row.id} className="flex h-6 items-center gap-m">
 						<Bone className="size-5 shrink-0 corner-s" />
 						<Bone
-							className="h-3 shrink-0 corner-xs"
+							className="h-2.5 shrink-0 corner-full"
 							style={{ width: row.label }}
 						/>
-						<div className="relative h-3 min-w-0 flex-1">
-							<Bone
-								className="absolute inset-y-0 corner-xs"
-								style={{ left: `${row.left}%`, width: `${row.width}%` }}
-							/>
-						</div>
+						<Bone className="ml-auto h-2.5 w-10 shrink-0 corner-full" />
 					</div>
 				))}
 			</div>
@@ -1117,13 +1103,13 @@ function McpCallsSample() {
 				)}
 			>
 				<div className="flex items-center gap-s py-m">
-					<Bone className="h-4 w-14 corner-xs" />
-					<Bone className="h-3 w-24 corner-xs" />
+					<Bone className="h-2.5 w-14 corner-full" />
+					<Bone className="h-2.5 w-24 corner-full" />
 				</div>
 				{["command", "context"].map((key) => (
 					<div key={key} className="flex flex-col gap-s py-m">
-						<Bone className="h-2.5 w-16 corner-xs" />
-						<Bone className="h-3 w-3/4 corner-xs" />
+						<Bone className="h-2.5 w-16 corner-full" />
+						<Bone className="h-2.5 w-3/4 corner-full" />
 					</div>
 				))}
 			</div>
@@ -1131,7 +1117,7 @@ function McpCallsSample() {
 				{OUTPUT_LINES.map((width) => (
 					<Bone
 						key={width}
-						className="h-3 corner-xs"
+						className="h-2.5 corner-full"
 						style={{ width: `${width}%` }}
 					/>
 				))}
@@ -1140,30 +1126,33 @@ function McpCallsSample() {
 	);
 }
 
-const FILE_LINES = [94, 88, 96, 70, 0, 90, 84, 92, 60, 0, 86, 94, 78].map(
-	(width, line) => ({ line, width }),
-);
+// A document: even lines in paragraphs, each ending short.
+const FILE_PARAGRAPHS = [
+	[94, 88, 96, 62],
+	[90, 84, 92, 48],
+	[86, 94, 70],
+];
 
 function FileCardSample() {
 	return (
 		<div className="flex flex-col">
 			<div className="flex items-center gap-m edge-b-m border-line-soft px-xl py-xl">
 				<Bone className="size-4 shrink-0 corner-full" />
-				<Bone className="h-3.5 w-28 corner-xs" />
+				<Bone className="h-2.5 w-28 corner-full" />
 			</div>
-			<div className="flex flex-col gap-m px-xl py-xl">
-				<Bone className="mb-xs h-4 w-1/3 corner-xs" />
-				{FILE_LINES.map(({ line, width }) =>
-					width ? (
-						<Bone
-							key={line}
-							className="h-3 corner-xs"
-							style={{ width: `${width}%` }}
-						/>
-					) : (
-						<span key={line} className="h-2" />
-					),
-				)}
+			<div className="flex flex-col gap-xl px-xl py-xl">
+				<Bone className="h-3.5 w-1/3 corner-full" />
+				{FILE_PARAGRAPHS.map((paragraph) => (
+					<div key={paragraph.join()} className="flex flex-col gap-m">
+						{paragraph.map((width) => (
+							<Bone
+								key={width}
+								className="h-2.5 corner-full"
+								style={{ width: `${width}%` }}
+							/>
+						))}
+					</div>
+				))}
 			</div>
 		</div>
 	);
