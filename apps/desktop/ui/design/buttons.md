@@ -40,7 +40,9 @@ Which variant?
 
 Sizes: `sm` (24px), `md` (32px, the default), `lg` (36px), `icon-sm`
 (24px square), `icon` (32px square) and `inline`. Use `lg` for a dialog's
-footer and sign-in. An icon-only button needs an `aria-label`.
+footer and sign-in, `md` everywhere else (a page's main action included), and
+`sm` only inside a dense line (a status line, a table row). An icon-only button
+needs an `aria-label`.
 
 ```tsx
 // Correct: a dialog footer, from DeleteWorkspaceDialog

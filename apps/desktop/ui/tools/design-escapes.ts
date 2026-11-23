@@ -9,7 +9,7 @@
  *            arbitrary tracking. CSS: font-size, line-height, letter-spacing
  *            with a literal value (allowed: var(…), a calc(…) of vars and
  *            unitless numbers, inherit, normal, initial, unset, 0, 1, 100%,
- *            1em), and a font-family that doesn't start with var( or inherit.
+ *            1em), a font-weight that isn't var(…) or a keyword, and a font-family that doesn't start with var( or inherit.
  *            Classes: font-mono, font-sans and font-serif (use font-body or
  *            font-data).
  *   space    Numeric or off-scale padding, margin, gap and space-x/y classes
@@ -767,6 +767,16 @@ export function scanCssDeclarations(
 							token: `${prop}: ${m[0]})`,
 						});
 				if (TYPE_PROPS.has(prop) && literalType(value))
+					out.push({
+						line: lineAt(segStart),
+						rule: "type",
+						token: `${prop}: ${value.trim()}`,
+					});
+				// a weight is a step (var(--weight-…)) or a keyword, never a number
+				if (
+					prop === "font-weight" &&
+					!/^\s*(?:var\(|inherit\b|normal\b|initial\b|unset\b)/.test(value)
+				)
 					out.push({
 						line: lineAt(segStart),
 						rule: "type",

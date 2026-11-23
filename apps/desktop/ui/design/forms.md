@@ -8,6 +8,7 @@ One component per HTML element. Never create a type-specific control
 Which control?
  ├── Pick one of 2 to 5 options that should all stay in view? → RadioGroup
  ├── Pick one of a longer list, or a secondary choice? → Select
+ ├── A date range? → AnalyticsDateRangePicker (never Input type="date")
  ├── On / off for one thing? → Checkbox
  ├── More than one line of text? → Textarea
  ├── One line of text with an icon or a button inside the field (search, copy)? → InputGroup
@@ -74,6 +75,14 @@ from a row of Pressables or toggled Buttons: that's a RadioGroup.
 <div className="flex">{options.map((o) => <Button aria-pressed={o === range} …>{o}</Button>)}</div>
 ```
 
+## Date range
+
+`src/features/analytics/date-range/components/AnalyticsDateRangePicker.tsx`:
+a trigger that opens the range calendar in a Popover. It takes `startDate`,
+`endDate` (as `yyyy-MM-dd`) and `onDateRangeApply`. Presets like "Last 7
+days" sit beside it as a RadioGroup or a Select. There is no single-date
+picker yet: if a screen needs one, say so in your report.
+
 ## Checkbox
 
 `src/app/ui/checkbox.tsx`. Always give it a visible `<Label>` or an
@@ -102,7 +111,9 @@ button inside it.
 `Field` (orientations `vertical`, the default, `horizontal` and
 `responsive`) stacks a `FieldLabel` with its control. Use `Label` for a
 checkbox's label. Every control has a label, either visible or as an
-`aria-label`: a placeholder is not a label. Mark an optional field with
+`aria-label`: a placeholder is not a label. A group of checkboxes sits in a
+`<fieldset>` with `aria-labelledby` pointing at its `FieldLabel`'s `id`, the
+same as a RadioGroup. Mark an optional field with
 "Optional" after its label, in `font-regular text-ink-3`; never mark the
 required ones.
 

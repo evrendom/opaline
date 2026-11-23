@@ -23,7 +23,7 @@
 	align-items: baseline;
 	gap: var(--space-m);
 	color: var(--menu-focused-label);
-	font-weight: 450;
+	font-weight: var(--weight-body-regular);
 	white-space: nowrap;
 }
 

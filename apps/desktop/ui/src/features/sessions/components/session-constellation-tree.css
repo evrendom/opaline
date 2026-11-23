@@ -36,7 +36,7 @@
 	font-family: var(--font-body);
 	font-feature-settings: "ss03";
 	font-variation-settings: "wght" 400;
-	font-weight: 400;
+	font-weight: var(--weight-body-regular);
 }
 
 .session-constellation-tree
@@ -317,7 +317,7 @@
 	font-family: var(--font-body);
 	font-feature-settings: "ss03";
 	font-variation-settings: "wght" 400;
-	font-weight: 400;
+	font-weight: var(--weight-body-regular);
 }
 
 .session-constellation-tree [data-trace-row-header] {
@@ -333,7 +333,7 @@
 	font-family: var(--font-body);
 	font-size: var(--size-m);
 	font-variation-settings: "wght" 400;
-	font-weight: 400;
+	font-weight: var(--weight-body-regular);
 	line-height: var(--line-m);
 }
 
@@ -343,7 +343,7 @@
 	font-family: var(--font-body);
 	font-size: var(--size-l);
 	font-variation-settings: "wght" 400;
-	font-weight: 400;
+	font-weight: var(--weight-body-regular);
 	line-height: var(--line-l);
 }
 
@@ -352,7 +352,7 @@
 	font-family: var(--font-body);
 	font-size: var(--size-m);
 	font-variation-settings: "wght" 400;
-	font-weight: 400;
+	font-weight: var(--weight-body-regular);
 	line-height: var(--line-m);
 }
 
@@ -364,7 +364,7 @@
 	font-size: var(--size-m);
 	font-variant-numeric: tabular-nums;
 	font-variation-settings: "wght" 400;
-	font-weight: 400;
+	font-weight: var(--weight-body-regular);
 	letter-spacing: normal;
 	line-height: var(--line-m);
 }
@@ -379,7 +379,7 @@
 	font-feature-settings: "ss03";
 	font-size: var(--size-m);
 	font-variation-settings: "wght" 400;
-	font-weight: 400;
+	font-weight: var(--weight-body-regular);
 	letter-spacing: normal;
 	line-height: var(--line-m);
 }
@@ -404,14 +404,14 @@
 .session-constellation-tree [data-trace-code-file-label] {
 	color: var(--ink-3) !important;
 	font-size: var(--size-l);
-	font-weight: 400;
+	font-weight: var(--weight-body-regular);
 	line-height: var(--line-l);
 }
 
 .session-constellation-tree [data-trace-code-open-label] {
 	color: var(--ink-3) !important;
 	font-size: var(--size-l);
-	font-weight: 400;
+	font-weight: var(--weight-body-regular);
 	line-height: var(--line-l);
 }
 
@@ -442,7 +442,7 @@
 	font-family: var(--font-body);
 	font-size: var(--size-l);
 	font-variation-settings: "wght" 400;
-	font-weight: 400;
+	font-weight: var(--weight-body-regular);
 	line-height: var(--line-l);
 }
 

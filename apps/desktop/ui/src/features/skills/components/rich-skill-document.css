@@ -171,7 +171,7 @@
 
 .rich-skill-document th {
 	background: var(--skill-document-table-background);
-	font-weight: 650;
+	font-weight: var(--weight-body-heavy);
 	text-align: left;
 }
 
@@ -192,7 +192,7 @@
 }
 
 .rich-skill-document strong {
-	font-weight: 650;
+	font-weight: var(--weight-body-heavy);
 }
 
 .rich-skill-document[data-variant="preview"] {

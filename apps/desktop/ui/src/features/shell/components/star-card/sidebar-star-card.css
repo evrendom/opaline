@@ -77,7 +77,7 @@
 	border-radius: 4px;
 	/* design-escape-ok(type): the split-flap digits are artwork, 21px set solid in the flap */
 	font-size: 21px;
-	font-weight: 700;
+	font-weight: var(--weight-body-heavy);
 	line-height: var(--flap-h);
 	font-variant-numeric: tabular-nums;
 	/* design-escape-ok(type): the flap digits' tight tracking */

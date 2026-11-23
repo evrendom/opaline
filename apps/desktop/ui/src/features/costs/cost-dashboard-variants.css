@@ -28,7 +28,7 @@
 .cost-breakdown-tabs > button[aria-selected="true"] {
 	color: var(--ink);
 	background: var(--hover);
-	font-weight: 500;
+	font-weight: var(--weight-body-medium);
 }
 
 .cost-page[data-variant="rail"] .cost-chart-panel {

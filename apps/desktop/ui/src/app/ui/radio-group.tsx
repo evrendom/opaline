@@ -9,13 +9,15 @@ import { cn } from "@/lib/utils";
 // is a Select. The group takes `value`/`onValueChange` (or `defaultValue`)
 // and an `aria-label` or `aria-labelledby`; each item is a radio with its own
 // visible label, so an option is never unlabelled.
-function RadioGroup({
+function RadioGroup<Value = string>({
 	className,
 	orientation = "vertical",
 	...props
-}: RadioGroupPrimitive.Props & { orientation?: "vertical" | "horizontal" }) {
+}: RadioGroupPrimitive.Props<Value> & {
+	orientation?: "vertical" | "horizontal";
+}) {
 	return (
-		<RadioGroupPrimitive
+		<RadioGroupPrimitive<Value>
 			data-slot="radio-group"
 			data-orientation={orientation}
 			className={cn(
@@ -28,11 +30,11 @@ function RadioGroup({
 	);
 }
 
-function RadioGroupItem({
+function RadioGroupItem<Value = string>({
 	className,
 	children,
 	...props
-}: Radio.Root.Props & { children: React.ReactNode }) {
+}: Radio.Root.Props<Value> & { children: React.ReactNode }) {
 	return (
 		// biome-ignore lint/a11y/noLabelWithoutControl: the radio is the label's own child
 		<label
@@ -43,7 +45,7 @@ function RadioGroupItem({
 				className,
 			)}
 		>
-			<Radio.Root
+			<Radio.Root<Value>
 				className={cn(
 					"relative flex size-4 shrink-0 items-center justify-center",
 					"corner-full edge-m border-transparent",

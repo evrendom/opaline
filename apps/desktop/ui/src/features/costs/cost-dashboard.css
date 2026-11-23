@@ -268,13 +268,13 @@
 .cost-metric-chip {
 	line-height: 1;
 	font-size: var(--size-m);
-	font-weight: 450;
+	font-weight: var(--weight-body-regular);
 	letter-spacing: var(--tracking-xs);
 	color: var(--ink-3);
 }
 .cost-metric-qualifier {
 	font-size: var(--size-m);
-	font-weight: 470;
+	font-weight: var(--weight-body-medium);
 	letter-spacing: var(--letter-spacing-m);
 	color: var(--ink-3);
 }
@@ -584,7 +584,7 @@
 }
 .cost-breakdown-selected {
 	color: var(--accent);
-	font-weight: 500;
+	font-weight: var(--weight-body-medium);
 }
 .cost-heading-currency {
 	opacity: 0.6;

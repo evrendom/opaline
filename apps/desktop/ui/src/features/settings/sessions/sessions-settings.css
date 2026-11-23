@@ -84,7 +84,7 @@
 .sessions-settings-table th {
 	height: 36px;
 	color: var(--ink-3);
-	font-weight: 450;
+	font-weight: var(--weight-body-regular);
 	white-space: nowrap;
 }
 .sessions-settings-table th,

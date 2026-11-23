@@ -59,7 +59,7 @@
 	height: 12px;
 	font-size: var(--size-s);
 	line-height: 1;
-	font-weight: 500;
+	font-weight: var(--weight-body-medium);
 	color: var(--ink-3);
 	white-space: nowrap;
 	font-variant-numeric: tabular-nums;

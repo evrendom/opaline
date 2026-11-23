@@ -201,6 +201,17 @@ describe("design-system escape check", () => {
 		expect(stripCssComments("a /* x\ny */ b")).toBe("a     \n     b");
 	});
 
+	test("CSS font-weight is a step or a keyword, never a number", () => {
+		const css = [
+			".a {",
+			"\tfont-weight: 450;",
+			"\tfont-weight: var(--weight-body-medium);",
+			"\tfont-weight: inherit;",
+			"}",
+		].join("\n");
+		expect(rules("src/a.css", css)).toEqual(["2 type font-weight: 450"]);
+	});
+
 	test("reads class strings, not code or comments", () => {
 		const source = [
 			"const rounded = Math.round(x); // text-sm in a comment",
