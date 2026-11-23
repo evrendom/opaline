@@ -224,7 +224,7 @@ export function RepoFiles({ repoKey }: { repoKey: string }) {
 
 function FilesPane({ children }: { children: React.ReactNode }) {
 	return (
-		<div className="h-full overflow-hidden pt-m pr-xxxl pb-m pl-xxl">
+		<div className="flex h-full flex-col overflow-hidden pt-m pr-xxxl pb-m pl-xxl">
 			{children}
 		</div>
 	);

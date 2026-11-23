@@ -414,7 +414,7 @@ function RepoDashboard({
 	);
 	if (repositories.isError || repositories.data?.length === 0)
 		return (
-			<div className="px-xxxl py-xxl">
+			<div className="flex h-full min-h-0 flex-1 flex-col px-xxxl py-xxl">
 				<EmptyState
 					icon={IconFolder}
 					title={

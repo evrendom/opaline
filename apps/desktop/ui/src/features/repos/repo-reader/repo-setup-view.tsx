@@ -306,7 +306,7 @@ export function RepoSetupView({
 	if (query.isPending) return <SetupSkeleton />;
 	if (!sectionFiles || (sectionFiles.length === 0 && listed.length === 0))
 		return (
-			<div className="h-full pt-m pr-xxxl pb-m pl-xxl">
+			<div className="flex h-full flex-col pt-m pr-xxxl pb-m pl-xxl">
 				<EmptyState
 					icon={copy.icon}
 					title={query.isError ? copy.failed : copy.title}

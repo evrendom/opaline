@@ -193,7 +193,7 @@ export function RepoSkillSessions({
 					))}
 				</div>
 			) : rows.length === 0 ? (
-				<div className="px-xxxl pt-xxl">
+				<div className="flex h-full min-h-0 flex-1 flex-col px-xxxl py-xxl">
 					<EmptyState
 						icon={IconRoute}
 						title={
