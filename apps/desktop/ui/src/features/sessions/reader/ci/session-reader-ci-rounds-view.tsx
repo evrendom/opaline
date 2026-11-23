@@ -7,6 +7,7 @@ import {
 	IconX,
 } from "@tabler/icons-react";
 import { FlowNumber } from "@/app/ui/flow-number";
+import { Pressable } from "@/app/ui/pressable";
 import { PLAIN_NUMBER } from "@/lib/figure";
 import { cn } from "@/lib/utils";
 import { CI_STATUS } from "../detail/step/session-reader-step-fields";
@@ -141,7 +142,7 @@ export function CiRoundDots({
 			{rounds.map((round, index) => {
 				const picked = isRoundPicked(round, pickedRun);
 				return (
-					<button
+					<Pressable
 						key={round.sha}
 						type="button"
 						aria-pressed={picked}
@@ -151,7 +152,7 @@ export function CiRoundDots({
 						className={cn(
 							"group/dot flex size-4 items-center justify-center",
 							"corner-full",
-							"pointer-events-auto focus-outline",
+							"pointer-events-auto",
 						)}
 					>
 						<span
@@ -162,7 +163,7 @@ export function CiRoundDots({
 									"scale-125 ring-2 ring-ink-2 ring-offset-1 ring-offset-canvas",
 							)}
 						/>
-					</button>
+					</Pressable>
 				);
 			})}
 		</span>
@@ -355,14 +356,14 @@ export function CiRounds({
 						round.outcome === "failed" || round.outcome === "flaky";
 					return (
 						<li key={round.sha} className="flex flex-col">
-							<button
+							<Pressable
 								type="button"
 								aria-pressed={picked}
 								aria-label={roundWords(round, index)}
 								title={roundWords(round, index)}
 								onClick={() => onPickRun(round.run.ciRunId)}
 								className={cn(
-									"grid w-full grid-cols-[16px_minmax(0,1fr)] gap-x-l focus-outline",
+									"grid w-full grid-cols-[16px_minmax(0,1fr)] gap-x-l",
 									"corner-m px-l py-s",
 									"text-left",
 									"transition-colors",
@@ -415,7 +416,7 @@ export function CiRounds({
 										</span>
 									</span>
 								</span>
-							</button>
+							</Pressable>
 							{round.untilNextMs !== null ? (
 								<span className="grid grid-cols-[16px_minmax(0,1fr)] gap-x-l px-l">
 									<span className="flex justify-center">

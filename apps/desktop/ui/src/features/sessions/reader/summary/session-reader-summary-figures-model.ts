@@ -29,19 +29,19 @@ const tokensDetail = (
 const COST = {
 	icon: IconCoinFilled,
 	measure: "cost",
-	tint: "text-amber-400 dark:text-yellow-500",
+	tint: "text-amber-400",
 } as const;
 const DURATION = {
 	icon: IconClockFilled,
 	measure: "time",
-	tint: "text-sky-400 dark:text-sky-500",
+	tint: "text-sky-400",
 } as const;
 const CONTEXT = {
 	icon: ContextMark,
 	label: "Context window",
 	shortLabel: "Context",
 	measure: "context",
-	tint: "text-[rgba(0,96,226,0.765)] dark:text-[#6aa6ff]",
+	tint: "text-accent",
 } as const;
 
 function nearestWindow(

@@ -117,8 +117,7 @@ export function FileTag({
 				className={cn(
 					"inline-flex h-6 max-w-full min-w-0 items-center gap-s",
 					"corner-full pr-l pl-xs",
-					"bg-canvas shadow-card",
-					"dark:bg-surface",
+					"bg-surface shadow-card",
 					className,
 				)}
 			>

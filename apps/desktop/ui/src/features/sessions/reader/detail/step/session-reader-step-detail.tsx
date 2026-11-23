@@ -6,6 +6,7 @@ import {
 } from "@tabler/icons-react";
 import { type ReactNode, useContext, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { Card, CardContent } from "@/app/ui/card";
 import {
 	ConversationSkillLinkContext,
 	ConversationSkillTurnContext,
@@ -149,9 +150,9 @@ export function SessionReaderStepDetail({
 			)}
 		>
 			{top ? (
-				<div className="shrink-0 corner-m bg-surface px-m pt-m pb-s shadow-card corner-squircle squircle:corner-xl">
-					{top}
-				</div>
+				<Card size="sm" className="shrink-0">
+					<CardContent>{top}</CardContent>
+				</Card>
 			) : null}
 			<div
 				ref={panelRef}
@@ -228,7 +229,7 @@ export function SessionReaderStepDetail({
 								"corner-full py-xs pr-m pl-l",
 								"text-body-m font-medium",
 								"bg-surface shadow-card transition-colors",
-								"hover:bg-hover dark:bg-hover",
+								"hover:bg-hover",
 							)}
 						>
 							Open details

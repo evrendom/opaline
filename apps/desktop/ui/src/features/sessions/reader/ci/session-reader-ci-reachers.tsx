@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { shortRunId, shortSubagentId } from "@/features/sessions/run-id";
 import { cn } from "@/lib/utils";
 import { SubagentTag } from "../subagents/session-reader-subagent-chip";
@@ -40,7 +41,7 @@ function HowWords({ link }: { link: CiReachLink }) {
 }
 
 const ROW =
-	"flex min-h-6 w-full min-w-0 items-center gap-m corner-s px-s text-left text-body-m transition-colors focus-outline hover:bg-hover";
+	"flex min-h-6 w-full min-w-0 items-center gap-m corner-s px-s text-left text-body-m transition-colors hover:bg-hover";
 
 export function ReachedBy({
 	lit = null,
@@ -70,7 +71,7 @@ export function ReachedBy({
 					const subagents = turn.reach.filter((each) => each.reacher.agent);
 					return (
 						<li key={turn.turnId} className="flex min-w-0 flex-col">
-							<button
+							<Pressable
 								type="button"
 								title={`Open turn ${first.index + 1} in the detail`}
 								onClick={() => onOpenTurn(turn.turnId)}
@@ -96,9 +97,9 @@ export function ReachedBy({
 										{subagents.length === 1 ? "subagent" : "subagents"}
 									</span>
 								)}
-							</button>
+							</Pressable>
 							{subagents.map(({ link, reacher }) => (
-								<button
+								<Pressable
 									key={reacher.key}
 									type="button"
 									title={`Open subagent ${shortSubagentId(reacher.agent ?? "")} in the detail`}
@@ -107,7 +108,7 @@ export function ReachedBy({
 									}
 									className={cn(
 										ROW,
-										"pl-[calc(var(--space-xxl)*4/3)]",
+										"pl-xxxl",
 										lit === reacher.key && "bg-field",
 									)}
 								>
@@ -119,7 +120,7 @@ export function ReachedBy({
 										{reacher.task ?? "Subagent"}
 									</span>
 									<HowWords link={link} />
-								</button>
+								</Pressable>
 							))}
 						</li>
 					);
@@ -154,7 +155,7 @@ export function PullTouchers({
 			<ul className="flex min-w-0 flex-col">
 				{shown.map(({ reacher, ways }) => (
 					<li key={reacher.key}>
-						<button
+						<Pressable
 							type="button"
 							onClick={() =>
 								onOpenTurn(reacher.turnId, reacher.agent ?? undefined)
@@ -173,18 +174,18 @@ export function PullTouchers({
 							<span className="shrink-0 text-body-s text-ink-3">
 								{ways.join(", ") || "ran while its CI did"}
 							</span>
-						</button>
+						</Pressable>
 					</li>
 				))}
 			</ul>
 			{rest > 0 || open ? (
-				<button
+				<Pressable
 					type="button"
 					onClick={() => setOpen(!open)}
-					className="w-fit text-body-s text-ink-3 tabular-nums focus-outline hover:text-ink"
+					className="w-fit text-body-s text-ink-3 tabular-nums hover:text-ink"
 				>
 					{open ? "Fewer" : `${rest} more`}
-				</button>
+				</Pressable>
 			) : null}
 		</div>
 	);

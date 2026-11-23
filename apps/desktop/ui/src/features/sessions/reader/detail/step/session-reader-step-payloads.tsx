@@ -349,7 +349,7 @@ export function ShellCommandBlock({ event }: { event: ToolEvent }) {
 	return (
 		<div className="relative">
 			<HighlightedCode
-				className="pr-[calc(var(--space-xxl)*4/3)]"
+				className="pr-xxxl"
 				code={layoutShellCommand(parts.command)}
 				language="bash"
 				prompt

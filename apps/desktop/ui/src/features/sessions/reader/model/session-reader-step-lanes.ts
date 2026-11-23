@@ -27,21 +27,21 @@ export * from "@rudel/api-routes/session-context/session-reader-step-lanes";
 
 export const ACTIVITY_COLOR: Record<Activity, string> = {
 	model: "bg-violet-500",
-	answer: "bg-violet-300 dark:bg-violet-400",
+	answer: "bg-violet-300",
 	explore: "bg-sky-500",
 	skill: "bg-indigo-500",
 	edit: "bg-amber-500",
 	verify: "bg-emerald-500",
 	run: "bg-blue-500",
 	git: "bg-orange-500",
-	wait: "bg-zinc-400 dark:bg-zinc-500",
+	wait: "bg-ink-4",
 	mcp: "bg-teal-500",
 	agent: "bg-pink-500",
 	message: "bg-pink-400",
 	ci: "bg-zinc-400",
 	compact: "bg-green-500",
-	hooks: "bg-zinc-400 dark:bg-zinc-500",
-	other: "bg-zinc-400 dark:bg-zinc-500",
+	hooks: "bg-ink-4",
+	other: "bg-ink-4",
 };
 
 type Glyph = ComponentType<{ className?: string }>;

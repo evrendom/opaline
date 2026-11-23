@@ -1,5 +1,7 @@
 import { IconArrowUpRight } from "@tabler/icons-react";
 import { useState } from "react";
+import { Button } from "@/app/ui/button";
+import { Pressable } from "@/app/ui/pressable";
 import { cn } from "@/lib/utils";
 import { getFileLanguage } from "../files/session-reader-file-tag";
 import { squarify } from "../summary/session-reader-breakdown";
@@ -218,7 +220,7 @@ export function ContextZoom({
 								width: w,
 							}}
 						>
-							<button
+							<Pressable
 								type="button"
 								data-context-pick=""
 								aria-pressed={picked.has(item.label)}
@@ -230,7 +232,7 @@ export function ContextZoom({
 								onClick={(event) =>
 									item.more ? open.go() : onPick(item.label, event.shiftKey)
 								}
-								className="absolute inset-0 corner-s-inset corner-squircle focus-outline transition-colors hover:bg-hover squircle:corner-l-inset dark:hover:bg-hover"
+								className="absolute inset-0 corner-s-inset corner-squircle transition-colors hover:bg-hover squircle:corner-l-inset"
 							/>
 							<span
 								className={cn(
@@ -257,22 +259,17 @@ export function ContextZoom({
 								) : null}
 							</span>
 							{!item.more && w >= 90 && h >= 56 ? (
-								<button
+								<Button
+									size="sm"
 									type="button"
 									data-context-pick=""
 									onClick={open.go}
 									aria-label={`Open ${nameOf(item.label, files)} in ${open.words}`}
-									className={cn(
-										"absolute right-1.5 bottom-1.5 inline-flex h-6 items-center gap-xxs",
-										"corner-s pr-xs pl-m",
-										"text-body-m font-medium",
-										"bg-field text-ink-3 transition-colors focus-outline",
-										"hover:bg-hover hover:text-ink",
-									)}
+									className="absolute right-1.5 bottom-1.5"
 								>
 									{open.words}
 									<IconArrowUpRight aria-hidden="true" className="size-3" />
-								</button>
+								</Button>
 							) : null}
 						</div>
 					);

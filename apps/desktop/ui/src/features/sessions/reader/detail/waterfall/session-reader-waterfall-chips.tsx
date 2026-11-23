@@ -17,6 +17,7 @@ import type {
 	ReactElement,
 	ReactNode,
 } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import { getModelIconComponent } from "@/components/conversation/conversation-trace-model-icon";
 import {
@@ -41,7 +42,7 @@ import { LayerTip, useTipLayer } from "./session-reader-tips";
 
 const CI_STANDARD = {
 	bar: "bg-zinc-400",
-	text: "text-zinc-600 dark:text-zinc-400",
+	text: "text-ink-2",
 	tint: "var(--color-zinc-400)",
 };
 
@@ -74,8 +75,8 @@ function ciTone(ci: SessionReaderStep["ci"]): {
 			tint: "var(--error)",
 		};
 	return {
-		bar: "bg-neutral-400 dark:bg-neutral-500",
-		text: "text-neutral-500 dark:text-neutral-400",
+		bar: "bg-ink-4",
+		text: "text-ink-3",
 		tint: "var(--color-neutral-400)",
 	};
 }
@@ -158,7 +159,8 @@ export function OpalChip({
 							"relative grid size-4.5 shrink-0 place-items-center transition-colors duration-(--motion-quick-duration) ease-wave",
 							sidebar === "active" ? tone.glyph : restingGlyphClassName,
 						)
-					: "relative grid size-4.5 shrink-0 place-items-center [--opal-fill:color-mix(in_oklab,var(--opal-tint)_15%,transparent)] [--opal-ring:color-mix(in_oklab,var(--opal-tint)_14%,transparent)] drop-shadow-[0_2px_3px_color-mix(in_oklab,var(--opal-tint)_25%,transparent)] dark:[--opal-ring:rgb(255_255_255/0.08)] dark:drop-shadow-[0_1px_2px_rgb(0_0_0/0.24)]",
+					: // design-escape-ok(dark): artwork; the opal chip's ring and drop, a tint in light and a white ring in dark
+						"relative grid size-4.5 shrink-0 place-items-center [--opal-fill:color-mix(in_oklab,var(--opal-tint)_15%,transparent)] [--opal-ring:color-mix(in_oklab,var(--opal-tint)_14%,transparent)] drop-shadow-[0_2px_3px_color-mix(in_oklab,var(--opal-tint)_25%,transparent)] dark:[--opal-ring:rgb(255_255_255/0.08)] dark:drop-shadow-[0_1px_2px_rgb(0_0_0/0.24)]",
 				solid &&
 					"[--opal-fill:color-mix(in_oklab,var(--opal-tint)_15%,var(--canvas,var(--canvas)))]",
 				className,
@@ -236,10 +238,7 @@ export function ModelChip({
 			solid={solid}
 			tint={brand?.tint ?? SLATE}
 			title={tip ? (model ?? "model") : undefined}
-			className={cn(
-				brand?.glyphClassName ?? "text-violet-600 dark:text-violet-400",
-				chip,
-			)}
+			className={cn(brand?.glyphClassName ?? "text-violet-500", chip)}
 		>
 			{ModelIcon ? (
 				<ModelIcon className={glyph} />
@@ -315,12 +314,12 @@ export function ChipToggle({
 			style={style}
 		>
 			<Tip label={open ? "Fold" : "Show"}>
-				<button
+				<Pressable
 					type="button"
 					aria-expanded={open}
 					aria-label={open ? `Fold ${label}` : `Show ${label}`}
 					onClick={onToggle}
-					className="pointer-events-auto size-4.5 corner-full focus-outline"
+					className="pointer-events-auto size-4.5 corner-full"
 				/>
 			</Tip>
 		</div>
@@ -338,8 +337,7 @@ export function stepBar(
 	if (step.waitsOnYou) return { className: "bg-amber-400" };
 	if (step.harness === "compaction") return { className: "bg-green-500" };
 	if (step.harness === "member") return { className: "bg-amber-400" };
-	if (step.harness === "hooks")
-		return { className: "bg-zinc-400 dark:bg-zinc-500" };
+	if (step.harness === "hooks") return { className: "bg-ink-4" };
 	if (step.harness === "notification" && !step.isError)
 		return {
 			className: step.notification?.agent ? "bg-pink-500" : "bg-blue-400",

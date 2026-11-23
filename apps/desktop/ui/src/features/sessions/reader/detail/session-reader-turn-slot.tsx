@@ -1,5 +1,6 @@
 import type { SessionDetailTurnSummary } from "@rudel/api-routes";
 import type { CSSProperties, ReactNode } from "react";
+import { Button } from "@/app/ui/button";
 import {
 	TURN_SLOT_LAYOUT_CLASS,
 	TURNS_PENDING_MARK,
@@ -75,13 +76,9 @@ export function TurnsPending({
 			{failed ? (
 				<p className="text-body-m text-ink-3 tabular-nums">
 					Turns {from}–{to} could not be loaded.{" "}
-					<button
-						type="button"
-						onClick={onRetry}
-						className="underline underline-offset-2 focus-outline hover:text-ink"
-					>
+					<Button variant="link" size="inline" type="button" onClick={onRetry}>
 						Retry
-					</button>
+					</Button>
 				</p>
 			) : null}
 		</div>

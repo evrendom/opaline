@@ -372,8 +372,8 @@ describe("session reader model", () => {
 	test("cost heat buckets against the session's quintiles", () => {
 		const thresholds = getCostQuintiles([0, 1, 2, 3, 4, 5]);
 		expect(thresholds).toEqual([2, 3, 4, 5]);
-		expect(getCostShade(0.5, thresholds)).toContain("green");
-		expect(getCostShade(9, thresholds)).toContain("red");
+		expect(getCostShade(0.5, thresholds)).toBe("text-success");
+		expect(getCostShade(9, thresholds)).toBe("text-error");
 		expect(getCostShade(null, thresholds)).toBeUndefined();
 	});
 

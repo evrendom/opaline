@@ -86,6 +86,6 @@ describe("the turns still to load", () => {
 			/>,
 		).replace(/<!-- -->/gu, "");
 		expect(failed).toContain("Turns 41–120 could not be loaded.");
-		expect(failed).toContain(">Retry</button>");
+		expect(failed).toContain(">Retry</span></button>");
 	});
 });

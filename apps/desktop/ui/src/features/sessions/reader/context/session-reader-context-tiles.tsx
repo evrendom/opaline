@@ -9,6 +9,7 @@ import {
 	useState,
 } from "react";
 import { useElementWidth } from "@/app/ui/horizontal-resize-handle";
+import { Pressable } from "@/app/ui/pressable";
 import { MOMENT_KINDS_APPEARANCE } from "@/features/compass/moment-labels";
 import { cn } from "@/lib/utils";
 import {
@@ -335,7 +336,7 @@ export function ContextTiles({
 							focused &&
 								(tile.part
 									? // design-escape-ok(shadow): artwork; the focused tile's glow is tinted from its category
-										"bg-[color-mix(in_oklab,var(--tint)_34%,transparent)] shadow-[0_2px_10px_-2px_color-mix(in_oklab,var(--tint)_45%,transparent)] dark:bg-[color-mix(in_oklab,var(--tint)_40%,transparent)] dark:shadow-[0_2px_12px_-2px_color-mix(in_oklab,var(--tint)_55%,transparent)]"
+										"bg-[color-mix(in_oklab,var(--tint)_37%,transparent)] shadow-[0_2px_11px_-2px_color-mix(in_oklab,var(--tint)_50%,transparent)]"
 									: "bg-hover-strong shadow-raised"),
 						)}
 						style={{
@@ -346,21 +347,19 @@ export function ContextTiles({
 							width: Math.max(0, tile.w - GAP),
 						}}
 					>
-						<button
+						<Pressable
 							type="button"
 							data-context-tile=""
 							aria-pressed={tile.key === picked}
 							aria-label={`Show what's in ${name}`}
 							onClick={(event) => pickBox(tile.key, event.shiftKey)}
-							className="absolute inset-0 corner-s-inset corner-squircle focus-outline transition-colors hover:bg-hover squircle:corner-l-inset dark:hover:bg-hover"
+							className="absolute inset-0 corner-s-inset corner-squircle transition-colors hover:bg-hover squircle:corner-l-inset"
 						/>
 						<span
 							aria-hidden="true"
 							className={cn(
 								"pointer-events-none relative flex min-w-0 flex-col text-body-l",
-								showName
-									? "px-[calc(var(--space-m)+var(--space-xxs))] py-xs"
-									: "h-full items-center justify-center",
+								showName ? "px-m py-xs" : "h-full items-center justify-center",
 							)}
 						>
 							<span className="flex min-w-0 items-center gap-s">

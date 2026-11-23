@@ -91,7 +91,7 @@ export function TouchedFiles({
 				/>
 			</PickStrip>
 			<div ref={column.ref} className="-mx-xs flex min-h-0 flex-1 flex-col">
-				<ScrollColumn className="px-xs pb-[calc(var(--space-xxl)*4/3)]">
+				<ScrollColumn className="px-xs pb-xxxl">
 					{order === "timeline" ? (
 						<RunTrace
 							agent={agent}
@@ -183,7 +183,7 @@ export function SessionFiles({
 				/>
 			</PickStrip>
 			<div ref={column.ref} className="-mx-xs flex min-h-0 flex-1 flex-col">
-				<ScrollColumn className="px-xs pb-[calc(var(--space-xxl)*4/3)]">
+				<ScrollColumn className="px-xs pb-xxxl">
 					{order === "timeline" ? (
 						<RunTrace
 							edits={edits}

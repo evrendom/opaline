@@ -119,10 +119,7 @@ export function TagChip({
 			solid={solid}
 			tint={tag.tint}
 			title={title}
-			className={cn(
-				small && "size-4",
-				flat && "drop-shadow-none dark:drop-shadow-none",
-			)}
+			className={cn(small && "size-4", flat && "drop-shadow-none")}
 		>
 			<Glyph
 				aria-hidden="true"
@@ -259,7 +256,7 @@ export function RailTagsPicker({
 						"relative inline-flex size-7 shrink-0 items-center justify-center",
 						"corner-full",
 						"bg-surface text-ink-3 shadow-card transition-colors",
-						"hover:bg-hover data-popup-open:bg-hover dark:bg-hover",
+						"hover:bg-hover data-popup-open:bg-hover",
 					)}
 				>
 					<IconAdjustmentsHorizontal aria-hidden="true" className="size-3.5" />

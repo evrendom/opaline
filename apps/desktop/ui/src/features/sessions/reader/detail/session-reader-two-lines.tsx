@@ -1,4 +1,5 @@
 import { type ReactNode, useCallback, useState } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { cn } from "@/lib/utils";
 
 export function TwoLines({
@@ -37,13 +38,13 @@ export function TwoLines({
 				{children}
 			</div>
 			{overflows || expanded ? (
-				<button
+				<Pressable
 					type="button"
 					onClick={() => setExpanded((value) => !value)}
-					className="text-body-m text-ink-3 focus-outline hover:text-ink"
+					className="text-body-m text-ink-3 hover:text-ink"
 				>
 					{expanded ? "Show less" : "Show more"}
-				</button>
+				</Pressable>
 			) : null}
 		</div>
 	);

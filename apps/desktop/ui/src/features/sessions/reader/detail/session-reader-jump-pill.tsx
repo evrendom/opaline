@@ -1,5 +1,6 @@
 import { IconArrowDown, IconArrowUp } from "@tabler/icons-react";
 import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
+import { Button } from "@/app/ui/button";
 import { cn } from "@/lib/utils";
 import { jumpNearThenEaseTo } from "./reader-jump-scroll";
 
@@ -89,18 +90,9 @@ export function JumpPill({
 	const side = useLastOffscreen(where);
 	const Arrow = side === "above" ? IconArrowUp : IconArrowDown;
 	return (
-		<button
-			type="button"
-			aria-hidden={where ? undefined : true}
-			aria-label={label}
-			tabIndex={where ? undefined : -1}
-			title={label}
-			onClick={onClick}
+		<span
 			className={cn(
-				"flex h-8 items-center gap-s",
-				"corner-full pr-[calc(var(--space-m)+var(--space-xxs))] pl-s",
-				"bg-canvas text-ink-3 shadow-card transition-[opacity,translate,color] duration-(--motion-medium-duration) ease-base",
-				"focus-outline hover:text-ink dark:bg-surface",
+				"flex transition-[opacity,translate] duration-(--motion-medium-duration) ease-base",
 				where
 					? "pointer-events-auto translate-y-0 opacity-100"
 					: cn(
@@ -109,8 +101,18 @@ export function JumpPill({
 						),
 			)}
 		>
-			{icon}
-			<Arrow aria-hidden="true" className="size-4" />
-		</button>
+			<Button
+				variant="primary"
+				type="button"
+				aria-hidden={where ? undefined : true}
+				aria-label={label}
+				tabIndex={where ? undefined : -1}
+				title={label}
+				onClick={onClick}
+			>
+				{icon}
+				<Arrow aria-hidden="true" className="size-4" />
+			</Button>
+		</span>
 	);
 }

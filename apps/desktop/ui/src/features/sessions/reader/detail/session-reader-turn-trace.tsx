@@ -171,14 +171,10 @@ export const TurnTrace = memo(function TurnTrace({
 		<div
 			ref={setRoot}
 			data-turn-trace=""
-			className="grid gap-[calc(var(--space-xxl)*4/3)] xl:grid-cols-[minmax(0,1fr)_3.5rem_var(--reader-card)]"
+			className="grid gap-xxxl xl:grid-cols-[minmax(0,1fr)_3.5rem_var(--reader-card)]"
 		>
-			<div className="isolate flex min-w-0 flex-col gap-xl pl-[calc(var(--space-xxl)*1.5)]">
-				{headNode ? (
-					<div className="-ml-[calc(var(--space-xxl)*1.5)] xl:hidden">
-						{headNode}
-					</div>
-				) : null}
+			<div className="isolate flex min-w-0 flex-col gap-xl pl-xxxl">
+				{headNode ? <div className="-ml-xxxl xl:hidden">{headNode}</div> : null}
 				<LaunchedSubagentsContext.Provider value={agent ? null : launchedSlot}>
 					<TraceAttempts
 						exchanges={exchanges}
@@ -194,9 +190,7 @@ export const TurnTrace = memo(function TurnTrace({
 						waterfall={waterfall}
 					/>
 				</LaunchedSubagentsContext.Provider>
-				{foot ? (
-					<div className="-ml-[calc(var(--space-xxl)*1.5)]">{foot}</div>
-				) : null}
+				{foot ? <div className="-ml-xxxl">{foot}</div> : null}
 			</div>
 			<div className="hidden min-w-0 self-stretch xl:col-start-3 xl:-mr-(--scrollbar,0px) xl:block">
 				<div
@@ -215,7 +209,7 @@ export const TurnTrace = memo(function TurnTrace({
 						)}
 					>
 						{headNode ? (
-							<div className="shrink-0 edge-b-m border-line px-l py-[calc(var(--space-m)+var(--space-xxs))]">
+							<div className="shrink-0 edge-b-m border-line px-l py-m">
 								{headNode}
 							</div>
 						) : null}
@@ -302,7 +296,7 @@ export const TurnTrace = memo(function TurnTrace({
 						ref={setLaunchedSlot}
 						className={cn(
 							"flex shrink-0 flex-col gap-l empty:hidden",
-							step ? "mt-[calc(var(--space-xxl)*4/3)]" : "mt-l",
+							step ? "mt-xxxl" : "mt-l",
 						)}
 					/>
 				</div>

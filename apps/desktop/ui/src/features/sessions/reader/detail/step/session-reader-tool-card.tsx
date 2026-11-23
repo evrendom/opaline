@@ -1,6 +1,8 @@
 import { IconChevronRight, IconTextWrap } from "@tabler/icons-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { type ReactNode, useState } from "react";
+import { Button } from "@/app/ui/button";
+import { Pressable } from "@/app/ui/pressable";
 import { CopyButton } from "@/features/shell/components/copy-button";
 import { cn } from "@/lib/utils";
 import { ShellOutput } from "./session-reader-shell-output";
@@ -81,7 +83,7 @@ export function ToolCard({
 			>
 				{call}
 				{collapsible && text ? (
-					<button
+					<Pressable
 						type="button"
 						aria-expanded={open}
 						onClick={() => setOpen((value) => !value)}
@@ -89,7 +91,7 @@ export function ToolCard({
 							"flex w-fit items-center gap-xs",
 							"-mb-xs corner-s px-s py-xs",
 							"text-body-s font-medium",
-							"text-ink-3 transition-colors focus-outline",
+							"text-ink-3 transition-colors",
 							"hover:text-ink",
 						)}
 					>
@@ -107,7 +109,7 @@ export function ToolCard({
 						>
 							{size.label}
 						</span>
-					</button>
+					</Pressable>
 				) : null}
 				<AnimatePresence initial={false}>
 					{text && (!collapsible || open) ? (
@@ -130,7 +132,7 @@ export function ToolCard({
 									)}
 								>
 									{prose ? (
-										<p className="pr-[calc(var(--space-xxl)*4/3)] text-body-l whitespace-pre-wrap [overflow-wrap:anywhere]">
+										<p className="pr-xxxl text-body-l whitespace-pre-wrap [overflow-wrap:anywhere]">
 											{text}
 										</p>
 									) : text.length <= LAYOUT_CHARS ? (
@@ -148,13 +150,13 @@ export function ToolCard({
 										</pre>
 									)}
 									{clipped ? (
-										<button
+										<Pressable
 											type="button"
 											onClick={() => setFull(true)}
-											className="w-fit px-l text-body-m text-ink-3 focus-outline hover:text-ink"
+											className="w-fit px-l text-body-m text-ink-3 hover:text-ink"
 										>
 											Show all {size.label}
-										</button>
+										</Pressable>
 									) : null}
 									<div
 										className={cn(
@@ -165,21 +167,15 @@ export function ToolCard({
 										)}
 									>
 										{prose ? null : (
-											<button
+											<Button
+												size="icon-sm"
 												type="button"
 												aria-pressed={wrap}
 												title={wrap ? "Don’t wrap lines" : "Wrap lines"}
 												onClick={() => setWrap((value) => !value)}
-												className={cn(
-													"inline-flex size-6 items-center justify-center",
-													"corner-xs",
-													"text-ink-3 transition-colors focus-outline",
-													"hover:text-ink",
-													wrap && "text-ink",
-												)}
 											>
 												<IconTextWrap aria-hidden="true" className="size-3.5" />
-											</button>
+											</Button>
 										)}
 										<CopyButton title="Copy output" value={output ?? ""} />
 									</div>

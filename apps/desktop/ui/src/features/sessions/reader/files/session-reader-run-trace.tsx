@@ -18,6 +18,7 @@ import {
 	IconZoomFilled,
 } from "@tabler/icons-react";
 import { type ReactNode, useMemo, useRef } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { countChanges, diffLines } from "@/components/pierre/line-diff";
 import { revealInList } from "@/lib/reveal-in-list";
 import { cn } from "@/lib/utils";
@@ -410,17 +411,17 @@ function StepRow({
 				: ICON[step.kind];
 	return (
 		<li ref={rowRef}>
-			<button
+			<Pressable
 				type="button"
 				onClick={onPick}
 				aria-current={selected || undefined}
 				className={cn(
 					"relative isolate flex h-6 w-full items-center gap-s",
 					"px-m",
-					"text-left text-body-m focus-outline",
+					"text-left text-body-m",
 					"before:absolute before:inset-x-0 before:inset-y-px before:-z-10 before:corner-s before:transition-colors",
 					depth === 1 && "pl-xxl",
-					depth === 2 && "pl-[calc(var(--space-xxl)*4/3)]",
+					depth === 2 && "pl-xxxl",
 					selected ? "before:bg-field" : "hover:before:bg-hover",
 					step.failed
 						? "text-error"
@@ -474,17 +475,11 @@ function StepRow({
 				) : null}
 				{edit ? (
 					<span className="shrink-0 text-body-s tabular-nums">
-						{/* design-escape-ok(colour): data paint; diff marks, added lines */}
-						<span className="text-success dark:text-green-400">
-							+{edit.added}
-						</span>{" "}
-						{/* design-escape-ok(colour): data paint; diff marks, removed lines */}
-						<span className="text-error dark:text-red-400">
-							−{edit.removed}
-						</span>
+						<span className="text-success">+{edit.added}</span>{" "}
+						<span className="text-error">−{edit.removed}</span>
 					</span>
 				) : null}
-			</button>
+			</Pressable>
 		</li>
 	);
 }

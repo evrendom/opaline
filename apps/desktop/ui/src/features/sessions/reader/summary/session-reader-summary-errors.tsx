@@ -156,7 +156,7 @@ export function CallLinks({ calls }: { calls: readonly RunCall[] }) {
 			key={call.step}
 			to={hrefOf(call)}
 			aria-label={`Open call ${shortCallId(call.native)} in the detail`}
-			className="group/call inline-flex h-6 items-center gap-xxs corner-s bg-hover pr-xs pl-xs font-medium tabular-nums transition-colors hover:bg-hover dark:bg-hover dark:hover:bg-hover-strong"
+			className="group/call inline-flex h-6 items-center gap-xxs corner-s bg-hover pr-xs pl-xs font-medium tabular-nums transition-colors hover:bg-hover-strong"
 		>
 			<StepIconChip size="sm" step={call.shown} tip={false} />
 			{mcpServerOf(call.shown) ? (

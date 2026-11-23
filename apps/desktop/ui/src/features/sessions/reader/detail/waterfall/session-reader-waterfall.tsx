@@ -6,6 +6,7 @@ import {
 	useMemo,
 	useState,
 } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { TooltipProvider } from "@/app/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { SessionReaderWaterfall } from "../../model/session-reader-model";
@@ -251,7 +252,7 @@ export function SessionReaderWaterfallView({
 			)}
 			{...(collapse ? toggleFocus : {})}
 		>
-			<button
+			<Pressable
 				type="button"
 				onClick={() => {
 					if (collapse && marked === WHOLE_TURN_ID) collapse.onToggle();
@@ -278,7 +279,7 @@ export function SessionReaderWaterfallView({
 					/>
 				</div>
 				<RowTotals cost={cost} durationMs={runMs} tokens={tokens} />
-			</button>
+			</Pressable>
 			{collapse ? (
 				<ChipToggle
 					className="pl-xs"

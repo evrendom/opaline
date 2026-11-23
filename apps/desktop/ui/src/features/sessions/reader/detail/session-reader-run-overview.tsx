@@ -1,6 +1,8 @@
 import type { SessionDetailTurnSummary } from "@rudel/api-routes";
 import { IconChevronRight } from "@tabler/icons-react";
 import { type ReactNode, useState } from "react";
+import { Button } from "@/app/ui/button";
+import { Pressable } from "@/app/ui/pressable";
 import {
 	Tooltip,
 	TooltipContent,
@@ -294,8 +296,7 @@ function Touched({ marks }: { marks: readonly SessionReaderTurnMark[] }) {
 											className={cn(
 												"inline-flex h-6 max-w-full min-w-0 items-center gap-s",
 												"corner-full pr-l pl-xs",
-												"bg-canvas shadow-card",
-												"dark:bg-surface",
+												"bg-surface shadow-card",
 											)}
 										>
 											<OpalChip tint={tint} className={cn("size-4", className)}>
@@ -342,28 +343,28 @@ function StepKinds({
 	return (
 		<div className={cn("flex flex-col", open && "gap-l")}>
 			<div className="flex items-center justify-between">
-				<button
+				<Pressable
 					type="button"
 					aria-expanded={open}
 					onClick={() => setOpen((value) => !value)}
-					className="flex items-center gap-xs text-body-m text-ink-3 focus-outline hover:text-ink"
+					className="flex items-center gap-xs text-body-m text-ink-3 hover:text-ink"
 				>
 					<IconChevronRight
 						aria-hidden="true"
 						className={cn("size-3.5 transition-transform", open && "rotate-90")}
 					/>
 					Steps · {options.length} {options.length === 1 ? "kind" : "kinds"}
-				</button>
+				</Pressable>
 				{filter.size > 0 ? (
-					<button
+					<Button
+						size="sm"
 						type="button"
 						onClick={() => {
 							for (const key of filter) onToggle(key);
 						}}
-						className="text-body-m text-ink-3 focus-outline hover:text-ink"
 					>
 						Show all
-					</button>
+					</Button>
 				) : null}
 			</div>
 			{open ? (
@@ -372,7 +373,7 @@ function StepKinds({
 						const on = filter.has(option.key);
 						const dimmed = filter.size > 0 && !on;
 						return (
-							<button
+							<Pressable
 								key={option.key}
 								type="button"
 								aria-pressed={on}
@@ -381,9 +382,9 @@ function StepKinds({
 								className={cn(
 									"flex w-full items-center gap-m",
 									"corner-s px-m py-xs",
-									"text-left focus-outline",
+									"text-left",
 									"hover:bg-hover",
-									on && "bg-hover dark:bg-hover",
+									on && "bg-hover",
 								)}
 							>
 								<StepIconChip step={option.sample} />
@@ -403,7 +404,7 @@ function StepKinds({
 										{option.errorCount} failed
 									</span>
 								) : null}
-							</button>
+							</Pressable>
 						);
 					})}
 				</div>
@@ -444,6 +445,12 @@ export function RunOverview({
 	const options = scope ? getWaterfallFilterOptions(steps) : filterOptions;
 	const touched = scope ? getStepMarks(steps) : marks;
 	const tokens = (turn.inputTokens ?? 0) + (turn.outputTokens ?? 0);
+	const tokenValue = (
+		<span className="flex flex-col gap-m">
+			{formatCompactNumber(tokens)}
+			<TokenSplit turn={turn} />
+		</span>
+	);
 	return (
 		<>
 			{touched.length > 0 ? (
@@ -488,16 +495,9 @@ export function RunOverview({
 							</span>
 						}
 					/>
-					<Field
-						label="Tokens"
-						className="col-span-2 edge-t-m border-line-soft pt-xl"
-						value={
-							<span className="flex flex-col gap-m">
-								{formatCompactNumber(tokens)}
-								<TokenSplit turn={turn} />
-							</span>
-						}
-					/>
+					<div className="col-span-2 edge-t-m border-line-soft pt-xl">
+						<Field label="Tokens" value={tokenValue} />
+					</div>
 				</div>
 			)}
 

@@ -1,12 +1,11 @@
 import { type Icon, IconX } from "@tabler/icons-react";
 import type { ReactNode } from "react";
+import { Button } from "@/app/ui/button";
+import { Pressable } from "@/app/ui/pressable";
 import { useSlidingPill } from "@/features/repos/pill-tabs";
 import { useScrollFade } from "@/hooks/use-scroll-fade";
 import { formatNumber, formatShortCount } from "@/lib/format";
 import { cn } from "@/lib/utils";
-
-export const TOGGLE =
-	"text-ink-3 active:not-aria-[haspopup]:translate-y-0 aria-pressed:bg-surface aria-pressed:text-ink aria-pressed:shadow-card dark:aria-pressed:bg-hover";
 
 export function ViewToggle<View extends string>({
 	iconsOnly = false,
@@ -47,7 +46,7 @@ export function ViewToggle<View extends string>({
 				/>
 			) : null}
 			{options.map(({ count, icon: Glyph, id, label: word, off }) => (
-				<button
+				<Pressable
 					key={id}
 					type="button"
 					skullet-block=""
@@ -61,7 +60,7 @@ export function ViewToggle<View extends string>({
 						"relative flex h-6 items-center gap-xs",
 						"corner-s corner-squircle",
 						"text-body-m font-medium",
-						"transition-colors focus-outline",
+						"transition-colors",
 						"disabled:cursor-default disabled:opacity-45 squircle:corner-l",
 						iconsOnly ? "px-s" : "px-m",
 						id === value ? "text-ink" : "text-ink-3 enabled:hover:text-ink",
@@ -75,7 +74,7 @@ export function ViewToggle<View extends string>({
 							<span className="sr-only">{formatNumber(count)}</span>
 						</span>
 					)}
-				</button>
+				</Pressable>
 			))}
 		</fieldset>
 	);
@@ -162,14 +161,14 @@ export function Crumb({
 		>
 			<span className="min-w-0 truncate">{children}</span>
 			{onClear ? (
-				<button
+				<Button
+					size="icon-sm"
 					type="button"
 					aria-label="Let go"
 					onClick={onClear}
-					className="shrink-0 corner-xs p-xxs text-ink-3 focus-outline hover:bg-hover hover:text-ink"
 				>
 					<IconX className="size-3" />
-				</button>
+				</Button>
 			) : (
 				<span className="w-1" />
 			)}

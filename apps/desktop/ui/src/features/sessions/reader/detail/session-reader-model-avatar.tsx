@@ -20,10 +20,7 @@ export function ModelAvatar({
 	}
 	return (
 		<ModelChip
-			chip={cn(
-				"size-6",
-				(flat || shadowless) && "drop-shadow-none dark:drop-shadow-none",
-			)}
+			chip={cn("size-6", (flat || shadowless) && "drop-shadow-none")}
 			glyph="size-3.5"
 			model={model}
 			solid={solid}

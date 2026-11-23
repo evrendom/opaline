@@ -1,6 +1,7 @@
 import type { SessionDetailTurnSummary } from "@rudel/api-routes";
 import { IconChevronDown } from "@tabler/icons-react";
 import { memo, type ReactNode, type SyntheticEvent, useState } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { shortRunId, shortSubagentId } from "@/features/sessions/run-id";
 import {
 	CopyIcon,
@@ -89,7 +90,7 @@ export const RailRow = memo(function RailRow({
 	const isIdle = (subagentId: string | null) =>
 		idle?.has(railLineKey(turn.turnId, subagentId)) ?? false;
 	return (
-		<button
+		<Pressable
 			ref={rowRef}
 			type="button"
 			aria-current={active ? "true" : undefined}
@@ -98,7 +99,7 @@ export const RailRow = memo(function RailRow({
 			className={cn(
 				"group/row relative grid auto-rows-[minmax(var(--rail-line-height),auto)] grid-cols-[minmax(0,1fr)_auto] items-center gap-x-s gap-y-(--rail-line-gap)",
 				"corner-s px-s corner-squircle",
-				"text-left text-body-m focus-outline",
+				"text-left text-body-m",
 				"squircle:corner-l",
 				shown.length > 0 && "pb-(--rail-line-gap)",
 			)}
@@ -159,7 +160,7 @@ export const RailRow = memo(function RailRow({
 				/>
 			))}
 			<RailLines count={1 + shown.length} />
-		</button>
+		</Pressable>
 	);
 });
 

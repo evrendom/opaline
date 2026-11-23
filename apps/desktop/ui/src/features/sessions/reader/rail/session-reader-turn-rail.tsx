@@ -18,6 +18,7 @@ import {
 } from "react";
 import { useLatestValueRef } from "@/app/hooks/useLatestValueRef";
 import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
+import { Pressable } from "@/app/ui/pressable";
 import { FluidHoverHighlight } from "@/components/fluid-hover-highlight";
 import { shortRunId } from "@/features/sessions/run-id";
 import type { ItemRect } from "@/hooks/use-fluid-hover";
@@ -327,11 +328,11 @@ export const TurnRailList = memo(function TurnRailList({
 						transition={false}
 						className={cn(
 							"z-0 corner-s bg-surface corner-squircle squircle:corner-l",
-							"shadow-raised dark:shadow-card",
+							"shadow-raised",
 						)}
 					/>
 					{whole ? (
-						<button
+						<Pressable
 							ref={rowRef(WHOLE_SESSION)}
 							type="button"
 							aria-pressed={whole.picked}
@@ -340,7 +341,7 @@ export const TurnRailList = memo(function TurnRailList({
 							className={cn(
 								"relative flex h-(--rail-line-height) shrink-0 items-center justify-between gap-s",
 								"corner-s px-s corner-squircle",
-								"text-left text-body-m tabular-nums focus-outline",
+								"text-left text-body-m tabular-nums",
 								"transition-opacity duration-(--motion-large-duration) ease-base",
 								"squircle:corner-l",
 								whole.disabled &&
@@ -362,7 +363,7 @@ export const TurnRailList = memo(function TurnRailList({
 								data-rail-line={whole.disabled ? undefined : ""}
 								className="pointer-events-none absolute inset-0 corner-s corner-squircle squircle:corner-l"
 							/>
-						</button>
+						</Pressable>
 					) : null}
 					{turns.map((turn) => (
 						<RailRow

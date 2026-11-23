@@ -253,7 +253,7 @@ export const SessionReaderView = memo(function SessionReaderView({
 							<div
 								className={cn(
 									"absolute top-0 right-0 z-50 flex h-(--stage-top) justify-start",
-									"pt-xl pr-[calc(var(--space-xxl)*4/3)]",
+									"pt-xl pr-xxxl",
 									"bg-(--reader-page)",
 									TAB_BAND_FROM[tab],
 								)}

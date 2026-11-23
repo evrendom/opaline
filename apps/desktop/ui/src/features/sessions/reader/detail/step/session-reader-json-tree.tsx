@@ -1,11 +1,10 @@
 import { IconChevronRight } from "@tabler/icons-react";
 import { useState } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { cn } from "@/lib/utils";
 
 const KIND_COLOR = {
-	// design-escape-ok(colour): data paint; JSON syntax colours, numbers
-	number: "text-[oklch(0.56_0.16_55)] dark:text-[oklch(0.8_0.14_55)]",
-	// design-escape-ok(colour): data paint; JSON syntax colours, literals
+	number: "text-[oklch(0.56_0.16_55)] dark:text-[oklch(0.8_0.14_55)]", // design-escape-ok(colour,dark): data paint; JSON syntax colours, numbers and literals
 	literal: "text-[oklch(0.5_0.2_292.717)] dark:text-[oklch(0.74_0.16_292.717)]",
 } as const;
 
@@ -71,11 +70,11 @@ function Entry({
 		);
 	return (
 		<>
-			<button
+			<Pressable
 				type="button"
 				aria-expanded={open}
 				onClick={() => setOpen((current) => !current)}
-				className="flex items-center gap-xxs text-left focus-outline hover:text-ink"
+				className="flex items-center gap-xxs text-left hover:text-ink"
 			>
 				<IconChevronRight
 					aria-hidden="true"
@@ -85,7 +84,7 @@ function Entry({
 					)}
 				/>
 				{key}
-			</button>
+			</Pressable>
 			<span className="text-ink-4">{open ? null : summary(value)}</span>
 			{open ? (
 				<div className="col-span-2 pl-xl">
