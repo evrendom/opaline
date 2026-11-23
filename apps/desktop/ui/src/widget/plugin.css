@@ -90,16 +90,16 @@ html[data-host-styles]
 		var(--shadow-float);
 }
 /* Toolbar pills and search fields: the host's surface, border and hover. */
-html[data-host-styles] :is([data-variant="toolbar"], .toolbar-search) {
+html[data-host-styles] :is([data-variant="primary"], .toolbar-search) {
 	background: var(--canvas);
 	box-shadow: 0 0 0 1px var(--line);
 }
 html[data-host-styles]
-	[data-variant="toolbar"]:is(:hover, [aria-expanded="true"]) {
+	[data-variant="primary"]:is(:hover, [aria-expanded="true"]) {
 	background: var(--hover);
 }
 html[data-host-styles]
-	[data-variant="toolbar"]:is([aria-pressed="true"], [data-active]) {
+	[data-variant="primary"]:is([aria-pressed="true"], [data-active]) {
 	box-shadow: 0 0 0 1px color-mix(in oklab, var(--ink) 24%, transparent);
 }
 /* The transcript tree keeps its own text palette. */

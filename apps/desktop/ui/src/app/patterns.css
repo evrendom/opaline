@@ -114,9 +114,8 @@
 }
 
 /* Form controls: the tall buttons and fields of the sign-in, sign-up and
-   invitation screens. Put on Button / Input with className; Button's outline
-   variant sits on the surface with the control shadow. Text inherits the
-   form's. */
+   invitation screens. Put on Button / Input with className; the button's
+   look is its variant's, this only makes it tall. Text inherits the form's. */
 .form-button {
 	min-height: 42px;
 	border-radius: var(--radius-s);
@@ -126,14 +125,8 @@
 		border-color var(--motion-duration) var(--motion-easing),
 		color var(--motion-duration) var(--motion-easing);
 }
-.form-button[data-variant="outline"] {
-	border-color: transparent;
+.form-button[data-variant="primary"] {
 	padding: var(--space-l) var(--space-xl);
-	background: var(--surface);
-	box-shadow: var(--shadow-card);
-}
-.form-button[data-variant="outline"]:hover:not(:disabled) {
-	background: var(--hover);
 }
 .form-input {
 	min-height: 44px;
@@ -991,16 +984,6 @@
 .settings-group [data-slot="button"] > svg:not([class*="size-"]) {
 	width: var(--space-xl);
 	height: var(--space-xl);
-}
-
-.settings-group [data-slot="button"][data-variant="outline"] {
-	border: 0;
-	background: var(--canvas);
-	box-shadow: var(--shadow-card);
-}
-
-.settings-group [data-slot="button"][data-variant="outline"]:hover {
-	background: var(--field);
 }
 
 .settings-fields {

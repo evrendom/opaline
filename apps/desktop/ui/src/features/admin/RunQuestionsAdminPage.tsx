@@ -181,6 +181,7 @@ function AddQuestionForm({
 					className="h-9 flex-1 corner-s edge-m bg-canvas px-l"
 				/>
 				<Button
+					variant="primary"
 					type="submit"
 					disabled={
 						wording.trim().length < 10 ||
@@ -281,17 +282,17 @@ function QuestionRow({
 						</span>
 					</div>
 					<div className="flex shrink-0 gap-xs">
-						<Button size="sm" variant="outline" onClick={onToggleTest}>
+						<Button size="md" variant="primary" onClick={onToggleTest}>
 							{testing ? "Close test" : "Test"}
 						</Button>
 						{question.state === "draft" ? (
-							<Button size="sm" onClick={onTurnOn}>
+							<Button variant="primary" size="md" onClick={onTurnOn}>
 								Turn on
 							</Button>
 						) : null}
 						<Button
-							size="sm"
-							variant="ghost"
+							size="md"
+							variant="secondary"
 							onClick={() =>
 								setEditing({
 									label: question.label ?? "",
@@ -301,7 +302,7 @@ function QuestionRow({
 						>
 							Edit
 						</Button>
-						<Button size="sm" variant="ghost" onClick={onRemove}>
+						<Button size="md" variant="secondary" onClick={onRemove}>
 							Remove
 						</Button>
 					</div>
@@ -327,14 +328,14 @@ function QuestionRow({
 							}
 							className="h-8 flex-1 corner-s edge-m bg-canvas px-l"
 						/>
-						<Button size="sm" type="submit">
+						<Button variant="primary" size="md" type="submit">
 							{editing.wording.trim() === question.question
 								? "Save label"
 								: "Save as new question"}
 						</Button>
 						<Button
-							size="sm"
-							variant="ghost"
+							size="md"
+							variant="secondary"
 							type="button"
 							onClick={() => setEditing(null)}
 						>
@@ -493,11 +494,11 @@ function QuestionTest({
 										{[true, false].map((yes) => (
 											<Button
 												key={String(yes)}
-												size="xs"
+												size="sm"
 												variant={
 													verdicts[verdictKey(run)] === yes
-														? "default"
-														: "outline"
+														? "primary"
+														: "primary"
 												}
 												aria-pressed={verdicts[verdictKey(run)] === yes}
 												onClick={() =>
@@ -516,7 +517,8 @@ function QuestionTest({
 			) : null}
 			{judged.length ? (
 				<Button
-					size="sm"
+					variant="primary"
+					size="md"
 					className="self-start"
 					onClick={() =>
 						run(() =>

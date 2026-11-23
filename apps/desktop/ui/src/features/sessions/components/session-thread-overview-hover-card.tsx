@@ -399,9 +399,10 @@ function SessionZoomSelectionCard({
 				</div>
 			</div>
 			<Button
+				variant="secondary"
 				className="relative self-center"
 				onClick={onConfirm}
-				size="xs"
+				size="sm"
 				type="button"
 			>
 				<TouchTarget />

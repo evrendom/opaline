@@ -62,8 +62,8 @@ export function SessionsSettingsView({
 							<code>{MANAGE_COMMAND}</code>
 							<Button
 								type="button"
-								variant="quiet"
-								size="sm"
+								variant="secondary"
+								size="md"
 								className="corner-s transition-none active:not-aria-[haspopup]:translate-y-0"
 								onClick={onCopy}
 								aria-label="Copy repository management command"
@@ -106,8 +106,8 @@ export function SessionsSettingsView({
 						</h2>
 						<Button
 							type="button"
-							variant="outline"
-							size="sm"
+							variant="primary"
+							size="md"
 							className="bg-canvas hover:bg-field"
 							disabled={fetching}
 							onClick={onRefresh}

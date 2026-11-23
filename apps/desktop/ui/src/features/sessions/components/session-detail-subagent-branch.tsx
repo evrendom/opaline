@@ -118,9 +118,9 @@ function SubagentBranchStatus({
 			<Button
 				className="h-8 [&_svg:not([class*='size-'])]:size-4"
 				onClick={onRetry}
-				size="sm"
+				size="md"
 				type="button"
-				variant="ghost"
+				variant="secondary"
 			>
 				Retry
 			</Button>

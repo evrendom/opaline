@@ -114,8 +114,8 @@ export function SetupCard({
 						{versions.map((version, index) => (
 							<Button
 								key={version.version}
-								size="xs"
-								variant="ghost"
+								size="sm"
+								variant="secondary"
 								className={cn(
 									"font-mono",
 									TOGGLE,

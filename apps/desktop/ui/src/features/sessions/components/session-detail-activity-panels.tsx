@@ -97,9 +97,9 @@ export function SessionDetailActivityOccurrencePanel({
 					aria-label={`Back to ${group.label}`}
 					className="size-7 corner-s text-ink-2 dark:hover:bg-hover-strong"
 					onClick={onBack}
-					size="icon-sm"
+					size="icon"
 					type="button"
-					variant="ghost"
+					variant="secondary"
 				>
 					<IconArrowLeft aria-hidden="true" className="size-3.5 text-current" />
 				</Button>
@@ -121,6 +121,7 @@ export function SessionDetailActivityOccurrencePanel({
 					{occurrence.time ? ` · ${occurrence.time}` : ""}
 				</p>
 				<Button
+					variant="primary"
 					className="mt-l px-[calc(var(--space-m)+var(--space-xxs))] [&_svg:not([class*='size-'])]:size-3"
 					onClick={() => {
 						onJump({
@@ -129,7 +130,7 @@ export function SessionDetailActivityOccurrencePanel({
 						});
 						window.setTimeout(onClose, 0);
 					}}
-					size="xs"
+					size="sm"
 					type="button"
 				>
 					View in transcript

@@ -139,8 +139,8 @@ describe("session overview drag zoom selection", () => {
 		expect(markup).toContain("w-80");
 		expect(markup).toContain("font-body");
 		expect(markup).toContain('data-slot="button"');
-		expect(markup).toContain('data-variant="default"');
-		expect(markup).toContain('data-size="xs"');
+		expect(markup).toContain('data-variant="secondary"');
+		expect(markup).toContain('data-size="sm"');
 		expect(markup).toContain("h-6");
 	});
 

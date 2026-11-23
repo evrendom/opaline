@@ -574,7 +574,7 @@
 .cost-range-lead > :last-child:not(:first-child) {
 	margin-left: auto;
 }
-.cost-range-lead [data-variant="toolbar"] {
+.cost-range-lead [data-variant="primary"] {
 	display: block;
 	max-width: 100%;
 	padding-inline: var(--space-m);
@@ -582,7 +582,7 @@
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
-.cost-range-lead [data-variant="toolbar"] > svg {
+.cost-range-lead [data-variant="primary"] > svg {
 	display: inline-block;
 	margin-right: var(--space-s);
 	vertical-align: -3px;

@@ -64,9 +64,9 @@ function DialogContent({
 						data-slot="dialog-close"
 						render={
 							<Button
-								variant="quiet"
+								variant="secondary"
 								className="absolute top-4 right-4"
-								size="icon-sm"
+								size="icon"
 							/>
 						}
 					>
@@ -108,7 +108,7 @@ function DialogFooter({
 		>
 			{children}
 			{showCloseButton && (
-				<DialogPrimitive.Close render={<Button variant="outline" />}>
+				<DialogPrimitive.Close render={<Button variant="primary" />}>
 					Close
 				</DialogPrimitive.Close>
 			)}

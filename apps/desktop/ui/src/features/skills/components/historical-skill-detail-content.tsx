@@ -96,8 +96,8 @@ export function HistoricalSkillDetailContent({
 						) : null}
 						<Button
 							type="button"
-							size="xs"
-							variant="quiet"
+							size="sm"
+							variant="secondary"
 							aria-pressed={raw}
 							className="text-ink-4 hover:text-ink"
 							onClick={() => setRaw((value) => !value)}
@@ -204,7 +204,7 @@ function SkillVersionMenu({
 		<Menu.Root>
 			<Menu.Trigger
 				aria-label={`Skill version, ${label}`}
-				render={<Button variant="toolbar" />}
+				render={<Button variant="primary" />}
 			>
 				<IconStack2
 					aria-hidden="true"

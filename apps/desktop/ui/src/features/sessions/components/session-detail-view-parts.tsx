@@ -39,13 +39,13 @@ export class SessionDetailErrorBoundary extends Component<
 							<Button
 								onClick={() => window.location.reload()}
 								type="button"
-								variant="outline"
+								variant="primary"
 							>
 								<IconRefresh />
 								Reload
 							</Button>
 							<a
-								className={buttonVariants({ variant: "ghost" })}
+								className={buttonVariants({ variant: "secondary" })}
 								href={this.props.fallbackHref}
 							>
 								Back to sessions

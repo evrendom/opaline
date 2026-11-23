@@ -1335,9 +1335,9 @@ function PaneMessage({
 				<Button
 					className="h-8 [&_svg:not([class*='size-'])]:size-4"
 					onClick={onAction}
-					size="sm"
+					size="md"
 					type="button"
-					variant="outline"
+					variant="primary"
 				>
 					{actionLabel}
 				</Button>

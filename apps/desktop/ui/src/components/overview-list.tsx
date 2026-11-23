@@ -210,7 +210,7 @@ export function OverviewRangeFiltersMenu<TKey extends string>({
 				aria-label={triggerLabel}
 				title={triggerLabel}
 				data-active={activeFilterCount > 0 || undefined}
-				render={<Button variant="toolbar" />}
+				render={<Button variant="primary" />}
 			>
 				<FilterTriggerLabel activeCount={activeFilterCount} />
 			</PopoverTrigger>

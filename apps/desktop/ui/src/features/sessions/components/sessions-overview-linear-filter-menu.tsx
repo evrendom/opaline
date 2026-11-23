@@ -25,8 +25,8 @@ export function LinearActiveFiltersButton({
 	return (
 		<Button
 			type="button"
-			variant="ghost"
-			size="icon-sm"
+			variant="secondary"
+			size="icon"
 			aria-label={label}
 			className="relative size-7 corner-s text-ink hover:bg-hover-strong"
 			onClick={onClick}

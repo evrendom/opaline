@@ -1349,9 +1349,9 @@ function TranscriptRowContent({
 					<Button
 						className="h-8 [&_svg:not([class*='size-'])]:size-4"
 						onClick={() => onRetryTurn?.(row.turnId)}
-						size="sm"
+						size="md"
 						type="button"
-						variant="outline"
+						variant="primary"
 					>
 						Retry turn
 					</Button>
@@ -1371,9 +1371,9 @@ function TranscriptRowContent({
 						onClick={() =>
 							startTransition(() => onLoadDirection?.(row.direction))
 						}
-						size="sm"
+						size="md"
 						type="button"
-						variant="outline"
+						variant="primary"
 					>
 						{row.state === "loading"
 							? "Loading…"

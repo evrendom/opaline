@@ -171,9 +171,7 @@ export function SessionsOverviewFiltersMenu({
 				aria-label={triggerLabel}
 				title={triggerLabel}
 				data-active={activeFilterCount > 0 || undefined}
-				render={
-					<Button variant="toolbar" size={iconOnly ? "icon" : "default"} />
-				}
+				render={<Button variant="primary" size={iconOnly ? "icon" : "md"} />}
 			>
 				<FilterTriggerLabel
 					activeCount={activeFilterCount}
@@ -350,8 +348,8 @@ export function SessionsOverviewFiltersMenu({
 								{selectedFilter ? (
 									<Button
 										type="button"
-										variant="ghost"
-										size="icon-sm"
+										variant="secondary"
+										size="icon"
 										aria-label="Back to all filters"
 										className="relative size-7 corner-s text-ink-3"
 										onClick={() => setSelectedFilterKey(null)}

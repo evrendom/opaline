@@ -75,8 +75,8 @@ export function ChangeBlock({
 				) : null}
 				{turnId ? (
 					<Button
-						size="xs"
-						variant="ghost"
+						size="sm"
+						variant="secondary"
 						className="ml-auto text-ink-3 px-[calc(var(--space-m)+var(--space-xxs))] [&_svg:not([class*='size-'])]:size-3"
 						onClick={() => onOpenTurn(turnId, change.agentId || undefined)}
 					>

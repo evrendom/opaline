@@ -24,7 +24,7 @@ export function SessionsFocusedDayTag() {
 				<Button
 					key="focused-day"
 					type="button"
-					variant="toolbar"
+					variant="primary"
 					aria-pressed="true"
 					title="Show every day again"
 					aria-label={`Showing ${dayLabel(picked)} only. Show every day again`}

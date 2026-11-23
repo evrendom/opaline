@@ -79,7 +79,7 @@ export function ToolbarSortMenu<K extends string>({
 			<Menu.Trigger
 				ref={triggerRef}
 				aria-label={`Sort ${noun}, ${activeSortLabel}, ${sort.direction === "asc" ? "ascending" : "descending"}`}
-				render={<Button variant="toolbar" />}
+				render={<Button variant="primary" />}
 			>
 				<IconSortDescending
 					aria-hidden="true"

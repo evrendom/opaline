@@ -191,8 +191,8 @@ export function WorkspaceMembersTable({
 								signInLink.canCopy(member) ? (
 									<Button
 										type="button"
-										variant="quiet"
-										size="icon-sm"
+										variant="secondary"
+										size="icon"
 										className="settings-icon-button"
 										aria-label={
 											pendingKey === `link:${member.id}`
@@ -215,8 +215,8 @@ export function WorkspaceMembersTable({
 							{canEdit && member.role !== "owner" ? (
 								<Button
 									type="button"
-									variant="quiet"
-									size="icon-sm"
+									variant="secondary"
+									size="icon"
 									className="settings-icon-button"
 									aria-label={
 										pendingKey === `remove:${member.id}`
@@ -251,16 +251,16 @@ export function WorkspaceMembersTable({
 					<DialogFooter>
 						<Button
 							type="button"
-							variant="bordered"
-							size="md"
+							variant="primary"
+							size="lg"
 							onClick={() => setRemoving(null)}
 						>
 							Cancel
 						</Button>
 						<Button
 							type="button"
-							variant="destructive"
-							size="md"
+							variant="danger"
+							size="lg"
 							onClick={() => {
 								if (removing) onRemove(removing.id);
 								setRemoving(null);

@@ -205,9 +205,9 @@ export function ReposOverview({
 						action={
 							<Button
 								type="button"
-								size="sm"
+								size="md"
 								className="h-8 gap-xs"
-								variant="outline"
+								variant="primary"
 								onClick={() => {
 									setSearch("");
 									clearFilters();

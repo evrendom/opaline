@@ -96,7 +96,12 @@ export function CreateWorkspaceCard({
 							{error}
 						</p>
 					) : null}
-					<Button type="submit" size="sm" disabled={isCreating || !slugPreview}>
+					<Button
+						variant="primary"
+						type="submit"
+						size="md"
+						disabled={isCreating || !slugPreview}
+					>
 						{isCreating ? "Creating workspace…" : submitLabel}
 					</Button>
 				</div>

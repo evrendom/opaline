@@ -17,8 +17,8 @@ export function RetryButton({
 	return (
 		<Button
 			type="button"
-			variant="outline"
-			size="sm"
+			variant="primary"
+			size="md"
 			className={className}
 			disabled={retrying}
 			onClick={onRetry}

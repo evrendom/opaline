@@ -530,8 +530,8 @@ export function UsageSessionDetail({
 					<Button
 						aria-label={backLabel}
 						title={backLabel}
-						variant="ghost"
-						size="icon-sm"
+						variant="secondary"
+						size="icon"
 						onClick={onBack}
 					>
 						<IconChevronLeft size={16} />

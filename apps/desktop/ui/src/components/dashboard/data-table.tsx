@@ -297,7 +297,7 @@ export function ToggleChip({
 }) {
 	return (
 		<Button
-			variant={active ? "destructive" : "outline"}
+			variant={active ? "danger" : "primary"}
 			aria-pressed={active}
 			onClick={onClick}
 			className={cn(
@@ -335,7 +335,7 @@ export function ClearFiltersButton({
 					className="inline-flex"
 				>
 					<Button
-						variant="outline"
+						variant="primary"
 						onClick={onClick}
 						className="text-ink-3 gap-xs bg-surface hover:bg-hover aria-expanded:bg-hover dark:hover:bg-hover dark:aria-expanded:bg-hover"
 					>
@@ -447,8 +447,8 @@ export function PaginationFooter({
 			)}
 			<div className="ml-s flex items-center gap-xs">
 				<Button
-					variant={page === 0 || isFetching ? "ghost" : "outline"}
-					size="icon-sm"
+					variant={page === 0 || isFetching ? "secondary" : "primary"}
+					size="icon"
 					aria-label="Previous page"
 					disabled={page === 0 || isFetching}
 					onClick={() => onPageChange(page - 1)}
@@ -456,8 +456,10 @@ export function PaginationFooter({
 					<IconChevronLeft />
 				</Button>
 				<Button
-					variant={page + 1 >= totalPages || isFetching ? "ghost" : "outline"}
-					size="icon-sm"
+					variant={
+						page + 1 >= totalPages || isFetching ? "secondary" : "primary"
+					}
+					size="icon"
 					aria-label="Next page"
 					disabled={page + 1 >= totalPages || isFetching}
 					onClick={() => onPageChange(page + 1)}

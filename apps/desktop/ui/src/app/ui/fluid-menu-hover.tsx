@@ -4,7 +4,7 @@ import { FluidHoverHighlight } from "./fluid-hover-highlight";
 import "./fluid-menu-hover.css";
 
 const DEFAULT_ITEMS =
-	'[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="option"], button:not([data-slot="button"]), [data-slot="button"][data-variant="ghost"], [data-fluid-menu-option], label[for]';
+	'[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="option"], button:not([data-slot="button"]), [data-slot="button"][data-variant="secondary"], [data-fluid-menu-option], label[for]';
 const ROOT = "[data-fluid-menu-root]";
 
 /**

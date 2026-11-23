@@ -245,7 +245,7 @@ function FilesUnavailable({
 					description="Opaline reads files from GitHub when you open them and never stores them."
 				>
 					<Button
-						variant="outline"
+						variant="primary"
 						className="mx-auto mt-m"
 						render={<Link to={getShellRoutePath(appRoutes.settingsGitHub())} />}
 					>

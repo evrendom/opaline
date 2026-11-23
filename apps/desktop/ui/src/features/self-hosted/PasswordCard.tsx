@@ -144,8 +144,9 @@ export function PasswordCard() {
 					</p>
 				) : null}
 				<Button
+					variant="primary"
 					type="submit"
-					size="sm"
+					size="md"
 					className="h-8 gap-xs"
 					disabled={saving || currentPasswordRequired === null}
 				>

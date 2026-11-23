@@ -25,67 +25,34 @@ import { Group, Specimen, State } from "./kit";
 import { demoPortraits } from "./providers";
 
 /*
- * Button variant × size × state, only as the reachable code passes them
- * (components/screens' <Button …> and buttonVariants(…) calls). Sizes the app
- * never passes to a variant are not shown.
+ * Button: four variants and nothing else (primary, secondary, danger, link),
+ * sizes sm, md (default), lg, icon-sm, icon and inline. `secondary` is the
+ * default; `primary` is named on purpose, once per view.
  */
 function Buttons() {
 	return (
 		<>
 			<Specimen
-				name="Button · default"
+				name="Button · primary"
 				source="app/ui/button.tsx"
-				where="Primary actions: Invite, Create workspace, Apply in the date picker, Go to dashboard (404), sign-in forms."
+				where="The screen's main action (Save, Connect, Apply, Sign in, Create workspace) and the toolbar's pills (date range, Sorted by, Filter). One main action per view."
 			>
-				<State label="default">
-					<Button>Go to dashboard</Button>
+				<State label="md">
+					<Button variant="primary">Save</Button>
 				</State>
-				<State label="sm">
-					<Button size="sm">Invite</Button>
-				</State>
-				<State label="sm, disabled (pending)">
-					<Button size="sm" disabled>
+				<State label="md, disabled (pending)">
+					<Button variant="primary" disabled>
 						Create workspace
 					</Button>
 				</State>
-				<State label="xs">
-					<Button size="xs">View in transcript</Button>
-				</State>
-				<State label="xs, disabled (link pending)">
-					<Button size="xs" disabled>
-						Copy
-					</Button>
-				</State>
-				<State label="xs, aria-pressed (admin verdict)">
-					<Button size="xs" aria-pressed>
-						Yes
-					</Button>
-				</State>
-				<State label="disabled">
-					<Button disabled>Continue</Button>
-				</State>
-			</Specimen>
-			<Specimen
-				name="Button · outline"
-				source="app/ui/button.tsx"
-				where="Secondary actions: Cancel in dialogs, Manage on GitHub, Reconnect, Open dashboard, Create invite link, Refresh."
-			>
-				<State label="default">
-					<Button variant="outline">Cancel</Button>
-				</State>
 				<State label="sm">
-					<Button variant="outline" size="sm">
-						Reconnect
-					</Button>
-				</State>
-				<State label="sm, disabled">
-					<Button variant="outline" size="sm" disabled>
-						Create invite link
+					<Button variant="primary" size="sm">
+						View in transcript
 					</Button>
 				</State>
 				<State label="as a link (render)">
 					<Button
-						variant="outline"
+						variant="primary"
 						nativeButton={false}
 						render={
 							// biome-ignore lint/a11y/useAnchorContent: the Button's children fill the anchor
@@ -96,96 +63,87 @@ function Buttons() {
 						Open on GitHub
 					</Button>
 				</State>
-				<State label="icon-sm (pager, enabled side)">
-					<Button variant="outline" size="icon-sm" aria-label="Next page">
+				<State label="pill, data-active (a range is set)">
+					<Button variant="primary" data-active="">
+						<IconCalendar />
+						Aug 24 - Aug 31, 2026 · Daily
+					</Button>
+				</State>
+				<State label="pill, open (data-popup-open)">
+					<Button variant="primary" data-popup-open="">
+						<IconAdjustmentsHorizontal />
+						Filter
+					</Button>
+				</State>
+				<State label="pill, aria-pressed (focused day)">
+					<Button variant="primary" aria-pressed>
+						Aug 24
+						<IconX />
+					</Button>
+				</State>
+				<State label="icon (pager, enabled side)">
+					<Button variant="primary" size="icon" aria-label="Next page">
 						<IconChevronRight />
 					</Button>
 				</State>
 			</Specimen>
 			<Specimen
-				name="Button · ghost"
+				name="Button · secondary (the default)"
 				source="app/ui/button.tsx"
-				where="Quiet actions: dialog and sheet close, member remove, the pager's end side, Raw / Rendered and version toggles, Retry, Copy, Cancel."
+				where="Everything that isn't the main action: Cancel, Retry, Copy, row actions, close and remove icons, Raw / Rendered toggles, the calendar's month arrows."
 			>
-				<State label="sm">
-					<Button variant="ghost" size="sm">
-						Retry
-					</Button>
+				<State label="md">
+					<Button>Cancel</Button>
 				</State>
-				<State label="sm, with icon">
-					<Button variant="ghost" size="sm">
+				<State label="md, with icon">
+					<Button>
 						<IconCopy aria-hidden="true" />
 						Copy
 					</Button>
 				</State>
-				<State label="sm, disabled">
-					<Button variant="ghost" size="sm" disabled>
-						Cancel
-					</Button>
+				<State label="md, disabled">
+					<Button disabled>Cancel</Button>
 				</State>
-				<State label="xs (file change's turn link)">
-					<Button variant="ghost" size="xs">
+				<State label="sm (file change's turn link)">
+					<Button size="sm">
 						Turn 1ic31r
 						<IconArrowUpRight data-icon="inline-end" />
 					</Button>
 				</State>
-				<State label="xs, rest / aria-pressed (Raw · Rendered)">
+				<State label="sm, rest / aria-pressed (Raw · Rendered)">
 					<div className="flex gap-xs">
-						<Button variant="ghost" size="xs" aria-pressed={false}>
+						<Button size="sm" aria-pressed={false}>
 							Raw
 						</Button>
-						<Button variant="ghost" size="xs" aria-pressed>
+						<Button size="sm" aria-pressed>
 							Rendered
 						</Button>
 					</div>
 				</State>
-				<State label="icon-sm">
-					<Button variant="ghost" size="icon-sm" aria-label="Remove member">
+				<State label="icon">
+					<Button size="icon" aria-label="Remove member">
 						<IconTrash />
 					</Button>
 				</State>
-				<State label="icon-sm, disabled">
-					<Button
-						variant="ghost"
-						size="icon-sm"
-						aria-label="Previous page"
-						disabled
-					>
+				<State label="icon, disabled">
+					<Button size="icon" aria-label="Previous page" disabled>
 						<IconChevronLeft />
-					</Button>
-				</State>
-				<State label="icon (calendar month)">
-					<Button variant="ghost" size="icon" aria-label="Previous month">
-						<IconChevronLeft />
-					</Button>
-				</State>
-				<State label="disabled">
-					<Button variant="ghost" disabled>
-						Cancel
 					</Button>
 				</State>
 			</Specimen>
 			<Specimen
-				name="Button · destructive"
+				name="Button · danger"
 				source="app/ui/button.tsx"
-				where="Delete workspace, Disconnect GitHub, Revoke existing links, Delete account."
+				where="Destructive or hard-to-undo actions only: Delete workspace, Disconnect GitHub, Revoke existing links."
 			>
-				<State label="default">
-					<Button variant="destructive">Delete workspace</Button>
-				</State>
-				<State label="default, disabled (until confirmed)">
-					<Button variant="destructive" disabled>
-						Delete workspace
-					</Button>
-				</State>
-				<State label="sm">
-					<Button variant="destructive" size="sm">
+				<State label="md">
+					<Button variant="danger">
 						<IconTrash />
 						Delete workspace
 					</Button>
 				</State>
-				<State label="sm, disabled">
-					<Button variant="destructive" size="sm" disabled>
+				<State label="md, disabled (until confirmed)">
+					<Button variant="danger" disabled>
 						Revoke existing links
 					</Button>
 				</State>
@@ -193,7 +151,7 @@ function Buttons() {
 			<Specimen
 				name="Button · link, inline"
 				source="app/ui/button.tsx"
-				where="A retry inside a sentence: sessions settings repositories, email digests, the desktop repository picker."
+				where="An action inside a sentence. Navigation is a <Link>, not a button."
 			>
 				<State label="link, inline">
 					<span className="text-body-xl text-ink-2">
@@ -209,46 +167,11 @@ function Buttons() {
 				source="components/retry-button.tsx"
 				where="After a load failed: repos, skills, MCP, dashboard chart, session reader, report, GitHub connection."
 			>
-				<State label="rest (outline, sm)">
+				<State label="rest">
 					<RetryButton onRetry={() => {}} />
 				</State>
 				<State label="retrying">
 					<RetryButton onRetry={() => {}} retrying />
-				</State>
-			</Specimen>
-			<Specimen
-				name="Button · toolbar"
-				source="app/ui/button.tsx"
-				where="The page toolbar's pills: date range, Sorted by, Filter, the focused-day tag, invite link actions."
-			>
-				<State label="rest">
-					<Button variant="toolbar">
-						<IconCalendar />
-						Aug 24 - Aug 31, 2026 · Daily
-					</Button>
-				</State>
-				<State label="data-active (a range is set)">
-					<Button variant="toolbar" data-active="">
-						<IconCalendar />
-						Aug 24 - Aug 31, 2026 · Daily
-					</Button>
-				</State>
-				<State label="open (data-popup-open)">
-					<Button variant="toolbar" data-popup-open="">
-						<IconAdjustmentsHorizontal />
-						Filter
-					</Button>
-				</State>
-				<State label="aria-pressed (focused day)">
-					<Button variant="toolbar" aria-pressed>
-						Aug 24
-						<IconX />
-					</Button>
-				</State>
-				<State label="disabled">
-					<Button variant="toolbar" disabled>
-						Copy
-					</Button>
 				</State>
 			</Specimen>
 		</>
@@ -373,16 +296,18 @@ function Fields() {
 							placeholder="you@company.com"
 						/>
 					</div>
-					<Button className="form-button">Continue</Button>
+					<Button variant="primary" className="form-button">
+						Continue
+					</Button>
 					<div className="flex items-center gap-m">
 						<Separator className="flex-1" />
 						<span className="text-body-m text-ink-3">or</span>
 						<Separator className="flex-1" />
 					</div>
-					<Button className="form-button" variant="outline">
+					<Button className="form-button" variant="primary">
 						Continue with GitHub
 					</Button>
-					<Button className="form-button" disabled>
+					<Button variant="primary" className="form-button" disabled>
 						Continue
 					</Button>
 				</div>
@@ -465,7 +390,7 @@ export function ControlsGroup() {
 				where="Icons lead the label at 14px; Invite, Create workspace (link), Delete workspace."
 			>
 				<State label="default sm + icon">
-					<Button size="sm">
+					<Button variant="primary" size="md">
 						<IconPlus data-icon="inline-start" />
 						Create workspace
 					</Button>

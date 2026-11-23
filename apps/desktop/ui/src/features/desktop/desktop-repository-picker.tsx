@@ -271,8 +271,9 @@ export function DesktopRepositoryPicker({
 						: status.text}
 				</p>
 				<Button
+					variant="primary"
 					type="button"
-					size="sm"
+					size="md"
 					className="h-8 gap-xs"
 					disabled={!canSubmit}
 					onClick={() => void submit()}

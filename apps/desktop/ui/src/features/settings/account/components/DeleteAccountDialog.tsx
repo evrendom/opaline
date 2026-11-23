@@ -96,8 +96,8 @@ export function DeleteAccountDialog({
 				<DialogFooter>
 					<Button
 						type="button"
-						variant="bordered"
-						size="md"
+						variant="primary"
+						size="lg"
 						onClick={() => onOpenChange(false)}
 						disabled={isDeleting}
 					>
@@ -105,8 +105,8 @@ export function DeleteAccountDialog({
 					</Button>
 					<Button
 						type="button"
-						variant="destructive"
-						size="md"
+						variant="danger"
+						size="lg"
 						onClick={() => void handleDelete()}
 						disabled={!canDelete}
 					>

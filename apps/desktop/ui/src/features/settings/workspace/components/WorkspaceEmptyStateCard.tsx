@@ -22,7 +22,7 @@ export function WorkspaceEmptyStateCard() {
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="group-data-[size=sm]/card:px-xl">
-				<Link to="#new-workspace" className={buttonVariants({ size: "sm" })}>
+				<Link to="#new-workspace" className={buttonVariants({ size: "md" })}>
 					<IconPlus data-icon="inline-start" />
 					Create workspace
 				</Link>

@@ -112,15 +112,15 @@ export function ResetPasswordForm({
 							{feedback.message}
 						</div>
 					) : null}
-					<Button type="submit" disabled={loading || !token}>
+					<Button variant="primary" type="submit" disabled={loading || !token}>
 						{loading ? "Resetting password..." : "Reset password"}
 					</Button>
 				</form>
 
 				<Button
 					type="button"
-					variant="ghost"
-					size="sm"
+					variant="secondary"
+					size="md"
 					onClick={onBackToLogin}
 					className="self-start text-ink-3"
 				>

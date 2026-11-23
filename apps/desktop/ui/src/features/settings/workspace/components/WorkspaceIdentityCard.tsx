@@ -198,16 +198,17 @@ export function WorkspaceIdentityCard({
 					) : null}
 					<Button
 						type="button"
-						variant="outline"
-						size="sm"
+						variant="primary"
+						size="md"
 						onClick={cancelEditing}
 						disabled={isSavingName}
 					>
 						Cancel
 					</Button>
 					<Button
+						variant="primary"
 						type="button"
-						size="sm"
+						size="md"
 						onClick={() => void saveName()}
 						disabled={
 							isSavingName || editedName.trim().length === 0 || invalidSlug

@@ -184,7 +184,7 @@ export function AnalyticsDateRangePicker({
 				render={
 					<Button
 						type="button"
-						variant="toolbar"
+						variant="primary"
 						data-active
 						className={triggerClassName}
 					/>
@@ -334,8 +334,8 @@ export function AnalyticsDateRangePicker({
 			<>
 				<Button
 					type="button"
-					variant="quiet"
-					size="sm"
+					variant="secondary"
+					size="md"
 					className="session-date-picker-action session-date-picker-cancel"
 					onClick={() => {
 						resetDraftDateRange();
@@ -345,8 +345,9 @@ export function AnalyticsDateRangePicker({
 					Cancel
 				</Button>
 				<Button
+					variant="primary"
 					type="submit"
-					size="sm"
+					size="md"
 					className="session-date-picker-action session-date-picker-apply"
 					disabled={!canApplyRange}
 				>

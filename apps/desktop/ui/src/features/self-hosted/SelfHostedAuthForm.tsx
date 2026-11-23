@@ -217,7 +217,7 @@ export function SelfHostedAuthForm({
 							<Button
 								key={provider}
 								type="button"
-								variant={index === 0 ? "default" : "outline"}
+								variant="primary"
 								className={cn(
 									"form-button",
 									index === 0 && "opaline-website-primary-button",
@@ -276,13 +276,18 @@ export function SelfHostedAuthForm({
 						}}
 						required
 					/>
-					<Button className="form-button" type="submit" disabled={loading}>
+					<Button
+						variant="primary"
+						className="form-button"
+						type="submit"
+						disabled={loading}
+					>
 						{loading ? "Verifying..." : "Verify code"}
 					</Button>
 					<Button
 						type="button"
-						variant="ghost"
-						size="sm"
+						variant="secondary"
+						size="md"
 						className="form-button text-ink-3"
 						disabled={loading}
 						onClick={() => {
@@ -364,7 +369,12 @@ export function SelfHostedAuthForm({
 							required
 						/>
 					</div>
-					<Button className="form-button" type="submit" disabled={loading}>
+					<Button
+						variant="primary"
+						className="form-button"
+						type="submit"
+						disabled={loading}
+					>
 						{mode === "sign-in"
 							? loading
 								? "Signing in..."
@@ -376,8 +386,8 @@ export function SelfHostedAuthForm({
 					{emailCodes ? (
 						<Button
 							type="button"
-							variant="ghost"
-							size="sm"
+							variant="secondary"
+							size="md"
 							className="form-button text-ink-3"
 							disabled={loading}
 							onClick={() => void sendCode()}

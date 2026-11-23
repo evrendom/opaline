@@ -50,8 +50,8 @@ export function ProfileLinkedAccountsCard({
 						) : (
 							<Button
 								type="button"
-								variant="outline"
-								size="sm"
+								variant="primary"
+								size="md"
 								aria-label={`Link ${provider.label}`}
 								onClick={() => onLinkProvider(provider.id)}
 								disabled={isPending || linkingProvider !== null}
