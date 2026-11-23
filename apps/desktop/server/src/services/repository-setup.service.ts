@@ -1,3 +1,4 @@
+import { getLogger } from "@logtape/logtape";
 import {
 	REPOSITORY_LISTED_SKILL_LIMIT,
 	REPOSITORY_MCP_TOOL_LIMIT,
@@ -23,6 +24,8 @@ import { committedBuildSql } from "./analysis/run-index-reader.js";
 import { ANALYSIS_QUERY_SETTINGS, query } from "./analysis/sql.js";
 import { RUN_INDEX_TABLE } from "./l1-edges/l1-edge-tables.js";
 import type { SessionRunCiScope } from "./run-ci/session-run-ci.js";
+
+const logger = getLogger(["rudel", "api", "repository-setup"]);
 
 const FINGERPRINT_SQL =
 	"hex(MD5(toJSONString(tuple(sa.git_remote, sa.package_name, sa.project_path))))";
@@ -62,9 +65,15 @@ export async function repositorySetup(
 			LIMIT ${REPOSITORY_SETUP_FILE_LIMIT}`,
 		query_params: repo.params,
 	});
-	const listed = query(env.executor, ListedSkillRowSchema, {
-		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
-		query: `WITH ${repo.sessionsCte}
+	// The listed skills are read only for one repo's setup view: across every
+	// repo (the skill and MCP pages) nothing reads them, and the scan would
+	// read all of transcript_records.text.
+	const listed =
+		repoKey === undefined
+			? Promise.resolve([])
+			: query(env.executor, ListedSkillRowSchema, {
+					clickhouse_settings: ANALYSIS_QUERY_SETTINGS,
+					query: `WITH ${repo.sessionsCte}
 			SELECT name, any(description) AS description,
 				uniqExact((user_id, session_id)) AS sessions,
 				toUnixTimestamp64Milli(max(ts)) AS last_ms
@@ -84,8 +93,14 @@ export async function repositorySetup(
 			GROUP BY name
 			ORDER BY sessions DESC, name
 			LIMIT ${REPOSITORY_LISTED_SKILL_LIMIT}`,
-		query_params: repo.params,
-	});
+					query_params: repo.params,
+				}).catch((error: unknown) => {
+					// The listings live in transcript_records.text: a large repo's scan can
+					// pass ClickHouse's read limit. They're extra; the setup files must
+					// still come back.
+					logger.warn("Listed skills skipped: {error}", { error });
+					return [];
+				});
 	const [rows, listedRows] = await Promise.all([setupFiles, listed]);
 	return {
 		files: rows.map((row) => ({

@@ -14,7 +14,7 @@ type Rows = readonly Record<string, unknown>[];
 function executorOf(tables: {
 	fingerprints: Rows;
 	files?: Rows;
-	listed?: Rows;
+	listed?: Rows | Error;
 	texts?: Rows;
 }) {
 	const statements: ClickHouseStatement[] = [];
@@ -34,6 +34,7 @@ function executorOf(tables: {
 						: sql.includes("rudel.session_analytics")
 							? tables.fingerprints
 							: undefined;
+			if (rows instanceof Error) throw rows;
 			if (!rows) throw new Error(`unexpected statement: ${sql}`);
 			return rows as T[];
 		},
@@ -125,7 +126,8 @@ describe("repositorySetup", () => {
 			range,
 		);
 		expect(result).toEqual({ files: [], listedSkills: [] });
-		expect(executor.statements).toHaveLength(2);
+		// the setup files only: the listed-skills scan is skipped without a repo
+		expect(executor.statements).toHaveLength(1);
 		for (const statement of executor.statements) {
 			expect(statement.query).toContain("repo_sessions");
 			expect(statement.query).not.toContain("{fingerprints:");
@@ -163,6 +165,49 @@ describe("repositorySetup", () => {
 		const statement = executor.statements[2];
 		expect(statement?.query).toContain("subtype = 'skill_listing'");
 		expect(statement?.query).toContain("repo_sessions");
+	});
+
+	test("across every repo (the skill and MCP pages) it skips the listed-skills scan", async () => {
+		const executor = executorOf({
+			fingerprints: [],
+			files: [],
+			listed: new Error("the listed-skills scan must not run here"),
+		});
+		const result = await repositorySetup({ executor }, WORKSPACE, undefined);
+		expect(result.listedSkills).toEqual([]);
+		expect(
+			executor.statements.some((statement) =>
+				statement.query.includes("rudel.transcript_records"),
+			),
+		).toBe(false);
+	});
+
+	test("a listed-skills scan over ClickHouse's read limit still returns the files", async () => {
+		const executor = executorOf({
+			fingerprints: [ATHENA],
+			files: [
+				{
+					setup_file: "skill:/Users/evren/.claude/skills/ui/SKILL.md",
+					kind: "skill_body",
+					scope: "user",
+					owner: "ui",
+					path: "/Users/evren/.claude/skills/ui/SKILL.md",
+					versions: "1",
+					runs: "3",
+					sessions: "2",
+					subagents: 0,
+					chars: "1200",
+					first_ms: ms("2026-11-01T10:00:00.000Z"),
+					last_ms: ms("2026-11-02T10:00:00.000Z"),
+				},
+			],
+			listed: new Error(
+				"Limit for rows or bytes to read exceeded, max bytes: 4.00 GiB",
+			),
+		});
+		const result = await repositorySetup({ executor }, WORKSPACE, REPO_KEY);
+		expect(result.files.map((file) => file.owner)).toEqual(["ui"]);
+		expect(result.listedSkills).toEqual([]);
 	});
 
 	test("a member who reads only their own sessions gets only theirs", async () => {
