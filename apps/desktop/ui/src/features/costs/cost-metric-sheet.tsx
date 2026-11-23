@@ -257,6 +257,7 @@ export function ExpandButton({
 		<span className="cost-metric-expand">
 			<Button
 				type="button"
+				variant="primary"
 				size="icon-sm"
 				aria-expanded={expanded}
 				aria-label={expanded ? "Collapse details" : "Expand details"}
