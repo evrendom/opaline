@@ -123,7 +123,9 @@ const REPLAY_BUTTON = `(() => {
 			const content = document.querySelector('[data-slot="sidebar-content"]');
 			if (!content) return;
 			const footer = document.createElement("div");
-			footer.className = "flex flex-col gap-2 p-2";
+			// Inline, from the space steps: Tailwind only generates the classes
+			// the UI's source uses, so a class written here may not exist.
+			footer.style.cssText = "display:flex;flex-direction:column;gap:var(--space-m);padding:var(--space-m)";
 			list = document.createElement("ul");
 			list.className = template.closest('[data-slot="sidebar-menu"]')?.className ?? "";
 			footer.append(list);
