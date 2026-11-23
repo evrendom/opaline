@@ -1,6 +1,8 @@
 import { scanMemberLanguageSignals } from "@rudel/language-signals";
 import { type ReactNode, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
+import { Card, CardContent } from "@/app/ui/card";
+import { Pressable } from "@/app/ui/pressable";
 import { SignalText } from "@/components/signal-text";
 import { cn } from "@/lib/utils";
 import { TwoLines } from "./session-reader-two-lines";
@@ -42,29 +44,29 @@ export function MemberBubble({
 			{avatar ? (
 				<span className="mt-s flex shrink-0">{avatar}</span>
 			) : (
-				<Avatar className="mt-s size-6 shrink-0 shadow-card after:hidden">
+				<Avatar size="sm" className="mt-s shrink-0">
 					{imageUrl ? <AvatarImage src={imageUrl} alt="" /> : null}
-					<AvatarFallback className="text-body-xs">
-						{label.charAt(0).toUpperCase()}
-					</AvatarFallback>
+					<AvatarFallback>{label.charAt(0).toUpperCase()}</AvatarFallback>
 				</Avatar>
 			)}
-			<div className="min-w-0 flex-1 corner-m bg-surface px-l py-m shadow-card corner-squircle squircle:corner-xl-inner">
-				{folded ? (
-					<TwoLines className="text-body-xl">{message}</TwoLines>
-				) : (
-					message
-				)}
-				{!folded && text.length > MEMBER_TEXT_CLAMP ? (
-					<button
-						type="button"
-						onClick={() => setExpanded((value) => !value)}
-						className="mt-s text-body-m text-ink-3 focus-outline hover:text-ink"
-					>
-						{expanded ? "Show less" : "Show more"}
-					</button>
-				) : null}
-			</div>
+			<Card size="sm" className="min-w-0 flex-1">
+				<CardContent>
+					{folded ? (
+						<TwoLines className="text-body-xl">{message}</TwoLines>
+					) : (
+						message
+					)}
+					{!folded && text.length > MEMBER_TEXT_CLAMP ? (
+						<Pressable
+							type="button"
+							onClick={() => setExpanded((value) => !value)}
+							className="mt-s text-body-m text-ink-3 hover:text-ink"
+						>
+							{expanded ? "Show less" : "Show more"}
+						</Pressable>
+					) : null}
+				</CardContent>
+			</Card>
 		</div>
 	);
 }

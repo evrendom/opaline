@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { cn } from "@/lib/utils";
 import { squarify } from "../summary/session-reader-breakdown";
 import { TINT, tileGlyph, tileLook } from "./session-reader-context-bar";
@@ -162,21 +163,21 @@ export function ContextRunTiles({
 						}
 					>
 						{named ? (
-							<button
+							<Pressable
 								type="button"
 								data-context-tile=""
 								onClick={(event) =>
 									onPick?.({ key: each.key, thing: null }, event.shiftKey)
 								}
 								className={cn(
-									"absolute inset-x-0 top-0 flex h-5 items-center gap-xs focus-outline",
+									"absolute inset-x-0 top-0 flex h-5 items-center gap-xs",
 									"px-s",
 									"text-left text-body-s font-medium",
 								)}
 							>
 								<Glyph className="size-3 shrink-0" />
 								<span className="truncate">{each.label}</span>
-							</button>
+							</Pressable>
 						) : null}
 						<span
 							className="absolute"
@@ -275,7 +276,7 @@ function Thing({
 			</span>
 		);
 	return (
-		<button
+		<Pressable
 			type="button"
 			data-context-tile=""
 			title={thing.label}
@@ -291,15 +292,13 @@ function Thing({
 			className={cn(
 				"absolute z-10 flex items-center justify-center",
 				"corner-xs corner-squircle",
-				"pointer-events-auto transition-colors focus-outline",
+				"pointer-events-auto transition-colors",
 				"squircle:corner-xs",
-				lit
-					? litLook
-					: "edge-m border-current/25 hover:bg-hover dark:hover:bg-hover-strong",
+				lit ? litLook : "edge-m border-current/25 hover:bg-field",
 			)}
 			style={style}
 		>
 			{mark}
-		</button>
+		</Pressable>
 	);
 }

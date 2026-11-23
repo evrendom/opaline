@@ -186,7 +186,7 @@ export function TipLayer({
 					<TooltipContent
 						anchor={shown.anchor}
 						side={shown.entry.side}
-						className="pointer-events-none"
+						style={{ pointerEvents: "none" }}
 					>
 						{shown.entry.label}
 					</TooltipContent>

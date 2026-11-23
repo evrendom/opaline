@@ -319,8 +319,6 @@ export function SessionReaderCiView({
 
 function Frame({ children }: { children: ReactNode }) {
 	return (
-		<div className="h-full overflow-hidden px-[calc(var(--space-xxl)*4/3)] pt-m pb-m">
-			{children}
-		</div>
+		<div className="h-full overflow-hidden px-xxxl pt-m pb-m">{children}</div>
 	);
 }

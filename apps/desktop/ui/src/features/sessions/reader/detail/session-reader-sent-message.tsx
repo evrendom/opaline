@@ -1,6 +1,7 @@
 import { getRawToolInput } from "@rudel/api-routes";
 import { IconArrowRight } from "@tabler/icons-react";
 import type { CSSProperties } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { textOf, tintedGround } from "@/features/compass/subagent-exchanges";
 import { cn } from "@/lib/utils";
 import type { SessionReaderStep } from "../model/session-reader-model";
@@ -32,21 +33,21 @@ export function SentMessage({
 				<ModelAvatar flat loading={false} model={model} />
 			</span>
 			<div className="flex min-w-0 flex-1 flex-col gap-s">
-				<button
+				<Pressable
 					type="button"
 					onClick={onSelect}
 					className={cn(
 						"inline-flex w-fit items-center gap-xs",
 						"corner-xs",
 						"text-body-m font-medium",
-						"text-ink-3 focus-outline",
+						"text-ink-3",
 						"hover:text-ink",
 						selected && "text-ink",
 					)}
 				>
 					To subagent
 					<IconArrowRight aria-hidden="true" className="size-3" />
-				</button>
+				</Pressable>
 				<div
 					className={cn(
 						"min-w-0 corner-m px-l py-m shadow-card corner-squircle squircle:corner-xl-inner",

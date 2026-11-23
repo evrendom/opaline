@@ -405,7 +405,7 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 												<div
 													{...READER_CONTENT_MARK}
 													className={cn(
-														"grid grid-cols-[var(--reader-rail)_minmax(0,1fr)_3.5rem] gap-[calc(var(--space-xxl)*4/3)]",
+														"grid grid-cols-[var(--reader-rail)_minmax(0,1fr)_3.5rem] gap-xxxl",
 														"px-(--reader-gutter) pt-m pb-(--reader-inset)",
 														"xl:grid-cols-[var(--reader-rail)_minmax(0,1fr)] xl:gap-(--reader-columns-gap)",
 													)}
@@ -437,7 +437,7 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 														</div>
 													</nav>
 
-													<div className="col-start-2 row-start-1 flex min-w-0 items-start gap-[calc(var(--space-xxl)*4/3)] pt-(--reader-top)">
+													<div className="col-start-2 row-start-1 flex min-w-0 items-start gap-xxxl pt-(--reader-top)">
 														<div
 															className="flex min-w-0 flex-1 flex-col"
 															style={{ gap: TURN_GAP_PX }}
@@ -452,7 +452,7 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 															/>
 															<FrozenSubagentsLayer onSlot={setFrozenSlot} />
 															{turns.length === 0 ? (
-																<p className="py-[calc(var(--space-xxl)*2)] text-center text-body-xl text-ink-3">
+																<p className="py-xxxl text-center text-body-xl text-ink-3">
 																	{emptyMessage}
 																</p>
 															) : null}
@@ -515,7 +515,7 @@ export const SessionReaderContent = memo(function SessionReaderContent({
 															turns={turns}
 														/>
 													</div>
-													<div className="col-start-3 row-start-1 grid w-14 xl:col-start-2 xl:mr-[calc(var(--reader-card)+var(--space-xxl)*4/3)] xl:justify-self-end">
+													<div className="col-start-3 row-start-1 grid w-14 xl:col-start-2 xl:mr-[calc(var(--reader-card)+var(--space-xxxl))] xl:justify-self-end">
 														<ReaderMap
 															focus={readFocus}
 															mapKey={mapKey}

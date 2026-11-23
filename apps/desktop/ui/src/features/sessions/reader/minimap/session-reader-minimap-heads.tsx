@@ -70,11 +70,11 @@ export function MinimapHeads({
 			className="pointer-events-none absolute inset-0 z-20"
 		>
 			<Head x={main.member * width} y={y}>
-				<Avatar className="size-3 shadow-card after:hidden">
+				<Avatar size="sm" className="size-3">
 					{member.imageUrl ? (
 						<AvatarImage src={member.imageUrl} alt="" />
 					) : null}
-					<AvatarFallback className="text-body-xxs">
+					<AvatarFallback>
 						{member.label.charAt(0).toUpperCase()}
 					</AvatarFallback>
 				</Avatar>

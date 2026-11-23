@@ -9,6 +9,7 @@ import {
 } from "react";
 import { Link } from "react-router-dom";
 import { FlowNumber } from "@/app/ui/flow-number";
+import { Pressable } from "@/app/ui/pressable";
 import { ConversationSkillLink } from "@/components/conversation/conversation-skill-link";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { FileTree } from "@/components/pierre/file-tree";
@@ -97,13 +98,13 @@ export function ShowAll({
 	onClick: () => void;
 }) {
 	return (
-		<button
+		<Pressable
 			type="button"
 			onClick={onClick}
-			className="w-fit text-body-m text-ink-3 tabular-nums focus-outline hover:text-ink"
+			className="w-fit text-body-m text-ink-3 tabular-nums hover:text-ink"
 		>
 			{children}
-		</button>
+		</Pressable>
 	);
 }
 
@@ -177,7 +178,7 @@ export function Row({ children }: { children: ReactNode }) {
 	return (
 		<li
 			className={cn(
-				"flex min-h-8 min-w-0 items-center gap-[calc(var(--space-m)+var(--space-xxs))]",
+				"flex min-h-8 min-w-0 items-center gap-m",
 				"corner-s px-m py-xs",
 				"text-body-l",
 				"hover:bg-hover",
@@ -221,7 +222,7 @@ export function PlaceLink({
 	const first = places[0];
 	if (!first) return null;
 	return (
-		<button
+		<Pressable
 			type="button"
 			title={`Open turn ${shortRunId(first.turnId)} in the detail`}
 			onClick={() => onOpen(first.turnId, first.agent)}
@@ -229,14 +230,14 @@ export function PlaceLink({
 				"shrink-0",
 				"corner-xs px-xs",
 				"text-body-m font-medium tabular-nums",
-				"text-ink-3 focus-outline",
+				"text-ink-3",
 				"hover:bg-field hover:text-ink",
 			)}
 		>
 			{shortRunId(first.turnId)}
 			{first.agent ? ` · ${shortSubagentId(first.agent)}` : ""}
 			{places.length > 1 ? ` +${places.length - 1}` : ""}
-		</button>
+		</Pressable>
 	);
 }
 
@@ -422,21 +423,21 @@ export function SummarySubagents({
 							<Link
 								to={places.hrefs.subagent(subagent.subagentId)}
 								title="Read its thread"
-								className="flex min-w-0 flex-1 items-center gap-[calc(var(--space-m)+var(--space-xxs))] hover:underline"
+								className="flex min-w-0 flex-1 items-center gap-m hover:underline"
 							>
 								{label}
 							</Link>
 						) : turnId ? (
-							<button
+							<Pressable
 								type="button"
 								title="Open it in focus in the detail"
 								onClick={() => onOpen(turnId, subagent.subagentId)}
-								className="flex min-w-0 flex-1 items-center gap-[calc(var(--space-m)+var(--space-xxs))] text-left focus-outline hover:underline"
+								className="flex min-w-0 flex-1 items-center gap-m text-left hover:underline"
 							>
 								{label}
-							</button>
+							</Pressable>
 						) : (
-							<span className="flex min-w-0 flex-1 items-center gap-[calc(var(--space-m)+var(--space-xxs))]">
+							<span className="flex min-w-0 flex-1 items-center gap-m">
 								{label}
 							</span>
 						)}

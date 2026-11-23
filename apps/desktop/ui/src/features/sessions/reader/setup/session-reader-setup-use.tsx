@@ -178,10 +178,7 @@ export function SetupRunTrace({
 		>
 			{() =>
 				waterfall ? (
-					<div
-						ref={attachPane}
-						className="pb-[calc(var(--space-xxl)*4/3)] pl-[calc(var(--space-xxl)*2)]"
-					>
+					<div ref={attachPane} className="pb-xxxl pl-xxxl">
 						<TraceAttempts
 							lanesSlot={null}
 							model={waterfall.model}

@@ -135,7 +135,7 @@ export function OpalTag({
 				aria-hidden="true"
 				height={TAG_HEIGHT}
 				// design-escape-ok(shadow): artwork; the opal tag's drop
-				className="pointer-events-none absolute top-0 left-0 overflow-visible drop-shadow-[0_0.5px_1px_rgb(0_0_0/0.06)] dark:drop-shadow-none"
+				className="pointer-events-none absolute top-0 left-0 overflow-visible drop-shadow-[0_0.5px_1px_rgb(0_0_0/0.06)]"
 			>
 				<path
 					ref={pathRef}

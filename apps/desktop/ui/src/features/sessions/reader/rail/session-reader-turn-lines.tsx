@@ -127,7 +127,7 @@ export function MemberFactLine({
 	);
 	return (
 		// Lined up with the message text beside the avatar.
-		<FactLine className="pl-[calc(var(--space-xxl)*1.5)]">
+		<FactLine className="pl-xxxl">
 			{[
 				<span key="who" className="font-medium text-ink">
 					{userLabel}

@@ -6,6 +6,7 @@ import type {
 import { IconBubbleText, IconCode } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
+import { Button } from "@/app/ui/button";
 import { cn } from "@/lib/utils";
 import { FileTag } from "../../files/session-reader-file-tag";
 import { explainCommandQuery } from "./explain-command-query";
@@ -396,22 +397,17 @@ function WordsButton({
 	const label = open ? "Show the command" : "Read in plain words";
 	const Icon = open ? IconCode : IconBubbleText;
 	return (
-		<button
+		<Button
+			size="icon-sm"
 			type="button"
 			aria-label={label}
 			aria-pressed={open}
 			title={label}
 			onClick={onToggle}
-			className={cn(
-				"inline-flex size-5 shrink-0 items-center justify-center",
-				"ml-auto corner-xs focus-outline",
-				"text-ink-4 transition-colors",
-				"hover:bg-hover hover:text-ink",
-				open && "bg-field text-ink",
-			)}
+			className="ml-auto"
 		>
 			<Icon aria-hidden="true" className="size-3.5" />
-		</button>
+		</Button>
 	);
 }
 
@@ -505,8 +501,7 @@ export function CommandLines({
 				className={cn(
 					"flex flex-col",
 					"divide-y corner-m edge-m px-m py-xxs",
-					"divide-line-soft border-line bg-canvas",
-					"dark:bg-canvas/25",
+					"divide-line-soft border-line bg-inset",
 				)}
 			>
 				{keyed(steps, (step) => step.raw).map(({ item, key }, index) => (

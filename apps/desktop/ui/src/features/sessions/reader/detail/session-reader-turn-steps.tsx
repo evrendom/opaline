@@ -8,6 +8,7 @@ import {
 	IconGhost,
 } from "@tabler/icons-react";
 import { type ReactNode, useMemo } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { ConversationTracePlanTag } from "@/components/conversation/conversation-trace-plan-tag";
 import { formatConversationModelSetting } from "@/components/conversation/model-section-header";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
@@ -139,15 +140,15 @@ export function RunSummaryBar({
 		</>
 	);
 	return onToggle ? (
-		<button
+		<Pressable
 			type="button"
 			aria-expanded={expanded}
 			aria-label={expanded ? "Fold the trace" : "Expand the trace"}
 			onClick={onToggle}
-			className={cn(className, "focus-outline")}
+			className={className}
 		>
 			{content}
-		</button>
+		</Pressable>
 	) : (
 		<div className={className}>{content}</div>
 	);
@@ -325,8 +326,7 @@ function RunStepTags({
 						"inline-flex h-5 items-center gap-xs",
 						"corner-full pr-m pl-xxs",
 						"tabular-nums",
-						"bg-canvas text-ink shadow-card",
-						"dark:bg-surface",
+						"bg-surface text-ink shadow-card",
 					)}
 				>
 					<OpalChip
@@ -458,8 +458,7 @@ function RunTag({
 				"inline-flex h-5 items-center",
 				"corner-full px-m",
 				"tabular-nums",
-				"bg-canvas text-ink shadow-card",
-				"dark:bg-surface",
+				"bg-surface text-ink shadow-card",
 				className,
 			)}
 		>

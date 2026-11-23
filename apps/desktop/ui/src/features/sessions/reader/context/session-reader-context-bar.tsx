@@ -9,6 +9,7 @@ import {
 	IconTools,
 } from "@tabler/icons-react";
 import type { ComponentType, CSSProperties } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { getModelIconComponent } from "@/components/conversation/conversation-trace-model-icon";
 import { MOMENT_KINDS_APPEARANCE } from "@/features/compass/moment-labels";
 import { cn } from "@/lib/utils";
@@ -87,17 +88,17 @@ export function tileLook(
 	if (kind === "free")
 		return {
 			className:
-				"border-dashed border-line text-ink-3 bg-[repeating-linear-gradient(135deg,transparent_0_6px,color-mix(in_srgb,var(--ink)_3.5%,transparent)_6px_7px)] dark:bg-[repeating-linear-gradient(135deg,transparent_0_6px,color-mix(in_srgb,var(--ink)_5%,transparent)_6px_7px)]",
+				"border-dashed border-line text-ink-3 bg-[repeating-linear-gradient(135deg,transparent_0_6px,var(--hover)_6px_7px)]",
 		};
 	if (strong)
 		return {
 			className:
-				"border-[color-mix(in_oklab,var(--tint)_55%,transparent)] bg-[color-mix(in_oklab,var(--tint)_22%,transparent)] text-[color-mix(in_oklab,var(--tint)_55%,black)] dark:bg-[color-mix(in_oklab,var(--tint)_28%,transparent)] dark:text-[color-mix(in_oklab,var(--tint)_75%,white)]",
+				"border-[color-mix(in_oklab,var(--tint)_55%,transparent)] bg-[color-mix(in_oklab,var(--tint)_25%,transparent)] text-[color-mix(in_oklab,var(--tint)_65%,var(--ink))]",
 			style: { "--tint": TINT[kind] } as CSSProperties,
 		};
 	return {
 		className:
-			"border-[color-mix(in_oklab,var(--tint)_32%,transparent)] bg-[color-mix(in_oklab,var(--tint)_10%,transparent)] text-[color-mix(in_oklab,var(--tint)_62%,black)] dark:bg-[color-mix(in_oklab,var(--tint)_15%,transparent)] dark:text-[color-mix(in_oklab,var(--tint)_70%,white)]",
+			"border-[color-mix(in_oklab,var(--tint)_32%,transparent)] bg-[color-mix(in_oklab,var(--tint)_12%,transparent)] text-[color-mix(in_oklab,var(--tint)_66%,var(--ink))]",
 		style: { "--tint": TINT[kind] } as CSSProperties,
 	};
 }
@@ -110,7 +111,7 @@ export function ContextMark({ className }: { className?: string }) {
 			viewBox="0 0 16 16"
 			fill="none"
 			aria-hidden="true"
-			className={cn("shrink-0 text-accent-line dark:text-accent", className)}
+			className={cn("shrink-0 text-accent", className)}
 		>
 			<rect
 				x="1.8"
@@ -226,7 +227,7 @@ export function ContextBar({
 										? "bg-error-tint text-error"
 										: warns && share >= CONTEXT_WARN
 											? "bg-warning-tint text-warning"
-											: "bg-hover text-ink-3 dark:bg-hover-strong",
+											: "bg-field text-ink-3",
 								)}
 							>
 								{share}%
@@ -290,13 +291,13 @@ function MeasureToggle({
 	onMeasure: (measure: ContextMeasure) => void;
 }) {
 	return (
-		<fieldset className="m-zero flex shrink-0 items-center gap-xxs corner-m edge-none bg-hover p-xxs corner-squircle squircle:corner-xl dark:bg-hover-strong">
+		<fieldset className="m-zero flex shrink-0 items-center gap-xxs corner-m edge-none bg-field p-xxs corner-squircle squircle:corner-xl">
 			<legend className="sr-only">Measure the map by</legend>
 			{MEASURES.map((each) => {
 				const pressed = each === measure;
 				const disabled = off?.has(each) ?? false;
 				return (
-					<button
+					<Pressable
 						key={each}
 						type="button"
 						aria-pressed={pressed}
@@ -311,15 +312,14 @@ function MeasureToggle({
 							"h-6",
 							"corner-s px-l corner-squircle",
 							"text-body-l",
-							"focus-outline",
 							"disabled:cursor-default disabled:opacity-40 squircle:corner-l",
 							pressed
 								? cn("bg-surface font-medium", PILL_SHADOW)
-								: "text-ink-3 hover:text-ink dark:hover:text-ink",
+								: "text-ink-3 hover:text-ink",
 						)}
 					>
 						{MEASURE_LOOK[each].label}
-					</button>
+					</Pressable>
 				);
 			})}
 		</fieldset>

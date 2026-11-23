@@ -5,13 +5,8 @@ import { Bone, Reveal } from "@/app/ui/bones";
 import { Button } from "@/app/ui/button";
 import { DiffView } from "@/components/pierre/diff-view";
 import { diffLines } from "@/components/pierre/line-diff";
-import { cn } from "@/lib/utils";
 import { useSessionSetupText } from "../../use-session-setup-text";
-import {
-	ScrollColumn,
-	TOGGLE,
-	ViewToggle,
-} from "../files/session-reader-files-parts";
+import { ScrollColumn, ViewToggle } from "../files/session-reader-files-parts";
 import { SetupMark } from "./session-reader-setup-column";
 import { SetupProse } from "./session-reader-setup-prose";
 import { KIND_LABEL, setupName, setupOwner } from "./session-setup-files";
@@ -68,7 +63,7 @@ export function SetupCard({
 	);
 	return (
 		<div className="flex min-h-0 min-w-0 flex-1 flex-col">
-			<header className="flex flex-col gap-m edge-b-m border-line-soft px-[calc(var(--space-xl)+var(--space-xs))] py-xl">
+			<header className="flex flex-col gap-m edge-b-m border-line-soft px-xl py-xl">
 				<div className="flex min-w-0 items-center gap-m">
 					<span className="flex shrink-0">
 						<SetupMark file={file} />
@@ -116,11 +111,6 @@ export function SetupCard({
 								key={version.version}
 								size="sm"
 								variant="secondary"
-								className={cn(
-									"font-mono",
-									TOGGLE,
-									"px-[calc(var(--space-m)+var(--space-xxs))] [&_svg:not([class*='size-'])]:size-3",
-								)}
 								aria-pressed={version === shown}
 								title={`First received ${new Date(version.firstAt).toLocaleString()}, by ${version.runs} ${version.runs === 1 ? "run" : "runs"}`}
 								onClick={() => pick(version.version)}
@@ -134,7 +124,7 @@ export function SetupCard({
 			<div className="flex min-h-0 flex-1">
 				<div className="flex min-h-0 min-w-0 flex-1 flex-col">
 					{!query.isLoading && !shown ? (
-						<p className="px-[calc(var(--space-xl)+var(--space-xs))] py-xl text-body-l text-ink-3">
+						<p className="px-xl py-xl text-body-l text-ink-3">
 							{query.isError
 								? "Its text could not be read."
 								: "Its text was not kept for this session."}
@@ -146,7 +136,7 @@ export function SetupCard({
 							label="Reading its text"
 							loading={query.isLoading}
 							sample={
-								<div className="flex flex-col gap-m px-[calc(var(--space-xl)+var(--space-xs))] py-xl">
+								<div className="flex flex-col gap-m px-xl py-xl">
 									{[88, 72, 80, 56, 64].map((width) => (
 										<Bone
 											key={width}
@@ -160,7 +150,7 @@ export function SetupCard({
 						>
 							{() =>
 								shown ? (
-									<ScrollColumn className="px-[calc(var(--space-xl)+var(--space-xs))] py-xl">
+									<ScrollColumn className="px-xl py-xl">
 										{hunks ? (
 											hunks.length === 0 ? (
 												<p className="text-body-l text-ink-3">

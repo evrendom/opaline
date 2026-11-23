@@ -163,7 +163,7 @@ function ActiveStepJump({
 		<div
 			ref={floatRef}
 			{...KEEPS_PICK_MARK}
-			className="absolute inset-x-0 top-2 flex justify-center pl-[calc(var(--space-xxl)*1.5)]"
+			className="absolute inset-x-0 top-2 flex justify-center pl-xxxl"
 		>
 			<JumpPill
 				icon={<StepIconChip step={step} />}

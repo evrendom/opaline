@@ -111,7 +111,7 @@ function Inline({ text }: { text: string }) {
 				return (
 					<code
 						key={key}
-						className="corner-xs bg-field px-xs py-[calc(var(--space-xxs)/2)] font-mono text-body-s"
+						className="corner-xs bg-field px-xs py-xxs font-mono text-body-s"
 					>
 						{part.slice(1, -1)}
 					</code>
@@ -136,7 +136,7 @@ export function SetupProse({
 		<div
 			data-selectable=""
 			className={cn(
-				"flex flex-col gap-[calc(var(--space-m)+var(--space-xxs))] text-body-l [overflow-wrap:anywhere]",
+				"flex flex-col gap-m text-body-l [overflow-wrap:anywhere]",
 				className,
 			)}
 		>
@@ -173,7 +173,7 @@ export function SetupProse({
 							<List
 								key={key}
 								className={cn(
-									"space-y-xxs pl-[calc(var(--space-xl)+var(--space-xs))] marker:text-ink-3",
+									"space-y-xxs pl-xxl marker:text-ink-3",
 									block.ordered ? "list-decimal" : "list-disc",
 								)}
 							>

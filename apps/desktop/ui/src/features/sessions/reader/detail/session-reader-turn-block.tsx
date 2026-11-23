@@ -1,5 +1,6 @@
 import type { SessionDetailTurnSummary } from "@rudel/api-routes";
 import { memo, useMemo } from "react";
+import { Button } from "@/app/ui/button";
 import { cn } from "@/lib/utils";
 import type { RunQuestionAnswer } from "../../run-question-tags";
 import {
@@ -95,13 +96,14 @@ export const TurnBlock = memo(function TurnBlock({
 				) : bodyState.status === "failed" ? (
 					<p className="pt-xxs text-body-xl text-ink-3">
 						This turn could not be loaded.{" "}
-						<button
+						<Button
+							variant="link"
+							size="inline"
 							type="button"
 							onClick={() => onRetry(turn.turnId)}
-							className="underline underline-offset-2 focus-outline hover:text-ink"
 						>
 							Retry
-						</button>
+						</Button>
 					</p>
 				) : finalMessage ? (
 					<AssistantResponse text={finalMessage} />
@@ -118,7 +120,7 @@ export const TurnBlock = memo(function TurnBlock({
 		<div
 			data-turn-steps={turn.toolCallCount}
 			data-turn-pending={body ? undefined : ""}
-			className="flex w-full flex-col gap-[calc(var(--space-xxl)*4/3)] text-body-xl"
+			className="flex w-full flex-col gap-xxxl text-body-xl"
 		>
 			{memberText && !hidden.has("prompts") ? (
 				<div className={cn("flex flex-col gap-m", READING_MEASURE)}>

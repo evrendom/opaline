@@ -233,7 +233,7 @@ export function SessionReaderSummary({
 	);
 	return (
 		<SessionSubagents onOpen={openSubagent} subagents={sessionSubagents}>
-			<div className="h-full overflow-hidden px-[calc(var(--space-xxl)*4/3)] pt-m pb-m">
+			<div className="h-full overflow-hidden px-xxxl pt-m pb-m">
 				<div className="flex h-full min-h-0 gap-xxl">
 					<div
 						className={cn(
@@ -257,7 +257,7 @@ export function SessionReaderSummary({
 						{...scroll.fade}
 						className={cn(
 							"flex min-h-0 min-w-0 flex-1 flex-col gap-xl overflow-y-auto [--scroll-fade-top-depth:0px] [--summary-top:var(--panes-top)] [container-type:size]",
-							"-mx-m -mb-m px-m pt-(--summary-top) pb-[calc(var(--space-xxl)*4/3)]",
+							"-mx-m -mb-m px-m pt-(--summary-top) pb-xxxl",
 							"scroll-fade",
 							"*:shrink-0",
 						)}

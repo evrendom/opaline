@@ -46,7 +46,7 @@ export function MarkLegend({
 				"corner-m p-xxs corner-squircle",
 				"text-body-m font-medium",
 				"bg-hover text-ink-3",
-				"squircle:corner-l dark:bg-hover",
+				"squircle:corner-l",
 				className,
 			)}
 		>

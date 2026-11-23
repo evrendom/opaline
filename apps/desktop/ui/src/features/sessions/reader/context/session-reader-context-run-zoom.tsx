@@ -1,5 +1,6 @@
 import { IconArrowUpRight } from "@tabler/icons-react";
 import { useState } from "react";
+import { Button } from "@/app/ui/button";
 import { cn } from "@/lib/utils";
 import { squarify } from "../summary/session-reader-breakdown";
 import { tileGlyph, tileLook } from "./session-reader-context-bar";
@@ -102,22 +103,17 @@ export function RunZoom({
 								top={TOP}
 								w={w}
 							/>
-							<button
+							<Button
+								size="sm"
 								type="button"
 								data-context-pick=""
 								onClick={() => onOpen(id, firstLitStep(run, lits))}
 								aria-label={`Open ${run.label} in Detail`}
-								className={cn(
-									"absolute right-1.5 bottom-1.5 z-20 inline-flex h-6 items-center gap-xxs",
-									"corner-s pr-xs pl-m",
-									"text-body-m font-medium",
-									"bg-field text-ink-3 transition-colors focus-outline",
-									"hover:bg-hover hover:text-ink",
-								)}
+								className="absolute right-1.5 bottom-1.5 z-20"
 							>
 								Detail
 								<IconArrowUpRight aria-hidden="true" className="size-3" />
-							</button>
+							</Button>
 						</div>
 					);
 				})}

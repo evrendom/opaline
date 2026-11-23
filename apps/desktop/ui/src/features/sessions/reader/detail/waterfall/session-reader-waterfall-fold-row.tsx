@@ -1,5 +1,6 @@
 import { IconStack2 } from "@tabler/icons-react";
 import type { CSSProperties } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { cn } from "@/lib/utils";
 import type { SessionReaderStep } from "../../model/session-reader-model";
 import {
@@ -118,7 +119,7 @@ export function FoldRow({
 			)}
 			{...toggleFocus}
 		>
-			<button
+			<Pressable
 				type="button"
 				onClick={holdsSelection ? onToggle : onSelect}
 				aria-expanded={expanded}
@@ -135,7 +136,7 @@ export function FoldRow({
 				{totals ? (
 					<RowTotals cost={null} durationMs={durationMs} tokens={0} />
 				) : null}
-			</button>
+			</Pressable>
 			<ChipToggle
 				className={INDENT}
 				label={variant === "repeat" ? "each call" : "these steps"}

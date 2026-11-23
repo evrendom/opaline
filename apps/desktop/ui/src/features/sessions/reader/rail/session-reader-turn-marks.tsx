@@ -171,8 +171,7 @@ export function RunTouchTags({
 					"inline-flex h-5 items-center gap-xs",
 					"corner-full pr-m pl-xxs",
 					"tabular-nums",
-					"bg-canvas text-ink shadow-card",
-					"dark:bg-surface",
+					"bg-surface text-ink shadow-card",
 				)}
 			>
 				<OpalChip tint={tint} className={cn("size-4", className)}>

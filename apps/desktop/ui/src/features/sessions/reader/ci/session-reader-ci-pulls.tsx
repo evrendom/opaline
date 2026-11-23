@@ -1,5 +1,6 @@
 import { IconBrandGithub } from "@tabler/icons-react";
 import { type ReactNode, useMemo } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { FluidList, useFluidListItem } from "@/components/fluid-list";
 import { cn } from "@/lib/utils";
 import { ScrollColumn } from "../files/session-reader-files-parts";
@@ -96,7 +97,7 @@ export function CiPullColumn({
 				run={run}
 				summary={`${prs} ${prs === 1 ? "PR" : "PRs"}`}
 			/>
-			<ScrollColumn className="-mx-xs px-xs pb-[calc(var(--space-xxl)*4/3)]">
+			<ScrollColumn className="-mx-xs px-xs pb-xxxl">
 				{rows.length === 0 ? (
 					<p className="py-xs pl-m text-body-s text-ink-3">
 						{agent
@@ -210,7 +211,7 @@ export function PullLine({
 				isPicked && "bg-field",
 			)}
 		>
-			<button
+			<Pressable
 				type="button"
 				aria-current={isPicked || undefined}
 				onClick={onPick}
@@ -218,7 +219,6 @@ export function PullLine({
 				className={cn(
 					"flex w-full items-start gap-l",
 					"text-left",
-					"focus-outline",
 					"after:absolute after:inset-0 after:corner-s",
 				)}
 			>
@@ -243,7 +243,7 @@ export function PullLine({
 						#{pull.number}
 					</span>
 				) : null}
-			</button>
+			</Pressable>
 			{row.rounds.length > 0 || meta ? (
 				<div className="pointer-events-none relative flex min-w-0 items-center gap-m pl-xxl">
 					{row.rounds.length > 0 ? (

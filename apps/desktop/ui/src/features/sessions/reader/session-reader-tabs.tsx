@@ -292,7 +292,7 @@ export function ViewBottomFade({ className }: { className?: string }) {
 			aria-hidden="true"
 			className={cn(
 				"sticky bottom-0 z-30 h-8",
-				"-mt-[calc(var(--space-xxl)*4/3)]",
+				"-mt-xxxl",
 				"pointer-events-none bg-linear-to-t from-canvas to-transparent opacity-0 transition-opacity duration-(--motion-medium-duration)",
 				"in-data-fade-bottom:opacity-100",
 				className,

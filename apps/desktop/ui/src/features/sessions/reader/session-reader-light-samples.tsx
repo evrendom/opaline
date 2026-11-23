@@ -33,9 +33,9 @@ function MemberSample() {
 
 function TurnSample({ trace = false }: { trace?: boolean }) {
 	return (
-		<div className="flex w-full flex-col gap-[calc(var(--space-xxl)*4/3)] text-body-xl">
+		<div className="flex w-full flex-col gap-xxxl text-body-xl">
 			<div className={cn("flex flex-col gap-m", READING_MEASURE)}>
-				<div className="flex flex-wrap items-center gap-m pl-[calc(var(--space-xxl)*1.5)] text-body-m">
+				<div className="flex flex-wrap items-center gap-m pl-xxxl text-body-m">
 					<span className="font-medium">you</span>
 					<span className="tabular-nums">Oct 22, 08:48</span>
 					<span className="tabular-nums">~8K tokens · 0.8%</span>
@@ -77,8 +77,8 @@ const CARD_LANES = [
 
 function TraceSample() {
 	return (
-		<div className="grid gap-[calc(var(--space-xxl)*4/3)] xl:grid-cols-[minmax(0,1fr)_3.5rem_var(--reader-card)]">
-			<div className="flex min-w-0 flex-col gap-xxl pl-[calc(var(--space-xxl)*1.5)] pt-m">
+		<div className="grid gap-xxxl xl:grid-cols-[minmax(0,1fr)_3.5rem_var(--reader-card)]">
+			<div className="flex min-w-0 flex-col gap-xxl pl-xxxl pt-m">
 				{TRACE_ROWS.map((row) => (
 					<div key={row.id} className="flex h-6 items-center gap-m">
 						<Bone className="size-5 shrink-0 corner-s" />
@@ -192,13 +192,13 @@ function MapSample() {
 export function DetailColumnsSample() {
 	return (
 		<>
-			<div className="flex min-w-0 items-start gap-[calc(var(--space-xxl)*4/3)] pt-(--reader-top) xl:col-start-2 xl:row-start-1">
-				<div className="flex min-w-0 flex-1 flex-col gap-[calc(var(--space-xxl)*4/3)]">
+			<div className="flex min-w-0 items-start gap-xxxl pt-(--reader-top) xl:col-start-2 xl:row-start-1">
+				<div className="flex min-w-0 flex-1 flex-col gap-xxxl">
 					<TurnSample trace />
 					<TurnSample />
 				</div>
 			</div>
-			<div className="grid w-14 xl:col-start-2 xl:row-start-1 xl:mr-[calc(var(--reader-card)+var(--space-xxl)*4/3)] xl:justify-self-end">
+			<div className="grid w-14 xl:col-start-2 xl:row-start-1 xl:mr-[calc(var(--reader-card)+var(--space-xxxl))] xl:justify-self-end">
 				<MapSample />
 			</div>
 		</>
@@ -249,7 +249,7 @@ export function DetailSample() {
 		<div className="h-full min-h-0 overflow-hidden [--reader-pane-top:calc(var(--stage-top,0.5rem)+1rem)] [--reader-top:var(--tabs-band,var(--reader-inset))] [container-type:size]">
 			<div
 				className={cn(
-					"grid grid-cols-[minmax(0,1fr)_3.5rem] gap-[calc(var(--space-xxl)*4/3)]",
+					"grid grid-cols-[minmax(0,1fr)_3.5rem] gap-xxxl",
 					"px-(--reader-gutter) pt-m pb-(--reader-inset)",
 					"xl:grid-cols-[var(--reader-rail)_minmax(0,1fr)] xl:gap-(--reader-columns-gap)",
 				)}
@@ -269,7 +269,7 @@ const FIGURES = ["a", "b", "c", "d"];
 
 export function PanesSample({ children }: { children?: ReactNode }) {
 	return (
-		<div className="h-full overflow-hidden px-[calc(var(--space-xxl)*4/3)] pt-m pb-m">
+		<div className="h-full overflow-hidden px-xxxl pt-m pb-m">
 			<div className="flex h-full min-h-0 gap-xxl">
 				<div className="flex min-h-0 w-(--reader-rail) shrink-0 flex-col">
 					<RailSample />
@@ -291,7 +291,7 @@ function SectionRows({ rows }: { rows: readonly number[] }) {
 
 export function SummarySample() {
 	return (
-		<div className="h-full overflow-hidden px-[calc(var(--space-xxl)*4/3)] pt-m pb-m">
+		<div className="h-full overflow-hidden px-xxxl pt-m pb-m">
 			<div className="flex h-full min-h-0 gap-xxl">
 				<div className="hidden min-h-0 w-(--reader-rail) shrink-0 lg:flex lg:flex-col">
 					<RailSample />

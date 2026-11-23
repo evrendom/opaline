@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { formatShare } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Tip } from "../detail/waterfall/session-reader-waterfall-chips";
@@ -107,13 +108,13 @@ export function Breakdown({
 		<div className="flex min-w-0 flex-col gap-xs">
 			{toggle ? (
 				<Tip label={`Show ${toggle.next}`}>
-					<button
+					<Pressable
 						type="button"
 						onClick={toggle.onToggle}
-						className="flex w-fit max-w-full focus-outline hover:[&>span]:text-ink"
+						className="flex w-fit max-w-full hover:[&>span]:text-ink"
 					>
 						{heading}
-					</button>
+					</Pressable>
 				</Tip>
 			) : (
 				heading

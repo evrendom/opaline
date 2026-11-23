@@ -2,6 +2,7 @@ import type { SessionSetupFile } from "@rudel/api-routes";
 import { IconListDetails, IconPlug, IconSettings } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { Reveal } from "@/app/ui/bones";
+import { Pressable } from "@/app/ui/pressable";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { FluidList, useFluidListItem } from "@/components/fluid-list";
 import { formatPaddedTimeOfDay } from "@/lib/format";
@@ -97,7 +98,7 @@ export function SetupColumn({
 				) : null}
 			</PickStrip>
 			<div ref={column.ref} className="-mx-xs flex min-h-0 flex-1 flex-col">
-				<ScrollColumn className="px-xs pb-[calc(var(--space-xxl)*4/3)]">
+				<ScrollColumn className="px-xs pb-xxxl">
 					{calls ? timeline : null}
 					{calls ? null : uses ? (
 						<FluidList className="flex flex-col gap-xxs">
@@ -110,7 +111,7 @@ export function SetupColumn({
 									icon={IconPlug}
 									title="No skills or MCP"
 									description="This run used no skill or MCP server."
-									className="mt-xs p-xxl py-[calc(var(--space-xxl)*4/3)]"
+									className="mt-xs p-xxl py-xxxl"
 								/>
 							) : (
 								<Reveal
@@ -277,7 +278,7 @@ function SetupUseGroup({
 	const total = group.tools.reduce((sum, tool) => sum + tool.uses.length, 0);
 	return (
 		<div className="flex flex-col gap-xxs pb-s">
-			<div className="flex items-center gap-[calc(var(--space-m)+var(--space-xxs))] px-[calc(var(--space-m)+var(--space-xxs))] py-s">
+			<div className="flex items-center gap-m px-m py-s">
 				<span className="flex shrink-0">
 					<SetupMark file={group.file} />
 				</span>
@@ -289,7 +290,7 @@ function SetupUseGroup({
 			{group.tools.map(({ tool, uses }) => (
 				<div key={tool ?? ""} className="flex flex-col gap-xxs">
 					{tool ? (
-						<div className="flex items-center gap-m py-xs pr-l pl-[calc(var(--space-xxl)*1.5)]">
+						<div className="flex items-center gap-m py-xs pr-l pl-xxxl">
 							<span className="min-w-0 flex-1 truncate text-body-m text-ink">
 								{tool}
 							</span>
@@ -299,11 +300,7 @@ function SetupUseGroup({
 					{uses.map((use) => (
 						<SetupUseRow
 							key={use.step.id}
-							indent={
-								tool
-									? "pl-[calc(var(--space-xxl)*2+var(--space-xs))]"
-									: "pl-[calc(var(--space-xxl)+var(--space-l))]"
-							}
+							nested={Boolean(tool)}
 							index={indexOf(use)}
 							isPicked={use.step.id === pickedUse}
 							onPick={() => onPickUse(use)}
@@ -353,40 +350,40 @@ function aboutOf(step: SessionReaderStep): string | null {
 }
 
 function SetupUseRow({
-	indent,
 	index,
 	isPicked,
+	nested,
 	onPick,
 	use: { step },
 }: {
-	indent: string;
 	index: number | undefined;
 	isPicked: boolean;
+	nested: boolean;
 	onPick: () => void;
 	use: SetupUse;
 }) {
 	const about = aboutOf(step);
 	const item = useFluidListItem<HTMLButtonElement>(index);
 	return (
-		<button
+		<Pressable
 			type="button"
 			ref={item.ref}
 			aria-current={isPicked || undefined}
 			onClick={onPick}
 			onFocus={item.onFocus}
 			className={cn(
-				"relative flex w-full items-center gap-[calc(var(--space-m)+var(--space-xxs))]",
-				"corner-s py-xs pr-[calc(var(--space-m)+var(--space-xxs))] corner-squircle",
+				"relative flex w-full items-center gap-m",
+				"corner-s py-xs pr-m corner-squircle",
 				"text-left",
-				"focus-outline transition-colors",
-				"squircle:corner-l",
-				indent,
+				"transition-colors",
+				"squircle:corner-l pl-xxxl",
 				isPicked && "bg-field",
 			)}
 		>
 			<span
 				className={cn(
 					"shrink-0 text-body-s tabular-nums",
+					nested && "ml-xl",
 					isPicked ? "text-ink" : "text-ink-3",
 				)}
 			>
@@ -400,7 +397,7 @@ function SetupUseRow({
 			>
 				{about}
 			</span>
-		</button>
+		</Pressable>
 	);
 }
 
@@ -445,17 +442,17 @@ function SetupFileRow({
 }) {
 	const item = useFluidListItem<HTMLButtonElement>(index);
 	return (
-		<button
+		<Pressable
 			type="button"
 			ref={item.ref}
 			aria-current={isPicked || undefined}
 			onClick={() => onPick(file.setupFile)}
 			onFocus={item.onFocus}
 			className={cn(
-				"relative flex w-full items-start gap-[calc(var(--space-m)+var(--space-xxs))]",
-				"corner-s px-[calc(var(--space-m)+var(--space-xxs))] py-s corner-squircle",
+				"relative flex w-full items-start gap-m",
+				"corner-s px-m py-s corner-squircle",
 				"text-left",
-				"focus-outline transition-colors",
+				"transition-colors",
 				"squircle:corner-l",
 				isPicked && "bg-field",
 			)}
@@ -478,6 +475,6 @@ function SetupFileRow({
 					{file.versions > 1 ? ` · ${file.versions} versions` : ""}
 				</span>
 			</span>
-		</button>
+		</Pressable>
 	);
 }

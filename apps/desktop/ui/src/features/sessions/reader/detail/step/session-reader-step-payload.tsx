@@ -1,5 +1,6 @@
 import { IconChevronRight } from "@tabler/icons-react";
 import { type ReactNode, useState } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { CopyButton } from "@/features/shell/components/copy-button";
 import { cn } from "@/lib/utils";
 import { HighlightedCode } from "./session-reader-step-payloads";
@@ -32,14 +33,14 @@ export function PayloadSection({
 	return (
 		<div className={cn("flex flex-col gap-m px-xxl", className)}>
 			<div className="flex items-center justify-between">
-				<button
+				<Pressable
 					type="button"
 					aria-expanded={open}
 					onClick={() => setOpen((value) => !value)}
 					className={cn(
 						"flex min-w-0 items-center gap-s",
 						"text-body-m",
-						"text-ink-3 transition-colors focus-outline",
+						"text-ink-3 transition-colors",
 						"hover:text-ink",
 					)}
 				>
@@ -51,7 +52,7 @@ export function PayloadSection({
 					<span className="text-ink-4 tabular-nums">
 						{hint ?? sizeHint(value)}
 					</span>
-				</button>
+				</Pressable>
 				<CopyButton value={value} title={`Copy ${label.toLowerCase()}`} />
 			</div>
 			{open && payload.show === "body" ? payload.body : null}
@@ -73,13 +74,13 @@ export function PayloadSection({
 				</pre>
 			) : null}
 			{open && payload.show !== "body" && clipped ? (
-				<button
+				<Pressable
 					type="button"
 					onClick={() => setFull(true)}
-					className="w-fit text-body-m text-ink-3 focus-outline hover:text-ink"
+					className="w-fit text-body-m text-ink-3 hover:text-ink"
 				>
 					Show all {sizeHint(value)}
-				</button>
+				</Pressable>
 			) : null}
 		</div>
 	);

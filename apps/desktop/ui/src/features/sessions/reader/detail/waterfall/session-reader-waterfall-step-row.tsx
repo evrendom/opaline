@@ -5,6 +5,7 @@ import {
 	IconRocket,
 } from "@tabler/icons-react";
 import { type CSSProperties, memo } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { cn } from "@/lib/utils";
 import type { SessionReaderStep } from "../../model/session-reader-model";
 import { railTagKeysOf } from "../../model/session-reader-step-lanes";
@@ -192,7 +193,7 @@ export const StepRowView = memo(function StepRowView({
 			)}
 			{...(onToggleSubtrace ? toggleFocus : {})}
 		>
-			<button
+			<Pressable
 				type="button"
 				onClick={() => {
 					if (onToggleSubtrace && selected) onToggleSubtrace();
@@ -251,7 +252,7 @@ export const StepRowView = memo(function StepRowView({
 				{totals ? (
 					<RowTotals cost={null} durationMs={timed ? ranMs : null} tokens={0} />
 				) : null}
-			</button>
+			</Pressable>
 			{onToggleSubtrace ? (
 				<ChipToggle
 					className={INDENT}

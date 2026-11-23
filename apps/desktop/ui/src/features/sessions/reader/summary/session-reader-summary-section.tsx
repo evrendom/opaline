@@ -25,21 +25,21 @@ export function SummarySection({
 		<Card
 			data-summary-section={anchor}
 			size="sm"
-			className={cn("min-w-0 scroll-mt-4", className)}
+			className={cn("min-w-0", className)}
 		>
-			<CardHeader className="flex flex-row items-baseline justify-between gap-xl">
-				<CardTitle>{title}</CardTitle>
-				{aside ??
-					(count !== undefined ? (
-						<span className="text-body-xl text-ink-3 tabular-nums">
-							<FlowNumber value={count} format={PLAIN_NUMBER} />
-						</span>
-					) : null)}
+			<CardHeader>
+				<div className="flex items-baseline justify-between gap-xl">
+					<CardTitle>{title}</CardTitle>
+					{aside ??
+						(count !== undefined ? (
+							<span className="text-body-xl text-ink-3 tabular-nums">
+								<FlowNumber value={count} format={PLAIN_NUMBER} />
+							</span>
+						) : null)}
+				</div>
 			</CardHeader>
-			<CardContent
-				className={cn("flex min-w-0 flex-col gap-m", fill && "min-h-0 flex-1")}
-			>
-				{children}
+			<CardContent className={cn("flex min-w-0", fill && "min-h-0 flex-1")}>
+				<div className="flex min-w-0 flex-1 flex-col gap-m">{children}</div>
 			</CardContent>
 		</Card>
 	);

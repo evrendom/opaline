@@ -83,7 +83,7 @@ export function FocusedSubagent({
 		<div
 			ref={rootRef}
 			{...turnMarks({ index: 0, turnId: turn.turnId })}
-			className="flex w-full flex-col gap-[calc(var(--space-xxl)*4/3)] text-body-xl"
+			className="flex w-full flex-col gap-xxxl text-body-xl"
 		>
 			<div
 				ref={stripRef}

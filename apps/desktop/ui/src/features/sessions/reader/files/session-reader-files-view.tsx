@@ -187,7 +187,7 @@ export function SessionReaderFilesView({
 	};
 
 	return (
-		<div className="h-full overflow-hidden px-[calc(var(--space-xxl)*4/3)] pt-m pb-m">
+		<div className="h-full overflow-hidden px-xxxl pt-m pb-m">
 			<SessionSubagents onOpen={openSubagent} subagents={subagents}>
 				<div className="flex h-full min-h-0 gap-xxl">
 					<div

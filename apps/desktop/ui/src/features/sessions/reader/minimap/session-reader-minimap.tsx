@@ -297,7 +297,7 @@ export function ReaderMinimap({
 				))}
 				<path
 					// design-escape-ok(colour): data paint; the main thread's lane, its rail at rest
-					className="fill-none stroke-violet-500/30 dark:stroke-violet-400/30"
+					className="fill-none stroke-violet-500/30"
 					d={`${line.rail} ${line.branches}`}
 					strokeLinecap="round"
 					strokeWidth={1.5}
@@ -316,12 +316,12 @@ export function ReaderMinimap({
 				))}
 				{focus && sessionRef.current ? null : (
 					<g
-						className="[filter:drop-shadow(0_0_3px_var(--color-violet-500))] dark:[filter:drop-shadow(0_0_4px_var(--color-violet-400))]"
+						className="[filter:drop-shadow(0_0_3px_var(--color-violet-500))]"
 						clipPath={`url(#${litId})`}
 					>
 						<path
 							// design-escape-ok(colour): data paint; the main thread's lane, its lit rail
-							className="fill-none stroke-violet-500 dark:stroke-violet-400"
+							className="fill-none stroke-violet-500"
 							d={`${line.rail} ${line.branches}`}
 							strokeLinecap="round"
 							strokeWidth={1.75}
@@ -401,7 +401,7 @@ export function ReaderMinimap({
 								: node.alert
 									? "fill-error stroke-error"
 									: // design-escape-ok(colour): data paint; the main thread's lane, its turn dots
-										"fill-canvas stroke-violet-500/60 dark:stroke-violet-400/60"
+										"fill-canvas stroke-violet-500/60"
 						}
 						style={
 							node.kind === "subagent"
@@ -482,7 +482,7 @@ export function ReaderMinimap({
 			</svg>
 			<div
 				ref={viewRef}
-				className="absolute inset-x-0 top-0 corner-s bg-canvas corner-squircle squircle:corner-l ring-1 ring-line hover:ring-line dark:bg-hover dark:hover:bg-hover-strong"
+				className="absolute inset-x-0 top-0 corner-s bg-hover corner-squircle squircle:corner-l ring-1 ring-line hover:bg-hover-strong"
 			/>
 			<MinimapHeads
 				focus={focus ?? null}
