@@ -16,9 +16,11 @@ const buttonVariants = cva(
 			variant: {
 				// The screen's main action, and the toolbar's pills: a card pill on
 				// the card shadow. Pressed, active (`data-active`, e.g. filters
-				// applied) or open lifts it onto the raised shadow.
+				// applied) or open lifts it onto the raised shadow. Its hover and
+				// open fill is opaque (field), so a pill over a chart or an image
+				// never turns see-through.
 				primary:
-					"bg-surface text-ink shadow-card hover:bg-hover aria-expanded:bg-hover data-popup-open:bg-hover aria-pressed:shadow-raised data-active:shadow-raised [&_svg:not([class*='text-'])]:text-ink-3",
+					"bg-surface text-ink shadow-card hover:bg-field aria-expanded:bg-field data-popup-open:bg-field aria-pressed:shadow-raised data-active:shadow-raised [&_svg:not([class*='text-'])]:text-ink-3",
 				// Everything else: Cancel, row actions, icon-only buttons. Plain text
 				// on a clear 1px edge, a field fill on hover, grey icons.
 				secondary:
