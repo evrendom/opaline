@@ -40,6 +40,7 @@ const BACKDROP_FRAGMENT = `
 	uniform vec3 uTintA;
 	uniform vec3 uTintB;
 	uniform vec3 uTintC;
+	uniform vec2 uTintDir;
 	uniform float uTint;
 	uniform sampler2D uField;
 	uniform vec2 uFieldSize;
@@ -76,8 +77,14 @@ const BACKDROP_FRAGMENT = `
 		return b + 0.5 * f * (c - a + f * (2.0 * a - 5.0 * b + 4.0 * c - e + f * (3.0 * (b - c) + e - a)));
 	}
 
-	vec3 tintAt(float x) {
-		float t = clamp(x / (uSize.x * 0.8) + 0.5, 0.0, 1.0) * 2.0;
+	// An agent's three colors run along uTintDir across the glow behind the
+	// tiles (about ±25% of the width and height), not the whole scene, so its
+	// outer colors show too: (1, 0) is left to right, (1, 1) bottom left to
+	// top right.
+	vec3 tintAt(vec2 p) {
+		vec2 q = p / (uSize * 0.25);
+		float s = dot(q, uTintDir) / max(abs(uTintDir.x) + abs(uTintDir.y), 1e-4);
+		float t = clamp(s * 0.5 + 0.5, 0.0, 1.0) * 2.0;
 		return t < 1.0 ? mix(uTintA, uTintB, t) : mix(uTintB, uTintC, t - 1.0);
 	}
 
@@ -96,7 +103,7 @@ const BACKDROP_FRAGMENT = `
 		float falloff = exp(-dot(spread, spread) * 2.4);
 		float body = mix(falloff, smoothstep(0.25, -0.35, d) * smoothstep(-3.2, -0.4, d) * falloff, uWave);
 		float fringe = exp(-abs(d + 0.06) / 0.05) * falloff * uWave * (1.0 - smoothstep(0.55, 1.0, uHand));
-		vec3 tint = tintAt(p.x);
+		vec3 tint = tintAt(p);
 		vec3 color = mix(vec3(0.0905), tint * 0.22, uTint) * body * (1.0 - uHand);
 		vec3 lineTone = mix(mix(mix(vec3(0.5), glimm(p.x * 0.05 + t * 0.02), uLine), uTone, uToneMix), tint, uTint);
 		float depth = max(d, 0.0);
@@ -124,7 +131,7 @@ const BACKDROP_FRAGMENT = `
 			vec3 sessionTone = slot.r > 0.5 ? mix(vec3(1.6), uTone * 9.0, slot.g) : vec3(0.3);
 			dotTone = mix(dotTone, sessionTone, uSessions);
 		}
-		dotTone = mix(dotTone, mix(vec3(1.0), tintAt(q.x) * (5.0 + spark * 4.0), lit), uTint);
+		dotTone = mix(dotTone, mix(vec3(1.0), tintAt(q) * (5.0 + spark * 4.0), lit), uTint);
 		vec3 tide = mix(vec3(1.0), vec3(0.62, 0.74, 1.0), water) * exp(-depth * 0.25 * water);
 		color += vec3(0.0905) * under * 0.5;
 		color += dotTone * tide * pip * (body * 0.9 + fringe * 0.6 + under * 0.6) * 0.22;
@@ -177,7 +184,7 @@ function mount(host, anchor, options = {}) {
 		new THREE.ShaderMaterial({
 			vertexShader: BACKDROP_VERTEX,
 			fragmentShader: BACKDROP_FRAGMENT,
-			uniforms: { uTime: { value: 0 }, uOpacity: { value: 1 }, uLight: { value: 0 }, uHand: { value: 0 }, uPage: { value: new THREE.Color(0xfcfcfc) }, uLit: { value: options.lit ? 1 : 0 }, uLine: { value: options.lit ? 1 : 0 }, uWave: { value: 1 }, uPhase: { value: 0 }, uCurve: { value: options.days ? 1 : 0 }, uDaysA: { value: options.days ? [...options.days] : new Array(30).fill(0) }, uDaysB: { value: options.days ? [...options.days] : new Array(30).fill(0) }, uDaysMix: { value: 0 }, uTone: { value: new THREE.Color(1, 1, 1) }, uToneMix: { value: 0 }, uSessions: { value: 0 }, uLift: { value: 0 }, uTintA: { value: new THREE.Color() }, uTintB: { value: new THREE.Color() }, uTintC: { value: new THREE.Color() }, uTint: { value: 0 }, uField: { value: null }, uFieldSize: { value: new THREE.Vector2(1, 1) }, uSize: { value: new THREE.Vector2(1, 1) } },
+			uniforms: { uTime: { value: 0 }, uOpacity: { value: 1 }, uLight: { value: 0 }, uHand: { value: 0 }, uPage: { value: new THREE.Color(0xfcfcfc) }, uLit: { value: options.lit ? 1 : 0 }, uLine: { value: options.lit ? 1 : 0 }, uWave: { value: 1 }, uPhase: { value: 0 }, uCurve: { value: options.days ? 1 : 0 }, uDaysA: { value: options.days ? [...options.days] : new Array(30).fill(0) }, uDaysB: { value: options.days ? [...options.days] : new Array(30).fill(0) }, uDaysMix: { value: 0 }, uTone: { value: new THREE.Color(1, 1, 1) }, uToneMix: { value: 0 }, uSessions: { value: 0 }, uLift: { value: 0 }, uTintA: { value: new THREE.Color() }, uTintB: { value: new THREE.Color() }, uTintC: { value: new THREE.Color() }, uTintDir: { value: new THREE.Vector2(1, 0) }, uTint: { value: 0 }, uField: { value: null }, uFieldSize: { value: new THREE.Vector2(1, 1) }, uSize: { value: new THREE.Vector2(1, 1) } },
 			depthWrite: false,
 		}),
 	);
@@ -593,16 +600,21 @@ function mount(host, anchor, options = {}) {
 			}
 		},
 		theme,
-		tint(colors, duration = 0.9) {
+		// direction: [x, y] the colors run along, y up; [1, 0] is left to right.
+		tint(colors, duration = 0.9, direction = [1, 0]) {
 			const uniforms = backdrop.material.uniforms;
 			const stops = [uniforms.uTintA.value, uniforms.uTintB.value, uniforms.uTintC.value];
 			const from = stops.map((stop) => stop.clone());
 			const target = colors ? colors.map((color) => new THREE.Color(color)) : from;
+			const dir = uniforms.uTintDir.value;
+			const fromDir = dir.clone();
+			const toDir = colors ? new THREE.Vector2(...direction) : fromDir;
 			const start = uniforms.uTint.value;
 			const end = colors ? 1 : 0;
 			const blend = start > 0.001;
 			tween("tint", 0, 1, duration, (value) => {
 				stops.forEach((stop, index) => stop.copy(blend ? from[index].clone().lerp(target[index], value) : target[index]));
+				dir.copy(blend ? fromDir.clone().lerp(toDir, value) : toDir);
 				uniforms.uTint.value = start + (end - start) * value;
 			});
 		},

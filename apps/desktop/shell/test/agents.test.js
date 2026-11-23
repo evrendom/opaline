@@ -58,6 +58,49 @@ test("both agents' plugins ping the local server from their Stop and SessionEnd 
 	).toEqual({ Authorization: "Bearer key-1" });
 });
 
+test("Antigravity's plugin is in its own layout: manifest, mcp_config.json and the skills, no hooks", () => {
+	const { root: marketplace, version } = writeMarketplace({
+		pluginDir,
+		server,
+	});
+	const target = path.join(marketplace, "opaline-antigravity");
+	const manifest = read(
+		path.join(target, ".antigravity-plugin", "plugin.json"),
+	);
+	expect(manifest).toMatchObject({
+		name: "opaline",
+		version,
+		logo: "assets/opaline.png",
+	});
+	expect(manifest.description).toContain("Gemini");
+	expect(fs.existsSync(path.join(target, manifest.logo))).toBe(true);
+	expect(read(path.join(target, "mcp_config.json"))).toEqual({
+		mcpServers: {
+			opaline: {
+				url: server.mcpUrl,
+				headers: { Authorization: "Bearer key-1" },
+			},
+		},
+	});
+	for (const absent of [
+		".claude-plugin",
+		".codex-plugin",
+		".mcp.json",
+		"hooks",
+		"hooks.json",
+	])
+		expect(fs.existsSync(path.join(target, absent))).toBe(false);
+	expect(text(path.join(target, "skills", "opaline", "SKILL.md"))).toBe(
+		text(path.join(pluginDir, "skills", "opaline", "SKILL.md")),
+	);
+});
+
+test("Antigravity reads the instruction line from ~/.gemini/GEMINI.md", () => {
+	expect(instructionFile("antigravity")).toBe(
+		path.join(os.homedir(), ".gemini", "GEMINI.md"),
+	);
+});
+
 test("the plugin version follows what the plugins contain, so a changed key reinstalls them", () => {
 	const first = writeMarketplace({ pluginDir, server }).version;
 	expect(writeMarketplace({ pluginDir, server }).version).toBe(first);

@@ -22,12 +22,13 @@ const COLORS = [
 ];
 // The agents Opaline connects to (its plugin and hooks).
 const AGENTS = [
-	{ key: "claude", label: "Claude Code", short: "Claude", color: "#D97757" },
-	{ key: "codex", label: "Codex", short: "Codex", color: "#10A37F" },
+	{ key: "claude", label: "Claude Code", short: "Claude", color: "oklch(0.663 0.139 38.7)" },
+	{ key: "codex", label: "Codex", short: "Codex", color: "oklch(0.667 0.162 271.6)" },
+	{ key: "antigravity", label: "Antigravity", short: "Antigravity", color: "oklch(0.637 0.191 258.1)" },
 ];
-// Every agent whose sessions the intro reads; Gemini is read from disk and
-// needs no connecting.
-const SOURCES = [...AGENTS, { key: "gemini", label: "Gemini", short: "Gemini", color: "#3C7BFF" }];
+// Every agent whose sessions the intro reads. Gemini's are read from disk
+// whether or not Antigravity is connected.
+const SOURCES = [...AGENTS.filter((agent) => agent.key !== "antigravity"), { key: "gemini", label: "Gemini", short: "Gemini", color: "oklch(0.572 0.235 262)" }];
 const money = (value) => `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const METRICS = [
 	{
@@ -960,10 +961,19 @@ async function buildUp(view) {
 	handoff(view);
 }
 
+// Each agent's icon colors, sampled from the icons, in the direction they run
+// across the scene (left to right unless AGENT_TINT_DIRECTIONS says): Claude's
+// tile (top, middle, bottom), Codex's cloud (lavender top to blue bottom) and
+// Antigravity's arch (blue bottom left, green, red top right).
+// Codex's lavender (oklch(0.766 0.118 290.1) in the icon) is pushed toward
+// orchid: the scene shows its tint dimmed, where lavender reads as blue.
 const AGENT_TINTS = {
-	claude: ["oklch(0.76 0.11 39.2)", "oklch(0.659 0.146 39.2)", "oklch(0.6 0.14 39.2)"],
-	codex: ["oklch(0.774 0.128 295.5)", "oklch(0.679 0.167 268.4)", "oklch(0.498 0.283 271.2)"],
+	claude: ["oklch(0.67 0.132 38.7)", "oklch(0.663 0.139 38.7)", "oklch(0.651 0.15 38.4)"],
+	codex: ["oklch(0.72 0.17 305)", "oklch(0.667 0.162 271.6)", "oklch(0.491 0.269 271.4)"],
+	antigravity: ["oklch(0.637 0.191 258.1)", "oklch(0.731 0.132 140.6)", "oklch(0.652 0.189 30.2)"],
 };
+// [x, y], y up: Antigravity's arch fades from its bottom left to its top right.
+const AGENT_TINT_DIRECTIONS = { antigravity: [1, 1] };
 
 function oklchToHex(value) {
 	const [l, c, h] = value.match(/[\d.]+/g).map(Number);
@@ -1076,7 +1086,7 @@ function rewind(reading, overlays, name) {
 
 content.addEventListener("pointerover", (event) => {
 	const tile = event.target.closest("[data-agent]");
-	if (tile && !tile.contains(event.relatedTarget)) glass?.tint(AGENT_TINTS[tile.dataset.agent]?.map(oklchToHex));
+	if (tile && !tile.contains(event.relatedTarget)) glass?.tint(AGENT_TINTS[tile.dataset.agent]?.map(oklchToHex), undefined, AGENT_TINT_DIRECTIONS[tile.dataset.agent]);
 });
 
 content.addEventListener("pointerout", (event) => {
