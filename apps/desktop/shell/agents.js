@@ -10,11 +10,16 @@ const MARKETPLACE = "opaline-local";
 const LOCAL_PLUGIN = `opaline@${MARKETPLACE}`;
 const CLOUD_PLUGIN = "opaline@opaline";
 const INSTRUCTION_LINE =
-	"To look up, search or analyse past Claude Code or Codex sessions, use the opaline:opaline skill instead of reading the raw session files; its answers open in the Opaline app.";
+	"To look up, search or analyse past Claude Code, Codex or Gemini sessions, use the opaline:opaline skill instead of reading the raw session files; its answers open in the Opaline app.";
 const EARLIER_INSTRUCTION_LINES = [
+	"To look up, search or analyse past Claude Code or Codex sessions, use the opaline:opaline skill instead of reading the raw session files; its answers open in the Opaline app.",
 	"For any analysis of coding-agent sessions (Claude Code or Codex), use the Opaline plugin; its answers open in the Opaline app.",
 ];
 const SHELL_VARIABLES = ["PATH", "CODEX_HOME", "CLAUDE_CONFIG_DIR"];
+// Antigravity installs a plugin from its folder; it has no marketplaces.
+const ANTIGRAVITY_PLUGIN = "opaline";
+const ANTIGRAVITY_DESCRIPTION =
+	"Analyse your Gemini, Claude Code and Codex sessions on this Mac: where your agents get stuck or waste time and money, and what to fix in your setup. Nothing leaves this Mac.";
 let shellEnv;
 
 function loginShellEnv() {
@@ -53,14 +58,14 @@ function log(message) {
 	fs.appendFileSync(file, `${new Date().toISOString()} ${message}\n`);
 }
 
-function run(command, args) {
+function run(command, args, env = {}) {
 	return loginShellEnv().then(
 		(shell) =>
 			new Promise((resolve) => {
 				execFile(
 					command,
 					args,
-					{ env: { ...process.env, ...shell }, timeout: 120_000 },
+					{ env: { ...process.env, ...shell, ...env }, timeout: 120_000 },
 					(error, stdout, stderr) =>
 						resolve({
 							ok: !error,
@@ -165,7 +170,17 @@ function writeMarketplace({ pluginDir, server }) {
 			},
 		},
 	};
-	const hash = crypto.createHash("sha256").update(JSON.stringify(variants));
+	// Antigravity reads a plugin's MCP servers from mcp_config.json (the
+	// transport follows from `url`) and runs only hooks inside the plugin, so
+	// its plugin has none: Opaline watches Gemini's session folders instead.
+	const antigravityMcp = {
+		url: server.mcpUrl,
+		headers: { Authorization: `Bearer ${server.apiKey}` },
+	};
+	const hash = crypto
+		.createHash("sha256")
+		.update(JSON.stringify(variants))
+		.update(JSON.stringify(antigravityMcp));
 	treeDigest(hash, pluginDir);
 	const fingerprint = hash.digest("hex").slice(0, 10);
 	const base = String(
@@ -205,6 +220,38 @@ function writeMarketplace({ pluginDir, server }) {
 			);
 		}
 	}
+	const antigravity = path.join(root, "opaline-antigravity");
+	fs.rmSync(antigravity, { recursive: true, force: true });
+	fs.cpSync(pluginDir, antigravity, { recursive: true });
+	const manifest = parse(
+		fs.readFileSync(
+			path.join(pluginDir, ".claude-plugin", "plugin.json"),
+			"utf8",
+		),
+	);
+	for (const other of [".claude-plugin", ".codex-plugin"])
+		fs.rmSync(path.join(antigravity, other), { recursive: true, force: true });
+	fs.mkdirSync(path.join(antigravity, ".antigravity-plugin"));
+	fs.writeFileSync(
+		path.join(antigravity, ".antigravity-plugin", "plugin.json"),
+		`${JSON.stringify(
+			{
+				...manifest,
+				name: ANTIGRAVITY_PLUGIN,
+				version,
+				description: ANTIGRAVITY_DESCRIPTION,
+				...(fs.existsSync(path.join(pluginDir, "assets", "opaline.png"))
+					? { logo: "assets/opaline.png" }
+					: {}),
+			},
+			null,
+			"\t",
+		)}\n`,
+	);
+	fs.writeFileSync(
+		path.join(antigravity, "mcp_config.json"),
+		`${JSON.stringify({ mcpServers: { opaline: antigravityMcp } }, null, 2)}\n`,
+	);
 	writeIfChanged(
 		path.join(root, ".claude-plugin", "marketplace.json"),
 		`${JSON.stringify({ name: MARKETPLACE, owner: { name: "Opaline" }, metadata: { description: "Opaline on this Mac" }, plugins: [{ name: "opaline", source: "./opaline-claude", description: "Find where your coding agents get stuck or waste time and money, from the sessions on this Mac.", category: "Developer Tools" }] }, null, 2)}\n`,
@@ -236,9 +283,116 @@ const agents = {
 		removeCloud: ["plugin", "remove", CLOUD_PLUGIN],
 		afterInstall: trustCodexHooks,
 	},
+	antigravity: {
+		label: "Antigravity",
+		binary: "agy",
+		marketplace: false,
+		plugins: (list) => (Array.isArray(list) ? list : []),
+		// Antigravity has no cloud Opaline plugin to tell apart.
+		matches: (plugin, id) =>
+			id === LOCAL_PLUGIN && plugin.name === ANTIGRAVITY_PLUGIN,
+		enabled: (plugin) => plugin.enabled !== false,
+		install: (root) => [
+			"plugin",
+			"install",
+			path.join(root, "opaline-antigravity"),
+		],
+		update: (root) => [
+			"plugin",
+			"install",
+			path.join(root, "opaline-antigravity"),
+		],
+		// Installing over a turned-off plugin leaves it off.
+		afterInstall: (binary) =>
+			run(binary, ["plugin", "enable", ANTIGRAVITY_PLUGIN]).then((result) =>
+				log(
+					`antigravity: plugin enable ${result.ok ? "ok" : `failed: ${result.output.trim()}`}`,
+				),
+			),
+		sync: syncT3Antigravity,
+	},
 };
 
+// T3 Code runs Antigravity with a Gemini folder of its own for each provider
+// setting (`agy acp --gemini-dir …`), and Antigravity reads plugins from that
+// folder, not from ~/.gemini.
+function t3GeminiDirs(home = os.homedir()) {
+	const root = path.join(home, ".t3", "userdata", "providers", "antigravity");
+	let entries;
+	try {
+		entries = fs.readdirSync(root, { withFileTypes: true });
+	} catch {
+		return [];
+	}
+	return entries
+		.filter((entry) => entry.isDirectory())
+		.map((entry) => path.join(root, entry.name))
+		.filter((dir) => fs.existsSync(path.join(dir, "config")));
+}
+
+// `agy plugin` has no flag for another Gemini folder and uses $HOME/.gemini,
+// so it runs with a HOME whose .gemini links to the folder.
+function geminiDirHome(dir) {
+	const home = path.join(
+		app.getPath("userData"),
+		"agents",
+		"gemini-homes",
+		crypto.createHash("sha256").update(dir).digest("hex").slice(0, 12),
+	);
+	const link = path.join(home, ".gemini");
+	let current;
+	try {
+		current = fs.readlinkSync(link);
+	} catch {}
+	if (current !== dir) {
+		fs.mkdirSync(home, { recursive: true });
+		fs.rmSync(link, { force: true });
+		fs.symlinkSync(dir, link);
+	}
+	return home;
+}
+
+function antigravityVersion(dir) {
+	return parse(
+		readText(
+			path.join(
+				dir,
+				"config",
+				"plugins",
+				ANTIGRAVITY_PLUGIN,
+				".antigravity-plugin",
+				"plugin.json",
+			),
+		),
+	)?.version;
+}
+
+async function syncT3Antigravity(binary, root, version, dirs = t3GeminiDirs()) {
+	for (const dir of dirs) {
+		if (antigravityVersion(dir) === version) continue;
+		const env = { HOME: geminiDirHome(dir) };
+		const installed = await run(
+			binary,
+			["plugin", "install", path.join(root, "opaline-antigravity")],
+			env,
+		);
+		const enabled = installed.ok
+			? await run(binary, ["plugin", "enable", ANTIGRAVITY_PLUGIN], env)
+			: installed;
+		log(
+			`antigravity: T3 Code folder ${path.basename(dir).slice(0, 8)} plugin install ${enabled.ok ? "ok" : `failed: ${enabled.output.trim()}`}`,
+		);
+	}
+}
+
+function command(key, name, root) {
+	const args = agents[key][name];
+	return typeof args === "function" ? args(root) : args;
+}
+
 function instructionFile(key, env = process.env) {
+	if (key === "antigravity")
+		return path.join(os.homedir(), ".gemini", "GEMINI.md");
 	if (key === "claude")
 		return path.join(
 			env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude"),
@@ -369,7 +523,7 @@ function removeInstructionLines({ keys, env }) {
 }
 
 async function inspectAgent(key) {
-	const binary = await which(key);
+	const binary = await which(agents[key].binary ?? key);
 	if (!binary) return { binary };
 	const listed = parse(
 		(await run(binary, ["plugin", "list", "--json"])).stdout,
@@ -590,14 +744,19 @@ function createAgents({ stack }) {
 				detail: error.message,
 			};
 		}
-		const added = await addMarketplace(key, found.binary, marketplace.root);
-		if (!added.ok)
-			return {
-				...agentStatus(key, found),
-				error: "Couldn’t add the plugin",
-				detail: failure(added.output),
-			};
-		const installed = await run(found.binary, agents[key].install);
+		if (agents[key].marketplace !== false) {
+			const added = await addMarketplace(key, found.binary, marketplace.root);
+			if (!added.ok)
+				return {
+					...agentStatus(key, found),
+					error: "Couldn’t add the plugin",
+					detail: failure(added.output),
+				};
+		}
+		const installed = await run(
+			found.binary,
+			command(key, "install", marketplace.root),
+		);
 		log(
 			`${key}: plugin install ${installed.ok ? "ok" : `failed: ${installed.output.trim()}`}`,
 		);
@@ -608,6 +767,11 @@ function createAgents({ stack }) {
 				detail: failure(installed.output),
 			};
 		await agents[key].afterInstall?.(found.binary);
+		await agents[key].sync?.(
+			found.binary,
+			marketplace.root,
+			marketplace.version,
+		);
 		const status = agentStatus(key, await inspectAgent(key));
 		if (status.connected) void offerInstructions(key);
 		return status;
@@ -647,14 +811,20 @@ function createAgents({ stack }) {
 		} catch (error) {
 			log(`instruction line not updated: ${error.message}`);
 		}
-		const { version } = writeMarketplace({ ...marketplaceSources(), server });
+		const { root, version } = writeMarketplace({
+			...marketplaceSources(),
+			server,
+		});
 		for (const [key, found] of statuses) {
-			if (!found.local || found.local.version === version) continue;
-			const updated = await run(found.binary, agents[key].update);
-			log(
-				`${key}: plugin update to ${version} ${updated.ok ? "ok" : `failed: ${updated.output.trim()}`}`,
-			);
-			if (updated.ok) await agents[key].afterInstall?.(found.binary);
+			if (!found.local) continue;
+			if (found.local.version !== version) {
+				const updated = await run(found.binary, command(key, "update", root));
+				log(
+					`${key}: plugin update to ${version} ${updated.ok ? "ok" : `failed: ${updated.output.trim()}`}`,
+				);
+				if (updated.ok) await agents[key].afterInstall?.(found.binary);
+			}
+			await agents[key].sync?.(found.binary, root, version);
 		}
 	}
 
@@ -664,6 +834,8 @@ function createAgents({ stack }) {
 module.exports = {
 	createAgents,
 	writeMarketplace,
+	syncT3Antigravity,
+	t3GeminiDirs,
 	instructionFile,
 	addInstructionLine,
 	removeInstructionLine,

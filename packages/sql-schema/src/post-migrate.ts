@@ -14,6 +14,17 @@ export const DEFERRED_CONSTRAINT_VALIDATIONS = [
 		constraint: "repository_evidence_object_kind_check",
 		table: "repository_evidence_object",
 	},
+	// 0077: Gemini as a source.
+	{ constraint: "ingest_job_source_check", table: "ingest_job" },
+	{
+		constraint: "ingest_processing_target_receipt_target_check",
+		table: "ingest_processing_target_receipt",
+	},
+	{ constraint: "live_session_source_check", table: "live_session" },
+	{
+		constraint: "repository_evidence_capture_source_check",
+		table: "repository_evidence_capture",
+	},
 ] as const;
 
 export type DeferredConstraintValidation =

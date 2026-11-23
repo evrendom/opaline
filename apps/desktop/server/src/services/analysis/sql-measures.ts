@@ -737,7 +737,7 @@ export function callsSql(
 		window.words === undefined ||
 		["*", ...names].some((word) => window.words?.has(word));
 	const programs = reads("command_programs", "command_prefixes");
-	const timeoutUnknown = `r.run_id = '' OR has(r.unrecorded_facts, 'timed_out_calls') OR (c.source = 'claude_code' AND c.agent_id != '' AND c.parser_version < ${TIMEOUT_LIMIT_SINCE_PARSER_VERSION})`;
+	const timeoutUnknown = `r.run_id = '' OR has(r.unrecorded_facts, 'timed_out_calls') OR (c.source IN ('claude_code', 'gemini') AND c.agent_id != '' AND c.parser_version < ${TIMEOUT_LIMIT_SINCE_PARSER_VERSION})`;
 	const columns: Readonly<Record<string, string>> = {
 		run_id: "r.run_id",
 		interrupted: `if(r.run_id = '' OR has(r.unrecorded_facts, 'interrupted_calls'), NULL, c.result_interrupted)`,

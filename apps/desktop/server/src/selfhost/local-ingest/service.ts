@@ -10,15 +10,19 @@ import type {
 	StoredFile,
 } from "./file-store.js";
 import {
+	GEMINI_TRANSLATION_MILESTONE,
 	INITIAL_IMPORT_MILESTONE,
 	type MilestoneStore,
 	memoryMilestoneStore,
 } from "./milestone-store.js";
 import {
+	antigravityBrains,
 	classifyTranscriptPath,
+	isWatchedTranscriptName,
 	type LocalIngestRoots,
 	type TranscriptFile,
 	type TranscriptSource,
+	watchedRoots,
 } from "./sources.js";
 import {
 	checkTranscript,
@@ -228,6 +232,8 @@ export class LocalIngest {
 	private readonly milestones: MilestoneStore;
 	private initialLoaded = false;
 	private initialDoneAt: number | null = null;
+	/** Gemini sessions to import again for a new translation. */
+	private readonly retranslate = new Set<string>();
 	private initialScope: Set<string> | null = null;
 	private initialTimer: ReturnType<typeof setTimeout> | undefined;
 	private initialDrainedReads = 0;
@@ -247,7 +253,35 @@ export class LocalIngest {
 		const rows = await this.deps.store.loadAll();
 		for (const row of rows) this.restore(row);
 		await this.loadInitialImport(rows);
+		await this.loadGeminiTranslation();
 		await this.waitForOwner();
+	}
+
+	/**
+	 * Gemini sessions are stored as a translation of their files. When the
+	 * translation changes (GEMINI_TRANSCRIPT_VERSION), every Gemini session
+	 * imported before is imported again once, though its file is unchanged;
+	 * the milestone is reached when the last one is.
+	 */
+	private async loadGeminiTranslation(): Promise<void> {
+		const reached = await this.milestones
+			.reachedAt(GEMINI_TRANSLATION_MILESTONE)
+			.catch(() => null);
+		if (reached) return;
+		for (const seen of this.files.values())
+			if (
+				seen.file.source === "gemini" &&
+				seen.file.role === "session" &&
+				seen.ingested
+			)
+				this.retranslate.add(seen.file.sessionPath);
+		if (this.retranslate.size === 0) await this.geminiTranslated();
+	}
+
+	private async geminiTranslated(): Promise<void> {
+		await this.milestones
+			.reach(GEMINI_TRANSLATION_MILESTONE, new Date(this.now()))
+			.catch(() => {});
 	}
 
 	private async loadInitialImport(rows: readonly StoredFile[]): Promise<void> {
@@ -658,6 +692,7 @@ export class LocalIngest {
 	private isStale(seen: SeenFile): boolean {
 		const ingested = seen.ingested;
 		if (!ingested) return true;
+		if (this.retranslate.has(seen.file.sessionPath)) return true;
 		if (
 			this.owner &&
 			(seen.owner?.organizationId !== this.owner.organizationId ||
@@ -674,7 +709,12 @@ export class LocalIngest {
 
 	private markIfStale(seen: SeenFile): void {
 		const entry = this.sessions.get(seen.file.sessionPath);
-		if (entry?.state === "skipped" && seen.ingested && !this.changedSince(seen))
+		if (
+			entry?.state === "skipped" &&
+			seen.ingested &&
+			!this.changedSince(seen) &&
+			!this.retranslate.has(seen.file.sessionPath)
+		)
 			return;
 		if (this.isStale(seen))
 			this.schedule(
@@ -916,6 +956,8 @@ export class LocalIngest {
 		);
 		const at = this.now();
 		entry.lastImportMs = at - importStarted;
+		if (outcome.kind !== "retry" && this.retranslate.delete(entry.sessionPath))
+			if (this.retranslate.size === 0) await this.geminiTranslated();
 		if (entry.lastIngestAt !== null && outcome.kind !== "retry")
 			this.deps.log?.(
 				`local ingest re-imported ${entry.sessionPath} (${Math.round(this.sessionBytes(entry.sessionPath) / 1024)} KB) in ${entry.lastImportMs} ms; its next live import waits at least ${Math.round(this.liveGap(entry) / 1000)} s`,
@@ -1192,15 +1234,43 @@ export class LocalIngest {
 		};
 		await walkCodex(codexSessions);
 		await walkCodex(codexArchivedSessions);
+		const { geminiTmp } = this.deps.roots;
+		if (geminiTmp)
+			for (const project of await readdir(geminiTmp, {
+				withFileTypes: true,
+			}).catch(() => [])) {
+				if (!project.isDirectory()) continue;
+				const chats = join(geminiTmp, project.name, "chats");
+				for (const name of await readdir(chats).catch(() => [] as string[])) {
+					const file = classifyTranscriptPath(
+						this.deps.roots,
+						join(chats, name),
+					);
+					if (file) files.push(file);
+				}
+			}
+		for (const brain of antigravityBrains(this.deps.roots))
+			for (const conversation of await readdir(brain, {
+				withFileTypes: true,
+			}).catch(() => [])) {
+				if (!conversation.isDirectory()) continue;
+				const file = classifyTranscriptPath(
+					this.deps.roots,
+					join(
+						brain,
+						conversation.name,
+						".system_generated",
+						"logs",
+						"transcript.jsonl",
+					),
+				);
+				if (file) files.push(file);
+			}
 		return files;
 	}
 
 	private watchRoots(): void {
-		for (const root of [
-			this.deps.roots.claudeProjects,
-			this.deps.roots.codexSessions,
-			this.deps.roots.codexArchivedSessions,
-		]) {
+		for (const root of watchedRoots(this.deps.roots)) {
 			if (this.watchers.has(root)) continue;
 			try {
 				const watcher = watch(root, { recursive: true }, (_event, name) => {
@@ -1209,7 +1279,7 @@ export class LocalIngest {
 						return;
 					}
 					const path = join(root, name.toString());
-					if (!path.endsWith(".jsonl") && !path.endsWith(".jsonl.zst")) return;
+					if (!isWatchedTranscriptName(path)) return;
 					this.touched.add(path);
 					if (!this.touchTimer) {
 						this.touchTimer = setTimeout(() => {

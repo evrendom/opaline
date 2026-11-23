@@ -1,4 +1,5 @@
 import { Buffer } from "node:buffer";
+import { RAW_SESSION_TABLES } from "@rudel/api-routes";
 import type { TranscriptSource } from "@rudel/api-routes/transcript-records";
 import {
 	type ClickHouseExecutor,
@@ -47,13 +48,9 @@ export async function readRawTranscriptLine(
 		readonly clickhouseSettings?: ClickHouseStatement["clickhouse_settings"];
 	} = {},
 ): Promise<string | undefined> {
-	const table = getSafeClickHouseTable(
-		address.source === "codex"
-			? "rudel.codex_sessions"
-			: "rudel.claude_sessions",
-	);
+	const table = getSafeClickHouseTable(RAW_SESSION_TABLES[address.source]);
 	const stream =
-		address.source === "claude_code"
+		address.source !== "codex"
 			? "if(mapContains(subagents, {agentId:String}), subagents[{agentId:String}], content)"
 			: "content";
 	const rows = await executor.query<{ raw: string }>({

@@ -98,7 +98,7 @@ export const ingestJob = pgTable(
 		),
 		check(
 			"ingest_job_source_check",
-			sql`${table.source} IN ('claude_code', 'codex')`,
+			sql`${table.source} IN ('claude_code', 'codex', 'gemini')`,
 		),
 		check(
 			"ingest_job_attempts_check",

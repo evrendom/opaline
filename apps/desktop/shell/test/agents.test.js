@@ -20,6 +20,8 @@ const {
 	offerInstructionLine,
 	removeInstructionLine,
 	removeInstructionLines,
+	syncT3Antigravity,
+	t3GeminiDirs,
 	updateInstructionLines,
 	writeMarketplace,
 } = require("../agents");
@@ -56,6 +58,99 @@ test("both agents' plugins ping the local server from their Stop and SessionEnd 
 		read(path.join(marketplace, "opaline-codex", ".mcp.json")).mcpServers
 			.opaline.http_headers,
 	).toEqual({ Authorization: "Bearer key-1" });
+});
+
+test("Antigravity's plugin is in its own layout: manifest, mcp_config.json and the skills, no hooks", () => {
+	const { root: marketplace, version } = writeMarketplace({
+		pluginDir,
+		server,
+	});
+	const target = path.join(marketplace, "opaline-antigravity");
+	const manifest = read(
+		path.join(target, ".antigravity-plugin", "plugin.json"),
+	);
+	expect(manifest).toMatchObject({
+		name: "opaline",
+		version,
+		logo: "assets/opaline.png",
+	});
+	expect(manifest.description).toContain("Gemini");
+	expect(fs.existsSync(path.join(target, manifest.logo))).toBe(true);
+	expect(read(path.join(target, "mcp_config.json"))).toEqual({
+		mcpServers: {
+			opaline: {
+				url: server.mcpUrl,
+				headers: { Authorization: "Bearer key-1" },
+			},
+		},
+	});
+	for (const absent of [
+		".claude-plugin",
+		".codex-plugin",
+		".mcp.json",
+		"hooks",
+		"hooks.json",
+	])
+		expect(fs.existsSync(path.join(target, absent))).toBe(false);
+	expect(text(path.join(target, "skills", "opaline", "SKILL.md"))).toBe(
+		text(path.join(pluginDir, "skills", "opaline", "SKILL.md")),
+	);
+});
+
+test("Antigravity reads the instruction line from ~/.gemini/GEMINI.md", () => {
+	expect(instructionFile("antigravity")).toBe(
+		path.join(os.homedir(), ".gemini", "GEMINI.md"),
+	);
+});
+
+test("the plugin also goes into each Gemini folder T3 Code runs Antigravity with, unless it is already current", async () => {
+	const home = path.join(root, "home");
+	const { root: marketplace, version } = writeMarketplace({
+		pluginDir,
+		server,
+	});
+	const providers = path.join(
+		home,
+		".t3",
+		"userdata",
+		"providers",
+		"antigravity",
+	);
+	const installed = (dir) =>
+		path.join(dir, "config", "plugins", "opaline", ".antigravity-plugin");
+	const [stale, current, unused] = ["stale", "current", "unused"].map((name) =>
+		path.join(providers, name),
+	);
+	for (const [dir, value] of [
+		[stale, "0.1.0-local.old"],
+		[current, version],
+	]) {
+		fs.mkdirSync(installed(dir), { recursive: true });
+		fs.writeFileSync(
+			path.join(installed(dir), "plugin.json"),
+			JSON.stringify({ version: value }),
+		);
+	}
+	fs.mkdirSync(unused, { recursive: true });
+	const calls = path.join(root, "calls");
+	const agy = path.join(root, "agy");
+	fs.writeFileSync(
+		agy,
+		`#!/bin/sh\necho "$(readlink "$HOME/.gemini") $*" >> '${calls}'\nif [ "$2" = install ]; then rm -rf "$HOME/.gemini/config/plugins/opaline" && cp -R "$3" "$HOME/.gemini/config/plugins/opaline"; fi\n`,
+		{ mode: 0o755 },
+	);
+	const dirs = t3GeminiDirs(home);
+	expect(dirs.sort()).toEqual([current, stale]);
+	await syncT3Antigravity(agy, marketplace, version, dirs);
+	expect(text(calls).trim().split("\n")).toEqual([
+		`${stale} plugin install ${path.join(marketplace, "opaline-antigravity")}`,
+		`${stale} plugin enable opaline`,
+	]);
+	expect(read(path.join(installed(stale), "plugin.json")).version).toBe(
+		version,
+	);
+	await syncT3Antigravity(agy, marketplace, version, dirs);
+	expect(text(calls).trim().split("\n")).toHaveLength(2);
 });
 
 test("the plugin version follows what the plugins contain, so a changed key reinstalls them", () => {

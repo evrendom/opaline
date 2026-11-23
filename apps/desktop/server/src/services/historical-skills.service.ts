@@ -114,7 +114,7 @@ export async function listHistoricalSkills(
 					AND sa.user_id = su.user_id
 					AND sa.session_id = su.session_id
 					AND (
-						(su.agent = 'claude' AND sa.source = 'claude_code')
+						(su.agent = 'claude' AND sa.source IN ('claude_code', 'gemini'))
 						OR (su.agent = 'codex' AND sa.source = 'codex')
 					)
 				${repoFilter ? `WHERE ${repoFilter.sql}` : ""}

@@ -80,6 +80,7 @@ const fact = (key: string) => `f_${key}`;
 const AGENT_NAMES: Readonly<Record<TranscriptSource, string>> = {
 	claude_code: "Claude Code",
 	codex: "Codex",
+	gemini: "Gemini",
 };
 
 /** Which agents and parser versions record what a runs column counts, as its gate says. */
@@ -248,7 +249,7 @@ function eventsOfRecordSql(): string {
 						${one("turn_error", `source = 'codex' AND subtype = 'task_complete' AND ${kind} = '' AND ${f("turn_error")} != ''`)},
 						${one("compaction", RUN_EVENT_RECORDS.isCompaction(f))})`;
 	return `${events} AS record_events,
-					arrayJoin(if(empty(record_events) AND source = 'claude_code' AND kind = 'meta',
+					arrayJoin(if(empty(record_events) AND source IN ('claude_code', 'gemini') AND kind = 'meta',
 						[CAST(tuple('notice', '', NULL, head), '${EVENT_TUPLE}')], record_events)) AS event`;
 }
 
@@ -274,7 +275,7 @@ export function eventsSql(runs: CommittedRuns, window: SqlWindow = {}): string {
 	const retryStatuses = `arrayFilter(status -> match(status, '^[1-5][0-9]{2}$'), arrayMap(component ->
 						if(JSONType(component, 'value') = 'String', JSONExtractString(component, 'value'), JSONExtractRaw(component, 'value')),
 						arrayFilter(component -> endsWith(JSONExtractString(component, 'path'), '.error.status'), JSONExtractArrayRaw(${f("api_errors_components")}))))`;
-	const statuses = `if(source = 'claude_code' AND ${f("api_error_status")} = '', ${retryStatuses},
+	const statuses = `if(source IN ('claude_code', 'gemini') AND ${f("api_error_status")} = '', ${retryStatuses},
 						${RUN_EVENT_RECORDS.apiErrorStatuses(f, "provider_error_kind")})`;
 	const error = `multiIf(source = 'codex', if(provider_error_kind != '', provider_error_kind, ${f("turn_error_kind")}),
 						${f("api_error")} != '', ${f("api_error")},

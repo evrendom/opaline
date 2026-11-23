@@ -26,6 +26,7 @@ type Status =
 const SOURCE_LABELS: Record<string, string> = {
 	claude_code: "Claude Code",
 	codex: "Codex",
+	gemini: "Gemini",
 };
 
 export function DesktopRepositoryPicker({

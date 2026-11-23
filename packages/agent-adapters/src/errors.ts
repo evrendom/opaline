@@ -1,9 +1,7 @@
-import type { Source } from "@rudel/api-routes";
-
-const SOURCE_DISPLAY_NAMES: Record<Source, string> = {
-	claude_code: "Claude Code",
-	codex: "Codex",
-};
+import {
+	SOURCE_LABELS as SOURCE_DISPLAY_NAMES,
+	type Source,
+} from "@rudel/api-routes";
 
 export function getMissingTranscriptTimestampMessage(source: Source): string {
 	return `${SOURCE_DISPLAY_NAMES[source]} transcript contains no valid timestamp`;

@@ -6,10 +6,12 @@ import {
 	TupleParam,
 } from "@clickhouse/client-web";
 import { getLogger } from "@logtape/logtape";
+import type { Source } from "@rudel/api-routes";
 import { resolveClickHouseUsername } from "@rudel/ch-schema/connection";
 import {
 	CLAUDE_SESSION_ANALYTICS_MV_SQL,
 	CODEX_SESSION_ANALYTICS_MV_SQL,
+	GEMINI_SESSION_ANALYTICS_MV_SQL,
 	SESSION_ANALYTICS_INSERT_COLUMNS,
 } from "@rudel/ch-schema/session-analytics-mv";
 import { withClickHouseWorkloadSettings } from "./clickhouse-workload.js";
@@ -112,6 +114,7 @@ export const ALLOWED_CLICKHOUSE_TABLES: ReadonlySet<string> = new Set([
 	"rudel.l1_edge_resolutions",
 	"rudel.mcp_tool_calls",
 	"rudel.codex_sessions",
+	"rudel.gemini_sessions",
 	"rudel.repository_session_evidence_index",
 	"rudel.run_index",
 	"rudel.run_requests",
@@ -224,6 +227,9 @@ export function buildLatestRawSessionContentSql(
 	const codexWhere = filters.source
 		? `${rawWhere}\n      AND {source:String} = 'codex'`
 		: rawWhere;
+	const geminiWhere = filters.source
+		? `${rawWhere}\n      AND {source:String} = 'gemini'`
+		: rawWhere;
 
 	return `
   SELECT
@@ -261,6 +267,20 @@ export function buildLatestRawSessionContentSql(
       ingested_at
     FROM rudel.codex_sessions
     WHERE ${codexWhere}
+
+    UNION ALL
+
+    SELECT
+      'gemini' AS source,
+      organization_id,
+      user_id,
+      session_id,
+      content,
+      subagents,
+      revision,
+      ingested_at
+    FROM rudel.gemini_sessions
+    WHERE ${geminiWhere}
   ) AS raw
   GROUP BY source, organization_id, user_id, session_id
 `;
@@ -531,6 +551,7 @@ export function buildIngestRecoveryCountStatement(
 	switch (target) {
 		case "rudel.claude_sessions":
 		case "rudel.codex_sessions":
+		case "rudel.gemini_sessions":
 			return recoveryCountStatement(
 				target,
 				`organization_id = {organizationId:String}
@@ -718,7 +739,7 @@ ${scopedMvSql}
 
 interface SessionAnalyticsRecoveryConfig {
 	readonly mvSql: string;
-	readonly source: "claude_code" | "codex";
+	readonly source: Source;
 }
 
 function getSessionAnalyticsRecoveryConfig(
@@ -732,6 +753,8 @@ function getSessionAnalyticsRecoveryConfig(
 			};
 		case "rudel.codex_sessions":
 			return { mvSql: CODEX_SESSION_ANALYTICS_MV_SQL, source: "codex" };
+		case "rudel.gemini_sessions":
+			return { mvSql: GEMINI_SESSION_ANALYTICS_MV_SQL, source: "gemini" };
 		default:
 			return null;
 	}

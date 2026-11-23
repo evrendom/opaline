@@ -7,9 +7,9 @@ import {
 describe("session detail ClickHouse snapshot", () => {
 	test("prunes obsolete transcript revisions before reading the content columns", () => {
 		const sql = buildSessionDetailRawSnapshotSql();
-		expect(sql.match(/revision = \{revision:UInt64\}/gu)).toHaveLength(3);
-		expect(sql.match(/PREWHERE organization_id/gu)).toHaveLength(2);
-		expect(sql.match(/source = \{source:String\}/gu)).toHaveLength(3);
+		expect(sql.match(/revision = \{revision:UInt64\}/gu)).toHaveLength(4);
+		expect(sql.match(/PREWHERE organization_id/gu)).toHaveLength(3);
+		expect(sql.match(/source = \{source:String\}/gu)).toHaveLength(4);
 	});
 	test("selects raw revision, content, and subagents in one argMax tuple", () => {
 		const sql = buildSessionDetailRawSnapshotSql();
@@ -35,11 +35,11 @@ describe("session detail ClickHouse snapshot", () => {
 		);
 	});
 
-	test("parameterizes uploader, owner, and session filters in both raw tables", () => {
+	test("parameterizes uploader, owner, and session filters in every raw table", () => {
 		const sql = buildSessionDetailRawSnapshotSql();
-		expect(sql.match(/organization_id = \{orgId:String\}/gu)).toHaveLength(3);
-		expect(sql.match(/user_id = \{ownerId:String\}/gu)).toHaveLength(3);
-		expect(sql.match(/session_id = \{sessionId:String\}/gu)).toHaveLength(3);
+		expect(sql.match(/organization_id = \{orgId:String\}/gu)).toHaveLength(4);
+		expect(sql.match(/user_id = \{ownerId:String\}/gu)).toHaveLength(4);
+		expect(sql.match(/session_id = \{sessionId:String\}/gu)).toHaveLength(4);
 	});
 
 	test("reads the current source and revision as one tuple", () => {

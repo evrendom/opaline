@@ -4,6 +4,7 @@ import {
 	AnalysisSearchInputSchema,
 	AnalysisSearchOutputSchema,
 } from "./analysis-search.js";
+import { SourceSchema } from "./schemas/source.js";
 
 export const RunRefSchema = z
 	.object({
@@ -135,7 +136,7 @@ export const AnalysisFindInputBaseSchema = z
 		to: z.string().date().optional(),
 		latest: z.number().int().min(1).max(200).optional(),
 		repository: z.string().min(1).optional(),
-		agent: z.enum(["claude_code", "codex"]).optional(),
+		agent: SourceSchema.optional(),
 		model: z.string().min(1).optional(),
 		sessionId: z.string().min(1).max(200).optional(),
 		parentSessionId: z.string().min(1).max(200).optional(),
@@ -480,7 +481,7 @@ export const AnalysisRunSchema = z.object({
 	/** Every model the run's usage was attributed to, most expensive first. */
 	models: z.array(z.string()).default([]),
 	repository: z.string(),
-	agent: z.enum(["claude_code", "codex"]),
+	agent: SourceSchema,
 	promptHead: z.string().max(160),
 	edits: z.number(),
 	toolCalls: z.number(),
@@ -544,7 +545,7 @@ export const AnalysisCallSchema = z.object({
 	record: z.number().int(),
 	block: z.number().int(),
 	at: z.string(),
-	agent: z.enum(["claude_code", "codex"]),
+	agent: SourceSchema,
 	tool: z.string(),
 	/** The file a `written` script was written to; empty otherwise. */
 	filePath: z.string(),
@@ -959,7 +960,7 @@ export const AnalysisWeeklyTotalsSchema = z.object({
 	week: z.string().nullable(),
 	/** The member (user id); null when grouped by week or agent. */
 	member: z.string().nullable(),
-	agent: z.enum(["claude_code", "codex"]).nullable(),
+	agent: SourceSchema.nullable(),
 	/** Weeks the row adds up. */
 	weeks: z.number().int(),
 	sessions: z.number().nullable(),
@@ -977,7 +978,7 @@ export const AnalysisWeeklyTotalsSchema = z.object({
 export const SessionBehindSchema = z.object({
 	sessionId: z.string(),
 	repository: z.string(),
-	agent: z.enum(["claude_code", "codex"]),
+	agent: SourceSchema,
 	startedAt: z.string().nullable(),
 	rows: z.number().int(),
 	firstSeen: z.string(),

@@ -13,7 +13,7 @@ import {
 	type SessionJob,
 	type SessionOutcome,
 } from "./service.js";
-import { localIngestRoots } from "./sources.js";
+import { localIngestRoots, watchedRoots } from "./sources.js";
 import { clearImageSpill } from "./transcript-file/index.js";
 
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -163,7 +163,7 @@ export async function startLocalIngest(options: {
 	};
 	registerLocalIngest(handle);
 	options.log(
-		`local ingest: ${roots.claudeProjects}, ${roots.codexSessions} and ${roots.codexArchivedSessions}, first import ${settings.historyDays} days then all history, background priority ${backgroundPrioritySupported(env) ? "on" : "off"}`,
+		`local ingest: ${watchedRoots(roots).join(", ")}, first import ${settings.historyDays} days then all history, background priority ${backgroundPrioritySupported(env) ? "on" : "off"}`,
 	);
 	return handle;
 }

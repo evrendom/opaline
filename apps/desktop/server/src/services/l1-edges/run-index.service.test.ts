@@ -1341,7 +1341,7 @@ describe("run index statements", () => {
 			const statement = build(scope, generation);
 			const reads = usageReads(statement.query);
 			expect(reads.length).toBeGreaterThan(0);
-			for (const read of reads) expect(read).toMatch(/source = /u);
+			for (const read of reads) expect(read).toMatch(/source (?:=|IN) /u);
 			expect(statement.query).toContain("e.source = {source:String}");
 			expect(statement.query_params).toMatchObject({ source: "claude_code" });
 		}

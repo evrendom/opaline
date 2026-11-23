@@ -94,6 +94,7 @@ function modelAccent(model: string | null): string | null {
 	const icon = model ? getModelBadgeTone(model).icon : null;
 	if (icon === "claude") return "#CC7D5E";
 	if (icon === "codex") return "var(--ink)";
+	if (icon === "gemini") return "#3C7BFF";
 	return null;
 }
 

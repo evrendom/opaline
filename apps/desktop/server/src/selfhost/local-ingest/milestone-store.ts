@@ -1,6 +1,10 @@
+import { GEMINI_TRANSCRIPT_VERSION } from "@rudel/agent-adapters";
 import type postgres from "postgres";
 
 export const INITIAL_IMPORT_MILESTONE = "initial_import";
+
+/** Reached once every Gemini session is stored in this translation. */
+export const GEMINI_TRANSLATION_MILESTONE = `gemini_transcript_v${GEMINI_TRANSCRIPT_VERSION}`;
 
 export interface MilestoneStore {
 	reachedAt(name: string): Promise<Date | null>;

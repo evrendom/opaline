@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import type { Source } from "@rudel/api-routes";
 import type { ClickHouseExecutor } from "../../clickhouse.js";
 import {
 	persistRepositoryEvidenceIndex,
@@ -20,7 +21,7 @@ export interface LocalSetupSession {
 	readonly organizationId: string;
 	readonly userId: string;
 	readonly sessionId: string;
-	readonly source: "claude_code" | "codex";
+	readonly source: Source;
 	readonly projectPath: string;
 	readonly repository: string;
 }

@@ -43,7 +43,7 @@ export function SessionsOverviewPendingRow({
 }: {
 	index: number;
 	repositoryName: string;
-	source: "claude_code" | "codex" | undefined;
+	source: "claude_code" | "codex" | "gemini" | undefined;
 	placeholderOnly: boolean;
 }) {
 	const cellClassName = SESSION_OVERVIEW_CELL_CLASS_NAME;
@@ -52,16 +52,20 @@ export function SessionsOverviewPendingRow({
 			? "claude"
 			: source === "codex"
 				? "gpt"
-				: index % 2 === 0
-					? "claude"
-					: "gpt";
+				: source === "gemini"
+					? "gemini"
+					: index % 2 === 0
+						? "claude"
+						: "gpt";
 	const sourceLabel = placeholderOnly
 		? ""
 		: source === "claude_code"
 			? "Claude"
 			: source === "codex"
 				? "Codex"
-				: "";
+				: source === "gemini"
+					? "Gemini"
+					: "";
 	// Stable variation keeps the preview from reshuffling on connection updates.
 	const variation = Math.imul(index + 1, 2654435761) >>> 0;
 	const skills = Array.from(

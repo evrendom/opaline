@@ -124,6 +124,8 @@ export function SessionModelMark({
 				// design-escape-ok(colour): data paint; Claude's brand orange on its model mark
 				tone.icon === "claude" && "text-[#b96949]",
 				tone.icon === "codex" && "text-ink",
+				// design-escape-ok(colour): data paint; Gemini's brand colour
+				tone.icon === "gemini" && "text-[#3C7BFF]",
 				tone.icon === null && "text-ink-3",
 			)}
 		>

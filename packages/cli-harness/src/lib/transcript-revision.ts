@@ -18,7 +18,7 @@ export const TRANSCRIPT_MAX_DELIVERY_BYTES =
 
 export interface TranscriptRevisionScope {
 	readonly actorId: string;
-	readonly provider: "claude_code" | "codex";
+	readonly provider: "claude_code" | "codex" | "gemini";
 	readonly providerInstanceId: string;
 	readonly sessionId: string;
 }

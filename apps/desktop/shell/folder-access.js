@@ -25,11 +25,11 @@ function encode(folder) {
 	return folder.replace(/[^A-Za-z0-9]/gu, "-").toLowerCase();
 }
 
-function holds(folder, { claudeFolders, codexPaths }) {
+function holds(folder, { claudeFolders, codexPaths, geminiPaths = [] }) {
 	const root = folder.toLowerCase();
 	const encoded = encode(folder);
 	return (
-		codexPaths.some((cwd) => {
+		[...codexPaths, ...geminiPaths].some((cwd) => {
 			const target = path.resolve(cwd).toLowerCase();
 			return target === root || target.startsWith(`${root}/`);
 		}) ||
@@ -88,7 +88,44 @@ async function codexCwd(file) {
 	}
 }
 
-async function sessionFolders({ claudeRoot, codexFiles }) {
+/**
+ * The folders Gemini CLI has run in: the keys of `~/.gemini/projects.json` and
+ * each project folder's `.project_root`. Antigravity's folders are only known
+ * from its transcripts, which the server reads.
+ */
+async function geminiProjectRoots(geminiRoot) {
+	const roots = [];
+	const add = (root) => {
+		if (
+			typeof root === "string" &&
+			root.startsWith("/") &&
+			root !== "/" &&
+			!roots.includes(root)
+		)
+			roots.push(root);
+	};
+	try {
+		const { projects } = JSON.parse(
+			await fs.promises.readFile(
+				path.join(geminiRoot, "projects.json"),
+				"utf8",
+			),
+		);
+		for (const root of Object.keys(projects ?? {})) add(root);
+	} catch {}
+	for (const folder of await children(path.join(geminiRoot, "tmp"))) {
+		try {
+			add(
+				(
+					await fs.promises.readFile(path.join(folder, ".project_root"), "utf8")
+				).trim(),
+			);
+		} catch {}
+	}
+	return roots;
+}
+
+async function sessionFolders({ claudeRoot, codexFiles, geminiRoot }) {
 	let claudeFolders = [];
 	try {
 		claudeFolders = await fs.promises.readdir(claudeRoot);
@@ -98,7 +135,8 @@ async function sessionFolders({ claudeRoot, codexFiles }) {
 		const cwd = await codexCwd(file);
 		if (cwd && !codexPaths.includes(cwd)) codexPaths.push(cwd);
 	}
-	return { claudeFolders, codexPaths };
+	const geminiPaths = geminiRoot ? await geminiProjectRoots(geminiRoot) : [];
+	return { claudeFolders, codexPaths, geminiPaths };
 }
 
 /**
@@ -109,12 +147,13 @@ async function sessionFolders({ claudeRoot, codexFiles }) {
 async function askForSessionFolders({
 	claudeRoot,
 	codexFiles,
+	geminiRoot,
 	platform = process.platform,
 	read = fs.promises.readdir,
 }) {
 	if (platform !== "darwin") return [];
 	const folders = await guardedFolders(
-		await sessionFolders({ claudeRoot, codexFiles }),
+		await sessionFolders({ claudeRoot, codexFiles, geminiRoot }),
 	);
 	const answers = [];
 	for (const folder of folders) {
@@ -129,4 +168,9 @@ async function askForSessionFolders({
 	return answers;
 }
 
-module.exports = { askForSessionFolders, codexCwd, guardedFolders };
+module.exports = {
+	askForSessionFolders,
+	codexCwd,
+	geminiProjectRoots,
+	guardedFolders,
+};

@@ -4,6 +4,8 @@ import {
 	type AnalysisFindOutput,
 	type AnalysisWeeklyTotals,
 	findLimit,
+	type Source,
+	SourceSchema,
 	WEEKLY_MEASURES,
 	WEEKLY_NULLABLE_MEASURES,
 	type WeeklyMeasure,
@@ -74,7 +76,7 @@ const SnapshotSchema = z.object({
 const count = z.coerce.number();
 export const WeeklyRowSchema = z.object({
 	user_id: z.string(),
-	agent: z.enum(["claude_code", "codex"]),
+	agent: SourceSchema,
 	week: z.string(),
 	sessions: count,
 	...Object.fromEntries(
@@ -86,7 +88,7 @@ export const WeeklyRowSchema = z.object({
 });
 export type WeeklyRow = {
 	user_id: string;
-	agent: "claude_code" | "codex";
+	agent: Source;
 	week: string;
 	sessions: number;
 } & Record<string, number | null>;
@@ -118,7 +120,7 @@ export function buildWeeklyRowsStatement(options: {
 	refreshId: string;
 	fromWeek: string;
 	to: string;
-	agent?: "claude_code" | "codex";
+	agent?: Source;
 }): ClickHouseStatement {
 	return {
 		clickhouse_settings: ANALYSIS_QUERY_SETTINGS,

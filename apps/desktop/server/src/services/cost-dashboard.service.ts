@@ -474,6 +474,12 @@ async function querySessionMetricRows(
 	   PREWHERE ${orgMatch("organization_id")}
 	   WHERE session_date < toDateTime({endDate:String}, 'UTC') + INTERVAL 1 DAY
 	    AND last_interaction_date >= toDateTime({startDate:String}, 'UTC')
+	   UNION ALL
+	   SELECT organization_id, user_id, 'gemini' AS source, session_id, session_date, revision
+	   FROM rudel.gemini_sessions
+	   PREWHERE ${orgMatch("organization_id")}
+	   WHERE session_date < toDateTime({endDate:String}, 'UTC') + INTERVAL 1 DAY
+	    AND last_interaction_date >= toDateTime({startDate:String}, 'UTC')
 	  )
 	  GROUP BY organization_id, user_id, source, session_id, session_date
 	 )`

@@ -11,6 +11,15 @@ export {
 	readCodexSessionMeta,
 } from "./adapters/codex/index.js";
 export {
+	GEMINI_TRANSCRIPT_VERSION,
+	type GeminiTranscript,
+	geminiAdapter,
+	inferAntigravityCwd,
+	readGeminiCliRecord,
+	translateAntigravityTranscript,
+	translateGeminiCliSession,
+} from "./adapters/gemini/index.js";
+export {
 	getInvalidTranscriptTimestampMessage,
 	getMissingTranscriptTimestampMessage,
 	InvalidTranscriptTimestampError,
@@ -42,7 +51,9 @@ export {
 // Auto-register adapters
 import { claudeCodeAdapter } from "./adapters/claude-code/index.js";
 import { codexAdapter } from "./adapters/codex/index.js";
+import { geminiAdapter } from "./adapters/gemini/index.js";
 import { registerAdapter } from "./registry.js";
 
 registerAdapter(claudeCodeAdapter);
 registerAdapter(codexAdapter);
+registerAdapter(geminiAdapter);

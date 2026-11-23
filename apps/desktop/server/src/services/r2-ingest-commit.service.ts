@@ -1522,6 +1522,7 @@ function selectIngestJobSql(): string {
 				ON receipt.ledger_id = ledger.id
 				AND receipt.target = CASE ingest_job.source
 					WHEN 'claude_code' THEN 'rudel.claude_sessions'
+					WHEN 'gemini' THEN 'rudel.gemini_sessions'
 					ELSE 'rudel.codex_sessions'
 				END
 			WHERE revision.organization_id = ingest_job.organization_id
