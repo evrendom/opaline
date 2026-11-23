@@ -69,6 +69,7 @@ function Plugin() {
 						.join(" ")}
 				/>
 			</svg>
+			{/* design-escape-ok(element): platform; the inline card renders before the app's stylesheet loads, so a primitive would be unstyled */}
 			<button
 				type="button"
 				onClick={() =>

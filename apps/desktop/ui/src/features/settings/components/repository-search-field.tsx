@@ -1,6 +1,9 @@
 import { IconSearch } from "@tabler/icons-react";
-import { cn } from "@/lib/utils";
-import "@/features/settings/sessions/sessions-settings.css";
+import {
+	InputGroup,
+	InputGroupAddon,
+	InputGroupInput,
+} from "@/app/ui/input-group";
 
 /** The "Find a repository…" field above a repository table (sessions
  *  settings, GitHub repositories, repositories on this Mac). */
@@ -15,12 +18,15 @@ export function RepositorySearchField({
 	label?: string;
 	value: string;
 	onChange: (value: string) => void;
+	/** Places the field (a margin, a width); its look is InputGroup's. */
 	className?: string;
 }) {
 	return (
-		<label className={cn("sessions-settings-search", className)}>
-			<IconSearch size={16} aria-hidden="true" />
-			<input
+		<InputGroup className={className}>
+			<InputGroupAddon>
+				<IconSearch aria-hidden="true" />
+			</InputGroupAddon>
+			<InputGroupInput
 				type="search"
 				name={name}
 				aria-label={label}
@@ -28,6 +34,6 @@ export function RepositorySearchField({
 				value={value}
 				onChange={(event) => onChange(event.target.value)}
 			/>
-		</label>
+		</InputGroup>
 	);
 }

@@ -1,4 +1,5 @@
 import { IconChevronRight } from "@tabler/icons-react";
+import { Pressable } from "@/app/ui/pressable";
 import { cn } from "@/lib/utils";
 
 interface DetailIdentityItem {
@@ -37,16 +38,12 @@ export function DetailIdentityBreadcrumb({
 							title={`${item.label}: ${item.title ?? item.value}`}
 						>
 							{item.onClick ? (
-								<button
-									type="button"
-									className={cn(
-										className,
-										"corner-xs focus-outline hover:text-ink",
-									)}
+								<Pressable
+									className={cn(className, "corner-xs hover:text-ink")}
 									onClick={item.onClick}
 								>
 									{item.value}
-								</button>
+								</Pressable>
 							) : (
 								<span
 									aria-current={current ? "page" : undefined}

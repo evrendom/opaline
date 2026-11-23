@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
 import { Button } from "@/app/ui/button";
 import { Checkbox } from "@/app/ui/checkbox";
+import { Pressable } from "@/app/ui/pressable";
 import { Skeleton } from "@/app/ui/skeleton";
 import { RepositorySearchField } from "@/features/settings/components/repository-search-field";
 import type {
@@ -244,16 +245,15 @@ export function DesktopRepositoryPicker({
 				</p>
 			)}
 			{list && !loadError && !query && hiddenCount > 0 && (
-				<button
-					type="button"
-					className="desktop-repository-more focus-outline"
+				<Pressable
+					className="desktop-repository-more"
 					aria-expanded={showAll}
 					onClick={() => setShowAll((value) => !value)}
 				>
 					{showAll
 						? "Show fewer"
 						: `Show ${hiddenCount.toLocaleString()} more (temporary folders and folders without sessions)`}
-				</button>
+				</Pressable>
 			)}
 
 			<div className="desktop-repository-footer">
@@ -274,7 +274,6 @@ export function DesktopRepositoryPicker({
 					variant="primary"
 					type="button"
 					size="md"
-					className="h-8 gap-xs"
 					disabled={!canSubmit}
 					onClick={() => void submit()}
 				>

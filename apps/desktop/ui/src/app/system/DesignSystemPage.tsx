@@ -61,7 +61,7 @@ function Specimens({
 		<ShowcaseProviders>
 			<div
 				ref={ref}
-				className="dashboard-01-theme flex min-w-0 flex-col gap-[calc(var(--space-xxl)*4/3)] bg-canvas p-xxl font-body text-body-xl text-ink antialiased"
+				className="dashboard-01-theme flex min-w-0 flex-col gap-xxxl bg-canvas p-xxl font-body text-body-xl text-ink antialiased"
 			>
 				<h1 className="text-display-xs font-medium text-ink capitalize">
 					{mode}

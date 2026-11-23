@@ -1,3 +1,4 @@
+import { OpalineMark48 } from "./opaline-mark";
 import "@/app/app-surface.css";
 
 export function AppLoadingScreen({
@@ -11,10 +12,7 @@ export function AppLoadingScreen({
 			aria-live="polite"
 			className="dashboard-01-theme flex min-h-svh items-center justify-center bg-canvas text-ink"
 		>
-			<span
-				aria-hidden="true"
-				className="size-12 bg-[url(/favicon-light.svg)] bg-contain bg-center bg-no-repeat dark:bg-[url(/favicon-dark.svg)]"
-			/>
+			<OpalineMark48 />
 			<span className="sr-only">{message}</span>
 		</div>
 	);

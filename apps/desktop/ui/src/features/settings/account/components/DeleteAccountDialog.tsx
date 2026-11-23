@@ -58,9 +58,11 @@ export function DeleteAccountDialog({
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent>
 				<DialogHeader>
-					<DialogTitle className="flex items-center gap-m">
-						<IconAlertTriangle className="text-error" />
-						Delete account
+					<DialogTitle>
+						<span className="flex items-center gap-m">
+							<IconAlertTriangle className="text-error" />
+							Delete account
+						</span>
 					</DialogTitle>
 					<DialogDescription>
 						This permanently deletes <strong>{user.name}</strong> ({user.email})
@@ -76,7 +78,7 @@ export function DeleteAccountDialog({
 						in cold storage.
 					</p>
 
-					<Field className="gap-m">
+					<Field>
 						<FieldLabel htmlFor="delete-account-confirm">
 							Type {user.email} to confirm
 						</FieldLabel>

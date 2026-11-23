@@ -31,7 +31,7 @@ html[data-welcome-shell],
 	height: 100%;
 	max-height: 100svh;
 	overflow-y: auto;
-	padding: var(--space-xxl) calc(var(--space-xxl) * 2);
+	padding: var(--space-xxl) var(--space-xxxl);
 }
 
 .cli-welcome-shell > .product-window-frame {
@@ -50,7 +50,7 @@ html[data-welcome-shell],
 
 @media (max-width: 1100px) and (min-width: 900px) {
 	.cli-welcome-panel {
-		padding-inline: calc(var(--space-xxl) * 4 / 3);
+		padding-inline: var(--space-xxxl);
 	}
 
 	.cli-welcome-shell {
@@ -63,10 +63,10 @@ html[data-welcome-shell],
 		display: flex;
 		flex-direction: column;
 		align-items: stretch;
-		gap: calc(var(--space-xxl) * 5 / 3);
+		gap: var(--space-xxxl);
 		height: auto;
 		min-height: 100svh;
-		padding: var(--space-xxl) var(--space-xl) calc(var(--space-xxl) * 4 / 3);
+		padding: var(--space-xxl) var(--space-xl) var(--space-xxxl);
 		overflow: clip;
 	}
 
@@ -92,10 +92,10 @@ html[data-welcome-shell],
 	}
 
 	.cli-welcome-panel {
-		padding-block: calc(var(--space-xxl) * 4 / 3);
+		padding-block: var(--space-xxxl);
 	}
 
 	.cli-welcome-shell > .product-window-frame {
-		margin-block: calc(var(--space-xxl) * 4 / 3);
+		margin-block: var(--space-xxxl);
 	}
 }

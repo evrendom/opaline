@@ -25,7 +25,7 @@
 	--knob-shadow: 0 1px 3px rgb(0 0 0 / 20%);
 	--shimmer-hi: oklch(0.2 0 0);
 	position: relative;
-	padding: calc(var(--space-l) + var(--space-xxs));
+	padding: var(--space-l);
 	text-align: center;
 	background: var(--surface);
 	color: var(--ink);
@@ -40,27 +40,8 @@
 	--shimmer-hi: oklch(0.99 0 0);
 }
 
-.star-card-close {
-	position: absolute;
-	z-index: 6;
-	top: var(--space-m);
-	right: var(--space-m);
-	display: grid;
-	place-items: center;
-	width: 24px;
-	height: 24px;
-	border: 0;
-	border-radius: var(--radius-full);
-	background: transparent;
-	color: color-mix(in oklch, var(--ink-3) 70%, transparent);
-	cursor: pointer;
-}
-.star-card-close:hover {
-	background: var(--field);
-	color: var(--ink);
-}
 .star-card-title {
-	margin: var(--space-m) calc(var(--space-xl) + var(--space-xs)) 0;
+	margin: var(--space-m) var(--space-xl) 0;
 	font-size: var(--size-l);
 	line-height: var(--line-l);
 	font-weight: var(--weight-medium);
@@ -219,7 +200,7 @@
 .star-card-track-wrap {
 	position: relative;
 	height: 36px;
-	margin-top: calc(var(--space-l) + var(--space-xxs));
+	margin-top: var(--space-l);
 }
 .star-card-track {
 	position: absolute;

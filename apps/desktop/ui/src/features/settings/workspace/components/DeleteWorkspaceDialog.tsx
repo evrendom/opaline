@@ -60,9 +60,11 @@ function DeleteWorkspaceDialogBody({
 	return (
 		<DialogContent>
 			<DialogHeader>
-				<DialogTitle className="flex items-center gap-m">
-					<IconAlertTriangle className="text-error" />
-					Delete workspace
+				<DialogTitle>
+					<span className="flex items-center gap-m">
+						<IconAlertTriangle className="text-error" />
+						Delete workspace
+					</span>
 				</DialogTitle>
 				<DialogDescription>
 					This permanently deletes <strong>{organization.name}</strong> and
@@ -84,7 +86,7 @@ function DeleteWorkspaceDialogBody({
 					</p>
 				)}
 
-				<Field className="gap-m">
+				<Field>
 					<FieldLabel htmlFor="delete-workspace-confirm">
 						Type {organization.name} to confirm
 					</FieldLabel>

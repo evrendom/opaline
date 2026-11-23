@@ -286,9 +286,9 @@ function TeamMemberRow({
 		<tr ref={rowRef} className="relative z-10 h-16">
 			<td className="h-16 py-zero pr-l pl-zero align-middle">
 				<div className="flex min-w-0 items-center gap-l">
-					<Avatar className="size-8 overflow-hidden bg-canvas outline-(length:--border-m) -outline-offset-1 outline-line">
+					<Avatar>
 						{row.imageUrl ? <AvatarImage alt="" src={row.imageUrl} /> : null}
-						<AvatarFallback className="bg-field font-medium text-ink">
+						<AvatarFallback>
 							{getMemberInitials(row.displayName)}
 						</AvatarFallback>
 					</Avatar>

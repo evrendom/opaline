@@ -193,7 +193,6 @@ export function WorkspaceMembersTable({
 										type="button"
 										variant="secondary"
 										size="icon"
-										className="settings-icon-button"
 										aria-label={
 											pendingKey === `link:${member.id}`
 												? `Making a sign-in link for ${member.user.name || member.user.email}`
@@ -217,7 +216,6 @@ export function WorkspaceMembersTable({
 									type="button"
 									variant="secondary"
 									size="icon"
-									className="settings-icon-button"
 									aria-label={
 										pendingKey === `remove:${member.id}`
 											? `Removing ${member.user.name || member.user.email}`

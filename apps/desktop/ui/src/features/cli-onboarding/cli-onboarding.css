@@ -36,11 +36,6 @@
 	display: grid;
 	gap: var(--space-l);
 }
-.cli-onboarding-auth-options button {
-	border: var(--border-m) solid var(--line);
-	background: var(--canvas);
-	padding: var(--space-l) var(--space-xl);
-}
 .cli-onboarding-divider {
 	text-align: center;
 	color: var(--ink-3);
@@ -48,13 +43,6 @@
 	line-height: var(--line-m);
 	letter-spacing: var(--letter-spacing-m);
 	padding: var(--space-xxs);
-}
-.cli-onboarding-primary {
-	width: 100%;
-	border: var(--border-m) solid var(--success);
-	background: var(--success);
-	color: white;
-	padding: var(--space-l) var(--space-xl);
 }
 .cli-onboarding-surface .cli-onboarding-terms {
 	font-size: var(--size-s);
@@ -77,22 +65,4 @@
 	font-size: var(--size-m);
 	line-height: var(--line-m);
 	letter-spacing: var(--letter-spacing-m);
-}
-.cli-onboarding-email input {
-	min-width: 0;
-	width: 100%;
-	border: var(--border-m) solid var(--line);
-	border-radius: var(--radius-s);
-	padding: var(--space-l) var(--space-l);
-	min-height: 44px;
-	font: inherit;
-}
-
-/* Dark: only the rules the current sign-in and welcome screens still render. */
-.dark .cli-onboarding-auth-options button {
-	border-color: var(--line);
-	background: var(--surface);
-}
-.dark .cli-onboarding-divider {
-	color: var(--ink-4);
 }

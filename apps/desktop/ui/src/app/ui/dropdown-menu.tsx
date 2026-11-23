@@ -82,7 +82,7 @@ function DropdownMenuItem({
 				"outline-hidden select-none",
 				"focus:bg-hover focus:text-sidebar-accent-foreground",
 				"not-data-[variant=danger]:focus:**:text-sidebar-accent-foreground",
-				"data-inset:pl-[calc(var(--space-xxl)*4/3)]",
+				"data-inset:pl-xxxl",
 				"data-[variant=danger]:text-error data-[variant=danger]:focus:bg-error-tint data-[variant=danger]:focus:text-error",
 				"data-disabled:pointer-events-none data-disabled:opacity-50",
 				"[&_svg]:pointer-events-none [&_svg]:shrink-0",
@@ -110,11 +110,11 @@ function DropdownMenuCheckboxItem({
 			data-inset={inset}
 			className={cn(
 				"relative flex items-center gap-m",
-				"corner-xs py-s pr-[calc(var(--space-xxl)*4/3)] pl-m",
+				"corner-xs py-s pr-xxxl pl-m",
 				"text-body-xl",
 				"outline-hidden select-none",
 				"focus:bg-hover focus:text-sidebar-accent-foreground focus:**:text-sidebar-accent-foreground",
-				"data-inset:pl-[calc(var(--space-xxl)*4/3)]",
+				"data-inset:pl-xxxl",
 				"data-disabled:pointer-events-none data-disabled:opacity-50",
 				"[&_svg]:pointer-events-none [&_svg]:shrink-0",
 				"[&_svg:not([class*='size-'])]:size-4",

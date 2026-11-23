@@ -95,8 +95,7 @@
 .toolbar-search {
 	width: 100%;
 	height: 32px;
-	padding: var(--space-zero) var(--space-l) var(--space-zero)
-		calc(var(--space-xxl) * 4 / 3);
+	padding: var(--space-zero) var(--space-l) var(--space-zero) var(--space-xxxl);
 	border: 0;
 	border-radius: var(--radius-full);
 	background: var(--surface);
@@ -111,41 +110,6 @@
 .toolbar-search::placeholder {
 	color: var(--ink-3);
 	opacity: 1;
-}
-
-/* Form controls: the tall buttons and fields of the sign-in, sign-up and
-   invitation screens. Put on Button / Input with className; the button's
-   look is its variant's, this only makes it tall. Text inherits the form's. */
-.form-button {
-	min-height: 42px;
-	border-radius: var(--radius-s);
-	font: inherit;
-	transition:
-		background-color var(--motion-duration) var(--motion-easing),
-		border-color var(--motion-duration) var(--motion-easing),
-		color var(--motion-duration) var(--motion-easing);
-}
-.form-button[data-variant="primary"] {
-	padding: var(--space-l) var(--space-xl);
-}
-.form-input {
-	min-height: 44px;
-	border: var(--border-m) solid var(--line);
-	border-radius: var(--radius-s);
-	background: var(--surface);
-}
-@media (max-width: 899px) {
-	.form-button,
-	.form-input {
-		font-size: var(--size-xxl);
-		line-height: var(--line-xxl);
-		letter-spacing: var(--letter-spacing-xxl);
-	}
-}
-@media (prefers-reduced-motion: reduce) {
-	.form-button {
-		transition: none;
-	}
 }
 
 /* Tab pill: the highlight that slides along a tab row or a segmented control
@@ -280,8 +244,7 @@
 	flex: 1;
 	border: 0;
 	border-radius: var(--radius-zero);
-	padding: calc(var(--space-m) + var(--space-xxs)) var(--space-zero)
-		calc(var(--space-m) + var(--space-xxs) / 2);
+	padding: var(--space-m) var(--space-zero) var(--space-m);
 	background: transparent;
 	color: var(--menu-label);
 	font-family: var(--font-body);
@@ -410,7 +373,7 @@
 	padding-bottom: var(--space-s);
 }
 .menu-empty {
-	padding: var(--space-xxl) calc(var(--space-l) + var(--space-xxs));
+	padding: var(--space-xxl) var(--space-l);
 	color: var(--menu-icon);
 	text-align: center;
 }
@@ -484,7 +447,7 @@
 	transform-origin: var(--transform-origin);
 }
 .menu-sort .menu-row {
-	padding-left: calc(var(--space-xxl) * 1.5);
+	padding-left: var(--space-xxxl);
 }
 .menu-sort-check {
 	position: absolute;
@@ -674,10 +637,10 @@
 	container: settings / inline-size;
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--space-xxl) * 5 / 3);
+	gap: var(--space-xxxl);
 	width: 100%;
 	min-width: 0;
-	padding-bottom: calc(var(--space-xxl) * 2);
+	padding-bottom: var(--space-xxxl);
 }
 
 .settings-group {
@@ -694,7 +657,7 @@
 	align-items: center;
 	justify-content: space-between;
 	gap: var(--space-xl);
-	padding-inline: calc(var(--space-xs) * 5);
+	padding-inline: var(--space-xl);
 }
 
 .settings-group-title {
@@ -727,7 +690,6 @@
 
 .settings-group-rows {
 	min-width: 0;
-	padding: var(--space-zero) calc(var(--space-xs) * 5);
 }
 
 .settings-group-rows > * + * {
@@ -736,7 +698,7 @@
 
 .settings-row,
 .settings-actions {
-	padding: calc(var(--space-xxs) * 7) var(--space-zero);
+	padding: var(--space-l) var(--space-zero);
 }
 
 .settings-row-copy > :first-child {
@@ -789,7 +751,9 @@
 	gap: var(--space-m);
 }
 
-/* Input: a hairline shadow instead of a border. */
+/* Fields: the primitives' control ground, shadow and focus ring, sized for
+   the settings rows. The URL field is a composite, so it draws the control
+   itself around its bare input. */
 .settings-group [data-slot="input"],
 .settings-url-field,
 .settings-group [data-slot="select-trigger"],
@@ -797,10 +761,13 @@
 	height: 48px;
 	border: 0;
 	border-radius: var(--radius-s);
-	background: transparent;
-	box-shadow: var(--shadow-card);
 	font-size: inherit;
-	padding-inline: calc(var(--space-xxs) * 5);
+	padding-inline: var(--space-l);
+}
+
+.settings-url-field {
+	background: var(--control);
+	box-shadow: var(--shadow-control);
 }
 
 .settings-row-control > [data-slot="select-trigger"] {
@@ -843,7 +810,7 @@
 	display: flex;
 	min-width: 0;
 	align-items: baseline;
-	gap: calc(var(--space-xxs) * 5);
+	gap: var(--space-m);
 }
 
 .settings-member-copy > :first-child {
@@ -883,16 +850,6 @@
 	color: var(--ink);
 	font-size: var(--size-m);
 	font-weight: var(--weight-body-medium);
-}
-
-.settings-group .settings-icon-button {
-	width: 32px;
-	padding: var(--space-zero);
-	color: var(--ink-3);
-}
-
-.settings-group .settings-icon-button:hover {
-	color: var(--ink);
 }
 
 .settings-member-copy > * {
@@ -1105,5 +1062,6 @@
 	border: 0;
 	border-radius: var(--radius-zero);
 	padding: var(--space-zero);
+	background: transparent;
 	box-shadow: none;
 }

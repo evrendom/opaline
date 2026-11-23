@@ -1,4 +1,5 @@
 import type { Root } from "react-dom/client";
+import { OpalineMark48 } from "@/app/bootstrap/opaline-mark";
 import { buttonVariants } from "@/app/ui/button";
 import {
 	currentHandoffPage,
@@ -10,10 +11,7 @@ export function AppHandoff({ link }: { link: string }) {
 	return (
 		<main className="flex min-h-svh items-center justify-center bg-canvas p-xxl text-ink">
 			<div className="flex w-full max-w-sm flex-col items-center gap-xxl text-center">
-				<span
-					aria-hidden="true"
-					className="size-12 bg-[url(/favicon-light.svg)] bg-contain bg-center bg-no-repeat dark:bg-[url(/favicon-dark.svg)]"
-				/>
+				<OpalineMark48 />
 				<div className="flex flex-col gap-s">
 					<h1 className="text-body-xxl font-heavy">Opened in Opaline</h1>
 					<p className="text-body-xl text-ink-3">

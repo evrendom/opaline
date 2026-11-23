@@ -14,6 +14,7 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/app/ui/dropdown-menu";
+import { Pressable } from "@/app/ui/pressable";
 import { TouchTarget } from "@/app/ui/touch-target";
 import {
 	getUtilityRailItemClassName,
@@ -52,14 +53,13 @@ export function WorkspaceMenuButton({
 		<DropdownMenu>
 			<DropdownMenuTrigger
 				render={
-					<button
-						type="button"
+					<Pressable
 						aria-label={workspaceName}
 						data-sidebar-interactive
 						data-sidebar-workspace-row
 						className={cn(
 							isHeaderVariant
-								? "relative flex size-7 shrink-0 items-center justify-center corner-s text-ink focus-outline hover:bg-hover active:scale-95"
+								? "relative flex size-7 shrink-0 items-center justify-center corner-s text-ink hover:bg-hover active:scale-95"
 								: getUtilityRailItemClassName(),
 							isBottomRailVariant &&
 								"!size-9 !w-9 self-auto overflow-visible corner-m",

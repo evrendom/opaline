@@ -136,28 +136,32 @@ export const DATA_PAINT: Record<string, { rules: Rule[]; why: string }> = {
 		rules: ["colour"],
 		why: "the trace icon tone palette (data paint)",
 	},
+	"src/features/shell/product-window-chrome.css": {
+		rules: ["colour"],
+		why: "the macOS window glass's edge and drop (platform) and the backdrop's connection-state glows (artwork)",
+	},
 	"src/features/shell/components/star-card/sidebar-star-card.css": {
 		rules: ["colour", "motion"],
 		why: "the star card's split-flap counter, knob, gold star, shimmer and celebration are artwork",
 	},
 	"src/app/ui/context-utilization-gradients.tsx": {
-		rules: ["colour"],
-		why: "the context-use gradient's stops: green to red heat",
+		rules: ["colour", "dark"],
+		why: "the context-use gradient's stops: green to red heat, lifted for dark",
 	},
 	"src/features/shell/config/shell-routes.tsx": {
 		rules: ["shadow"],
 		why: "each nav icon's glow is tinted from its own opal colour",
 	},
 	"src/features/shell/components/shell-nav-icon.tsx": {
-		rules: ["colour", "shadow"],
-		why: "the opal nav icon's fill, ring and drop are artwork",
+		rules: ["colour", "shadow", "dark"],
+		why: "the opal nav icon's fill, ring and drop are artwork, drawn per mode",
 	},
 	"src/features/shell/components/repo-nav-icon.tsx": {
-		rules: ["colour", "shadow"],
-		why: "a repository's icon is painted from its hue",
+		rules: ["colour", "shadow", "dark"],
+		why: "a repository's icon is painted from its hue, per mode",
 	},
 	"src/features/shell/components/AppSidebar.tsx": {
-		rules: ["colour"],
+		rules: ["colour", "dark"],
 		why: "the opal nav icon's dark fill and ring are artwork",
 	},
 	"src/components/conversation/code-highlight-worker.ts": {

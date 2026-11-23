@@ -27,7 +27,6 @@ export function SidebarInstallCommand() {
 			<SidebarMenuButton
 				data-sidebar-interactive=""
 				data-copied={copied ? "true" : undefined}
-				className="copy-button"
 				aria-label={label}
 				title={label}
 				onClick={() => void copy()}

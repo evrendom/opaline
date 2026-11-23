@@ -1,4 +1,5 @@
 import { type ReactNode, useId } from "react";
+import { Card, CardContent } from "@/app/ui/card";
 import "../../components/settings-section.css";
 
 /** A card: the section's title and description head the
@@ -32,7 +33,11 @@ export function WorkspaceSettingsGroup({
 				{action ? <div className="settings-group-action">{action}</div> : null}
 			</div>
 			{children ? (
-				<div className="settings-group-rows surface-card">{children}</div>
+				<Card size="sm">
+					<CardContent>
+						<div className="settings-group-rows">{children}</div>
+					</CardContent>
+				</Card>
 			) : null}
 		</section>
 	);

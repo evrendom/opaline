@@ -1,6 +1,20 @@
 import { ORG_SLUG_MAX_LENGTH } from "@rudel/api-routes/reserved-slugs";
 import { IconCamera } from "@tabler/icons-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import { Button } from "@/app/ui/button";
+import { Input } from "@/app/ui/input";
+import {
+	InputGroup,
+	InputGroupAddon,
+	InputGroupInput,
+} from "@/app/ui/input-group";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/app/ui/select";
 import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import { workspaceUrlPrefix } from "@/features/self-hosted/surfaces";
 import type { Organization } from "@/features/workspace/organization/types";
@@ -294,29 +308,33 @@ export function WelcomeSteps({
 						{state.organizations.length > 1 && (
 							<div className="cli-welcome-field">
 								<label htmlFor="welcome-workspace">Upload to</label>
-								<select
-									id="welcome-workspace"
+								<Select
 									name="workspace"
 									value={organization?.id ?? ""}
 									disabled={busy || Boolean(connectedOrganizationId)}
-									onChange={(event) => {
+									onValueChange={(value) => {
 										organizationSelectionTouched.current = true;
-										setOrganizationId(event.target.value);
+										setOrganizationId(String(value ?? ""));
 										setWorkspaceName(null);
 										setWorkspaceSlug(null);
 									}}
 								>
-									{state.organizations.map((org) => (
-										<option key={org.id} value={org.id}>
-											{org.name}
-										</option>
-									))}
-								</select>
+									<SelectTrigger id="welcome-workspace" className="w-full">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										{state.organizations.map((org) => (
+											<SelectItem key={org.id} value={org.id}>
+												{org.name}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
 							</div>
 						)}
 						<div className="cli-welcome-field">
 							<label htmlFor="welcome-workspace-name">Name</label>
-							<input
+							<Input
 								id="welcome-workspace-name"
 								name="workspaceName"
 								autoComplete="organization"
@@ -333,9 +351,11 @@ export function WelcomeSteps({
 						</div>
 						<div className="cli-welcome-field">
 							<label htmlFor="welcome-workspace-slug">URL</label>
-							<div className="cli-welcome-url-input">
-								<span aria-hidden="true">{workspaceUrlPrefix(selfHost)}</span>
-								<input
+							<InputGroup>
+								<InputGroupAddon aria-hidden="true">
+									{workspaceUrlPrefix(selfHost)}
+								</InputGroupAddon>
+								<InputGroupInput
 									id="welcome-workspace-slug"
 									name="workspaceSlug"
 									value={slug}
@@ -357,7 +377,7 @@ export function WelcomeSteps({
 									)}
 									required
 								/>
-							</div>
+							</InputGroup>
 							<output
 								id="welcome-workspace-slug-status"
 								className="cli-welcome-slug-status"
@@ -380,9 +400,11 @@ export function WelcomeSteps({
 								</>
 							)}
 						</p>
-						<button
+						<Button
 							type="submit"
-							className="cli-onboarding-primary"
+							variant="primary"
+							size="lg"
+							className="w-full"
 							disabled={
 								busy ||
 								state.isLoading ||
@@ -397,16 +419,15 @@ export function WelcomeSteps({
 								: progress.organizationId
 									? "Continue"
 									: "Continue and upload"}
-						</button>
+						</Button>
 						{!connectedOrganizationId && (
-							<button
+							<Button
 								type="button"
-								className="cli-onboarding-text-button"
 								disabled={busy}
 								onClick={() => void run(onSignOut)}
 							>
 								Use a different account
-							</button>
+							</Button>
 						)}
 					</form>
 				)}
@@ -427,6 +448,7 @@ export function WelcomeSteps({
 									) : (
 										<IconCamera size={20} aria-hidden="true" />
 									)}
+									{/* design-escape-ok(element): native; a hidden file picker under the avatar */}
 									<input
 										type="file"
 										name="avatar"
@@ -440,7 +462,7 @@ export function WelcomeSteps({
 										}}
 									/>
 								</label>
-								<input
+								<Input
 									id="welcome-name"
 									name="name"
 									autoComplete="name"
@@ -454,7 +476,7 @@ export function WelcomeSteps({
 						</div>
 						<div className="cli-welcome-field">
 							<label htmlFor="welcome-job-title">Title</label>
-							<input
+							<Input
 								id="welcome-job-title"
 								name="jobTitle"
 								autoComplete="organization-title"
@@ -466,32 +488,35 @@ export function WelcomeSteps({
 							/>
 						</div>
 						<div className="cli-welcome-actions">
-							<button
+							<Button
 								type="button"
-								className="cli-onboarding-text-button"
 								onClick={() => advance("done")}
 								disabled={busy}
 							>
 								Skip
-							</button>
-							<button
+							</Button>
+							<Button
 								type="submit"
-								className="cli-onboarding-primary"
+								variant="primary"
+								size="lg"
+								className="w-full"
 								disabled={busy || !name.trim()}
 							>
 								{busy ? "Saving…" : "Continue"}
-							</button>
+							</Button>
 						</div>
 					</form>
 				)}
 				{progress.step === "done" && snapshot.state === "completed" && (
-					<button
+					<Button
 						type="button"
-						className="cli-onboarding-primary"
+						variant="primary"
+						size="lg"
+						className="w-full"
 						onClick={onFinish}
 					>
 						Open your dashboard
-					</button>
+					</Button>
 				)}
 			</div>
 		</div>

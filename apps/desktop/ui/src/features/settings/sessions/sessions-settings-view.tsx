@@ -2,6 +2,7 @@ import type { RepositorySettings } from "@rudel/api-routes";
 import { IconCheck, IconCopy, IconFolder } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { Button } from "@/app/ui/button";
+import { Card, CardContent } from "@/app/ui/card";
 import { Skeleton } from "@/app/ui/skeleton";
 import { RepositorySearchField } from "@/features/settings/components/repository-search-field";
 import "@/features/settings/components/settings-section.css";
@@ -53,40 +54,43 @@ export function SessionsSettingsView({
 					</p>
 				</div>
 				{localManager ? (
-					<div className="sessions-settings-card surface-card">
-						{localManager}
-					</div>
+					<Card size="sm">
+						<CardContent>{localManager}</CardContent>
+					</Card>
 				) : (
-					<div className="sessions-settings-card sessions-settings-manage surface-card">
-						<div className="sessions-settings-command">
-							<code>{MANAGE_COMMAND}</code>
-							<Button
-								type="button"
-								variant="secondary"
-								size="md"
-								className="corner-s transition-none active:not-aria-[haspopup]:translate-y-0"
-								onClick={onCopy}
-								aria-label="Copy repository management command"
-							>
-								{copied ? (
-									<IconCheck size={16} aria-hidden="true" />
-								) : (
-									<IconCopy size={16} aria-hidden="true" />
-								)}
-								{copied ? "Copied" : "Copy"}
-							</Button>
-						</div>
-						<p className="sessions-settings-note">
-							Changes apply on the computer running the command. Existing
-							sessions stay in your workspace.
-						</p>
-						{signInCommand ? (
-							<p className="sessions-settings-note">
-								On a computer that has not signed in to this server yet, run{" "}
-								<code>{signInCommand}</code> first.
-							</p>
-						) : null}
-					</div>
+					<Card size="sm">
+						<CardContent>
+							<div className="sessions-settings-manage">
+								<div className="sessions-settings-command">
+									<code>{MANAGE_COMMAND}</code>
+									<Button
+										type="button"
+										variant="secondary"
+										size="md"
+										onClick={onCopy}
+										aria-label="Copy repository management command"
+									>
+										{copied ? (
+											<IconCheck size={16} aria-hidden="true" />
+										) : (
+											<IconCopy size={16} aria-hidden="true" />
+										)}
+										{copied ? "Copied" : "Copy"}
+									</Button>
+								</div>
+								<p className="sessions-settings-note">
+									Changes apply on the computer running the command. Existing
+									sessions stay in your workspace.
+								</p>
+								{signInCommand ? (
+									<p className="sessions-settings-note">
+										On a computer that has not signed in to this server yet, run{" "}
+										<code>{signInCommand}</code> first.
+									</p>
+								) : null}
+							</div>
+						</CardContent>
+					</Card>
 				)}
 			</section>
 			<section
@@ -108,7 +112,6 @@ export function SessionsSettingsView({
 							type="button"
 							variant="primary"
 							size="md"
-							className="bg-canvas hover:bg-field"
 							disabled={fetching}
 							onClick={onRefresh}
 						>
@@ -120,78 +123,75 @@ export function SessionsSettingsView({
 						computers.
 					</p>
 				</div>
-				<div className="sessions-settings-card surface-card">
-					<RepositorySearchField
-						className="mb-m"
-						name="repository-search"
-						value={search}
-						onChange={onSearch}
-					/>
-					{error ? (
-						<div className="sessions-settings-empty" role="alert">
-							Could not load repositories.{" "}
-							<Button
-								variant="link"
-								size="inline"
-								className="font-regular text-inherit decoration-current underline-offset-[3px]"
-								onClick={onRefresh}
-							>
-								Try again
-							</Button>
-						</div>
-					) : (
-						<div className="sessions-settings-table-wrap">
-							<table className="sessions-settings-table">
-								<thead>
-									<tr>
-										<th scope="col">Repository</th>
-										<th scope="col">Uploaded sessions</th>
-										<th scope="col">Auto-upload</th>
-									</tr>
-								</thead>
-								<tbody>
-									{pending ? (
-										<SampleRows />
-									) : (
-										visible.map((repo) => (
-											<tr key={repo.key}>
-												<td>
-													<div className="sessions-settings-repo">
-														<IconFolder size={16} aria-hidden="true" />
-														<span
-															className="sessions-settings-repo-name"
-															title={repo.name}
-														>
-															{repo.name}
-														</span>
-													</div>
-												</td>
-												<td>{repo.sessionCount.toLocaleString()}</td>
-												<td>
-													<UploadStatus reports={repo.reports} />
-												</td>
-											</tr>
-										))
-									)}
-								</tbody>
-							</table>
-						</div>
-					)}
-					{!pending && !error && !visible.length && (
-						<p className="sessions-settings-empty">
-							{search
-								? "No repositories match your search."
-								: "No repositories yet. Run the command above to upload your first sessions."}
-						</p>
-					)}
-					{repositories?.some((repo) => !repo.reports.length) && (
-						<p className="sessions-settings-note sessions-settings-status-note">
-							Not reported means no computer has shared an upload setting for
-							that repository in this workspace. Older or manually uploaded
-							sessions can appear here before a setting is reported.
-						</p>
-					)}
-				</div>
+				<Card size="sm">
+					<CardContent>
+						<RepositorySearchField
+							className="mb-m"
+							name="repository-search"
+							value={search}
+							onChange={onSearch}
+						/>
+						{error ? (
+							<div className="sessions-settings-empty" role="alert">
+								Could not load repositories.{" "}
+								<Button variant="link" size="inline" onClick={onRefresh}>
+									Try again
+								</Button>
+							</div>
+						) : (
+							<div className="sessions-settings-table-wrap">
+								<table className="sessions-settings-table">
+									<thead>
+										<tr>
+											<th scope="col">Repository</th>
+											<th scope="col">Uploaded sessions</th>
+											<th scope="col">Auto-upload</th>
+										</tr>
+									</thead>
+									<tbody>
+										{pending ? (
+											<SampleRows />
+										) : (
+											visible.map((repo) => (
+												<tr key={repo.key}>
+													<td>
+														<div className="sessions-settings-repo">
+															<IconFolder size={16} aria-hidden="true" />
+															<span
+																className="sessions-settings-repo-name"
+																title={repo.name}
+															>
+																{repo.name}
+															</span>
+														</div>
+													</td>
+													<td>{repo.sessionCount.toLocaleString()}</td>
+													<td>
+														<UploadStatus reports={repo.reports} />
+													</td>
+												</tr>
+											))
+										)}
+									</tbody>
+								</table>
+							</div>
+						)}
+						{!pending && !error && !visible.length && (
+							<p className="sessions-settings-empty">
+								{search
+									? "No repositories match your search."
+									: "No repositories yet. Run the command above to upload your first sessions."}
+							</p>
+						)}
+						{repositories?.some((repo) => !repo.reports.length) && (
+							<p className="sessions-settings-note sessions-settings-status-note">
+								Not reported means no computer has shared an upload setting for
+								that repository in this workspace. Older or manually uploaded
+								sessions can appear here before a setting is reported.
+							</p>
+						)}
+					</CardContent>
+				</Card>
 			</section>
 		</div>
 	);

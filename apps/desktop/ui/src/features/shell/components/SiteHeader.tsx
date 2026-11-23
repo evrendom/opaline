@@ -110,7 +110,7 @@ export function SiteHeader({
 					? "p-zero"
 					: // Page header: no rule underneath, the section chip
 						// beside a larger title, aligned with the page's 32px gutter.
-						"h-14 gap-m edge-b-none pt-m pr-[calc(var(--space-xxl)*4/3)] pl-[calc(var(--space-xxl)*4/3)]"
+						"h-14 gap-m edge-b-none pt-m pr-xxxl pl-xxxl"
 			}
 		>
 			{sessionDetailId !== null ? (
@@ -199,7 +199,7 @@ export function SiteHeader({
 						data-fluid-menu-root=""
 						className={cn(
 							"hidden min-w-0 items-center gap-m",
-							"pr-m pl-[calc(var(--space-xl)+var(--space-xxs))]",
+							"pr-m pl-xl",
 							"bg-inset",
 							"lg:flex lg:w-[var(--session-list-pane-width,29.8125rem)] lg:flex-none",
 						)}

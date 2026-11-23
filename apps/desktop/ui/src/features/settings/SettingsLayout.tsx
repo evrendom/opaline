@@ -86,7 +86,7 @@ export function SettingsSectionTab({
 				aria-current={active ? "page" : undefined}
 				className={cn(
 					"relative flex h-8 items-center",
-					"corner-s px-[calc(var(--space-m)+var(--space-xxs))] corner-squircle",
+					"corner-s px-l corner-squircle",
 					"text-body-xl font-medium",
 					"focus-outline",
 					"squircle:corner-l pointer-coarse:h-12",
@@ -147,7 +147,7 @@ export function SettingsLayout() {
 				className={cn(
 					"grid min-h-0 min-w-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] gap-xl overflow-hidden",
 					"px-xxl",
-					"@min-[640px]/settings:grid-cols-[168px_minmax(0,1fr)] @min-[640px]/settings:grid-rows-[minmax(0,1fr)] @min-[640px]/settings:gap-[calc(var(--space-xxl)*4/3)]",
+					"@min-[640px]/settings:grid-cols-[168px_minmax(0,1fr)] @min-[640px]/settings:grid-rows-[minmax(0,1fr)] @min-[640px]/settings:gap-xxxl",
 				)}
 			>
 				<aside
@@ -184,7 +184,7 @@ export function SettingsLayout() {
 					>
 						<SelectTrigger
 							aria-label="Settings section"
-							className="w-full corner-s bg-transparent text-body-xxl data-[size=md]:h-12"
+							className="w-full data-[size=md]:h-12"
 						>
 							<SelectValue>{settingsRouteMap[activeRouteId].label}</SelectValue>
 						</SelectTrigger>

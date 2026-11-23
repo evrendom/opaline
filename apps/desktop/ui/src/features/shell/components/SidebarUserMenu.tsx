@@ -32,13 +32,9 @@ export function SidebarUserMenu() {
 		<SidebarMenuItem>
 			<SidebarMenuButton
 				data-sidebar-interactive=""
-				className="pr-s"
 				render={<Link to={getShellRoutePath(appRoutes.settingsAccount())} />}
 			>
-				<Avatar
-					size="sm"
-					className="size-4.5 after:edge-none after:shadow-card"
-				>
+				<Avatar size="sm" className="size-4.5">
 					{viewer ? (
 						// Bundled demo portraits must be present in the prerendered HTML.
 						// The interactive AvatarImage waits for a client-side load.
@@ -52,9 +48,7 @@ export function SidebarUserMenu() {
 					) : (
 						<>
 							<AvatarImage src={image} alt="" />
-							<AvatarFallback className="text-body-xxs">
-								{initials}
-							</AvatarFallback>
+							<AvatarFallback>{initials}</AvatarFallback>
 						</>
 					)}
 				</Avatar>

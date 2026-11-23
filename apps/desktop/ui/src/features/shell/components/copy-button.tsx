@@ -1,5 +1,6 @@
 import { useId, useRef, useState } from "react";
 import { useMountEffect } from "@/app/hooks/useMountEffect";
+import { Button } from "@/app/ui/button";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { cn } from "@/lib/utils";
 import "./copy-button.css";
@@ -9,8 +10,8 @@ const COPY_FEEDBACK_MS = 2000;
 
 /**
  * Copies a value and holds the copied state for the marketing site's feedback
- * window. Put `copy-button` and `data-copied` on the element that wraps the
- * `CopyIcon` so its animation plays.
+ * window. Put `data-copied` on the element that wraps the `CopyIcon` so its
+ * animation plays.
  */
 export function useCopyFeedback(value: string) {
 	const [copied, setCopied] = useState(false);
@@ -31,7 +32,7 @@ export function useCopyFeedback(value: string) {
 }
 
 // The marketing site's copy icon: the two squares merge into a circle and a
-// check draws inside it while the nearest `.copy-button` is copied.
+// check draws inside it while the nearest `[data-copied]` is copied.
 export function CopyIcon({ className }: { className?: string }) {
 	const maskId = useId();
 
@@ -99,26 +100,22 @@ export function CopyButton({
 }: {
 	value: string;
 	title: string;
+	/** Places the button; its look is Button's. */
 	className?: string;
 }) {
 	const { copied, copy } = useCopyFeedback(value);
 
 	return (
-		<button
+		<Button
 			type="button"
+			size="icon-sm"
 			title={title}
 			aria-label={copied ? "Copied" : title}
 			data-copied={copied ? "true" : undefined}
 			onClick={() => void copy()}
-			className={cn(
-				"copy-button inline-flex shrink-0 items-center justify-center",
-				"corner-xs p-xs",
-				"text-ink-4 transition-colors focus-outline",
-				"hover:text-ink",
-				className,
-			)}
+			className={className}
 		>
 			<CopyIcon className="size-4.5" />
-		</button>
+		</Button>
 	);
 }

@@ -3,9 +3,7 @@ import { useOptionalSidebar } from "@/app/ui/sidebar";
 import { cn } from "@/lib/utils";
 
 /** The window plus the strip of canvas under it.
- * The column owns the inset's canvas margin, which SidebarInset only applies
- * as the sidebar's direct sibling, so pair it with `shellWindowRadiusClassName`
- * on the inset. */
+ * The column owns the canvas margin around the window (SidebarInset). */
 export function ShellWindowColumn({
 	children,
 	footer,
@@ -32,8 +30,6 @@ export function ShellWindowColumn({
 		</div>
 	);
 }
-
-export const shellWindowRadiusClassName = "md:corner-m squircle:md:corner-xl";
 
 /** Holds the footer's height while there is nothing to show. */
 export function ShellWindowFooterPlaceholder() {

@@ -10,6 +10,8 @@ import {
 	useQueryClient,
 } from "@tanstack/react-query";
 import { useState } from "react";
+import { Button } from "@/app/ui/button";
+import { Input } from "@/app/ui/input";
 import { useDebouncedValue } from "@/components/dashboard/hooks";
 import { client } from "@/lib/orpc";
 import { cn } from "@/lib/utils";
@@ -60,7 +62,7 @@ export function WorkspaceFeaturesAdminPage() {
 		<main
 			className={cn(
 				"flex max-w-5xl flex-col gap-xxl",
-				"mx-auto px-xxl py-[calc(var(--space-xxl)*5/3)]",
+				"mx-auto px-xxl py-xxxl",
 				"text-body-xl",
 				"text-ink",
 			)}
@@ -73,16 +75,18 @@ export function WorkspaceFeaturesAdminPage() {
 					redeploy. Default hands the decision back to the environment.
 				</p>
 			</header>
-			<label className="flex flex-col gap-xs">
-				<span className="text-ink-3">Find a workspace by name, slug or id</span>
-				<input
+			<div className="flex flex-col gap-xs">
+				<label htmlFor="workspace-features-search" className="text-ink-3">
+					Find a workspace by name, slug or id
+				</label>
+				<Input
 					id="workspace-features-search"
 					value={search}
 					onChange={(event) => setSearch(event.target.value)}
 					placeholder="acme"
-					className="h-9 max-w-sm corner-s edge-m bg-canvas px-l"
+					className="max-w-sm"
 				/>
-			</label>
+			</div>
 			{error ? (
 				<p role="alert" className="text-error">
 					{error}
@@ -211,12 +215,13 @@ function FeatureSwitch({
 			<fieldset
 				aria-label={label}
 				disabled={busy}
-				className="inline-flex w-fit overflow-hidden corner-s edge-m"
+				className="inline-flex w-fit gap-xs"
 			>
 				{options.map((option) => (
-					<button
+					<Button
 						key={option.value}
 						type="button"
+						size="sm"
 						aria-pressed={current === option.value}
 						onClick={async () => {
 							if (option.value === current) return;
@@ -224,15 +229,9 @@ function FeatureSwitch({
 							await onChoose(option.value);
 							setBusy(false);
 						}}
-						className={cn(
-							"h-8 px-[calc(var(--space-m)+var(--space-xxs))] text-body-m whitespace-nowrap focus-outline focus-visible:-outline-offset-2 disabled:cursor-wait",
-							current === option.value
-								? "bg-ink text-canvas"
-								: "bg-canvas text-ink-3 hover:text-ink",
-						)}
 					>
 						{option.text}
-					</button>
+					</Button>
 				))}
 			</fieldset>
 			<span

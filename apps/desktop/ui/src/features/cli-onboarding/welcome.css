@@ -4,7 +4,7 @@
 .cli-welcome-panel-content {
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--space-xxl) * 2);
+	gap: var(--space-xxxl);
 	min-height: 100%;
 }
 .cli-welcome-brand-row {
@@ -12,37 +12,6 @@
 	align-items: center;
 	justify-content: space-between;
 	gap: var(--space-xl);
-}
-.cli-welcome-form .cli-welcome-back {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	gap: var(--space-s);
-	min-height: 44px;
-	margin: var(--space-zero) var(--space-zero) var(--space-xxl)
-		calc(var(--space-m) * -1);
-	padding: var(--space-zero) var(--space-m);
-	border: 0;
-	border-radius: var(--radius-s);
-	background: transparent;
-	color: var(--ink-3);
-	font: inherit;
-	font-size: var(--size-l);
-	line-height: var(--line-l);
-	letter-spacing: var(--letter-spacing-l);
-}
-.cli-welcome-form .cli-welcome-back:hover:not(:disabled) {
-	background: var(--hover);
-	color: var(--ink);
-}
-.cli-welcome-back:focus-visible {
-	/* the focus-outline mark */
-	outline: 2px solid var(--accent);
-	outline-offset: 1px;
-}
-.cli-welcome-back:disabled {
-	opacity: 0.55;
-	cursor: default;
 }
 .cli-welcome-brand {
 	display: inline-flex;
@@ -145,30 +114,21 @@
 	letter-spacing: var(--letter-spacing-xl);
 	line-height: var(--line-xl);
 	text-wrap: pretty;
-	margin: var(--space-zero) var(--space-zero) calc(var(--space-xxl) * 4 / 3);
+	margin: var(--space-zero) var(--space-zero) var(--space-xxxl);
 }
-.cli-welcome-form button {
-	min-height: 42px;
+.cli-welcome-form .cli-welcome-command {
 	font: inherit;
 	border-radius: var(--radius-s);
 }
-.cli-welcome-form button:disabled {
+.cli-welcome-form .cli-welcome-command:disabled {
 	opacity: 0.55;
 	cursor: default;
 }
-.cli-welcome-form button:focus-visible,
+.cli-welcome-form .cli-welcome-command:focus-visible,
 .cli-welcome-avatar:focus-within {
 	/* the focus-outline mark */
 	outline: 2px solid var(--accent);
 	outline-offset: 1px;
-}
-.cli-welcome-form .cli-onboarding-primary {
-	background: var(--primary);
-	border-color: var(--primary);
-	color: var(--primary-fg);
-}
-.cli-welcome-form .cli-onboarding-primary:hover:not(:disabled) {
-	background: var(--primary-hover);
 }
 .cli-welcome-form .cli-welcome-command {
 	width: 100%;
@@ -209,25 +169,6 @@
 .cli-welcome-form .cli-onboarding-auth-options {
 	gap: var(--space-l);
 }
-.cli-welcome-form .cli-onboarding-auth-options button {
-	border-color: transparent;
-	background: var(--surface);
-	box-shadow: var(--shadow-card);
-}
-.cli-welcome-form .cli-onboarding-auth-options button:hover:not(:disabled) {
-	background: var(--hover);
-}
-.cli-welcome-form
-	.cli-onboarding-auth-options
-	button.opaline-website-primary-button,
-.cli-welcome-form
-	.cli-onboarding-auth-options
-	button.opaline-website-primary-button:hover:not(:disabled) {
-	border-color: transparent;
-	background: var(--primary);
-	color: var(--primary-fg);
-	box-shadow: none;
-}
 .cli-welcome-form .cli-onboarding-divider {
 	display: flex;
 	gap: var(--space-l);
@@ -242,24 +183,10 @@
 	background: var(--line);
 }
 .cli-welcome-form .cli-onboarding-terms {
-	margin-top: calc(var(--space-xxl) * 1.25);
+	margin-top: var(--space-xxxl);
 	font-size: var(--size-s);
 	letter-spacing: var(--letter-spacing-s);
 	line-height: var(--line-s);
-}
-.cli-welcome-form .cli-onboarding-text-button {
-	background: none;
-	border: none;
-	color: var(--ink-3);
-	padding: var(--space-m) var(--space-zero);
-	font-size: var(--size-l);
-	line-height: var(--line-l);
-	letter-spacing: var(--letter-spacing-l);
-	text-decoration: none;
-}
-.cli-welcome-form .cli-onboarding-text-button:hover:not(:disabled) {
-	color: var(--ink);
-	text-decoration: underline;
 }
 .cli-welcome-form .cli-onboarding-error {
 	color: var(--error);
@@ -320,46 +247,6 @@
 	line-height: var(--line-l);
 	letter-spacing: var(--letter-spacing-l);
 }
-.cli-welcome-field input:not([type="file"]),
-.cli-welcome-field select,
-.cli-welcome-form .cli-onboarding-email input {
-	width: 100%;
-	min-width: 0;
-	min-height: 44px;
-	border: var(--border-m) solid var(--line);
-	border-radius: var(--radius-s);
-	padding: var(--space-l) var(--space-l);
-	background: var(--surface);
-	color: var(--ink);
-	font: inherit;
-}
-.cli-welcome-url-input {
-	display: flex;
-	min-width: 0;
-	overflow: hidden;
-	border: var(--border-m) solid var(--line);
-	border-radius: var(--radius-l);
-	background: var(--surface);
-}
-.cli-welcome-url-input > span {
-	display: flex;
-	align-items: center;
-	flex: 0 0 auto;
-	padding: var(--space-zero) var(--space-l);
-	border-right: var(--border-m) solid var(--line);
-	background: var(--field);
-	color: var(--ink-3);
-}
-.cli-welcome-field .cli-welcome-url-input input {
-	border: 0;
-	border-radius: var(--radius-zero);
-	background: transparent;
-	outline: none;
-}
-.cli-welcome-url-input:focus-within {
-	outline: 1px solid var(--ink);
-	outline-offset: -1px;
-}
 .cli-welcome-form .cli-welcome-slug-status {
 	margin: var(--space-zero);
 	font-size: var(--size-m);
@@ -374,22 +261,6 @@
 .cli-welcome-form .cli-welcome-slug-status[data-status="taken"] {
 	color: var(--error);
 }
-.cli-welcome-field #welcome-workspace-name {
-	border-radius: var(--radius-l);
-}
-.cli-welcome-field input::placeholder {
-	color: var(--ink-3);
-}
-.cli-welcome-field input:focus-visible,
-.cli-welcome-field select:focus-visible,
-.cli-welcome-form .cli-onboarding-email input:focus-visible {
-	outline: 2px solid var(--ink);
-	outline-offset: -1px;
-}
-.cli-welcome-field .cli-welcome-url-input input:focus-visible {
-	outline: none;
-	box-shadow: none;
-}
 .cli-welcome-form .cli-welcome-upload-note {
 	font-size: var(--size-m);
 	line-height: var(--line-m);
@@ -403,9 +274,6 @@
 	justify-content: flex-end;
 	gap: var(--space-l);
 	padding-top: var(--space-xxl);
-}
-.cli-welcome-actions .cli-onboarding-primary {
-	width: 100%;
 }
 .cli-welcome-profile-row {
 	display: flex;
@@ -455,11 +323,9 @@
 @media (max-width: 899px) {
 	.cli-welcome-panel-content {
 		min-height: auto;
-		gap: calc(var(--space-xxl) * 5 / 3);
+		gap: var(--space-xxxl);
 	}
-	.cli-welcome-form p,
-	.cli-welcome-form button,
-	.cli-welcome-field input:not([type="file"]) {
+	.cli-welcome-form p {
 		font-size: var(--size-xxl);
 		line-height: var(--line-xxl);
 		letter-spacing: var(--letter-spacing-xxl);

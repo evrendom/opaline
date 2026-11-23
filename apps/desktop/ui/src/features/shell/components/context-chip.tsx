@@ -19,7 +19,7 @@ export function ContextChip({
 			title={title}
 			className={cn(
 				"inline-flex h-8 max-w-xs shrink-0 items-center gap-s",
-				"corner-full pr-l pl-[calc(var(--space-m)+var(--space-xxs))]",
+				"corner-full pr-l pl-l",
 				"text-body-xl whitespace-nowrap",
 				"bg-surface shadow-card",
 				"[&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg:not([class*='text-'])]:text-ink-3",

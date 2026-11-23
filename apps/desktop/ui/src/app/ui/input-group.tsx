@@ -51,13 +51,12 @@ const inputGroupAddonVariants = cva(
 		variants: {
 			align: {
 				"inline-start":
-					"order-first pl-[calc(var(--space-m)+var(--space-xxs))] has-[>button]:-ml-xs has-[>kbd]:-ml-xxs",
-				"inline-end":
-					"order-last pr-[calc(var(--space-m)+var(--space-xxs))] has-[>button]:-mr-xs has-[>kbd]:-mr-xxs",
+					"order-first pl-l has-[>button]:-ml-xs has-[>kbd]:-ml-xxs",
+				"inline-end": "order-last pr-l has-[>button]:-mr-xs has-[>kbd]:-mr-xxs",
 				"block-start":
-					"order-first w-full justify-start px-[calc(var(--space-m)+var(--space-xxs))] pt-m group-has-[>input]/input-group:pt-m [.border-b]:pb-m",
+					"order-first w-full justify-start px-l pt-m group-has-[>input]/input-group:pt-m [.border-b]:pb-m",
 				"block-end":
-					"order-last w-full justify-start px-[calc(var(--space-m)+var(--space-xxs))] pb-m group-has-[>input]/input-group:pb-m [.border-t]:pt-m",
+					"order-last w-full justify-start px-l pb-m group-has-[>input]/input-group:pb-m [.border-t]:pt-m",
 			},
 		},
 		defaultVariants: {
@@ -136,7 +135,7 @@ function InputGroupInput({
 			className={cn(
 				"flex-1",
 				"corner-zero edge-none",
-				"bg-transparent shadow-none ring-0 aria-invalid:ring-0",
+				"bg-transparent shadow-none ring-0 focus-visible:ring-0 aria-invalid:ring-0",
 				className,
 			)}
 			{...props}

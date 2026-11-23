@@ -11,6 +11,8 @@ import {
 } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/app/ui/button";
+import { Pressable } from "@/app/ui/pressable";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { orpc } from "@/lib/orpc";
 import "./cli-update-notice.css";
@@ -114,18 +116,17 @@ function CliUpdateNoticeView({
 						{installedVersion} → {latestVersion}
 					</span>
 				</p>
-				<button
+				<Button
 					type="button"
-					className="cli-update-notice-dismiss focus-outline"
+					size="icon-sm"
 					aria-label="Dismiss CLI update notice"
 					onClick={onDismiss}
 				>
 					<IconX aria-hidden="true" className="size-3.5" stroke={1.8} />
-				</button>
+				</Button>
 			</div>
 			<div className="menu-list">
-				<button
-					type="button"
+				<Pressable
 					className="menu-row"
 					title={CLI_UPDATE_COMMAND}
 					onClick={() => void copyCommand()}
@@ -142,7 +143,7 @@ function CliUpdateNoticeView({
 					<span className="min-w-0 flex-1 truncate">
 						{copied ? "Copied" : "Copy update command"}
 					</span>
-				</button>
+				</Pressable>
 				<a
 					href={getCliReleaseUrl(latestVersion)}
 					target="_blank"

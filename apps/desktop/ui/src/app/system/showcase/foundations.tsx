@@ -68,7 +68,7 @@ const TRACKING = [
 	["tracking-l", "tracking-l"],
 	["tracking-xl", "tracking-xl"],
 ] as const;
-const SPACE = ["xxs", "xs", "s", "m", "l", "xl", "xxl"] as const;
+const SPACE = ["xxs", "xs", "s", "m", "l", "xl", "xxl", "xxxl"] as const;
 const CORNERS = [
 	["zero", "corner-zero"],
 	["xs", "corner-xs"],

@@ -80,6 +80,7 @@ function SelectTrigger({
 				"corner-s corner-squircle py-m pr-l pl-l",
 				"text-body-xl whitespace-nowrap",
 				"bg-control shadow-control transition-all outline-none",
+				"focus-visible:ring-[1.5px] focus-visible:ring-focus-ring",
 				"squircle:corner-xl",
 				"disabled:cursor-not-allowed disabled:opacity-50",
 				"aria-invalid:border-error aria-invalid:ring-[1.5px] aria-invalid:ring-error-line",
@@ -178,7 +179,7 @@ function SelectItem({
 			label={derivedLabel}
 			className={cn(
 				"relative flex w-full items-center gap-m",
-				"corner-s py-s pr-[calc(var(--space-xxl)*4/3)] pl-m",
+				"corner-s py-s pr-xxxl pl-m",
 				"text-body-xl",
 				"outline-hidden select-none",
 				"focus:bg-hover focus:text-sidebar-accent-foreground",

@@ -144,7 +144,7 @@ export function AppSidebar({
 				<FluidMenuHover items="[data-sidebar-interactive]" bridgeGap={12} />
 				{/* The plugin's host already titles it "Opaline". */}
 				{import.meta.env.MODE === "plugin" ? null : (
-					<SidebarHeader className="desktop-drag-header">
+					<SidebarHeader data-desktop-drag="">
 						<DesktopWindowBar />
 						<IntroReveal label="Workspace">
 							<SidebarWorkspaceSwitcher />

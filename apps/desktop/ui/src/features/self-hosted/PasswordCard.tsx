@@ -147,7 +147,6 @@ export function PasswordCard() {
 					variant="primary"
 					type="submit"
 					size="md"
-					className="h-8 gap-xs"
 					disabled={saving || currentPasswordRequired === null}
 				>
 					{saving ? "Changing…" : "Change password"}

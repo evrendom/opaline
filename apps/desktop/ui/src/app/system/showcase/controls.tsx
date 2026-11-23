@@ -19,7 +19,9 @@ import { Checkbox } from "@/app/ui/checkbox";
 import { Field, FieldLabel } from "@/app/ui/field";
 import { Input } from "@/app/ui/input";
 import { Label } from "@/app/ui/label";
+import { Pressable } from "@/app/ui/pressable";
 import { Separator } from "@/app/ui/separator";
+import { Textarea } from "@/app/ui/textarea";
 import { RetryButton } from "@/components/retry-button";
 import { Group, Specimen, State } from "./kit";
 import { demoPortraits } from "./providers";
@@ -178,59 +180,81 @@ function Buttons() {
 	);
 }
 
-function PatternButtons() {
+function Sizes() {
 	return (
-		<>
-			<Specimen
-				name="text-button"
-				source="app/patterns.css"
-				where="Compass toolbar (Runs / Patterns tabs, Everyone / Mine, Back), the breakdown sheet's Clear, chart coverage refresh."
-			>
-				<State label="rest">
-					<button type="button" className="text-button">
-						Everyone
-					</button>
-				</State>
-				<State label="aria-selected (tab)">
-					<button
-						type="button"
-						role="tab"
-						aria-selected
-						className="text-button"
-					>
-						Runs
-					</button>
-				</State>
-				<State label="aria-pressed">
-					<button type="button" className="text-button" aria-pressed="true">
-						Mine
-					</button>
-				</State>
-				<State label="with icon">
-					<button type="button" className="text-button">
-						<IconArrowLeft aria-hidden="true" className="size-3.5" />
-						Back
-					</button>
-				</State>
-				<State label="disabled">
-					<button type="button" className="text-button" disabled>
-						<IconRefresh aria-hidden="true" className="size-3.5" />
+		<Specimen
+			name="Button · sizes"
+			source="app/ui/button.tsx"
+			where="One vocabulary across the primitives: sm (24px), md (32px, the default), lg (36px, the sign-in forms), icon-sm and icon for icon-only buttons, inline inside a sentence."
+		>
+			<State label="sm">
+				<Button size="sm">Small</Button>
+			</State>
+			<State label="md (default)">
+				<Button>Medium</Button>
+			</State>
+			<State label="lg">
+				<Button variant="primary" size="lg">
+					Continue
+				</Button>
+			</State>
+			<State label="icon-sm">
+				<Button size="icon-sm" aria-label="Close">
+					<IconX />
+				</Button>
+			</State>
+			<State label="icon">
+				<Button size="icon" aria-label="Refresh">
+					<IconRefresh />
+				</Button>
+			</State>
+			<State label="inline">
+				<span className="text-body-xl text-ink-2">
+					Nothing yet.{" "}
+					<Button variant="link" size="inline">
 						Refresh
-					</button>
-				</State>
-			</Specimen>
-			<Specimen
-				name="secondary-button"
-				source="app/patterns.css"
-				where="Compass pattern and run detail actions, the breakdown sheet's Apply."
-			>
-				<State label="rest">
-					<button type="button" className="secondary-button">
-						Open the session
-					</button>
-				</State>
-			</Specimen>
-		</>
+					</Button>
+				</span>
+			</State>
+		</Specimen>
+	);
+}
+
+/*
+ * Pressable: a whole clickable row, tile, bar, chip or disclosure. Button
+ * semantics, the focus mark and the disabled state, and no look of its own:
+ * its className is free. Anything shaped like a button is a Button.
+ */
+function Pressables() {
+	return (
+		<Specimen
+			name="Pressable"
+			source="app/ui/pressable.tsx"
+			where="Clickable rows, tiles, chart bars, chips and disclosures: the repository picker's rows, the workspace menu, the star card's switch. Tab to one to see the focus mark."
+		>
+			<State label="row" className="w-72">
+				<Pressable className="flex w-full items-center gap-m corner-s px-m py-s text-body-xl hover:bg-hover">
+					<IconArrowLeft aria-hidden="true" className="size-3.5 text-ink-3" />
+					<span className="flex-1 truncate">opaline/desktop</span>
+					<span className="text-body-m text-ink-3">12 sessions</span>
+				</Pressable>
+			</State>
+			<State label="tile" className="w-44">
+				<Pressable className="flex w-full flex-col gap-xs corner-m bg-surface p-l shadow-card hover:shadow-raised">
+					<span className="text-body-l font-medium">Claude Code</span>
+					<span className="text-body-m text-ink-3">418 sessions</span>
+				</Pressable>
+			</State>
+			<State label="disabled" className="w-72">
+				<Pressable
+					disabled
+					className="flex w-full items-center gap-m corner-s px-m py-s text-body-xl"
+				>
+					<span className="flex-1 truncate">opaline/site</span>
+					<span className="text-body-m text-ink-3">Added</span>
+				</Pressable>
+			</State>
+		</Specimen>
 	);
 }
 
@@ -253,6 +277,40 @@ function Fields() {
 				</State>
 				<State label="disabled (saving)" className="w-56">
 					<Input defaultValue="Opaline Demo" disabled />
+				</State>
+			</Specimen>
+			<Specimen
+				name="Textarea"
+				source="app/ui/textarea.tsx"
+				where="Multi-line text: a report's question, a run question's wording. The same field as Input, growing with its content from three lines."
+			>
+				<State label="placeholder" className="w-72">
+					<Textarea placeholder="Which sessions touched the billing code?" />
+				</State>
+				<State label="value" className="w-72">
+					<Textarea
+						defaultValue={
+							"Did the agent run the tests\nbefore it said it was done?"
+						}
+					/>
+				</State>
+				<State label="disabled" className="w-72">
+					<Textarea defaultValue="Saving" disabled />
+				</State>
+			</Specimen>
+			<Specimen
+				name="The control field: bg-control · shadow-control"
+				source="app/tokens.css · app/ui/input.tsx · app/ui/select.tsx"
+				where="Every text field and select stands on the control role: clear on the card's drop in light, a soft tint inside a hairline in dark. The roles flip; no field carries a per-mode class."
+			>
+				<State label="Input" className="w-56">
+					<Input placeholder="Search repositories" />
+				</State>
+				<State label="Input variant plain (dialogs)" className="w-56">
+					<Input variant="plain" placeholder="Opaline Demo" />
+				</State>
+				<State label="the bare role" className="w-56">
+					<div className="h-9 w-full corner-s bg-control shadow-control" />
 				</State>
 			</Specimen>
 			<Specimen
@@ -283,20 +341,16 @@ function Fields() {
 				</State>
 			</Specimen>
 			<Specimen
-				name="Sign-in form: form-input, form-button, Label, Separator"
-				source="app/patterns.css · app/ui/label.tsx · app/ui/separator.tsx"
+				name="Sign-in form: Input, Button lg, Label, Separator"
+				source="app/ui/input.tsx · app/ui/button.tsx · app/ui/label.tsx · app/ui/separator.tsx"
 				where="Sign in, sign up, reset password, self-hosted sign-in and the invitation page."
 			>
 				<div className="flex w-80 flex-col gap-l">
 					<div className="flex flex-col gap-s">
 						<Label htmlFor="showcase-email">Email</Label>
-						<Input
-							id="showcase-email"
-							className="form-input"
-							placeholder="you@company.com"
-						/>
+						<Input id="showcase-email" placeholder="you@company.com" />
 					</div>
-					<Button variant="primary" className="form-button">
+					<Button variant="primary" size="lg" className="w-full">
 						Continue
 					</Button>
 					<div className="flex items-center gap-m">
@@ -304,10 +358,10 @@ function Fields() {
 						<span className="text-body-m text-ink-3">or</span>
 						<Separator className="flex-1" />
 					</div>
-					<Button className="form-button" variant="primary">
+					<Button size="lg" className="w-full">
 						Continue with GitHub
 					</Button>
-					<Button variant="primary" className="form-button" disabled>
+					<Button variant="primary" size="lg" className="w-full" disabled>
 						Continue
 					</Button>
 				</div>
@@ -381,7 +435,8 @@ export function ControlsGroup() {
 	return (
 		<Group title="Controls">
 			<Buttons />
-			<PatternButtons />
+			<Sizes />
+			<Pressables />
 			<Fields />
 			<Identity />
 			<Specimen

@@ -21,27 +21,6 @@
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
 }
-.self-hosted-command .self-hosted-command-copy {
-	flex: 0 0 auto;
-	min-height: 0;
-	height: 30px;
-	padding: var(--space-zero) var(--space-m);
-	border: 0;
-	border-radius: var(--radius-xs);
-	background: transparent;
-	color: var(--ink-3);
-	font-size: var(--size-m);
-	line-height: var(--line-m);
-	letter-spacing: var(--letter-spacing-m);
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-s);
-	cursor: pointer;
-}
-.self-hosted-command .self-hosted-command-copy:hover {
-	background: var(--field);
-	color: var(--ink);
-}
 .self-hosted-mcp-note {
 	margin: var(--space-zero);
 	padding-inline: var(--space-xxl);
@@ -83,7 +62,7 @@
 .self-hosted-steps {
 	display: grid;
 	gap: var(--space-xxl);
-	margin: var(--space-zero) var(--space-zero) calc(var(--space-xxl) * 4 / 3);
+	margin: var(--space-zero) var(--space-zero) var(--space-xxxl);
 	padding: var(--space-zero);
 	list-style: none;
 	counter-reset: self-hosted-step;

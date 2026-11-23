@@ -42,8 +42,10 @@ export function MembersSettingsSection() {
 				<div className="settings-page">
 					{!data.state.isPending && data.state.isError ? (
 						<SettingsSectionCard>
-							<CardContent className="text-body-xl text-ink-3 group-data-[size=sm]/card:px-xl">
-								Member data couldn&apos;t be loaded right now.
+							<CardContent>
+								<p className="text-ink-3">
+									Member data couldn&apos;t be loaded right now.
+								</p>
 							</CardContent>
 						</SettingsSectionCard>
 					) : null}

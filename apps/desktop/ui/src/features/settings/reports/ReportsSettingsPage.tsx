@@ -43,8 +43,10 @@ export function ReportsSettingsPage() {
 		return (
 			<div className="settings-page">
 				<SettingsSectionCard>
-					<CardContent className="text-body-xl text-ink-3 group-data-[size=sm]/card:px-xl">
-						Reports couldn&apos;t be loaded right now.
+					<CardContent>
+						<p className="text-ink-3">
+							Reports couldn&apos;t be loaded right now.
+						</p>
 					</CardContent>
 				</SettingsSectionCard>
 			</div>

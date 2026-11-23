@@ -1,8 +1,8 @@
 .sessions-settings {
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--space-xxl) * 5 / 3);
-	padding-bottom: calc(var(--space-xxl) * 4 / 3);
+	gap: var(--space-xxxl);
+	padding-bottom: var(--space-xxxl);
 	font-size: var(--size-xl);
 	line-height: var(--line-xl);
 }
@@ -15,10 +15,7 @@
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-xs);
-	padding-inline: calc(var(--space-xs) * 5);
-}
-.sessions-settings-card {
-	padding: var(--space-xl) calc(var(--space-xs) * 5);
+	padding-inline: var(--space-xl);
 }
 .sessions-settings h2 {
 	margin: var(--space-zero);
@@ -35,15 +32,14 @@
 .sessions-settings-manage {
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--space-xxs) * 5);
+	gap: var(--space-m);
 }
 .sessions-settings-command {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: var(--space-l);
-	padding: var(--space-m) calc(var(--space-xxs) * 5) var(--space-m)
-		calc(var(--space-xxs) * 7);
+	padding: var(--space-m) var(--space-l) var(--space-m) var(--space-l);
 	border: var(--border-m) solid var(--line);
 	border-radius: var(--radius-s);
 	background: var(--surface);
@@ -74,35 +70,6 @@
 	font-variant-numeric: tabular-nums;
 }
 
-.sessions-settings-search {
-	display: flex;
-	align-items: center;
-	gap: var(--space-m);
-	padding: calc(var(--space-xxs) * 3.5) calc(var(--space-xxs) * 5);
-	border: var(--border-m) solid var(--line);
-	border-radius: var(--radius-xs);
-	color: var(--ink-3);
-}
-.sessions-settings-search svg {
-	flex-shrink: 0;
-}
-.sessions-settings-search:focus-within {
-	outline: 2px solid var(--focus);
-	outline-offset: -1px;
-}
-.sessions-settings-search input {
-	width: 100%;
-	min-width: 0;
-	background: transparent;
-	font: inherit;
-	font-size: var(--size-l);
-	color: var(--ink);
-	border: 0;
-	outline: 0;
-}
-.sessions-settings-search input::placeholder {
-	color: var(--ink-3);
-}
 .sessions-settings-table-wrap {
 	max-width: 100%;
 	overflow-x: auto;
@@ -187,18 +154,17 @@
 	border: var(--border-m) solid var(--ink-3);
 }
 .sessions-settings-empty {
-	padding: calc(var(--space-xxs) * 14) var(--space-zero);
+	padding: var(--space-xxxl) var(--space-zero);
 	color: var(--ink-3);
 }
 .sessions-settings-status-note {
-	padding-top: calc(var(--space-xxs) * 7);
+	padding-top: var(--space-l);
 }
 @media (max-width: 640px) {
 	.sessions-settings,
 	.sessions-settings h2,
 	.sessions-settings p,
 	.sessions-settings-command code,
-	.sessions-settings-search input,
 	.sessions-settings-table {
 		font-size: var(--size-xxl);
 	}

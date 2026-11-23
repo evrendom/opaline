@@ -7,6 +7,14 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
 import { Button } from "@/app/ui/button";
+import { Input } from "@/app/ui/input";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/app/ui/select";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
 import { client } from "@/lib/orpc";
 
@@ -49,7 +57,7 @@ export function RunQuestionsAdminPage() {
 	);
 
 	return (
-		<main className="mx-auto flex max-w-3xl flex-col gap-xxl px-xxl py-[calc(var(--space-xxl)*5/3)] text-body-xl text-ink">
+		<main className="mx-auto flex max-w-3xl flex-col gap-xxl px-xxl py-xxxl text-body-xl text-ink">
 			<header className="flex flex-col gap-xs">
 				<h1 className="text-body-xxl font-medium">Run questions</h1>
 				<p className="text-ink-3">
@@ -57,7 +65,7 @@ export function RunQuestionsAdminPage() {
 					probability of yes. A new wording is a new question; earlier answers
 					keep their wording. Test a question on 20 runs before turning it on.
 				</p>
-				<ul className="list-disc pl-[calc(var(--space-xl)+var(--space-xs))] text-ink-3">
+				<ul className="list-disc pl-xl text-ink-3">
 					<li>Ask one yes/no question; split a compound condition in two.</li>
 					<li>
 						Phrase it so a high value means yes (not "Was the run free of
@@ -173,12 +181,12 @@ function AddQuestionForm({
 				<label className="sr-only" htmlFor="run-question-new">
 					New run question
 				</label>
-				<input
+				<Input
 					id="run-question-new"
 					value={wording}
 					onChange={(event) => setWording(event.target.value)}
 					placeholder="Did the agent struggle to find the right file?"
-					className="h-9 flex-1 corner-s edge-m bg-canvas px-l"
+					className="flex-1"
 				/>
 				<Button
 					variant="primary"
@@ -194,36 +202,38 @@ function AddQuestionForm({
 					Add
 				</Button>
 			</div>
-			<label className="flex flex-col gap-xs text-ink-3">
-				Tag label (optional): the short name the dashboard shows, at most{" "}
-				{RUN_QUESTION_LABEL_MAX_CHARS} characters
-				<input
+			<div className="flex flex-col gap-xs">
+				<label htmlFor="run-question-new-label" className="text-ink-3">
+					Tag label (optional): the short name the dashboard shows, at most{" "}
+					{RUN_QUESTION_LABEL_MAX_CHARS} characters
+				</label>
+				<Input
+					id="run-question-new-label"
 					value={label}
 					onChange={(event) => setLabel(event.target.value)}
 					placeholder="Hunted for files"
 					maxLength={RUN_QUESTION_LABEL_MAX_CHARS}
-					className="h-8 corner-s edge-m bg-canvas px-l text-ink"
 				/>
-			</label>
+			</div>
 			<details>
 				<summary className="text-ink-3">Criteria (optional)</summary>
 				<div className="mt-m flex flex-col gap-m">
-					<label className="flex flex-col gap-xs">
-						A yes looks like
-						<input
+					<div className="flex flex-col gap-xs">
+						<label htmlFor="run-question-new-yes">A yes looks like</label>
+						<Input
+							id="run-question-new-yes"
 							value={yes}
 							onChange={(event) => setYes(event.target.value)}
-							className="h-8 corner-s edge-m bg-canvas px-l"
 						/>
-					</label>
-					<label className="flex flex-col gap-xs">
-						A no looks like
-						<input
+					</div>
+					<div className="flex flex-col gap-xs">
+						<label htmlFor="run-question-new-no">A no looks like</label>
+						<Input
+							id="run-question-new-no"
 							value={no}
 							onChange={(event) => setNo(event.target.value)}
-							className="h-8 corner-s edge-m bg-canvas px-l"
 						/>
-					</label>
+					</div>
 				</div>
 			</details>
 		</form>
@@ -320,13 +330,13 @@ function QuestionRow({
 						<label className="sr-only" htmlFor={`run-question-${question.id}`}>
 							New wording
 						</label>
-						<input
+						<Input
 							id={`run-question-${question.id}`}
 							value={editing.wording}
 							onChange={(event) =>
 								setEditing({ ...editing, wording: event.target.value })
 							}
-							className="h-8 flex-1 corner-s edge-m bg-canvas px-l"
+							className="flex-1"
 						/>
 						<Button variant="primary" size="md" type="submit">
 							{editing.wording.trim() === question.question
@@ -342,18 +352,21 @@ function QuestionRow({
 							Cancel
 						</Button>
 					</div>
-					<label className="flex items-center gap-m text-body-m text-ink-3">
-						Tag label
-						<input
+					<div className="flex items-center gap-m text-body-m text-ink-3">
+						<label htmlFor={`run-question-label-${question.id}`}>
+							Tag label
+						</label>
+						<Input
+							id={`run-question-label-${question.id}`}
 							aria-label="Tag label"
 							value={editing.label}
 							onChange={(event) =>
 								setEditing({ ...editing, label: event.target.value })
 							}
 							maxLength={RUN_QUESTION_LABEL_MAX_CHARS}
-							className="h-7 flex-1 corner-s edge-m bg-canvas px-m text-ink"
+							className="flex-1"
 						/>
-					</label>
+					</div>
 				</form>
 			)}
 			{testing ? (
@@ -413,38 +426,47 @@ function QuestionTest({
 				<label htmlFor={`run-question-test-${question.id}`}>
 					Test on the newest 20 runs of
 				</label>
-				<select
-					id={`run-question-test-${question.id}`}
+				<Select
 					value={workspaceId}
-					onChange={(event) => setChosen(event.target.value)}
-					className="h-8 corner-s edge-m bg-canvas px-m"
+					onValueChange={(value) => setChosen(String(value ?? ""))}
 				>
-					{organizations.map((organization) => (
-						<option key={organization.id} value={organization.id}>
-							{organization.name}
-						</option>
-					))}
-				</select>
+					<SelectTrigger id={`run-question-test-${question.id}`} size="sm">
+						<SelectValue />
+					</SelectTrigger>
+					<SelectContent>
+						{organizations.map((organization) => (
+							<SelectItem key={organization.id} value={organization.id}>
+								{organization.name}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
 				{providers.length ? (
 					<>
 						<label htmlFor={`run-question-provider-${question.id}`}>
 							Answered by
 						</label>
-						<select
-							id={`run-question-provider-${question.id}`}
+						<Select
 							value={provider}
-							onChange={(event) => {
+							onValueChange={(value) => {
 								setVerdicts({});
-								setPickedProvider(event.target.value);
+								setPickedProvider(String(value ?? ""));
 							}}
-							className="h-8 corner-s edge-m bg-canvas px-m"
 						>
-							{providers.map((name) => (
-								<option key={name} value={name}>
-									{name}
-								</option>
-							))}
-						</select>
+							<SelectTrigger
+								id={`run-question-provider-${question.id}`}
+								size="sm"
+							>
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								{providers.map((name) => (
+									<SelectItem key={name} value={name}>
+										{name}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
 					</>
 				) : null}
 				<Button

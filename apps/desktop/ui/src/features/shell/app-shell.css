@@ -38,7 +38,8 @@
 	height: 32px;
 	align-items: center;
 	gap: var(--space-xxs);
-	padding-left: calc(var(--space-xxl) * 3);
+	/* platform: clears the macOS traffic lights (left 15px, three 12px lights). */
+	padding-left: 72px;
 }
 
 :root[data-desktop] .desktop-window-lights {
@@ -71,7 +72,7 @@
 
 /* The window drags by the sidebar's header, the page header and the shell's
    gaps; their controls stay clickable. */
-:root[data-desktop] :is(.desktop-drag-header, [data-slot="dashboard-header"]) {
+:root[data-desktop] :is([data-desktop-drag], [data-slot="dashboard-header"]) {
 	-webkit-app-region: drag;
 }
 
@@ -84,7 +85,7 @@
 }
 
 :root[data-desktop]
-	:is(.desktop-drag-header, [data-slot="dashboard-header"])
+	:is([data-desktop-drag], [data-slot="dashboard-header"])
 	:is(
 		a,
 		button,
@@ -102,7 +103,8 @@
 :root[data-desktop]:not([data-fullscreen])
 	[data-sidebar-state="collapsed"]
 	[data-slot="dashboard-header"] {
-	padding-left: calc(var(--space-xxl) * 11 / 3);
+	/* platform: clears the traffic lights and the sidebar toggle beside them. */
+	padding-left: 88px;
 }
 
 :root[data-desktop] .product-window-frame .desktop-window-bar {
@@ -111,6 +113,6 @@
 
 :root[data-desktop]
 	.product-window-frame
-	:is(.desktop-drag-header, [data-slot="dashboard-header"]) {
+	:is([data-desktop-drag], [data-slot="dashboard-header"]) {
 	-webkit-app-region: no-drag;
 }

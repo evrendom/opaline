@@ -316,11 +316,14 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
 	return (
 		<main
 			data-slot="sidebar-inset"
+			// The content window: a canvas card on the chrome, clipping its
+			// page to its corners. ShellWindowColumn owns the margin around it.
+			// `dashboard-01-window` is the hook app-surface.css (the dark
+			// inside edge) and the sessions resize handle find the window by.
 			className={cn(
-				"relative flex w-full flex-1 flex-col",
-				"corner-squircle",
+				"dashboard-01-window relative flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden overscroll-none",
+				"corner-squircle md:corner-m squircle:md:corner-xl",
 				"bg-canvas shadow-card",
-				"md:peer-data-[variant=inset]:m-m md:peer-data-[variant=inset]:ml-zero md:peer-data-[variant=inset]:corner-m squircle:md:peer-data-[variant=inset]:corner-xl md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-m",
 				className,
 			)}
 			{...props}
@@ -387,9 +390,10 @@ function SidebarGroupLabel({
 				className: cn(
 					"flex h-8 shrink-0 items-center",
 					"corner-s px-m",
-					"text-body-m font-medium",
-					"text-ink-2 ring-sidebar-ring outline-hidden transition-[margin,opacity] duration-(--motion-medium-duration) ease-linear",
-					"group-data-[collapsible=icon]:-mt-[calc(var(--space-xxl)*4/3)] group-data-[collapsible=icon]:opacity-0 [&>svg]:size-4 [&>svg]:shrink-0",
+					// the sidebar's section label: the chrome's quiet grey, both modes
+					"text-body-s font-regular",
+					"text-ink-chrome ring-sidebar-ring outline-hidden transition-[margin,opacity] duration-(--motion-medium-duration) ease-linear",
+					"group-data-[collapsible=icon]:-mt-xxxl group-data-[collapsible=icon]:opacity-0 [&>svg]:size-4 [&>svg]:shrink-0",
 					className,
 				),
 			},
@@ -443,7 +447,7 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
 // border-radius but not its corner-shape, so a squircle active row would not
 // match the hover highlight.
 const sidebarMenuButtonVariants = cva(
-	"peer/menu-button group/menu-button flex w-full cursor-default items-center gap-m overflow-hidden corner-l p-m text-left text-body-xl ring-sidebar-ring focus-outline transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-[calc(var(--space-xxl)*4/3)] group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-m! hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground [&_svg]:size-4.5 [&_svg]:shrink-0 [&>span:last-child]:truncate",
+	"peer/menu-button group/menu-button flex w-full cursor-default items-center gap-m overflow-hidden corner-l p-m text-left text-body-xl ring-sidebar-ring focus-outline transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-xxxl group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-m! hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground [&_svg]:size-4.5 [&_svg]:shrink-0 [&>span:last-child]:truncate",
 	{
 		variants: {
 			variant: {

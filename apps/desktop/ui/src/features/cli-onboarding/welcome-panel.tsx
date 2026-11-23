@@ -1,6 +1,7 @@
 import { IconChevronLeft } from "@tabler/icons-react";
 import { createContext, type ReactNode, useContext, useState } from "react";
 import { createPortal } from "react-dom";
+import { Button } from "@/app/ui/button";
 import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import { ProductBrand } from "@/features/shell/components/product-brand";
 
@@ -59,15 +60,15 @@ export function WelcomeBack({
 	disabled: boolean;
 }) {
 	return (
-		<button
+		<Button
 			type="button"
-			className="cli-welcome-back"
+			className="-ml-m mb-xxl"
 			onClick={onClick}
 			disabled={disabled}
 		>
-			<IconChevronLeft size={16} aria-hidden="true" />
+			<IconChevronLeft aria-hidden="true" />
 			Back
-		</button>
+		</Button>
 	);
 }
 

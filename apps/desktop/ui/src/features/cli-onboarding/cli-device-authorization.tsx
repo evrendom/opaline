@@ -1,4 +1,5 @@
 import { Fragment, useState } from "react";
+import { Button } from "@/app/ui/button";
 import { submitCliDeviceDecision } from "./cli-onboarding-auth";
 import { WelcomeProgress } from "./welcome-panel";
 
@@ -88,16 +89,17 @@ export function CliDeviceAuthorization({ userCode }: { userCode: string }) {
 				</p>
 			) : null}
 			<div className="cli-welcome-actions">
-				<button
-					className="cli-onboarding-text-button"
+				<Button
 					type="button"
 					disabled={processingAction !== null}
 					onClick={() => void submit("deny")}
 				>
 					{processingAction === "deny" ? "Denying…" : "Deny request"}
-				</button>
-				<button
-					className="cli-onboarding-primary"
+				</Button>
+				<Button
+					variant="primary"
+					size="lg"
+					className="w-full"
 					type="button"
 					disabled={processingAction !== null}
 					onClick={() => void submit("approve")}
@@ -105,7 +107,7 @@ export function CliDeviceAuthorization({ userCode }: { userCode: string }) {
 					{processingAction === "approve"
 						? "Connecting…"
 						: "Approve and continue"}
-				</button>
+				</Button>
 			</div>
 		</div>
 	);

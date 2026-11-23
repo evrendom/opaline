@@ -19,7 +19,7 @@ html[data-auth-shell],
 	min-height: 100svh;
 	align-items: center;
 	justify-content: center;
-	padding: calc(var(--space-xxl) * 2) var(--space-xxl);
+	padding: var(--space-xxxl) var(--space-xxl);
 }
 
 .opaline-auth-content {
@@ -28,7 +28,7 @@ html[data-auth-shell],
 }
 
 .opaline-auth-intro {
-	margin-bottom: calc(var(--space-xxl) * 4 / 3);
+	margin-bottom: var(--space-xxxl);
 	text-align: center;
 }
 
@@ -66,29 +66,14 @@ html[data-auth-shell],
 	text-transform: uppercase;
 }
 
-.form-input.opaline-auth-code-input {
-	min-height: 56px;
-	border: 0;
-	padding-inline: var(--space-xl);
-	background: var(--surface);
-	box-shadow: var(--shadow-card);
-	color: var(--ink);
-	font-size: var(--size-xxl);
-	line-height: var(--line-xxl);
-	font-variant-numeric: tabular-nums;
-	font-weight: var(--weight-body-medium);
-	letter-spacing: var(--tracking-xl);
-	text-align: center;
-}
-
 @media (max-width: 899px) {
 	.opaline-auth-main {
-		padding-block: calc(var(--space-xxl) * 5 / 3);
+		padding-block: var(--space-xxxl);
 	}
 }
 
 @media (max-height: 700px) and (min-width: 900px) {
 	.opaline-auth-main {
-		padding-block: calc(var(--space-xxl) * 4 / 3);
+		padding-block: var(--space-xxxl);
 	}
 }

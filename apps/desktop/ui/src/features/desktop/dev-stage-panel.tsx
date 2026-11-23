@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { Pressable } from "@/app/ui/pressable";
 import { CLI_SETUP_PATH } from "../cli-onboarding/cli-authorization";
 import { useDesktop } from "./desktop-bridge";
 import {
@@ -51,29 +52,22 @@ export function DevStagePanel() {
 		<div className="dev-stage-panel">
 			{open && (
 				<div className="dev-stage-list">
-					<button
-						type="button"
-						className="focus-outline"
-						aria-pressed={stage === null}
-						onClick={() => pick(null)}
-					>
+					<Pressable aria-pressed={stage === null} onClick={() => pick(null)}>
 						Live
-					</button>
+					</Pressable>
 					{(["flow", "edge"] as const).map((group) => (
 						<div key={group} className="dev-stage-group">
 							<span>{group === "flow" ? "Flow" : "Edge cases"}</span>
 							{DEV_STAGES.map((item, position) =>
 								item.group === group ? (
-									<button
+									<Pressable
 										key={item.id}
-										type="button"
-										className="focus-outline"
 										aria-pressed={stage === item.id}
 										onClick={() => pick(item.id)}
 									>
 										<b>{position + 1}</b>
 										{item.label}
-									</button>
+									</Pressable>
 								) : null,
 							)}
 						</div>
@@ -81,15 +75,14 @@ export function DevStagePanel() {
 					<small>⌥← ⌥→ to step</small>
 				</div>
 			)}
-			<button
-				type="button"
-				className="dev-stage-toggle focus-outline"
+			<Pressable
+				className="dev-stage-toggle"
 				onClick={() => setOpen((value) => !value)}
 			>
 				{index >= 0
 					? `${index + 1} · ${DEV_STAGES[index]?.label}`
 					: "Dev stages · Live"}
-			</button>
+			</Pressable>
 		</div>
 	);
 }

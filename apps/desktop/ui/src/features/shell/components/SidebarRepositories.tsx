@@ -56,11 +56,7 @@ export function SidebarRepositories({ reposActive }: { reposActive: boolean }) {
 		!welcome.length && hasMoreRepositories(query.data ?? [], repos.length);
 	return (
 		<SidebarGroup>
-			<SidebarGroupLabel
-				className={"h-6 text-body-s font-regular text-ink-chrome"}
-			>
-				Repositories
-			</SidebarGroupLabel>
+			<SidebarGroupLabel className="h-6">Repositories</SidebarGroupLabel>
 			<SidebarGroupContent>
 				<nav aria-label="Most used repositories">
 					<SidebarMenu>

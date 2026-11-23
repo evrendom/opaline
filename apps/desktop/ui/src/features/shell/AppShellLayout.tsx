@@ -21,10 +21,7 @@ import { ShellDashboardRangeControls } from "@/features/costs/dashboard-range-co
 import { AppSidebar } from "@/features/shell/components/AppSidebar";
 import { LastSessionUploadBar } from "@/features/shell/components/last-session-upload-bar";
 import { SiteHeader } from "@/features/shell/components/SiteHeader";
-import {
-	ShellWindowColumn,
-	shellWindowRadiusClassName,
-} from "@/features/shell/components/shell-window-column";
+import { ShellWindowColumn } from "@/features/shell/components/shell-window-column";
 import { shellNavigationRoutes } from "@/features/shell/config/shell-routes";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { NewseshListHeaderPortalContext } from "@/features/shell/newsesh-list-header-portal";
@@ -232,14 +229,7 @@ export function LeftSidebarAppShellLayout() {
 												showLastSessionUpload ? <LastSessionUploadBar /> : null
 											}
 										>
-											<SidebarInset
-												className={cn(
-													"dashboard-01-window min-h-0 min-w-0 overflow-hidden overscroll-none bg-[var(--canvas)]",
-													shellWindowRadiusClassName,
-												)}
-											>
-												{shellWindowContent}
-											</SidebarInset>
+											<SidebarInset>{shellWindowContent}</SidebarInset>
 										</ShellWindowColumn>
 									</SidebarProvider>
 								</div>

@@ -10,6 +10,7 @@ const PLAIN_INPUT_CLASS_NAME = cn(
 	"text-body-xxl md:text-body-xl",
 	"bg-hover",
 	"transition-[color,box-shadow,background-color] outline-none",
+	"focus-visible:ring-[1.5px] focus-visible:ring-focus-ring",
 	"file:inline-flex file:h-7 file:edge-none file:bg-transparent file:text-body-xl file:font-medium file:text-ink",
 	"placeholder:text-ink-3",
 	"disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
@@ -18,11 +19,13 @@ const PLAIN_INPUT_CLASS_NAME = cn(
 
 // The field every single- and multi-line text control shares: a squircle on
 // the control ground and shadow (the roles flip it for dark), placeholder in
-// ink-4.
+// ink-4, a focus ring when focused.
 export const FIELD_CLASS_NAME = cn(
-	"corner-s corner-squircle px-[calc(var(--space-m)+var(--space-xxs))] py-xs",
+	"corner-s corner-squircle px-l py-xs",
 	"text-body-xxl",
 	"bg-control shadow-control transition-[color,box-shadow] outline-none",
+	// the field's focus mark: a soft focus ring over the control shadow
+	"focus-visible:ring-[1.5px] focus-visible:ring-focus-ring",
 	"squircle:corner-xl-inner",
 	"file:inline-flex file:h-7 file:edge-none file:bg-transparent file:text-body-xl file:font-medium file:text-ink",
 	"placeholder:text-ink-4",

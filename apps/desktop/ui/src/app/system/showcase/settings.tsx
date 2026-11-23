@@ -4,6 +4,8 @@ import type {
 } from "@rudel/api-routes";
 import type { ReactNode } from "react";
 import { CardContent } from "@/app/ui/card";
+import { SelfHostedAuthForm } from "@/features/self-hosted/SelfHostedAuthForm";
+import type { SelfHostInfo } from "@/features/self-hosted/self-host-info";
 import { AppearanceCard } from "@/features/settings/account/components/AppearanceCard";
 import { ProfileOverviewCard } from "@/features/settings/account/components/ProfileOverviewCard";
 import { SettingsSectionCard } from "@/features/settings/components/settings-section";
@@ -138,6 +140,15 @@ export function MembersTableControl() {
 export function AppearanceControl() {
 	return <AppearanceCard />;
 }
+
+const LOCAL_SIGN_IN: SelfHostInfo = {
+	selfHosted: true,
+	version: "dev",
+	appUrl: "",
+	mcpUrl: "",
+	setupComplete: true,
+	auth: { password: true, emailCodes: true, social: [], openSignup: true },
+};
 
 function Column({ children }: { children: ReactNode }) {
 	return (
@@ -316,14 +327,30 @@ export function SettingsGroup() {
 			</Specimen>
 
 			<Specimen
+				name="SelfHostedAuthForm (local sign-in)"
+				source="features/self-hosted/SelfHostedAuthForm.tsx"
+				where="The local Mac app's sign-in: Input fields, a tall primary Button for the main action, secondary for the alternative, link Buttons inside the sentence."
+			>
+				<State label="sign-in, password and email codes" className="w-96">
+					<SelfHostedAuthForm
+						mode="sign-in"
+						info={LOCAL_SIGN_IN}
+						onSwitchMode={NOOP}
+					/>
+				</State>
+			</Specimen>
+
+			<Specimen
 				name="SettingsSectionCard"
 				source="features/settings/components/settings-section.tsx"
 				where="Settings → Reports and Members when their data can't load."
 			>
 				<Column>
 					<SettingsSectionCard>
-						<CardContent className="text-body-xl text-ink-3">
-							Reports couldn&apos;t be loaded right now.
+						<CardContent>
+							<p className="text-ink-3">
+								Reports couldn&apos;t be loaded right now.
+							</p>
 						</CardContent>
 					</SettingsSectionCard>
 				</Column>

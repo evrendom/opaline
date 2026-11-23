@@ -187,7 +187,7 @@ export function DemoRoot({
 			{active && connection === "error" ? (
 				<div
 					role="alert"
-					className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 corner-m bg-surface p-xl text-ink shadow-float dark:shadow-card"
+					className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 corner-m bg-surface p-xl text-ink edge-m border-line shadow-float"
 				>
 					The demo data could not load.{" "}
 					<Button variant="link" size="inline" onClick={() => void connect()}>

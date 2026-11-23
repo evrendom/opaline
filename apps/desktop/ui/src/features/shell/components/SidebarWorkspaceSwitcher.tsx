@@ -1,5 +1,6 @@
 "use client";
 
+import { Avatar as AvatarPrimitive } from "@base-ui/react/avatar";
 import {
 	IconBuilding,
 	IconCheck,
@@ -13,7 +14,6 @@ import {
 	getWorkspacePathAfterSwitch,
 	getWorkspaceSlugFromPath,
 } from "@/app/routes";
-import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -63,18 +63,24 @@ function WorkspaceMark({ logo }: { logo: string | null | undefined }) {
 			aria-hidden="true"
 			className={cn("flex size-5 shrink-0", WORKSPACE_MARK_SHADOW_CLASS_NAME)}
 		>
-			<Avatar
+			{/* Artwork, not an avatar: the headless Base UI avatar keeps the
+			    load-and-fall-back behaviour without the round Avatar look. */}
+			<AvatarPrimitive.Root
 				skullet-own=""
 				data-workspace-mark=""
-				className="size-5 corner-zero after:hidden [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]"
+				className="flex size-5 select-none [-webkit-mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat] [mask:url('/opaline-trace-fill.svg')_center/contain_no-repeat]"
 			>
 				{logo ? (
-					<AvatarImage src={logo} alt="" className="corner-zero" />
+					<AvatarPrimitive.Image
+						src={logo}
+						alt=""
+						className="aspect-square size-full object-cover"
+					/>
 				) : null}
-				<AvatarFallback className="corner-zero">
+				<AvatarPrimitive.Fallback className="flex size-full items-center justify-center bg-field text-ink-3">
 					<IconBuilding className="size-3!" />
-				</AvatarFallback>
-			</Avatar>
+				</AvatarPrimitive.Fallback>
+			</AvatarPrimitive.Root>
 		</span>
 	);
 }
@@ -93,18 +99,13 @@ export function SidebarWorkspaceSwitcher() {
 			<SidebarMenuItem>
 				<DropdownMenu>
 					<DropdownMenuTrigger
-						render={
-							<SidebarMenuButton
-								data-sidebar-interactive=""
-								className="pr-m pl-[calc(var(--space-s)+var(--space-xxs)/2)] [&_svg]:size-3.5"
-							/>
-						}
+						render={<SidebarMenuButton data-sidebar-interactive="" />}
 					>
 						<WorkspaceMark logo={state.activeOrg?.logo} />
 						<span className="flex-1 truncate text-left font-medium">
 							{workspaceName}
 						</span>
-						<IconChevronDown className="ml-auto opacity-15" />
+						<IconChevronDown className="ml-auto size-3.5! opacity-15" />
 					</DropdownMenuTrigger>
 					<DropdownMenuContent
 						align="start"

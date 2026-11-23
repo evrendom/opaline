@@ -1,14 +1,13 @@
+import { OpalineMark48 } from "@/app/bootstrap/opaline-mark";
 import "@/app/app-surface.css";
 import type { ReactNode } from "react";
 import { SidebarInset } from "@/app/ui/sidebar";
 import {
 	ShellWindowColumn,
 	ShellWindowFooterPlaceholder,
-	shellWindowRadiusClassName,
 } from "@/features/shell/components/shell-window-column";
 import { shellChromeStyle } from "@/features/shell/shell-chrome-style";
 import { useRootMark } from "@/hooks/use-root-mark";
-import { cn } from "@/lib/utils";
 import "./product-window-chrome.css";
 import "./app-shell.css";
 
@@ -18,11 +17,7 @@ export function ProductLoadingIndicator() {
 			aria-busy="true"
 			className="flex min-h-0 flex-1 items-center justify-center"
 		>
-			{/* A CSS image resolves from the app's own origin, also in the plugin. */}
-			<span
-				aria-hidden="true"
-				className="size-12 bg-[url(/favicon-light.svg)] bg-contain bg-center bg-no-repeat dark:bg-[url(/favicon-dark.svg)]"
-			/>
+			<OpalineMark48 />
 			<span className="sr-only">Loading workspace</span>
 		</output>
 	);
@@ -52,14 +47,7 @@ export function ProductLoadingScreen({ children }: { children?: ReactNode }) {
 						)
 					}
 				>
-					<SidebarInset
-						className={cn(
-							"dashboard-01-window min-h-0 overflow-hidden overscroll-none bg-[var(--canvas)]",
-							shellWindowRadiusClassName,
-						)}
-					>
-						{children ?? <ProductLoadingIndicator />}
-					</SidebarInset>
+					<SidebarInset>{children ?? <ProductLoadingIndicator />}</SidebarInset>
 				</ShellWindowColumn>
 			</div>
 		</div>

@@ -210,10 +210,8 @@ describe("RunQuestionsAdminPage", () => {
 		expect(await screen.findByText(/Draft · Untested/)).toBeInTheDocument();
 
 		await user.click(screen.getByRole("button", { name: "Test" }));
-		await user.selectOptions(
-			screen.getByLabelText("Test on the newest 20 runs of"),
-			"org-data",
-		);
+		await user.click(screen.getByLabelText("Test on the newest 20 runs of"));
+		await user.click(await screen.findByRole("option", { name: "Our data" }));
 		await user.click(screen.getByRole("button", { name: "Run test" }));
 		const rows = await screen.findAllByRole("group", {
 			name: /Is the answer yes/,
@@ -270,10 +268,8 @@ describe("RunQuestionsAdminPage", () => {
 		});
 
 		await user.click(screen.getByRole("button", { name: "Test" }));
-		await user.selectOptions(
-			await screen.findByLabelText("Answered by"),
-			"jev",
-		);
+		await user.click(await screen.findByLabelText("Answered by"));
+		await user.click(await screen.findByRole("option", { name: "jev" }));
 		await user.click(screen.getByRole("button", { name: "Run test" }));
 
 		expect(await screen.findByText("0.90")).toBeInTheDocument();

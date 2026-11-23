@@ -7,7 +7,7 @@ import { useOptionalOrganization } from "@/features/workspace/organization/useOr
 export function NotFoundPage() {
 	const workspace = useOptionalOrganization()?.state.activeOrg;
 	return (
-		<div className="flex min-h-screen items-center justify-center px-xxl py-[calc(var(--space-xxl)*2)]">
+		<div className="flex min-h-screen items-center justify-center px-xxl py-xxxl">
 			<div className="flex max-w-md flex-col items-center gap-xl text-center">
 				<div className="text-body-xl font-medium uppercase tracking-xl text-ink-3">
 					404

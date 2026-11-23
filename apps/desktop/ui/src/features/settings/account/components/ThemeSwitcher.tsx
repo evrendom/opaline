@@ -2,7 +2,7 @@ import { IconDeviceLaptop, IconMoon, IconSun } from "@tabler/icons-react";
 import { motion } from "motion/react";
 import { useId } from "react";
 import { useTheme } from "@/app/providers/ThemeProvider";
-import { cn } from "@/lib/utils";
+import { Button } from "@/app/ui/button";
 
 const MORPH = { type: "spring", stiffness: 400, damping: 38 } as const;
 
@@ -28,19 +28,15 @@ export function ThemeSwitcher() {
 			{THEME_OPTIONS.map(({ value, label, icon: Icon }) => {
 				const active = theme === value;
 				return (
-					<button
+					<Button
 						key={value}
 						type="button"
+						size="icon-sm"
 						aria-label={label}
 						aria-pressed={active}
 						title={label}
 						onClick={() => setTheme(value)}
-						className={cn(
-							"relative flex size-7 items-center justify-center",
-							"corner-full",
-							"focus-outline transition-colors",
-							active ? "text-ink" : "text-ink-4 hover:text-ink",
-						)}
+						className="relative"
 					>
 						{active ? (
 							<motion.span
@@ -50,7 +46,7 @@ export function ThemeSwitcher() {
 							/>
 						) : null}
 						<Icon aria-hidden="true" className="relative z-10 size-3.5" />
-					</button>
+					</Button>
 				);
 			})}
 		</fieldset>

@@ -7,8 +7,7 @@
 }
 
 .settings-page-title {
-	padding: var(--space-zero) calc(var(--space-xs) * 5)
-		calc(var(--space-xxl) * 4 / 3);
+	padding: var(--space-zero) var(--space-xl) var(--space-xxxl);
 	font-size: var(--display-size-xs);
 	line-height: var(--display-line-xs);
 	font-weight: var(--weight-body-medium);

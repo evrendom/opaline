@@ -77,7 +77,7 @@ function Table({
 						// the screen edge so right-aligned values are easier to scan.
 						// Applied here (not on TableHead/TableCell) so it wins over their
 						// px-8 and covers any cell component in the last slot.
-						"[&_th:last-child]:pr-[calc(var(--space-xxl)*1.5)] [&_td:last-child]:pr-[calc(var(--space-xxl)*1.5)]",
+						"[&_th:last-child]:pr-xxxl [&_td:last-child]:pr-xxxl",
 						className,
 					)}
 					{...props}
@@ -174,7 +174,7 @@ function TableHead({
 		<th
 			data-slot="table-head"
 			className={cn(
-				"text-left align-middle font-medium whitespace-nowrap has-[[role=checkbox]]:pr-zero px-[calc(var(--space-xxl)*4/3)]",
+				"text-left align-middle font-medium whitespace-nowrap has-[[role=checkbox]]:pr-zero px-xxxl",
 				align && alignClass[align],
 				className,
 			)}
@@ -192,7 +192,7 @@ function TableCell({
 		<td
 			data-slot="table-cell"
 			className={cn(
-				"align-middle whitespace-nowrap has-[[role=checkbox]]:pr-zero py-m px-[calc(var(--space-xxl)*4/3)]",
+				"align-middle whitespace-nowrap has-[[role=checkbox]]:pr-zero py-m px-xxxl",
 				align && alignClass[align],
 				className,
 			)}

@@ -16,10 +16,7 @@ import {
 import { SidebarUserMenu } from "@/features/shell/components/SidebarUserMenu";
 import { SidebarWorkspaceSwitcher } from "@/features/shell/components/SidebarWorkspaceSwitcher";
 import { SiteHeader } from "@/features/shell/components/SiteHeader";
-import {
-	ShellWindowColumn,
-	shellWindowRadiusClassName,
-} from "@/features/shell/components/shell-window-column";
+import { ShellWindowColumn } from "@/features/shell/components/shell-window-column";
 import { REPOSITORY_HUES } from "@/features/shell/components/sidebar-repositories-model";
 import {
 	shellNavigationRoutes,
@@ -74,12 +71,7 @@ function ShellFrame() {
 			>
 				<AppSidebar fillHeight />
 				<ShellWindowColumn footer={<LastSessionUploadBar />}>
-					<SidebarInset
-						className={cn(
-							"dashboard-01-window min-h-0 min-w-0 overflow-hidden overscroll-none bg-[var(--canvas)]",
-							shellWindowRadiusClassName,
-						)}
-					>
+					<SidebarInset>
 						<SiteHeader
 							actions={<ShellDashboardRangeControls />}
 							setNewseshListPortalHost={noop}

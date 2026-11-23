@@ -32,27 +32,6 @@
 	font-variant-numeric: tabular-nums;
 }
 
-.cli-update-notice-dismiss {
-	display: flex;
-	width: 24px;
-	height: 24px;
-	flex: none;
-	align-items: center;
-	justify-content: center;
-	border: 0;
-	border-radius: var(--cli-update-notice-inner-radius);
-	background: transparent;
-	color: var(--menu-icon);
-	transition:
-		background-color var(--motion-quick-duration) var(--motion-wave-easing),
-		color var(--motion-quick-duration) var(--motion-wave-easing);
-}
-
-.cli-update-notice-dismiss:is(:hover, :focus-visible) {
-	background: var(--menu-highlight);
-	color: var(--menu-focused-label);
-}
-
 .cli-update-notice .menu-list {
 	padding: var(--cli-update-notice-inset) 0;
 }

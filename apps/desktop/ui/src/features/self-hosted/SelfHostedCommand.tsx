@@ -1,3 +1,4 @@
+import { Button } from "@/app/ui/button";
 import {
 	CopyIcon,
 	useCopyFeedback,
@@ -17,16 +18,16 @@ export function SelfHostedCommand({
 			<pre>
 				<code>{command}</code>
 			</pre>
-			<button
+			<Button
 				type="button"
-				className="self-hosted-command-copy copy-button focus-outline"
+				size="sm"
 				data-copied={copied ? "true" : undefined}
 				aria-label={copied ? `${label} copied` : `Copy ${label}`}
 				onClick={() => void copy()}
 			>
 				<CopyIcon className="size-4" />
 				{copied ? "Copied" : "Copy"}
-			</button>
+			</Button>
 		</div>
 	);
 }

@@ -194,13 +194,14 @@ export function SelfHostedAuthForm({
 				</div>
 				<p className="text-center text-body-xl text-ink-3">
 					Already have an account?{" "}
-					<button
+					<Button
 						type="button"
+						variant="link"
+						size="inline"
 						onClick={switchMode}
-						className="underline underline-offset-4 hover:text-primary focus-outline"
 					>
 						Sign in
-					</button>
+					</Button>
 				</p>
 			</div>
 		);
@@ -213,15 +214,12 @@ export function SelfHostedAuthForm({
 			{providers.length > 0 ? (
 				<>
 					<div className="flex flex-col gap-m">
-						{providers.map((provider, index) => (
+						{providers.map((provider) => (
 							<Button
 								key={provider}
 								type="button"
-								variant="primary"
-								className={cn(
-									"form-button",
-									index === 0 && "opaline-website-primary-button",
-								)}
+								size="lg"
+								className="w-full"
 								disabled={loading}
 								onClick={() => void signInWithProvider(provider)}
 							>
@@ -263,7 +261,6 @@ export function SelfHostedAuthForm({
 					<Input
 						autoComplete="one-time-code"
 						autoFocus
-						className="form-input opaline-auth-code-input"
 						id="self-hosted-code"
 						inputMode="numeric"
 						name="code"
@@ -278,7 +275,8 @@ export function SelfHostedAuthForm({
 					/>
 					<Button
 						variant="primary"
-						className="form-button"
+						size="lg"
+						className="w-full"
 						type="submit"
 						disabled={loading}
 					>
@@ -287,8 +285,8 @@ export function SelfHostedAuthForm({
 					<Button
 						type="button"
 						variant="secondary"
-						size="md"
-						className="form-button text-ink-3"
+						size="lg"
+						className="w-full"
 						disabled={loading}
 						onClick={() => {
 							setCodeSentTo(null);
@@ -310,7 +308,6 @@ export function SelfHostedAuthForm({
 								Name
 							</Label>
 							<Input
-								className="form-input"
 								id="self-hosted-name"
 								name="name"
 								autoComplete="name"
@@ -327,7 +324,6 @@ export function SelfHostedAuthForm({
 							Email
 						</Label>
 						<Input
-							className="form-input"
 							id="self-hosted-email"
 							name="email"
 							type="email"
@@ -347,7 +343,6 @@ export function SelfHostedAuthForm({
 							Password
 						</Label>
 						<Input
-							className="form-input"
 							id="self-hosted-password"
 							name="password"
 							type="password"
@@ -371,7 +366,8 @@ export function SelfHostedAuthForm({
 					</div>
 					<Button
 						variant="primary"
-						className="form-button"
+						size="lg"
+						className="w-full"
 						type="submit"
 						disabled={loading}
 					>
@@ -387,8 +383,8 @@ export function SelfHostedAuthForm({
 						<Button
 							type="button"
 							variant="secondary"
-							size="md"
-							className="form-button text-ink-3"
+							size="lg"
+							className="w-full"
 							disabled={loading}
 							onClick={() => void sendCode()}
 						>
@@ -414,13 +410,9 @@ export function SelfHostedAuthForm({
 				{mode === "sign-in"
 					? "Don't have an account? "
 					: "Already have an account? "}
-				<button
-					type="button"
-					onClick={switchMode}
-					className="underline underline-offset-4 hover:text-primary focus-outline"
-				>
+				<Button type="button" variant="link" size="inline" onClick={switchMode}>
 					{mode === "sign-in" ? "Create one" : "Sign in"}
-				</button>
+				</Button>
 			</p>
 		</div>
 	);

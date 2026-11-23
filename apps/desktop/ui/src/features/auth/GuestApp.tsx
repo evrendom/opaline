@@ -8,7 +8,6 @@ import {
 	selfHostedAuthCopy,
 } from "@/features/self-hosted/self-hosted-auth";
 import { useRootMark } from "@/hooks/use-root-mark";
-import "@/features/shell/website-button.css";
 import "./guest-app.css";
 
 type Page = "login" | "signup";
