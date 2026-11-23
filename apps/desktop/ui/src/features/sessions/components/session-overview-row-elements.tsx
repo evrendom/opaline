@@ -16,7 +16,7 @@ export const SESSION_OVERVIEW_CELL_CLASS_NAME =
 	"flex min-w-0 items-center px-l";
 
 export const SESSION_OVERVIEW_METADATA_CLASS_NAME =
-	"whitespace-nowrap text-left text-body-m font-regular text-ink-3 tabular-nums [font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe_UI_Variable_Display','Segoe_UI',Helvetica,Arial,sans-serif]";
+	"whitespace-nowrap text-left text-body-m font-regular text-ink-3 tabular-nums";
 
 export const SESSION_OVERVIEW_SIGNAL_TAG_CLASS_NAME =
 	"flex min-w-0 shrink items-center gap-xxs corner-xs px-s py-xxs text-body-xs font-regular tabular-nums";

@@ -1,8 +1,36 @@
 import { Checkbox as CheckboxPrimitive } from "@base-ui/react/checkbox";
 import { IconCheck } from "@tabler/icons-react";
+import type * as React from "react";
 import { cn } from "@/lib/utils";
 
-function Checkbox({ className, ...props }: CheckboxPrimitive.Root.Props) {
+// A checkbox with visible text takes it as children: the checkbox and its
+// text become one label, in regular weight like a radio option. Without
+// children, give it an `aria-label` (a table cell, a menu row that labels it).
+function Checkbox({
+	className,
+	children,
+	...props
+}: CheckboxPrimitive.Root.Props & { children?: React.ReactNode }) {
+	if (children != null) {
+		return (
+			// biome-ignore lint/a11y/noLabelWithoutControl: the checkbox is the label's own child
+			<label
+				data-slot="checkbox-label"
+				className={cn(
+					"flex w-fit items-center gap-s text-body-xl",
+					"has-data-disabled:opacity-50",
+					className,
+				)}
+			>
+				<CheckboxBox {...props} />
+				{children}
+			</label>
+		);
+	}
+	return <CheckboxBox className={className} {...props} />;
+}
+
+function CheckboxBox({ className, ...props }: CheckboxPrimitive.Root.Props) {
 	return (
 		<CheckboxPrimitive.Root
 			data-slot="checkbox"

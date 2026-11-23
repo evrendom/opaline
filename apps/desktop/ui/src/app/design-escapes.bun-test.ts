@@ -201,6 +201,13 @@ describe("design-system escape check", () => {
 		expect(stripCssComments("a /* x\ny */ b")).toBe("a     \n     b");
 	});
 
+	test("arbitrary type properties in a class", () => {
+		expect(classifyClass("[font-family:Inter,sans-serif]")).toBe("type");
+		expect(classifyClass("[font-weight:450]")).toBe("type");
+		expect(classifyClass("[line-height:14px]")).toBe("type");
+		expect(classifyClass("[line-height:var(--line-m)]")).toBeUndefined();
+	});
+
 	test("CSS font-weight is a step or a keyword, never a number", () => {
 		const css = [
 			".a {",

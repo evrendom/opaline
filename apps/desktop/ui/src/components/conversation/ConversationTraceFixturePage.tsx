@@ -18,7 +18,7 @@ export function ConversationTraceFixturePage() {
 		<div
 			data-conversation-trace-scroll-container
 			data-trace-fixture-scroller
-			className="isolate h-dvh min-w-0 overflow-y-auto bg-canvas antialiased [font-family:Inter,sans-serif]"
+			className="isolate h-dvh min-w-0 overflow-y-auto bg-canvas antialiased"
 		>
 			{turns.map((turn, index) => (
 				<section

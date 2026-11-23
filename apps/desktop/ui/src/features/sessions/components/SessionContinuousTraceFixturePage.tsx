@@ -576,7 +576,7 @@ export function SessionContinuousTraceFixturePage() {
 			data-trace-fixture-scroller
 			data-trace-fixture-total-turns={fixtureOptions.length}
 			data-session-constellation-version="v2"
-			className="session-constellation-tree session-constellation-tree-v2 session-transcript-mask isolate h-dvh min-w-0 overflow-y-auto overscroll-contain bg-canvas antialiased [font-family:Inter,sans-serif] [overflow-anchor:none] [scrollbar-gutter:stable]"
+			className="session-constellation-tree session-constellation-tree-v2 session-transcript-mask isolate h-dvh min-w-0 overflow-y-auto overscroll-contain bg-canvas antialiased [overflow-anchor:none] [scrollbar-gutter:stable]"
 		>
 			{mountsThread ? (
 				<SessionTranscriptList

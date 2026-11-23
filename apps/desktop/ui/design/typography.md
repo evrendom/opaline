@@ -45,10 +45,8 @@ a number in CSS (`font-weight: 450`; use `var(--weight-body-medium)`). Medium
 is for titles, labels and buttons; heavy is for the one figure that has to
 dominate a screen. Body copy is always regular.
 
-A figure in a summary or metric (a total, a count, a cost) is
-`text-body-xl font-medium tabular-nums tracking-xs` over its label in
-`text-body-s text-ink-3`, as the cost dashboard's metrics are. A value that
-can't be computed shows `—` in `ink-3`.
+A figure in a summary or metric (a total, a count, a cost) is a `Stat` (see
+[surfaces.md](surfaces.md)): never set a figure's type by hand.
 
 ## Line and tracking
 

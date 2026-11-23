@@ -391,6 +391,14 @@ export function classifyClass(word: string): Rule | undefined {
 	if (/^leading-.+$/.test(u)) return "type";
 	// the data face is font-data (Geist Mono with its weights), never font-mono
 	if (/^font-(?:mono|sans|serif)$/.test(u)) return "type";
+	// an arbitrary type property: a font stack is never a class, and a size,
+	// line, tracking or weight is a step's var, never a literal
+	if (/^\[font-family:/.test(u)) return "type";
+	if (
+		/^\[(?:font-weight|font-size|line-height|letter-spacing):/.test(u) &&
+		!/^\[[\w-]+:var\(--[\w-]+\)\]$/.test(u)
+	)
+		return "type";
 	if (
 		/^tracking-(?:tighter|tight|normal|wide|wider|widest|\[.+\]|\(.+\))$/.test(
 			u,
@@ -489,6 +497,11 @@ const PRIMITIVES = [
 	"Popover",
 	"PopoverContent",
 	"PopoverTitle",
+	"List",
+	"ListItem",
+	"Stat",
+	"StatGroup",
+	"Tag",
 	"RadioGroup",
 	"RadioGroupItem",
 	"Select",

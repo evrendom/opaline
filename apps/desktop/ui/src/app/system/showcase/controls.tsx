@@ -19,9 +19,12 @@ import { Checkbox } from "@/app/ui/checkbox";
 import { Field, FieldLabel } from "@/app/ui/field";
 import { Input } from "@/app/ui/input";
 import { Label } from "@/app/ui/label";
+import { List, ListItem } from "@/app/ui/list";
 import { Pressable } from "@/app/ui/pressable";
 import { RadioGroup, RadioGroupItem } from "@/app/ui/radio-group";
 import { Separator } from "@/app/ui/separator";
+import { Stat, StatGroup } from "@/app/ui/stat";
+import { Tag } from "@/app/ui/tag";
 import { Textarea } from "@/app/ui/textarea";
 import { RetryButton } from "@/components/retry-button";
 import { Group, Specimen, State } from "./kit";
@@ -340,6 +343,9 @@ function Fields() {
 				<State label="disabled, checked">
 					<Checkbox defaultChecked disabled aria-label="Always on" />
 				</State>
+				<State label="with text">
+					<Checkbox defaultChecked>Email me</Checkbox>
+				</State>
 			</Specimen>
 			<Specimen
 				name="RadioGroup"
@@ -430,7 +436,7 @@ function Identity() {
 			<Specimen
 				name="Badge"
 				source="app/ui/badge.tsx"
-				where="Only the report page: whether a report is shared."
+				where="A status word on a pill: shared reports, repo signals, failed file changes, the reader's turn lines."
 			>
 				<State label="secondary (shared)">
 					<Badge>Shared</Badge>
@@ -445,6 +451,58 @@ function Identity() {
 						<Badge variant="error">Failed</Badge>
 					</div>
 				</State>
+			</Specimen>
+			<Specimen
+				name="Tag"
+				source="app/ui/tag.tsx"
+				where="What a thing is or touches, on its row: tools, files, models, subagents, signal counts."
+			>
+				<State label="sm (default)">
+					<div className="flex gap-xs">
+						<Tag>Plan</Tag>
+						<Tag>
+							<IconCopy aria-hidden="true" />
+							Edit
+						</Tag>
+						<Tag tone="error">3 frustrated</Tag>
+						<Tag tone="success">2 thanks</Tag>
+					</div>
+				</State>
+				<State label="md">
+					<Tag size="md">
+						<IconCopy aria-hidden="true" />
+						src/app/ui/tag.tsx
+					</Tag>
+				</State>
+			</Specimen>
+			<Specimen
+				name="List"
+				source="app/ui/list.tsx"
+				where="Rows of things with a hairline between them."
+			>
+				<List className="w-80">
+					<ListItem>
+						<span className="flex-1 text-body-l font-medium">
+							Nightly digest
+						</span>
+						<Badge variant="success">Active</Badge>
+					</ListItem>
+					<ListItem>
+						<span className="flex-1 text-body-l font-medium">Cost spike</span>
+						<Badge>Paused</Badge>
+					</ListItem>
+				</List>
+			</Specimen>
+			<Specimen
+				name="Stat"
+				source="app/ui/stat.tsx"
+				where="Figures with their labels: totals, counts, costs."
+			>
+				<StatGroup>
+					<Stat label="Sessions" value="1,204" />
+					<Stat label="Cost" value="$84" unit="this week" />
+					<Stat label="Cache hit" value={null} />
+				</StatGroup>
 			</Specimen>
 			<Specimen
 				name="Separator · vertical"

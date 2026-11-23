@@ -8,6 +8,8 @@ Where does this content live?
  ├── Actions on a thing (rename, delete, copy link)? → DropdownMenu
  ├── A one-line explanation on hover or focus? → Tooltip
  ├── A grouped block on the page? → Card
+ ├── Rows of things (rules, members, runs)? → List
+ ├── Figures with labels (a total, a count)? → StatGroup of Stat
  └── Nothing to show yet? → Empty
 ```
 
@@ -19,10 +21,10 @@ padding, settings groups). Never build a card by hand from
 `bg-surface … shadow-card` on a `div`: that's a Card.
 
 ```tsx
-// Correct: from workspace-settings-group
+// Correct
 <Card size="sm">
   <CardContent>
-    <div className="settings-group-rows">{children}</div>
+    <List>{rows}</List>
   </CardContent>
 </Card>
 
@@ -32,8 +34,47 @@ padding, settings groups). Never build a card by hand from
 ```
 
 Lay out a card's children on a child element, never on `CardContent` itself.
-A list of rows inside a card is a child `ul` with `settings-group-rows`: it
-draws the hairline between rows. Each row is `flex items-center gap-l py-l`.
+Rows inside a card are a `List`; figures are a `StatGroup`.
+
+## List
+
+`src/app/ui/list.tsx`: `List` and `ListItem`. Rows of things with a hairline
+between them: rules, members, runs. A `ListItem` is a 12px-padded flex row
+with a 12px gap; lay out what's inside it (a name over its meta, a Badge, a
+menu at the end with `ml-auto`) on its children.
+
+```tsx
+// Correct
+<List>
+  {rules.map((rule) => (
+    <ListItem key={rule.id}>
+      <div className="flex min-w-0 flex-1 flex-col gap-xxs">
+        <span className="text-body-l font-medium">{rule.name}</span>
+        <span className="text-body-s text-ink-3">{rule.schedule}</span>
+      </div>
+      <Badge variant="success">Active</Badge>
+    </ListItem>
+  ))}
+</List>
+
+// Incorrect: hand-drawn dividers
+<ul className="divide-y divide-line">…</ul>
+```
+
+## Stat
+
+`src/app/ui/stat.tsx`: `StatGroup` and `Stat`. A figure with its label: a
+total, a count, a cost. `Stat` takes `label`, `value` and an optional `unit`;
+a `null` value shows `—` in ink-3. Put several in a `StatGroup`, which lays
+them out in a wrapping row.
+
+```tsx
+<StatGroup>
+  <Stat label="Sessions" value="1,204" />
+  <Stat label="Cost" value="$84" unit="this week" />
+  <Stat label="Cache hit" value={null} />
+</StatGroup>
+```
 
 ## Dialog
 
@@ -98,6 +139,33 @@ Which tone?
 
 // Incorrect: a hand-built status chip
 <span className="corner-full bg-error-tint px-m text-error">Failed</span>
+```
+
+## Tag
+
+`src/app/ui/tag.tsx`. A small, square-cornered label on a thing in a row: the
+tool, file, model or subagent a step touched, a count, "Plan", "MCP".
+
+```
+Badge or Tag?
+ ├── Is it the status of the thing (Failed, Shared, Up to date)? → Badge
+ └── Is it what the thing is, touches or contains (a tool, a file, a count)? → Tag
+```
+
+`tone` is `neutral` (the default), `success`, `warning` or `error`, and a tone
+only ever means state (a frustrated turn is `error`, a positive one
+`success`). `size` is `sm` (18px, the default: a session row, a waterfall) or
+`md` (20px: beside body text, a trace step). An icon goes first as a child;
+it's sized and coloured for you. Never build a tag from a `span` with
+`corner-xs` and a fill: that's a Tag.
+
+```tsx
+// Correct
+<Tag><IconTool aria-hidden="true" />Edit</Tag>
+<Tag tone="error">3 frustrated</Tag>
+
+// Incorrect: a hand-built tag
+<span className="corner-xs bg-field px-s text-body-xs text-ink-3">Plan</span>
 ```
 
 ## Avatar

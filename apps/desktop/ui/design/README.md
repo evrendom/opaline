@@ -53,7 +53,7 @@ screen is an error.
 | [space-and-shape.md](space-and-shape.md) | set padding, gap, corners, elevation or motion |
 | [buttons.md](buttons.md) | add anything clickable |
 | [forms.md](forms.md) | add a field, select, radio group, checkbox or search box |
-| [surfaces.md](surfaces.md) | add a card, dialog, sheet, popover, tooltip, menu, badge, avatar, empty state or skeleton |
+| [surfaces.md](surfaces.md) | add a card, list, stat, dialog, sheet, popover, tooltip, menu, badge, tag, avatar, empty state or skeleton |
 | [icons.md](icons.md) | add or size an icon |
 | [exceptions.md](exceptions.md) | need data paint (a chart, syntax colour, brand colour) or artwork |
 

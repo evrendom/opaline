@@ -85,9 +85,19 @@ picker yet: if a screen needs one, say so in your report.
 
 ## Checkbox
 
-`src/app/ui/checkbox.tsx`. Always give it a visible `<Label>` or an
+`src/app/ui/checkbox.tsx`. A checkbox with visible text takes the text as
+its children, the same as a RadioGroupItem: the box and text become one
+label in regular weight. Without visible text (a table cell), give it an
 `aria-label`. For an action that applies at once, use a Checkbox in a row,
 not a Button toggle.
+
+```tsx
+// Correct
+<Checkbox checked={emailMe} onCheckedChange={setEmailMe}>Email me</Checkbox>
+
+// Incorrect: a separate Label, which is medium weight and meant for fields
+<Checkbox id="email-me" /><Label htmlFor="email-me">Email me</Label>
+```
 
 ## InputGroup
 
@@ -109,8 +119,9 @@ button inside it.
 ## Field and Label
 
 `Field` (orientations `vertical`, the default, `horizontal` and
-`responsive`) stacks a `FieldLabel` with its control. Use `Label` for a
-checkbox's label. Every control has a label, either visible or as an
+`responsive`) stacks a `FieldLabel` with its control. `Label` is a field's
+label outside a `Field` (the sign-in form); a checkbox or radio option takes
+its text as children instead. Every control has a label, either visible or as an
 `aria-label`: a placeholder is not a label. A group of checkboxes sits in a
 `<fieldset>` with `aria-labelledby` pointing at its `FieldLabel`'s `id`, the
 same as a RadioGroup. Mark an optional field with

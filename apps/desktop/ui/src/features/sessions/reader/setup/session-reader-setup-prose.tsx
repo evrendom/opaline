@@ -168,9 +168,9 @@ export function SetupProse({
 							</p>
 						);
 					case "list": {
-						const List = block.ordered ? "ol" : "ul";
+						const ProseList = block.ordered ? "ol" : "ul";
 						return (
-							<List
+							<ProseList
 								key={key}
 								className={cn(
 									"space-y-xxs pl-xxl marker:text-ink-4",
@@ -183,7 +183,7 @@ export function SetupProse({
 										<Inline text={item} />
 									</li>
 								))}
-							</List>
+							</ProseList>
 						);
 					}
 					case "code":
