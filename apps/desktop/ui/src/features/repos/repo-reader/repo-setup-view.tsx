@@ -7,6 +7,7 @@ import { IconFileText, IconPlug, IconSparkles } from "@tabler/icons-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Fragment, type ReactNode, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { Pressable } from "@/app/ui/pressable";
 import { Skeleton as Bar } from "@/app/ui/skeleton";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import {
@@ -162,7 +163,7 @@ function CalledServerCard({
 function ListedSkillCard({ skill }: { skill: RepositoryListedSkill }) {
 	return (
 		<div className="flex min-h-0 min-w-0 flex-1 flex-col">
-			<header className="flex flex-col gap-m edge-b-m border-line-soft px-[calc(var(--space-xl)+var(--space-xs))] py-xl">
+			<header className="flex flex-col gap-m edge-b-m border-line-soft px-xl py-xl">
 				<div className="flex min-w-0 items-center gap-m">
 					<span className="flex shrink-0 opacity-60 grayscale">
 						<SkillMarkGlyph />
@@ -175,7 +176,7 @@ function ListedSkillCard({ skill }: { skill: RepositoryListedSkill }) {
 					</span>
 				</div>
 			</header>
-			<div className="flex flex-col gap-l px-[calc(var(--space-xl)+var(--space-xs))] py-xl text-body-l">
+			<div className="flex flex-col gap-l px-xl py-xl text-body-l">
 				{skill.description ? <p>{skill.description}</p> : null}
 				<p className="text-body-m text-ink-3">
 					Offered in {skill.sessions}{" "}
@@ -305,7 +306,7 @@ export function RepoSetupView({
 	if (query.isPending) return <SetupSkeleton />;
 	if (!sectionFiles || (sectionFiles.length === 0 && listed.length === 0))
 		return (
-			<div className="h-full pt-m pr-[calc(var(--space-xxl)*4/3)] pb-m pl-xxl">
+			<div className="h-full pt-m pr-xxxl pb-m pl-xxl">
 				<EmptyState
 					icon={copy.icon}
 					title={query.isError ? copy.failed : copy.title}
@@ -318,7 +319,7 @@ export function RepoSetupView({
 			</div>
 		);
 	return (
-		<div className="h-full overflow-hidden pt-m pr-[calc(var(--space-xxl)*4/3)] pb-m pl-xxl">
+		<div className="h-full overflow-hidden pt-m pr-xxxl pb-m pl-xxl">
 			<div className="flex h-full min-h-0 gap-xxl">
 				<div className="-mb-m flex min-h-0 w-[320px] shrink-0 flex-col gap-s">
 					<div
@@ -345,12 +346,12 @@ export function RepoSetupView({
 							</span>
 						) : null}
 					</div>
-					<ScrollColumn className="-mx-xs px-xs pb-[calc(var(--space-xxl)*4/3)]">
+					<ScrollColumn className="-mx-xs px-xs pb-xxxl">
 						<FluidList>
 							{groups.map((group, groupIndex) => (
 								<section key={group.label} className="flex flex-col gap-xxs">
 									{groups.length > 1 ? (
-										<h3 className="px-[calc(var(--space-m)+var(--space-xxs))] pt-l pb-xs text-body-s font-medium text-ink-3">
+										<h3 className="px-l pt-l pb-xs text-body-s font-medium text-ink-3">
 											{group.label}
 										</h3>
 									) : null}
@@ -557,7 +558,7 @@ function ToolRows({
 					<li key={tool.name}>
 						<FluidListItem<HTMLButtonElement> index={20_000 + index}>
 							{(item) => (
-								<button
+								<Pressable
 									type="button"
 									ref={item.ref}
 									aria-current={isPicked || undefined}
@@ -565,9 +566,9 @@ function ToolRows({
 									onFocus={item.onFocus}
 									className={cn(
 										"relative flex w-full items-baseline gap-s",
-										"corner-s py-xs pr-[calc(var(--space-m)+var(--space-xxs))] pl-l corner-squircle",
+										"corner-s py-xs pr-l pl-l corner-squircle",
 										"text-left text-body-s tabular-nums",
-										"focus-outline transition-colors",
+										"transition-colors",
 										"squircle:corner-l",
 										isPicked && "bg-field",
 									)}
@@ -583,7 +584,7 @@ function ToolRows({
 									<span className="ml-auto shrink-0 text-ink-3">
 										{tool.calls} {tool.calls === 1 ? "call" : "calls"}
 									</span>
-								</button>
+								</Pressable>
 							)}
 						</FluidListItem>
 					</li>
@@ -644,7 +645,7 @@ function VersionRows({
 					<li key={version.version}>
 						<FluidListItem<HTMLButtonElement> index={10_000 + index}>
 							{(item) => (
-								<button
+								<Pressable
 									type="button"
 									ref={item.ref}
 									aria-current={isShown || undefined}
@@ -652,9 +653,9 @@ function VersionRows({
 									onFocus={item.onFocus}
 									className={cn(
 										"relative flex w-full items-baseline gap-s",
-										"corner-s py-xs pr-[calc(var(--space-m)+var(--space-xxs))] pl-l corner-squircle",
+										"corner-s py-xs pr-l pl-l corner-squircle",
 										"text-left text-body-s tabular-nums",
-										"focus-outline transition-colors",
+										"transition-colors",
 										"squircle:corner-l",
 										isShown && "bg-field",
 									)}
@@ -674,7 +675,7 @@ function VersionRows({
 										{version.sessions}{" "}
 										{version.sessions === 1 ? "session" : "sessions"}
 									</span>
-								</button>
+								</Pressable>
 							)}
 						</FluidListItem>
 					</li>
@@ -742,17 +743,17 @@ function RepoSetupRow({
 		</span>
 	);
 	return (
-		<button
+		<Pressable
 			type="button"
 			ref={item.ref}
 			aria-current={isPicked || undefined}
 			onClick={() => onPick(file.setupFile)}
 			onFocus={item.onFocus}
 			className={cn(
-				"relative flex w-full items-center gap-[calc(var(--space-m)+var(--space-xxs))]",
-				"corner-s px-[calc(var(--space-m)+var(--space-xxs))] py-s corner-squircle",
+				"relative flex w-full items-center gap-m",
+				"corner-s px-l py-s corner-squircle",
 				"text-left",
-				"focus-outline transition-colors",
+				"transition-colors",
 				"squircle:corner-l",
 				isPicked && "bg-field",
 			)}
@@ -789,7 +790,7 @@ function RepoSetupRow({
 					</span>
 				) : null}
 			</span>
-		</button>
+		</Pressable>
 	);
 }
 
@@ -815,7 +816,7 @@ const CARD_SKELETON = [88, 72, 80, 56, 76, 64, 84, 48];
 function SetupSkeleton() {
 	return (
 		<div
-			className="h-full overflow-hidden pt-m pr-[calc(var(--space-xxl)*4/3)] pb-m pl-xxl"
+			className="h-full overflow-hidden pt-m pr-xxxl pb-m pl-xxl"
 			aria-hidden="true"
 		>
 			<div className="flex h-full min-h-0 gap-xxl">
@@ -828,7 +829,7 @@ function SetupSkeleton() {
 							<div
 								// biome-ignore lint/suspicious/noArrayIndexKey: a fixed placeholder list
 								key={index}
-								className="flex h-7 items-center gap-[calc(var(--space-m)+var(--space-xxs))] px-[calc(var(--space-m)+var(--space-xxs))]"
+								className="flex h-7 items-center gap-m px-l"
 							>
 								<Bar className="size-4 shrink-0 corner-full" />
 								<Bar
@@ -840,12 +841,7 @@ function SetupSkeleton() {
 					</div>
 				</div>
 				<div className={RUNS_SHELF}>
-					<div
-						className={cn(
-							RAIL_SHELF,
-							"w-[120px] px-[calc(var(--space-l)+var(--space-xxs))] pt-l",
-						)}
-					>
+					<div className={cn(RAIL_SHELF, "w-[120px] px-l pt-l")}>
 						{RAIL_SKELETON.map((width, index) => (
 							<Bar
 								// biome-ignore lint/suspicious/noArrayIndexKey: a fixed placeholder list
@@ -857,7 +853,7 @@ function SetupSkeleton() {
 					</div>
 					<div
 						className={cn(
-							"relative z-10 flex min-h-0 min-w-0 flex-1 flex-col gap-l overflow-hidden px-[calc(var(--space-xl)+var(--space-xs))] py-xl",
+							"relative z-10 flex min-h-0 min-w-0 flex-1 flex-col gap-l overflow-hidden px-xl py-xl",
 							CARD,
 						)}
 					>

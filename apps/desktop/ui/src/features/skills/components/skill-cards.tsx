@@ -11,6 +11,7 @@ import {
 	useLayoutEffect,
 	useRef,
 } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { SkillMark } from "@/components/skill-mark";
 import { getSkillMarkLook } from "@/components/skill-mark-look";
 import {
@@ -21,7 +22,6 @@ import { OpalineShape } from "@/features/shell/components/shell-nav-icon";
 import { RichSkillDocument } from "@/features/skills/components/rich-skill-document";
 import { cn } from "@/lib/utils";
 import { skillDescription } from "./skill-description";
-
 export function SkillCardsGrid({
 	skills,
 	onSelect,
@@ -125,11 +125,11 @@ export function OverviewCard({
 				CARD,
 			)}
 		>
-			<button
+			<Pressable
 				type="button"
 				aria-label={`Open ${name}`}
 				onClick={() => onSelect(name)}
-				className="absolute inset-0 z-20 corner-m corner-squircle squircle:corner-xl focus-outline"
+				className="absolute inset-0 z-20 corner-m corner-squircle squircle:corner-xl"
 			/>
 			<div className="pointer-events-none flex min-h-0 flex-1 flex-col">
 				<div

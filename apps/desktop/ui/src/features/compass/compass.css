@@ -176,8 +176,7 @@
 	gap: var(--space-xxl);
 	max-width: 880px;
 	margin: 0 auto;
-	padding: var(--space-xxl) calc(var(--space-xxl) + var(--space-xl))
-		calc(var(--space-xxl) * 2 + var(--space-xl));
+	padding: var(--space-xxl) var(--space-xxxl) var(--space-xxxl);
 }
 .compass-detail-header {
 	display: flex;
@@ -227,7 +226,7 @@
 .compass-properties {
 	display: flex;
 	flex-wrap: wrap;
-	gap: var(--space-m) calc(var(--space-xxl) * 4 / 3);
+	gap: var(--space-m) var(--space-xxxl);
 	padding: var(--space-l) var(--space-xl);
 	border-radius: var(--radius-m);
 	background: var(--hover);
@@ -368,7 +367,7 @@
 	-webkit-box-orient: vertical;
 	-webkit-line-clamp: 3;
 	overflow: hidden;
-	margin-left: calc(var(--space-xl) + var(--space-s));
+	margin-left: var(--space-xxl);
 	color: var(--ink-3);
 	font-size: var(--size-l);
 	line-height: var(--line-l);
@@ -438,25 +437,6 @@
 	gap: var(--space-s);
 	color: var(--ink-3);
 	font-size: var(--size-m);
-}
-.compass-settings-value input {
-	width: 56px;
-	height: 26px;
-	padding: var(--space-zero) var(--space-s);
-	border: var(--border-m) solid var(--line);
-	border-radius: var(--radius-xs);
-	background: transparent;
-	color: var(--ink);
-	font-size: var(--size-l);
-	font-variant-numeric: tabular-nums;
-	text-align: right;
-}
-.compass-settings-value input:disabled {
-	opacity: 0.5;
-}
-.compass-settings-value input:focus-visible {
-	outline: 2px solid var(--focus);
-	outline-offset: -1px;
 }
 
 /* Observation, chips, votes, fixes and weeks. */
@@ -538,20 +518,6 @@
 	color: var(--ink-3);
 	font-variant-numeric: tabular-nums;
 }
-.compass-note {
-	width: 100%;
-	min-height: 72px;
-	padding: var(--space-m) var(--space-l);
-	border: 1px solid var(--line);
-	border-radius: var(--radius-s);
-	background: transparent;
-	font-size: var(--size-xl);
-	resize: vertical;
-}
-.compass-note:focus {
-	outline: 2px solid var(--accent);
-	outline-offset: -1px;
-}
 .compass-weeks {
 	display: flex;
 	align-items: flex-end;
@@ -585,12 +551,10 @@
 		display: none;
 	}
 	.compass-detail-pane > .compass-back {
-		display: inline-flex;
-		align-items: center;
-		gap: var(--space-xs);
+		display: flex;
 		margin: var(--space-l) 0 0 var(--space-l);
 	}
 	.compass-detail {
-		padding: var(--space-xl) var(--space-xl) calc(var(--space-xxl) * 2);
+		padding: var(--space-xl) var(--space-xl) var(--space-xxxl);
 	}
 }

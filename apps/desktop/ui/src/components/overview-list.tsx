@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/app/ui/avatar";
 import { Button } from "@/app/ui/button";
 import { FluidHoverHighlight } from "@/app/ui/fluid-hover-highlight";
 import { Popover, PopoverTitle, PopoverTrigger } from "@/app/ui/popover";
+import { Pressable } from "@/app/ui/pressable";
 import { FilterTriggerLabel } from "@/components/filter-trigger-label";
 import { SessionMenuPopoverContent } from "@/features/sessions/components/session-menu-popover-content";
 import { SessionMenuFlyoutSurface } from "@/features/sessions/components/sessions-overview-linear-filter-flyout";
@@ -17,12 +18,11 @@ import {
 	useFluidHover,
 } from "@/hooks/use-fluid-hover";
 import { cn } from "@/lib/utils";
-
 // The two-line overview rows shared by Repos and Skills: a name over who uses
 // it, with the metrics trailing in fixed tracks so they line up without
 // column headers.
 export const OVERVIEW_ROW_LEAD_CELL_CLASS_NAME =
-	"flex min-w-0 items-center gap-l pr-l pl-[calc(var(--space-xl)+var(--space-xs))]";
+	"flex min-w-0 items-center gap-l pr-l pl-xl";
 export const OVERVIEW_METRIC_CELL_CLASS_NAME =
 	"flex min-w-0 items-center justify-end px-l text-right text-body-m whitespace-nowrap tabular-nums text-ink-2";
 export const OVERVIEW_METRIC_UNIT_CLASS_NAME = "text-ink-3";
@@ -124,11 +124,11 @@ export function OverviewMembers({
 
 function MemberAvatar({ avatarUrl }: { avatarUrl: string | undefined }) {
 	return (
-		<Avatar className="size-4 bg-canvas ring-1 ring-canvas after:border-line">
+		<Avatar size="sm" className="size-4">
 			{avatarUrl ? (
 				<AvatarImage alt="" src={avatarUrl} decoding="async" loading="lazy" />
 			) : null}
-			<AvatarFallback className="bg-hover">
+			<AvatarFallback>
 				<IconUser aria-hidden="true" className="size-2.5 shrink-0 text-ink-2" />
 			</AvatarFallback>
 		</Avatar>
@@ -245,14 +245,14 @@ export function OverviewRangeFiltersMenu<TKey extends string>({
 					{activeFilterCount > 0 ? (
 						<div className="menu-footer">
 							<div aria-hidden="true" className="menu-separator" />
-							<button
+							<Pressable
 								type="button"
 								aria-label="Clear all filters"
 								className="menu-row"
 								onClick={onClearAll}
 							>
 								Clear all
-							</button>
+							</Pressable>
 						</div>
 					) : null}
 					{selectedFilter ? (

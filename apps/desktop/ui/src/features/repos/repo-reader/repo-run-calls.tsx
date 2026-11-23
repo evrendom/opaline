@@ -10,6 +10,7 @@ import { type ReactNode, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
 import { Reveal } from "@/app/ui/bones";
+import { Pressable } from "@/app/ui/pressable";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { CodeSample } from "@/components/pierre/code-skeleton";
 import { DiffView, languageForPath } from "@/components/pierre/diff-view";
@@ -751,15 +752,15 @@ function ReadCommand({ bash, text }: { bash: boolean; text: string }) {
 	const hunks = useMemo(() => wholeText(text), [text]);
 	return (
 		<div className="flex flex-col gap-xs corner-s bg-hover">
-			<button
+			<Pressable
 				type="button"
 				aria-expanded={open}
 				onClick={() => setOpen(!open)}
-				className="flex w-full items-center gap-s corner-s px-m py-s text-left text-body-m text-ink-3 transition-colors hover:text-ink focus-outline"
+				className="flex w-full items-center gap-s corner-s px-m py-s text-left text-body-m text-ink-3 transition-colors hover:text-ink"
 			>
 				<SelectorMark open={open} />
 				View command
-			</button>
+			</Pressable>
 			{open ? (
 				<div className="px-m pb-m">
 					<DiffView hunks={hunks} language={bash ? "bash" : null} wrap />

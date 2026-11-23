@@ -20,7 +20,7 @@ type Report = AnalysisHistoryReportOutput;
 type ReportResult = Report["results"][number];
 
 const MARKDOWN_CLASS_NAME =
-	"[overflow-wrap:anywhere] [&_a]:underline [&_code]:corner-xs [&_code]:bg-field [&_code]:px-xs [&_code]:font-data [&_code]:text-body-l [&_h1]:mt-xl [&_h1]:font-heavy [&_h2]:mt-xl [&_h2]:font-heavy [&_h3]:mt-l [&_h3]:font-heavy [&_li]:my-xxs [&_ol]:my-m [&_ol]:list-decimal [&_ol]:pl-[calc(var(--space-xl)+var(--space-xs))] [&_p]:my-m [&_pre]:my-m [&_pre]:overflow-x-auto [&_pre]:corner-s [&_pre]:bg-field [&_pre]:p-l [&_pre_code]:bg-transparent [&_pre_code]:p-zero [&_table]:my-m [&_td]:edge-m [&_td]:px-m [&_td]:py-xs [&_th]:edge-m [&_th]:px-m [&_th]:py-xs [&_ul]:my-m [&_ul]:list-disc [&_ul]:pl-[calc(var(--space-xl)+var(--space-xs))] [&>*:first-child]:mt-zero [&>*:last-child]:mb-zero";
+	"[overflow-wrap:anywhere] [&_a]:underline [&_code]:corner-xs [&_code]:bg-field [&_code]:px-xs [&_code]:font-data [&_code]:text-body-l [&_h1]:mt-xl [&_h1]:font-heavy [&_h2]:mt-xl [&_h2]:font-heavy [&_h3]:mt-l [&_h3]:font-heavy [&_li]:my-xxs [&_ol]:my-m [&_ol]:list-decimal [&_ol]:pl-xl [&_p]:my-m [&_pre]:my-m [&_pre]:overflow-x-auto [&_pre]:corner-s [&_pre]:bg-field [&_pre]:p-l [&_pre_code]:bg-transparent [&_pre_code]:p-zero [&_table]:my-m [&_td]:edge-m [&_td]:px-m [&_td]:py-xs [&_th]:edge-m [&_th]:px-m [&_th]:py-xs [&_ul]:my-m [&_ul]:list-disc [&_ul]:pl-xl [&>*:first-child]:mt-zero [&>*:last-child]:mb-zero";
 const REMARK_PLUGINS = [remarkGfm, remarkAppLinks];
 
 export function ReportView({
@@ -43,7 +43,7 @@ export function ReportView({
 	return (
 		<main
 			data-selectable=""
-			className="mx-auto flex w-full max-w-3xl flex-col gap-[calc(var(--space-xxl)*4/3)] px-xxl py-[calc(var(--space-xxl)*5/3)] text-body-xl text-ink"
+			className="mx-auto flex w-full max-w-3xl flex-col gap-xxxl px-xxl py-xxxl text-body-xl text-ink"
 		>
 			<header className="flex flex-col gap-m">
 				<p className="text-body-m text-ink-3">Saved analysis</p>
@@ -86,7 +86,7 @@ export function ReportView({
 					Findings
 				</h2>
 				{findings.length ? (
-					<ol className="flex list-decimal flex-col gap-l pl-[calc(var(--space-xl)+var(--space-xs))]">
+					<ol className="flex list-decimal flex-col gap-l pl-xl">
 						{findings.map((step) => (
 							<li key={step.id} className="pl-xs">
 								<p>{step.finding}</p>
@@ -158,11 +158,13 @@ function HealthSection({ health }: { health: HealthBlock }) {
 						<TableBody>
 							{health.actions.map((action) => (
 								<TableRow key={`${action.rank}-${action.title}`}>
-									<TableCell className="whitespace-normal font-medium">
-										{action.title}
+									<TableCell>
+										<span className="whitespace-normal font-medium">
+											{action.title}
+										</span>
 									</TableCell>
-									<TableCell className="whitespace-normal">
-										{action.why}
+									<TableCell>
+										<span className="whitespace-normal">{action.why}</span>
 									</TableCell>
 									<TableCell>{action.impact}</TableCell>
 									<TableCell>{action.effort}</TableCell>
@@ -185,8 +187,8 @@ function HealthSection({ health }: { health: HealthBlock }) {
 						<TableBody>
 							{health.signals.map((signal) => (
 								<TableRow key={`${signal.area}-${signal.label}`}>
-									<TableCell className="whitespace-normal">
-										{signal.label}
+									<TableCell>
+										<span className="whitespace-normal">{signal.label}</span>
 									</TableCell>
 									<TableCell>{signal.status}</TableCell>
 								</TableRow>
@@ -239,8 +241,8 @@ function ResultTable({ result }: { result: ReportResult }) {
 					<TableHeader>
 						<TableRow>
 							{result.columns.map((column) => (
-								<TableHead key={column} className="font-data text-body-m">
-									{column}
+								<TableHead key={column}>
+									<span className="font-data text-body-m">{column}</span>
 								</TableHead>
 							))}
 						</TableRow>
@@ -249,11 +251,8 @@ function ResultTable({ result }: { result: ReportResult }) {
 						{keyedRows(result.rows).map(({ key, row }) => (
 							<TableRow key={key}>
 								{row.map((cell, cellIndex) => (
-									<TableCell
-										key={`${result.columns[cellIndex] ?? cellIndex}`}
-										className="font-data text-body-m"
-									>
-										{cell}
+									<TableCell key={`${result.columns[cellIndex] ?? cellIndex}`}>
+										<span className="font-data text-body-m">{cell}</span>
 									</TableCell>
 								))}
 							</TableRow>

@@ -16,6 +16,7 @@ import {
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
+import { Pressable } from "@/app/ui/pressable";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { DateRangeOverride } from "@/features/analytics/date-range/DateRangeProvider";
 import type { DashboardVariant } from "@/features/costs/cost-dashboard-page";
@@ -171,7 +172,7 @@ export function RepoDetailPage({
 	const shownTab = clickedTab ? clickedTab.to : tab;
 	const summaryPane = useMemo(
 		() => (
-			<div className="flex h-full min-h-0 min-w-0 flex-col pt-m pr-[calc(var(--space-xxl)*4/3)] pb-m pl-xxl">
+			<div className="flex h-full min-h-0 min-w-0 flex-col pt-m pr-xxxl pb-m pl-xxl">
 				<RepoSessionBoxes fill />
 			</div>
 		),
@@ -287,7 +288,7 @@ export function RepoDetailPage({
 	};
 	const sessions = <UsageSessionsPane {...sessionsProps} />;
 	return (
-		<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-inset dark:bg-canvas text-ink [--reader-page:var(--canvas)]">
+		<div className="dashboardy-page flex h-full min-h-0 min-w-0 flex-1 flex-col bg-canvas text-ink [--reader-page:var(--canvas)]">
 			<RepoDetailHeader
 				repoKey={repoKey}
 				name={name}
@@ -413,7 +414,7 @@ function RepoDashboard({
 	);
 	if (repositories.isError || repositories.data?.length === 0)
 		return (
-			<div className="px-[calc(var(--space-xxl)*4/3)] py-xxl">
+			<div className="px-xxxl py-xxl">
 				<EmptyState
 					icon={IconFolder}
 					title={
@@ -463,7 +464,7 @@ export function RepoDetailHeader({
 	const repoHue = useRepositoryHue(repoKey);
 	if (!headerPortal) return null;
 	const crumbClassName =
-		"flex items-center gap-s text-ink-3 transition-colors hover:text-ink focus-outline";
+		"flex items-center gap-s text-ink-3 transition-colors hover:text-ink";
 	const separator = (
 		<IconChevronRight
 			aria-hidden="true"
@@ -483,7 +484,7 @@ export function RepoDetailHeader({
 				aria-label="Repo breadcrumb"
 				className="flex min-w-0 flex-1 items-center gap-s text-body-xxl font-medium tracking-xs"
 			>
-				<button
+				<Pressable
 					type="button"
 					onClick={onBack}
 					data-fluid-menu-root=""
@@ -496,18 +497,18 @@ export function RepoDetailHeader({
 						tone={shellRoute.tone}
 					/>
 					{shellRoute.title}
-				</button>
+				</Pressable>
 				{separator}
 				{sessionId ? (
 					<>
-						<button
+						<Pressable
 							type="button"
 							onClick={onBackToSessions}
 							data-fluid-menu-root=""
 							className={cn(crumbClassName, "min-w-0 shrink")}
 						>
 							{repoLabel}
-						</button>
+						</Pressable>
 						{separator}
 						<span
 							aria-current="page"

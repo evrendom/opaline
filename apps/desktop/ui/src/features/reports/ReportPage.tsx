@@ -80,7 +80,7 @@ function ReportSkeleton() {
 	return (
 		<main
 			aria-label="Loading report"
-			className="mx-auto flex w-full max-w-3xl flex-col gap-xl px-xxl py-[calc(var(--space-xxl)*5/3)]"
+			className="mx-auto flex w-full max-w-3xl flex-col gap-xl px-xxl py-xxxl"
 		>
 			<Skeleton className="h-3 w-24 corner-xs" />
 			<Skeleton className="h-6 w-2/3 corner-xs" />

@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type CSSProperties, useId, useState } from "react";
 import { toast } from "sonner";
 import { Checkbox } from "@/app/ui/checkbox";
+import { Input } from "@/app/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/app/ui/popover";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
 import { client, orpc } from "@/lib/orpc";
@@ -67,38 +68,36 @@ export function CompassSettingsButton() {
 			>
 				<IconAdjustmentsHorizontal aria-hidden="true" className="size-4" />
 			</PopoverTrigger>
-			<PopoverContent
-				align="end"
-				sideOffset={6}
-				className="compass-settings w-[23rem] gap-m p-m"
-			>
-				<div className="compass-settings-heading">
-					<span className="font-medium">What Compass catches</span>
-					<span className="compass-hint">
-						{canEdit
-							? "A run shows when one of these flags marks it. Changes apply to the whole workspace."
-							: "A run shows when one of these flags marks it. Owners and admins can change them."}
-					</span>
-				</div>
-				<div className="compass-settings-list">
-					{query.data ? (
-						COMPASS_FLAGS.map((flag) => (
-							<FlagSettingRow
-								key={flag.kind}
-								flag={flag}
-								setting={query.data.settings.flags[flag.kind]}
-								canEdit={canEdit}
-								frustrationCheck={query.data.frustrationCheck}
-								onChange={(next) => void change(flag.kind, next)}
-							/>
-						))
-					) : query.isError ? (
-						<p className="compass-hint px-m py-l">
-							Could not load the settings.
-						</p>
-					) : (
-						<p className="compass-hint px-m py-l">Loading…</p>
-					)}
+			<PopoverContent align="end" sideOffset={6} className="w-[23rem]">
+				<div className="flex flex-col gap-m">
+					<div className="compass-settings-heading">
+						<span className="font-medium">What Compass catches</span>
+						<span className="compass-hint">
+							{canEdit
+								? "A run shows when one of these flags marks it. Changes apply to the whole workspace."
+								: "A run shows when one of these flags marks it. Owners and admins can change them."}
+						</span>
+					</div>
+					<div className="compass-settings-list">
+						{query.data ? (
+							COMPASS_FLAGS.map((flag) => (
+								<FlagSettingRow
+									key={flag.kind}
+									flag={flag}
+									setting={query.data.settings.flags[flag.kind]}
+									canEdit={canEdit}
+									frustrationCheck={query.data.frustrationCheck}
+									onChange={(next) => void change(flag.kind, next)}
+								/>
+							))
+						) : query.isError ? (
+							<p className="compass-hint px-m py-l">
+								Could not load the settings.
+							</p>
+						) : (
+							<p className="compass-hint px-m py-l">Loading…</p>
+						)}
+					</div>
 				</div>
 			</PopoverContent>
 		</Popover>
@@ -179,7 +178,7 @@ function FlagValueInput({
 	};
 	return (
 		<span className="compass-settings-value">
-			<input
+			<Input
 				type="number"
 				inputMode="numeric"
 				min={bounds.min}
@@ -188,6 +187,7 @@ function FlagValueInput({
 				value={draft}
 				disabled={disabled}
 				aria-label={bounds.label}
+				className="w-16"
 				onChange={(event) => setDraft(event.target.value)}
 				onBlur={commit}
 				onKeyDown={(event) => {

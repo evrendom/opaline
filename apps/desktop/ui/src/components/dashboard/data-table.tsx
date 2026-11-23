@@ -187,17 +187,17 @@ export function SortableHead<K extends string>({
 					onSort(sortKey);
 				}
 			}}
-			className={cn("group select-none outline-none", className)}
+			className={cn("group", className)}
 		>
 			{/* The arrow sits after the label but takes no layout space on
-			    right-aligned columns (-mr-5 = its size-3.5 + gap-s footprint,
+			    right-aligned columns (-mr-xl = its size-3.5 + gap-xxs footprint,
 			    hanging into the cell's right padding), so the label's right edge
 			    lines up exactly with the numbers below. It only appears on hover
 			    or when the column is actively sorted. */}
 			<span
 				className={cn(
-					"inline-flex flex-row-reverse items-center gap-s text-ink",
-					align === "right" && "-mr-[calc(var(--space-xl)+var(--space-xs))]",
+					"inline-flex flex-row-reverse items-center gap-xxs text-ink select-none",
+					align === "right" && "-mr-xl",
 				)}
 			>
 				<Arrow
@@ -274,7 +274,6 @@ export function SearchInput({
 						size="icon-sm"
 						aria-label="Clear search"
 						onClick={() => onChange("")}
-						className="corner-full text-ink-4 hover:text-ink"
 					>
 						<IconX className="size-3.5" />
 					</InputGroupButton>
@@ -300,15 +299,6 @@ export function ToggleChip({
 			variant={active ? "danger" : "primary"}
 			aria-pressed={active}
 			onClick={onClick}
-			className={cn(
-				// transition-[color,box-shadow] (not the base transition-all) matches
-				// the SearchInput surface: background hover flips instantly,
-				// text/shadow still ease. The inactive label/icon dims to muted
-				// (outline would pin the icon to neutral, hence the svg override).
-				"font-regular transition-[color,box-shadow] active:scale-100",
-				!active &&
-					"text-ink-4 hover:text-ink-4 bg-surface hover:bg-hover aria-expanded:bg-hover dark:hover:bg-hover dark:aria-expanded:bg-hover [&_svg:not([class*='text-'])]:text-ink-4 dark:[&_svg:not([class*='text-'])]:text-ink-4",
-			)}
 		>
 			{children}
 		</Button>
@@ -334,11 +324,7 @@ export function ClearFiltersButton({
 					transition={{ duration: 0.13, ease: "easeOut" }}
 					className="inline-flex"
 				>
-					<Button
-						variant="primary"
-						onClick={onClick}
-						className="text-ink-3 gap-xs bg-surface hover:bg-hover aria-expanded:bg-hover dark:hover:bg-hover dark:aria-expanded:bg-hover"
-					>
+					<Button onClick={onClick}>
 						<IconX />
 						Clear
 					</Button>
@@ -412,21 +398,7 @@ export function PaginationFooter({
 					value={String(pageSize)}
 					onValueChange={(v) => v && onPageSizeChange(Number(v))}
 				>
-					<SelectTrigger
-						title="Rows per page"
-						// Strip the trigger surface down to bare text so it reads as part
-						// of the count line, only revealing itself as a control on hover.
-						className={cn(
-							"h-auto gap-s",
-							"corner-s edge-none p-zero",
-							"text-body-m tabular-nums",
-							"bg-transparent text-ink-4 shadow-none transition-[color,box-shadow]",
-							"data-[size=md]:h-auto",
-							"squircle:corner-s",
-							"hover:text-ink",
-							"dark:edge-none dark:bg-transparent dark:shadow-none dark:hover:bg-transparent",
-						)}
-					>
+					<SelectTrigger title="Rows per page" size="sm">
 						{range}
 					</SelectTrigger>
 					<SelectContent

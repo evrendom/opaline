@@ -59,7 +59,7 @@ export function HistoricalSkillDetailContent({
 				className={cn(
 					"flex shrink-0 items-center gap-l",
 					variant === "card"
-						? "px-xxl pt-[calc(var(--space-xl)+var(--space-xs))] pb-xs"
+						? "px-xxl pt-xl pb-xs"
 						: "h-12 edge-b-m border-line px-xxl",
 				)}
 				data-slot="skill-version-toolbar"
@@ -99,7 +99,6 @@ export function HistoricalSkillDetailContent({
 							size="sm"
 							variant="secondary"
 							aria-pressed={raw}
-							className="text-ink-4 hover:text-ink"
 							onClick={() => setRaw((value) => !value)}
 						>
 							{raw ? "Rendered" : "Raw"}
@@ -110,12 +109,7 @@ export function HistoricalSkillDetailContent({
 			<div
 				ref={scrollRef}
 				data-slot="skill-content-scroll"
-				className={cn(
-					"min-h-0 flex-1 overflow-y-auto overscroll-none",
-					variant === "card"
-						? "p-xxl"
-						: "p-xxl sm:p-[calc(var(--space-xxl)+var(--space-xs))]",
-				)}
+				className={cn("min-h-0 flex-1 overflow-y-auto overscroll-none p-xxl")}
 			>
 				{isPending && previewContent ? (
 					<SkillDetailPreview previewContent={previewContent} />
@@ -178,7 +172,7 @@ export function HistoricalSkillDetailContent({
 									/>
 								</>
 							) : (
-								<div className="py-[calc(var(--space-xxl)*5/3)] text-center text-body-xl text-ink-2">
+								<div className="py-xxxl text-center text-body-xl text-ink-2">
 									No complete content was recovered
 								</div>
 							)

@@ -11,6 +11,7 @@ import {
 import { useSearchParams } from "react-router-dom";
 import { useLatestValueRef } from "@/app/hooks/useLatestValueRef";
 import { Bone, Reveal } from "@/app/ui/bones";
+import { Pressable } from "@/app/ui/pressable";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import { FluidList, useFluidListItem } from "@/components/fluid-list";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
@@ -96,7 +97,7 @@ export function usePickedRun() {
 }
 
 export const RAIL_SHELF =
-	"-mr-[calc(var(--space-xl)+var(--space-xs))] flex min-h-0 shrink-0 flex-col gap-xs corner-m bg-inset pr-[calc(var(--space-xl)+var(--space-xs))] shadow-inset corner-squircle squircle:corner-xl";
+	"-mr-xl flex min-h-0 shrink-0 flex-col gap-xs corner-m bg-inset pr-xl shadow-inset corner-squircle squircle:corner-xl";
 
 export const PICKED_ROW = "bg-surface shadow-raised";
 
@@ -106,7 +107,7 @@ function ShelfOutline() {
 	return (
 		<span
 			aria-hidden="true"
-			className="pointer-events-none absolute inset-y-4 right-0 left-4 corner-l edge-m edge-r-none border-dashed corner-squircle squircle:corner-xl-outer dark:border-line-soft"
+			className="pointer-events-none absolute inset-y-4 right-0 left-4 corner-l edge-m edge-r-none border-dashed corner-squircle squircle:corner-xl-outer"
 		/>
 	);
 }
@@ -357,7 +358,7 @@ function RunRow({
 	const id = run.turnId ? shortRunId(run.turnId) : `Run ${run.turn}`;
 	const item = useFluidListItem<HTMLButtonElement>(index);
 	return (
-		<button
+		<Pressable
 			type="button"
 			aria-current={isPicked || undefined}
 			aria-label={run.agentId ? `Run ${id}, subagent` : `Run ${id}`}
@@ -368,7 +369,7 @@ function RunRow({
 				"relative flex w-full items-center gap-s",
 				"corner-s px-m py-s corner-squircle",
 				"text-left text-body-m font-medium tabular-nums",
-				"focus-outline transition-colors",
+				"transition-colors",
 				"squircle:corner-l",
 				isPicked ? PICKED_ROW : undefined,
 			)}
@@ -381,7 +382,7 @@ function RunRow({
 					subagentId={run.agentId}
 				/>
 			) : null}
-		</button>
+		</Pressable>
 	);
 }
 

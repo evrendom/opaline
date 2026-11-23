@@ -6,6 +6,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { cn } from "@/lib/utils";
 
 type PillBox = { left: number; width: number };
@@ -73,7 +74,7 @@ export function PillTabs<T extends string>({
 				const active = id === shown;
 				const TabIcon = active && activeIcon ? activeIcon : icon;
 				return (
-					<button
+					<Pressable
 						key={id}
 						type="button"
 						role="tab"
@@ -85,9 +86,9 @@ export function PillTabs<T extends string>({
 						}}
 						className={cn(
 							"relative flex h-8 items-center",
-							"corner-s px-[calc(var(--space-m)+var(--space-xxs))] corner-squircle",
+							"corner-s px-l corner-squircle",
 							"text-body-xl font-medium",
-							"transition-colors focus-outline",
+							"transition-colors",
 							"squircle:corner-l",
 							active && !pill && cn("bg-field", pillClassName),
 							active
@@ -103,7 +104,7 @@ export function PillTabs<T extends string>({
 							<TabIcon aria-hidden="true" className="size-3.5" />
 							{tabLabel}
 						</span>
-					</button>
+					</Pressable>
 				);
 			})}
 			{trailing ? (

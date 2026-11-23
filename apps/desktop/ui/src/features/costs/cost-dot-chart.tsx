@@ -14,6 +14,7 @@ import {
 import "./cost-dot-chart.css";
 import { Reveal } from "@/app/ui/bones";
 import { FlowFigure } from "@/app/ui/flow-number";
+import { Pressable } from "@/app/ui/pressable";
 import { OPALINE_OUTLINE } from "@/features/shell/components/shell-nav-icon";
 import { textFigure } from "@/lib/figure";
 import type { ChartInterval, groupChartTrend } from "./chart-interval";
@@ -602,7 +603,7 @@ export function CostDotChart({
 								currentSlot,
 							)}
 						/>
-						<button
+						<Pressable
 							type="button"
 							className="cost-dot-grid"
 							style={
@@ -669,7 +670,7 @@ export function CostDotChart({
 									/>
 								</>
 							)}
-						</button>
+						</Pressable>
 					</div>
 				</FrameBones>
 			) : (

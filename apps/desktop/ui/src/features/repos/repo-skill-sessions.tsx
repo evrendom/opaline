@@ -5,6 +5,7 @@ import type {
 import { IconRoute } from "@tabler/icons-react";
 import { keepPreviousData, useQueries } from "@tanstack/react-query";
 import { type ReactNode, useMemo, useRef, useState } from "react";
+import { Pressable } from "@/app/ui/pressable";
 import { Skeleton } from "@/app/ui/skeleton";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
@@ -192,7 +193,7 @@ export function RepoSkillSessions({
 					))}
 				</div>
 			) : rows.length === 0 ? (
-				<div className="px-[calc(var(--space-xxl)*4/3)] pt-xxl">
+				<div className="px-xxxl pt-xxl">
 					<EmptyState
 						icon={IconRoute}
 						title={
@@ -332,7 +333,7 @@ function AgentTraceRow({
 			{/* Frozen, it sits on the list's own ground, so the rows scrolling
 			    behind it don't show through its rounded top corners. */}
 			<div className={cn(open && "sticky top-0 z-40 bg-canvas")}>
-				<button
+				<Pressable
 					ref={itemRef}
 					type="button"
 					aria-expanded={open}
@@ -418,7 +419,7 @@ function AgentTraceRow({
 							{formatReaderCost(run.estimatedCost)}
 						</span>
 					</div>
-				</button>
+				</Pressable>
 				{open ? (
 					// The panel card's top edge (corners, stroke, shadow) freezes with
 					// the row, so the card keeps its top while the rest of it scrolls

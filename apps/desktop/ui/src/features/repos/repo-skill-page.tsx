@@ -7,6 +7,7 @@ import {
 import { useCallback, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
+import { Pressable } from "@/app/ui/pressable";
 import { SkillMark } from "@/components/skill-mark";
 import { useDateRange } from "@/features/analytics/date-range/useDateRange";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
@@ -120,7 +121,7 @@ export function SkillPage({
 					value={view}
 					onChange={selectView}
 					label="Skill views"
-					className="pr-[calc(var(--space-xxl)*4/3)] pl-xxl"
+					className="pr-xxxl pl-xxl"
 				/>
 				{/* The workspace dashboard over this skill's sessions (in the repo):
 				    the same cards, chart and breakdowns, computed from the rows.
@@ -208,7 +209,7 @@ function SkillHeader({
 	const shellRoute = useCurrentShellRoute();
 	if (!headerPortal) return null;
 	const crumbClassName =
-		"flex shrink-0 items-center gap-m text-ink-3 transition-colors hover:text-ink focus-outline";
+		"flex shrink-0 items-center gap-m text-ink-3 transition-colors hover:text-ink";
 	const separator = (
 		<IconChevronRight
 			aria-hidden="true"
@@ -221,7 +222,7 @@ function SkillHeader({
 			aria-label="Skill breadcrumb"
 			className="flex min-w-0 flex-1 items-center gap-s text-body-xxl font-medium tracking-xs"
 		>
-			<button
+			<Pressable
 				type="button"
 				onClick={onBackToList}
 				data-fluid-menu-root=""
@@ -234,11 +235,11 @@ function SkillHeader({
 					tone={shellRoute.tone}
 				/>
 				{shellRoute.title}
-			</button>
+			</Pressable>
 			{separator}
 			{repo ? (
 				<>
-					<button
+					<Pressable
 						type="button"
 						onClick={repo.onBack}
 						data-fluid-menu-root=""
@@ -251,7 +252,7 @@ function SkillHeader({
 							tone={shellRoute.tone}
 						/>
 						<span className="truncate">{repo.name}</span>
-					</button>
+					</Pressable>
 					{separator}
 				</>
 			) : null}

@@ -21,8 +21,10 @@ import {
 	type ReactNode,
 	useState,
 } from "react";
+import { Button } from "@/app/ui/button";
 import { FlowNumber } from "@/app/ui/flow-number";
 import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
+import { Pressable } from "@/app/ui/pressable";
 import { SessionMenuPopup } from "@/features/sessions/components/session-menu-popup";
 import { formatReaderCost } from "@/features/sessions/reader/model/session-reader-model";
 import {
@@ -99,7 +101,7 @@ export function RunRow({
 	const lead = run.flags[0] ? MOMENT_KINDS_APPEARANCE[run.flags[0].kind] : null;
 	const LeadGlyph = lead?.icon;
 	return (
-		<button
+		<Pressable
 			type="button"
 			className={`compass-item${notFriction ? " compass-row-muted" : ""}`}
 			aria-current={selected || undefined}
@@ -132,7 +134,7 @@ export function RunRow({
 				</span>
 				<span>{shortDate(run.startedAt)}</span>
 			</span>
-		</button>
+		</Pressable>
 	);
 }
 
@@ -408,26 +410,26 @@ export function ObservationCard({
 			<div className="compass-feedback" data-fluid-menu-root="">
 				<FluidMenuHover items="button" />
 				<span>Did this help?</span>
-				<button
+				<Button
 					type="button"
-					className="text-button"
+					size="sm"
 					aria-pressed={feedback.mine === true}
 					aria-label="Useful"
 					onClick={() => vote(true)}
 				>
 					<IconThumbUp aria-hidden="true" className="size-3.5" />
 					{feedback.useful}
-				</button>
-				<button
+				</Button>
+				<Button
 					type="button"
-					className="text-button"
+					size="sm"
 					aria-pressed={feedback.mine === false}
 					aria-label="Not useful"
 					onClick={() => vote(false)}
 				>
 					<IconThumbDown aria-hidden="true" className="size-3.5" />
 					{feedback.notUseful}
-				</button>
+				</Button>
 			</div>
 		</article>
 	);

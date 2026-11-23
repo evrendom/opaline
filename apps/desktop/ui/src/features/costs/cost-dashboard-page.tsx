@@ -17,6 +17,7 @@ import {
 import { createPortal } from "react-dom";
 import { IntroReveal } from "@/app/ui/bones";
 import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
+import { Pressable } from "@/app/ui/pressable";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import { EmptyState } from "@/components/dashboard/page-parts";
 import { RetryButton } from "@/components/retry-button";
@@ -76,7 +77,7 @@ export function CostFilterChip({
 	inactive: boolean;
 }) {
 	return (
-		<button
+		<Pressable
 			type="button"
 			className="filter-chip"
 			data-inactive={inactive}
@@ -85,7 +86,7 @@ export function CostFilterChip({
 			<span className="filter-chip-dimension">{dimension}</span>
 			<span className="truncate">{value}</span>
 			<IconX size={12} className="shrink-0" />
-		</button>
+		</Pressable>
 	);
 }
 
@@ -411,16 +412,15 @@ export function CostDashboardView({
 							{tabbed ? (
 								<div className="cost-breakdown-tabs" role="tablist">
 									{dimensions.map((dimension) => (
-										<button
+										<Pressable
 											key={dimension}
 											type="button"
-											className="focus-outline"
 											role="tab"
 											aria-selected={dimension === activeTab}
 											onClick={() => setBreakdownTab(dimension)}
 										>
 											{COST_LABELS[dimension]}
-										</button>
+										</Pressable>
 									))}
 								</div>
 							) : null}

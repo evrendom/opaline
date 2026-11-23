@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
+import { Pressable } from "@/app/ui/pressable";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
 import { pullRequestUrl } from "@/features/sessions/reader/ci/session-reader-run-ci";
 import { CARD } from "@/features/sessions/reader/files/session-reader-files-parts";
@@ -9,7 +10,6 @@ import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { cn } from "@/lib/utils";
 import { OUTCOME_TONE, type RepoPull } from "./repo-ci-model";
 import { type RepoSession, useRepoData } from "./repo-page-data";
-
 export { CARD };
 
 export function money(value: number): string {
@@ -109,7 +109,7 @@ export function SkillLink({ name }: { name: string }) {
 			to={href(name)}
 			className={cn(
 				"inline-flex h-6 max-w-full items-center",
-				"corner-full px-[calc(var(--space-m)+var(--space-xxs))]",
+				"corner-full px-l",
 				"truncate text-body-s",
 				"bg-surface text-ink shadow-card",
 				"hover:text-ink",
@@ -266,12 +266,7 @@ export function Bars({
 }) {
 	const max = Math.max(...values, 0);
 	return (
-		<div
-			className={cn(
-				"flex h-16 items-end gap-[calc(var(--space-xxs)*3/2)]",
-				className,
-			)}
-		>
+		<div className={cn("flex h-16 items-end gap-xxs", className)}>
 			{values
 				.map((value, slot) => ({
 					value,
@@ -279,13 +274,13 @@ export function Bars({
 					id: labels?.[slot] ?? `slot-${slot}`,
 				}))
 				.map(({ value, slot: index, id }) => (
-					<button
+					<Pressable
 						key={id}
 						type="button"
 						title={labels?.[index]}
 						onClick={onPick ? () => onPick(index) : undefined}
 						className={cn(
-							"min-w-0 flex-1 corner-zero transition-opacity focus-outline",
+							"min-w-0 flex-1 corner-zero transition-opacity",
 							onPick ? "hover:opacity-100" : "cursor-default",
 							highlight === undefined ||
 								highlight === null ||
