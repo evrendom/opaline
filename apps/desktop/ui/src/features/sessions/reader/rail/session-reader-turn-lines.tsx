@@ -5,6 +5,7 @@ import {
 	IconMoodSmile,
 } from "@tabler/icons-react";
 import { Fragment, type ReactNode } from "react";
+import { Badge } from "@/app/ui/badge";
 import { formatModelDisplayLabel } from "@/features/dashboard/components/dashboard-model-brand";
 import {
 	type RunQuestionAnswer,
@@ -40,9 +41,6 @@ type Signal = SessionDetailTurnSummary["signalOccurrences"][number];
 function quotes(signals: readonly Signal[]): string {
 	return signals.map((signal) => `“${signal.matchedText}”`).join(", ");
 }
-
-const PILL =
-	"inline-flex h-5 items-center gap-xs corner-xl px-m font-medium [&>svg]:size-3";
 
 /** Facts separated by dots. */
 function FactLine({
@@ -150,26 +148,23 @@ export function MemberFactLine({
 				negative.length > 0 || frustrated || positive.length > 0 ? (
 					<span key="signals" className="flex items-center gap-s">
 						{negative.length > 0 || frustrated ? (
-							<span
+							<Badge
+								variant="error"
 								title={
 									negative.length > 0
 										? quotes(negative)
 										: "Tracked as frustrated: the run before it is flagged"
 								}
-								className={cn(PILL, "bg-error-tint text-error")}
 							>
 								<IconMoodSad aria-hidden="true" />
 								Frustration
-							</span>
+							</Badge>
 						) : null}
 						{positive.length > 0 ? (
-							<span
-								title={quotes(positive)}
-								className={cn(PILL, "bg-success-tint text-success")}
-							>
+							<Badge variant="success" title={quotes(positive)}>
 								<IconMoodSmile aria-hidden="true" />
 								Positive
-							</span>
+							</Badge>
 						) : null}
 					</span>
 				) : null,
@@ -180,14 +175,14 @@ export function MemberFactLine({
 						data-run-question-tags
 					>
 						{questions.map((question) => (
-							<span
+							<Badge
 								key={question.id}
+								variant="warning"
 								title={runQuestionTagTitle(question)}
-								className={cn(PILL, "bg-warning-tint text-warning")}
 							>
 								<IconMessageQuestion aria-hidden="true" />
 								{runQuestionTagLabel(question)}
-							</span>
+							</Badge>
 						))}
 					</span>
 				) : null,

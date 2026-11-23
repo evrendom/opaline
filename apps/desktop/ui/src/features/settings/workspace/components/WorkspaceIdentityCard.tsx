@@ -8,6 +8,11 @@ import {
 } from "@/app/routes";
 import { Button } from "@/app/ui/button";
 import { Input } from "@/app/ui/input";
+import {
+	InputGroup,
+	InputGroupAddon,
+	InputGroupInput,
+} from "@/app/ui/input-group";
 import { useSelfHost } from "@/features/self-hosted/self-host-info";
 import { workspaceUrlPrefix } from "@/features/self-hosted/surfaces";
 import {
@@ -135,9 +140,11 @@ export function WorkspaceIdentityCard({
 			</WorkspaceSettingsRow>
 			<WorkspaceSettingsRow label="Workspace URL" controlId="workspace-slug">
 				<div className="settings-url-control">
-					<div className="settings-url-field">
-						<span aria-hidden="true">{workspaceUrlPrefix(selfHost)}</span>
-						<Input
+					<InputGroup>
+						<InputGroupAddon>
+							<span aria-hidden="true">{workspaceUrlPrefix(selfHost)}</span>
+						</InputGroupAddon>
+						<InputGroupInput
 							id="workspace-slug"
 							name="workspace-slug"
 							value={isEditingName ? editedSlug : organization.slug}
@@ -177,7 +184,7 @@ export function WorkspaceIdentityCard({
 								isEditingName ? "workspace-slug-status" : undefined
 							}
 						/>
-					</div>
+					</InputGroup>
 					{isEditingName ? (
 						<output id="workspace-slug-status" className="settings-status">
 							{slugAvailability.message}

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Badge } from "@/app/ui/badge";
 import { Bones, Reveal } from "@/app/ui/bones";
 import type { PrimarySettingsRouteId } from "@/features/settings/config/settings-routes";
 import { REPORTS_SETTINGS_DESCRIPTION } from "@/features/settings/reports/reports-settings-copy";
@@ -32,7 +33,7 @@ function SettingsPageSample({ routeId }: { routeId: PrimarySettingsRouteId }) {
 							label="A saved analysis of the team's sessions"
 							description="Saved last week"
 						>
-							<span className="settings-badge">Shared</span>
+							<Badge>Shared</Badge>
 						</WorkspaceSettingsRow>
 					))}
 				</WorkspaceSettingsGroup>

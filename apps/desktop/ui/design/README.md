@@ -18,7 +18,8 @@ task needs.
    If no role fits, use the nearest one.
 2. **Components, never raw elements.** Screens build from `src/app/ui/`.
    Never write `<button>`, `<input>`, `<select>` or `<textarea>` in a screen:
-   use `Button`, `Pressable`, `Input`, `Textarea`, `Select` or `Checkbox`.
+   use `Button`, `Pressable`, `Input`, `Textarea`, `Select`, `RadioGroup` or
+   `Checkbox`.
 3. **Primitives own their look.** `className` on a primitive may only place it:
    margin, width and height, flex and grid placement, position and display.
    Never pass a colour, background, border, shadow, corner, padding, type or
@@ -51,7 +52,7 @@ screen is an error.
 | [typography.md](typography.md) | set text: size, weight, line, tracking, font |
 | [space-and-shape.md](space-and-shape.md) | set padding, gap, corners, elevation or motion |
 | [buttons.md](buttons.md) | add anything clickable |
-| [forms.md](forms.md) | add a field, select, checkbox or search box |
+| [forms.md](forms.md) | add a field, select, radio group, checkbox or search box |
 | [surfaces.md](surfaces.md) | add a card, dialog, sheet, popover, tooltip, menu, badge, avatar, empty state or skeleton |
 | [icons.md](icons.md) | add or size an icon |
 | [exceptions.md](exceptions.md) | need data paint (a chart, syntax colour, brand colour) or artwork |
@@ -61,9 +62,8 @@ screen is an error.
 `bun run check:design` (CI runs it) fails the build on any escape from these
 rules. Its rules are type, space, radius, colour, shadow, opacity, motion,
 base, dark, element and restyle, plus marker for bad exemptions. The baseline
-in `tools/design-escapes.baseline.json` holds every rule at zero except a
-known 15 `restyle` selectors in `patterns.css`. When the check fails, fix the
-code. Don't add a marker: markers are only for the cases in
+in `tools/design-escapes.baseline.json` holds every rule at zero. When the
+check fails, fix the code. Don't add a marker: markers are only for the cases in
 [exceptions.md](exceptions.md).
 
 A dev showcase of every role, step and primitive lives at `/dev/design-system`

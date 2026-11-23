@@ -55,10 +55,6 @@ apps/desktop/ui/
 
 ## Known debt
 
-- `patterns.css`'s settings group reaches into `Input`, `Select`, `Button` and
-  `Avatar` through `[data-slot=…]` selectors (48px fields and pills): 15
-  `restyle` escapes, held by the baseline. The fix is a size on the
-  primitives that settings asks for.
 - Six files are over 1,000 lines (`cost-chart.tsx`,
   `session-transcript-list.tsx`, `conversation-trace-tree.tsx`,
   `session-detail-fast-response-pane.tsx`, `workspace-use-view.tsx` and

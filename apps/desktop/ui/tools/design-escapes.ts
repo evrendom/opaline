@@ -489,6 +489,8 @@ const PRIMITIVES = [
 	"Popover",
 	"PopoverContent",
 	"PopoverTitle",
+	"RadioGroup",
+	"RadioGroupItem",
 	"Select",
 	"SelectContent",
 	"SelectItem",

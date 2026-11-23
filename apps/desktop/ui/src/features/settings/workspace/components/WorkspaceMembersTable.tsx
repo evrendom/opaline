@@ -158,6 +158,7 @@ export function WorkspaceMembersTable({
 									>
 										<SelectTrigger
 											size="sm"
+											className="w-full"
 											aria-label={`Role for ${member.user.name || member.user.email}`}
 										>
 											<SelectValue>

@@ -20,6 +20,7 @@ import { Field, FieldLabel } from "@/app/ui/field";
 import { Input } from "@/app/ui/input";
 import { Label } from "@/app/ui/label";
 import { Pressable } from "@/app/ui/pressable";
+import { RadioGroup, RadioGroupItem } from "@/app/ui/radio-group";
 import { Separator } from "@/app/ui/separator";
 import { Textarea } from "@/app/ui/textarea";
 import { RetryButton } from "@/components/retry-button";
@@ -338,6 +339,31 @@ function Fields() {
 				</State>
 				<State label="disabled, checked">
 					<Checkbox defaultChecked disabled aria-label="Always on" />
+				</State>
+			</Specimen>
+			<Specimen
+				name="RadioGroup"
+				source="app/ui/radio-group.tsx"
+				where="Pick one of two to five options that should all stay in view."
+			>
+				<State label="vertical">
+					<RadioGroup defaultValue="weekly" aria-label="Digest">
+						<RadioGroupItem value="daily">Daily</RadioGroupItem>
+						<RadioGroupItem value="weekly">Weekly</RadioGroupItem>
+						<RadioGroupItem value="never" disabled>
+							Never
+						</RadioGroupItem>
+					</RadioGroup>
+				</State>
+				<State label="horizontal">
+					<RadioGroup
+						defaultValue="7d"
+						orientation="horizontal"
+						aria-label="Range"
+					>
+						<RadioGroupItem value="7d">7 days</RadioGroupItem>
+						<RadioGroupItem value="30d">30 days</RadioGroupItem>
+					</RadioGroup>
 				</State>
 			</Specimen>
 			<Specimen

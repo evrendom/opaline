@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Badge } from "@/app/ui/badge";
 import { Group, Specimen, State } from "./kit";
 
 /*
@@ -221,9 +222,9 @@ export function FoundationsGroup() {
 					</Line>
 				))}
 				<Line label="line-solid">
-					<span className="inline-flex h-5 items-center corner-full bg-field px-m text-body-s line-solid text-ink-2">
-						set solid in a chip
-					</span>
+					<Badge>
+						<span className="line-solid">set solid in a chip</span>
+					</Badge>
 				</Line>
 				<Line label="line-tight">
 					<span className="text-body-xs line-tight text-ink-2">

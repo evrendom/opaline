@@ -29,6 +29,8 @@ export const FIELD_CLASS_NAME = cn(
 	"squircle:corner-xl-inner",
 	"file:inline-flex file:h-7 file:edge-none file:bg-transparent file:text-body-xl file:font-medium file:text-ink",
 	"placeholder:text-ink-4",
+	// a read-only value reads as meta: it shows, it doesn't take input
+	"read-only:text-ink-3",
 	"disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
 	"aria-invalid:border-error aria-invalid:ring-[1.5px] aria-invalid:ring-error-line",
 	"md:text-body-xl",

@@ -6,9 +6,8 @@ One component per HTML element. Never create a type-specific control
 
 ```
 Which control?
- ├── Pick one of a fixed list? → Select (2 or 3 options too: there is no radio
- │   group yet, so never hand-build one from Pressables; say in your report
- │   that a radio group would read better)
+ ├── Pick one of 2 to 5 options that should all stay in view? → RadioGroup
+ ├── Pick one of a longer list, or a secondary choice? → Select
  ├── On / off for one thing? → Checkbox
  ├── More than one line of text? → Textarea
  ├── One line of text with an icon or a button inside the field (search, copy)? → InputGroup
@@ -18,7 +17,7 @@ Which control?
 ## Input
 
 `src/app/ui/input.tsx`. A 36px field on the `control` ground and shadow, with
-the placeholder in `ink-4`.
+the placeholder in `ink-4` and a `readOnly` value in `ink-3`.
 
 Variants: `default` and `plain`. Nothing else exists.
 - `default` is everywhere: settings, sign-in, forms.
@@ -51,6 +50,26 @@ its content from 80px. Use it for notes, descriptions and messages.
 <SelectTrigger size="sm" aria-label={`Role for ${member.user.name}`}>
   <SelectValue />
 </SelectTrigger>
+```
+
+## RadioGroup
+
+`src/app/ui/radio-group.tsx`: `RadioGroup` and `RadioGroupItem`. Each item
+carries its own visible label as its children. The group takes `value` and
+`onValueChange` (or `defaultValue`) and an `aria-label` or
+`aria-labelledby`. `orientation` is `vertical` (the default) or
+`horizontal` (two or three short options on one line). Never build a choice
+from a row of Pressables or toggled Buttons: that's a RadioGroup.
+
+```tsx
+// Correct
+<RadioGroup value={range} onValueChange={setRange} orientation="horizontal" aria-label="Range">
+  <RadioGroupItem value="7d">7 days</RadioGroupItem>
+  <RadioGroupItem value="30d">30 days</RadioGroupItem>
+</RadioGroup>
+
+// Incorrect: a hand-built segmented choice
+<div className="flex">{options.map((o) => <Button aria-pressed={o === range} …>{o}</Button>)}</div>
 ```
 
 ## Checkbox

@@ -1,6 +1,7 @@
 import type { AnalysisHistorySearchOutput } from "@rudel/api-routes";
 import { Link, useParams } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
+import { Badge } from "@/app/ui/badge";
 import { CardContent } from "@/app/ui/card";
 import { useAnalyticsQuery } from "@/features/analytics/queries/useAnalyticsQuery";
 import { dataWindow, formatDay } from "@/features/reports/report-dates";
@@ -110,7 +111,7 @@ function ReportRow({
 				description={`Saved ${formatDay(report.createdAt)}${authorName ? ` by ${authorName}` : ""} · ${dataWindow(report)}`}
 			>
 				{report.shared ? (
-					<span className="settings-badge">Shared with workspace</span>
+					<Badge>Shared with workspace</Badge>
 				) : (
 					<span className="settings-status">Not shared</span>
 				)}

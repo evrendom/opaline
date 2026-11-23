@@ -9,6 +9,7 @@ import {
 } from "@tabler/icons-react";
 import { memo, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { Badge } from "@/app/ui/badge";
 import { Reveal } from "@/app/ui/bones";
 import { Button } from "@/app/ui/button";
 import { SearchInput } from "@/components/dashboard/data-table";
@@ -427,13 +428,13 @@ export function RepoSignals({ repo }: { repo: RepositorySummary }) {
 			count: repo.signals.userNegative,
 			label: "negative",
 			title: "Negative user signals",
-			color: "bg-error-tint text-error",
+			variant: "error" as const,
 		},
 		{
 			count: repo.signals.modelApologies,
 			label: "apologies",
 			title: "Model apologies",
-			color: "bg-warning-tint text-warning",
+			variant: "warning" as const,
 		},
 	].filter((signal) => signal.count > 0);
 	if (signals.length === 0) return null;
@@ -443,17 +444,14 @@ export function RepoSignals({ repo }: { repo: RepositorySummary }) {
 			className="flex min-w-0 shrink list-none items-center gap-xs overflow-hidden"
 		>
 			{signals.map((signal) => (
-				<li
+				<Badge
 					key={signal.label}
+					render={<li />}
 					title={signal.title}
-					className={cn(
-						"shrink-0 corner-xs px-s py-xxs text-body-xs line-tight whitespace-nowrap",
-						signal.color,
-					)}
+					variant={signal.variant}
 				>
-					<span className="tabular-nums">{signal.count.toLocaleString()}</span>{" "}
-					{signal.label}
-				</li>
+					{`${signal.count.toLocaleString()} ${signal.label}`}
+				</Badge>
 			))}
 		</ul>
 	);

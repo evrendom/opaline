@@ -3,6 +3,7 @@ import {
 	type SessionFileChange,
 } from "@rudel/api-routes";
 import { IconAlertTriangleFilled, IconArrowUpRight } from "@tabler/icons-react";
+import { Badge } from "@/app/ui/badge";
 import { Button } from "@/app/ui/button";
 import { DiffView } from "@/components/pierre/diff-view";
 import type { DiffHunk } from "@/components/pierre/line-diff";
@@ -62,16 +63,10 @@ export function ChangeBlock({
 					/>
 				) : null}
 				{change.failed ? (
-					<span
-						className={cn(
-							"inline-flex items-center gap-xs",
-							"corner-full px-s py-xxs",
-							"bg-error-tint text-error",
-						)}
-					>
-						<IconAlertTriangleFilled className="size-3" />
+					<Badge variant="error">
+						<IconAlertTriangleFilled aria-hidden="true" />
 						Failed, nothing changed
-					</span>
+					</Badge>
 				) : null}
 				{turnId ? (
 					<Button
