@@ -288,7 +288,7 @@ function ReadRuler({
 			title={title}
 			className="flex w-10 shrink-0 flex-col items-end gap-xxs"
 		>
-			<span className="text-body-xs line-solid text-ink-3 tabular-nums">
+			<span className="text-body-xs line-solid text-ink-4 tabular-nums">
 				{count === null
 					? "all lines"
 					: `${count.toLocaleString()} ${count === 1 ? "line" : "lines"}`}
@@ -319,7 +319,7 @@ function RepoRow({ root }: { root: string }) {
 				"flex h-6 items-center gap-s",
 				"px-m pt-xs",
 				"text-body-s font-medium",
-				"text-ink-3",
+				"text-ink-4",
 			)}
 		>
 			<IconFolderOpenFilled

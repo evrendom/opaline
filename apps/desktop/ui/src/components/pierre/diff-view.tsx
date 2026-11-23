@@ -240,7 +240,7 @@ function renderRow(
 		return (
 			<div
 				key={`separator-${hunk.oldStart}-${hunk.newStart}`}
-				className="flex gap-m px-s py-xs text-ink-3 italic"
+				className="flex gap-m px-s py-xs text-ink-4 italic"
 			>
 				<span skullet-ignore="" className="shrink-0" style={numberStyle} />
 				<span skullet-ignore="" className="w-2 shrink-0" />
@@ -305,7 +305,7 @@ function renderRow(
 			</span>
 			<span
 				skullet-ignore=""
-				className={cn("w-2 shrink-0 text-ink-3 select-none", look.signColor)}
+				className={cn("w-2 shrink-0 text-ink-4 select-none", look.signColor)}
 			>
 				{look.sign}
 			</span>

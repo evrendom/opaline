@@ -199,7 +199,7 @@ function Letters({ pieces }: { pieces: Piece[] }) {
 function QuoteMark({ piece }: { piece: Piece }) {
 	const double = piece.text === '"';
 	return (
-		<span className="text-ink-3">
+		<span className="text-ink-4">
 			{piece.mark === "open" ? (double ? "“" : "‘") : double ? "”" : "’"}
 		</span>
 	);

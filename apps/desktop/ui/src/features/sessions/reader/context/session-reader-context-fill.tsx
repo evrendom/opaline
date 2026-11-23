@@ -67,7 +67,7 @@ export function ContextFill({
 					strokeDasharray={`${Math.max(share * 100, 1)} 100`}
 					strokeLinecap="round"
 					strokeWidth="2"
-					className={share > 0.8 ? "text-warning" : "text-ink-3"}
+					className={share > 0.8 ? "text-warning" : "text-ink-4"}
 				/>
 			</svg>
 			<span>
@@ -151,7 +151,7 @@ function ContextRange({
 				</svg>
 				<span className="inline-flex items-center gap-xs">
 					<span className="text-ink-3">{percentOf(first.share)}</span>
-					<IconArrowRight aria-hidden="true" className="size-3 text-ink-3" />
+					<IconArrowRight aria-hidden="true" className="size-3 text-ink-4" />
 					<span>{percentOf(last.share)}</span>
 					<span className="text-ink-3">context window</span>
 				</span>

@@ -172,7 +172,7 @@ export function FileDetail({
 				/>
 			</ReaderPaneHeader>
 			<span
-				className="-mt-xs truncate pl-m text-left text-body-m text-ink-3 [direction:rtl]"
+				className="-mt-xs truncate pl-m text-left text-body-m text-ink-4 [direction:rtl]"
 				title={directory}
 			>
 				{`‎${directory}‎`}

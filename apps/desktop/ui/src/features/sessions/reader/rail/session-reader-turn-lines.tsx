@@ -100,7 +100,7 @@ function PromptTokens({
 				.join("\n")}
 		>
 			~{formatCompactNumber(estimate.tokens)} tokens
-			{share ? <span className="text-ink-3"> · {share}</span> : null}
+			{share ? <span className="text-ink-4"> · {share}</span> : null}
 		</span>
 	);
 }

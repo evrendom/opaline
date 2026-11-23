@@ -84,7 +84,7 @@ function StepFigure({
 				<span className="flex min-w-0 items-baseline gap-s text-body-l line-tight tabular-nums">
 					<span className="truncate text-ink">{value ?? "—"}</span>
 					{share === null ? null : (
-						<span className="shrink-0 text-body-s text-ink-3">
+						<span className="shrink-0 text-body-s text-ink-4">
 							{formatShare(fill)}
 						</span>
 					)}

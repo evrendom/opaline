@@ -44,7 +44,7 @@ export function ChangeBlock({
 				className={cn(
 					"flex min-h-6 flex-wrap items-center gap-x-s gap-y-xs",
 					"text-body-m tabular-nums",
-					"text-ink-3",
+					"text-ink-4",
 				)}
 			>
 				<span className="font-medium text-ink">
@@ -102,7 +102,7 @@ export function ChangeBlock({
 					)}
 				</LazyBlock>
 			) : (
-				<p className="text-body-m text-ink-3">No change in text.</p>
+				<p className="text-body-m text-ink-4">No change in text.</p>
 			)}
 			{change.cut ? <Cut /> : null}
 		</li>
@@ -111,7 +111,7 @@ export function ChangeBlock({
 
 export function Cut() {
 	return (
-		<p className="text-body-m text-ink-3">
+		<p className="text-body-m text-ink-4">
 			Cut at {SESSION_FILE_TEXT_LIMIT.toLocaleString()} characters; the rest is
 			in the transcript.
 		</p>

@@ -371,7 +371,7 @@ export function SessionReaderWaterfallView({
 												/>
 											))}
 											{bare ? (
-												<div className="absolute inset-x-0 top-0 flex justify-between px-xs text-body-xxs text-ink-3 tabular-nums">
+												<div className="absolute inset-x-0 top-0 flex justify-between px-xs text-body-xxs text-ink-4 tabular-nums">
 													<span>0s</span>
 													<span>{formatWholeDuration(total)}</span>
 												</div>

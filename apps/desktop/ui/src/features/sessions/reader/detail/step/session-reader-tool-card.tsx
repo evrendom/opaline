@@ -105,7 +105,7 @@ export function ToolCard({
 						Result
 						<span
 							title={size.title}
-							className="font-regular text-ink-3 tabular-nums"
+							className="font-regular text-ink-4 tabular-nums"
 						>
 							{size.label}
 						</span>

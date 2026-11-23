@@ -100,7 +100,7 @@ export function Breakdown({
 		<span className="truncate text-body-m text-ink-3">
 			{title}
 			{toggle?.label ? (
-				<span className="text-ink-3"> · {toggle.label}</span>
+				<span className="text-ink-4"> · {toggle.label}</span>
 			) : null}
 		</span>
 	);

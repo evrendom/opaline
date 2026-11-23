@@ -325,7 +325,7 @@ function RepoFileDetail({
 					"shrink-0 [direction:rtl]",
 					"-mt-xs pl-m",
 					"truncate text-left text-body-m",
-					"text-ink-3",
+					"text-ink-4",
 				)}
 				title={directory}
 			>

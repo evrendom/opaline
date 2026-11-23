@@ -94,7 +94,7 @@ function RowTags({
 			))}
 			{rest > 0 ? (
 				<span
-					className="text-body-xs font-regular text-ink-3 tabular-nums"
+					className="text-body-xs font-regular text-ink-4 tabular-nums"
 					title={tags
 						.slice(ROW_TAGS)
 						.map((tag) => tag.label)
@@ -260,7 +260,7 @@ export function FileTree({
 		<div className="flex flex-col">
 			{model.rootLabel ? (
 				<div
-					className="truncate px-m pb-xs text-body-m text-ink-3 [direction:rtl] text-left"
+					className="truncate px-m pb-xs text-body-m text-ink-4 [direction:rtl] text-left"
 					title={model.rootLabel}
 				>
 					{`‎${model.rootLabel}‎`}
@@ -360,7 +360,7 @@ export function FileTree({
 									<RowTags onPick={onPickTag} tags={row.item.tags} />
 								) : null}
 								{row.item?.badge ? (
-									<span className="shrink-0 text-body-m font-regular text-ink-3 tabular-nums">
+									<span className="shrink-0 text-body-m font-regular text-ink-4 tabular-nums">
 										{row.item.badge}
 									</span>
 								) : null}

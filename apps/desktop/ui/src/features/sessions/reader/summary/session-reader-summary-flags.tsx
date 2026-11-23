@@ -111,7 +111,7 @@ function SnippetLines({
 				</span>
 			))}
 			{snippets.length > SNIPPETS ? (
-				<span className="text-body-m text-ink-3 tabular-nums">
+				<span className="text-body-m text-ink-4 tabular-nums">
 					+{snippets.length - SNIPPETS} more
 				</span>
 			) : null}

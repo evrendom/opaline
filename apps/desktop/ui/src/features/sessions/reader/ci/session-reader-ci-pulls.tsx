@@ -226,7 +226,7 @@ export function PullLine({
 					aria-hidden="true"
 					className={cn(
 						"mt-xxs size-4 shrink-0",
-						look.className || "text-ink-3",
+						look.className || "text-ink-4",
 					)}
 				/>
 				<span

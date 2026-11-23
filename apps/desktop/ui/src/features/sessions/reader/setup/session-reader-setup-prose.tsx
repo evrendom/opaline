@@ -173,7 +173,7 @@ export function SetupProse({
 							<List
 								key={key}
 								className={cn(
-									"space-y-xxs pl-xxl marker:text-ink-3",
+									"space-y-xxs pl-xxl marker:text-ink-4",
 									block.ordered ? "list-decimal" : "list-disc",
 								)}
 							>
