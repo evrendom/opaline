@@ -58,14 +58,14 @@ function log(message) {
 	fs.appendFileSync(file, `${new Date().toISOString()} ${message}\n`);
 }
 
-function run(command, args) {
+function run(command, args, env = {}) {
 	return loginShellEnv().then(
 		(shell) =>
 			new Promise((resolve) => {
 				execFile(
 					command,
 					args,
-					{ env: { ...process.env, ...shell }, timeout: 120_000 },
+					{ env: { ...process.env, ...shell, ...env }, timeout: 120_000 },
 					(error, stdout, stderr) =>
 						resolve({
 							ok: !error,
@@ -309,8 +309,81 @@ const agents = {
 					`antigravity: plugin enable ${result.ok ? "ok" : `failed: ${result.output.trim()}`}`,
 				),
 			),
+		sync: syncT3Antigravity,
 	},
 };
+
+// T3 Code runs Antigravity with a Gemini folder of its own for each provider
+// setting (`agy acp --gemini-dir …`), and Antigravity reads plugins from that
+// folder, not from ~/.gemini.
+function t3GeminiDirs(home = os.homedir()) {
+	const root = path.join(home, ".t3", "userdata", "providers", "antigravity");
+	let entries;
+	try {
+		entries = fs.readdirSync(root, { withFileTypes: true });
+	} catch {
+		return [];
+	}
+	return entries
+		.filter((entry) => entry.isDirectory())
+		.map((entry) => path.join(root, entry.name))
+		.filter((dir) => fs.existsSync(path.join(dir, "config")));
+}
+
+// `agy plugin` has no flag for another Gemini folder and uses $HOME/.gemini,
+// so it runs with a HOME whose .gemini links to the folder.
+function geminiDirHome(dir) {
+	const home = path.join(
+		app.getPath("userData"),
+		"agents",
+		"gemini-homes",
+		crypto.createHash("sha256").update(dir).digest("hex").slice(0, 12),
+	);
+	const link = path.join(home, ".gemini");
+	let current;
+	try {
+		current = fs.readlinkSync(link);
+	} catch {}
+	if (current !== dir) {
+		fs.mkdirSync(home, { recursive: true });
+		fs.rmSync(link, { force: true });
+		fs.symlinkSync(dir, link);
+	}
+	return home;
+}
+
+function antigravityVersion(dir) {
+	return parse(
+		readText(
+			path.join(
+				dir,
+				"config",
+				"plugins",
+				ANTIGRAVITY_PLUGIN,
+				".antigravity-plugin",
+				"plugin.json",
+			),
+		),
+	)?.version;
+}
+
+async function syncT3Antigravity(binary, root, version, dirs = t3GeminiDirs()) {
+	for (const dir of dirs) {
+		if (antigravityVersion(dir) === version) continue;
+		const env = { HOME: geminiDirHome(dir) };
+		const installed = await run(
+			binary,
+			["plugin", "install", path.join(root, "opaline-antigravity")],
+			env,
+		);
+		const enabled = installed.ok
+			? await run(binary, ["plugin", "enable", ANTIGRAVITY_PLUGIN], env)
+			: installed;
+		log(
+			`antigravity: T3 Code folder ${path.basename(dir).slice(0, 8)} plugin install ${enabled.ok ? "ok" : `failed: ${enabled.output.trim()}`}`,
+		);
+	}
+}
 
 function command(key, name, root) {
 	const args = agents[key][name];
@@ -694,6 +767,11 @@ function createAgents({ stack }) {
 				detail: failure(installed.output),
 			};
 		await agents[key].afterInstall?.(found.binary);
+		await agents[key].sync?.(
+			found.binary,
+			marketplace.root,
+			marketplace.version,
+		);
 		const status = agentStatus(key, await inspectAgent(key));
 		if (status.connected) void offerInstructions(key);
 		return status;
@@ -738,12 +816,15 @@ function createAgents({ stack }) {
 			server,
 		});
 		for (const [key, found] of statuses) {
-			if (!found.local || found.local.version === version) continue;
-			const updated = await run(found.binary, command(key, "update", root));
-			log(
-				`${key}: plugin update to ${version} ${updated.ok ? "ok" : `failed: ${updated.output.trim()}`}`,
-			);
-			if (updated.ok) await agents[key].afterInstall?.(found.binary);
+			if (!found.local) continue;
+			if (found.local.version !== version) {
+				const updated = await run(found.binary, command(key, "update", root));
+				log(
+					`${key}: plugin update to ${version} ${updated.ok ? "ok" : `failed: ${updated.output.trim()}`}`,
+				);
+				if (updated.ok) await agents[key].afterInstall?.(found.binary);
+			}
+			await agents[key].sync?.(found.binary, root, version);
 		}
 	}
 
@@ -753,6 +834,8 @@ function createAgents({ stack }) {
 module.exports = {
 	createAgents,
 	writeMarketplace,
+	syncT3Antigravity,
+	t3GeminiDirs,
 	instructionFile,
 	addInstructionLine,
 	removeInstructionLine,
