@@ -55,7 +55,7 @@ function barColor(step: SessionReaderStep): string {
 	if (step.isError) return "bg-rose-500";
 	if (step.waitsOnYou || step.harness === "member") return "bg-amber-400";
 	if (step.harness) return ACTIVITY_COLOR[activityOf(step)];
-	if (step.kind === "message") return "bg-violet-300";
+	if (step.kind === "message") return "bg-violet-300 dark:bg-violet-300";
 	return ACTIVITY_COLOR[activityOf(step)];
 }
 
@@ -154,7 +154,7 @@ function ciBars(
 		.filter((step) => step.kind === "ci")
 		.flatMap(leaves)
 		.map((job) => ({
-			className: stepBar(job, model).className ?? "bg-ink-4",
+			className: stepBar(job, model).className ?? "bg-ink-disabled",
 			from: job.startMs,
 			stepId: job.id,
 			title: `${job.name} · ${formatDuration(job.endMs - job.startMs)}`,
@@ -170,10 +170,10 @@ function ciBars(
 			{
 				className:
 					span.to === null
-						? "bg-ink-4"
+						? "bg-ink-disabled"
 						: step.isError
 							? "bg-rose-500"
-							: "bg-ink-4",
+							: "bg-ink-disabled",
 				from: span.from,
 				name: label,
 				open: span.to === null,

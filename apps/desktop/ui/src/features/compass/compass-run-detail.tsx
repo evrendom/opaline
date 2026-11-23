@@ -23,9 +23,7 @@ import { type CSSProperties, type ReactNode, useState } from "react";
 import { Link } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
 import { Bone, Reveal } from "@/app/ui/bones";
-import { Button } from "@/app/ui/button";
 import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
-import { Pressable } from "@/app/ui/pressable";
 import { formatReaderCost } from "@/features/sessions/reader/model/session-reader-model";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import { useUserMap } from "@/features/workspace/hooks/useUserMap";
@@ -33,6 +31,7 @@ import { useOrganization } from "@/features/workspace/organization/useOrganizati
 import { client, orpc } from "@/lib/orpc";
 import { ObservationCard } from "./compass-moments";
 import { MOMENT_KINDS_APPEARANCE } from "./moment-labels";
+
 /**
  * The right pane for one noticeable run: what it was asked, every flag and
  * what it saw, the observation (or the button that asks for one), and then
@@ -247,9 +246,9 @@ function FlagItem({ flag }: { flag: RunFlag }) {
 	const Glyph = kind.icon;
 	return (
 		<li>
-			<Pressable
+			<button
 				type="button"
-				className="compass-flag-item"
+				className="compass-flag-item focus-outline"
 				style={{ "--glyph-color": kind.color } as CSSProperties}
 				onClick={() =>
 					document
@@ -265,7 +264,7 @@ function FlagItem({ flag }: { flag: RunFlag }) {
 						? `#${flag.spanStart}`
 						: `#${flag.spanStart}–${flag.spanEnd}`}
 				</span>
-			</Pressable>
+			</button>
 		</li>
 	);
 }
@@ -317,10 +316,15 @@ function Observation({
 		);
 	return (
 		<div className="flex flex-col items-start gap-s">
-			<Button type="button" onClick={observe} disabled={busy}>
+			<button
+				type="button"
+				className="secondary-button inline-flex items-center gap-s"
+				onClick={observe}
+				disabled={busy}
+			>
 				<IconSparkles aria-hidden="true" className="size-4" />
 				{busy ? "Reading the run…" : "Observe with Claude"}
-			</Button>
+			</button>
 			<span className="compass-hint">
 				Sends only this run’s flagged records to Anthropic. The note is kept for
 				your workspace.
@@ -458,9 +462,9 @@ function ContextGroup({
 			}
 		>
 			{head.starting.length > 0 ? <FlagMarkers flags={head.starting} /> : null}
-			<Pressable
+			<button
 				type="button"
-				className="compass-timeline-line compass-timeline-group"
+				className="compass-timeline-line compass-timeline-group focus-outline"
 				onClick={() => setOpen(true)}
 			>
 				<IconFileText aria-hidden="true" className="compass-timeline-icon" />
@@ -470,7 +474,7 @@ function ContextGroup({
 				<span className="compass-timeline-meta">
 					#{head.record.record}–{items.at(-1)?.record.record}
 				</span>
-			</Pressable>
+			</button>
 		</li>
 	);
 }
@@ -536,9 +540,9 @@ function TimelineItem({
 				</span>
 			</div>
 			{record.text && record.kind !== "file_change" ? (
-				<Pressable
+				<button
 					type="button"
-					className="compass-timeline-text"
+					className="compass-timeline-text focus-outline"
 					data-open={open || undefined}
 					data-long={long || undefined}
 					aria-expanded={long ? open : undefined}
@@ -548,7 +552,7 @@ function TimelineItem({
 					{open && cut
 						? ` … ${(record.textChars - record.text.length).toLocaleString("en-US")} more characters in the session`
 						: ""}
-				</Pressable>
+				</button>
 			) : null}
 		</li>
 	);

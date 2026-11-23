@@ -191,7 +191,10 @@ export const TraceAttempts = memo(function TraceAttempts({
 	return (
 		<SubagentTints ids={subagentIds}>
 			<TipLayer>
-				<div data-trace="" className="relative flex flex-col gap-xl">
+				<div
+					data-trace=""
+					className="relative flex flex-col gap-[calc(var(--space-xl)+var(--space-xs))]"
+				>
 					{lanesSlot
 						? createPortal(
 								<RunLanes
@@ -384,8 +387,9 @@ function Bubble({
 	return (
 		<div
 			className={cn(
-				"min-w-0 flex-1 corner-m px-l py-m corner-squircle squircle:corner-xl-inner",
-				!tint && "bg-hover",
+				"min-w-0 flex-1 corner-m px-l py-[calc(var(--space-m)+var(--space-xxs))] corner-squircle squircle:corner-xl-inner",
+				// design-escape-ok(colour,opacity): shipped value; black/[0.025] (white/[0.04] in dark)
+				!tint && "bg-black/[0.025] dark:bg-white/[0.04]",
 			)}
 			style={tint ? tintedGround(tint) : undefined}
 		>

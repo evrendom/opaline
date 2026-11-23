@@ -32,10 +32,7 @@ import { CompassSettingsButton } from "./compass-settings";
 import { useCompassAccess, useCompassEnabled } from "./use-compass-access";
 import "@/features/costs/cost-dashboard.css";
 import "./compass.css";
-
-import { Button } from "@/app/ui/button";
 import { FlowNumber } from "@/app/ui/flow-number";
-import { Pressable } from "@/app/ui/pressable";
 import { PLAIN_NUMBER } from "@/lib/figure";
 
 const PAGE_SIZE = 100;
@@ -179,7 +176,7 @@ function CompassView({ observable }: { observable: boolean }) {
 					<div className="compass-pane-toolbar" data-fluid-menu-root="">
 						<FluidMenuHover items="button" />
 						<div className="compass-tabs" role="tablist">
-							<Pressable
+							<button
 								type="button"
 								role="tab"
 								aria-selected={view === "runs"}
@@ -192,8 +189,8 @@ function CompassView({ observable }: { observable: boolean }) {
 										<FlowNumber value={noticeable} format={PLAIN_NUMBER} />
 									</span>
 								)}
-							</Pressable>
-							<Pressable
+							</button>
+							<button
 								type="button"
 								role="tab"
 								aria-selected={view === "patterns"}
@@ -206,14 +203,14 @@ function CompassView({ observable }: { observable: boolean }) {
 										{patterns.data.patterns.length}
 									</span>
 								) : null}
-							</Pressable>
+							</button>
 						</div>
 						<div className="compass-toolbar-controls">
 							{view === "runs" ? (
 								<>
-									<Button
+									<button
 										type="button"
-										size="sm"
+										className="text-button"
 										aria-pressed={mine}
 										onClick={() => setMine((value) => !value)}
 										title={
@@ -221,7 +218,7 @@ function CompassView({ observable }: { observable: boolean }) {
 										}
 									>
 										{mine ? "Mine" : "Everyone"}
-									</Button>
+									</button>
 									<KindsMenu
 										kinds={kinds}
 										counts={firstPage?.counts}
@@ -284,9 +281,9 @@ function CompassView({ observable }: { observable: boolean }) {
 											))}
 											{list.hasNextPage ? (
 												<div className="compass-more">
-													<Button
+													<button
 														type="button"
-														size="sm"
+														className="text-button"
 														disabled={list.isFetchingNextPage}
 														onClick={() => {
 															void list.fetchNextPage();
@@ -295,7 +292,7 @@ function CompassView({ observable }: { observable: boolean }) {
 														{list.isFetchingNextPage
 															? "Loading…"
 															: "Show more runs"}
-													</Button>
+													</button>
 												</div>
 											) : null}
 										</>
@@ -333,12 +330,14 @@ function CompassView({ observable }: { observable: boolean }) {
 					</ListBody>
 				</section>
 				<section className="compass-detail-pane" aria-label="Detail">
-					<div className="compass-back">
-						<Button type="button" size="sm" onClick={() => setReading(false)}>
-							<IconArrowLeft aria-hidden="true" className="size-3.5" />
-							Back to the list
-						</Button>
-					</div>
+					<button
+						type="button"
+						className="text-button compass-back"
+						onClick={() => setReading(false)}
+					>
+						<IconArrowLeft aria-hidden="true" className="size-3.5" />
+						Back to the list
+					</button>
 					{view === "runs" ? (
 						selectedRun || list.isPending ? (
 							<Reveal

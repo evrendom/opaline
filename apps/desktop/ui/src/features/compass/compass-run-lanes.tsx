@@ -16,7 +16,6 @@ import {
 	useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { Pressable } from "@/app/ui/pressable";
 import { TipLayer } from "@/features/sessions/reader/detail/waterfall/session-reader-tips";
 import {
 	formatDuration,
@@ -143,7 +142,7 @@ function GroupGap() {
 const AgentGlyph = LANE_LOOK.agent.glyph;
 
 const TRACE_WINDOW =
-	"pointer-events-none absolute -top-1.5 -bottom-0.5 -z-5 hidden corner-xs bg-surface corner-squircle squircle:corner-l shadow-card will-change-transform";
+	"pointer-events-none absolute -top-1.5 -bottom-0.5 -z-5 hidden corner-xs bg-canvas corner-squircle squircle:corner-l shadow-chip will-change-transform dark:bg-hover-strong";
 
 export function RunLanes({
 	onlyPickedLane = false,
@@ -387,14 +386,14 @@ export function RunLanes({
 		return (
 			<div key={lane.id} className="flex h-4 items-center gap-xs">
 				{onOpen ? (
-					<Pressable
+					<button
 						type="button"
 						aria-label={`Open ${lane.label}'s thread`}
 						onClick={onOpen}
-						className="group/open flex corner-full"
+						className="group/open flex corner-full focus-outline"
 					>
 						{mark}
-					</Pressable>
+					</button>
 				) : (
 					mark
 				)}
@@ -413,7 +412,7 @@ export function RunLanes({
 							className={cn(
 								"inline-flex shrink-0 items-center gap-xxs",
 								"text-body-m tabular-nums",
-								"text-error transition-[opacity,filter] duration-(--motion-medium-duration)",
+								"text-rose-mark transition-[opacity,filter] duration-(--motion-medium-duration)",
 								anyPicked &&
 									!pickedLanes.has(lane.id) &&
 									"opacity-35 saturate-[0.15]",
@@ -451,8 +450,10 @@ export function RunLanes({
 				key={lane.id}
 				className={cn(
 					"relative h-4 overflow-hidden",
-					"corner-xs",
-					"before:absolute before:inset-0 before:-z-10 before:bg-hover",
+					// design-escape-ok(radius): shipped value; 4px corner
+					"rounded-[4px]",
+					// design-escape-ok(opacity): no role renders this; field/60
+					"before:absolute before:inset-0 before:-z-10 before:bg-field/60",
 				)}
 			>
 				{lane.bars.map((bar) => {
@@ -478,12 +479,13 @@ export function RunLanes({
 							data-step={bar.stepId}
 							className={cn(
 								"absolute inset-y-[2px] flex min-w-[2px] items-center overflow-hidden",
-								"corner-xs",
+								// design-escape-ok(radius): shipped value; 3px corner
+								"rounded-[3px]",
 								"hover:brightness-110",
 								own ? null : bar.className,
 								"transition-[opacity,filter] duration-(--motion-medium-duration)",
 								bar.stepId === selected &&
-									// design-escape-ok(colour): data paint; the picked bar's white ring over its lane colour
+									// design-escape-ok(colour): the picked bar's ring is white over its lane colour in both modes (data paint)
 									"z-10 ring-2 ring-white/90 ring-inset",
 								anyPicked &&
 									bar.stepId !== selected &&
@@ -513,7 +515,7 @@ export function RunLanes({
 						>
 							{bar.name && !bar.open && at.width > 18 ? (
 								<span
-									// design-escape-ok(colour): data paint; the step name printed white on its lane bar
+									// design-escape-ok(colour): the step name is printed on its painted lane bar, white in both modes and set solid
 									className="pointer-events-none truncate pl-xs font-data text-body-xxs line-solid text-white"
 								>
 									{bar.name}
@@ -528,9 +530,11 @@ export function RunLanes({
 					<span
 						className={cn(
 							"absolute top-1/2 right-0.5",
-							"corner-xs px-xxs",
+							// design-escape-ok(radius): shipped value; 3px corner
+							"rounded-[3px] px-xxs",
 							"text-body-xxs tabular-nums",
-							"pointer-events-none -translate-y-1/2 bg-canvas text-ink-3",
+							// design-escape-ok(opacity): no role renders this; canvas/90
+							"pointer-events-none -translate-y-1/2 bg-canvas/90 text-ink-3",
 						)}
 					>
 						+{formatRanOn(ranOnPast(lane.bars, ends.to))}
@@ -556,7 +560,7 @@ export function RunLanes({
 			data-clock-from={view.from}
 			data-clock-to={view.to}
 			className={cn(
-				"corner-m bg-surface px-m py-m shadow-card corner-squircle squircle:corner-xl",
+				"corner-m bg-card px-m py-m shadow-card corner-squircle squircle:corner-xl",
 				!launched &&
 					"pointer-events-auto sticky top-(--reader-pane-top,var(--reader-top,1rem))",
 			)}
@@ -627,7 +631,7 @@ export function RunLanes({
 					) : null}
 					{unused > 0 && !narrowed ? (
 						<div className="flex h-2 items-center justify-center pt-xxs">
-							<Pressable
+							<button
 								type="button"
 								aria-pressed={allLanes}
 								aria-label={
@@ -641,14 +645,15 @@ export function RunLanes({
 										: `Show all lanes, ${unused} this run didn't use`
 								}
 								onClick={() => setAllLanes((shown) => !shown)}
-								className="inline-flex items-center corner-xs px-xxs text-ink-4 hover:bg-hover hover:text-ink"
+								// design-escape-ok(radius,opacity): shipped value; 4px corner, muted-foreground/70
+								className="inline-flex items-center rounded-[4px] px-xxs text-ink-3/70 hover:bg-hover hover:text-ink focus-outline"
 							>
 								{allLanes ? (
 									<IconChevronUp aria-hidden="true" className="size-2.5" />
 								) : (
 									<IconChevronDown aria-hidden="true" className="size-2.5" />
 								)}
-							</Pressable>
+							</button>
 						</div>
 					) : null}
 				</div>
@@ -669,7 +674,8 @@ export function RunLanes({
 						<span ref={windowRef} className={TRACE_WINDOW} />
 						{brush ? (
 							<span
-								className="pointer-events-none absolute -inset-y-0.5 corner-xs edge-m border-ink-4 bg-hover"
+								// design-escape-ok(opacity): no role renders this; the brush's ink/30 edge and ink/5 fill
+								className="pointer-events-none absolute -inset-y-0.5 corner-xs edge-m border-ink/30 bg-ink/5"
 								style={{
 									left: `${pct(brush.from)}%`,
 									width: `${pct(brush.to) - pct(brush.from)}%`,
@@ -677,7 +683,8 @@ export function RunLanes({
 							/>
 						) : null}
 					</div>
-					<div className="relative flex justify-between gap-m px-xxs text-body-xxs line-solid text-ink-4 tabular-nums">
+					{/* design-escape-ok(opacity): shipped value; muted-foreground/70 */}
+					<div className="relative flex justify-between gap-m px-xxs text-body-xxs line-solid text-ink-3/70 tabular-nums">
 						<span className={cn(brush && "invisible")}>
 							{offset(view.from)}
 						</span>
@@ -770,7 +777,8 @@ export function RunLanes({
 									<span ref={agentWindowRef} className={TRACE_WINDOW} />
 									{brush ? (
 										<span
-											className="pointer-events-none absolute -inset-y-0.5 corner-xs edge-m border-ink-4 bg-hover"
+											// design-escape-ok(opacity): no role renders this; the brush's ink/30 edge and ink/5 fill
+											className="pointer-events-none absolute -inset-y-0.5 corner-xs edge-m border-ink/30 bg-ink/5"
 											style={{
 												left: `${pct(brush.from)}%`,
 												width: `${pct(brush.to) - pct(brush.from)}%`,

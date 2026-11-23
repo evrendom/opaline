@@ -7,11 +7,7 @@ import {
 import { type CSSProperties, type KeyboardEvent, useState } from "react";
 import { Link } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
-import { Button } from "@/app/ui/button";
 import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
-import { Pressable } from "@/app/ui/pressable";
-import { Stat, StatGroup } from "@/app/ui/stat";
-import { Textarea } from "@/app/ui/textarea";
 import { SERIES_COLORS } from "@/features/costs/chart-colors";
 import { formatReaderCost } from "@/features/sessions/reader/model/session-reader-model";
 import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
@@ -39,7 +35,7 @@ export function PatternRow({
 }) {
 	const group = layerGroup(pattern.layer);
 	return (
-		<Pressable
+		<button
 			type="button"
 			className="compass-item"
 			aria-current={selected || undefined}
@@ -68,7 +64,7 @@ export function PatternRow({
 				</span>
 				<span>{formatReaderCost(pattern.costUsd)}</span>
 			</span>
-		</Pressable>
+		</button>
 	);
 }
 
@@ -120,13 +116,20 @@ export function PatternPane({
 				<h2 className="compass-detail-title">{pattern.label}</h2>
 				<p className="compass-detail-summary">{pattern.summary}</p>
 			</header>
-			<div className="corner-m bg-hover px-xl py-l">
-				<StatGroup>
-					<Stat label="Runs" value={pattern.runs} />
-					<Stat label="Members" value={pattern.members} />
-					<Stat label="Cost" value={formatReaderCost(pattern.costUsd)} />
-				</StatGroup>
-			</div>
+			<dl className="compass-properties">
+				<div>
+					<dt>Runs</dt>
+					<dd>{pattern.runs}</dd>
+				</div>
+				<div>
+					<dt>Members</dt>
+					<dd>{pattern.members}</dd>
+				</div>
+				<div>
+					<dt>Cost</dt>
+					<dd>{formatReaderCost(pattern.costUsd)}</dd>
+				</div>
+			</dl>
 			{pattern.weekly.length >= 3 ? (
 				<section className="compass-detail-section" aria-label="Weeks">
 					<h3>Per week</h3>
@@ -181,20 +184,22 @@ export function PatternPane({
 							What did you change? A pointer, a check, a standard or a habit.
 							Compass then shows how often this happens since.
 						</span>
-						<Textarea
+						<textarea
 							value={note}
 							onChange={(event) => setNote(event.target.value)}
 							maxLength={500}
 							aria-label="The fix"
+							className="compass-note"
 						/>
 						<div>
-							<Button
+							<button
 								type="button"
+								className="secondary-button"
 								disabled={busy || note.trim().length < 3}
 								onClick={save}
 							>
 								{busy ? "Saving…" : "Record the fix"}
-							</Button>
+							</button>
 						</div>
 					</div>
 				)}

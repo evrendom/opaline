@@ -66,7 +66,8 @@
  *            stale marker (none of its rules has
  *            an escape on its line or the next).
  *
- * What it reads, under src (skipping site/, dev/, test dirs, fixtures, tests,
+ * What it reads, under src (skipping site/, dev/, experimental features
+ * behind a flag (EXPERIMENTAL_DIRS: src/features/compass), test dirs, fixtures, tests,
  * stories, .d.ts, and src/app/theme.css and src/app/tokens.css, which define
  * the primitives and the roles): the string literals of every .ts/.tsx file (class names
  * live in strings), the `@apply` lines of every .css file, and every
@@ -230,6 +231,8 @@ export const BASELINE_FILE = path.join(
 );
 
 const SKIP_DIRS = new Set(["site", "dev", "test", "__tests__", "fixtures"]);
+/** Experimental features behind a flag: outside the system until they ship. */
+const EXPERIMENTAL_DIRS = new Set(["src/features/compass"]);
 const SKIP_FILE =
 	/\.(test|bun-test|spec|stories)\.[cm]?tsx?$|fixtures?\.[cm]?tsx?$|\.d\.ts$/;
 const SKIP_PATH = new Set([
@@ -959,7 +962,9 @@ function* sourceFiles(dir: string): Generator<string> {
 	for (const entry of readdirSync(dir, { withFileTypes: true })) {
 		const full = path.join(dir, entry.name);
 		if (entry.isDirectory()) {
-			if (!SKIP_DIRS.has(entry.name)) yield* sourceFiles(full);
+			const rel = path.relative(UI_ROOT, full).split(path.sep).join("/");
+			if (!SKIP_DIRS.has(entry.name) && !EXPERIMENTAL_DIRS.has(rel))
+				yield* sourceFiles(full);
 		} else if (
 			/\.(tsx?|css)$/.test(entry.name) &&
 			!SKIP_FILE.test(entry.name)

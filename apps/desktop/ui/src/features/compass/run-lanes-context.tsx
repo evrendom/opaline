@@ -111,8 +111,10 @@ export function ContextLane({
 		<div
 			className={cn(
 				"relative h-8 overflow-hidden",
-				"corner-xs",
-				"before:absolute before:inset-0 before:-z-10 before:bg-hover",
+				// design-escape-ok(radius): shipped value; 5px corner
+				"rounded-[5px]",
+				// design-escape-ok(opacity): no role renders this; field/60
+				"before:absolute before:inset-0 before:-z-10 before:bg-field/60",
 			)}
 		>
 			<svg
@@ -123,12 +125,12 @@ export function ContextLane({
 			>
 				<path
 					d={`${path} L ${x(points.at(-1)?.atMs ?? view.to)} 100 L ${x(points[0]?.atMs ?? view.from)} 100 Z`}
-					// design-escape-ok(colour): data paint; the context lane's violet series
+					// design-escape-ok(colour): shipped value; violet-500 context lane
 					className="fill-violet-500/15"
 				/>
 				<path
 					d={path}
-					// design-escape-ok(colour): data paint; the context lane's violet series
+					// design-escape-ok(colour): shipped value; violet-500 context lane
 					className="fill-none stroke-violet-500"
 					strokeWidth={1.25}
 					vectorEffect="non-scaling-stroke"
@@ -159,13 +161,13 @@ export function ContextLane({
 				</span>
 			</Tip>
 			<span
-				// design-escape-ok(colour): data paint; the context lane's violet series
+				// design-escape-ok(colour): shipped value; violet-500 context lane
 				className={cn(LANE_LABEL, "bottom-1 left-1 text-violet-500")}
 			>
 				{fillAt(view.from)}
 			</span>
 			<span
-				// design-escape-ok(colour): data paint; the context lane's violet series
+				// design-escape-ok(colour): shipped value; violet-500 context lane
 				className={cn(LANE_LABEL, "right-1 bottom-1 text-violet-500")}
 			>
 				{fillAt(view.to)}
