@@ -10,7 +10,10 @@
 
 :root {
 	/* -- Ground */
-	--canvas: var(--neutral-1); /* the window's content */
+	/* the window's content: a step off white in light, so white cards stand off it */
+	--canvas: color-mix(in oklab, var(--neutral-2) 60%, var(--neutral-1));
+	/* the frame behind the content window: the sidebar and window chrome */
+	--chrome: var(--canvas);
 	--surface: var(--neutral-1); /* cards, panels, popovers, menus, controls */
 	--inset: var(
 		--neutral-2
@@ -120,6 +123,8 @@
 }
 
 .dark {
+	--canvas: var(--neutral-1);
+	--chrome: oklch(0.145 0 0); /* darker than the window it holds */
 	--surface: var(--neutral-2);
 	--primary: var(--neutral-10);
 	--shadow-card:
@@ -239,6 +244,6 @@
 }
 
 .dark {
-	--sidebar: oklch(0.145 0 0);
+	--sidebar: var(--chrome);
 	--sidebar-primary-foreground: var(--ink);
 }

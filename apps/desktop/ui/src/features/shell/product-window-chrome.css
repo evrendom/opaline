@@ -51,7 +51,7 @@
 /* Dark: the shell's own solid canvas behind a hairline edge (self-contained,
    since the landing page has none of the app's shadow tokens). */
 .dark .product-window-frame {
-	background: var(--canvas);
+	background: var(--chrome);
 	box-shadow:
 		0 0 0 1px rgb(255 255 255 / 0.07), /* design-escape-ok(colour): platform; the macOS window glass's edge and drop */
 		0 24px 48px -12px rgb(0 0 0 / 0.5);
