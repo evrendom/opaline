@@ -395,8 +395,17 @@ export function classifyClass(word: string): Rule | undefined {
 		if (value === "px" || /^\d+(\.\d+)?$/.test(value)) return "space";
 		const inner = /^\[(.+)\]$/.exec(value)?.[1];
 		if (inner && LENGTH_LITERAL.test(inner)) return "space";
-		// a calc() of steps (p-[calc(var(--space-xs)*5)]) is an off-scale value
-		if (inner?.startsWith("calc(")) return "space";
+		// a calc() made only of steps (p-[calc(var(--space-xs)*5)]) is an
+		// off-scale value; one that adds a step to a runtime measure (an indent
+		// depth, a measured offset) is layout, and passes
+		if (inner?.startsWith("calc(")) {
+			const vars = [...inner.matchAll(/var\((--[\w-]+)/g)].map((m) => m[1]);
+			if (
+				!inner.includes("env(") &&
+				vars.every((v) => /^--(?:space|border)-/.test(v))
+			)
+				return "space";
+		}
 		return undefined;
 	}
 

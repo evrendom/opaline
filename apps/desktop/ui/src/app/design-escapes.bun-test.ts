@@ -60,6 +60,9 @@ describe("design-system escape check", () => {
 		expect(classifyClass("gap-[calc(var(--space-xxl)*4/3)]")).toBe("space");
 		expect(classifyClass("px-[calc(var(--space-xxs)*5)]")).toBe("space");
 		expect(classifyClass("p-xxxl")).toBeUndefined();
+		expect(
+			classifyClass("pl-[calc(var(--depth)*var(--space-m)+var(--space-xs))]"),
+		).toBeUndefined();
 	});
 
 	test("dark: a per-mode class is a missing role", () => {

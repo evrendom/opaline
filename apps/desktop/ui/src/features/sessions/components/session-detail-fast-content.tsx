@@ -39,7 +39,10 @@ import type { SessionTurnSelection } from "./session-turn-table-selection";
 import { recordAnchorJournal } from "./transcript-forensics";
 import { useSessionDetailOverviewPages } from "./use-session-detail-overview-pages";
 
-const columnBottomPaddingClassName = "pb-xxxl";
+// Clears the dock under the transcript and the window's safe area, so the
+// last turn never sits behind them.
+const columnBottomPaddingClassName =
+	"pb-[calc(var(--space-xxxl)*2.5+env(safe-area-inset-bottom))]";
 
 export function SessionDetailFastContent({
 	showOverviewStrip = true,
