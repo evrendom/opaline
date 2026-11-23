@@ -72,6 +72,11 @@ export default defineConfig(({ mode }) => {
 
 	return {
 		plugins: [react(), tailwindcss()],
+		// A build's id: the skeletons forget their saved shapes when it changes
+		// (src/app/ui/bones.tsx), so a changed sample reaches existing users.
+		define: {
+			"import.meta.env.VITE_BUILD_ID": JSON.stringify(String(Date.now())),
+		},
 		build:
 			mode === "plugin"
 				? undefined
