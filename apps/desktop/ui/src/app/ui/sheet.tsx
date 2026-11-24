@@ -48,7 +48,7 @@ function SheetContent({
 				className={cn(
 					"fixed z-50 flex flex-col",
 					"text-body-xl",
-					"bg-surface bg-clip-padding text-ink transition duration-(--motion-medium-duration) ease-wave",
+					"bg-overlay bg-clip-padding text-ink transition duration-(--motion-medium-duration) ease-wave",
 					"shadow-float",
 					"data-ending-style:opacity-0",
 					"data-starting-style:opacity-0",

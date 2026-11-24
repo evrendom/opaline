@@ -299,7 +299,7 @@ export function SessionReaderWaterfallView({
 				<span
 					ref={cursorLabelRef}
 					style={{ display: "none" }}
-					className="pointer-events-none absolute top-0 z-10 corner-xs border bg-canvas px-s py-xxs text-body-xs whitespace-nowrap text-ink-3 tabular-nums shadow-float"
+					className="pointer-events-none absolute top-0 z-10 corner-xs border bg-overlay px-s py-xxs text-body-xs whitespace-nowrap text-ink-3 tabular-nums shadow-float"
 				/>
 			</div>
 			<div />

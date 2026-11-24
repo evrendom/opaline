@@ -49,7 +49,7 @@ function DialogContent({
 					"fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] gap-xxl",
 					"corner-xl-inner corner-squircle p-xxl",
 					"text-body-xl",
-					"-translate-x-1/2 -translate-y-1/2 bg-surface text-ink shadow-card duration-(--motion-quick-duration) outline-none",
+					"-translate-x-1/2 -translate-y-1/2 bg-overlay text-ink shadow-card duration-(--motion-quick-duration) outline-none",
 					"squircle:corner-xl-outer",
 					"sm:max-w-md",
 					"data-open:animate-in data-open:fade-in-0 data-open:zoom-in-[96%]",

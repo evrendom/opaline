@@ -40,7 +40,7 @@ function PopoverContent({
 						"z-50 flex w-72 flex-col gap-xl",
 						"corner-m corner-squircle p-l",
 						"text-body-xl",
-						"origin-(--transform-origin) bg-surface text-ink shadow-card outline-hidden duration-(--motion-quick-duration)",
+						"origin-(--transform-origin) bg-overlay text-ink shadow-card outline-hidden duration-(--motion-quick-duration)",
 						"squircle:corner-xl",
 						"data-[side=bottom]:slide-in-from-top-2",
 						"data-[side=inline-end]:slide-in-from-left-2",
