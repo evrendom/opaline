@@ -30,7 +30,7 @@ import {
 import type { SessionOverviewZoomWindow } from "./session-thread-overview-zoom";
 
 const SESSION_OVERVIEW_HOVER_CARD_SURFACE_CLASSES =
-	"absolute top-0 z-50 w-80 max-w-[calc(100%-1.5rem)] corner-s bg-canvas font-body text-body-m text-ink shadow-float ring-1 ring-line";
+	"absolute top-0 z-50 w-80 max-w-[calc(100%-1.5rem)] corner-s bg-overlay font-body text-body-m text-ink shadow-float ring-1 ring-line";
 
 interface SessionContextUtilizationRingStyle extends CSSProperties {
 	"--session-context-ring-color-dark": string;

@@ -11,7 +11,8 @@ error, because there are no shades.
 | Role | What it is |
 |---|---|
 | `canvas` | the window's content: the page itself |
-| `surface` | cards, panels, popovers, menus, controls |
+| `surface` | cards, panels and controls on the page |
+| `overlay` | anything floating above the page: menus, popovers, select lists, tooltips, hover cards, dialogs, sheets (the components set it). Equal to `surface` in light, a step lighter in dark, where a shadow can't lift it |
 | `inset` | a recessed area on the canvas: wells, code, rails |
 | `field` | chips, tags, segmented tracks, a selected row in a list |
 | `hover` | a row under the pointer, and any soft tint (marks, stripes) |
@@ -23,7 +24,9 @@ error, because there are no shades.
 ```
 What background do I use?
  ├── Is it behind a modal? → scrim (Dialog and Sheet already do it)
- ├── Is it a card, panel, popover or menu? → surface (Card, PopoverContent … already do it)
+ ├── Does it float above the page (a menu, popover, tooltip, hover card,
+ │   dialog or sheet)? → overlay (the components already do it)
+ ├── Is it a card or a panel on the page? → surface (Card already does it)
  ├── Is it sunk into the page: a code block, a well, a rail? → inset
  ├── Is it a chip, tag, track or a selected row? → field
  ├── Is it a hover, or a soft tint on a mark? → hover

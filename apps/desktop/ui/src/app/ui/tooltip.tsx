@@ -54,7 +54,7 @@ function TooltipContent({
 						"z-50 inline-flex w-fit max-w-xs items-center gap-s",
 						"corner-s corner-squircle px-l py-s",
 						"text-body-m",
-						"origin-(--transform-origin) bg-surface text-ink shadow-card",
+						"origin-(--transform-origin) bg-overlay text-ink shadow-card",
 						"squircle:corner-xl-inner",
 						"has-data-[slot=kbd]:pr-s",
 						"data-[side=bottom]:slide-in-from-top-2",
@@ -73,7 +73,7 @@ function TooltipContent({
 				>
 					{children}
 					{hideArrow ? null : (
-						<TooltipPrimitive.Arrow className="z-50 size-2.5 translate-y-[calc(-50%-2px)] rotate-45 corner-zero bg-surface fill-surface data-[side=bottom]:top-1 data-[side=inline-end]:top-1/2! data-[side=inline-end]:-left-1 data-[side=inline-end]:translate-x-[1.5px] data-[side=inline-end]:-translate-y-1/2 data-[side=inline-start]:top-1/2! data-[side=inline-start]:-right-1 data-[side=inline-start]:translate-x-[-1.5px] data-[side=inline-start]:-translate-y-1/2 data-[side=left]:top-1/2! data-[side=left]:-right-1 data-[side=left]:translate-x-[-1.5px] data-[side=left]:-translate-y-1/2 data-[side=right]:top-1/2! data-[side=right]:-left-1 data-[side=right]:translate-x-[1.5px] data-[side=right]:-translate-y-1/2 data-[side=top]:-bottom-2.5" />
+						<TooltipPrimitive.Arrow className="z-50 size-2.5 translate-y-[calc(-50%-2px)] rotate-45 corner-zero bg-overlay fill-overlay data-[side=bottom]:top-1 data-[side=inline-end]:top-1/2! data-[side=inline-end]:-left-1 data-[side=inline-end]:translate-x-[1.5px] data-[side=inline-end]:-translate-y-1/2 data-[side=inline-start]:top-1/2! data-[side=inline-start]:-right-1 data-[side=inline-start]:translate-x-[-1.5px] data-[side=inline-start]:-translate-y-1/2 data-[side=left]:top-1/2! data-[side=left]:-right-1 data-[side=left]:translate-x-[-1.5px] data-[side=left]:-translate-y-1/2 data-[side=right]:top-1/2! data-[side=right]:-left-1 data-[side=right]:translate-x-[1.5px] data-[side=right]:-translate-y-1/2 data-[side=top]:-bottom-2.5" />
 					)}
 				</TooltipPrimitive.Popup>
 			</TooltipPrimitive.Positioner>

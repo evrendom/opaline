@@ -146,7 +146,7 @@ function SelectContent({
 					className={cn(
 						"relative isolate z-50 max-h-(--available-height) w-(--anchor-width) min-w-36 overflow-x-hidden overflow-y-auto",
 						"corner-s corner-squircle p-xs",
-						"origin-(--transform-origin) bg-surface text-ink shadow-card duration-(--motion-quick-duration) outline-none",
+						"origin-(--transform-origin) bg-overlay text-ink shadow-card duration-(--motion-quick-duration) outline-none",
 						"squircle:corner-xl-inner",
 						"data-[align-trigger=true]:animate-none",
 						"data-[side=bottom]:slide-in-from-top-2",
@@ -228,7 +228,7 @@ function SelectScrollUpButton({
 			className={cn(
 				"top-0 z-10 flex w-full items-center justify-center",
 				"py-xs",
-				"cursor-default bg-surface",
+				"cursor-default bg-overlay",
 				"[&_svg:not([class*='size-'])]:size-4",
 				className,
 			)}
@@ -249,7 +249,7 @@ function SelectScrollDownButton({
 			className={cn(
 				"bottom-0 z-10 flex w-full items-center justify-center",
 				"py-xs",
-				"cursor-default bg-surface",
+				"cursor-default bg-overlay",
 				"[&_svg:not([class*='size-'])]:size-4",
 				className,
 			)}

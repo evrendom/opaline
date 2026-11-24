@@ -1421,7 +1421,7 @@ function TranscriptRowDebugBadge({
 	return (
 		<output
 			ref={outputRef}
-			className="pointer-events-none absolute top-1 right-2 z-50 corner-s edge-m border-line bg-canvas px-m py-xs text-body-s text-ink-3 shadow-float"
+			className="pointer-events-none absolute top-1 right-2 z-50 corner-s edge-m border-line bg-overlay px-m py-xs text-body-s text-ink-3 shadow-float"
 		/>
 	);
 }

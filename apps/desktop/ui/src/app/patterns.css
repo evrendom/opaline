@@ -110,7 +110,7 @@
 .menu-popover,
 .menu-surface {
 	--menu-hairline: 1px;
-	--menu-background: var(--surface);
+	--menu-background: var(--overlay);
 	--menu-border: var(--line);
 	--menu-label: var(--ink);
 	--menu-focused-label: var(--ink);

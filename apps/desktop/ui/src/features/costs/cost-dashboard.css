@@ -469,7 +469,7 @@
 	border-radius: var(--radius-m);
 	padding: var(--space-l);
 	color: var(--ink);
-	background: var(--canvas);
+	background: var(--overlay);
 	box-shadow:
 		var(--shadow-float),
 		0 0 0 1px var(--line);
@@ -764,7 +764,7 @@
 .cost-tools[data-open="true"] {
 	grid-template-columns: 1fr;
 	grid-template-rows: 1fr;
-	background: var(--canvas);
+	background: var(--overlay);
 	box-shadow:
 		var(--shadow-float),
 		0 0 0 1px var(--line);
