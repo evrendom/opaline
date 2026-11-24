@@ -44,7 +44,7 @@
 		"@rudel/sql-schema": "workspace:*",
 		"@rudel/usage-events": "workspace:*",
 		"better-auth": "1.6.34",
-		"drizzle-orm": "0.45.1",
+		"drizzle-orm": "0.45.2",
 		"postgres": "^3.4.5",
 		"resend": "^6.9.3",
 		"zod": "4.6.5"
