@@ -28,7 +28,8 @@
 	margin: var(--space-zero);
 	color: var(--ink-3);
 	text-wrap: pretty;
-}.sessions-settings .sessions-settings-note {
+}
+.sessions-settings .sessions-settings-note {
 	font-size: var(--size-m);
 	line-height: var(--line-m);
 }

@@ -59,7 +59,8 @@
 .cli-welcome-footer a:hover {
 	color: var(--ink);
 	text-decoration: underline;
-}.cli-onboarding-surface.cli-welcome-form {
+}
+.cli-onboarding-surface.cli-welcome-form {
 	flex: 0 0 auto;
 	width: 100%;
 	max-width: 400px;
@@ -87,7 +88,8 @@
 	line-height: var(--line-xl);
 	text-wrap: pretty;
 	margin: var(--space-zero) var(--space-zero) var(--space-xxxl);
-}.cli-welcome-form .cli-welcome-command:disabled {
+}
+.cli-welcome-form .cli-welcome-command:disabled {
 	opacity: 0.55;
 	cursor: default;
 }
@@ -96,8 +98,8 @@
 	/* the focus-outline mark */
 	outline: 2px solid var(--accent);
 	outline-offset: 1px;
-}/* The shared marketing CTA is a black pill; dark mirrors it to a light one,
-   with light frosted glass over the same opal glow. *//* The preview uses the same surface, row tracks and badges as the dashboard. */
+} /* The shared marketing CTA is a black pill; dark mirrors it to a light one,
+   with light frosted glass over the same opal glow. */ /* The preview uses the same surface, row tracks and badges as the dashboard. */
 .cli-welcome-preview [data-session-disabled] [data-dashboard-grid-row-scope] {
 	opacity: 1;
 }

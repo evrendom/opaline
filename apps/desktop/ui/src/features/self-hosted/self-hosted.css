@@ -20,7 +20,8 @@
 	line-height: var(--line-m);
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
-}.cli-welcome-form .self-hosted-welcome-open {
+}
+.cli-welcome-form .self-hosted-welcome-open {
 	display: flex;
 	align-items: center;
 	justify-content: center;

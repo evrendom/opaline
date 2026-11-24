@@ -15,7 +15,7 @@ const RETIRED_CLI_QUERY_KEY = ["selfhost", "retired-cli"] as const;
 const CHECK_INTERVAL_MS = 5 * 60_000;
 
 const BANNER_CLASS =
-	"flex items-start gap-2 border-b px-4 py-2 text-sm border-amber-300/60 bg-amber-50 text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-100";
+	"flex items-start gap-m border-b border-warning-line bg-warning-tint px-xl py-m text-body-l text-ink";
 
 /**
  * The retired CLI still tries to upload to Opaline's shut-down cloud. The
@@ -54,25 +54,24 @@ export function RetiredCliBanner() {
 		<section aria-label="Retired Opaline CLI" className={BANNER_CLASS}>
 			<IconAlertTriangle
 				aria-hidden="true"
-				className="mt-1.5 size-4 shrink-0"
+				className="mt-s size-4 shrink-0 text-warning"
 			/>
-			<div className="flex min-w-0 flex-1 flex-col gap-0.5 py-1">
+			<div className="flex min-w-0 flex-1 flex-col gap-xxs py-xs">
 				<p>
 					The retired Opaline CLI is still installed on this Mac. It tries to
 					send your sessions to Opaline's shut-down cloud, and Opaline does not
 					need it.
 				</p>
 				{remove.error ? (
-					<p role="alert" className="text-amber-800 dark:text-amber-300">
+					<p role="alert" className="text-error">
 						{remove.error.message}
 					</p>
 				) : null}
 			</div>
-			<div className="flex shrink-0 items-center gap-1">
+			<div className="flex shrink-0 items-center gap-xs">
 				<Button
 					type="button"
 					size="sm"
-					variant="ghost"
 					disabled={remove.isPending}
 					onClick={() => {
 						writeRetiredCliDismissed();
@@ -84,7 +83,7 @@ export function RetiredCliBanner() {
 				<Button
 					type="button"
 					size="sm"
-					variant="outline"
+					variant="primary"
 					disabled={remove.isPending}
 					onClick={() => remove.mutate()}
 				>
@@ -112,15 +111,18 @@ function RetiredCliRemovalView({
 			{removal.busy ? (
 				<IconAlertTriangle
 					aria-hidden="true"
-					className="mt-1.5 size-4 shrink-0"
+					className="mt-s size-4 shrink-0 text-warning"
 				/>
 			) : (
-				<IconCheck aria-hidden="true" className="mt-1.5 size-4 shrink-0" />
+				<IconCheck
+					aria-hidden="true"
+					className="mt-s size-4 shrink-0 text-success"
+				/>
 			)}
-			<div className="flex min-w-0 flex-1 flex-col gap-1 py-1">
+			<div className="flex min-w-0 flex-1 flex-col gap-xs py-xs">
 				<p>{title}</p>
 				{removal.removed.length ? (
-					<ul className="list-disc pl-5">
+					<ul className="list-disc pl-xl">
 						{removal.removed.map((line) => (
 							<li key={line}>{line}</li>
 						))}
@@ -129,7 +131,7 @@ function RetiredCliRemovalView({
 				{removal.skipped.length ? (
 					<>
 						<p>Left alone because they could not be read or kept changing:</p>
-						<ul className="list-disc pl-5">
+						<ul className="list-disc pl-xl">
 							{removal.skipped.map((line) => (
 								<li key={line}>{line}</li>
 							))}
@@ -137,13 +139,7 @@ function RetiredCliRemovalView({
 					</>
 				) : null}
 			</div>
-			<Button
-				type="button"
-				size="sm"
-				variant="ghost"
-				className="shrink-0"
-				onClick={onClose}
-			>
+			<Button type="button" size="sm" className="shrink-0" onClick={onClose}>
 				Close
 			</Button>
 		</section>

@@ -26,7 +26,6 @@ import {
 	useNavigate,
 } from "react-router-dom";
 import { appRoutes } from "@/app/routes";
-import { IconPlugFilled } from "@/app/ui/icon-plug-filled";
 import {
 	Select,
 	SelectContent,
