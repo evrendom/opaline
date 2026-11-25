@@ -73,6 +73,12 @@
 	--error-tint: var(--error-transparent);
 	--error-line: var(--error-translucent);
 
+	/* -- Platform: the macOS window controls, which the product demo draws
+	   itself (the Mac app gets real ones). Apple's colours, both modes. */
+	--window-close: rgb(255 95 87);
+	--window-minimise: rgb(254 188 46);
+	--window-zoom: rgb(40 200 64);
+
 	/* -- Elevation by role. A hairline plus a soft drop stands in for a border;
 	   dark trades the drop for an inset highlight edge. Tailwind reads each as
 	   `shadow-<role>` (registered below). They live here, not in the theme:

@@ -55,15 +55,15 @@
 	width: 14px;
 	height: 14px;
 	border-radius: 50%;
-	background: var(--warning);
+	background: var(--window-close);
 }
 
 :root[data-desktop] .desktop-window-lights > span:nth-child(2) {
-	background: var(--warning-translucent);
+	background: var(--window-minimise);
 }
 
 :root[data-desktop] .desktop-window-lights > span:nth-child(3) {
-	background: var(--success);
+	background: var(--window-zoom);
 }
 
 :root[data-desktop][data-fullscreen] .desktop-window-bar {

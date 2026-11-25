@@ -77,6 +77,7 @@ that's already a card is a double edge: never add one.
 | `success`, `success-tint`, `success-line` | done, passed, merged, positive |
 | `warning`, `warning-tint`, `warning-line` | needs attention, interrupted, near a limit |
 | `error`, `error-tint`, `error-line` | failed, invalid, destructive, negative |
+| `window-close`, `window-minimise`, `window-zoom` | the macOS window controls the product demo draws (the shell only); never a state colour |
 
 Each state has the same three strengths: text and icons in the base role, a
 fill in `-tint`, and an edge or ring in `-line`. Colour means state. Never
