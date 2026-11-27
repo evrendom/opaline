@@ -29,7 +29,7 @@
 		"@anthropic-ai/sdk": "0.132.1",
 		"@aws-sdk/client-s3": "3.1112.0",
 		"@aws-sdk/s3-request-presigner": "3.1112.0",
-		"@better-auth/api-key": "1.6.34",
+		"@better-auth/api-key": "1.7.7",
 		"@clickhouse/client-web": "^1.11.0",
 		"@logtape/file": "^2.0.4",
 		"@logtape/logtape": "^2.0.4",
@@ -43,11 +43,11 @@
 		"@rudel/secret-filter": "workspace:*",
 		"@rudel/sql-schema": "workspace:*",
 		"@rudel/usage-events": "workspace:*",
-		"better-auth": "1.6.34",
-		"drizzle-orm": "0.45.1",
+		"better-auth": "1.7.7",
+		"drizzle-orm": "0.45.2",
 		"postgres": "^3.4.5",
 		"resend": "^6.9.3",
-		"zod": "4.6.5"
+		"zod": "4.6.6"
 	},
 	"devDependencies": {
 		"@orpc/contract": "latest",

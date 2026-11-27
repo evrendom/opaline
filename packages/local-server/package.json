@@ -9,7 +9,7 @@
 		"build": "bun build src/main.ts --target=node --format=esm --outfile dist/local-server.js"
 	},
 	"dependencies": {
-		"zod": "^4.6.5"
+		"zod": "^4.6.6"
 	},
 	"devDependencies": {
 		"@rudel/typescript-config": "workspace:*",

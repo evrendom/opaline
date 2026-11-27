@@ -1,15 +1,9 @@
 import { apiKey } from "@better-auth/api-key";
 import { getLogger } from "@logtape/logtape";
 import * as schema from "@rudel/sql-schema";
-import { type BetterAuthPlugin, betterAuth } from "better-auth";
+import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { APIError, createAuthMiddleware } from "better-auth/api";
-import {
-	bearer,
-	deviceAuthorization,
-	emailOTP,
-	mcp,
-} from "better-auth/plugins";
+import { bearer, deviceAuthorization, emailOTP } from "better-auth/plugins";
 import {
 	createDefaultOrganizationWithRetry,
 	createOrganizationPlugin,
@@ -76,14 +70,6 @@ export interface AuthConfig {
 	) => Promise<void>;
 }
 
-/**
- * MCP authorization codes are only issued for requests the consent page in
- * handlers/mcp-http.ts forwards with this per-process secret. Any other
- * authorize request, however its path is spelled, is sent to that page.
- */
-export const MCP_CONSENT_HEADER = "x-opaline-mcp-consent";
-export const MCP_CONSENT_SECRET = crypto.randomUUID();
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- drizzleAdapter accepts { [key: string]: any }
 export function createAuth(db: object, config: AuthConfig) {
 	const authBaseURL = normalizeAuthBaseURL(config.appURL);
@@ -99,27 +85,6 @@ export function createAuth(db: object, config: AuthConfig) {
 			: undefined,
 		basePath: AUTH_BASE_PATH,
 		baseURL: authBaseURL,
-		hooks: {
-			before: createAuthMiddleware(async (ctx) => {
-				if (
-					ctx.path === "/mcp/authorize" &&
-					ctx.request?.headers.get(MCP_CONSENT_HEADER) !== MCP_CONSENT_SECRET
-				) {
-					const search = ctx.request ? new URL(ctx.request.url).search : "";
-					throw ctx.redirect(`/api/mcp/consent${search}`);
-				}
-				// Refresh grants are answered in handlers/mcp-http.ts, which rotates
-				// them; the plugin's session lookup is for server-side calls only.
-				if (
-					ctx.request &&
-					(ctx.path === "/mcp/get-session" ||
-						(ctx.path === "/mcp/token" &&
-							ctx.body?.grant_type === "refresh_token"))
-				) {
-					throw new APIError("NOT_FOUND");
-				}
-			}),
-		},
 		secret: config.secret,
 		database: drizzleAdapter(db as Parameters<typeof drizzleAdapter>[0], {
 			provider: "pg",
@@ -185,19 +150,6 @@ export function createAuth(db: object, config: AuthConfig) {
 				validateClient: async (clientId) => clientId === "rudel-cli",
 				verificationUri: config.cliDeviceVerificationUrl,
 			}),
-			// OAuth server for MCP clients (Codex, ChatGPT). Every authorization
-			// passes the consent page (see MCP_CONSENT_SECRET). The plugin's options
-			// type is not exported, so `Auth` could not be named with it; the
-			// endpoints are typed in mcp-http.ts instead.
-			mcp({
-				loginPage: `${config.frontendURL}/login`,
-				resource: `${authBaseURL}/api/mcp`,
-				oidcConfig: {
-					loginPage: `${config.frontendURL}/login`,
-					requirePKCE: true,
-					allowPlainCodeChallengeMethod: false,
-				},
-			}) as BetterAuthPlugin,
 			...((config.selfHostedLogin
 				? [selfHostedLoginPlugin(config.selfHostedLogin)]
 				: []) as []),

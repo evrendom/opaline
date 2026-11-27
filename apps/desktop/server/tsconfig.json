@@ -1,6 +1,10 @@
 {
 	"extends": "@rudel/typescript-config/node.json",
 	"compilerOptions": {
+		// An app, not a library: nothing imports its types, and Better Auth's
+		// inferred `createAuth` type is too long to serialize as a declaration.
+		"declaration": false,
+		"declarationMap": false,
 		"outDir": "./dist",
 		"rootDir": "./src",
 		"types": ["bun-types"]
