@@ -1,8 +1,11 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { SessionsOverviewFiltersMenu } from "./sessions-overview-filters-menu";
 import type { SessionOverviewRangeFilterValues } from "./sessions-overview-table-utils";
+
+type MenuProps = ComponentProps<typeof SessionsOverviewFiltersMenu>;
 
 const emptyRange = { maximum: null, minimum: null };
 const rangeBounds = {
@@ -251,8 +254,8 @@ function renderLinearFilters({
 	onRangeFilterChange = vi.fn(),
 	rangeFilterValues = emptyRangeFilterValues,
 }: {
-	onFilterOptionChecked?: ReturnType<typeof vi.fn>;
-	onRangeFilterChange?: ReturnType<typeof vi.fn>;
+	onFilterOptionChecked?: MenuProps["onFilterOptionChecked"];
+	onRangeFilterChange?: MenuProps["onRangeFilterChange"];
 	rangeFilterValues?: SessionOverviewRangeFilterValues;
 } = {}) {
 	return render(

@@ -460,7 +460,6 @@ async function handleRequest(
 	if (selfHostResponse) return selfHostResponse;
 	const mcpResponse = handleMcpRoute(request, url, {
 		auth,
-		allowedOrigins: trustedOrigins,
 		publicLookupSource,
 		requestId,
 	});

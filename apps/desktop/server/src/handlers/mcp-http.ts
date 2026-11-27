@@ -1,14 +1,8 @@
 import { getLogger } from "@logtape/logtape";
 import { createRouterClient, ORPCError } from "@orpc/server";
-import {
-	type Auth,
-	MCP_CONSENT_HEADER,
-	MCP_CONSENT_SECRET,
-	type Session,
-} from "../auth.js";
+import type { Auth, Session } from "../auth.js";
 import { getClickhouse } from "../clickhouse.js";
 import { sqlClient } from "../db.js";
-import { getFrontendOrigin } from "../frontend-origin.js";
 import { isSelfHosted, isSelfHostedAdmin } from "../lib/self-hosted.js";
 import { splitAnalyticsInputs } from "../mcp/analytics-inputs.js";
 import { workspacePageUrl } from "../mcp/app-links.js";
@@ -48,11 +42,6 @@ import {
 } from "../services/mcp-analytics/tool-calls.js";
 
 export const MCP_PATH = "/api/mcp";
-export const MCP_CONSENT_PATH = "/api/mcp/consent";
-const MCP_AUTHORIZE_PATH = "/api/auth/mcp/authorize";
-const MCP_TOKEN_PATH = "/api/auth/mcp/token";
-const ACCESS_TOKEN_TTL_SECONDS = 3600;
-const REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 3600;
 const PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26"];
 const logger = getLogger(["opaline", "api", "mcp"]);
 const SERVER_INFO = {
@@ -75,7 +64,6 @@ const TOOLS = [...MCP_TOOLS, ...PLUGIN_TOOLS].map(withRedactedOutput);
 
 interface McpDependencies {
 	readonly auth: Auth;
-	readonly allowedOrigins: readonly string[];
 	readonly publicLookupSource: string;
 	readonly requestId: string;
 }
@@ -85,18 +73,6 @@ interface JsonRpcRequest {
 	readonly method?: string;
 	readonly params?: Record<string, unknown>;
 }
-
-/** Endpoints of Better Auth's MCP plugin, which `Auth` cannot name. */
-interface McpAuthApi {
-	getMCPProtectedResource(): Promise<unknown>;
-	getMcpOAuthConfig(): Promise<unknown>;
-	getMcpSession(input: {
-		headers: Headers;
-	}): Promise<{ userId?: string | null; accessTokenExpiresAt: Date } | null>;
-}
-
-const UNAVAILABLE_HTML =
-	"<p>The Opaline plugin is not available for your account yet.</p>";
 
 /**
  * Dark launch: until MCP_PLUGIN_PUBLIC is exactly "true", only members of the
@@ -134,12 +110,9 @@ function listedTools(listing: { retro: boolean; admin: boolean }) {
 	return listing.retro ? tools.map(retroListedTool) : tools.map(listedTool);
 }
 
-function mcpApi(auth: Auth) {
-	return auth.api as unknown as McpAuthApi;
-}
-
 /**
- * Routes the MCP endpoint, its OAuth discovery documents and the consent step.
+ * Routes the MCP endpoint. Clients authenticate with an API key (the Mac app
+ * writes one into each agent's plugin config); there is no OAuth flow.
  * Returns null for any other path.
  */
 export function handleMcpRoute(
@@ -148,12 +121,6 @@ export function handleMcpRoute(
 	dependencies: McpDependencies,
 ): Promise<Response> | null {
 	if (url.pathname === MCP_PATH) return handleMcpRequest(request, dependencies);
-	if (url.pathname === MCP_CONSENT_PATH) {
-		return handleConsentRequest(request, url, dependencies);
-	}
-	if (url.pathname === MCP_TOKEN_PATH && request.method === "POST") {
-		return handleTokenRequest(request, dependencies.auth);
-	}
 	// Domain ownership check for the OpenAI plugin directory.
 	if (url.pathname === "/.well-known/openai-apps-challenge") {
 		const token = process.env.OPENAI_APPS_CHALLENGE_TOKEN;
@@ -163,93 +130,7 @@ export function handleMcpRoute(
 				: new Response("Not Found", { status: 404 }),
 		);
 	}
-	if (url.pathname.startsWith("/.well-known/oauth-protected-resource")) {
-		return discoveryResponse(
-			mcpApi(dependencies.auth).getMCPProtectedResource(),
-		);
-	}
-	if (url.pathname.startsWith("/.well-known/oauth-authorization-server")) {
-		return discoveryResponse(mcpApi(dependencies.auth).getMcpOAuthConfig());
-	}
 	return null;
-}
-
-async function discoveryResponse(metadata: Promise<unknown>) {
-	return Response.json(await metadata, {
-		headers: { "Access-Control-Allow-Origin": "*" },
-	});
-}
-
-/**
- * Better Auth 1.5.4 neither rotates refresh tokens nor checks confidential
- * clients' secrets on refresh, so refresh grants are answered here: the old
- * grant is consumed atomically and replaced. Code exchanges pass through.
- */
-async function handleTokenRequest(request: Request, auth: Auth) {
-	const raw = await request.clone().text();
-	const body = new URLSearchParams(
-		request.headers.get("content-type")?.includes("json")
-			? Object.entries(safeJson(raw)).map(([key, value]): [string, string] => [
-					key,
-					`${value}`,
-				])
-			: raw,
-	);
-	if (body.get("grant_type") !== "refresh_token") return auth.handler(request);
-	const basic = request.headers.get("authorization")?.match(/^Basic (.+)$/u);
-	const [basicId, basicSecret] = basic?.[1]
-		? Buffer.from(basic[1], "base64").toString().split(":")
-		: [];
-	const clientId = body.get("client_id") ?? basicId ?? "";
-	const clientSecret = body.get("client_secret") ?? basicSecret ?? "";
-	const [client] = await sqlClient<
-		Array<{ type: string; client_secret: string | null }>
-	>`
-		SELECT type, client_secret FROM "oauthApplication"
-		WHERE client_id = ${clientId} AND disabled IS NOT TRUE
-	`;
-	if (
-		!client ||
-		(client.type !== "public" && client.client_secret !== clientSecret)
-	) {
-		return Response.json({ error: "invalid_client" }, { status: 401 });
-	}
-	const token = (bytes: number) =>
-		Buffer.from(crypto.getRandomValues(new Uint8Array(bytes))).toString(
-			"base64url",
-		);
-	const accessToken = token(32);
-	const refreshToken = token(32);
-	const [grant] = await sqlClient<Array<{ scopes: string }>>`
-		WITH consumed AS (
-			DELETE FROM "oauthAccessToken"
-			WHERE refresh_token = ${body.get("refresh_token") ?? ""}
-				AND client_id = ${clientId}
-				AND refresh_token_expires_at > now()
-			RETURNING user_id, scopes
-		)
-		INSERT INTO "oauthAccessToken" (
-			id, access_token, refresh_token, access_token_expires_at,
-			refresh_token_expires_at, client_id, user_id, scopes
-		)
-		SELECT ${crypto.randomUUID()}, ${accessToken}, ${refreshToken},
-			now() + make_interval(secs => ${ACCESS_TOKEN_TTL_SECONDS}),
-			now() + make_interval(secs => ${REFRESH_TOKEN_TTL_SECONDS}),
-			${clientId}, user_id, scopes
-		FROM consumed
-		RETURNING scopes
-	`;
-	if (!grant) return Response.json({ error: "invalid_grant" }, { status: 400 });
-	return Response.json(
-		{
-			access_token: accessToken,
-			token_type: "Bearer",
-			expires_in: ACCESS_TOKEN_TTL_SECONDS,
-			refresh_token: refreshToken,
-			scope: grant.scopes,
-		},
-		{ headers: { "Cache-Control": "no-store" } },
-	);
 }
 
 async function handleMcpRequest(
@@ -269,34 +150,16 @@ async function handleMcpRequest(
 	if (headerVersion && !PROTOCOL_VERSIONS.includes(headerVersion)) {
 		return unsupportedProtocolVersion(headerVersion);
 	}
-	const token = await mcpApi(dependencies.auth).getMcpSession({
-		headers: request.headers,
-	});
-	const oauthUserId =
-		token?.userId && token.accessTokenExpiresAt >= new Date()
-			? token.userId
-			: null;
-	const userId =
-		oauthUserId ??
-		(isSelfHosted()
-			? await apiKeyUserId(
-					dependencies.auth.api,
-					apiKeyFromHeaders(request.headers),
-				)
-			: null);
+	const userId = isSelfHosted()
+		? await apiKeyUserId(
+				dependencies.auth.api,
+				apiKeyFromHeaders(request.headers),
+			)
+		: null;
 	if (!userId) {
-		const metadataUrl = new URL(
-			`/.well-known/oauth-protected-resource${MCP_PATH}`,
-			request.url,
-		);
 		return Response.json(
 			{ error: "invalid_token" },
-			{
-				status: 401,
-				headers: {
-					"WWW-Authenticate": `Bearer resource_metadata="${metadataUrl}"`,
-				},
-			},
+			{ status: 401, headers: { "WWW-Authenticate": "Bearer" } },
 		);
 	}
 	if (!(await isMcpAvailable(userId))) {
@@ -679,171 +542,6 @@ async function createToolContext(
 		requestId: dependencies.requestId,
 		publicLookupSource: dependencies.publicLookupSource,
 	};
-}
-
-async function handleConsentRequest(
-	request: Request,
-	url: URL,
-	dependencies: McpDependencies,
-): Promise<Response> {
-	const { auth } = dependencies;
-	const session = await auth.api.getSession({ headers: request.headers });
-	if (request.method === "GET") {
-		// The login page only accepts a plain relative redirect, so the OAuth
-		// query (which contains encoded URLs) travels base64url-encoded.
-		const params = new URLSearchParams(
-			url.searchParams.has("q")
-				? Buffer.from(url.searchParams.get("q") ?? "", "base64url").toString()
-				: url.search,
-		);
-		if (!session) {
-			const q = Buffer.from(params.toString()).toString("base64url");
-			const redirect = `${MCP_CONSENT_PATH}?q=${q}`;
-			return Response.redirect(
-				`${getFrontendOrigin()}/login?redirect=${encodeURIComponent(redirect)}`,
-				302,
-			);
-		}
-		if (!(await isMcpAvailable(session.user.id))) {
-			return htmlPage(UNAVAILABLE_HTML, 403);
-		}
-		const [client] = await sqlClient<Array<{ name: string | null }>>`
-			SELECT name FROM "oauthApplication"
-			WHERE client_id = ${params.get("client_id") ?? ""}
-			LIMIT 1
-		`;
-		if (!client) return htmlPage("Unknown application.", 400);
-		return htmlPage(
-			consentHtml({
-				clientName: client.name || "An application",
-				redirectHost: safeHost(params.get("redirect_uri")),
-				email: session.user.email,
-				query: params.toString(),
-				userId: session.user.id,
-			}),
-		);
-	}
-	if (request.method !== "POST") {
-		return new Response("Method Not Allowed", {
-			status: 405,
-			headers: { Allow: "GET, POST" },
-		});
-	}
-	const origin = request.headers.get("origin");
-	if (!session || !origin || !dependencies.allowedOrigins.includes(origin)) {
-		return htmlPage("This request could not be verified.", 403);
-	}
-	if (!(await isMcpAvailable(session.user.id))) {
-		return htmlPage(UNAVAILABLE_HTML, 403);
-	}
-	const form = await request.formData();
-	const query = new URLSearchParams(`${form.get("query") ?? ""}`);
-	// The page named one account; a sign-in in another tab must not inherit it.
-	if (form.get("user") !== session.user.id) {
-		return htmlPage(
-			"<p>You switched Opaline accounts. Start the connection again from the app.</p>",
-			409,
-		);
-	}
-	if (form.get("decision") !== "allow") {
-		const [client] = await sqlClient<Array<{ redirect_urls: string }>>`
-			SELECT redirect_urls FROM "oauthApplication"
-			WHERE client_id = ${query.get("client_id") ?? ""}
-		`;
-		const redirectUri = query.get("redirect_uri") ?? "";
-		if (!client?.redirect_urls.split(",").includes(redirectUri)) {
-			return htmlPage(
-				"<p>Access was not granted. You can close this window.</p>",
-			);
-		}
-		const denied = new URL(redirectUri);
-		denied.searchParams.set("error", "access_denied");
-		if (query.get("state"))
-			denied.searchParams.set("state", `${query.get("state")}`);
-		return handoffPage(denied.toString());
-	}
-	// Better Auth validates the client, redirect URI, scopes and PKCE here and
-	// answers with the redirect that carries the authorization code. Calling
-	// its handler with the consent secret is the only way to reach authorize.
-	const headers = new Headers(request.headers);
-	headers.set(MCP_CONSENT_HEADER, MCP_CONSENT_SECRET);
-	const response = await auth.handler(
-		new Request(
-			new URL(`${MCP_AUTHORIZE_PATH}?${query}`, request.url).toString(),
-			{ headers },
-		),
-	);
-	const location = response.headers.get("location");
-	return response.status === 302 && location ? handoffPage(location) : response;
-}
-
-/**
- * Production pages carry `form-action 'self'`, which blocks a form POST from
- * redirecting to the client's callback, so the callback is opened from a page.
- */
-function handoffPage(url: string) {
-	const href = escapeHtml(url);
-	return htmlPage(
-		`<meta http-equiv="refresh" content="0;url=${href}" /><p>Returning to the app… <a href="${href}">Continue</a></p>`,
-	);
-}
-
-function safeJson(raw: string): Record<string, unknown> {
-	try {
-		return JSON.parse(raw) ?? {};
-	} catch {
-		return {};
-	}
-}
-
-function safeHost(value: string | null) {
-	try {
-		return value ? new URL(value).host : "";
-	} catch {
-		return "";
-	}
-}
-
-function escapeHtml(value: string) {
-	return value.replace(
-		/[&<>"']/gu,
-		(character) => `&#${character.charCodeAt(0)};`,
-	);
-}
-
-function consentHtml(input: {
-	clientName: string;
-	redirectHost: string;
-	email: string;
-	query: string;
-	userId: string;
-}) {
-	return `<h1>Connect ${escapeHtml(input.clientName)} to Opaline?</h1>
-<p>It will be able to read your Opaline dashboards, sessions, skills, repositories and team data as <strong>${escapeHtml(input.email)}</strong>, and save or share the analyses you ask for. Until an analysis is saved it is a private draft, deleted after 7 days. It never changes or deletes your sessions. Besides analyses, it changes only your own default-workspace setting for the plugin, from the plugin settings page.</p>
-<p class="muted">You will be sent back to ${escapeHtml(input.redirectHost || "the application")}. Only continue if you started this connection.</p>
-<form method="post" action="${MCP_CONSENT_PATH}">
-<input type="hidden" name="query" value="${escapeHtml(input.query)}" />
-<input type="hidden" name="user" value="${escapeHtml(input.userId)}" />
-<button name="decision" value="allow" type="submit">Allow</button>
-<button name="decision" value="deny" type="submit" class="secondary">Cancel</button>
-</form>`;
-}
-
-function htmlPage(body: string, status = 200) {
-	return new Response(
-		`<!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><title>Opaline</title>
-<style>body{max-width:440px;margin:15vh auto;padding:0 24px;font:15px/1.5 system-ui,sans-serif;color:#1f1f1f}h1{font-size:20px}.muted{color:#6b6b6b}button{font:inherit;padding:8px 16px;border-radius:8px;border:1px solid #1f1f1f;background:#1f1f1f;color:#fff;cursor:pointer;margin-right:8px}.secondary{background:transparent;color:#1f1f1f}</style>
-</head><body>${body}</body></html>`,
-		{
-			status,
-			headers: {
-				"Content-Type": "text/html; charset=utf-8",
-				"Cache-Control": "no-store",
-				"Content-Security-Policy": "frame-ancestors 'none'",
-				"Referrer-Policy": "same-origin",
-			},
-		},
-	);
 }
 
 function rpcResult(id: JsonRpcRequest["id"], result: unknown) {
