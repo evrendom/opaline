@@ -121,7 +121,7 @@ describe("usage rollup read path", () => {
 		expect(rollups).toContain("AND is_consistent = 1");
 		expect(rollups).toContain("estimated_costs AS group_estimated_cost");
 		expect(rollups).toContain("pricing_models AS pricing_model");
-		expect(rollups).not.toContain("rudel.usage_events");
+		expect(rollups).not.toContain("FROM rudel.usage_events FINAL");
 		expect(events).not.toContain("rudel.usage_session_rollups");
 		const tail = (sql: string) =>
 			sql.slice(sql.indexOf("usage_event_session_rollups AS ("));

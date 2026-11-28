@@ -26,6 +26,8 @@ const TABLES_WITH_TTL = [
 	"mcp_tool_calls",
 	"session_inventory",
 	"session_language_signals",
+	// Live requests between imports; the stored usage_events are the record.
+	"usage_events_pending",
 	"weekly_totals",
 ];
 

@@ -33,7 +33,9 @@ describe("usage-event analytics query contract", () => {
 		const sql = buildUsageEventAnalyticsCte();
 
 		expect(sql).toContain("FROM rudel.usage_events FINAL");
-		expect(sql.match(/FROM rudel\.usage_events/gu)).toHaveLength(1);
+		// Stored events are read once; the pending requests' check reads only
+		// stored event IDs and times, never FINAL.
+		expect(sql.match(/FROM rudel\.usage_events FINAL/gu)).toHaveLength(1);
 		expect(sql).toContain(
 			"argMaxIf(event_version, event_version, record_kind = 'receipt') AS receipt_generation",
 		);

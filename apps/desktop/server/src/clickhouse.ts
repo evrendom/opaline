@@ -137,6 +137,7 @@ export const ALLOWED_CLICKHOUSE_TABLES: ReadonlySet<string> = new Set([
 	"rudel.transcript_records",
 	"rudel.usage_events",
 	"rudel.usage_session_rollups",
+	"rudel.usage_events_pending",
 	"rudel.weekly_totals",
 	"rudel.wrapped_user_archetype_snapshots_v1",
 ]);
