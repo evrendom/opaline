@@ -18,7 +18,6 @@ import {
 } from "@/app/ui/sidebar";
 import { useLocalDesktopApp } from "@/features/desktop/local-app";
 import { DesktopWindowBar } from "@/features/shell/components/desktop-window-bar";
-import { SidebarInstallCommand } from "@/features/shell/components/SidebarInstallCommand";
 import { SidebarRepositories } from "@/features/shell/components/SidebarRepositories";
 import { SidebarUserMenu } from "@/features/shell/components/SidebarUserMenu";
 import { SidebarWorkspaceSwitcher } from "@/features/shell/components/SidebarWorkspaceSwitcher";
@@ -183,7 +182,6 @@ export function AppSidebar({
 				{localApp ? null : (
 					<SidebarFooter>
 						<SidebarMenu>
-							<SidebarInstallCommand />
 							{footerRoutes.map((route) => (
 								<SidebarNavItem
 									key={route.id}

@@ -259,16 +259,14 @@ export function SettingsGroup() {
 			</Specimen>
 
 			<Specimen
-				name="SessionsSettingsView (command copy field, RepositorySearchField, upload table)"
+				name="SessionsSettingsView (RepositorySearchField, upload table)"
 				source="features/settings/sessions/sessions-settings-view.tsx"
-				where="Settings → Sessions: the upload command, then repositories with each upload state."
+				where="Settings → Sessions: repositories with each upload state."
 			>
 				<State label="loaded" className="w-full max-w-[40rem]">
 					<SessionsSettingsView
-						copied={false}
 						error={false}
 						fetching={false}
-						onCopy={NOOP}
 						onRefresh={NOOP}
 						onSearch={NOOP}
 						pending={false}
@@ -279,10 +277,8 @@ export function SettingsGroup() {
 				</State>
 				<State label="could not load" className="w-full max-w-[40rem]">
 					<SessionsSettingsView
-						copied
 						error
 						fetching={false}
-						onCopy={NOOP}
 						onRefresh={NOOP}
 						onSearch={NOOP}
 						pending={false}

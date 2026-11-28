@@ -19,6 +19,7 @@ import {
 	loginUrl,
 	MEMBER_LOGIN_TOKEN_TTL_SECONDS,
 } from "../selfhost/login-tokens.js";
+import { type RetiredCli, retiredCli } from "../selfhost/retired-cli.js";
 import { isOpenSignup } from "../selfhost/signup-gate.js";
 
 export const SELFHOST_PATH_PREFIX = "/api/selfhost/";
@@ -53,6 +54,8 @@ export interface SelfHostDependencies {
 		sql: postgres.Sql,
 		env: Environment,
 	) => Promise<GitHubTokenStatus>;
+	/** The retired CLI on this Mac; tests pass one bound to a sandbox home. */
+	readonly retiredCli?: RetiredCli;
 }
 
 const SetupBodySchema = z.object({
@@ -97,6 +100,10 @@ export function handleSelfHostRoute(
 			return ingestNotify(request, deps);
 		case "GET /api/selfhost/plan-usage":
 			return planUsageReport(request, url, deps);
+		case "GET /api/selfhost/retired-cli":
+			return retiredCliStatus(request, deps);
+		case "POST /api/selfhost/retired-cli/remove":
+			return removeRetiredCli(request, deps);
 		case "GET /api/selfhost/login":
 			return deps.auth.handler(
 				new Request(
@@ -593,4 +600,60 @@ function repositoriesParam(url: URL): ReadonlySet<string> | undefined {
 		.filter((repository) => repository.length > 0)
 		.slice(0, MAX_PLAN_USAGE_REPOSITORIES);
 	return repositories.length > 0 ? new Set(repositories) : undefined;
+}
+
+async function retiredCliStatus(
+	request: Request,
+	deps: SelfHostDependencies,
+): Promise<Response> {
+	if (!hasDesktopApp(deps.env))
+		return Response.json({ error: "not_found" }, { status: 404 });
+	const actor = await loginLinkActor(request, deps);
+	if (actor instanceof Response) return actor;
+	return Response.json({
+		present: (deps.retiredCli ?? retiredCli).present(),
+	});
+}
+
+/**
+ * Runs the retired CLI's own cleanup for the person using this Mac: the
+ * same lock and the same matching as the CLI, so only what the CLI
+ * installed is removed. Only a signed-in owner or admin in the app can
+ * ask; agents holding the plugin's API key cannot.
+ */
+async function removeRetiredCli(
+	request: Request,
+	deps: SelfHostDependencies,
+): Promise<Response> {
+	if (!hasDesktopApp(deps.env))
+		return Response.json({ error: "not_found" }, { status: 404 });
+	const session = await deps.auth.api
+		.getSession({ headers: request.headers })
+		.catch(() => null);
+	if (!session)
+		return Response.json(
+			{ error: "unauthorized", message: "Sign in to the Opaline app." },
+			{ status: 401 },
+		);
+	if (!(await isSelfHostedAdmin(deps.sql, session.user.id)))
+		return Response.json(
+			{
+				error: "forbidden",
+				message:
+					"Only the owner or an admin of this Mac's Opaline can do this.",
+			},
+			{ status: 403 },
+		);
+	try {
+		return Response.json((deps.retiredCli ?? retiredCli).remove());
+	} catch (error) {
+		logger.warn("Could not remove the retired CLI: {error}", { error });
+		return Response.json(
+			{
+				error: "remove_failed",
+				message: "Opaline could not remove the retired CLI. Try again.",
+			},
+			{ status: 500 },
+		);
+	}
 }

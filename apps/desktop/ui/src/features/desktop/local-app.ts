@@ -6,7 +6,6 @@ export const LOCAL_APP_HIDDEN_SETTINGS: ReadonlySet<SettingsRouteId> = new Set([
 	"members",
 	"team",
 	"sessions",
-	"mcp",
 ]);
 
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);

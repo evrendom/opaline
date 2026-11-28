@@ -55,6 +55,7 @@ This file is the instructions for every coding agent: Codex reads `AGENTS.md`, a
 | `packages/api-routes` (`@rudel/api-routes`) | Shared RPC contract (`@orpc/contract` + Zod schemas). Single source of truth for the API interface. |
 | `packages/ch-schema` (`@rudel/ch-schema`) | ClickHouse table schema (`rudel.claude_sessions`, `rudel.session_analytics`), generated TypeScript types, and ingest functions via `chkit`. The root entry point is full and pulls in `@chkit/core` and `@clickhouse/client`; `@rudel/ch-schema/generated` and `@rudel/ch-schema/connection` are lightweight. **Use the narrowest entry point** for runtime imports to avoid loading heavy ClickHouse dependencies. |
 | `packages/sql-schema` (`@rudel/sql-schema`) | Drizzle ORM schema for Postgres auth tables (`user`, `session`, `account`, `verification`, `user_avatar`). |
+| `packages/cli-retire` (`@rudel/cli-retire`) | Removes what the retired CLI installed (its hooks, Codex notify wrapper, cloud MCP servers, saved sign-in and cloud state) and detects it read-only. Bundled into the CLI, which runs it on every command, and used by the Mac app's server for its "Remove" banner and MCP instructions. |
 | `packages/typescript-config` (`@rudel/typescript-config`) | Shared `tsconfig` base files (`base.json`, `node.json`, `react-library.json`). |
 
 Local development databases: `scripts/dev-compose.yml` starts Postgres and ClickHouse (`bun run infra:up`).

@@ -16,7 +16,6 @@ export {
 } from "./session-arrivals.js";
 
 import { cliDataContract } from "./cli-data.js";
-import { CliUpdateStatusSchema } from "./cli-version.js";
 import {
 	LiveSessionAppendInputSchema,
 	LiveSessionAppendOutputSchema,
@@ -407,7 +406,6 @@ export * from "./analysis-measures.js";
 export * from "./analysis-peek.js";
 export * from "./avatar.js";
 export * from "./cli-data.js";
-export * from "./cli-version.js";
 export * from "./device-flow.js";
 export * from "./github-repository-evidence.js";
 export * from "./live-session.js";
@@ -1232,7 +1230,6 @@ export const contract = {
 		authStatus: oc.output(CliUserSchema),
 		revokeToken: oc.output(z.object({ success: z.literal(true) })),
 		setupStatus: oc.output(CliSetupStatusSchema),
-		updateStatus: oc.output(CliUpdateStatusSchema),
 		sessionUploadStatus: oc
 			.input(CliSessionUploadStatusInputSchema)
 			.output(CliSessionUploadStatusOutputSchema),

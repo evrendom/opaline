@@ -105,21 +105,6 @@ describe("AppSidebar", () => {
 		compass.enabled = false;
 	});
 
-	it("offers the install command above settings", () => {
-		renderSidebar();
-
-		const footer = screen.getByRole("contentinfo");
-		const items = within(footer).getAllByRole("listitem");
-		expect(
-			within(items[0]).getByRole("button", {
-				name: "Copy install command: npx opaline@latest",
-			}),
-		).toHaveTextContent("npx opaline@latest");
-		expect(
-			within(items[1]).getByRole("link", { name: "Settings" }),
-		).toBeInTheDocument();
-	});
-
 	it("marks only the current section as active", () => {
 		renderSidebar();
 

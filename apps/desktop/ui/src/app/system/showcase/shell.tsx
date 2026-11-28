@@ -7,7 +7,6 @@ import {
 	SidebarNavTile,
 } from "@/features/shell/components/AppSidebar";
 import { LastSessionUploadBar } from "@/features/shell/components/last-session-upload-bar";
-import { SidebarInstallCommand } from "@/features/shell/components/SidebarInstallCommand";
 import {
 	SidebarAllReposRow,
 	SidebarRepositories,
@@ -183,14 +182,13 @@ export function ShellGroup() {
 
 			<Specimen
 				name="Sidebar footer"
-				source="features/shell/components/SidebarInstallCommand.tsx · AppSidebar.tsx (SidebarNavItem) · SidebarUserMenu.tsx"
-				where="The sidebar's foot: the install command to copy, Settings (open on any settings page) and the account row."
+				source="features/shell/components/AppSidebar.tsx (SidebarNavItem) · SidebarUserMenu.tsx"
+				where="The sidebar's foot: Settings (open on any settings page) and the account row."
 			>
 				{(["Settings at rest", "Settings open"] as const).map((label) => (
 					<State key={label} label={label}>
 						<Chrome>
 							<SidebarMenu>
-								<SidebarInstallCommand />
 								<SidebarNavItem
 									route={shellRouteMap.settings}
 									active={label === "Settings open"}

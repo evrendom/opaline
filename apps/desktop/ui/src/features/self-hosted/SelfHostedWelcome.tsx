@@ -8,8 +8,7 @@ import { useLocalDesktopApp } from "@/features/desktop/local-app";
 import { useShellOnboardingPanel } from "@/features/shell/shell-onboarding-panel";
 import { useOrganization } from "@/features/workspace/organization/useOrganization";
 import { orpc } from "@/lib/orpc";
-import { SelfHostedCommand } from "./SelfHostedCommand";
-import { selfHostedWelcomeCopy } from "./teammate-setup";
+import { selfHostedWelcomeCopy } from "./welcome-copy";
 import "@/features/cli-onboarding/cli-onboarding.css";
 import "@/features/cli-onboarding/welcome.css";
 import "./self-hosted.css";
@@ -27,11 +26,9 @@ export function SelfHostedWelcome() {
 	const localApp = useLocalDesktopApp();
 	const workspace = state.activeOrg ?? state.organizations[0];
 	const copy = selfHostedWelcomeCopy(
-		window.location.origin,
 		{
 			pending: setupStatus.isPending,
 			hasUploadedSessions: setupStatus.data?.hasUploadedSessions === true,
-			hasCliLogin: setupStatus.data?.hasCliLogin === true,
 		},
 		localApp,
 	);
@@ -42,25 +39,6 @@ export function SelfHostedWelcome() {
 					<WelcomePanel>
 						<h1>{copy.title}</h1>
 						<p>{copy.body}</p>
-						{copy.forTeammates ? (
-							<h2 className="self-hosted-welcome-section-title">
-								For teammates
-							</h2>
-						) : null}
-						{copy.steps.length ? (
-							<ol className="self-hosted-steps" data-numbered="">
-								{copy.steps.map((step) => (
-									<li key={step.id}>
-										<h3>{step.title}</h3>
-										<SelfHostedCommand
-											command={step.command}
-											label={step.title}
-										/>
-										<p>{step.description}</p>
-									</li>
-								))}
-							</ol>
-						) : null}
 						{workspace ? (
 							<Link
 								className="self-hosted-welcome-open"
@@ -72,7 +50,7 @@ export function SelfHostedWelcome() {
 					</WelcomePanel>,
 					panel,
 				)}
-			<WelcomeSessionPreview snapshot={null} />
+			<WelcomeSessionPreview />
 		</>
 	);
 }

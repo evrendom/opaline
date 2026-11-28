@@ -10,7 +10,6 @@ import { Reveal } from "@/app/ui/bones";
 import { EmptyState, PageEmptyState } from "@/components/dashboard/page-parts";
 import { CodeSkeleton } from "@/components/pierre/code-skeleton";
 import { RetryButton } from "@/components/retry-button";
-import { CliUpdateNoticeContent } from "@/features/cli-update/CliUpdateNotice";
 import { BreakdownEmpty } from "@/features/costs/breakdown-empty";
 import { ChartEmptyNotice } from "@/features/costs/chart-empty-notice";
 import { ChartSkeleton } from "@/features/costs/cost-chart";
@@ -20,7 +19,6 @@ import { SessionsOverviewEmpty } from "@/features/sessions/components/sessions-o
 import { SessionsOverviewSample } from "@/features/sessions/components/sessions-overview-skeleton";
 import { SettingsPageSkeleton } from "@/features/settings/components/settings-page-skeleton";
 import { ProductLoadingIndicator } from "@/features/shell/product-loading-screen";
-import "@/features/cli-update/cli-update-notice.css";
 import "@/features/costs/cost-dashboard.css";
 import { Group, Specimen, State } from "./kit";
 
@@ -236,21 +234,6 @@ export function FeedbackGroup() {
 				<div className="w-full overflow-hidden corner-s shadow-card">
 					<OutageBanner />
 				</div>
-			</Specimen>
-			<Specimen
-				name="CliUpdateNoticeContent (menu-surface, menu-heading, menu-list, menu-row)"
-				source="features/cli-update/CliUpdateNotice.tsx"
-				where="Bottom left of the window when the installed CLI is older than the latest."
-			>
-				<Box className="h-40 w-80">
-					<CliUpdateNoticeContent
-						status={{
-							installedVersion: "1.4.2",
-							latestVersion: "1.6.0",
-							outdated: true,
-						}}
-					/>
-				</Box>
 			</Specimen>
 		</Group>
 	);

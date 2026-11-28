@@ -60,33 +60,6 @@
 	color: var(--ink);
 	text-decoration: underline;
 }
-.cli-welcome-progress {
-	display: flex;
-	flex-direction: column;
-	align-items: flex-end;
-	gap: var(--space-s);
-	color: var(--ink-3);
-	font-size: var(--size-l);
-	line-height: var(--line-l);
-	letter-spacing: var(--letter-spacing-l);
-	font-variant-numeric: tabular-nums;
-}
-.cli-welcome-progress ol {
-	display: flex;
-	gap: var(--space-s);
-	list-style: none;
-	padding: var(--space-zero);
-	margin: var(--space-zero);
-}
-.cli-welcome-progress li {
-	width: 18px;
-	height: 2px;
-	border-radius: var(--radius-xs);
-	background: var(--line);
-}
-.cli-welcome-progress li[data-complete="true"] {
-	background: var(--ink);
-}
 .cli-onboarding-surface.cli-welcome-form {
 	flex: 0 0 auto;
 	width: 100%;
@@ -116,10 +89,6 @@
 	text-wrap: pretty;
 	margin: var(--space-zero) var(--space-zero) var(--space-xxxl);
 }
-.cli-welcome-form .cli-welcome-command {
-	font: inherit;
-	border-radius: var(--radius-s);
-}
 .cli-welcome-form .cli-welcome-command:disabled {
 	opacity: 0.55;
 	cursor: default;
@@ -129,196 +98,10 @@
 	/* the focus-outline mark */
 	outline: 2px solid var(--accent);
 	outline-offset: 1px;
-}
-.cli-welcome-form .cli-welcome-command {
-	width: 100%;
-	height: 44px;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	gap: var(--space-m);
-	font-size: var(--size-l);
-	line-height: var(--line-l);
-	letter-spacing: var(--letter-spacing-l);
-	font-weight: var(--weight-body-medium);
-	font-feature-settings: "ss03";
-	min-height: 44px;
-}
-/* The shared marketing CTA is a black pill; dark mirrors it to a light one,
-   with light frosted glass over the same opal glow. */
-.dark .cli-welcome-command.instant-v2-button-primary,
-.dark .cli-welcome-command.instant-v2-button-primary:focus-visible {
-	background: var(--primary);
-	color: var(--primary-fg);
-}
-.dark .cli-welcome-command .instant-v2-button-glass {
-	background: color-mix(in oklab, var(--ink-2) 40%, transparent);
-	box-shadow:
-		inset 0 0 0 0.5px color-mix(in oklab, var(--primary-fg) 10%, transparent),
-		inset 0 1px 0 color-mix(in oklab, var(--ink) 60%, transparent);
-}
-.cli-welcome-command svg {
-	flex-shrink: 0;
-}
-.cli-welcome-command span {
-	overflow-wrap: anywhere;
-}
-.cli-welcome-command + .cli-onboarding-error {
-	margin-top: var(--space-l);
-}
-.cli-welcome-form .cli-onboarding-auth-options {
-	gap: var(--space-l);
-}
-.cli-welcome-form .cli-onboarding-divider {
-	display: flex;
-	gap: var(--space-l);
-	align-items: center;
-	padding: var(--space-xs) var(--space-zero);
-}
-.cli-welcome-form .cli-onboarding-divider::before,
-.cli-welcome-form .cli-onboarding-divider::after {
-	content: "";
-	height: 1px;
-	flex: 1;
-	background: var(--line);
-}
-.cli-welcome-form .cli-onboarding-terms {
-	margin-top: var(--space-xxxl);
-	font-size: var(--size-s);
-	letter-spacing: var(--letter-spacing-s);
-	line-height: var(--line-s);
-}
-.cli-welcome-form .cli-onboarding-error {
-	color: var(--error);
-}
-.cli-device-code {
-	width: 100%;
-}
-.cli-device-code-value {
-	display: flex;
-	width: 100%;
-	min-width: 0;
-	align-items: center;
-	gap: clamp(3px, 0.5vw, 6px);
-}
-.cli-device-code-character {
-	display: grid;
-	width: auto;
-	min-width: 0;
-	height: 56px;
-	flex: 1 1 0;
-	place-items: center;
-	border: var(--border-m) solid var(--line);
-	border-radius: var(--radius-s);
-	background: var(--surface);
-	color: var(--ink);
-	font-family: inherit;
-	font-size: var(--size-xxl);
-	letter-spacing: var(--letter-spacing-xxl);
-	font-weight: var(--weight-body-heavy);
-	font-variant-numeric: tabular-nums;
-	line-height: 1;
-}
-.cli-device-code-separator {
-	display: grid;
-	width: 10px;
-	flex: 0 0 10px;
-	place-items: center;
-	color: var(--ink-3);
-	font-size: var(--size-xxl);
-	line-height: var(--line-xxl);
-	letter-spacing: var(--letter-spacing-xxl);
-}
-.cli-device-code + .cli-onboarding-error {
-	margin: var(--space-l) var(--space-zero) var(--space-zero);
-}
-.cli-welcome-fields {
-	display: grid;
-	gap: var(--space-xxl);
-}
-.cli-welcome-field {
-	display: grid;
-	gap: var(--space-l);
-	min-width: 0;
-}
-.cli-welcome-field label {
-	color: var(--ink-3);
-	font-size: var(--size-l);
-	line-height: var(--line-l);
-	letter-spacing: var(--letter-spacing-l);
-}
-.cli-welcome-form .cli-welcome-slug-status {
-	margin: var(--space-zero);
-	font-size: var(--size-m);
-	letter-spacing: var(--letter-spacing-m);
-	line-height: var(--line-m);
-	color: var(--ink-3);
-}
-.cli-welcome-form .cli-welcome-slug-status[data-status="available"] {
-	color: var(--success);
-}
-.cli-welcome-form .cli-welcome-slug-status[data-status="invalid"],
-.cli-welcome-form .cli-welcome-slug-status[data-status="taken"] {
-	color: var(--error);
-}
-.cli-welcome-form .cli-welcome-upload-note {
-	font-size: var(--size-m);
-	line-height: var(--line-m);
-	letter-spacing: var(--letter-spacing-m);
-	margin: var(--space-zero);
-}
-.cli-welcome-actions {
-	display: flex;
-	flex-direction: column-reverse;
-	align-items: center;
-	justify-content: flex-end;
-	gap: var(--space-l);
-	padding-top: var(--space-xxl);
-}
-.cli-welcome-profile-row {
-	display: flex;
-	gap: var(--space-l);
-	align-items: center;
-}
-.cli-welcome-avatar {
-	width: 48px;
-	height: 48px;
-	flex: 0 0 48px;
-	border-radius: 50%;
-	display: grid;
-	place-items: center;
-	position: relative;
-	overflow: hidden;
-	border: var(--border-m) solid var(--line);
-}
-.cli-welcome-avatar img {
-	width: 100%;
-	height: 100%;
-	object-fit: cover;
-}
-.cli-welcome-form .cli-welcome-avatar input {
-	position: absolute;
-	inset: 0;
-	opacity: 0;
-	width: 100%;
-}
-.cli-welcome-step-content {
-	animation: welcome-form-enter var(--motion-large-duration)
-		var(--motion-strong-easing) both;
-}
-/* The preview uses the same surface, row tracks and badges as the dashboard. */
+} /* The shared marketing CTA is a black pill; dark mirrors it to a light one,
+   with light frosted glass over the same opal glow. */ /* The preview uses the same surface, row tracks and badges as the dashboard. */
 .cli-welcome-preview [data-session-disabled] [data-dashboard-grid-row-scope] {
 	opacity: 1;
-}
-@keyframes welcome-form-enter {
-	from {
-		opacity: 0;
-		transform: translateY(6px);
-	}
-	to {
-		opacity: 1;
-		transform: none;
-	}
 }
 @media (max-width: 899px) {
 	.cli-welcome-panel-content {
@@ -335,11 +118,6 @@
 		font-size: var(--display-size-xxs);
 		line-height: var(--display-line-xxs);
 		letter-spacing: var(--display-letter-spacing-xxs);
-	}
-}
-@media (prefers-reduced-motion: reduce) {
-	.cli-welcome-step-content {
-		animation: none;
 	}
 }
 

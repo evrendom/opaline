@@ -115,13 +115,13 @@ test("the detail page exposes the error and all stored diagnostics, including ze
 	]) {
 		expect(html).toContain(value);
 	}
-	expect(html).not.toContain("Retry this session with");
-	expect(
-		renderToStaticMarkup(
-			<SessionUploadFailureDetail
-				failure={{ ...failure, retryable: true }}
-				userLabel="Test member"
-			/>,
-		),
-	).toContain("opaline upload");
+	const retryable = renderToStaticMarkup(
+		<SessionUploadFailureDetail
+			failure={{ ...failure, retryable: true }}
+			userLabel="Test member"
+		/>,
+	);
+	expect(retryable).toContain(failure.error);
+	expect(retryable).not.toContain("opaline upload");
+	expect(retryable).not.toContain("size yet");
 });

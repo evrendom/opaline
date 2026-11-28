@@ -10,7 +10,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { CREDENTIALS_FILE } from "../retire/state.js";
+import { CREDENTIALS_FILE } from "@rudel/cli-retire";
 import {
 	makeHome,
 	persistentClaudeHook,
