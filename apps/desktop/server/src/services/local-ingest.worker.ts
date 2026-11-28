@@ -1,4 +1,7 @@
-import { lowerWorkerThreadPriority } from "../lib/background-work.js";
+import {
+	lowerWorkerThreadPriority,
+	markThreadAsBackgroundWork,
+} from "../lib/background-work.js";
 import { runIngestWorkInline } from "../lib/inline-work.js";
 import type { SessionOutcome } from "../selfhost/local-ingest/service.js";
 import {
@@ -11,6 +14,7 @@ import type {
 } from "./local-ingest-thread.types.js";
 
 void lowerWorkerThreadPriority();
+markThreadAsBackgroundWork();
 
 declare const self: {
 	addEventListener(

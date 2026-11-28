@@ -44,9 +44,10 @@ export async function duplicateExit(
 				sourceContentSha256: transcriptHash,
 			},
 		);
-	const transcriptRecordsCurrent = await deps.stores.recordsCurrent(
-		deps.stores.executor(),
-		{
+	// Off (and so current) for a hot import, which owes them to a full one.
+	const transcriptRecordsCurrent =
+		!enabled.records.enabled ||
+		(await deps.stores.recordsCurrent(deps.stores.executor(), {
 			config: enabled.records,
 			content: filteredInput.content,
 			contentSha256: transcriptHash,
@@ -54,8 +55,7 @@ export async function duplicateExit(
 			sessionId: input.sessionId,
 			subagents: prepared.subagents,
 			userId: context.user.id,
-		},
-	);
+		}));
 	if (!skillReceiptMatches || !transcriptRecordsCurrent) {
 		logger.info(
 			"Reprocessing duplicate session with a missing or stale derived-data receipt (organization_id={organizationId} session_id={sessionId} skills_current={skillsCurrent} transcript_records_current={transcriptRecordsCurrent})",

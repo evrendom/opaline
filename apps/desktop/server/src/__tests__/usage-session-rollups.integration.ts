@@ -216,14 +216,20 @@ describe("usage session rollups", () => {
 			"SELECT * FROM usage_analytics_daily_sessions ORDER BY session_id, usage_date",
 			"SELECT * EXCEPT (receipt_generation, latest_receipt_event_count, latest_receipt_is_complete, latest_receipt_is_deleted, active_event_count) FROM priced_usage_groups ORDER BY ALL",
 		]) {
-			const read = (source: UsageSource) =>
+			const read = (
+				source: UsageSource,
+				stale: Parameters<typeof buildUsageEventAnalyticsCte>[3] = [],
+			) =>
 				executor.query<Record<string, unknown>>({
-					query: `WITH ${buildUsageEventAnalyticsCte({}, false, source)} ${query}`,
+					query: `WITH ${buildUsageEventAnalyticsCte({}, false, source, stale)} ${query}`,
 					query_params: { orgId: organizationId },
 				});
 			const events = await read("events");
 			expect(events.length).toBeGreaterThan(0);
 			expect(await read("rollups")).toEqual(events);
+			expect(
+				await read("rollups", [{ sessionId: codex, source: "codex", userId }]),
+			).toEqual(events);
 		}
 	});
 
@@ -314,18 +320,22 @@ describe("usage session rollups", () => {
 		expect(ours(await candidates())).toEqual([]);
 	});
 
-	test("a workspace prices from the rollups only while every session has a current one", async () => {
+	test("a workspace prices each session from a current rollup and the rest from their events", async () => {
 		const key = (sessionId: string) => ({
 			organizationId: guardOrganizationId,
 			sessionId,
 			source: "claude_code",
 			userId,
 		});
-		const readsRollups = async () => {
+		// The sessions priced from their events, or null when none are priced from rollups.
+		const fromEvents = async () => {
 			clearUsageRollupReadiness();
-			return (
-				await getUsageAnalyticsQueryContext(guardOrganizationId)
-			).cteDefinitions.includes(USAGE_SESSION_ROLLUPS_TABLE);
+			const context = await getUsageAnalyticsQueryContext(guardOrganizationId);
+			if (!context.cteDefinitions.includes(USAGE_SESSION_ROLLUPS_TABLE))
+				return null;
+			return (context.staleRollupSessions ?? [])
+				.map((session) => session.sessionId)
+				.sort();
 		};
 		const first = `guard_first_${runId}`;
 		const second = `guard_second_${runId}`;
@@ -343,13 +353,13 @@ describe("usage session rollups", () => {
 				"claude_code",
 				guardOrganizationId,
 			);
-		expect(await readsRollups()).toBe(false);
+		expect(await fromEvents()).toBeNull();
 
 		await refreshUsageSessionRollups(executor, [key(first)]);
-		expect(await readsRollups()).toBe(false);
+		expect(await fromEvents()).toEqual([second]);
 
 		await refreshUsageSessionRollups(executor, [key(second)]);
-		expect(await readsRollups()).toBe(true);
+		expect(await fromEvents()).toEqual([]);
 
 		const [row] = await executor.query<Record<string, unknown>>({
 			query: `SELECT * FROM ${USAGE_SESSION_ROLLUPS_TABLE} FINAL WHERE organization_id = {organization:String} AND session_id = {sessionId:String}`,
@@ -359,10 +369,10 @@ describe("usage session rollups", () => {
 			table: USAGE_SESSION_ROLLUPS_TABLE,
 			values: [{ ...row, build_version: 1 }],
 		});
-		expect(await readsRollups()).toBe(false);
+		expect(await fromEvents()).toEqual([first]);
 
 		await refreshUsageSessionRollups(executor, [key(first)]);
-		expect(await readsRollups()).toBe(true);
+		expect(await fromEvents()).toEqual([]);
 
 		await upload(
 			first,
@@ -372,7 +382,7 @@ describe("usage session rollups", () => {
 			"claude_code",
 			guardOrganizationId,
 		);
-		expect(await readsRollups()).toBe(false);
+		expect(await fromEvents()).toEqual([first]);
 		const candidates = await executor.query<{ session_id: string }>(
 			buildUsageRollupCandidatesStatement({
 				checkReceipts: true,
@@ -384,10 +394,10 @@ describe("usage session rollups", () => {
 			first,
 		);
 		await refreshUsageSessionRollups(executor, [key(first)]);
-		expect(await readsRollups()).toBe(true);
+		expect(await fromEvents()).toEqual([]);
 
 		process.env.USAGE_ROLLUP_ORG_IDS = "none";
-		expect(await readsRollups()).toBe(false);
+		expect(await fromEvents()).toBeNull();
 	});
 
 	test("the backfill rechecks rows built before their receipt or right after an upload, and waits out a back-off", async () => {

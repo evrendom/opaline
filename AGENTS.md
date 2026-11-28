@@ -117,7 +117,7 @@ Local development databases: `scripts/dev-compose.yml` starts Postgres and Click
 | `USAGE_EVENT_EXTRACTION_ENABLED` | No | Usage-event extraction kill switch. Set `false` to keep raw ingest available while bypassing extraction (default: `true`). |
 | `USAGE_EVENT_ANALYTICS_CUTOVER_MODE` | No | Request-level analytics routing: `off`, `canary`, or `all`. Missing and invalid values fail closed to `off`. A self-hosted server defaults it to `all`, with `USAGE_ROLLUP_ORG_IDS=all` and `USAGE_ROLLUP_BACKFILL_ENABLED=1`, as production sets them. |
 | `USAGE_EVENT_ANALYTICS_CANARY_ORG_IDS` | No | Comma-separated organization IDs routed to request-level analytics in `canary` mode. An empty list keeps the cutover off. |
-| `USAGE_ROLLUP_ORG_IDS` | No | Workspaces that price from per-session usage rollups, each only while every session has a current rollup. Unset or `all`: every workspace; `none`: none (kill switch); otherwise a comma-separated list. |
+| `USAGE_ROLLUP_ORG_IDS` | No | Workspaces that price from per-session usage rollups. A session whose rollup is missing or behind its latest upload or usage receipt (a live session between its import and its rollup rebuild) is priced from its events in the same query; with more than 100 such sessions (`USAGE_ROLLUP_MAX_STALE_SESSIONS`) the whole workspace prices from events. Coverage is checked at most every 30 seconds per workspace. Unset or `all`: every workspace; `none`: none (kill switch); otherwise a comma-separated list. |
 | `USAGE_EXTRACTION_QUEUE_GLOBAL_MAX_BYTES` | No | Maximum active-plus-queued extraction bytes per API process (default: 256 MiB). |
 | `USAGE_EXTRACTION_QUEUE_GLOBAL_MAX_JOBS` | No | Maximum active-plus-queued extraction jobs per API process (default: 8). |
 | `USAGE_EXTRACTION_QUEUE_PER_USER_MAX_BYTES` | No | Maximum active-plus-queued extraction bytes for one authenticated user (default: 128 MiB). |
@@ -250,6 +250,8 @@ Shared avatar constants (size caps, MIME allowlist, regex patterns) live in `pac
 ## Self-Hosting
 
 The Mac app (`apps/desktop/shell`, with `packages/local-server`) runs this server in self-hosted mode on one Mac. The entry point is `apps/desktop/server/src/selfhost/main.ts` (env checks, migrations, schema, HTTP, scheduler in `selfhost/scheduler.ts`); the `/api/selfhost/*` routes are in `handlers/selfhost-http.ts`. Self-hosted behaviour stays behind `isSelfHosted()`. The hosted service (Vercel functions, Convex, the website, the Docker team server) is not in this repository.
+
+Local ingest (`selfhost/local-ingest/service.ts`) imports due sessions most recently written first (a subagent's write counts for its parent). A re-import of a live session (written in the last `coldQuietMs`, 3 minutes, and not ended) is hot (`importSession` `derived: "hot"`): it stores the raw revision, usage, its receipt and rollup and the Codex lineage, and skips language signals, transcript records (with the run index, search index and git observations) and skills; the session gets one full import once it has been quiet that long, when its agent says it ended, or when its page asks for it (`refresh`), and a pending full import survives a restart in `local_ingest_file.next_attempt_at` of its `ingested` row. Every other caller and every first, final or history import stays full.
 
 ## ClickHouse Schema Management (chkit)
 

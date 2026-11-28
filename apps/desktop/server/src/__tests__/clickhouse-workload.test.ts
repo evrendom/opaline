@@ -4,6 +4,7 @@ import {
 	clickHouseWorkloadForPath,
 	runAsClickHouseWorkload,
 } from "../clickhouse-workload.js";
+import { runAsBackgroundWork } from "../lib/background-work.js";
 
 const requests: URL[] = [];
 const server = Bun.serve({
@@ -46,6 +47,35 @@ describe("ClickHouse workload settings", () => {
 				),
 			),
 		).toEqual({ maxThreads: "2", priority: "5" });
+	});
+
+	test("scheduled jobs and local imports run at the background priority", async () => {
+		expect(
+			await sentSettings(() =>
+				runAsBackgroundWork(() => executor.query({ query: "SELECT 1" })),
+			),
+		).toEqual({ maxThreads: "2", priority: "5" });
+	});
+
+	test("a thread marked as background sends every statement at the background priority", async () => {
+		const source = `
+			const { markThreadAsBackgroundWork } = await import(${JSON.stringify(new URL("../lib/background-work.ts", import.meta.url).href)});
+			const { currentClickHouseWorkload } = await import(${JSON.stringify(new URL("../clickhouse-workload.ts", import.meta.url).href)});
+			const before = currentClickHouseWorkload();
+			markThreadAsBackgroundWork();
+			postMessage({ before, after: currentClickHouseWorkload() });
+		`;
+		const worker = new Worker(
+			URL.createObjectURL(new Blob([source], { type: "text/javascript" })),
+		);
+		const result = await new Promise((resolve) => {
+			worker.onmessage = (event) => resolve(event.data);
+		});
+		worker.terminate();
+		expect(result).toEqual({ before: "interactive", after: "background" });
+		expect(
+			await sentSettings(() => executor.query({ query: "SELECT 1" })),
+		).toEqual({ maxThreads: "4", priority: "1" });
 	});
 
 	test("a statement's own settings win", async () => {

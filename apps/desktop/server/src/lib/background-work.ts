@@ -3,6 +3,7 @@ import { setPriority } from "node:os";
 import type { ClickHouseSettings } from "@clickhouse/client-web";
 
 const background = new AsyncLocalStorage<true>();
+let threadIsBackground = false;
 
 export const BACKGROUND_CLICKHOUSE_MAX_THREADS = 2;
 export const BACKGROUND_WORKERS_ENV = "OPALINE_BACKGROUND_WORKERS";
@@ -12,7 +13,16 @@ export function runAsBackgroundWork<T>(work: () => Promise<T>): Promise<T> {
 }
 
 export function isBackgroundWork(): boolean {
-	return background.getStore() === true;
+	return threadIsBackground || background.getStore() === true;
+}
+
+/**
+ * Everything this thread does is background work: its ClickHouse statements run
+ * at the background priority, below the dashboard's reads. For the threads that
+ * run jobs and imports end to end (maintenance, local import).
+ */
+export function markThreadAsBackgroundWork(): void {
+	threadIsBackground = true;
 }
 
 export function withBackgroundClickHouseSettings(

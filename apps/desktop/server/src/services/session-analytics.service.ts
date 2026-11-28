@@ -404,7 +404,7 @@ async function getSessionAnalyticsBaseRows(
 				AND ${buildSessionHasSubagentsSql("sa")}
 				AND ${dateFilter}
 		),
-		${buildSubagentUsageCte("session_list_agent_parents", usage.usageSource)},
+		${buildSubagentUsageCte("session_list_agent_parents", usage.usageSource, usage.staleRollupSessions)},
 		session_list_rows AS (
 			SELECT ${SESSION_LIST_ROW_COLUMNS},
 				error_count,

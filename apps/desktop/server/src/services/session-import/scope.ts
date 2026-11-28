@@ -39,6 +39,8 @@ export interface ImportRun {
 	readonly clickhouse: ClickHouseExecutor;
 	readonly deps: SessionImportDependencies;
 	readonly enabled: {
+		/** Off for a hot import, like skills and records. */
+		readonly languageSignals: boolean;
 		readonly records: TranscriptRecordsExtractionConfig;
 		readonly skills: boolean;
 		readonly usage: boolean;

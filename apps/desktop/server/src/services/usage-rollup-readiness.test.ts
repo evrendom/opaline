@@ -3,13 +3,24 @@ import type { ClickHouseExecutor, ClickHouseStatement } from "../clickhouse.js";
 import {
 	buildUsageRollupCoverageStatement,
 	clearUsageRollupReadiness,
-	hasCompleteUsageRollups,
-	isUsageRollupCoverageComplete,
+	readUsageRollupCoverage,
 	USAGE_ROLLUP_BUILD_VERSION,
+	USAGE_ROLLUP_MAX_STALE_SESSIONS,
+	usageRollupCoverageFromRow,
 } from "./usage-session-rollup.service.js";
 
+type Stale = Array<[string, string, string]>;
+const stale = (count: number): Stale =>
+	Array.from({ length: count }, (_, index) => [
+		"user-a",
+		"claude_code",
+		`session-${index}`,
+	]);
+
 function coverageExecutor(
-	answer: () => Promise<Array<{ rolled_up: number; uncovered: number }>>,
+	answer: () => Promise<
+		Array<{ rolled_up: number; uncovered: number; stale?: Stale }>
+	>,
 ) {
 	const statements: ClickHouseStatement[] = [];
 	const executor = {
@@ -24,20 +35,60 @@ function coverageExecutor(
 beforeEach(() => clearUsageRollupReadiness());
 
 describe("usage rollup readiness", () => {
-	test("a workspace is ready only when every session has a current rollup", () => {
-		expect(isUsageRollupCoverageComplete(undefined)).toBe(false);
-		expect(isUsageRollupCoverageComplete({ rolled_up: 0, uncovered: 0 })).toBe(
-			false,
-		);
-		expect(isUsageRollupCoverageComplete({ rolled_up: 0, uncovered: 12 })).toBe(
-			false,
-		);
-		expect(isUsageRollupCoverageComplete({ rolled_up: 40, uncovered: 1 })).toBe(
-			false,
-		);
+	test("a workspace with rollups prices its few stale sessions from their events", () => {
+		const notReady = { ready: false, staleSessions: [] };
+		expect(usageRollupCoverageFromRow(undefined)).toEqual(notReady);
 		expect(
-			isUsageRollupCoverageComplete({ rolled_up: "40", uncovered: "0" }),
+			usageRollupCoverageFromRow({ rolled_up: 0, uncovered: 0, stale: [] }),
+		).toEqual(notReady);
+		expect(
+			usageRollupCoverageFromRow({
+				rolled_up: 0,
+				uncovered: 12,
+				stale: stale(12),
+			}),
+		).toEqual(notReady);
+		expect(
+			usageRollupCoverageFromRow({
+				rolled_up: "40",
+				uncovered: "0",
+				stale: [],
+			}),
+		).toEqual({ ready: true, staleSessions: [] });
+		expect(
+			usageRollupCoverageFromRow({
+				rolled_up: 40,
+				uncovered: 1,
+				stale: [["user-a", "codex", "thread-1"]],
+			}),
+		).toEqual({
+			ready: true,
+			staleSessions: [
+				{ sessionId: "thread-1", source: "codex", userId: "user-a" },
+			],
+		});
+		const most = USAGE_ROLLUP_MAX_STALE_SESSIONS;
+		expect(
+			usageRollupCoverageFromRow({
+				rolled_up: 40,
+				uncovered: most,
+				stale: stale(most),
+			}).ready,
 		).toBe(true);
+		expect(
+			usageRollupCoverageFromRow({
+				rolled_up: 40,
+				uncovered: most + 1,
+				stale: stale(most + 1),
+			}),
+		).toEqual(notReady);
+		expect(
+			usageRollupCoverageFromRow({
+				rolled_up: 40,
+				uncovered: 2,
+				stale: stale(1),
+			}),
+		).toEqual(notReady);
 	});
 
 	test("counts sessions without a rollup, of another build, built before their latest upload, or behind their latest receipt", () => {
@@ -54,6 +105,9 @@ describe("usage rollup readiness", () => {
 			"r.receipt_generation != e.receipt_generation",
 		);
 		expect(statement.query).toContain("FROM rudel.usage_events");
+		expect(statement.query).toContain(
+			`groupArrayIf(${USAGE_ROLLUP_MAX_STALE_SESSIONS + 1})`,
+		);
 		expect(
 			statement.query.match(/organization_id = \{organizationId:String\}/g),
 		).toHaveLength(3);
@@ -64,46 +118,30 @@ describe("usage rollup readiness", () => {
 		expect(statement.clickhouse_settings?.join_use_nulls).toBe(0);
 	});
 
-	test("zero rollup rows, an older build and a complete workspace", async () => {
-		const answers = [
-			{ rolled_up: 0, uncovered: 30 },
-			{ rolled_up: 30, uncovered: 3 },
-			{ rolled_up: 30, uncovered: 0 },
-		];
-		for (const [index, answer] of answers.entries()) {
-			clearUsageRollupReadiness();
-			const { executor } = coverageExecutor(async () => [answer]);
-			expect(await hasCompleteUsageRollups(executor, "org-a")).toBe(
-				index === 2,
-			);
-		}
-	});
-
-	test("caches a ready workspace for two minutes and a not-ready one for one", async () => {
+	test("caches the coverage for thirty seconds", async () => {
 		let clock = 0;
-		let answer = { rolled_up: 5, uncovered: 0 };
+		let answer = { rolled_up: 5, uncovered: 0, stale: [] as Stale };
 		const { executor, statements } = coverageExecutor(async () => [answer]);
-		const ready = () => hasCompleteUsageRollups(executor, "org-a", () => clock);
-		expect(await Promise.all([ready(), ready()])).toEqual([true, true]);
+		const read = async () =>
+			(await readUsageRollupCoverage(executor, "org-a", () => clock))
+				.staleSessions.length;
+		expect(await Promise.all([read(), read()])).toEqual([0, 0]);
 		expect(statements).toHaveLength(1);
-		clock = 119_000;
-		answer = { rolled_up: 5, uncovered: 1 };
-		expect(await ready()).toBe(true);
-		clock = 120_000;
-		expect(await ready()).toBe(false);
+		answer = { rolled_up: 5, uncovered: 1, stale: stale(1) };
+		clock = 29_999;
+		expect(await read()).toBe(0);
+		clock = 30_000;
+		expect(await read()).toBe(1);
 		expect(statements).toHaveLength(2);
-		clock += 59_000;
-		answer = { rolled_up: 6, uncovered: 0 };
-		expect(await ready()).toBe(false);
-		clock += 1_000;
-		expect(await ready()).toBe(true);
-		expect(statements).toHaveLength(3);
 	});
 
 	test("a failed check prices from the events", async () => {
 		const { executor } = coverageExecutor(async () => {
 			throw new Error("timeout");
 		});
-		expect(await hasCompleteUsageRollups(executor, "org-a")).toBe(false);
+		expect(await readUsageRollupCoverage(executor, "org-a")).toEqual({
+			ready: false,
+			staleSessions: [],
+		});
 	});
 });

@@ -41,6 +41,16 @@ export interface SessionImportRequest {
 		readonly session: AppContext["session"];
 		readonly user: { readonly id: string };
 	};
+	/**
+	 * `"hot"` (the local app's re-import of a live session) stores the raw
+	 * revision, usage, its receipt and rollup and the Codex lineage, and skips
+	 * the stages cost does not read: language signals, transcript records (with
+	 * the run index, search index and git observations) and skills. The caller
+	 * owes a `"full"` import once the session is quiet; a hot import writes no
+	 * skill or records receipt, so that import is never a duplicate. Default
+	 * `"full"`.
+	 */
+	readonly derived?: "hot" | "full";
 	readonly durableProcessing?: {
 		readonly failpoint: IngestProcessingFailpoint | undefined;
 		readonly operationId: string;
@@ -128,6 +138,8 @@ function openRun(
 	claimedLedger: ClaimedIngestProcessingLedger | undefined,
 ): ImportRun {
 	const { contentHash, filteredText, ownership } = prepared;
+	const hot = request.derived === "hot";
+	const records = readTranscriptRecordsExtractionConfig();
 	return {
 		claimedLedger,
 		clickhouse: claimedLedger
@@ -139,9 +151,10 @@ function openRun(
 			: deps.stores.executor(),
 		deps,
 		enabled: {
+			languageSignals: !hot,
 			usage: readBooleanEnv("USAGE_EVENT_EXTRACTION_ENABLED", true),
-			skills: readBooleanEnv("SKILL_EXTRACTION_ENABLED", true),
-			records: readTranscriptRecordsExtractionConfig(),
+			skills: !hot && readBooleanEnv("SKILL_EXTRACTION_ENABLED", true),
+			records: hot ? { ...records, enabled: false } : records,
 		},
 		prepared,
 		request,

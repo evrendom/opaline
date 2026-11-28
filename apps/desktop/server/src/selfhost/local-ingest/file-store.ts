@@ -56,6 +56,11 @@ export interface FileStore {
 		readonly state: "ingested" | "kept" | "skipped";
 		readonly reason: string | null;
 		readonly at: Date;
+		/**
+		 * The session was imported hot and owes a full import at this time; kept
+		 * in `next_attempt_at` of an `ingested` row, so a restart still runs it.
+		 */
+		readonly coldDueAt?: Date | null;
 	}): Promise<void>;
 	recordOutcome(input: {
 		readonly paths: readonly string[];
@@ -136,7 +141,7 @@ export function createFileStore(sql: postgres.Sql): FileStore {
 					)
 					SELECT item.path, item.source, item.role, item."sessionPath", $2, $3, $4, item.device, item.inode,
 						item.size, item."mtimeMs", item.head, item.size, item.tail, item."mtimeMs",
-						$5, $6, 0, NULL, $7::timestamptz, now()
+						$5, $6, 0, $8::timestamptz, $7::timestamptz, now()
 					FROM jsonb_to_recordset($1::text::jsonb) AS item(
 						path text, source text, role text, "sessionPath" text, device text, inode text,
 						size bigint, "mtimeMs" float8, head text, tail text
@@ -147,7 +152,7 @@ export function createFileStore(sql: postgres.Sql): FileStore {
 						size = EXCLUDED.size, mtime_ms = EXCLUDED.mtime_ms, head_sha256 = EXCLUDED.head_sha256,
 						ingested_size = EXCLUDED.ingested_size, ingested_tail_sha256 = EXCLUDED.ingested_tail_sha256,
 						ingested_mtime_ms = EXCLUDED.ingested_mtime_ms, state = EXCLUDED.state,
-						reason = EXCLUDED.reason, attempts = 0, next_attempt_at = NULL,
+						reason = EXCLUDED.reason, attempts = 0, next_attempt_at = EXCLUDED.next_attempt_at,
 						ingested_at = EXCLUDED.ingested_at, updated_at = now()`,
 					[
 						JSON.stringify(
@@ -170,6 +175,7 @@ export function createFileStore(sql: postgres.Sql): FileStore {
 						input.state,
 						input.reason,
 						input.at.toISOString(),
+						input.coldDueAt?.toISOString() ?? null,
 					],
 				);
 			}

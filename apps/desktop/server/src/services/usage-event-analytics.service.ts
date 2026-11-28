@@ -521,6 +521,8 @@ export interface UsageAnalyticsQueryContext {
 	readonly mode: "events" | "legacy";
 	readonly sessionsRelation: "usage_analytics_sessions";
 	readonly usageSource?: UsageSource;
+	/** With `usageSource` "rollups": the sessions priced from their events instead. */
+	readonly staleRollupSessions?: readonly UsageSessionRef[];
 }
 
 interface ReadinessState {
@@ -574,7 +576,7 @@ export function buildPricedUsageEventsCte(filters: string): string {
 
 export class UsageEventAnalyticsReadinessGate {
 	private readonly degradedTtlMs: number;
-	private inFlight: Promise<ReadinessState> | null = null;
+	private inFlight: Promise<ReadinessState | "slow"> | null = null;
 	private readonly now: () => number;
 	private readonly probe: () => Promise<void>;
 	private readonly readyTtlMs: number;
@@ -600,22 +602,25 @@ export class UsageEventAnalyticsReadinessGate {
 		this.inFlight ??= this.runProbe().finally(() => {
 			this.inFlight = null;
 		});
-		this.state = await this.inFlight;
-		if (this.state.status !== "ready") throwAnalyticsUnavailable();
+		const state = await this.inFlight;
+		// A probe that only ran out of time says nothing about the schema: a busy
+		// ClickHouse (a Mac app's first minutes, importing every session) answers
+		// it late. The read goes ahead under its own limits, and the next one
+		// probes again, instead of every dashboard number failing with a 503.
+		if (state === "slow") return;
+		this.state = state;
+		if (state.status !== "ready") throwAnalyticsUnavailable();
 	}
 
-	private async runProbe(): Promise<ReadinessState> {
+	private async runProbe(): Promise<ReadinessState | "slow"> {
 		let timeoutId: ReturnType<typeof setTimeout> | undefined;
-		const timeout = new Promise<never>((_, reject) => {
-			timeoutId = setTimeout(
-				() =>
-					reject(new Error("usage-event analytics readiness probe timed out")),
-				this.timeoutMs,
-			);
+		const timeout = new Promise<"slow">((resolve) => {
+			timeoutId = setTimeout(() => resolve("slow"), this.timeoutMs);
 		});
 
 		try {
-			await Promise.race([this.probe(), timeout]);
+			const outcome = await Promise.race([this.probe(), timeout]);
+			if (outcome === "slow") return "slow";
 			return { checkedAt: this.now(), status: "ready" };
 		} catch {
 			return { checkedAt: this.now(), status: "degraded" };
@@ -771,19 +776,12 @@ const SUBAGENT_SPAN_AGGREGATES = [
 export function buildSubagentUsageCte(
 	parentsRelation: string,
 	usageSource: UsageSource = "events",
+	staleRollupSessions: readonly UsageSessionRef[] = [],
 ): string {
 	const parentKeys = `(organization_id, user_id, source, session_id) IN (
 				SELECT organization_id, user_id, source, session_id FROM ${parentsRelation}
 			)`;
-	const receipts =
-		usageSource === "rollups"
-			? `
-			SELECT organization_id, user_id, source, session_id, receipt_generation
-			FROM ${getSafeClickHouseTable(USAGE_SESSION_ROLLUPS_TABLE)} FINAL
-			WHERE ${organizationMatchSql("organization_id")}
-				AND ${parentKeys}
-				AND is_consistent = 1`
-			: `
+	const eventReceipts = (sessionFilter: string) => `
 			SELECT
 				organization_id,
 				user_id,
@@ -792,10 +790,25 @@ export function buildSubagentUsageCte(
 				argMaxIf(event_version, event_version, record_kind = 'receipt') AS receipt_generation
 			FROM ${getSafeClickHouseTable(USAGE_EVENTS_TABLE)} FINAL
 			WHERE ${organizationMatchSql("organization_id")}
-				AND ${parentKeys}
+				AND ${parentKeys}${sessionFilter}
 			GROUP BY organization_id, user_id, source, session_id
 			HAVING argMaxIf(receipt_is_complete, event_version, record_kind = 'receipt') = 1
 				AND argMaxIf(is_deleted, event_version, record_kind = 'receipt') = 0`;
+	const stale = staleSessionsSql(staleRollupSessions);
+	const receipts =
+		usageSource === "rollups"
+			? `
+			SELECT organization_id, user_id, source, session_id, receipt_generation
+			FROM ${getSafeClickHouseTable(USAGE_SESSION_ROLLUPS_TABLE)} FINAL
+			WHERE ${organizationMatchSql("organization_id")}
+				AND ${parentKeys}
+				AND is_consistent = 1${stale ? `\n\t\t\t\tAND NOT ${stale}` : ""}${
+					stale
+						? `
+			UNION ALL${eventReceipts(`\n\t\t\t\tAND ${stale}`)}`
+						: ""
+				}`
+			: eventReceipts("");
 	return `
 		subagent_usage_receipts AS (${receipts}
 		),
@@ -956,33 +969,87 @@ export function buildUsageEventCandidateCtes(
 		)`;
 }
 
-function buildUsageRollupPricedGroupsCte(usageEventFilters: string): string {
+/** A session by the key columns every usage table shares after `organization_id`. */
+export interface UsageSessionRef {
+	readonly userId: string;
+	readonly source: string;
+	readonly sessionId: string;
+}
+
+function sqlStringLiteral(value: string): string {
+	return `'${value.replaceAll("\\", "\\\\").replaceAll("'", "\\'")}'`;
+}
+
+/** `(user_id, source, session_id) IN <the sessions>`, or "" for none. */
+export function staleSessionsSql(sessions: readonly UsageSessionRef[]): string {
+	if (sessions.length === 0) return "";
+	const tuples = sessions
+		.map(
+			(session) =>
+				`(${sqlStringLiteral(session.userId)}, ${sqlStringLiteral(session.source)}, ${sqlStringLiteral(session.sessionId)})`,
+		)
+		.join(", ");
+	return `(user_id, source, session_id) IN (SELECT arrayJoin(CAST([${tuples}], 'Array(Tuple(String, String, String))')))`;
+}
+
+/**
+ * Prices every session from its rollup, except `staleSessions`, whose rollup is
+ * missing or behind their usage: those are priced from their events, as if the
+ * workspace had no rollups. One live session no longer sends the whole workspace
+ * back to pricing every request it ever made.
+ */
+function buildUsageRollupPricedGroupsCte(
+	usageEventFilters: string,
+	staleSessions: readonly UsageSessionRef[],
+): string {
+	const stale = staleSessionsSql(staleSessions);
+	if (!stale)
+		return buildRollupGroupsSelect("priced_usage_groups", usageEventFilters);
 	return `
+		${buildUsageEventCandidateCtes(`${usageEventFilters}\n\t\t\t\t\tAND ${stale}`)},
+		${buildPricedUsageGroupsCtes("usage_event_pricing_candidates", "event_priced_usage_groups")},
+		${buildRollupGroupsSelect("rollup_priced_usage_groups", `${usageEventFilters}\n\t\t\t\t\tAND NOT ${stale}`)},
 		priced_usage_groups AS (
+			SELECT ${PRICED_USAGE_GROUP_COLUMNS.join(", ")} FROM rollup_priced_usage_groups
+			UNION ALL
+			SELECT ${PRICED_USAGE_GROUP_COLUMNS.join(", ")} FROM event_priced_usage_groups
+		)`;
+}
+
+const PRICED_USAGE_GROUP_COLUMNS = [
+	"organization_id",
+	"user_id",
+	"source",
+	"session_id",
+	"record_kind",
+	"usage_date",
+	"pricing_identity",
+	"model_provider",
+	"service_tier",
+	"inference_speed",
+	"inference_geo",
+	"context_band",
+	"is_priceable",
+	"has_geo_gap",
+	"latest_main_model",
+	"latest_event_model",
+	"group_uncached_input_tokens",
+	"group_cache_read_input_tokens",
+	"group_cache_write_5m_input_tokens",
+	"group_cache_write_1h_input_tokens",
+	"group_output_tokens",
+	"pricing_model",
+	"group_estimated_cost",
+] as const;
+
+function buildRollupGroupsSelect(
+	relation: string,
+	usageEventFilters: string,
+): string {
+	return `
+		${relation} AS (
 			SELECT
-				organization_id,
-				user_id,
-				source,
-				session_id,
-				record_kind,
-				usage_date,
-				pricing_identity,
-				model_provider,
-				service_tier,
-				inference_speed,
-				inference_geo,
-				context_band,
-				is_priceable,
-				has_geo_gap,
-				latest_main_model,
-				latest_event_model,
-				group_uncached_input_tokens,
-				group_cache_read_input_tokens,
-				group_cache_write_5m_input_tokens,
-				group_cache_write_1h_input_tokens,
-				group_output_tokens,
-				pricing_model,
-				group_estimated_cost
+				${PRICED_USAGE_GROUP_COLUMNS.join(",\n\t\t\t\t")}
 			FROM (
 				SELECT *
 				FROM ${getSafeClickHouseTable(USAGE_SESSION_ROLLUPS_TABLE)} FINAL
@@ -1009,7 +1076,10 @@ function buildUsageRollupPricedGroupsCte(usageEventFilters: string): string {
 		)`;
 }
 
-export function buildPricedUsageGroupsCtes(candidatesRelation: string): string {
+export function buildPricedUsageGroupsCtes(
+	candidatesRelation: string,
+	outputRelation = "priced_usage_groups",
+): string {
 	return `
 		usage_event_pricing_groups AS (
 			SELECT
@@ -1020,7 +1090,7 @@ export function buildPricedUsageGroupsCtes(candidatesRelation: string): string {
 		usage_event_pricing_rate_card AS (
 			${EVENT_PRICING_RATE_CARD_SQL}
 		),
-		priced_usage_groups AS (
+		${outputRelation} AS (
 			${buildPricedGroupsSelect("usage_event_pricing_groups")}
 		)`;
 }
@@ -1031,6 +1101,7 @@ export function buildUsageEventAnalyticsCte(
 	scope: UsageAnalyticsScope = {},
 	lineageEnabled?: boolean,
 	usageSource: UsageSource = "events",
+	staleRollupSessions: readonly UsageSessionRef[] = [],
 ): string {
 	const usageEventFilters = buildUsageEventFilters(scope);
 	// The organization/key filters follow the table's primary-key prefix, so FINAL
@@ -1045,7 +1116,10 @@ export function buildUsageEventAnalyticsCte(
 		${scope.window ? `${buildUsageWindowCte(scope.window, usageSource)},` : ""}
 		${
 			usageSource === "rollups"
-				? buildUsageRollupPricedGroupsCte(usageEventFilters)
+				? buildUsageRollupPricedGroupsCte(
+						usageEventFilters,
+						staleRollupSessions,
+					)
 				: `${buildUsageEventCandidateCtes(usageEventFilters)},
 		${buildPricedUsageGroupsCtes("usage_event_pricing_candidates")}`
 		},
@@ -1235,16 +1309,22 @@ function throwAnalyticsUnavailable(): never {
 	});
 }
 
-async function resolveUsageSource(
-	organizationId: string,
-): Promise<UsageSource> {
-	if (!shouldReadUsageRollups(organizationId)) return "events";
-	const { hasCompleteUsageRollups } = await import(
+async function resolveUsageSource(organizationId: string): Promise<{
+	readonly usageSource: UsageSource;
+	readonly staleRollupSessions: readonly UsageSessionRef[];
+}> {
+	const events = { usageSource: "events", staleRollupSessions: [] } as const;
+	if (!shouldReadUsageRollups(organizationId)) return events;
+	const { readUsageRollupCoverage } = await import(
 		"./usage-session-rollup.service.js"
 	);
-	return (await hasCompleteUsageRollups(getClickhouse(), organizationId))
-		? "rollups"
-		: "events";
+	const coverage = await readUsageRollupCoverage(
+		getClickhouse(),
+		organizationId,
+	);
+	return coverage.ready
+		? { usageSource: "rollups", staleRollupSessions: coverage.staleSessions }
+		: events;
 }
 
 export async function getUsageAnalyticsQueryContext(
@@ -1267,7 +1347,8 @@ export async function getUsageAnalyticsQueryContext(
 	}
 
 	await readinessGate.assertReady();
-	const usageSource = await resolveUsageSource(organizationId);
+	const { usageSource, staleRollupSessions } =
+		await resolveUsageSource(organizationId);
 	return {
 		clickhouseSettings: USAGE_ANALYTICS_CLICKHOUSE_SETTINGS,
 		cteDefinitions: buildUsageEventAnalyticsCte(
@@ -1276,11 +1357,13 @@ export async function getUsageAnalyticsQueryContext(
 				: scope,
 			undefined,
 			usageSource,
+			staleRollupSessions,
 		),
 		dailySessionsRelation: "usage_analytics_daily_sessions",
 		metadataRelation: "usage_analytics_metadata",
 		mode: "events",
 		sessionsRelation: "usage_analytics_sessions",
+		staleRollupSessions,
 		usageSource,
 	};
 }

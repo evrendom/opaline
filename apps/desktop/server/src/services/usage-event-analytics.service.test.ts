@@ -391,16 +391,20 @@ describe("usage-event analytics readiness gate", () => {
 		expect(probeAttempts).toBe(2);
 	});
 
-	test("enforces its own short timeout", async () => {
+	test("a probe that runs out of time lets the read through and is asked again", async () => {
+		let probeAttempts = 0;
 		const gate = new UsageEventAnalyticsReadinessGate({
-			degradedTtlMs: 5,
-			probe: () => new Promise(() => {}),
-			readyTtlMs: 50,
+			degradedTtlMs: 1_000,
+			probe: () => {
+				probeAttempts += 1;
+				return new Promise(() => {});
+			},
+			readyTtlMs: 1_000,
 			timeoutMs: 5,
 		});
 
-		await expect(gate.assertReady()).rejects.toMatchObject({
-			code: "SERVICE_UNAVAILABLE",
-		});
+		await expect(gate.assertReady()).resolves.toBeUndefined();
+		await expect(gate.assertReady()).resolves.toBeUndefined();
+		expect(probeAttempts).toBe(2);
 	});
 });

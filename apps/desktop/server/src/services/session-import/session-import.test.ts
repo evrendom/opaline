@@ -29,10 +29,15 @@ function upload(content: string): IngestSessionInput {
 	};
 }
 
-function importInto(stores: MemoryStores, input: IngestSessionInput) {
+function importInto(
+	stores: MemoryStores,
+	input: IngestSessionInput,
+	derived?: "hot" | "full",
+) {
 	return processIngestSession(
 		{
 			awaitLanguageSignals: true,
+			...(derived ? { derived } : {}),
 			context: { apiKeyId: null, session: null, user: { id: "user" } },
 			enforceRateLimits: false,
 			errorFactories: createBackgroundIngestErrorFactories(),
@@ -97,6 +102,79 @@ test("an identical re-import whose records are stale is stored again", async () 
 	expect(stores.calls.indexOf("records_current")).toBeLessThan(
 		stores.calls.indexOf("revision"),
 	);
+});
+
+test("a hot import stores the session, its usage and receipt, and skips the cold stages", async () => {
+	const skillRequests: (boolean | undefined)[] = [];
+	// Stands in for the extraction worker (recorded here, not in `calls`).
+	const extract = memoryStores().dependencies.workers.extractFacts;
+	const stores = memoryStores({
+		workers: {
+			extractFacts: (request) => {
+				skillRequests.push(request.extractSkills);
+				return extract(request);
+			},
+		},
+	});
+	const live = claudeTranscript(3);
+	await importInto(stores, upload(claudeTranscript(2)));
+	stores.calls.length = 0;
+	stores.runIndex.length = 0;
+	await importInto(stores, upload(live), "hot");
+	expect(stores.calls).toEqual([
+		"filter",
+		"claim",
+		"agent_metadata",
+		"revision",
+		"insert rudel.claude_sessions",
+		"content",
+		"usage_generation",
+		"usage",
+		"content_and_usage_receipt",
+	]);
+	expect(skillRequests).toEqual([true, false]);
+	expect(stores.runIndex).toEqual([]);
+
+	// The full import it owes, of the same bytes, is no duplicate: it runs
+	// every stage the hot one skipped.
+	stores.calls.length = 0;
+	await importInto(stores, upload(live), "full");
+	expect(stores.calls.filter((call) => call !== "run_index")).toEqual([
+		"filter",
+		"claim",
+		"agent_metadata",
+		"raw_exists",
+		"skill_receipt",
+		"records_current",
+		"revision",
+		"insert rudel.claude_sessions",
+		"content",
+		"language_signals",
+		"records",
+		"git_observations",
+		"usage_generation",
+		"skills",
+		"usage",
+		"content_and_usage_receipt",
+		"search_index",
+	]);
+	expect(skillRequests).toEqual([true, false, true]);
+	expect(stores.runIndex).toHaveLength(1);
+});
+
+test("an identical hot re-import leaves before the raw insert without retrying derived evidence", async () => {
+	const stores = memoryStores();
+	const content = claudeTranscript(2);
+	await importInto(stores, upload(content));
+	stores.calls.length = 0;
+	await importInto(stores, upload(content), "hot");
+	expect(stores.rawRows).toHaveLength(1);
+	expect(stores.calls).toEqual([
+		"filter",
+		"claim",
+		"agent_metadata",
+		"raw_exists",
+	]);
 });
 
 test("a grown transcript is stored as a new revision", async () => {
