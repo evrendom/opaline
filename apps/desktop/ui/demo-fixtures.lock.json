@@ -1,0 +1,8 @@
+{
+	"dataset": "loomrail-2026-11-27",
+	"url": "https://github.com/evrendom/opaline/releases/download/demo-fixtures-loomrail-2026-11-27/demo-fixtures.tar.gz",
+	"sha256": "b4574bb787cf5bf44f4e80001cc88e5ecd20c82913be1af055bd5da3e8ea13e6",
+	"bytes": 409406492,
+	"answers": 85804,
+	"files": 39669
+}

@@ -3,11 +3,17 @@ import type {
 	GitHubRepositoryConnectionStatus,
 	GitHubTokenStatus,
 } from "@rudel/api-routes";
+import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { MemoryRouter } from "react-router-dom";
 import { GitHubRepositoryList } from "@/features/settings/github/GitHubRepositoryList";
 import { markupText } from "@/test/markup-text";
 import { GitHubTokenCard } from "./GitHubTokenCard";
 import { WorkspaceGitHubConnectionView } from "./WorkspaceGitHubConnection";
+
+// The card links to the dashboard through the app's router.
+const markupInRouter = (element: ReactElement) =>
+	renderToStaticMarkup(<MemoryRouter>{element}</MemoryRouter>);
 
 const READY: GitHubTokenStatus = {
 	state: "ready",
@@ -32,7 +38,7 @@ const READY: GitHubTokenStatus = {
 };
 
 test("a gh login shows its account, scopes, repositories, sweep and rate limit", () => {
-	const markup = renderToStaticMarkup(
+	const markup = markupInRouter(
 		<GitHubTokenCard token={READY} dashboard="visible" />,
 	);
 	expect(markup).toContain(
@@ -45,12 +51,13 @@ test("a gh login shows its account, scopes, repositories, sweep and rate limit",
 	expect(markup).toContain("4,100 of 5,000 requests left this hour");
 	expect(markup).toContain("Within limit");
 	expect(markup).toContain("Open dashboard");
+	expect(markup).toContain('href="/dashboard?metric=mergedPullRequests"');
 	expect(markup).not.toContain("Connect GitHub");
 	expect(markup).not.toContain("self-hosted-command");
 });
 
 test("without a token the card says why and gives the command that fixes it", () => {
-	const markup = renderToStaticMarkup(
+	const markup = markupInRouter(
 		<GitHubTokenCard
 			token={{
 				...READY,
@@ -83,7 +90,7 @@ test("without a token the card says why and gives the command that fixes it", ()
 });
 
 test("a token without the repo scope and a paused collection are flagged", () => {
-	const markup = renderToStaticMarkup(
+	const markup = markupInRouter(
 		<GitHubTokenCard
 			token={{
 				...READY,
@@ -127,7 +134,7 @@ test("the repository list says the repositories come from sessions", () => {
 		repositorySelection: "selected",
 		token: READY,
 	};
-	const markup = renderToStaticMarkup(<GitHubRepositoryList status={status} />);
+	const markup = markupInRouter(<GitHubRepositoryList status={status} />);
 	expect(markup).toContain(
 		"From this workspace&#x27;s sessions, read with the token of octo.",
 	);
@@ -141,7 +148,7 @@ test("the GitHub section stays empty until the server shows a token", () => {
 			typeof WorkspaceGitHubConnectionView
 		>[0]["evidenceStatus"],
 	) =>
-		renderToStaticMarkup(
+		markupInRouter(
 			<WorkspaceGitHubConnectionView evidenceStatus={evidenceStatus} />,
 		);
 	const connection: GitHubRepositoryConnectionStatus = {

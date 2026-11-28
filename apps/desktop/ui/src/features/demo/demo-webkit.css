@@ -5,6 +5,12 @@ html[data-demo-webkit] :is([class*="mask:"], [class*="drop-shadow"]) {
 	will-change: transform;
 }
 
+/* The trace tree's inline masks fall back to /opaline-trace-fill.svg at the
+ * site's root; the demo build bundles the file (vite.demo.config.ts). */
+:root {
+	--opaline-trace-mask: url("/opaline-trace-fill.svg");
+}
+
 /* This is a programmatic scroll target, not a keyboard control. Keep focus
  * for scrolling without drawing a ring around the entire demo window. */
 [data-slot="sessions-overview-scroll-container"]:focus,

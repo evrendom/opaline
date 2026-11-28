@@ -8,7 +8,7 @@ import {
 	usePlanUsage,
 } from "@/features/costs/plan-usage/use-plan-usage";
 import { buildDashboardSessionTabMetrics } from "@/features/dashboard/data/dashboard-tab-adapters";
-import { useDemoRuntime } from "@/features/demo/demo-runtime";
+import { DEMO_RANGE, useDemoRuntime } from "@/features/demo/demo-runtime";
 import { useLocalDesktopApp } from "@/features/desktop/local-app";
 import { mergeLiveSessionRows } from "@/features/sessions/live-session-rows";
 import { resolveActiveSessionDateRangeOptionId } from "@/features/sessions/session-date-ranges";
@@ -138,7 +138,7 @@ export function useSessionsPageData({
 		staleTime: SESSION_QUERY_STALE_TIME,
 	});
 	const previewSeed =
-		startDate === "2026-08-01" && endDate === "2026-08-31"
+		startDate === DEMO_RANGE.startDate && endDate === DEMO_RANGE.endDate
 			? demo?.seed
 			: undefined;
 	const activeDateRangeOptionId = resolveActiveSessionDateRangeOptionId({

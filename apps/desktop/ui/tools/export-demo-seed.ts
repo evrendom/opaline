@@ -9,7 +9,10 @@ import {
 	demoPlanUsageSearch,
 } from "../src/features/demo/demo-runtime";
 import { getSessionOverviewCost } from "../src/features/sessions/components/sessions-overview-table-utils";
+// @ts-expect-error a plain .mjs build helper
+import { fetchDemoFixtures } from "./fetch-demo-fixtures.mjs";
 
+await fetchDemoFixtures();
 const fixtures = new URL("../demo-public/fixtures/", import.meta.url);
 const index = JSON.parse(
 	await readFile(new URL("index.json", fixtures), "utf8"),
@@ -53,6 +56,23 @@ const unfiltered = (input: Record<string, unknown>) =>
 	Object.values(input).every(
 		(value) => !Array.isArray(value) || value.length === 0,
 	);
+// The list the Sessions page asks for on DEMO_RANGE: the first page of every
+// session, newest first (not one repository's, skill's or a filtered list).
+const SESSION_LIST_SCOPES = [
+	"repoKey",
+	"skillName",
+	"filters",
+	"userId",
+	"projectPath",
+	"repository",
+	"source",
+];
+const sessionsPage = (input: Record<string, unknown>) =>
+	inRange(input) &&
+	(input.offset ?? 0) === 0 &&
+	(input.sortBy ?? "session_date") === "session_date" &&
+	(input.sortOrder ?? "desc") === "desc" &&
+	SESSION_LIST_SCOPES.every((scope) => input[scope] === undefined);
 
 const organization = z
 	.object({
@@ -67,18 +87,23 @@ const organization = z
 const session = z
 	.object({ user: z.object({ id: z.string() }) })
 	.parse(await first("/api/auth/get-session"));
+// The desktop app asks for the whole range at once (up to 1000 rows) and a
+// paged list for 50: take the longest page recorded.
 const sessions = z
 	.array(SessionOverviewListRowSchema)
 	.parse(
-		await first(
-			"/rpc/analytics/sessions/list",
-			(input) => inRange(input) && input.offset === 0,
-		),
+		[...(await answer("/rpc/analytics/sessions/list", sessionsPage))].sort(
+			(a, b) => Number(b.input.limit ?? 0) - Number(a.input.limit ?? 0),
+		)[0]?.data,
 	);
 const costs = (
 	await answer(
 		"/rpc/analytics/overview/costs",
-		(input) => inRange(input) && unfiltered(input),
+		// The opening screen is daily; other intervals are recorded too.
+		(input) =>
+			inRange(input) &&
+			unfiltered(input) &&
+			(input.durationInterval ?? "daily") === "daily",
 	)
 ).filter(
 	(entry, position, all) =>

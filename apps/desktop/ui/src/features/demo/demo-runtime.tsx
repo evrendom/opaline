@@ -10,9 +10,11 @@ import { z } from "zod";
 import { planUsageSearch } from "@/features/costs/plan-usage/use-plan-usage";
 import { parseSelfHostInfo } from "@/features/self-hosted/self-host-info";
 
+/** The range the demo opens on: the "Last 30 days" preset on the demo clock's
+ *  day (`DEMO_TODAY`), so the date picker shows it as that preset. */
 export const DEMO_RANGE = {
-	startDate: "2026-08-01",
-	endDate: "2026-08-31",
+	startDate: "2026-10-28",
+	endDate: "2026-11-27",
 } as const;
 
 export function demoPlanUsageSearch(): string {
