@@ -1,6 +1,9 @@
 import type { ClickHouseExecutor } from "../../clickhouse.js";
 import { repositorySql } from "../../services/repository-key-sql.js";
-import { buildPricedUsageEventsCte } from "../../services/usage-event-analytics.service.js";
+import {
+	buildPricedUsageEventsCte,
+	buildUncountedPendingUsageSql,
+} from "../../services/usage-event-analytics.service.js";
 import type { PlanProvider } from "./readings.js";
 import type { CostRow } from "./window-series.js";
 
@@ -24,13 +27,27 @@ export async function readCostRows(
 	}>({
 		query: `WITH ${buildPricedUsageEventsCte(
 			"e.source = {source:String} AND e.occurred_at >= fromUnixTimestamp64Milli({from:Int64}) AND e.occurred_at < fromUnixTimestamp64Milli({to:Int64})",
+		)},
+		-- Requests of live sessions since their last import, priced when read;
+		-- those the import has stored since are counted from the events above.
+		pending_priced_events AS (${buildUncountedPendingUsageSql(
+			"source = {source:String} AND occurred_at >= fromUnixTimestamp64Milli({from:Int64}) AND occurred_at < fromUnixTimestamp64Milli({to:Int64})",
+			"1",
 		)}
+		),
+		all_priced_events AS (
+			SELECT session_id, agent_id, occurred_at, pricing_model, estimated_cost
+			FROM analysis_priced_events
+			UNION ALL
+			SELECT session_id, agent_id, occurred_at, pricing_model, estimated_cost
+			FROM pending_priced_events
+		)
 			SELECT session_id AS sessionId,
 				if(agent_id IN ('', 'main'), '', agent_id) AS agentId,
 				toString(toUnixTimestamp(toStartOfFiveMinutes(occurred_at)) * 1000) AS at,
 				toString(pricing_model) AS model,
 				sum(ifNull(estimated_cost, 0)) AS cost
-			FROM analysis_priced_events
+			FROM all_priced_events
 			GROUP BY sessionId, agentId, at, model
 			HAVING cost > 0
 			ORDER BY at`,

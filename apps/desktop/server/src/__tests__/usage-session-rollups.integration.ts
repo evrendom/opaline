@@ -10,6 +10,7 @@ import {
 	ingestRudelSessionAnalytics,
 	type RudelSessionAnalyticsRow,
 } from "@rudel/ch-schema/generated";
+import { USAGE_EVENTS_PENDING_TABLE } from "@rudel/ch-schema/usage-events-pending";
 import { USAGE_SESSION_ROLLUPS_TABLE } from "@rudel/ch-schema/usage-session-rollups";
 import {
 	USAGE_EVENT_EXTRACTION_VERSION,
@@ -19,6 +20,10 @@ import {
 	type UsageEventSource,
 } from "@rudel/usage-events";
 import { createClickHouseExecutor } from "../clickhouse.js";
+import {
+	pendingUsageRow,
+	writePendingUsage,
+} from "../selfhost/local-ingest/usage-tail.js";
 import {
 	getClickHouseSessionPurgePlans,
 	purgeClickHouseRows,
@@ -75,6 +80,7 @@ afterAll(async () => {
 		"rudel.usage_events",
 		"rudel.session_analytics",
 		USAGE_SESSION_ROLLUPS_TABLE,
+		USAGE_EVENTS_PENDING_TABLE,
 	])
 		await executor
 			.execute({
@@ -90,6 +96,54 @@ afterAll(async () => {
 });
 
 describe("usage session rollups", () => {
+	test("a live session's pending requests count until its import stores them, and then once", async () => {
+		const sessionId = `pending_${runId}`;
+		const totals = async (source: UsageSource) => {
+			const [row] = await executor.query<{ tokens: number; requests: number }>({
+				query: `WITH ${buildUsageEventAnalyticsCte({}, false, source)}
+					SELECT toUInt64(sum(total_tokens)) AS tokens, toUInt64(count()) AS requests
+					FROM usage_analytics_daily_sessions WHERE session_id = {sessionId:String}`,
+				query_params: { orgId: organizationId, sessionId },
+			});
+			return Number(row?.tokens ?? 0);
+		};
+		const tokensOf = (event: UsageEvent) =>
+			event.uncachedInputTokens +
+			event.cacheReadInputTokens +
+			(event.cacheWrite5mInputTokens ?? 0) +
+			(event.cacheWrite1hInputTokens ?? 0) +
+			event.outputTokens;
+		const stored = usageEvent(sessionId, "2");
+		await upload(sessionId, "95", [stored]);
+		await refreshUsageSessionRollups(executor, [rollupKey(sessionId)]);
+		const before = {
+			events: await totals("events"),
+			rollups: await totals("rollups"),
+		};
+		expect(before.events).toBe(tokensOf(stored));
+		expect(before.rollups).toBe(before.events);
+
+		const newer = usageEvent(sessionId, "4", { outputTokens: 50 });
+		// Already stored, and older than the stored usage: neither counts.
+		const duplicate = usageEvent(sessionId, "2");
+		const older = usageEvent(sessionId, "1", { outputTokens: 900 });
+		await writePendingUsage(
+			executor,
+			[newer, duplicate, older].flatMap((event) => {
+				const row = pendingUsageRow({ ...event, organizationId }, new Date());
+				return row ? [row] : [];
+			}),
+		);
+		for (const source of ["events", "rollups"] as const)
+			expect(await totals(source)).toBe(tokensOf(stored) + tokensOf(newer));
+
+		// The next import stores the newer request: it now counts from there, once.
+		await upload(sessionId, "96", [stored, newer], true);
+		await refreshUsageSessionRollups(executor, [rollupKey(sessionId)]);
+		for (const source of ["events", "rollups"] as const)
+			expect(await totals(source)).toBe(tokensOf(stored) + tokensOf(newer));
+	});
+
 	test("an upload writes its session's rollup and a re-upload replaces it whole", async () => {
 		const sessionId = `replace_${runId}`;
 		await upload(sessionId, "10", [

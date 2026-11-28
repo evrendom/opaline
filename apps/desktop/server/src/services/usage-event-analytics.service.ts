@@ -1,4 +1,5 @@
 import { ORPCError } from "@orpc/server";
+import { USAGE_EVENTS_PENDING_TABLE } from "@rudel/ch-schema/usage-events-pending";
 import { USAGE_SESSION_ROLLUPS_TABLE } from "@rudel/ch-schema/usage-session-rollups";
 import {
 	type ClickHouseExecutor,
@@ -1001,18 +1002,107 @@ export function staleSessionsSql(sessions: readonly UsageSessionRef[]): string {
 function buildUsageRollupPricedGroupsCte(
 	usageEventFilters: string,
 	staleSessions: readonly UsageSessionRef[],
+	outputRelation = "priced_usage_groups",
 ): string {
 	const stale = staleSessionsSql(staleSessions);
-	if (!stale)
-		return buildRollupGroupsSelect("priced_usage_groups", usageEventFilters);
+	if (!stale) return buildRollupGroupsSelect(outputRelation, usageEventFilters);
 	return `
 		${buildUsageEventCandidateCtes(`${usageEventFilters}\n\t\t\t\t\tAND ${stale}`)},
 		${buildPricedUsageGroupsCtes("usage_event_pricing_candidates", "event_priced_usage_groups")},
 		${buildRollupGroupsSelect("rollup_priced_usage_groups", `${usageEventFilters}\n\t\t\t\t\tAND NOT ${stale}`)},
-		priced_usage_groups AS (
+		${outputRelation} AS (
 			SELECT ${PRICED_USAGE_GROUP_COLUMNS.join(", ")} FROM rollup_priced_usage_groups
 			UNION ALL
 			SELECT ${PRICED_USAGE_GROUP_COLUMNS.join(", ")} FROM event_priced_usage_groups
+		)`;
+}
+
+/**
+ * The requests a live session made since its last import that the stored
+ * usage does not count yet: the Mac app reads them from the transcript's
+ * appended lines and prices them as it reads (`usage_events_pending`). A
+ * pending request counts only while its event is not stored and it happened
+ * after the latest request the session's stored usage has, so the next import
+ * takes over each one and nothing is counted twice, even if an event ID ever
+ * differed. `pendingFilters` reads the pending table's bare columns.
+ */
+export function buildUncountedPendingUsageSql(
+	pendingFilters: string,
+	organizationMatch: string,
+): string {
+	const pending = getSafeClickHouseTable(USAGE_EVENTS_PENDING_TABLE);
+	const events = getSafeClickHouseTable(USAGE_EVENTS_TABLE);
+	const pendingSessions = `(organization_id, user_id, source, session_id) IN (
+						SELECT organization_id, user_id, source, session_id
+						FROM ${pending}
+						WHERE ${organizationMatch}
+					)`;
+	return `
+			SELECT p.*
+			FROM (
+				SELECT *
+				FROM ${pending} FINAL
+				WHERE ${pendingFilters}
+			) AS p
+			LEFT ANY JOIN (
+				SELECT organization_id, user_id, source, session_id,
+					max(occurred_at) AS stored_until
+				FROM ${events}
+				WHERE ${organizationMatch}
+					AND record_kind = 'event'
+					AND ${pendingSessions}
+				GROUP BY organization_id, user_id, source, session_id
+			) AS stored
+				ON stored.organization_id = p.organization_id
+				AND stored.user_id = p.user_id
+				AND stored.source = p.source
+				AND stored.session_id = p.session_id
+			WHERE p.occurred_at > ifNull(stored.stored_until, toDateTime64(0, 3, 'UTC'))
+				AND (p.organization_id, p.user_id, p.source, p.session_id, p.event_id) NOT IN (
+					SELECT organization_id, user_id, source, session_id, event_id
+					FROM ${events}
+					WHERE ${organizationMatch}
+						AND record_kind = 'event'
+						AND ${pendingSessions}
+				)`;
+}
+
+/** Uncounted pending requests (see `buildUncountedPendingUsageSql`), each as its own priced group. */
+function buildPendingPricedGroupsCte(
+	usageEventFilters: string,
+	tenant: UsageAnalyticsScope["tenant"],
+): string {
+	return `
+		pending_priced_usage_groups AS (
+			SELECT
+				organization_id,
+				user_id,
+				source,
+				session_id,
+				'event' AS record_kind,
+				usage_date,
+				if(model_status = 'unresolved', raw_model, resolved_model) AS pricing_identity,
+				model_provider,
+				service_tier,
+				inference_speed,
+				inference_geo,
+				context_band,
+				toUInt8(estimated_cost IS NOT NULL) AS is_priceable,
+				has_geo_gap,
+				pricing_model AS latest_main_model,
+				pricing_model AS latest_event_model,
+				uncached_input_tokens AS group_uncached_input_tokens,
+				cache_read_input_tokens AS group_cache_read_input_tokens,
+				cache_write_5m_input_tokens AS group_cache_write_5m_input_tokens,
+				cache_write_1h_input_tokens AS group_cache_write_1h_input_tokens,
+				output_tokens AS group_output_tokens,
+				pricing_model,
+				estimated_cost AS group_estimated_cost
+			FROM (${buildUncountedPendingUsageSql(
+				usageEventFilters,
+				organizationMatchSql("organization_id", tenant),
+			)}
+			)
 		)`;
 }
 
@@ -1119,10 +1209,17 @@ export function buildUsageEventAnalyticsCte(
 				? buildUsageRollupPricedGroupsCte(
 						usageEventFilters,
 						staleRollupSessions,
+						"stored_priced_usage_groups",
 					)
 				: `${buildUsageEventCandidateCtes(usageEventFilters)},
-		${buildPricedUsageGroupsCtes("usage_event_pricing_candidates")}`
+		${buildPricedUsageGroupsCtes("usage_event_pricing_candidates", "stored_priced_usage_groups")}`
 		},
+		${buildPendingPricedGroupsCte(usageEventFilters, scope.tenant)},
+		priced_usage_groups AS (
+			SELECT ${PRICED_USAGE_GROUP_COLUMNS.join(", ")} FROM stored_priced_usage_groups
+			UNION ALL
+			SELECT ${PRICED_USAGE_GROUP_COLUMNS.join(", ")} FROM pending_priced_usage_groups
+		),
 		usage_event_session_rollups AS (
 			SELECT
 				p.organization_id,
