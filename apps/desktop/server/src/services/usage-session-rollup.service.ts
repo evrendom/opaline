@@ -13,6 +13,7 @@ import { isUsageRollupWriteEnabled } from "../lib/env.js";
 import {
 	buildPricedUsageGroupsCtes,
 	buildUsageEventCandidateCtes,
+	type UsageSessionRef,
 } from "./usage-event-analytics.service.js";
 
 export interface UsageRollupSessionKey {
@@ -32,8 +33,12 @@ const logger = getLogger(["rudel", "api", "usage-session-rollups"]);
 export const USAGE_ROLLUP_INGEST_MAX_EXECUTION_SECONDS = 5;
 export const USAGE_ROLLUP_RETRY_AFTER_MINUTES = 60;
 const BUILD_VERSION_SLOT = "{rollupBuildVersion}";
-const READY_TTL_MS = 2 * 60_000;
-const NOT_READY_TTL_MS = 60_000;
+const COVERAGE_TTL_MS = 30_000;
+/**
+ * At most this many sessions without a current rollup are priced from their
+ * events beside the rollups; more and the whole workspace prices from events.
+ */
+export const USAGE_ROLLUP_MAX_STALE_SESSIONS = 100;
 const SESSION_ANALYTICS_TABLE = "rudel.session_analytics";
 const USAGE_EVENTS_TABLE = "rudel.usage_events";
 
@@ -260,12 +265,25 @@ export async function refreshUsageSessionRollupAfterWrite(
 	}
 }
 
-interface UsageRollupReadiness {
-	readonly checkedAt: number;
-	readonly ready: Promise<boolean>;
+export interface UsageRollupCoverage {
+	/** Price from the rollups, and `staleSessions` from their events. */
+	readonly ready: boolean;
+	readonly staleSessions: readonly UsageSessionRef[];
 }
 
+interface UsageRollupReadiness {
+	readonly checkedAt: number;
+	readonly coverage: Promise<UsageRollupCoverage>;
+}
+
+const NOT_READY: UsageRollupCoverage = { ready: false, staleSessions: [] };
+
 const readiness = new Map<string, UsageRollupReadiness>();
+
+const STALE_ROLLUP_SQL = `r.session_id = ''
+					OR r.build_version != {buildVersion:UInt32}
+					OR r.built_at < sa.ingested_at
+					OR r.receipt_generation != e.receipt_generation`;
 
 export function buildUsageRollupCoverageStatement(
 	organizationId: string,
@@ -278,12 +296,11 @@ export function buildUsageRollupCoverageStatement(
 		},
 		query: `SELECT
 				countIf(r.session_id != '') AS rolled_up,
-				countIf(
-					r.session_id = ''
-					OR r.build_version != {buildVersion:UInt32}
-					OR r.built_at < sa.ingested_at
-					OR r.receipt_generation != e.receipt_generation
-				) AS uncovered
+				countIf(${STALE_ROLLUP_SQL}) AS uncovered,
+				groupArrayIf(${USAGE_ROLLUP_MAX_STALE_SESSIONS + 1})(
+					(sa.user_id, sa.source, sa.session_id),
+					${STALE_ROLLUP_SQL}
+				) AS stale
 			FROM (
 				SELECT user_id, toString(source) AS source, session_id,
 					max(ingested_at) AS ingested_at
@@ -318,26 +335,44 @@ export function buildUsageRollupCoverageStatement(
 	};
 }
 
-export function isUsageRollupCoverageComplete(
-	row: { rolled_up: number | string; uncovered: number | string } | undefined,
-): boolean {
-	return (
-		row !== undefined &&
-		Number(row.rolled_up) > 0 &&
-		Number(row.uncovered) === 0
-	);
+interface UsageRollupCoverageRow {
+	readonly rolled_up: number | string;
+	readonly uncovered: number | string;
+	readonly stale?: ReadonlyArray<readonly [string, string, string]>;
 }
 
-async function readUsageRollupCoverage(
+/**
+ * A workspace prices from its rollups once it has any and at most
+ * `USAGE_ROLLUP_MAX_STALE_SESSIONS` sessions lack a current one; those few are
+ * priced from their events.
+ */
+export function usageRollupCoverageFromRow(
+	row: UsageRollupCoverageRow | undefined,
+): UsageRollupCoverage {
+	if (row === undefined || Number(row.rolled_up) === 0) return NOT_READY;
+	const uncovered = Number(row.uncovered);
+	const stale = row.stale ?? [];
+	if (uncovered > USAGE_ROLLUP_MAX_STALE_SESSIONS || stale.length !== uncovered)
+		return NOT_READY;
+	return {
+		ready: true,
+		staleSessions: stale.map(([userId, source, sessionId]) => ({
+			sessionId,
+			source,
+			userId,
+		})),
+	};
+}
+
+async function queryUsageRollupCoverage(
 	executor: ClickHouseExecutor,
 	organizationId: string,
-): Promise<boolean> {
+): Promise<UsageRollupCoverage> {
 	try {
-		const [row] = await executor.query<{
-			rolled_up: number | string;
-			uncovered: number | string;
-		}>(buildUsageRollupCoverageStatement(organizationId));
-		return isUsageRollupCoverageComplete(row);
+		const [row] = await executor.query<UsageRollupCoverageRow>(
+			buildUsageRollupCoverageStatement(organizationId),
+		);
+		return usageRollupCoverageFromRow(row);
 	} catch (error) {
 		logger.warn(
 			"Usage rollup readiness check failed; pricing from events (organization_id={organizationId} error={error})",
@@ -346,26 +381,24 @@ async function readUsageRollupCoverage(
 				organizationId,
 			},
 		);
-		return false;
+		return NOT_READY;
 	}
 }
 
-export async function hasCompleteUsageRollups(
+export async function readUsageRollupCoverage(
 	executor: ClickHouseExecutor,
 	organizationId: string,
 	now: () => number = Date.now,
-): Promise<boolean> {
+): Promise<UsageRollupCoverage> {
 	const cached = readiness.get(organizationId);
-	if (cached) {
-		const ttl = (await cached.ready) ? READY_TTL_MS : NOT_READY_TTL_MS;
-		if (now() - cached.checkedAt < ttl) return cached.ready;
-	}
+	if (cached && now() - cached.checkedAt < COVERAGE_TTL_MS)
+		return cached.coverage;
 	const entry = {
 		checkedAt: now(),
-		ready: readUsageRollupCoverage(executor, organizationId),
+		coverage: queryUsageRollupCoverage(executor, organizationId),
 	};
 	readiness.set(organizationId, entry);
-	return entry.ready;
+	return entry.coverage;
 }
 
 export function clearUsageRollupReadiness(): void {

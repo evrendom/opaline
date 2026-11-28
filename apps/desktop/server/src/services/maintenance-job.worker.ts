@@ -1,4 +1,7 @@
-import { lowerWorkerThreadPriority } from "../lib/background-work.js";
+import {
+	lowerWorkerThreadPriority,
+	markThreadAsBackgroundWork,
+} from "../lib/background-work.js";
 import { runIngestWorkInline } from "../lib/inline-work.js";
 import type {
 	MaintenanceJobRequest,
@@ -7,6 +10,7 @@ import type {
 import { OFF_THREAD_JOBS } from "./maintenance-job-thread.js";
 
 void lowerWorkerThreadPriority();
+markThreadAsBackgroundWork();
 // Work a job would hand to another worker runs here instead.
 runIngestWorkInline();
 
