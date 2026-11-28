@@ -129,6 +129,24 @@ export async function startLocalIngest(options: {
 		derivedQueued: () => countDerivedQueued(sqlClient),
 		resolveOwner: () => resolveLocalOwner(sqlClient),
 		ingestSession: runner.ingestSession,
+		// OPALINE_USAGE_TAIL=0 turns it off: cost then waits for each import.
+		...(env.OPALINE_USAGE_TAIL === "0"
+			? {}
+			: {
+					tailUsage: async (job, owner) => {
+						const [tail, { getClickhouse }, background] = await Promise.all([
+							import("./usage-tail.js"),
+							import("../../clickhouse.js"),
+							import("../../lib/background-work.js"),
+						]);
+						await background.runAsBackgroundWork(async () =>
+							tail.writePendingUsage(
+								getClickhouse(),
+								await tail.readAppendedUsage(job, owner),
+							),
+						);
+					},
+				}),
 		onIngested: () => {
 			if (wakeTimer) return;
 			wakeTimer = setTimeout(() => {

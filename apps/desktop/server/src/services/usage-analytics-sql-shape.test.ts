@@ -44,21 +44,29 @@ describe("usage analytics SQL shape", () => {
 			RATE_CARD_TYPE,
 			MODIFIER_RULES_TYPE,
 			"usage_event_pricing_rate_card",
-			"rudel.usage_events",
+			"FROM rudel.usage_events FINAL",
 		])
 			expect(count(rollups, fragment)).toBe(0);
-		expect(count(rollups, "priced_usage_groups AS (")).toBe(1);
-		expect(rollups.length).toBeLessThan(16_000);
+		expect(rollups.match(/(?<![a-z_])priced_usage_groups AS \(/g)).toHaveLength(
+			1,
+		);
+		// About 3 KB of it is the pending requests of live sessions.
+		expect(rollups.length).toBeLessThan(18_000);
 	});
 
 	test("the events path and the rollup build each define the pricing once", () => {
 		const events = cte("events");
 		const insert = buildUsageSessionRollupInsertSql();
-		const pricing = buildPricedUsageGroupsCtes(
-			"usage_event_pricing_candidates",
-		);
-		for (const sql of [events, insert]) {
-			expect(count(sql, pricing)).toBe(1);
+		for (const [sql, output] of [
+			[events, "stored_priced_usage_groups"],
+			[insert, "priced_usage_groups"],
+		] as const) {
+			expect(
+				count(
+					sql,
+					buildPricedUsageGroupsCtes("usage_event_pricing_candidates", output),
+				),
+			).toBe(1);
 			expect(count(sql, "extractGroups(")).toBe(1);
 			expect(count(sql, RATE_CARD_TYPE)).toBe(1);
 			expect(count(sql, MODIFIER_RULES_TYPE)).toBe(3);

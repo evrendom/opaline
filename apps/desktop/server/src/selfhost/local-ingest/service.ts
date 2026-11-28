@@ -18,6 +18,7 @@ import {
 import {
 	antigravityBrains,
 	classifyTranscriptPath,
+	claudeSessionId,
 	isWatchedTranscriptName,
 	type LocalIngestRoots,
 	type TranscriptFile,
@@ -33,6 +34,7 @@ import {
 	statTranscript,
 	type TranscriptChange,
 } from "./transcript-file/index.js";
+import type { UsageTailJob } from "./usage-tail.js";
 
 export interface Owner {
 	readonly userId: string;
@@ -126,6 +128,11 @@ export interface LocalIngestSettings {
 	 * when its agent says it ended).
 	 */
 	readonly coldQuietMs: number;
+	/**
+	 * Between imports of a live Claude Code session, the usage of its newly
+	 * appended lines is read at most this often (see `tailUsage`).
+	 */
+	readonly tailIntervalMs: number;
 	readonly scanIntervalMs: number;
 	readonly partialLineGraceMs: number;
 	readonly retryBaseMs: number;
@@ -148,6 +155,7 @@ export const DEFAULT_LOCAL_INGEST_SETTINGS: LocalIngestSettings = {
 	liveGapFactor: 20,
 	liveMaxGapMs: 10 * 60_000,
 	coldQuietMs: 3 * 60_000,
+	tailIntervalMs: 10_000,
 	scanIntervalMs: 5 * 60_000,
 	partialLineGraceMs: 30_000,
 	retryBaseMs: 10_000,
@@ -166,6 +174,11 @@ export interface LocalIngestDependencies {
 		owner: Owner,
 	) => Promise<SessionOutcome>;
 	readonly onIngested?: () => void;
+	/**
+	 * Reads the usage a session's transcripts gained since its last import and
+	 * stores it as pending, so cost is current while the next import waits.
+	 */
+	readonly tailUsage?: (job: UsageTailJob, owner: Owner) => Promise<void>;
 	readonly milestones?: MilestoneStore;
 	readonly derivedQueued?: () => Promise<number>;
 	readonly backgroundPriority: boolean;
@@ -232,6 +245,14 @@ export class LocalIngest {
 	private readonly files = new Map<string, SeenFile>();
 	private readonly subagentPaths = new Map<string, Set<string>>();
 	private readonly sessions = new Map<string, SessionEntry>();
+	private readonly tails = new Map<
+		string,
+		{
+			timer: ReturnType<typeof setTimeout> | undefined;
+			lastAt: number;
+			running: boolean;
+		}
+	>();
 	private readonly watchers = new Map<string, FSWatcher>();
 	private readonly touched = new Set<string>();
 	private readonly stoppedAt = new Map<string, number>();
@@ -444,6 +465,7 @@ export class LocalIngest {
 
 	async stop(): Promise<void> {
 		this.stopped = true;
+		for (const tail of this.tails.values()) clearTimeout(tail.timer);
 		clearTimeout(this.pumpTimer);
 		clearTimeout(this.touchTimer);
 		clearTimeout(this.ownerTimer);
@@ -1256,6 +1278,80 @@ export class LocalIngest {
 					: now + this.settings.quietMs,
 				options.final || entry.lastIngestAt === null,
 			);
+			this.scheduleTail(entry);
+		}
+	}
+
+	/**
+	 * A live Claude Code session that was imported before and whose next import
+	 * is not about to start gets its appended usage read within a few seconds,
+	 * at most every `tailIntervalMs`.
+	 */
+	private scheduleTail(entry: SessionEntry): void {
+		if (
+			!this.deps.tailUsage ||
+			this.stopped ||
+			entry.source !== "claude_code" ||
+			entry.lastIngestAt === null ||
+			entry.final
+		)
+			return;
+		const now = this.now();
+		if (
+			!entry.running &&
+			entry.dueAt !== null &&
+			entry.dueAt - now < this.settings.tailIntervalMs
+		)
+			return;
+		const tail = this.tails.get(entry.sessionPath) ?? {
+			timer: undefined,
+			lastAt: 0,
+			running: false,
+		};
+		this.tails.set(entry.sessionPath, tail);
+		if (tail.timer !== undefined) return;
+		const delay = Math.max(
+			this.settings.quietMs,
+			tail.lastAt + this.settings.tailIntervalMs - now,
+		);
+		tail.timer = setTimeout(() => {
+			tail.timer = undefined;
+			void this.runTail(entry, tail);
+		}, delay);
+	}
+
+	private async runTail(
+		entry: SessionEntry,
+		tail: { lastAt: number; running: boolean },
+	): Promise<void> {
+		const owner = this.owner;
+		const tailUsage = this.deps.tailUsage;
+		if (!owner || !tailUsage || tail.running || this.stopped) return;
+		tail.running = true;
+		tail.lastAt = this.now();
+		try {
+			await tailUsage(
+				{
+					sessionId: claudeSessionId(entry.sessionPath),
+					source: "claude_code",
+					files: this.filesOf(entry.sessionPath).map((seen) => ({
+						path: seen.file.path,
+						fromByte: seen.ingested?.size ?? 0,
+						agentId:
+							seen.file.role === "subagent"
+								? (/^agent-(.+)\.jsonl$/u.exec(basename(seen.file.path))?.[1] ??
+									null)
+								: null,
+					})),
+				},
+				owner,
+			);
+		} catch (error) {
+			this.deps.log?.(
+				`usage of ${entry.sessionPath} since its last import was not read: ${error instanceof Error ? error.message : String(error)}`,
+			);
+		} finally {
+			tail.running = false;
 		}
 	}
 

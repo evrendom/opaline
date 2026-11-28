@@ -23,6 +23,7 @@
 		"./session-inventory": "./src/session-inventory.ts",
 		"./call-facts": "./src/call-facts.ts",
 		"./transcript-record-commands": "./src/transcript-record-commands.ts",
+		"./usage-events-pending": "./src/usage-events-pending.ts",
 		"./usage-session-rollups": "./src/usage-session-rollups.ts"
 	},
 	"scripts": {

@@ -13,6 +13,7 @@ import { SESSION_IMAGES_TABLE } from "@rudel/ch-schema/session-images";
 import { SESSION_INVENTORY_TABLE } from "@rudel/ch-schema/session-inventory";
 import { SESSION_SAVED_OUTPUTS_TABLE } from "@rudel/ch-schema/session-saved-outputs";
 import { TRANSCRIPT_RECORD_COMMANDS_TABLE } from "@rudel/ch-schema/transcript-record-commands";
+import { USAGE_EVENTS_PENDING_TABLE } from "@rudel/ch-schema/usage-events-pending";
 import { USAGE_SESSION_ROLLUPS_TABLE } from "@rudel/ch-schema/usage-session-rollups";
 import { WEEKLY_TOTALS_TABLE } from "@rudel/ch-schema/weekly-totals";
 import {
@@ -252,6 +253,9 @@ export function getClickHouseSessionPurgePlans(
 		{ column, table: RUN_QUESTION_ANSWERS_TABLE },
 		{ column, table: USAGE_EVENTS_TABLE },
 		{ column, table: USAGE_SESSION_ROLLUPS_TABLE },
+		// Live requests read between imports; the follow-up pass removes rows
+		// a read in flight stored after the first.
+		{ column, table: USAGE_EVENTS_PENDING_TABLE },
 		{ column, table: WRAPPED_USER_ARCHETYPE_SNAPSHOTS_TABLE },
 		{ column, table: `rudel.${REPOSITORY_EVIDENCE_INDEX_TABLE}` },
 		// Saved outputs (task outputs, large tool outputs), published with the
