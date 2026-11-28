@@ -2,6 +2,9 @@ import { readFileSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { gunzipSync } from "node:zlib";
 import { build } from "vite";
+import { fetchDemoFixtures } from "./fetch-demo-fixtures.mjs";
+
+await fetchDemoFixtures();
 
 await build({ configFile: "vite.demo.config.ts" });
 await build({

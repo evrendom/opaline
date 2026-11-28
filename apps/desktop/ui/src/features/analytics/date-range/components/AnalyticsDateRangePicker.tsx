@@ -38,6 +38,8 @@ export type AnalyticsDateRangePickerProps = {
 	calendarControls?: ReactNode;
 	align?: "start" | "center" | "end";
 	variant?: "default" | "linear";
+	/** Shows the range without letting anyone change it (the product demo's dashboard). */
+	readOnly?: boolean;
 };
 
 function LinearCalendarChevron({
@@ -92,6 +94,7 @@ export function AnalyticsDateRangePicker({
 	calendarControls,
 	align = "end",
 	variant = "default",
+	readOnly = false,
 }: AnalyticsDateRangePickerProps) {
 	const [open, setOpen] = useState(false);
 	const popoverScrollRegionRef = useRef<HTMLDivElement>(null);
@@ -173,6 +176,36 @@ export function AnalyticsDateRangePicker({
 		setOpen(false);
 	}
 
+	const triggerContent = (
+		<>
+			{compact ? null : (
+				<IconCalendar
+					aria-hidden="true"
+					data-icon="inline-start"
+					className="size-4"
+				/>
+			)}
+			{triggerSuffix && !compact
+				? `${shownValue} · ${triggerSuffix}`
+				: shownValue}
+		</>
+	);
+
+	if (readOnly) {
+		return (
+			<Button
+				type="button"
+				variant="primary"
+				data-active
+				aria-disabled="true"
+				data-read-only=""
+				className={triggerClassName}
+			>
+				{triggerContent}
+			</Button>
+		);
+	}
+
 	return (
 		<Popover
 			open={open}
@@ -191,16 +224,7 @@ export function AnalyticsDateRangePicker({
 					/>
 				}
 			>
-				{compact ? null : (
-					<IconCalendar
-						aria-hidden="true"
-						data-icon="inline-start"
-						className="size-4"
-					/>
-				)}
-				{triggerSuffix && !compact
-					? `${shownValue} · ${triggerSuffix}`
-					: shownValue}
+				{triggerContent}
 			</PopoverTrigger>
 			<SessionMenuPopoverContent
 				ref={setPopoverElement}

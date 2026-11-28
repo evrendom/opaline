@@ -1,11 +1,14 @@
 import type { GitHubTokenStatus } from "@rudel/api-routes";
-import { buttonVariants } from "@/app/ui/button";
+import { Link } from "react-router-dom";
+import { appRoutes } from "@/app/routes";
+import { Button } from "@/app/ui/button";
 import { formatDateTime, formatRelative } from "@/components/dashboard/format";
 import { SelfHostedCommand } from "@/features/self-hosted/SelfHostedCommand";
 import {
 	WorkspaceSettingsGroup,
 	WorkspaceSettingsRow,
 } from "@/features/settings/workspace/components/workspace-settings-group";
+import { useShellRoutePath } from "@/features/shell/hooks/use-shell-route-path";
 import "@/features/settings/sessions/sessions-settings.css";
 import "./github-connection-card.css";
 
@@ -106,17 +109,28 @@ export function GitHubTokenCard({
 					label="Dashboard"
 					description="Merged PRs and CI runs are on the dashboard."
 				>
-					<a
-						data-slot="button"
-						data-variant="primary"
-						className={buttonVariants({ variant: "primary", size: "md" })}
-						href="../../dashboard?metric=mergedPullRequests"
-					>
-						Open dashboard
-					</a>
+					<OpenDashboardButton />
 				</WorkspaceSettingsRow>
 			) : null}
 		</WorkspaceSettingsGroup>
+	);
+}
+
+/** In the app's router, so it stays in the window (and in the product demo). */
+function OpenDashboardButton() {
+	const getShellRoutePath = useShellRoutePath();
+	return (
+		<Button
+			variant="primary"
+			nativeButton={false}
+			render={
+				<Link
+					to={`${getShellRoutePath(appRoutes.dashboard())}?metric=mergedPullRequests`}
+				/>
+			}
+		>
+			Open dashboard
+		</Button>
 	);
 }
 

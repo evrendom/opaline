@@ -87,3 +87,5 @@ dist-selfhost/
 
 # CI scratch (test shards, packed CLI smoke)
 .tmp/
+# The product demo's recorded answers come from a release asset (apps/desktop/ui/demo-fixtures.lock.json)
+apps/desktop/ui/demo-public/fixtures/
