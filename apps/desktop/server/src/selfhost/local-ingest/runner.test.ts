@@ -32,8 +32,10 @@ function run(
 	imageDirectory: string | null = null,
 ) {
 	const sleeps: number[] = [];
+	const requests: { readonly derived?: string }[] = [];
 	const runner = createSessionRunner({
-		importSession: async () => {
+		importSession: async (request) => {
+			requests.push(request);
 			const next = outcomes.shift();
 			if (!next) throw new Error("no outcome left");
 			return next;
@@ -64,12 +66,14 @@ function run(
 	});
 	return {
 		sleeps,
-		outcome: (): Promise<SessionOutcome> =>
+		requests,
+		outcome: (derived?: "hot" | "full"): Promise<SessionOutcome> =>
 			runner(
 				{
 					sessionPath: "/s.jsonl",
 					source: "claude_code",
 					change: { kind: "whole", reason: "new", since: null },
+					...(derived ? { derived } : {}),
 				},
 				{ organizationId: "org", userId: "user" },
 			),
@@ -192,6 +196,19 @@ test("a full queue is given up on after the busy wait limit", async () => {
 	expect(outcome).toEqual({ kind: "retry", reason: "busy", files });
 	expect(sleeps.reduce((sum, ms) => sum + ms, 0)).toBe(BUSY_WAIT_LIMIT_MS);
 	expect(imports).toBe(sleeps.length + 1);
+});
+
+test("a hot job asks for a hot import; any other is full", async () => {
+	const stored = { kind: "stored", usage: "complete" } as const;
+	const runner = run([stored, stored, stored]);
+	await runner.outcome("hot");
+	await runner.outcome("full");
+	await runner.outcome();
+	expect(runner.requests.map((request) => request.derived)).toEqual([
+		"hot",
+		"full",
+		"full",
+	]);
 });
 
 test("a corrupt compressed transcript is a retry, never an import", async () => {

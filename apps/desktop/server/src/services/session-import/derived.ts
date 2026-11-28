@@ -50,12 +50,55 @@ export async function storeDerivedFacts(
 		source: filteredInput.source,
 		userId: context.user.id,
 	};
-	await startLanguageSignals(run, languageSignalInput, stored.ingestedAt);
+	if (enabled.languageSignals)
+		await startLanguageSignals(run, languageSignalInput, stored.ingestedAt);
 
 	// Derived data must never endanger the upload or the required extraction
 	// below: the job never rejects, runs in its own worker under its own limits,
 	// and is only awaited (in `finally`) so the response sees its receipt.
-	const transcriptRecordsJob = deps.stores
+	const transcriptRecordsJob = enabled.records.enabled
+		? persistRecordsThenQueueIndex(run, stored)
+		: Promise.resolve("skipped" as const);
+
+	try {
+		return await extractAndStoreFacts(run, stored);
+	} finally {
+		// Search indexing runs after the records extraction slot is released,
+		// for uploads only; it is bounded and never fails the upload.
+		if ((await transcriptRecordsJob) === "written")
+			await timedIngestPhase("server.search_index", () =>
+				deps.stores.indexSearch(deps.stores.executor(), {
+					organizationId: orgId,
+					sessionId: input.sessionId,
+					signal,
+					source: filteredInput.source,
+					userId: context.user.id,
+				}),
+			);
+		if (
+			enabled.languageSignals &&
+			shouldAwaitBestEffortLanguageSignals({
+				awaitBestEffortLanguageSignals:
+					request.awaitBestEffortLanguageSignals ?? false,
+				awaitLanguageSignals: request.awaitLanguageSignals,
+				durableProcessing: request.durableProcessing !== undefined,
+			})
+		) {
+			await timedIngestPhase("server.language_signals", () =>
+				writeLanguageSignalsBestEffort(deps.stores, languageSignalInput),
+			);
+		}
+	}
+}
+
+function persistRecordsThenQueueIndex(
+	run: ImportRun,
+	stored: StoredRevision,
+): Promise<"failed" | "skipped" | "written"> {
+	const { deps, enabled, prepared, request } = run;
+	const { filteredInput, orgId, timestamps } = prepared;
+	const { context, input, signal } = request;
+	return deps.stores
 		.persistRecords(deps.stores.executor(), {
 			config: enabled.records,
 			content: filteredInput.content,
@@ -74,35 +117,6 @@ export async function storeDerivedFacts(
 				await deps.runIndex.enqueue(importedSession(run));
 			return records;
 		});
-
-	try {
-		return await extractAndStoreFacts(run, stored);
-	} finally {
-		// Search indexing runs after the records extraction slot is released,
-		// for uploads only; it is bounded and never fails the upload.
-		if ((await transcriptRecordsJob) === "written")
-			await timedIngestPhase("server.search_index", () =>
-				deps.stores.indexSearch(deps.stores.executor(), {
-					organizationId: orgId,
-					sessionId: input.sessionId,
-					signal,
-					source: filteredInput.source,
-					userId: context.user.id,
-				}),
-			);
-		if (
-			shouldAwaitBestEffortLanguageSignals({
-				awaitBestEffortLanguageSignals:
-					request.awaitBestEffortLanguageSignals ?? false,
-				awaitLanguageSignals: request.awaitLanguageSignals,
-				durableProcessing: request.durableProcessing !== undefined,
-			})
-		) {
-			await timedIngestPhase("server.language_signals", () =>
-				writeLanguageSignalsBestEffort(deps.stores, languageSignalInput),
-			);
-		}
-	}
 }
 
 async function startLanguageSignals(

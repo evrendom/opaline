@@ -100,6 +100,7 @@ export function createSessionRunner(
 						aggregateContentMaxBytes: LOCAL_INGEST_CONTENT_MAX_BYTES,
 						awaitLanguageSignals: true,
 						contentSlimmed: true,
+						derived: job.derived ?? "full",
 						context: {
 							apiKeyId: null,
 							session: { activeOrganizationId: owner.organizationId } as never,

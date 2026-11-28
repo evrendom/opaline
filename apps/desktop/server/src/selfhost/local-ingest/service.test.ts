@@ -104,7 +104,7 @@ function memoryStore(): FileStore & { rows: Map<string, StoredFile> } {
 					state: input.state,
 					reason: input.reason,
 					attempts: 0,
-					nextAttemptAt: null,
+					nextAttemptAt: input.coldDueAt ?? null,
 					ingestedAt: input.at,
 				});
 		},
@@ -394,6 +394,12 @@ test("the session's end and a look at the session import at once, past the live 
 	await settle(service);
 	expect(ingest.finished).toHaveLength(3);
 	expect((ingest.finished[2]?.at ?? 0) - asked).toBeLessThan(400);
+	// Someone is reading it: that import is full, not hot.
+	expect(ingest.calls.map((call) => call.derived)).toEqual([
+		"full",
+		"full",
+		"full",
+	]);
 	await service.stop();
 });
 
@@ -994,4 +1000,151 @@ test("a new Gemini translation imports every Gemini session again once; Claude C
 	await settle(upgraded);
 	await upgraded.stop();
 	expect(third.calls.map((call) => call.sessionPath)).toEqual([gemini]);
+});
+
+const derivedOf = (calls: readonly SessionJob[]) =>
+	calls.map((call) => call.derived ?? "full");
+
+test("a live session's re-imports are hot; once it is quiet it gets one full import, later for every new write", async () => {
+	const path = await session("live", 0);
+	const ingest = timedIngestor(0);
+	const service = create(memoryStore(), ingest, {
+		settings: { ...liveSettings, liveIntervalMs: 0, coldQuietMs: 300 },
+	});
+	await service.start();
+	await settle(service);
+	await appendFile(path, line("turn 2"));
+	await service.notify([path], false);
+	await waitFor(() => ingest.calls.length === 2);
+	await Bun.sleep(150);
+	await appendFile(path, line("turn 3"));
+	const lastWrite = performance.now();
+	await service.notify([path], false);
+	// The full import it owes is not counted as queued work.
+	await waitFor(
+		() => ingest.finished.length === 3 && service.status().sessionsQueued === 0,
+	);
+	expect(derivedOf(ingest.calls)).toEqual(["full", "hot", "hot"]);
+
+	await waitFor(() => ingest.finished.length === 4);
+	expect(derivedOf(ingest.calls)).toEqual(["full", "hot", "hot", "full"]);
+	expect(ingest.calls[3]?.change.kind).toBe("unchanged");
+	expect((ingest.finished[3]?.at ?? 0) - lastWrite).toBeGreaterThanOrEqual(290);
+	await Bun.sleep(400);
+	expect(ingest.calls).toHaveLength(4);
+	await service.stop();
+});
+
+test("the session's end gets the full import it owes at once; a session past the quiet window is imported in full", async () => {
+	const path = await session("ending", 0);
+	const quiet = await session("quiet", 10);
+	const ingest = ingestor();
+	const service = create(memoryStore(), ingest, {
+		settings: {
+			concurrency: 1,
+			quietMs: 1,
+			liveIntervalMs: 0,
+			coldQuietMs: 60_000,
+		},
+	});
+	await service.start();
+	await settle(service);
+	await appendFile(path, line("last turn"));
+	await service.notify([path], false);
+	await waitFor(() => ingest.calls.length === 3);
+	await service.notify([path], true);
+	await waitFor(() => ingest.calls.length === 4);
+	expect(
+		ingest.calls.map((call) => [call.sessionPath, call.derived ?? "full"]),
+	).toEqual([
+		[path, "full"],
+		[quiet, "full"],
+		[path, "hot"],
+		[path, "full"],
+	]);
+	await service.notify([path], true);
+	await settle(service);
+	expect(ingest.calls).toHaveLength(4);
+
+	const old = new Date(Date.now() - 10 * 60_000);
+	await appendFile(quiet, line("late line"));
+	await utimes(quiet, old, old);
+	await service.notify([quiet], false);
+	await waitFor(() => ingest.calls.length === 5);
+	expect(ingest.calls[4]).toMatchObject({
+		sessionPath: quiet,
+		derived: "full",
+	});
+	await service.stop();
+});
+
+test("a session only imported hot gets its full import after a restart", async () => {
+	const path = await session("live", 0);
+	const store = memoryStore();
+	const first = ingestor();
+	const service = create(store, first, {
+		settings: {
+			concurrency: 1,
+			quietMs: 1,
+			liveIntervalMs: 0,
+			coldQuietMs: 60_000,
+		},
+	});
+	await service.start();
+	await settle(service);
+	await appendFile(path, line("turn 2"));
+	await service.notify([path], false);
+	await waitFor(() => first.calls.length === 2);
+	await settle(service);
+	await service.stop();
+	expect(derivedOf(first.calls)).toEqual(["full", "hot"]);
+	expect(store.rows.get(path)?.nextAttemptAt).not.toBeNull();
+
+	const second = ingestor();
+	const restarted = create(store, second, {
+		now: () => Date.now() + 2 * 60_000,
+		settings: {
+			concurrency: 1,
+			quietMs: 1,
+			liveIntervalMs: 0,
+			coldQuietMs: 60_000,
+		},
+	});
+	await restarted.start();
+	await waitFor(() => second.calls.length === 1);
+	await settle(restarted);
+	expect(second.calls.map((call) => [call.derived, call.change.kind])).toEqual([
+		["full", "unchanged"],
+	]);
+	expect(store.rows.get(path)?.nextAttemptAt).toBeNull();
+	await restarted.stop();
+
+	const third = ingestor();
+	const again = create(store, third);
+	await again.start();
+	await settle(again);
+	expect(third.calls).toHaveLength(0);
+	await again.stop();
+});
+
+test("due sessions run most recently written first, a subagent's write counting for its parent", async () => {
+	const parent = await session("parent", 60);
+	const subagents = join(roots.claudeProjects, "-repo", "parent", "subagents");
+	await mkdir(subagents, { recursive: true });
+	const subagent = join(subagents, "agent-a1.jsonl");
+	await writeFile(subagent, line("sub"));
+	const recent = new Date(Date.now() - 60_000);
+	await utimes(subagent, recent, recent);
+	const middle = await session("middle", 30);
+	const old = await session("old", 90);
+	const ingest = ingestor();
+	const service = create(memoryStore(), ingest);
+	await service.start();
+	await settle(service);
+	expect(ingest.calls.map((call) => call.sessionPath)).toEqual([
+		parent,
+		middle,
+		old,
+	]);
+	await service.stop();
 });

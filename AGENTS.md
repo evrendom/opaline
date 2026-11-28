@@ -251,6 +251,8 @@ Shared avatar constants (size caps, MIME allowlist, regex patterns) live in `pac
 
 The Mac app (`apps/desktop/shell`, with `packages/local-server`) runs this server in self-hosted mode on one Mac. The entry point is `apps/desktop/server/src/selfhost/main.ts` (env checks, migrations, schema, HTTP, scheduler in `selfhost/scheduler.ts`); the `/api/selfhost/*` routes are in `handlers/selfhost-http.ts`. Self-hosted behaviour stays behind `isSelfHosted()`. The hosted service (Vercel functions, Convex, the website, the Docker team server) is not in this repository.
 
+Local ingest (`selfhost/local-ingest/service.ts`) imports due sessions most recently written first (a subagent's write counts for its parent). A re-import of a live session (written in the last `coldQuietMs`, 3 minutes, and not ended) is hot (`importSession` `derived: "hot"`): it stores the raw revision, usage, its receipt and rollup and the Codex lineage, and skips language signals, transcript records (with the run index, search index and git observations) and skills; the session gets one full import once it has been quiet that long, when its agent says it ended, or when its page asks for it (`refresh`), and a pending full import survives a restart in `local_ingest_file.next_attempt_at` of its `ingested` row. Every other caller and every first, final or history import stays full.
+
 ## ClickHouse Schema Management (chkit)
 
 Schema definitions live in `packages/ch-schema/src/db/schema/*.ts`. The toolkit `chkit` generates SQL migrations, applies them, and produces TypeScript codegen.

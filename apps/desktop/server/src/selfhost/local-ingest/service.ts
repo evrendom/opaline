@@ -44,6 +44,12 @@ export interface SessionJob {
 	readonly source: TranscriptSource;
 	readonly change: TranscriptChange;
 	readonly bytes?: number;
+	/**
+	 * `"hot"`: a live session imported again, stored with its usage only; the
+	 * cold stages (records, search, git observations, skills, language
+	 * signals) wait for the `"full"` import once it is quiet. Default `"full"`.
+	 */
+	readonly derived?: "hot" | "full";
 }
 
 export interface SessionProject {
@@ -114,6 +120,12 @@ export interface LocalIngestSettings {
 	 */
 	readonly liveGapFactor: number;
 	readonly liveMaxGapMs: number;
+	/**
+	 * A session written to within this long is live: its re-imports are hot,
+	 * and it gets one full import this long after its last write (or at once
+	 * when its agent says it ended).
+	 */
+	readonly coldQuietMs: number;
 	readonly scanIntervalMs: number;
 	readonly partialLineGraceMs: number;
 	readonly retryBaseMs: number;
@@ -135,6 +147,7 @@ export const DEFAULT_LOCAL_INGEST_SETTINGS: LocalIngestSettings = {
 	liveIntervalMs: 8_000,
 	liveGapFactor: 20,
 	liveMaxGapMs: 10 * 60_000,
+	coldQuietMs: 3 * 60_000,
 	scanIntervalMs: 5 * 60_000,
 	partialLineGraceMs: 30_000,
 	retryBaseMs: 10_000,
@@ -193,6 +206,10 @@ interface SessionEntry {
 	lastIngestAt: number | null;
 	/** How long the last import took, which sets how long a live session waits. */
 	lastImportMs: number | null;
+	/** Imported hot: when its full import is due (postponed by every write). */
+	coldDueAt: number | null;
+	/** Someone is reading the session: its next import is full. */
+	fullNext: boolean;
 	sessionId: string | null;
 	project: SessionProject | null;
 }
@@ -203,6 +220,11 @@ const GAVE_UP = "gave up after";
 const DRAINED_READS = 2;
 const STOP_GRACE_MS = 10_000;
 const ZST_DECODED_RATIO = 4;
+
+/** A change waits for its import; otherwise a full import a hot one owes. */
+function dueAtOf(entry: SessionEntry): number | null {
+	return entry.dueAt ?? entry.coldDueAt;
+}
 
 export class LocalIngest {
 	private readonly settings: LocalIngestSettings;
@@ -402,6 +424,7 @@ export class LocalIngest {
 			return;
 		}
 		for (const seen of this.files.values()) this.markIfStale(seen);
+		this.pumpSoon(0);
 		if (this.deps.watchFiles !== false) this.watchRoots();
 		await this.scan();
 		this.beginInitialImport();
@@ -618,6 +641,8 @@ export class LocalIngest {
 			entry.lastIngestAt > (this.lastIngestAt ?? 0)
 		)
 			this.lastIngestAt = entry.lastIngestAt;
+		if (row.state === "ingested" && row.nextAttemptAt !== null)
+			entry.coldDueAt = row.nextAttemptAt.getTime();
 		if (retry) this.schedule(entry, this.now(), true);
 		else if (row.state === "pending" || row.state === "failed")
 			this.schedule(entry, row.nextAttemptAt?.getTime() ?? this.now(), true);
@@ -650,6 +675,8 @@ export class LocalIngest {
 				attempts: 0,
 				lastIngestAt: null,
 				lastImportMs: null,
+				coldDueAt: null,
+				fullNext: false,
 				sessionId: null,
 				project: null,
 			};
@@ -687,6 +714,14 @@ export class LocalIngest {
 			if (seen) files.push(seen);
 		}
 		return files;
+	}
+
+	/** The newest write to any of the session's files. */
+	private lastWrite(sessionPath: string): number {
+		let written = 0;
+		for (const seen of this.filesOf(sessionPath))
+			written = Math.max(written, seen.stat.mtimeMs);
+		return written;
 	}
 
 	private isStale(seen: SeenFile): boolean {
@@ -768,12 +803,16 @@ export class LocalIngest {
 	/**
 	 * Someone is looking at this session (its page, or a question about it):
 	 * import its pending change now instead of after its live gap, but not
-	 * more often than `liveIntervalMs`. Returns whether a change was pending.
+	 * more often than `liveIntervalMs`, and in full (its records are what the
+	 * reader reads), with a full import it still owes. Returns whether a change
+	 * or that full import was pending.
 	 */
 	refresh(sessionId: string): boolean {
 		for (const entry of this.sessions.values()) {
 			if (entry.sessionId !== sessionId) continue;
-			if (entry.dueAt === null && !entry.running) return false;
+			if (entry.dueAt === null && !entry.running && entry.coldDueAt === null)
+				return false;
+			entry.fullNext = true;
 			this.schedule(
 				entry,
 				Math.max(
@@ -806,14 +845,19 @@ export class LocalIngest {
 			this.workBytes(entry.sessionPath) >= this.settings.exclusiveBytes
 				? 1
 				: 0;
+		// The most recently written first: live sessions, then today's, then
+		// older history, so after a restart the active sessions' numbers come
+		// first. A full import a live session owes waits behind its own writes.
 		const due = [...this.sessions.values()]
-			.filter((entry) => !entry.running && entry.dueAt !== null)
-			.map((entry) => ({ entry, giant: giant(entry) }))
+			.filter((entry) => !entry.running && dueAtOf(entry) !== null)
+			.map((entry) => ({
+				entry,
+				giant: giant(entry),
+				written: this.lastWrite(entry.sessionPath),
+			}))
 			.sort(
 				(left, right) =>
-					left.giant - right.giant ||
-					(this.files.get(right.entry.sessionPath)?.stat.mtimeMs ?? 0) -
-						(this.files.get(left.entry.sessionPath)?.stat.mtimeMs ?? 0),
+					left.giant - right.giant || right.written - left.written,
 			)
 			.map(({ entry }) => entry);
 		let next = Number.POSITIVE_INFINITY;
@@ -821,7 +865,7 @@ export class LocalIngest {
 		for (const entry of due) {
 			if (exclusiveRunning) break;
 			if (this.running >= this.settings.concurrency) break;
-			const dueAt = entry.dueAt ?? now;
+			const dueAt = dueAtOf(entry) ?? now;
 			if (dueAt > now) {
 				next = Math.min(next, dueAt);
 				continue;
@@ -837,7 +881,8 @@ export class LocalIngest {
 			this.run(entry, bytes);
 			if (exclusive) break;
 		}
-		if (this.running === 0 && due.length === 0) this.finishImportIfIdle();
+		if (this.running === 0 && due.every((entry) => entry.dueAt === null))
+			this.finishImportIfIdle();
 		if (Number.isFinite(next)) this.pumpSoon(next - now);
 	}
 
@@ -881,10 +926,12 @@ export class LocalIngest {
 		entry.again = false;
 		const final = entry.final;
 		entry.final = false;
+		const full = entry.fullNext;
+		entry.fullNext = false;
 		this.running += 1;
 		this.runningBytes += bytes;
 		let nextDueAt: number | null = null;
-		const work = this.ingest(entry, owner, final)
+		const work = this.ingest(entry, owner, final, full)
 			.then((due) => {
 				nextDueAt = due;
 			})
@@ -913,6 +960,7 @@ export class LocalIngest {
 		entry: SessionEntry,
 		owner: Owner,
 		final: boolean,
+		full: boolean,
 	): Promise<number | null> {
 		const main = this.files.get(entry.sessionPath);
 		const check = main
@@ -924,6 +972,7 @@ export class LocalIngest {
 			: null;
 		if (!main || !check || check.kind === "missing") {
 			entry.firstDirtyAt = null;
+			entry.coldDueAt = null;
 			return null;
 		}
 		main.stat = check.stat;
@@ -937,6 +986,7 @@ export class LocalIngest {
 		if (
 			change.kind === "unchanged" &&
 			!ownerChanged &&
+			entry.coldDueAt === null &&
 			entry.state !== "failed" &&
 			entry.state !== "pending" &&
 			snapshot.every((seen) => !this.isStale(seen))
@@ -944,6 +994,18 @@ export class LocalIngest {
 			entry.firstDirtyAt = null;
 			return null;
 		}
+		// A re-import of a live session is hot: it stores the session and its
+		// usage, and the cold stages wait for one full import once it is quiet.
+		// First imports, final ones, history and anything unusual stay full.
+		const written = Math.max(...snapshot.map((seen) => seen.stat.mtimeMs));
+		const hot =
+			!final &&
+			!full &&
+			!ownerChanged &&
+			entry.state === "ingested" &&
+			entry.lastIngestAt !== null &&
+			!this.retranslate.has(entry.sessionPath) &&
+			this.now() - written < this.settings.coldQuietMs;
 		const importStarted = this.now();
 		const outcome = await this.deps.ingestSession(
 			{
@@ -951,6 +1013,7 @@ export class LocalIngest {
 				source: entry.source,
 				change,
 				bytes: this.workBytes(entry.sessionPath),
+				derived: hot ? "hot" : "full",
 			},
 			owner,
 		);
@@ -960,7 +1023,7 @@ export class LocalIngest {
 			if (this.retranslate.size === 0) await this.geminiTranslated();
 		if (entry.lastIngestAt !== null && outcome.kind !== "retry")
 			this.deps.log?.(
-				`local ingest re-imported ${entry.sessionPath} (${Math.round(this.sessionBytes(entry.sessionPath) / 1024)} KB) in ${entry.lastImportMs} ms; its next live import waits at least ${Math.round(this.liveGap(entry) / 1000)} s`,
+				`local ingest re-imported ${entry.sessionPath} (${Math.round(this.sessionBytes(entry.sessionPath) / 1024)} KB, ${hot ? "hot" : "full"}) in ${entry.lastImportMs} ms; its next live import waits at least ${Math.round(this.liveGap(entry) / 1000)} s`,
 			);
 		entry.firstDirtyAt = null;
 		const gaveUp =
@@ -982,6 +1045,13 @@ export class LocalIngest {
 			});
 			return at + delay;
 		}
+		// A hot import owes a full one once the session is quiet; one that
+		// stored nothing (kept, skipped) still postpones a full import owed.
+		if (!hot) entry.coldDueAt = null;
+		else if (outcome.kind === "ingested" || entry.coldDueAt !== null)
+			entry.coldDueAt = written + this.settings.coldQuietMs;
+		const coldDueAt =
+			entry.coldDueAt === null ? null : new Date(entry.coldDueAt);
 		const decided = await this.identities(snapshot, outcome.files ?? []);
 		if (outcome.kind === "skipped" || outcome.kind === "retry") {
 			const reason =
@@ -999,6 +1069,7 @@ export class LocalIngest {
 				state: "skipped",
 				reason,
 				at: new Date(at),
+				coldDueAt,
 			});
 		} else {
 			entry.state = outcome.kind;
@@ -1017,6 +1088,7 @@ export class LocalIngest {
 				state: outcome.kind,
 				reason: outcome.reason ?? null,
 				at: new Date(at),
+				coldDueAt,
 			});
 			this.deps.onIngested?.();
 		}
