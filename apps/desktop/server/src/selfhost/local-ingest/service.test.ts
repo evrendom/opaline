@@ -5,6 +5,7 @@ import {
 	mkdtemp,
 	rename,
 	rm,
+	stat,
 	utimes,
 	writeFile,
 } from "node:fs/promises";
@@ -24,6 +25,7 @@ import {
 } from "./service.js";
 import type { LocalIngestRoots } from "./sources.js";
 import { readSession } from "./transcript-file/index.js";
+import type { UsageTailJob } from "./usage-tail.js";
 
 let home: string;
 let roots: LocalIngestRoots;
@@ -1146,5 +1148,32 @@ test("due sessions run most recently written first, a subagent's write counting 
 		middle,
 		old,
 	]);
+	await service.stop();
+});
+
+test("between imports, a live Claude Code session's appended usage is read from where the last import stopped", async () => {
+	const path = await session("tailed", 0);
+	const firstSize = (await stat(path)).size;
+	const ingest = timedIngestor(40);
+	const tails: UsageTailJob[] = [];
+	const service = create(memoryStore(), ingest, {
+		settings: { ...liveSettings, tailIntervalMs: 50 },
+		tailUsage: async (job) => {
+			tails.push(job);
+		},
+	});
+	await service.start();
+	await settle(service);
+	expect(tails).toHaveLength(0);
+	await appendFile(path, line("turn 2"));
+	await service.notify([path], false);
+	await waitFor(() => tails.length === 1);
+	expect(tails[0]).toEqual({
+		sessionId: "tailed",
+		source: "claude_code",
+		files: [{ path, fromByte: firstSize, agentId: null }],
+	});
+	// Its next import still waits out the live gap.
+	expect(ingest.calls).toHaveLength(1);
 	await service.stop();
 });
