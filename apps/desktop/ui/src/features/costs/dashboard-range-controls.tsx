@@ -1,5 +1,6 @@
 import { FluidMenuHover } from "@/app/ui/fluid-menu-hover";
 import { DashboardDateControls } from "@/features/dashboard/components/DashboardDateControls";
+import { useDemoRuntime } from "@/features/demo/demo-runtime";
 import { CHART_INTERVALS, type ChartInterval } from "./chart-interval";
 import { ChartIntervalPicker } from "./chart-interval-picker";
 import { useChartInterval } from "./use-chart-interval";
@@ -16,6 +17,8 @@ export function DashboardRangeControls({
 	inHeader: boolean;
 	compact?: boolean;
 }) {
+	// The product demo's recordings cover its opening range only: its dashboard range is fixed.
+	const demo = useDemoRuntime();
 	return (
 		<div
 			className="cost-range-controls"
@@ -25,6 +28,7 @@ export function DashboardRangeControls({
 			<FluidMenuHover items="button" />
 			<DashboardDateControls
 				compact={compact}
+				readOnly={demo !== null}
 				triggerSuffix={
 					CHART_INTERVALS.find((option) => option.value === interval)?.label
 				}
